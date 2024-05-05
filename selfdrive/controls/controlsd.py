@@ -1005,6 +1005,9 @@ class Controls:
     controlsState.canErrorCounter = self.card.can_rcv_cum_timeout_counter
     controlsState.experimentalMode = self.experimental_mode
 
+    if self.v_cruise_helper.v_cruise_kph != 255:
+      controlsState.vCruise = controlsState.vCruise * 1.0076 # Encourage driving at the set speed. 5/4/2024
+
     lat_tuning = self.CP.lateralTuning.which()
     if self.joystick_mode:
       controlsState.lateralControlState.debugState = lac_log
