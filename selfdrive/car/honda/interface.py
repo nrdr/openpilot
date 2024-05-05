@@ -79,12 +79,12 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalActuatorDelayUpperBound = 0.5 # s
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
+    elif ret.enableGasInterceptor:
+      # use direct pedal signal, no tune
+      ret.stoppingDecelRate = 0.2 # avoid harsh braking when entering stopped state
     else:
-      # default longitudinal tuning for all hondas
-      ret.longitudinalTuning.kpBP = [0., 5., 35.]
-      ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
-      ret.longitudinalTuning.kiBP = [0., 35.]
-      ret.longitudinalTuning.kiV = [0.18, 0.12]
+      # default longitudinal tuning for this branch
+      ret.stoppingDecelRate = 0.2
 
     eps_modified = False
     for fw in car_fw:
@@ -95,7 +95,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 1326.
       ret.wheelbase = 2.70
       ret.centerToFront = ret.wheelbase * 0.4
-      ret.steerRatio = 15.38  # 10.93 is end-to-end spec
+      ret.steerRatio = 18.38  # 10.93 is end-to-end spec
       if eps_modified:
         # stock request input values:     0x0000, 0x00DE, 0x014D, 0x01EF, 0x0290, 0x0377, 0x0454, 0x0610, 0x06EE
         # stock request output values:    0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x1680, 0x1680
@@ -260,7 +260,7 @@ class CarInterface(CarInterfaceBase):
       ret.mass = 4278. * CV.LB_TO_KG  # average weight
       ret.wheelbase = 2.86
       ret.centerToFront = ret.wheelbase * 0.428
-      ret.steerRatio = 16.0  # as spec
+      ret.steerRatio = 18.0  # as spec
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
       ret.tireStiffnessFactor = 0.444
       ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]]

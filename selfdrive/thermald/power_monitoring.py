@@ -16,7 +16,7 @@ CAR_CHARGING_RATE_W = 45
 VBATT_PAUSE_CHARGING = 11.8           # Lower limit on the LPF car battery voltage
 MIN_ON_TIME_S = 3600
 DELAY_SHUTDOWN_TIME_S = 300 # Wait at least DELAY_SHUTDOWN_TIME_S seconds after offroad_time to shutdown.
-VOLTAGE_SHUTDOWN_MIN_OFFROAD_TIME_S = 60
+VOLTAGE_SHUTDOWN_MIN_OFFROAD_TIME_S = 43200
 
 class PowerMonitoring:
   def __init__(self):
@@ -113,7 +113,7 @@ class PowerMonitoring:
 
     max_time_offroad_s = interp(int(self.params.get("MaxTimeOffroad", encoding="utf8")),
                                 [0, 1,  2,  3,   4,   5,   6,    7,    8,     9,    10,    11,     12],
-                                [0, 5, 30, 60, 180, 300, 600, 1800, 3600, 10800, 18000, 36000, 108000])
+                                [0, 172800, 172800, 172800, 172800, 172800, 172800, 172800, 172800, 172800, 172800, 172800, 172800])
     now = time.monotonic()
     should_shutdown = False
     offroad_time = (now - offroad_timestamp)
