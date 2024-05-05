@@ -298,6 +298,7 @@ class Controls:
 
     self.live_torque = self.params.get_bool("LiveTorque")
     self.torqued_override = self.params.get_bool("TorquedOverride")
+    self.custom_stock_planner_speed = self.params.get_bool("CustomStockLongPlanner")
 
     self.enable_mads = self.params.get_bool("EnableMads")
     self.mads_disengage_lateral_on_brake = self.params.get_bool("DisengageLateralOnBrake")
@@ -1004,6 +1005,9 @@ class Controls:
     controlsState.canErrorCounter = self.card.can_rcv_cum_timeout_counter
     controlsState.experimentalMode = self.experimental_mode
 
+    if self.v_cruise_helper.v_cruise_kph != 255:
+      controlsState.vCruise = controlsState.vCruise * 1.0076 # Encourage driving at the set speed. 5/4/2024
+
     lat_tuning = self.CP.lateralTuning.which()
     if self.joystick_mode:
       controlsState.lateralControlState.debugState = lac_log
@@ -1072,7 +1076,8 @@ class Controls:
   def params_thread(self, evt):
     while not evt.is_set():
       self.is_metric = self.params.get_bool("IsMetric")
-      self.experimental_mode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
+      self.experimental_mode = self.params.get_bool("ExperimentalMode") and (self.CP.openpilotLongitudinalControl or
+                                                                             (not self.CP.pcmCruiseSpeed and self.custom_stock_planner_speed))
       if self.CP.notCar:
         self.joystick_mode = self.params.get_bool("JoystickDebugMode")
 
@@ -1082,6 +1087,7 @@ class Controls:
 
       if self.sm.frame % int(2.5 / DT_CTRL) == 0:
         self.live_torque = self.params.get_bool("LiveTorque")
+        self.custom_stock_planner_speed = self.params.get_bool("CustomStockLongPlanner")
       time.sleep(0.1)
 
   def controlsd_thread(self):

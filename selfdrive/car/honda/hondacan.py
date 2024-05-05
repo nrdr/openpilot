@@ -127,10 +127,11 @@ def create_ui_commands(packer, CP, enabled, pcm_speed, hud, is_metric, acc_hud, 
   bus_pt = get_pt_bus(CP.carFingerprint)
   radar_disabled = CP.carFingerprint in (HONDA_BOSCH - HONDA_BOSCH_RADARLESS) and CP.openpilotLongitudinalControl
   bus_lkas = get_lkas_cmd_bus(CP.carFingerprint, radar_disabled)
+  current_speed = CV.KPH_TO_MPH
 
   if CP.openpilotLongitudinalControl:
     acc_hud_values = {
-      'CRUISE_SPEED': hud.v_cruise,
+      'CRUISE_SPEED': current_speed,
       'ENABLE_MINI_CAR': 1 if enabled else 0,
       'HUD_DISTANCE': gac_tr_cluster,  # max distance setting on display
       'IMPERIAL_UNIT': int(not is_metric),
@@ -145,10 +146,11 @@ def create_ui_commands(packer, CP, enabled, pcm_speed, hud, is_metric, acc_hud, 
     else:
       acc_hud_values['PCM_SPEED'] = pcm_speed * CV.MS_TO_KPH
       acc_hud_values['PCM_GAS'] = hud.pcm_accel
+      acc_hud_values['ACC_PROBLEM'] = 0
       acc_hud_values['SET_ME_X01'] = 1
-      acc_hud_values['FCM_OFF'] = acc_hud['FCM_OFF']
-      acc_hud_values['FCM_OFF_2'] = acc_hud['FCM_OFF_2']
-      acc_hud_values['FCM_PROBLEM'] = acc_hud['FCM_PROBLEM']
+      acc_hud_values['FCM_OFF'] = 0
+      acc_hud_values['FCM_OFF_2'] = 0
+      acc_hud_values['FCM_PROBLEM'] = 0
       acc_hud_values['ICONS'] = acc_hud['ICONS']
     commands.append(packer.make_can_msg("ACC_HUD", bus_pt, acc_hud_values))
 
