@@ -127,11 +127,10 @@ def create_ui_commands(packer, CP, enabled, pcm_speed, hud, is_metric, acc_hud, 
   bus_pt = get_pt_bus(CP.carFingerprint)
   radar_disabled = CP.carFingerprint in (HONDA_BOSCH - HONDA_BOSCH_RADARLESS) and CP.openpilotLongitudinalControl
   bus_lkas = get_lkas_cmd_bus(CP.carFingerprint, radar_disabled)
-  current_speed = CV.KPH_TO_MPH
 
   if CP.openpilotLongitudinalControl:
     acc_hud_values = {
-      'CRUISE_SPEED': current_speed,
+      'CRUISE_SPEED': 255,
       'ENABLE_MINI_CAR': 1 if enabled else 0,
       'HUD_DISTANCE': gac_tr_cluster,  # max distance setting on display
       'IMPERIAL_UNIT': int(not is_metric),
