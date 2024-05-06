@@ -180,7 +180,7 @@ class CarController:
     actuators = CC.actuators
     hud_control = CC.hudControl
     conversion = hondacan.get_cruise_speed_conversion(self.CP.carFingerprint, CS.is_metric)
-    hud_v_cruise = CS.out.vEgo / conversion
+    hud_v_cruise = CS.out.vEgo / conversion if CS.out.vEgo > 0.3 else 253
     pcm_cancel_cmd = CC.cruiseControl.cancel
 
     if CC.longActive:
