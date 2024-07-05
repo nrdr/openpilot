@@ -833,10 +833,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.SOFT_DISABLE: soft_disable_alert("Sensor Data Invalid"),
   },
 
-  EventName.noGps: {
-    ET.PERMANENT: no_gps_alert,
-  },
-
   EventName.soundsUnavailable: {
     ET.PERMANENT: NormalPermanentAlert("Speaker not found", "Reboot your Device"),
     ET.NO_ENTRY: NoEntryAlert("Speaker not found"),
