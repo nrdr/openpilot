@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+from cereal import custom
 from cereal import car
 from panda import Panda
+from openpilot.common.params import Params # sunnypilot long tune toggle
 from openpilot.common.conversions import Conversions as CV
 from openpilot.common.numpy_fast import interp
 from openpilot.selfdrive.car.honda.hondacan import CanBus
@@ -35,7 +37,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   @staticmethod
-  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
+  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, personality=custom.LongitudinalPersonalitySP.standard):
     ret.carName = "honda"
 
     CAN = CanBus(ret, fingerprint)
@@ -82,12 +84,22 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalActuatorDelayUpperBound = 0.5 # s
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
-    else:
-      # default longitudinal tuning for all hondas
-      ret.longitudinalTuning.kpBP = [0., 5., 35.]
-      ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
-      ret.longitudinalTuning.kiBP = [0., 35.]
-      ret.longitudinalTuning.kiV = [0.18, 0.12]
+
+    if ret.enableGasInterceptorDEPRECATED:
+      ret.longitudinalTuning.deadzoneBP = [0., 8., 21., 22.]
+      ret.longitudinalTuning.deadzoneV = [.0, .14, .19, 0.]
+      ret.longitudinalTuning.kf = 1.0
+      ret.longitudinalTuning.kpBP = [2.0, 7.0, 22.0]
+      ret.longitudinalTuning.kpV = [0.3, 0.7, 0.9]
+      ret.longitudinalTuning.kiBP = [2.0, 7.0, 22.0]
+      ret.longitudinalTuning.kiV = [0.0, 0.13, 0.19]
+      ret.vEgoStopping = 0.1
+      ret.vEgoStarting = 0.1
+      ret.startAccel = 1.0
+      ret.stopAccel = -2.0
+      ret.stoppingDecelRate = 0.2
+      ret.longitudinalActuatorDelayLowerBound = 0.1
+      ret.longitudinalActuatorDelayUpperBound = 0.1
 
     eps_modified = False
     for fw in car_fw:
@@ -306,7 +318,7 @@ class CarInterface(CarInterfaceBase):
 
     ret, self.CS = self.get_sp_common_state(ret, self.CS,
                                             min_enable_speed_pcm=(self.CP.pcmCruise and self.CP.minEnableSpeed > 0 and self.CP.pcmCruiseSpeed),
-                                            gap_button=(self.CS.cruise_setting == 3))
+                                            gap_button=(self.CS.cruise_setting == 4))
 
     ret.buttonEvents = buttonEvents
 
