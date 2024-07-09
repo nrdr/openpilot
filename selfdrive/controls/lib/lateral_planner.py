@@ -194,7 +194,7 @@ class LateralPlanner:
            and self.vision_curve_laneless):
           self.dynamic_lane_profile_status_buffer = True
         if (self.LP.lll_prob + self.LP.rll_prob) / 2 > 0.5 \
-          and ((longitudinal_plan_sp.visionCurrentLatAcc < 0.6 and longitudinal_plan_sp.visionMaxPredLatAcc < 0.3)
+          and ((longitudinal_plan_sp.visionCurrentLatAcc < 0.6 and longitudinal_plan_sp.visionMaxPredLatAcc < 0.2)
            or not self.vision_curve_laneless):
           self.dynamic_lane_profile_status_buffer = False
         if self.dynamic_lane_profile_status_buffer:  # in buffer mode, always laneless
