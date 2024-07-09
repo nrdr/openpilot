@@ -81,7 +81,8 @@ class CarInterface(CarInterfaceBase):
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
       # default longitudinal tuning for all hondas
-      
+      ret.longitudinalTuning.kiBP = [0., 5., 35.]
+      ret.longitudinalTuning.kiV = [3.6, 2.4, 1.5]
 
     eps_modified = False
     for fw in car_fw:
