@@ -11,7 +11,7 @@ from openpilot.selfdrive.car.fw_query_definitions import FwQueryConfig, Request,
 
 Ecu = car.CarParams.Ecu
 VisualAlert = car.CarControl.HUDControl.VisualAlert
-
+# Note to Harald: check with Honda Ridgeline to see if any changes need to be made
 
 class CarControllerParams:
   # Allow small margin below -3.5 m/s^2 from ISO 15622:2018 since we
