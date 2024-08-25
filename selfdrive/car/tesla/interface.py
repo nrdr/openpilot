@@ -12,7 +12,7 @@ class CarInterface(CarInterfaceBase):
     ret.carName = "tesla"
 
     # There is no safe way to do steer blending with user torque,
-    # so the steering behaves like autopilot. This is not
+     so the steering behaves like autopilot. This is not
     # how openpilot should be, hence dashcamOnly
     ret.dashcamOnly = True
 
