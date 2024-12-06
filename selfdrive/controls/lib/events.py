@@ -610,7 +610,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   EventName.steerSaturated: {
     ET.WARNING: Alert(
       "Steering Torque Exhausted",
-      "Your steering torque sucks.",
+      "The little civic that could.",
       AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, 2.),
   },
