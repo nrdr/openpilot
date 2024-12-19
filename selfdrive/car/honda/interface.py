@@ -81,9 +81,19 @@ class CarInterface(CarInterfaceBase):
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
     else:
-      # default longitudinal tuning for all hondas
-      ret.longitudinalTuning.kiBP = [0., 5., 35.]
-      ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
+      # gas pedal interceptor tune
+      # Soft p:      [1.2, 0.8, 0.5]
+      # Agressive p: [3.6, 2.4, 1.5]
+      # Soft i:      [0.18, 0.12]
+      # Agressive i: [0.54, 0.36]
+      # The summary of this tune (written by me) is as follows:
+      # Provide a consistent braking experince on city streets, brake semi-early but smoothly.
+      # Adjust the final stopping state so that the brakes transition to a stop with comfort in mind. Tuned for Japan 2018 Civic Touring
+      # Provide a slightly more agressive highway profile, that activates above 50mph (22m/s) and comes into full effect by 65mph (29m/s).
+      ret.longitudinalTuning.kpBP = [0., 5., 22., 29.]
+      ret.longitudinalTuning.kpV = [1.8, 1.7, 1.6, 2.5]
+      ret.longitudinalTuning.kiBP = [0., 22., 29.]
+      ret.longitudinalTuning.kiV = [0.18, 0.22, 0.44]
 
     eps_modified = False
     for fw in car_fw:
