@@ -140,14 +140,16 @@ def create_bosch_supplemental_1(packer, CAN, car_fingerprint):
   return packer.make_can_msg("BOSCH_SUPPLEMENTAL_1", bus, values)
 
 
-def create_ui_commands(packer, CAN, CP, enabled, pcm_speed, hud, is_metric, acc_hud, lkas_hud, lat_active):
+def create_ui_commands(packer, CAN, CP, enabled, pcm_speed, hud, is_metric, acc_hud, lkas_hud, lat_active, active, stopping_counter):
   commands = []
   radar_disabled = CP.carFingerprint in (HONDA_BOSCH - HONDA_BOSCH_RADARLESS) and CP.openpilotLongitudinalControl
   bus_lkas = get_lkas_cmd_bus(CAN, CP.carFingerprint, radar_disabled)
 
+  standstill = 1 if active and stopping_counter > 0 else 0
+
   if CP.openpilotLongitudinalControl:
     acc_hud_values = {
-      'CRUISE_SPEED': hud.v_cruise,
+      'CRUISE_SPEED': 252 if standstill != 0 and hud.car != 0 else hud.v_cruise,
       'ENABLE_MINI_CAR': 1 if enabled else 0,
       # only moves the lead car without ACC_ON
       'HUD_DISTANCE': (hud.lead_distance_bars + 1) % 4,  # wraps to 0 at 4 bars
