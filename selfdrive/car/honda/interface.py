@@ -93,9 +93,9 @@ class CarInterface(CarInterfaceBase):
       # Adjust the final stopping state so that the brakes transition to a stop with comfort in mind. Tuned for Japan 2018 Civic Touring
       # Provide a slightly more agressive highway profile, that activates above 50mph (22m/s) and comes into full effect by 65mph (29m/s).
       ret.longitudinalTuning.kpBP = [0., 5., 22., 29.]
-      ret.longitudinalTuning.kpV = [1.7, 1.6, 1.5, 1.4]
+      ret.longitudinalTuning.kpV = [1.8, 1.7, 1.6, 1.5]
       ret.longitudinalTuning.kiBP = [0., 22., 29.]
-      ret.longitudinalTuning.kiV = [0.18, 0.22, 0.32]
+      ret.longitudinalTuning.kiV = [0.18, 0.22, 0.44]
 
     eps_modified = False
     for fw in car_fw:
