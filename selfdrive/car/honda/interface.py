@@ -36,7 +36,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   @staticmethod
-  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, personality):
+  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, personality=custom.LongitudinalPersonalitySP.standard):
     ret.carName = "honda"
 
     CAN = CanBus(ret, fingerprint)
@@ -83,7 +83,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalActuatorDelayUpperBound = 0.5 # s
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
-    elif personality==custom.LongitudinalPersonalitySP.relaxed:
+    elif personality==custom.LongitudinalPersonalitySP.standard:
       # gas pedal interceptor tune
       # Soft p:      [1.2, 0.8, 0.5]
       # Agressive p: [3.6, 2.4, 1.5]

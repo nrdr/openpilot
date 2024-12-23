@@ -11,6 +11,7 @@ from collections.abc import Callable
 from functools import cache
 
 from cereal import car
+from cereal import custom
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.conversions import Conversions as CV
 from openpilot.common.simple_kalman import KF1D, get_kalman_gain
