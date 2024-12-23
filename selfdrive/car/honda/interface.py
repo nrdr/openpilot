@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from cereal import custom
 from cereal import car
 from panda import Panda
 from openpilot.common.conversions import Conversions as CV
@@ -35,7 +36,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   @staticmethod
-  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
+  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, personality):
     ret.carName = "honda"
 
     CAN = CanBus(ret, fingerprint)
@@ -82,7 +83,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalActuatorDelayUpperBound = 0.5 # s
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
-    else:
+    elif personality==custom.LongitudinalPersonalitySP.relaxed:
       # gas pedal interceptor tune
       # Soft p:      [1.2, 0.8, 0.5]
       # Agressive p: [3.6, 2.4, 1.5]
@@ -96,6 +97,11 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kpV = [1.8, 1.7, 1.6, 2.5]
       ret.longitudinalTuning.kiBP = [0., 22., 29.]
       ret.longitudinalTuning.kiV = [0.18, 0.22, 0.44]
+    else:
+      ret.longitudinalTuning.kpBP = [0., 5., 35.]
+      ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
+      ret.longitudinalTuning.kiBP = [0., 35.]
+      ret.longitudinalTuning.kiV = [0.18, 0.12]
 
     eps_modified = False
     for fw in car_fw:
@@ -314,7 +320,7 @@ class CarInterface(CarInterfaceBase):
 
     ret, self.CS = self.get_sp_common_state(ret, self.CS,
                                             min_enable_speed_pcm=(self.CP.pcmCruise and self.CP.minEnableSpeed > 0 and self.CP.pcmCruiseSpeed),
-                                            gap_button=(self.CS.cruise_setting == 3))
+                                            gap_button=(self.CS.cruise_setting == 4))
 
     ret.buttonEvents = buttonEvents
 
