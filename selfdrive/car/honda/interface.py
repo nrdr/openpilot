@@ -25,13 +25,11 @@ class CarInterface(CarInterfaceBase):
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
     if CP.carFingerprint in HONDA_BOSCH:
       return CarControllerParams.BOSCH_ACCEL_MIN, CarControllerParams.BOSCH_ACCEL_MAX
-    elif CP.enableGasInterceptorDEPRECATED:
-      return CarControllerParams.NIDEC_ACCEL_MIN, CarControllerParams.NIDEC_ACCEL_MAX
     else:
       # NIDECs don't allow acceleration near cruise_speed,
       # so limit limits of pid to prevent windup
-      ACCEL_MAX_VALS = [CarControllerParams.NIDEC_ACCEL_MAX, 0.2]
-      ACCEL_MAX_BP = [cruise_speed - 2., cruise_speed - .2]
+      ACCEL_MAX_VALS = [CarControllerParams.NIDEC_ACCEL_MAX, 0.2, 0.01]
+      ACCEL_MAX_BP = [cruise_speed - 0.07, cruise_speed + 0.5, cruise_speed + 2.]
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   @staticmethod
@@ -83,19 +81,11 @@ class CarInterface(CarInterfaceBase):
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
     else:
-      # gas pedal interceptor tune
-      # Soft p:      [1.2, 0.8, 0.5]
-      # Agressive p: [3.6, 2.4, 1.5]
-      # Soft i:      [0.18, 0.12]
-      # Agressive i: [0.54, 0.36]
-      # The summary of this tune (written by me) is as follows:
-      # Provide a consistent braking experince on city streets, brake semi-early but smoothly.
-      # Adjust the final stopping state so that the brakes transition to a stop with comfort in mind. Tuned for Japan 2018 Civic Touring
-      # Provide a slightly more agressive highway profile, that activates above 50mph (22m/s) and comes into full effect by 65mph (29m/s).
-      ret.longitudinalTuning.kpBP = [0., 5., 22., 29.]
-      ret.longitudinalTuning.kpV = [1.8, 1.7, 1.6, 2.5]
-      ret.longitudinalTuning.kiBP = [0., 22., 29.]
-      ret.longitudinalTuning.kiV = [0.18, 0.22, 0.44]
+      # default longitudinal tuning for all hondas
+      ret.longitudinalTuning.kpBP = [0., 5., 35.]
+      ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
+      ret.longitudinalTuning.kiBP = [0., 35.]
+      ret.longitudinalTuning.kiV = [0.18, 0.12]
 
     eps_modified = False
     for fw in car_fw:
