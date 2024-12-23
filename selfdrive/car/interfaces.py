@@ -375,7 +375,7 @@ class CarInterfaceBase(ABC):
     ret.steerRatioRear = 0.  # no rear steering, at least on the listed cars aboveA
     ret.openpilotLongitudinalControl = False
     ret.stopAccel = -2.0
-    ret.stoppingDecelRate = 0.25 # brake_travel/s while trying to stop
+    ret.stoppingDecelRate = 0.125 # brake_travel/s while trying to stop
     ret.vEgoStopping = 0.1
     ret.vEgoStarting = 0.5
     ret.stoppingControl = True
@@ -387,8 +387,8 @@ class CarInterfaceBase(ABC):
     ret.longitudinalTuning.kiBP = [0.]
     ret.longitudinalTuning.kiV = [1.]
     # TODO estimate car specific lag, use .15s for now
-    ret.longitudinalActuatorDelayLowerBound = 0.15
-    ret.longitudinalActuatorDelayUpperBound = 0.15
+    ret.longitudinalActuatorDelayLowerBound = 0
+    ret.longitudinalActuatorDelayUpperBound = 0
     ret.steerLimitTimer = 1.0
     return ret
 
