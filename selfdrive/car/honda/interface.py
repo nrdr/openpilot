@@ -36,7 +36,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   @staticmethod
-  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, personality=custom.LongitudinalPersonalitySP.standard):
+  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, personality):
     ret.carName = "honda"
 
     CAN = CanBus(ret, fingerprint)
@@ -83,7 +83,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalActuatorDelayUpperBound = 0.5 # s
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
-    elif personality==custom.LongitudinalPersonalitySP.standard:
+    elif personality==custom.LongitudinalPersonalitySP.relaxed:
       # gas pedal interceptor tune
       # Soft p:      [1.2, 0.8, 0.5]
       # Agressive p: [3.6, 2.4, 1.5]
@@ -93,15 +93,26 @@ class CarInterface(CarInterfaceBase):
       # Provide a consistent braking experince on city streets, brake semi-early but smoothly.
       # Adjust the final stopping state so that the brakes transition to a stop with comfort in mind. Tuned for Japan 2018 Civic Touring
       # Provide a slightly more agressive highway profile, that activates above 50mph (22m/s) and comes into full effect by 65mph (29m/s).
-      ret.longitudinalTuning.kpBP = [0., 5., 22., 29.]
-      ret.longitudinalTuning.kpV = [1.8, 1.7, 1.6, 2.5]
-      ret.longitudinalTuning.kiBP = [0., 22., 29.]
-      ret.longitudinalTuning.kiV = [0.18, 0.22, 0.44]
-    else:
       ret.longitudinalTuning.kpBP = [0., 5., 35.]
       ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
       ret.longitudinalTuning.kiBP = [0., 35.]
       ret.longitudinalTuning.kiV = [0.18, 0.12]
+    elif personality==custom.LongitudinalPersonalitySP.standard:
+      ret.longitudinalTuning.kpBP = [0., 5., 22., 29.]
+      ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5, 1.4]
+      ret.longitudinalTuning.kiBP = [0., 22., 29.]
+      ret.longitudinalTuning.kiV = [0.18, 0.12, 0.32]
+    elif personality==custom.LongitudinalPersonalitySP.moderate:
+      ret.longitudinalTuning.kpBP = [0.]
+      ret.longitudinalTuning.kpV = [1.]
+      ret.longitudinalTuning.kiBP = [0.]
+      ret.longitudinalTuning.kiV = [1.]
+    elif personality==custom.LongitudinalPersonalitySP.aggressive:
+      ret.longitudinalTuning.kpBP = [0., 5., 22., 29.]
+      ret.longitudinalTuning.kpV = [3.6, 3.2, 2.8, 2.5]
+      ret.longitudinalTuning.kiBP = [0., 22., 29.]
+      ret.longitudinalTuning.kiV = [0.54, 0.45, 0.36]
+      
 
     eps_modified = False
     for fw in car_fw:
