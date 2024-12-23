@@ -36,7 +36,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   @staticmethod
-  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, personality):
+  def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, personality=custom.LongitudinalPersonalitySP.standard):
     ret.carName = "honda"
 
     CAN = CanBus(ret, fingerprint)
