@@ -185,7 +185,7 @@ class LateralPlanner:
     elif self.dynamic_lane_profile == 2:
       # laneless while lane change in progress
       if self.DH.lane_change_state in (LaneChangeState.laneChangeStarting, LaneChangeState.laneChangeFinishing):
-        return False
+        return True
       # only while lane change is off
       elif self.DH.lane_change_state == LaneChangeState.off:
         # laneline probability too low, we switch to laneless mode
