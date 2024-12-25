@@ -38,7 +38,6 @@ class LateralPlanner:
     self.factor2 = (CP.centerToFront * CP.mass) / (CP.wheelbase * CP.tireStiffnessRear)
     self.last_cloudlog_t = 0
     self.solution_invalid_cnt = 0
-    self.steerRatio = CP.steerRatio
 
     self.path_xyz = np.zeros((TRAJECTORY_SIZE, 3))
     self.velocity_xyz = np.zeros((TRAJECTORY_SIZE, 3))
@@ -114,14 +113,6 @@ class LateralPlanner:
         car_speed = np.linalg.norm(self.velocity_xyz, axis=1) - get_speed_error(md, v_ego_car)
         self.v_plan = np.clip(car_speed, MIN_SPEED, np.inf)
         self.v_ego = self.v_plan[0]
-
-    if self.v_ego > 11:
-      # boost steerRatio by boost amount if desired steer angle is high
-      self.steerRatio = 16.93
-    elif self.v_ego > 14:
-      self.steerRatio = 19.93
-    else:
-      self.steerRatio = 10.93
 
       # Lane change logic
       lane_change_prob = self.LP.l_lane_change_prob + self.LP.r_lane_change_prob
