@@ -117,9 +117,9 @@ class LateralPlanner:
 
     if self.v_ego > 11:
       # boost steerRatio by boost amount if desired steer angle is high
-      self.steerRatio = 14.10
+      self.steerRatio = 16.93
     elif self.v_ego > 14:
-      self.steerRatio = 16.50
+      self.steerRatio = 19.93
     else:
       self.steerRatio = 10.93
 
