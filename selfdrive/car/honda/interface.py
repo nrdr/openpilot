@@ -78,7 +78,7 @@ class CarInterface(CarInterfaceBase):
     ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
     ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
 
-    soft_tune = Params().get_bool("ToyotaTSS2Long")
+    soft_tune = Params().get_bool("StockLongToyota")
 
     if candidate in HONDA_BOSCH:
       ret.longitudinalTuning.kpV = [0.25]
