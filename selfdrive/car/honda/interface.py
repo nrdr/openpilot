@@ -88,7 +88,7 @@ class CarInterface(CarInterfaceBase):
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
     elif soft_tune:
       ret.longitudinalTuning.kpBP = [0., 5., 20., 30.]
-      ret.longitudinalTuning.kpV = [1.3, 1.0, 0.7, 0.1]
+      ret.longitudinalTuning.kpV = [2.2, 2.0, 1.8, 1.6]
       ret.longitudinalTuning.kiBP = [0.,   1.,    2.,    3.,   4.,   5.,    12.,  20.,  27., 40.]
       ret.longitudinalTuning.kiV = [.348, .3361, .3168, .2831, .2571, .226, .198, .17,  .10, .01]
       ret.vEgoStopping = 0.25
