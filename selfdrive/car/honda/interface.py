@@ -95,7 +95,8 @@ class CarInterface(CarInterfaceBase):
       ret.vEgoStarting = 0.15
       ret.stopAccel = -0.4
       ret.stoppingDecelRate = 0.05
-      ret.longitudinalActuatorDelay = 0.05
+      ret.longitudinalActuatorDelayLowerBound = 0.05
+      ret.longitudinalActuatorDelayUpperBound = 0.05
 
     eps_modified = False
     for fw in car_fw:
