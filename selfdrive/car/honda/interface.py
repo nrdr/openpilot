@@ -87,9 +87,9 @@ class CarInterface(CarInterfaceBase):
 
     if ret.enableGasInterceptorDEPRECATED:
       ret.longitudinalTuning.kpBP = [0., 5., 35.]
-      ret.longitudinalTuning.kpV = [1.2, 1.4, 1.6]
+      ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
       ret.longitudinalTuning.kiBP = [0., 35.]
-      ret.longitudinalTuning.kiV = [0.12, 0.24]
+      ret.longitudinalTuning.kiV = [0.18, 0.12]
       ret.vEgoStopping = 0.1
       ret.vEgoStarting = 0.5
       ret.stopAccel = -2.0
