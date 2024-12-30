@@ -78,20 +78,23 @@ class CarInterface(CarInterfaceBase):
     ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
     ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
 
-    soft_tune = Params().get_bool("StockLongToyota")
-
     if candidate in HONDA_BOSCH:
       ret.longitudinalTuning.kpV = [0.25]
       ret.longitudinalTuning.kiV = [0.05]
       ret.longitudinalActuatorDelayUpperBound = 0.5 # s
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
-    else:
-      ret.longitudinalTuning.kpBP = [0., 5., 35.]
-      ret.longitudinalTuning.kpV = [3.5, 3.5, 3.5]
-      ret.longitudinalTuning.kiBP = [0., 35.]
-      ret.longitudinalTuning.kiV = [0.18, 0.12]
-      ret.vEgoStopping = 0.5
+    
+    my_tune = Params().get_bool("DynamicExperimentalControlToggle")
+    
+    if my_tune:
+      ret.longitudinalTuning.deadzoneBP = [0., 8.05]
+      ret.longitudinalTuning.deadzoneV = [.0, .14]
+      ret.longitudinalTuning.kpBP = [0., 100.]
+      ret.longitudinalTuning.kpV = [3.0, 3.0, 3.0]
+      ret.longitudinalTuning.kiBP = [0., 100.]
+      ret.longitudinalTuning.kiV = [0.1, 0.1]
+      ret.vEgoStopping = 0.1
       ret.vEgoStarting = 0.5
       ret.stopAccel = -2.0
       ret.stoppingDecelRate = 0.8
