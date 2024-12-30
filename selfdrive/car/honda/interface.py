@@ -91,12 +91,12 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kpV = [2.2, 2.0, 1.8, 1.6]
       ret.longitudinalTuning.kiBP = [0.,   1.,    2.,    3.,   4.,   5.,    12.,  20.,  27., 40.]
       ret.longitudinalTuning.kiV = [.348, .3361, .3168, .2831, .2571, .226, .198, .17,  .10, .01]
-      ret.vEgoStopping = 0.25
-      ret.vEgoStarting = 0.25
+      ret.vEgoStopping = 0.5
+      ret.vEgoStarting = 0.5
       ret.stopAccel = -2.0
-      ret.stoppingDecelRate = 0.3
-      ret.longitudinalActuatorDelayLowerBound = 0.05
-      ret.longitudinalActuatorDelayUpperBound = 0.05
+      ret.stoppingDecelRate = 0.8
+      ret.longitudinalActuatorDelayLowerBound = 0.15
+      ret.longitudinalActuatorDelayUpperBound = 0.15
 
     eps_modified = False
     for fw in car_fw:
