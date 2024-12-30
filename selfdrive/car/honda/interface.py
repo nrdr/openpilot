@@ -87,10 +87,12 @@ class CarInterface(CarInterfaceBase):
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
     elif soft_tune:
-      ret.longitudinalTuning.kpBP = [0., 5., 20., 30.]
-      ret.longitudinalTuning.kpV = [2.2, 2.0, 1.8, 1.6]
-      ret.longitudinalTuning.kiBP = [0.,   1.,    2.,    3.,   4.,   5.,    12.,  20.,  27., 40.]
-      ret.longitudinalTuning.kiV = [.348, .3361, .3168, .2831, .2571, .226, .198, .17,  .10, .01]
+      ret.longitudinalTuning.kpBP = [0., 5., 35.]
+      ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
+      ret.longitudinalTuning.kiBP = [0., 35.]
+      ret.longitudinalTuning.kiV = [0.18, 0.12]
+      ret.longitudinalTuning.kdBP = [0., 5., 35.]
+      ret.longitudinalTuning.kdV = [1.6, 1.2, 0.5]
       ret.vEgoStopping = 0.5
       ret.vEgoStarting = 0.5
       ret.stopAccel = -2.0
