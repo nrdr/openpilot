@@ -85,8 +85,8 @@ class CarInterface(CarInterfaceBase):
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
     
-    my_tune = Params().get_bool("DynamicExperimentalControlToggle")
-    
+    my_tune = Params().get_bool("DynamicExperimentalControl")
+
     if my_tune:
       ret.longitudinalTuning.deadzoneBP = [0., 8.05]
       ret.longitudinalTuning.deadzoneV = [.0, .14]
