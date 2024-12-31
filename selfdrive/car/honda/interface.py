@@ -86,7 +86,7 @@ class CarInterface(CarInterfaceBase):
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
 
     if ret.enableGasInterceptorDEPRECATED:
-      ret.longitudinalTuning.deadzoneBP = [0., 8. 21., 22.]
+      ret.longitudinalTuning.deadzoneBP = [0., 8., 21., 22.]
       ret.longitudinalTuning.deadzoneV = [.0, .14, .19, 0.]
       ret.longitudinalTuning.kpBP = [0., 5., 35.]
       ret.longitudinalTuning.kpV = [1.2, 0.8, 0.5]
