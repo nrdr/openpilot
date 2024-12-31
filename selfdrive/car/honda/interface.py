@@ -92,7 +92,7 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kpBP = [0.]
       ret.longitudinalTuning.kpV = [1.0]
       ret.longitudinalTuning.kiBP = [0.]
-      ret.longitudinalTuning.kiV = [0.5]
+      ret.longitudinalTuning.kiV = [0.05]
       ret.vEgoStopping = 0.1
       ret.vEgoStarting = 0.1
       ret.startAccel = 1.0
