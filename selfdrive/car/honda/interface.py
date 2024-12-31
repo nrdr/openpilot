@@ -88,12 +88,18 @@ class CarInterface(CarInterfaceBase):
     if ret.enableGasInterceptorDEPRECATED:
       ret.longitudinalTuning.deadzoneBP = [0., 8., 21., 22.]
       ret.longitudinalTuning.deadzoneV = [.0, .14, .19, 0.]
+      ret.longitudinalTuning.kf = 1.0
+      ret.longitudinalTuning.kpBP = [0.]
+      ret.longitudinalTuning.kpV = [1.0]
+      ret.longitudinalTuning.kiBP = [0.]
+      ret.longitudinalTuning.kiV = [0.0]
       ret.vEgoStopping = 0.1
       ret.vEgoStarting = 0.1
+      ret.startAccel = 1.0
       ret.stopAccel = -2.0
       ret.stoppingDecelRate = 0.2
-      ret.longitudinalActuatorDelayLowerBound = 0.05
-      ret.longitudinalActuatorDelayUpperBound = 0.05
+      ret.longitudinalActuatorDelayLowerBound = 0.1
+      ret.longitudinalActuatorDelayUpperBound = 0.1
 
     eps_modified = False
     for fw in car_fw:
