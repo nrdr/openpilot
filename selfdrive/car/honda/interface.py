@@ -82,8 +82,14 @@ class CarInterface(CarInterfaceBase):
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
     else:
       # default longitudinal tuning for all hondas
-      ret.longitudinalTuning.kiBP = [0., 5., 35.]
-      ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
+      #tune.kiBP = [0.,  5.,   12.,  20.,  27.,  36.,  40.]
+      #tune.kiV = [0.34, 0.234, 0.20, 0.17, 0.105, 0.09, 0.08]
+      # toyota values noted above
+      # ret.longitudinalTuning.kiBP = [0., 5., 35.]
+      # ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
+      # honda values noted above
+      ret.longitudinalTuning.kiBP = [0.,  5.,   12.,  20.,  27.,  36.]
+      ret.longitudinalTuning.kiV = [1.2, 0.8, 1.2, 1.4, 1.6, 1.7]
 
     eps_modified = False
     for fw in car_fw:
@@ -100,9 +106,11 @@ class CarInterface(CarInterfaceBase):
         # note: max request allowed is 4096, but request is capped at 3840 in firmware, so modifications result in 2x max
         ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 2560, 8000], [0, 2560, 3840]]
         ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]]
+        ret.steerRatio = 15.33
       else:
         ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 2560], [0, 2560]]
         ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[1.1], [0.33]]
+        ret.steerRatio = 15.33
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL, CAR.HONDA_CIVIC_2022):
       if eps_modified:
