@@ -44,13 +44,15 @@ const int UI_ROAD_NAME_MARGIN_X = 14;
 
 struct FeatureStatusText {
   const QStringList dlp_list_text = { "Laneful",    "Laneless", "Auto"};
-  const QStringList gac_list_text = { "Aggressive", "Moderate", "Standard", "Relaxed"};
-  const QStringList slc_list_text = { "Inactive",   "Temp Off", "Adapting", "Active", "Pre Active"};
+  const QStringList gac_list_text = { "1.0 (s)", "1.5 (s)", "2.0 (s)", "0.5 (s)"};
+  const QStringList acc_list_text = { "Hurry", "Standard", "Chill", "Default"};
+  const QStringList slc_list_text = { "Inactive",   "Temp Off", "Adapting", "Active", "Pre-Active"};
 };
 
 struct FeatureStatusColor {
   const QStringList dlp_list_color = { "#2020f8",      "#0df87a",  "#0df8f8"            };
   const QStringList gac_list_color = { "#ff4b4b",      "#fcff4b",  "#4bff66", "#6a0ac9" };
+  const QStringList acc_list_color = { "#ff4b4b",      "#fcff4b",  "#4bff66", "#6a0ac9" };
   const QStringList slc_list_color = { "#ffffff",      "#ffffff",  "#fcff4b", "#4bff66", "#fcff4b" };
 };
 
@@ -58,8 +60,8 @@ struct FeatureStatusColor {
 const QColor sp_bg_colors [] = {
   [STATUS_DISENGAGED] = bg_colors[STATUS_DISENGAGED],
   [STATUS_OVERRIDE] = bg_colors[STATUS_OVERRIDE],
-  [STATUS_ENGAGED] = QColor(0x00, 0xc8, 0x00, 0xf1),
-  [STATUS_MADS] = QColor(0x00, 0xc8, 0xc8, 0xf1),
+  [STATUS_ENGAGED] = QColor(0x16, 0x4E, 0xE5, 0xf1), // deep blue (acc)
+  [STATUS_MADS] = QColor(0x23, 0x8B, 0x23, 0xf1), // #238b23 // forest green (lkas)
 };
 #define bg_colors sp_bg_colors // Override the bg_colors array with the sp_bg_colors array
 
@@ -96,7 +98,7 @@ public:
     for (const auto &role : sunnylinkRoles) {
       if(role.roleType != RoleType::Sponsor)
         continue;
-      
+
       if (auto sponsorRole = role.as<SponsorRoleModel>(); !sponsorRoleWithHighestTier.has_value() || sponsorRoleWithHighestTier->roleTier < sponsorRole.roleTier) {
         sponsorRoleWithHighestTier = sponsorRole;
       }
@@ -121,7 +123,7 @@ signals:
 
 private slots:
   void update() override;
-  
+
 
 private:
   std::vector<RoleModel> sunnylinkRoles = {};

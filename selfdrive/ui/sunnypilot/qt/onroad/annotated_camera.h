@@ -190,6 +190,7 @@ private:
   int blinker_state = 0;
 
   cereal::LongitudinalPlanSP::SpeedLimitControlState slcState;
+  int accelerationPersonality;
   int longitudinalPersonality;
   int dynamicLaneProfile;
   QString mpcSource;
