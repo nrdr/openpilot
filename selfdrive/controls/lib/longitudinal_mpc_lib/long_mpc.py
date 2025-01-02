@@ -54,52 +54,54 @@ T_IDXS_LST = [index_function(idx, max_val=MAX_T, max_idx=N) for idx in range(N+1
 T_IDXS = np.array(T_IDXS_LST)
 FCW_IDXS = T_IDXS < 5.0
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
-COMFORT_BRAKE = 2.5
+COMFORT_BRAKE = 3.0
 STOP_DISTANCE = 6.0
 
-def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.standard):
+def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.aggressive):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
-    return 1.0
+    return 0.8 # 1 bar. Last logic was 1.0
   elif personality==custom.LongitudinalPersonalitySP.standard:
-    return 1.0
+    return 1.5 # 4 bar. Last logic was 1.0
   elif personality==custom.LongitudinalPersonalitySP.moderate:
-    return 0.9
+    return 1.0 # 3 bar. Last logic was 0.9
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
-    return 0.8
+    return 0.9 # 2 bar. Last logic was 0.8
   elif personality==custom.LongitudinalPersonalitySP.overtake:
     return 0.1
   else:
     raise NotImplementedError("Longitudinal personality not supported")
 
-
-def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.standard):
+def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.aggressive):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
-    return 1.75
+    return 0.5 # 1 bar. Last logic was 2.2
   elif personality==custom.LongitudinalPersonalitySP.standard:
-    return 1.45
+    return 2.0 # 4 bar. Last logic was 1.7
   elif personality==custom.LongitudinalPersonalitySP.moderate:
-    return 1.25
+    return 1.5 # 3 bar. Last logic was 1.2
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
-    return 1.0
+    return 1.0 # 2 bar. Last logic was 0.7
   elif personality==custom.LongitudinalPersonalitySP.overtake:
-    return 0.25
+    return 0.1
   else:
     raise NotImplementedError("Longitudinal personality not supported")
 
-# Last updated: September 29, 2024
-def get_dynamic_personality(v_ego, personality=custom.LongitudinalPersonalitySP.standard):
+# Last updated: Jan 28, 2025 by nrdr
+def get_dynamic_personality(v_ego, personality=custom.LongitudinalPersonalitySP.aggressive):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
-    x_vel =  [0,    14.,   27.7]
-    y_dist = [1.75, 1.75,  2.00]
+    x_vel =  [0,    8.,   17.,   27.7]
+    y_dist = [2.8, 1.8,  0.7,  0.5]
   elif personality==custom.LongitudinalPersonalitySP.standard:
-    x_vel =  [0,    14.,   27.7]
-    y_dist = [1.75, 1.75,  1.70]
+    x_vel =  [0,    8.,   17.,   27.7]
+    y_dist = [2.5, 2.35,  2.2,  2.0]
   elif personality==custom.LongitudinalPersonalitySP.moderate:
-    x_vel =  [0,    14.,   27.7]
-    y_dist = [1.45, 1.45,  1.48]
+    x_vel =  [0,    8.,   17.,   27.7]
+    y_dist = [2.8, 2.2,  1.7,  1.5]
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
-    x_vel =  [0,    14.,   27.7]
-    y_dist = [1.25, 1.25,  1.28]
+    x_vel =  [0,    8.,   17.,   27.7]
+    y_dist = [2.8, 1.8,  1.2,  1.0]
+  elif personality==custom.LongitudinalPersonalitySP.overtake:
+    x_vel =  [0, 40.2]
+    y_dist = [0.1, 0.1]
   else:
     raise NotImplementedError("Dynamic personality not supported")
   return np.interp(v_ego, x_vel, y_dist)

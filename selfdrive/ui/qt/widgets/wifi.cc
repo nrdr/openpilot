@@ -22,14 +22,14 @@ WiFiPromptWidget::WiFiPromptWidget(QWidget *parent) : QFrame(parent) {
       icon->setPixmap(pixmap.scaledToWidth(80, Qt::SmoothTransformation));
       title_layout->addWidget(icon);
 
-      QLabel *title = new QLabel(tr("Setup Wi-Fi"));
+      QLabel *title = new QLabel(tr("Wi-Fi Settings"));
       title->setStyleSheet("font-size: 64px; font-weight: 600;");
       title_layout->addWidget(title);
       title_layout->addStretch();
     }
     setup_layout->addLayout(title_layout);
 
-    QLabel *desc = new QLabel(tr("Connect to Wi-Fi to upload driving data and help improve openpilot"));
+    QLabel *desc = new QLabel(tr("Easily locate network information and connect to this device via SSH."));
     desc->setStyleSheet("font-size: 40px; font-weight: 400;");
     desc->setWordWrap(true);
     setup_layout->addWidget(desc);

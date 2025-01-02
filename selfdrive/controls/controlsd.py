@@ -60,7 +60,7 @@ ACTUATOR_FIELDS = tuple(car.CarControl.Actuators.schema.fields.keys())
 ACTIVE_STATES = (State.enabled, State.softDisabling, State.overriding)
 ENABLED_STATES = (State.preEnabled, *ACTIVE_STATES)
 
-PERSONALITY_MAPPING = {0: 0, 1: 1, 2: 2, 3: 2}
+PERSONALITY_MAPPING = {0: 0, 1: 1, 2: 2, 3: 3}
 
 
 class Controls:
@@ -743,11 +743,11 @@ class Controls:
         self.params.put_bool_nonblocking("ExperimentalMode", self.experimental_mode)
         self.experimental_mode_update = True
 
-    # decrement personality on distance button press
+    # increase personality on distance button press
     if self.CP.openpilotLongitudinalControl:
       if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
         if not self.experimental_mode_update:
-          self.personality = (self.personality - 1) % 3
+          self.personality = (self.personality + 1) % 4
           self.params.put_nonblocking('LongitudinalPersonality', str(self.personality))
         self.experimental_mode_update = False
 
@@ -782,7 +782,7 @@ class Controls:
     hudControl.speedVisible = self.enabled_long
     hudControl.lanesVisible = self.enabled
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
-    hudControl.leadDistanceBars = PERSONALITY_MAPPING.get(self.personality, log.LongitudinalPersonality.standard) + 1
+    hudControl.leadDistanceBars = PERSONALITY_MAPPING.get(self.personality, log.LongitudinalPersonality.aggressive) + 1
 
     hudControl.rightLaneVisible = True
     hudControl.leftLaneVisible = True
@@ -847,7 +847,7 @@ class Controls:
     if not self.overtaking_accel_allowed and not self.prev_overtaking_accel_allowed:
       self.overtaking_accel_blocked = False
     self.overtaking_accel_allowed = ((blinker_svs.laneChangeDirection == LaneChangeDirection.right and dm_state.isRHD) or
-                                     (blinker_svs.laneChangeDirection == LaneChangeDirection.left and not dm_state.isRHD)) and \
+                                     (blinker_svs.laneChangeDirection == LaneChangeDirection.left)) and \
                                     (blinker_svs.laneChangeState in (LaneChangeState.preLaneChange, LaneChangeState.laneChangeStarting)) and \
                                     not self.overtaking_accel_blocked
     self.prev_overtaking_accel_engaged = self.overtaking_accel_engaged
@@ -895,7 +895,7 @@ class Controls:
     controlsState.startMonoTime = int(start_time * 1e9)
     controlsState.forceDecel = bool(force_decel)
     controlsState.experimentalMode = self.experimental_mode
-    controlsState.personality = PERSONALITY_MAPPING.get(self.personality, log.LongitudinalPersonality.standard)
+    controlsState.personality = PERSONALITY_MAPPING.get(self.personality, log.LongitudinalPersonality.aggressive)
 
     lat_tuning = self.CP.lateralTuning.which()
     if self.joystick_mode:

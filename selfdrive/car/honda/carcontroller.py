@@ -100,12 +100,14 @@ HUDData = namedtuple("HUDData",
                      ["pcm_accel", "v_cruise", "lead_visible",
                       "lanes_visible", "fcw", "acc_alert", "steer_required", "lead_distance_bars", "dashed_lanes"])
 
+def rate_limit_steer(new_steer, last_steer, speed):
+  # Time constant parameters
+  # Adjust alpha dynamically based on speed if desired
+  base_tau = 0.2  # Time constant in seconds
+  alpha = DT_CTRL / (base_tau + DT_CTRL)  # Alpha for first-order low-pass
 
-def rate_limit_steer(new_steer, last_steer):
-  # TODO just hardcoded ramp to min/max in 0.33s for all Honda
-  MAX_DELTA = 3 * DT_CTRL
-  return clip(new_steer, last_steer - MAX_DELTA, last_steer + MAX_DELTA)
-
+  # Simple low-pass filter
+  return alpha * new_steer + (1 - alpha) * last_steer
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_name, CP, VM):
@@ -173,8 +175,14 @@ class CarController(CarControllerBase):
     actuators = CC.actuators
     hud_control = CC.hudControl
     conversion = hondacan.get_cruise_speed_conversion(self.CP.carFingerprint, CS.is_metric)
-    hud_v_cruise = hud_control.setSpeed / conversion if hud_control.speedVisible else 255
+    stopping_hud = actuators.longControlState == LongCtrlState.stopping
+    hud_v_cruise = 255
     pcm_cancel_cmd = CC.cruiseControl.cancel
+
+    # 0-251 = (Actual Speed Values)
+    # 252 = Stopped
+    # 253 = --
+    # 255 = (Blank)
 
     if CC.longActive:
       accel = actuators.accel
@@ -184,7 +192,7 @@ class CarController(CarControllerBase):
       gas, brake = 0.0, 0.0
 
     # *** rate limit steer ***
-    limited_steer = rate_limit_steer(actuators.steer, self.last_steer)
+    limited_steer = rate_limit_steer(actuators.steer, self.last_steer, CS.out.vEgo)
     self.last_steer = limited_steer
 
     # *** apply brake hysteresis ***
@@ -229,7 +237,7 @@ class CarController(CarControllerBase):
                                                       CS.CP.openpilotLongitudinalControl))
 
     # wind brake from air resistance decel at high speed
-    wind_brake = interp(CS.out.vEgo, [0.0, 2.3, 35.0], [0.001, 0.002, 0.15])
+    wind_brake = interp(CS.out.vEgo, [0.0, 2.3, 17.8816, 29.0576], [0.001, 0.002, 0.003, 0.67056])
     # all of this is only relevant for HONDA NIDEC
     max_accel = interp(CS.out.vEgo, self.params.NIDEC_MAX_ACCEL_BP, self.params.NIDEC_MAX_ACCEL_V)
     # TODO this 1.44 is just to maintain previous behavior
@@ -308,8 +316,9 @@ class CarController(CarControllerBase):
             # Sending non-zero gas when OP is not enabled will cause the PCM not to respond to throttle as expected
             # when you do enable.
             if CC.longActive:
-              self.gas = clip(gas_mult * (gas - brake + wind_brake * 3 / 4), 0., 1.)
+              self.gas = clip(gas_mult * gas, 0., 1.)
             else:
+              wind_brake = 0.0 # fix car surging on engagement
               self.gas = 0.0
             can_sends.append(create_gas_interceptor_command(self.packer, self.gas, self.frame // 2))
 

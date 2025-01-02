@@ -56,8 +56,8 @@ void ExperimentalButtonSP::updateState(const UIStateSP &s) {
 OnroadSettingsButton::OnroadSettingsButton(QWidget *parent) : QPushButton(parent) {
   // btn_size: 192 * 80% ~= 152
   // img_size: (152 / 4) * 3 = 114
-  setFixedSize(152, 152);
-  settings_img = loadPixmap("../assets/navigation/icon_settings.svg", {114, 114});
+  setFixedSize(250, 250);
+  settings_img = loadPixmap("../assets/navigation/direction_merge_straight.png", {0, 0});
 
   // hidden by default, made visible if Driving Personality / GAC, DLP, DEC, or SLC is enabled
   setVisible(false);
@@ -66,7 +66,7 @@ OnroadSettingsButton::OnroadSettingsButton(QWidget *parent) : QPushButton(parent
 
 void OnroadSettingsButton::paintEvent(QPaintEvent *event) {
   QPainter p(this);
-  drawCustomButtonIcon(p, 152, 152, settings_img, QColor(0, 0, 0, 166), isDown() ? 0.6 : 1.0);
+  drawCustomButtonIcon(p, 250, 250, settings_img, QColor(0, 0, 0, 0), isDown() ? 0.6 : 1.0);
 }
 
 void OnroadSettingsButton::updateState(const UIStateSP &s) {
