@@ -124,7 +124,7 @@ OnroadSettings::OnroadSettings(bool closeable, QWidget *parent) : QFrame(parent)
     auto *subtitle_heading = new QVBoxLayout;
     subtitle_heading->setContentsMargins(0, 0, 0, 0);
     {
-      auto *subtitle = new QLabel(tr("<b>ONROAD SETTINGS | SUNNYPILOT</b>"), this);
+      auto *subtitle = new QLabel(tr("<b>ONROAD SETTINGS | OPENPILOT</b>"), this);
       subtitle->setStyleSheet("color: #A0A0A0; font-size: 34px; font-weight: 300;");
       subtitle_heading->addWidget(subtitle, 0, Qt::AlignCenter);
     }
@@ -155,18 +155,6 @@ void OnroadSettings::changeDynamicLaneProfile() {
   refresh();
 }
 
-void OnroadSettings::changeGapAdjustCruise() {
-  UISceneSP &scene = uiStateSP()->scene;
-  const auto cp = (*uiStateSP()->sm)["carParams"].getCarParams();
-  bool can_change = hasLongitudinalControl(cp);
-  if (can_change) {
-    scene.longitudinal_personality--;
-    scene.longitudinal_personality = scene.longitudinal_personality < 0 ? 3 : scene.longitudinal_personality;
-    params.put("LongitudinalPersonality", std::to_string(scene.longitudinal_personality));
-  }
-  refresh();
-}
-
 void OnroadSettings::changeAccelerationPersonality() {
   UISceneSP &scene = uiStateSP()->scene;
   const auto cp = (*uiStateSP()->sm)["carParams"].getCarParams();
@@ -175,6 +163,18 @@ void OnroadSettings::changeAccelerationPersonality() {
     scene.longitudinal_accel_personality--;
     scene.longitudinal_accel_personality = scene.longitudinal_accel_personality < 0 ? 3 : scene.longitudinal_accel_personality;
     params.put("AccelPersonality", std::to_string(scene.longitudinal_accel_personality));
+  }
+  refresh();
+}
+
+void OnroadSettings::changeGapAdjustCruise() {
+  UISceneSP &scene = uiStateSP()->scene;
+  const auto cp = (*uiStateSP()->sm)["carParams"].getCarParams();
+  bool can_change = hasLongitudinalControl(cp);
+  if (can_change) {
+    scene.longitudinal_personality--;
+    scene.longitudinal_personality = scene.longitudinal_personality < 0 ? 3 : scene.longitudinal_personality;
+    params.put("LongitudinalPersonality", std::to_string(scene.longitudinal_personality));
   }
   refresh();
 }
@@ -351,20 +351,20 @@ void OptionWidget::updateDynamicLaneProfile(QString param) {
 void OptionWidget::updateGapAdjustCruise(QString param) {
   auto icon_color = "#3B4356";
   auto title_text = "";
-  auto subtitle_text = "Driving Personality";
+  auto subtitle_text = "Following Profile";
   auto lp = atoi(params.get(param.toStdString()).c_str());
 
   if (lp == 0) {
-    title_text = "Aggressive";
+    title_text = "1.0 seconds";
     icon_color = "#ff4b4b";
   } else if (lp == 1) {
-    title_text = "Moderate";
+    title_text = "1.5 seconds";
     icon_color = "#fcff4b";
   } else if (lp == 2) {
-    title_text = "Standard";
+    title_text = "2.0 seconds";
     icon_color = "#4bff66";
   } else if (lp == 3) {
-    title_text = "Relaxed";
+    title_text = "0.5 seconds";
     icon_color = "#6a0ac9";
   }
 
@@ -380,20 +380,20 @@ void OptionWidget::updateGapAdjustCruise(QString param) {
 void OptionWidget::updateAccelerationPersonality(QString param) {
   auto icon_color = "#3B4356";
   auto title_text = "";
-  auto subtitle_text = "Acceleration Personality";
+  auto subtitle_text = "Speed Profile";
   auto ap = atoi(params.get(param.toStdString()).c_str());
 
   if (ap == 0) {
-    title_text = "Sport";
+    title_text = "Hurry";
     icon_color = "#ff4b4b";
   } else if (ap == 1) {
-    title_text = "Normal";
+    title_text = "Standard";
     icon_color = "#fcff4b";
   } else if (ap == 2) {
-    title_text = "Eco";
+    title_text = "Chill";
     icon_color = "#4bff66";
   } else if (ap == 3) {
-    title_text = "Stock";
+    title_text = "Default";
     icon_color = "#6a0ac9";
   }
 

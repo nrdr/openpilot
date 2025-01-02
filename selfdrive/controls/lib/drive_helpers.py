@@ -10,11 +10,11 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 # WARNING: this value was determined based on the model's training distribution,
 #          model predictions above this speed can be unpredictable
 # V_CRUISE's are in kph
-V_CRUISE_MIN = 8
-V_CRUISE_MAX = 145
+V_CRUISE_MIN = 0
+V_CRUISE_MAX = 250
 V_CRUISE_UNSET = 255
-V_CRUISE_INITIAL = 40
-V_CRUISE_INITIAL_EXPERIMENTAL_MODE = 105
+V_CRUISE_INITIAL = 0
+V_CRUISE_INITIAL_EXPERIMENTAL_MODE = 0
 IMPERIAL_INCREMENT = round(CV.MPH_TO_KPH, 1)  # round here to avoid rounding errors incrementing set speed
 
 MIN_SPEED = 1.0
@@ -50,8 +50,8 @@ FCA_V_CRUISE_MIN = {
   False: int(20 * CV.MPH_TO_KPH),
 }
 HONDA_V_CRUISE_MIN = {
-  True: 40,
-  False: int(25 * CV.MPH_TO_KPH),
+  True: 0,
+  False: int(0 * CV.MPH_TO_KPH),
 }
 HYUNDAI_V_CRUISE_MIN = {
   True: 30,
@@ -242,7 +242,6 @@ class VCruiseHelper:
       self.v_cruise_kph = self.v_cruise_kph_last
     else:
       self.v_cruise_kph = int(round(clip(CS.vEgo * CV.MS_TO_KPH, initial, V_CRUISE_MAX)))
-
     self.v_cruise_cluster_kph = self.v_cruise_kph
 
   def _update_v_cruise_slc(self, long_plan_sp):

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import numpy as np
 from cereal import car
 from panda import Panda
 from openpilot.common.conversions import Conversions as CV
@@ -6,8 +7,8 @@ from openpilot.common.numpy_fast import interp
 from openpilot.selfdrive.car.honda.hondacan import CanBus
 from openpilot.selfdrive.car.honda.values import CarControllerParams, CruiseButtons, CruiseSettings, HondaFlags, CAR, HONDA_BOSCH, \
                                                  HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_RADARLESS
-from openpilot.selfdrive.car import create_button_events, get_safety_config
-from openpilot.selfdrive.car.interfaces import CarInterfaceBase
+from openpilot.selfdrive.car import create_button_events, get_safety_config, get_friction
+from openpilot.selfdrive.car.interfaces import CarInterfaceBase, TorqueFromLateralAccelCallbackType, FRICTION_THRESHOLD, LatControlInputs
 from openpilot.selfdrive.car.disable_ecu import disable_ecu
 
 
@@ -27,12 +28,34 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.BOSCH_ACCEL_MIN, CarControllerParams.BOSCH_ACCEL_MAX
     elif CP.enableGasInterceptorDEPRECATED:
       return CarControllerParams.NIDEC_ACCEL_MIN, CarControllerParams.NIDEC_ACCEL_MAX
+    # try doing this backwards
     else:
       # NIDECs don't allow acceleration near cruise_speed,
       # so limit limits of pid to prevent windup
       ACCEL_MAX_VALS = [CarControllerParams.NIDEC_ACCEL_MAX, 0.2]
       ACCEL_MAX_BP = [cruise_speed - 2., cruise_speed - .2]
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
+
+  def torque_from_lateral_accel_modded(self, latcontrol_inputs: LatControlInputs, torque_params: car.CarParams.LateralTorqueTuning, lateral_accel_error: float, lateral_accel_deadzone: float, friction_compensation: bool, gravity_adjusted: bool) -> float:
+    threshold = 0.8
+    threshold_lat_accel = 1/torque_params.latAccelFactor * threshold
+    mod_factor = 2.0 # Lateral Accel
+    # The default is a linear relationship between torque and lateral acceleration (accounting for road roll and steering friction)
+    friction = get_friction(lateral_accel_error, lateral_accel_deadzone, FRICTION_THRESHOLD, torque_params, friction_compensation)
+    if abs(latcontrol_inputs.lateral_acceleration) > threshold_lat_accel:
+      modded_lat_accel_factor = float(torque_params.latAccelFactor) * mod_factor
+      excess_lat_accel = abs(latcontrol_inputs.lateral_acceleration) - threshold_lat_accel
+      torque = float(np.sign(latcontrol_inputs.lateral_acceleration)) * threshold_lat_accel / float(torque_params.latAccelFactor)
+      torque += float(np.sign(latcontrol_inputs.lateral_acceleration)) * excess_lat_accel / modded_lat_accel_factor
+    else:
+      torque = latcontrol_inputs.lateral_acceleration / float(torque_params.latAccelFactor)
+    return torque + friction
+
+  def torque_from_lateral_accel(self) -> TorqueFromLateralAccelCallbackType:
+    if self.CP.enableGasInterceptorDEPRECATED:
+      return self.torque_from_lateral_accel_modded
+    else:
+      return self.torque_from_lateral_accel_linear
 
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
@@ -82,8 +105,14 @@ class CarInterface(CarInterfaceBase):
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
     else:
       # default longitudinal tuning for all hondas
-      ret.longitudinalTuning.kiBP = [0., 5., 35.]
-      ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
+      #tune.kiBP = [0.,  5.,   12.,  20.,  27.,  36.,  40.]
+      #tune.kiV = [0.34, 0.234, 0.20, 0.17, 0.105, 0.09, 0.08]
+      # toyota values noted above
+      # ret.longitudinalTuning.kiBP = [0., 5., 35.]
+      # ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
+      # honda values noted above
+      ret.longitudinalTuning.kiBP = [0.,  5.,   12.,  20.,  27.,  36.]
+      ret.longitudinalTuning.kiV = [0.4, 0.6, 0.8, 1.6, 1.8, 2.0]
 
     eps_modified = False
     for fw in car_fw:
@@ -98,11 +127,17 @@ class CarInterface(CarInterfaceBase):
         # stock filter output values:     0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108
         # modified filter output values:  0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0400, 0x0480
         # note: max request allowed is 4096, but request is capped at 3840 in firmware, so modifications result in 2x max
-        ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 2560, 8000], [0, 2560, 3840]]
-        ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]]
+        ret.lateralTuning.pid.kf = 0.00003 # conservative feed-forward
+        ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x6540, 0x7080]
+        ret.lateralParams.torqueV = [0x0, 0x200, 0x300, 0x478, 0x5EC, 0x800, 0xA00, 0xE00, 0xF00]
+        # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]], [[0.15], [0.05]]
+        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 17, 22, 27], [0.15, 0.15, 0.15, 0.15]] # 3x [[0.1575], [0.05175]]
+        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 17, 22], [0.045, 0.045, 0.045, 0.045]]
       else:
-        ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 2560], [0, 2560]]
-        ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[1.1], [0.33]]
+        ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
+        ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x6540, 0x7080]
+        ret.lateralParams.torqueV = [0x0, 0x200, 0x300, 0x478, 0x5EC, 0x800, 0xA00, 0xE00, 0xF00]
+        ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]] # force modded values always on this fork
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL, CAR.HONDA_CIVIC_2022):
       if eps_modified:
@@ -209,7 +244,7 @@ class CarInterface(CarInterfaceBase):
           if fw.ecu == "eps" and b"-" not in fw.fwVersion and b"," in fw.fwVersion:
             ret.lateralTuning.pid.kf = 0.00004
             ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 0xA00, 0x3C00], [0, 2560, 3840]]
-            ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.1575], [0.05175]]
+            ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.00525], [0.01725]]
           elif fw.ecu == "eps" and b"-" in fw.fwVersion and b"," in fw.fwVersion:
             ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 0xA00, 0x2800], [0, 2560, 3840]]
             ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]]

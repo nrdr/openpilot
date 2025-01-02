@@ -13,6 +13,7 @@ from collections.abc import Callable
 from functools import cache
 
 from cereal import car
+from cereal import custom
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.conversions import Conversions as CV
 from openpilot.common.simple_kalman import KF1D, get_kalman_gain
@@ -370,10 +371,10 @@ class CarInterfaceBase(ABC):
     ret.minEnableSpeed = -1. # enable is done by stock ACC, so ignore this
     ret.steerRatioRear = 0.  # no rear steering, at least on the listed cars aboveA
     ret.openpilotLongitudinalControl = False
-    ret.stopAccel = -2.0
-    ret.stoppingDecelRate = 0.8 # brake_travel/s while trying to stop
-    ret.vEgoStopping = 0.5
-    ret.vEgoStarting = 0.5
+    ret.stopAccel = -4.0
+    ret.stoppingDecelRate = 0.05 # brake_travel/s while trying to stop
+    ret.vEgoStopping = 0.15
+    ret.vEgoStarting = 0.15
     ret.stoppingControl = True
     ret.longitudinalTuning.kf = 1.
     ret.longitudinalTuning.kpBP = [0.]
@@ -455,17 +456,6 @@ class CarInterfaceBase(ABC):
                            enable_buttons=(ButtonType.accelCruise, ButtonType.decelCruise)):
     events = Events()
 
-    if cs_out.doorOpen and (c.latActive or c.longActive):
-      events.add(EventName.doorOpen)
-    if cs_out.seatbeltUnlatched and cs_out.gearShifter != GearShifter.park:
-      events.add(EventName.seatbeltNotLatched)
-    if cs_out.gearShifter != GearShifter.drive and (extra_gears is None or
-       cs_out.gearShifter not in extra_gears) and not (cs_out.gearShifter == GearShifter.unknown and
-       self.gear_warning < int(0.5/DT_CTRL)):
-      if cs_out.vEgo < 5:
-        events.add(EventName.silentWrongGear)
-      else:
-        events.add(EventName.wrongGear)
     if cs_out.gearShifter == GearShifter.reverse:
       if not self.CS.params_list.reverse_dm_cam and cs_out.vEgo < 5:
         events.add(EventName.spReverseGear)
@@ -492,8 +482,6 @@ class CarInterfaceBase(ABC):
         events.add(EventName.brakeHold)
       else:
         events.add(EventName.silentBrakeHold)
-    if cs_out.parkingBrake:
-      events.add(EventName.parkBrake)
     if cs_out.accFaulted:
       events.add(EventName.accFaulted)
     if cs_out.steeringPressed:
