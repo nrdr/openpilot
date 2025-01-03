@@ -133,7 +133,7 @@ UiElement DeveloperUi::getAEgo(float a_ego) {
   QString value = QString::number(a_ego, 'f', 1);
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "G-Force:", "m/s²", color);
+  return UiElement(value, "G-Force:", "m/s²   ", color);
 }
 
 // Add Relative Velocity to Primary Lead Car
@@ -179,7 +179,7 @@ UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
   QString value = QString::number(std::fabs(steering_torque_eps), 'f', 1);
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "EPS Torque:", "N·dm", color);
+  return UiElement(value, "   EPS Torque:", "N·dm", color);
 }
 
 // Add Bearing Degree and Direction from Car (Compass)
@@ -211,7 +211,7 @@ UiElement DeveloperUi::getBearingDeg(float bearing_accuracy_deg, float bearing_d
     dir_value = "OFF";
   }
 
-  return UiElement(QString("%1 | %2").arg(dir_value).arg(value), "Compass:", "", color);
+  return UiElement(QString("%1 | %2").arg(dir_value).arg(value), "", "", color);
 }
 
 // Add Altitude of Current Location
