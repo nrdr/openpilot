@@ -152,7 +152,7 @@ UiElement DeveloperUi::getVEgoLead(bool lead_status, float lead_v_rel, float v_e
     }
   }
 
-  return UiElement(value, "|             Lead Vehicle:", speed_unit, color);
+  return UiElement(value, "Lead:", speed_unit, color);
 }
 
 // Add Friction Coefficient Raw from torqued
@@ -179,7 +179,7 @@ UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
   QString value = QString::number(std::fabs(steering_torque_eps), 'f', 1);
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "|                Torque:", "N·dm", color);
+  return UiElement(value, "Torque:", "N·dm", color);
 }
 
 // Add Bearing Degree and Direction from Car (Compass)
@@ -220,5 +220,5 @@ UiElement DeveloperUi::getAltitude(float gps_accuracy, float altitude) {
   QString value = (gps_accuracy != 0.00) ? QString::number(altitude, 'f', 1) : "-";
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "|  Elevation:", "m", color);
+  return UiElement(value, "Elevation:", "m", color);
 }
