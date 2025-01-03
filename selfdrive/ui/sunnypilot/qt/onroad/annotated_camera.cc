@@ -1042,12 +1042,12 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
 
   // Driving Personality / Gap Adjust Cruise
   if (longitudinal) {
-    drawFeatureStatusElement(longitudinalPersonality, feature_text.gac_list_text, feature_color.gac_list_color, longitudinal, "N/A", "GAP");
+    drawFeatureStatusElement(longitudinalPersonality, feature_text.gac_list_text, feature_color.gac_list_color, longitudinal, "N/A", "Personality");
   }
 
   // Dynamic Lane Profile
   if (drivingModelGen == cereal::ModelGeneration::ONE) {
-    drawFeatureStatusElement(dynamicLaneProfile, feature_text.dlp_list_text, feature_color.dlp_list_color, true, "OFF", "DLP");
+    drawFeatureStatusElement(dynamicLaneProfile, feature_text.dlp_list_text, feature_color.dlp_list_color, true, "OFF", "Laneline Policy");
   }
 
   // TODO: Add toggle variables to cereal, and parse from cereal
@@ -1061,7 +1061,7 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
     p.setBrush(dec_color);
     p.drawEllipse(dec_btn);
     QString dec_status_text;
-    dec_status_text.sprintf("DEC: %s\n", dynamicExperimentalControlToggle ? (experimentalMode ? QString(mpcSource).toStdString().c_str() : QString("Inactive").toStdString().c_str()) : "OFF");
+    dec_status_text.sprintf("AI Controller: %s\n", dynamicExperimentalControlToggle ? (experimentalMode ? QString(mpcSource).toStdString().c_str() : QString("Standby").toStdString().c_str()) : "OFF");
     p.setPen(QPen(shadow_color, 2));
     p.drawText(x + drop_shadow_size, y + drop_shadow_size, dec_status_text);
     p.setPen(QPen(text_color, 2));
@@ -1072,7 +1072,7 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
   // TODO: Add toggle variables to cereal, and parse from cereal
   // Speed Limit Control
   if (longitudinal || !car_params.getPcmCruiseSpeed()) {
-    drawFeatureStatusElement(int(slcState), feature_text.slc_list_text, feature_color.slc_list_color, speedLimitControlToggle, "OFF", "SLC");
+    drawFeatureStatusElement(int(slcState), feature_text.slc_list_text, feature_color.slc_list_color, speedLimitControlToggle, "OFF", "Speed Limit Control");
   }
 }
 
@@ -1157,7 +1157,7 @@ void AnnotatedCameraWidgetSP::drawLaneLines(QPainter &painter, const UIStateSP *
       const float lane_pos = line.getY().size() > 0 ? std::abs(line.getY()[5]) : default_pos;  // get redder when line is closer to car
       float hue = 332.5 * lane_pos - 332.5;  // equivalent to {1.4, 1.0}: {133, 0} (green to red)
       hue = std::fmin(133, fmax(0, hue)) / 360.;  // clip and normalize
-      painter.setBrush(QColor::fromHslF(hue, 1.0, 0.50, std::clamp<float>(scene.lane_line_probs[i], 0.0, 0.7)));
+      painter.setBrush(QColor::fromHslF(1.0, 1.0, 1.0, std::clamp<float>(scene.lane_line_probs[i], 0.0, 0.7)));
     } else {
       painter.setBrush(QColor::fromRgbF(1.0, 1.0, 1.0, std::clamp<float>(scene.lane_line_probs[i], 0.0, 0.7)));
     }
@@ -1171,7 +1171,7 @@ void AnnotatedCameraWidgetSP::drawLaneLines(QPainter &painter, const UIStateSP *
 
   // road edges
   for (int i = 0; i < std::size(scene.road_edge_vertices); ++i) {
-    painter.setBrush(QColor::fromRgbF(1.0, 0, 0, std::clamp<float>(1.0 - scene.road_edge_stds[i], 0.0, 1.0)));
+    painter.setBrush(QColor::fromRgbF(0.56, 0.67, 0.77, std::clamp<float>(1.0 - scene.road_edge_stds[i], 0.0, 1.0)));
     painter.drawPolygon(scene.road_edge_vertices[i]);
   }
 
@@ -1183,9 +1183,9 @@ void AnnotatedCameraWidgetSP::drawLaneLines(QPainter &painter, const UIStateSP *
 
   if (madsEnabled || car_state.getCruiseState().getEnabled()) {
     if (steerOverride && latActive) {
-      bg.setColorAt(0.0, QColor::fromHslF(20 / 360., 0.94, 0.51, 0.17));
-      bg.setColorAt(0.5, QColor::fromHslF(20 / 360., 1.0, 0.68, 0.17));
-      bg.setColorAt(1.0, QColor::fromHslF(20 / 360., 1.0, 0.68, 0.0));
+      bg.setColorAt(0.0, QColor::fromHslF(20 / 360., 0.94, 0.51, 1.0));
+      bg.setColorAt(0.5, QColor::fromHslF(20 / 360., 1.0, 0.68, 1.0));
+      bg.setColorAt(1.0, QColor::fromHslF(20 / 360., 1.0, 0.68, 1.0));
     } else if (!(latActive || car_state.getCruiseState().getEnabled())) {
       bg.setColorAt(0, whiteColor());
       bg.setColorAt(1, whiteColor(0));
@@ -1216,9 +1216,9 @@ void AnnotatedCameraWidgetSP::drawLaneLines(QPainter &painter, const UIStateSP *
       }
 
     } else {
-      bg.setColorAt(0.0, QColor::fromHslF(148 / 360., 0.94, 0.51, 0.4));
-      bg.setColorAt(0.5, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.35));
-      bg.setColorAt(1.0, QColor::fromHslF(112 / 360., 1.0, 0.68, 0.0));
+      bg.setColorAt(0.0, QColor::fromHslF(210 / 360., 0.84, 0.49, 1.0));
+      bg.setColorAt(0.5, QColor::fromHslF(210 / 360., 0.84, 0.49, 1.0));
+      bg.setColorAt(1.0, QColor::fromHslF(210 / 360., 0.84, 0.49, 1.0));
     }
   } else {
     bg.setColorAt(0.0, whiteColor(102));
