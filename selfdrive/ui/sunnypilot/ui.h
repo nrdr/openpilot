@@ -58,8 +58,8 @@ struct FeatureStatusColor {
 const QColor sp_bg_colors [] = {
   [STATUS_DISENGAGED] = bg_colors[STATUS_DISENGAGED],
   [STATUS_OVERRIDE] = bg_colors[STATUS_OVERRIDE],
-  [STATUS_ENGAGED] = QColor(0x00, 0xc8, 0x00, 0xf1),
-  [STATUS_MADS] = QColor(0x00, 0xc8, 0xc8, 0xf1),
+  [STATUS_ENGAGED] = QColor(0x00, 0x00, 0xFF, 0xf1),
+  [STATUS_MADS] = QColor(0x00, 0x00, 0xC8, 0xf1),
 };
 #define bg_colors sp_bg_colors // Override the bg_colors array with the sp_bg_colors array
 
@@ -96,7 +96,7 @@ public:
     for (const auto &role : sunnylinkRoles) {
       if(role.roleType != RoleType::Sponsor)
         continue;
-      
+
       if (auto sponsorRole = role.as<SponsorRoleModel>(); !sponsorRoleWithHighestTier.has_value() || sponsorRoleWithHighestTier->roleTier < sponsorRole.roleTier) {
         sponsorRoleWithHighestTier = sponsorRole;
       }
@@ -121,7 +121,7 @@ signals:
 
 private slots:
   void update() override;
-  
+
 
 private:
   std::vector<RoleModel> sunnylinkRoles = {};
