@@ -523,8 +523,10 @@ void AnnotatedCameraWidgetSP::drawHud(QPainter &p) {
 
   // current speed
   if (!hideVEgoUi) {
+    int x = width(28);
+    int y = height(300);
     p.setFont(InterFont(176, QFont::Bold));
-    drawColoredText(p, 28, 550, speedStr, brakeLights ? QColor(0xff, 0, 0, 255) : QColor(0xff, 0xff, 0xff, 255));
+    drawColoredText(QPoint(x, y), speedStr, brakeLights ? QColor(0xff, 0, 0, 255) : QColor(0xff, 0xff, 0xff, 255));
     p.setFont(InterFont(66));
     drawText(p, rect().center().x(), 290, speedUnit, 200);
   }
