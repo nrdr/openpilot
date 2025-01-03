@@ -174,7 +174,7 @@ class CarController(CarControllerBase):
     hud_control = CC.hudControl
     conversion = hondacan.get_cruise_speed_conversion(self.CP.carFingerprint, CS.is_metric)
     stopping_hud = actuators.longControlState == LongCtrlState.stopping
-    hud_v_cruise = 252 if stopping_hud else hud_control.setSpeed / conversion if hud_control.speedVisible else 253
+    hud_v_cruise = 252 if stopping_hud else hud_control.setSpeed / conversion if hud_control.speedVisible else 255
     pcm_cancel_cmd = CC.cruiseControl.cancel
 
     # 0-251 = (Actual Speed Values)
