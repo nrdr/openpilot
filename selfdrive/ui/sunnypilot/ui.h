@@ -58,8 +58,8 @@ struct FeatureStatusColor {
 const QColor sp_bg_colors [] = {
   [STATUS_DISENGAGED] = bg_colors[STATUS_DISENGAGED],
   [STATUS_OVERRIDE] = bg_colors[STATUS_OVERRIDE],
-  [STATUS_ENGAGED] = QColor(0x14, 0x00, 0xE8, 0xf1),
-  [STATUS_MADS] = QColor(0x14, 0x00, 0xE8, 0xf1),
+  [STATUS_ENGAGED] = QColor(0x14, 0x8C, 0xE8, 0xf1), // blue
+  [STATUS_MADS] = QColor(0x14, 0x8C, 0xE8, 0xf1), // blue
 };
 #define bg_colors sp_bg_colors // Override the bg_colors array with the sp_bg_colors array
 
