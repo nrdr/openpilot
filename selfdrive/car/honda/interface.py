@@ -91,7 +91,7 @@ class CarInterface(CarInterfaceBase):
         eps_modified = True
 
     if candidate == CAR.HONDA_CIVIC:
-      ret.steerRatio = 19.33
+      ret.steerRatio = 15.38
       if eps_modified:
         # stock request input values:     0x0000, 0x00DE, 0x014D, 0x01EF, 0x0290, 0x0377, 0x0454, 0x0610, 0x06EE
         # stock request output values:    0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x1680, 0x1680
