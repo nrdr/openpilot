@@ -101,7 +101,7 @@ VisualsPanel::VisualsPanel(QWidget *parent) : ListWidgetSP(parent) {
   };
 
   // Visuals: Developer UI Info (Dev UI)
-  std::vector<QString> dev_ui_settings_texts{tr("Off"), tr("5 Metrics"), tr("10 Metrics")};
+  std::vector<QString> dev_ui_settings_texts{tr("Off"), tr("Side"), tr("Side + Credits")};
   dev_ui_settings = new ButtonParamControlSP(
     "DevUIInfo", tr("Developer UI"), tr("Display real-time parameters and metrics from various sources."),
     "",
