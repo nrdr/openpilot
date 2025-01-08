@@ -57,7 +57,7 @@ OnroadSettingsButton::OnroadSettingsButton(QWidget *parent) : QPushButton(parent
   // btn_size: 192 * 80% ~= 152
   // img_size: (152 / 4) * 3 = 114
   setFixedSize(152, 152);
-  settings_img = loadPixmap("../assets/navigation/icon_settings.svg", {114, 114});
+  settings_img = loadPixmap("../assets/navigation/icon_settings.svg", {0, 0});
 
   // hidden by default, made visible if Driving Personality / GAC, DLP, DEC, or SLC is enabled
   setVisible(false);
