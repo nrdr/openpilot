@@ -47,7 +47,7 @@ UiElement DeveloperUi::getDRel(bool lead_status, float lead_d_rel) {
     }
   }
 
-  return UiElement(value, "VEHICLE DISTANCE", "m", color);
+  return UiElement(value, "Object Distance", "m", color);
 }
 
 // Add Relative Velocity vs Primary Lead Car
@@ -66,7 +66,7 @@ UiElement DeveloperUi::getVRel(bool lead_status, float lead_v_rel, bool is_metri
     }
   }
 
-  return UiElement(value, "SPEED DIFF", speed_unit, color);
+  return UiElement(value, "Relative Speed", speed_unit, color);
 }
 
 // Add Real Steering Angle
@@ -83,7 +83,7 @@ UiElement DeveloperUi::getSteeringAngleDeg(float angle_steers, bool mads_enabled
     color = QColor(255, 188, 0, 255);
   }
 
-  return UiElement(value, "STEERING ANGLE", "", color);
+  return UiElement(value, "Steering Angle", "", color);
 }
 
 // Add Actual Lateral Acceleration (roll compensated) when using Torque
@@ -115,16 +115,16 @@ UiElement DeveloperUi::getSteeringAngleDesiredDeg(bool mads_enabled, bool lat_ac
     }
   }
 
-  return UiElement(value, "IDEAL ANGLE", "", color);
+  return UiElement(value, "Desired Angle", "", color);
 }
 
 // Add Device Memory (RAM) Usage
 // Unit: Percent
 UiElement DeveloperUi::getMemoryUsagePercent(int memory_usage_percent) {
-  QString value = QString("%1%2").arg(QString::number(memory_usage_percent, 'd', 0)).arg("%");
+  QString value = QString("%1%2").arg(QString::number(memory_usage_percent, 'd', 0)).arg("% Memory");
   QColor color = (memory_usage_percent > 85) ? QColor(255, 188, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "MEMORY USAGE", "", color);
+  return UiElement(value, "", "", color);
 }
 
 // Add Vehicle Current Acceleration
@@ -133,7 +133,7 @@ UiElement DeveloperUi::getAEgo(float a_ego) {
   QString value = QString::number(a_ego, 'f', 1);
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "G-Force:", "m/s²   ", color);
+  return UiElement(value, "Longitudinal:", "m/s²   ", color);
 }
 
 // Add Relative Velocity to Primary Lead Car
@@ -179,7 +179,7 @@ UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
   QString value = QString::number(std::fabs(steering_torque_eps), 'f', 1);
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Torque:", "N·dm", color);
+  return UiElement(value, "", "N·dm Torque", color);
 }
 
 // Add Bearing Degree and Direction from Car (Compass)
@@ -211,7 +211,7 @@ UiElement DeveloperUi::getBearingDeg(float bearing_accuracy_deg, float bearing_d
     dir_value = "OFF";
   }
 
-  return UiElement(QString("%1 | %2").arg(dir_value).arg(value), "|", "", color);
+  return UiElement(QString("%1 | %2").arg(dir_value).arg(value), "", "", color);
 }
 
 // Add Altitude of Current Location
