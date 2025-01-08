@@ -121,10 +121,10 @@ UiElement DeveloperUi::getSteeringAngleDesiredDeg(bool mads_enabled, bool lat_ac
 // Add Device Memory (RAM) Usage
 // Unit: Percent
 UiElement DeveloperUi::getMemoryUsagePercent(int memory_usage_percent) {
-  QString value = QString("%1%2").arg(QString::number(memory_usage_percent, 'd', 0)).arg("% Memory");
+  QString value = QString("%1%2").arg(QString::number(memory_usage_percent, 'd', 0)).arg("%");
   QColor color = (memory_usage_percent > 85) ? QColor(255, 188, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "", "", color);
+  return UiElement(value, "Memory", "", color);
 }
 
 // Add Vehicle Current Acceleration
@@ -179,7 +179,7 @@ UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
   QString value = QString::number(std::fabs(steering_torque_eps), 'f', 1);
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "", "N·dm Torque", color);
+  return UiElement("Openpilot build v01.08.2025, authored by Brett Pakkala. All rights reserved.", color);
 }
 
 // Add Bearing Degree and Direction from Car (Compass)
