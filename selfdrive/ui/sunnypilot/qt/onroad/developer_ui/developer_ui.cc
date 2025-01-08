@@ -176,10 +176,10 @@ UiElement DeveloperUi::getLatAccelFactorFiltered(float lat_accel_factor_filtered
 // Add Steering Torque from Car EPS
 // Unit: Newton Meters
 UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
-  QString value = ("Openpilot build v01.08.2025, authored by Brett Pakkala.");
+  QString value = ("");
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Openpilot build v01.08.2025, authored by Brett Pakkala.", "Openpilot build v01.08.2025, authored by Brett Pakkala.", color);
+  return UiElement(value, "", "Openpilot build v01.08.2025, authored by Brett Pakkala.", color);
 }
 
 // Add Bearing Degree and Direction from Car (Compass)
