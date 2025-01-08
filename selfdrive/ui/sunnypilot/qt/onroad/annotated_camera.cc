@@ -825,9 +825,9 @@ void AnnotatedCameraWidgetSP::drawRightDevUi(QPainter &p, int x, int y) {
   QRect ldu(x, y, 184, rh);
 }
 
-int AnnotatedCameraWidgetSP::drawNewDevUi(QPainter &p, int x, int y, const QString &label, QColor &color) {
+int AnnotatedCameraWidgetSP::drawNewDevUi(QPainter &p, int x, int y, const QString &value, const QString &label, const QString &units, QColor &color) {
   p.setFont(InterFont(38, QFont::Bold));
-  drawCenteredLeftText(p, x, y, label, whiteColor(), color);
+  drawCenteredLeftText(p, x, y, label, whiteColor(), value, units, color);
 
   return 430;
 }
@@ -839,7 +839,7 @@ void AnnotatedCameraWidgetSP::drawNewDevUi2(QPainter &p, int x, int y) {
   //w += drawNewDevUi(p, rw, y, vEgoLeadElement.value, vEgoLeadElement.label, vEgoLeadElement.units, vEgoLeadElement.color);
 
   UiElement steeringTorqueEpsElement = DeveloperUi::getSteeringTorqueEps(steeringTorqueEps);
-  rw += drawNewDevUi(p, rw, y, steeringTorqueEpsElement.label, steeringTorqueEpsElement.color);
+  rw += drawNewDevUi(p, rw, y, steeringTorqueEpsElement.value, steeringTorqueEpsElement.label, steeringTorqueEpsElement.units, steeringTorqueEpsElement.color);
 
 }
 
