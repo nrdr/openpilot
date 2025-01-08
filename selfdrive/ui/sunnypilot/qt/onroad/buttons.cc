@@ -66,7 +66,7 @@ OnroadSettingsButton::OnroadSettingsButton(QWidget *parent) : QPushButton(parent
 
 void OnroadSettingsButton::paintEvent(QPaintEvent *event) {
   QPainter p(this);
-  drawCustomButtonIcon(p, 152, 152, settings_img, QColor(0, 0, 0, 166), isDown() ? 0.6 : 1.0);
+  drawCustomButtonIcon(p, 152, 152, settings_img, QColor(0, 0, 0, 0), isDown() ? 0.6 : 1.0);
 }
 
 void OnroadSettingsButton::updateState(const UIStateSP &s) {
