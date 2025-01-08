@@ -791,6 +791,10 @@ void AnnotatedCameraWidgetSP::drawRightDevUi(QPainter &p, int x, int y) {
   int rh = 5;
   int ry = y;
 
+  UiElement memoryUsagePercentElement = DeveloperUi::getMemoryUsagePercent(memoryUsagePercent);
+  rh += drawDevUiRight(p, x, ry, memoryUsagePercentElement.value, memoryUsagePercentElement.label, memoryUsagePercentElement.units, memoryUsagePercentElement.color);
+  ry = y + rh;
+
   UiElement vRelElement = DeveloperUi::getVRel(lead_status, lead_v_rel, is_metric, speedUnit);
   rh += drawDevUiRight(p, x, ry, vRelElement.value, vRelElement.label, vRelElement.units, vRelElement.color);
   ry = y + rh;
@@ -808,16 +812,8 @@ void AnnotatedCameraWidgetSP::drawRightDevUi(QPainter &p, int x, int y) {
   }
   ry = y + rh;
 
-  UiElement aEgoElement = DeveloperUi::getAEgo(aEgo);
-  rh += drawDevUiRight(p, x, ry, aEgoElement.value, aEgoElement.label, aEgoElement.units, aEgoElement.color);
-  ry = y + rh;
-
   UiElement altitudeElement = DeveloperUi::getAltitude(gpsAccuracy, altitude);
   rh += drawDevUiRight(p, x, ry, altitudeElement.value, altitudeElement.label, altitudeElement.units, altitudeElement.color);
-  ry = y + rh;
-
-  UiElement bearingDegElement = DeveloperUi::getBearingDeg(bearingAccuracyDeg, bearingDeg);
-  rh += drawDevUiRight(p, x, ry, bearingDegElement.value, bearingDegElement.label, bearingDegElement.units, bearingDegElement.color);
   ry = y + rh;
 
   rh += 25;
