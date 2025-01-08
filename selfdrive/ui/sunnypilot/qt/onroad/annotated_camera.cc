@@ -524,9 +524,9 @@ void AnnotatedCameraWidgetSP::drawHud(QPainter &p) {
   // current speed
   if (!hideVEgoUi) {
     p.setFont(InterFont(196, QFont::Bold));
-    drawColoredText(p, rect().left() + 180, 850, tr("70"), brakeLights ? QColor(0xff, 0, 0, 255) : QColor(0xff, 0xff, 0xff, 255));
+    drawColoredText(p, rect().left() + 200, 850, tr("70"), brakeLights ? QColor(0xff, 0, 0, 255) : QColor(0xff, 0xff, 0xff, 255));
     p.setFont(InterFont(86));
-    drawText(p, rect().left() + 180, 930, speedUnit, 200);
+    drawText(p, rect().left() + 200, 930, speedUnit, 200);
   }
 
   if (!reversing) {
@@ -1167,12 +1167,13 @@ void AnnotatedCameraWidgetSP::drawLaneLines(QPainter &painter, const UIStateSP *
 
   if (madsEnabled || car_state.getCruiseState().getEnabled()) {
     if (steerOverride && latActive) {
-      bg.setColorAt(0.0, QColor::fromHslF(20 / 360., 0.94, 0.51, 1.0));
-      bg.setColorAt(0.5, QColor::fromHslF(20 / 360., 1.0, 0.68, 1.0));
-      bg.setColorAt(1.0, QColor::fromHslF(20 / 360., 1.0, 0.68, 1.0));
-    } else if (!(latActive || car_state.getCruiseState().getEnabled())) {
-      bg.setColorAt(0, whiteColor());
-      bg.setColorAt(1, whiteColor(0));
+      bg.setColorAt(0.0, QColor::fromHslF(360 / 360., 1.0, 1.0, 1.0));
+      bg.setColorAt(0.5, QColor::fromHslF(360 / 360., 1.0, 1.0, 1.0));
+      bg.setColorAt(1.0, QColor::fromHslF(360 / 360., 1.0, 1.0, 1.0));
+    } else if (car_state.getCruiseState().getEnabled()) {
+      bg.setColorAt(0.0, QColor::fromHslF(120 / 360., 1.0, 0.50, 1.0));
+      bg.setColorAt(0.5, QColor::fromHslF(120 / 360., 1.0, 0.50, 1.0));
+      bg.setColorAt(1.0, QColor::fromHslF(120 / 360., 1.0, 0.50, 1.0));
     } else if (exp_mode_path) {
       // The first half of track_vertices are the points for the right side of the path
       const auto &acceleration = sm["modelV2"].getModelV2().getAcceleration().getX();
@@ -1205,9 +1206,9 @@ void AnnotatedCameraWidgetSP::drawLaneLines(QPainter &painter, const UIStateSP *
       bg.setColorAt(1.0, QColor::fromHslF(210 / 360., 0.84, 0.49, 1.0));
     }
   } else {
-    bg.setColorAt(0.0, whiteColor(102));
-    bg.setColorAt(0.5, whiteColor(89));
-    bg.setColorAt(1.0, whiteColor(0));
+    bg.setColorAt(1.0, whiteColor(255));
+    bg.setColorAt(1.0, whiteColor(255));
+    bg.setColorAt(1.0, whiteColor(255));
   }
 
   painter.setBrush(bg);
