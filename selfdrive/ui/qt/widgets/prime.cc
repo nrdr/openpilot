@@ -138,24 +138,24 @@ PrimeAdWidget::PrimeAdWidget(QWidget* parent) : QFrame(parent) {
   main_layout->setContentsMargins(80, 90, 80, 60);
   main_layout->setSpacing(0);
 
-  QLabel *upgrade = new QLabel(tr("Openpilot Home"));
+  QLabel *upgrade = new QLabel(tr("Openpilot Standby"));
   upgrade->setStyleSheet("font-size: 75px; font-weight: bold;");
   main_layout->addWidget(upgrade, 0, Qt::AlignTop);
   main_layout->addSpacing(50);
 
-  QLabel *description = new QLabel(tr("Build compiled 01.02.2025 // 10:24PM"));
+  QLabel *description = new QLabel(tr("This build was compiled by Brett Pakkala."));
   description->setStyleSheet("font-size: 56px; font-weight: light; color: white;");
   description->setWordWrap(true);
   main_layout->addWidget(description, 0, Qt::AlignTop);
 
   main_layout->addStretch();
 
-  QLabel *features = new QLabel(tr("Compiled by Brett"));
+  QLabel *features = new QLabel(tr("Special thanks to:"));
   features->setStyleSheet("font-size: 41px; font-weight: bold; color: #E5E5E5;");
   main_layout->addWidget(features, 0, Qt::AlignBottom);
   main_layout->addSpacing(30);
 
-  QVector<QString> bullets = {tr("Custom Pedal Tuning"), tr("Custom UI"), tr("Anti-Nag"), tr("Random Enhancements")};
+  QVector<QString> bullets = {tr("Jason Wen (sunnyhaibin)"), tr("Harald Schäfer (haraschax)"), tr("Tim Wilson (twilsonco)"), tr("Mich (przm83)")};
   for (auto &b : bullets) {
     const QString check = "<b><font color='#465BEA'>✓</font></b> ";
     QLabel *l = new QLabel(check + b);
