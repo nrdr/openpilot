@@ -133,7 +133,7 @@ UiElement DeveloperUi::getAEgo(float a_ego) {
   QString value = QString::number(a_ego, 'f', 1);
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Longitudinal:", "m/s²   ", color);
+  return UiElement(value, "-----Longitudinal:", "m/s²   ", color);
 }
 
 // Add Relative Velocity to Primary Lead Car
