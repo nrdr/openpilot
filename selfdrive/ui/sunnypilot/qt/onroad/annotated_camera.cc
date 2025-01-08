@@ -812,6 +812,10 @@ void AnnotatedCameraWidgetSP::drawRightDevUi(QPainter &p, int x, int y) {
   rh += drawDevUiRight(p, x, ry, altitudeElement.value, altitudeElement.label, altitudeElement.units, altitudeElement.color);
   ry = y + rh;
 
+  UiElement bearingDegElement = DeveloperUi::getBearingDeg(bearingAccuracyDeg, bearingDeg);
+  rh += drawDevUiRight(p, x, ry, bearingDegElement.value, bearingDegElement.label, bearingDegElement.units, bearingDegElement.color);
+  ry = y + rh;
+
   rh += 25;
   p.setBrush(QColor(0, 0, 0, 0));
   QRect ldu(x, y, 184, rh);

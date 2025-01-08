@@ -211,7 +211,7 @@ UiElement DeveloperUi::getBearingDeg(float bearing_accuracy_deg, float bearing_d
     dir_value = "OFF";
   }
 
-  return UiElement(QString("%1 | %2").arg(dir_value).arg(value), "Compass", "", color);
+  return UiElement(QString("%1 | %2").arg(dir_value).arg(value), "", "", color);
 }
 
 // Add Altitude of Current Location
