@@ -481,7 +481,7 @@ void AnnotatedCameraWidgetSP::drawHud(QPainter &p) {
   speedLimitWarning(p, sign_rect, sign_margin);
 
   // US/Canada (MUTCD style) sign
-  if (((mapSourcedSpeedLimit && !is_metric && !isNavSpeedLimit) || has_us_speed_limit) && slcShowSign) {
+  if (!is_metric) {
     p.setPen(Qt::NoPen);
     p.setBrush(whiteColor());
     p.drawRoundedRect(sign_rect, 24, 24);
