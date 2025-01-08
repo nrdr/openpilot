@@ -812,6 +812,14 @@ void AnnotatedCameraWidgetSP::drawRightDevUi(QPainter &p, int x, int y) {
   }
   ry = y + rh;
 
+  UiElement aEgoElement = DeveloperUi::getAEgo(aEgo);
+  rh += drawDevUiRight(p, x, ry, aEgoElement.value, aEgoElement.label, aEgoElement.units, aEgoElement.color);
+  ry = y + rh;
+
+  UiElement altitudeElement = DeveloperUi::getAltitude(gpsAccuracy, altitude);
+  rh += drawDevUiRight(p, x, ry, altitudeElement.value, altitudeElement.label, altitudeElement.units, altitudeElement.color);
+  ry = y + rh;
+
   rh += 25;
   p.setBrush(QColor(0, 0, 0, 0));
   QRect ldu(x, y, 184, rh);
@@ -826,12 +834,6 @@ int AnnotatedCameraWidgetSP::drawNewDevUi(QPainter &p, int x, int y, const QStri
 
 void AnnotatedCameraWidgetSP::drawNewDevUi2(QPainter &p, int x, int y) {
   int rw = 90;
-
-  UiElement aEgoElement = DeveloperUi::getAEgo(aEgo);
-  rw += drawNewDevUi(p, rw, y, aEgoElement.value, aEgoElement.label, aEgoElement.units, aEgoElement.color);
-
-  UiElement memoryUsagePercentElement = DeveloperUi::getMemoryUsagePercent(memoryUsagePercent);
-  rw += drawNewDevUi(p, rw, y, memoryUsagePercentElement.value, memoryUsagePercentElement.label, memoryUsagePercentElement.units, memoryUsagePercentElement.color);
 
   //#UiElement vEgoLeadElement = DeveloperUi::getVEgoLead(lead_status, lead_v_rel, vEgo, is_metric, speedUnit);
   //w += drawNewDevUi(p, rw, y, vEgoLeadElement.value, vEgoLeadElement.label, vEgoLeadElement.units, vEgoLeadElement.color);
