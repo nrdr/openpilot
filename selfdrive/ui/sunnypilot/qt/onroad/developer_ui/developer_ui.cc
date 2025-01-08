@@ -211,7 +211,7 @@ UiElement DeveloperUi::getBearingDeg(float bearing_accuracy_deg, float bearing_d
     dir_value = "OFF";
   }
 
-  return UiElement(QString("%1 | %2").arg(dir_value).arg(value), "", "", color);
+  return UiElement(QString("%1 | %2").arg(dir_value).arg(value), "Compass", "", color);
 }
 
 // Add Altitude of Current Location
@@ -220,5 +220,5 @@ UiElement DeveloperUi::getAltitude(float gps_accuracy, float altitude) {
   QString value = (gps_accuracy != 0.00) ? QString::number(altitude, 'f', 1) : "-";
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Elevation:", "m", color);
+  return UiElement(value, "Elevation", "m", color);
 }
