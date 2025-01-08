@@ -603,7 +603,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.cruiseEngageBlocked: {
     ET.WARNING: Alert(
-      "openpilot Unavailable",
+      "Openpilot Unavailable",
       "Pedal Pressed During Cruise Engage",
       AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.brakePressed, AudibleAlert.refuse, 3.),
