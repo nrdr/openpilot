@@ -179,7 +179,7 @@ UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
   QString value = ("");
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "", "Openpilot build v01.08.2025, authored by Brett Pakkala. All rights reserved.", color);
+  return UiElement(value, "", "Openpilot build v01.08.2025.05.39, authored by Brett Pakkala. All rights reserved.", color);
 }
 
 // Add Bearing Degree and Direction from Car (Compass)
