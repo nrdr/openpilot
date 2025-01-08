@@ -1049,7 +1049,7 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
     p.setBrush(dec_color);
     p.drawEllipse(dec_btn);
     QString dec_status_text;
-    dec_status_text.sprintf("AI Controller: %s\n", dynamicExperimentalControlToggle ? (experimentalMode ? QString(mpcSource).toStdString().c_str() : QString("Standby").toStdString().c_str()) : "OFF");
+    dec_status_text.sprintf("End-to-End: %s\n", dynamicExperimentalControlToggle ? (experimentalMode ? QString(mpcSource).toStdString().c_str() : QString("Disabled").toStdString().c_str()) : "Standby");
     p.setPen(QPen(shadow_color, 2));
     p.drawText(x + drop_shadow_size, y + drop_shadow_size, dec_status_text);
     p.setPen(QPen(text_color, 2));
