@@ -580,7 +580,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   EventName.laneChange: {
     ET.WARNING: Alert(
       "Automatically Changing Lanes",
-      "Please use caution as Openpilot cannot see blind-spot.",
+      "Please check your surroundings.",
       AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .1),
   },
