@@ -1171,9 +1171,9 @@ void AnnotatedCameraWidgetSP::drawLaneLines(QPainter &painter, const UIStateSP *
       bg.setColorAt(0.5, QColor::fromHslF(360 / 360., 1.0, 1.0, 1.0));
       bg.setColorAt(1.0, QColor::fromHslF(360 / 360., 1.0, 1.0, 1.0));
     } else if (car_state.getCruiseState().getEnabled()) {
-      bg.setColorAt(0.0, QColor::fromHslF(120 / 360., 1.0, 0.50, 1.0));
-      bg.setColorAt(0.5, QColor::fromHslF(120 / 360., 1.0, 0.50, 1.0));
-      bg.setColorAt(1.0, QColor::fromHslF(120 / 360., 1.0, 0.50, 1.0));
+      bg.setColorAt(0.0, QColor::fromHslF(224 / 360., 0.82, 0.49, 1.0));
+      bg.setColorAt(0.5, QColor::fromHslF(224 / 360., 0.82, 0.49, 1.0));
+      bg.setColorAt(1.0, QColor::fromHslF(224 / 360., 0.82, 0.49, 1.0));
     } else if (exp_mode_path) {
       // The first half of track_vertices are the points for the right side of the path
       const auto &acceleration = sm["modelV2"].getModelV2().getAcceleration().getX();
