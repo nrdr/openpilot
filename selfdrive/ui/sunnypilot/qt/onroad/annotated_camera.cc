@@ -799,13 +799,8 @@ void AnnotatedCameraWidgetSP::drawRightDevUi(QPainter &p, int x, int y) {
   rh += drawDevUiRight(p, x, ry, steeringAngleDegElement.value, steeringAngleDegElement.label, steeringAngleDegElement.units, steeringAngleDegElement.color);
   ry = y + rh;
 
-  if (lateralState == "torque") {
-    UiElement actualLateralAccelElement = DeveloperUi::getActualLateralAccel(curvature, vEgo, roll, madsEnabled, latActive);
-    rh += drawDevUiRight(p, x, ry, actualLateralAccelElement.value, actualLateralAccelElement.label, actualLateralAccelElement.units, actualLateralAccelElement.color);
-  } else {
-    UiElement steeringAngleDesiredDegElement = DeveloperUi::getSteeringAngleDesiredDeg(madsEnabled, latActive, steerAngleDesired, angleSteers);
-    rh += drawDevUiRight(p, x, ry, steeringAngleDesiredDegElement.value, steeringAngleDesiredDegElement.label, steeringAngleDesiredDegElement.units, steeringAngleDesiredDegElement.color);
-  }
+  UiElement steeringAngleDesiredDegElement = DeveloperUi::getSteeringAngleDesiredDeg(madsEnabled, latActive, steerAngleDesired, angleSteers);
+  rh += drawDevUiRight(p, x, ry, steeringAngleDesiredDegElement.value, steeringAngleDesiredDegElement.label, steeringAngleDesiredDegElement.units, steeringAngleDesiredDegElement.color);
   ry = y + rh;
 
   UiElement altitudeElement = DeveloperUi::getAltitude(gpsAccuracy, altitude);
