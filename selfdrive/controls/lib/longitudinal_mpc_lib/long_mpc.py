@@ -74,13 +74,13 @@ def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.standard):
 
 def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.standard):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
-    return 2.0
+    return 2.2
   elif personality==custom.LongitudinalPersonalitySP.standard:
-    return 1.5
+    return 1.7
   elif personality==custom.LongitudinalPersonalitySP.moderate:
-    return 1.0
+    return 1.2
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
-    return 0.5
+    return 0.7
   elif personality==custom.LongitudinalPersonalitySP.overtake:
     return 0.1
   else:
@@ -89,17 +89,17 @@ def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.standard):
 # Last updated: September 29, 2024
 def get_dynamic_personality(v_ego, personality=custom.LongitudinalPersonalitySP.standard):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
-    x_vel =  [0,    14.,   27.7]
-    y_dist = [1.75, 1.75,  2.00]
+    x_vel =  [0,    8.,   9.,   27.7]
+    y_dist = [2.0, 1.8,  2.2,  2.2]
   elif personality==custom.LongitudinalPersonalitySP.standard:
-    x_vel =  [0,    14.,   27.7]
-    y_dist = [1.75, 1.75,  1.70]
+    x_vel =  [0,    8.,   9.,   27.7]
+    y_dist = [2.0, 1.8,  1.7,  1.7]
   elif personality==custom.LongitudinalPersonalitySP.moderate:
-    x_vel =  [0,    14.,   27.7]
-    y_dist = [1.45, 1.45,  1.48]
+    x_vel =  [0,    8.,   9.,   27.7]
+    y_dist = [2.0, 1.8,  1.2,  1.2]
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
-    x_vel =  [0,    14.,   27.7]
-    y_dist = [1.25, 1.25,  1.28]
+    x_vel =  [0,    8.,   9.,   27.7]
+    y_dist = [2.0, 1.8,  0.8,  0.8]
   else:
     raise NotImplementedError("Dynamic personality not supported")
   return np.interp(v_ego, x_vel, y_dist)
