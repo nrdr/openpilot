@@ -316,6 +316,7 @@ class CarController(CarControllerBase):
             if CC.longActive:
               self.gas = clip(gas_mult * (gas - brake + wind_brake * 3 / 4), 0., 1.)
             else:
+              wind_brake - 0.0 # fix car surging on engagement
               self.gas = 0.0
             can_sends.append(create_gas_interceptor_command(self.packer, self.gas, self.frame // 2))
 
