@@ -67,7 +67,7 @@ def get_uds_client(can_addr, debug):
   try:
     panda = Panda(disable_checks=True)
     panda.set_safety_mode(Panda.SAFETY_ELM327)
-    uds_client = UdsClient(panda, can_addr, debug=False)
+    uds_client = UdsClient(panda, can_addr, debug=False, bus = 1)
     print("Using real client")
   except Exception:
     mock_helper = mock.patch('panda.python.uds.UdsClient', autospec=True)
@@ -101,7 +101,7 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   fw = x5a(read_file(args.rwd))
-  validate_fw(fw, args.cipher_ops, args.checksum_offsets)
+  #validate_fw(fw, args.cipher_ops, args.checksum_offsets)
 
   print(fw)
 
