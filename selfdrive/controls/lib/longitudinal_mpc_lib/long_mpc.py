@@ -82,7 +82,7 @@ def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.standard):
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
     return 0.7
   elif personality==custom.LongitudinalPersonalitySP.overtake:
-    return 0.1
+    return 0.25
   else:
     raise NotImplementedError("Longitudinal personality not supported")
 
@@ -100,6 +100,9 @@ def get_dynamic_personality(v_ego, personality=custom.LongitudinalPersonalitySP.
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
     x_vel =  [0,    8.,   17.,   27.7]
     y_dist = [2.8, 1.8,  1.2,  0.7]
+  elif personality==custom.LongitudinalPersonalitySP.overtake:
+    x_vel =  [0, 40.2]
+    y_dist = [0.25, 0.25]
   else:
     raise NotImplementedError("Dynamic personality not supported")
   return np.interp(v_ego, x_vel, y_dist)
