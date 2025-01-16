@@ -467,8 +467,6 @@ class IsoTpMessage():
         # no timeout indicates non-blocking
         if timeout == 0:
           return None, rx_in_progress
-        if time.monotonic() - start_time > timeout:
-          raise MessageTimeoutError("timeout waiting for response")
     finally:
       if self.debug and self.rx_dat:
         print(f"ISO-TP: RESPONSE - {hex(self._can_client.rx_addr)} 0x{bytes.hex(self.rx_dat)}")
