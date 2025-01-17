@@ -13,6 +13,7 @@ from collections.abc import Callable
 from functools import cache
 
 from cereal import car
+from cereal import custom
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.conversions import Conversions as CV
 from openpilot.common.simple_kalman import KF1D, get_kalman_gain
@@ -370,10 +371,10 @@ class CarInterfaceBase(ABC):
     ret.minEnableSpeed = -1. # enable is done by stock ACC, so ignore this
     ret.steerRatioRear = 0.  # no rear steering, at least on the listed cars aboveA
     ret.openpilotLongitudinalControl = False
-    ret.stopAccel = -2.0
-    ret.stoppingDecelRate = 0.8 # brake_travel/s while trying to stop
-    ret.vEgoStopping = 0.5
-    ret.vEgoStarting = 0.5
+    ret.stopAccel = -4.0
+    ret.stoppingDecelRate = 0.05 # brake_travel/s while trying to stop
+    ret.vEgoStopping = 0.15
+    ret.vEgoStarting = 0.15
     ret.stoppingControl = True
     ret.longitudinalTuning.kf = 1.
     ret.longitudinalTuning.kpBP = [0.]

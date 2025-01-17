@@ -173,8 +173,14 @@ class CarController(CarControllerBase):
     actuators = CC.actuators
     hud_control = CC.hudControl
     conversion = hondacan.get_cruise_speed_conversion(self.CP.carFingerprint, CS.is_metric)
-    hud_v_cruise = hud_control.setSpeed / conversion if hud_control.speedVisible else 255
+    stopping_hud = actuators.longControlState == LongCtrlState.stopping
+    hud_v_cruise = 252 if stopping_hud else hud_control.setSpeed / conversion if hud_control.speedVisible else 255
     pcm_cancel_cmd = CC.cruiseControl.cancel
+
+    # 0-251 = (Actual Speed Values)
+    # 252 = Stopped
+    # 253 = --
+    # 255 = (Blank)
 
     if CC.longActive:
       accel = actuators.accel
@@ -308,8 +314,9 @@ class CarController(CarControllerBase):
             # Sending non-zero gas when OP is not enabled will cause the PCM not to respond to throttle as expected
             # when you do enable.
             if CC.longActive:
-              self.gas = clip(gas_mult * (gas - brake + wind_brake * 3 / 4), 0., 1.)
+              self.gas = clip(gas_mult * gas, 0., 1.)
             else:
+              wind_brake - 0.0 # fix car surging on engagement
               self.gas = 0.0
             can_sends.append(create_gas_interceptor_command(self.packer, self.gas, self.frame // 2))
 
