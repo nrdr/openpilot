@@ -76,7 +76,7 @@ const QColor bg_colors [] = {
   [STATUS_DISENGAGED] =  QColor(0xFF, 0xFF, 0xFF, 0xf1), // white (override/disabled)
   [STATUS_OVERRIDE] = QColor(0xFF, 0xFF, 0xFF, 0xf1), // white (override)
   [STATUS_ENGAGED] = QColor(0x16, 0x4E, 0xE5, 0xf1), // deep blue (acc)
-  [STATUS_MADS] = QColor(0x14, 0x8C, 0xE8, 0xf1), // blue (lkas)
+  [STATUS_MADS] = QColor(0x23, 0x8B, 0x23, 0xf1), // #238b23 // forest green (lkas)
 };
 
 
