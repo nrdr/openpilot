@@ -8,7 +8,7 @@ from openpilot.common.params import Params
 from openpilot.selfdrive.car.honda.hondacan import CanBus
 from openpilot.selfdrive.car.honda.values import CarControllerParams, CruiseButtons, CruiseSettings, HondaFlags, CAR, HONDA_BOSCH, \
                                                  HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_RADARLESS
-from openpilot.selfdrive.car import create_button_events, get_safety_config
+from openpilot.selfdrive.car import create_button_events, get_safety_config, get_friction
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase, TorqueFromLateralAccelCallbackType, FRICTION_THRESHOLD, LatControlInputs
 from openpilot.selfdrive.car.disable_ecu import disable_ecu
 
@@ -41,7 +41,7 @@ class CarInterface(CarInterfaceBase):
     threshold_lat_accel = 1/torque_params.latAccelFactor * threshold
     mod_factor = 2.0 # <-- CHANGE THIS
     # The default is a linear relationship between torque and lateral acceleration (accounting for road roll and steering friction)
-    friction = torque_params.friction(lateral_accel_error, lateral_accel_deadzone, FRICTION_THRESHOLD, torque_params, friction_compensation)
+    friction = get_friction(lateral_accel_error, lateral_accel_deadzone, FRICTION_THRESHOLD, torque_params, friction_compensation)
     if abs(latcontrol_inputs.lateral_acceleration) > threshold_lat_accel:
       modded_lat_accel_factor = float(torque_params.latAccelFactor) * mod_factor
       excess_lat_accel = abs(latcontrol_inputs.lateral_acceleration) - threshold_lat_accel
