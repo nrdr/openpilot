@@ -169,7 +169,7 @@ def create_ui_commands(packer, CAN, CP, enabled, pcm_speed, hud, is_metric, acc_
       acc_hud_values['FCM_OFF'] = 0
       acc_hud_values['FCM_OFF_2'] = 0
       acc_hud_values['FCM_PROBLEM'] = 0
-      acc_hud_values['ICONS'] = acc_hud['ICONS']
+      acc_hud_values['ICONS'] = 0
     commands.append(packer.make_can_msg("ACC_HUD", CAN.pt, acc_hud_values))
 
   lkas_hud_values = {
