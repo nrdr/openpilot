@@ -192,7 +192,7 @@ class NormalPermanentAlert(Alert):
 
 
 class StartupAlert(Alert):
-  def __init__(self, alert_text_1: str, alert_text_2: str = "Build 07.09.2024 compiled by Brett.", alert_status=AlertStatus.normal):
+  def __init__(self, alert_text_1: str, alert_text_2: str = "Build 01.25.2025 compiled by Brett.", alert_status=AlertStatus.normal):
     super().__init__(alert_text_1, alert_text_2,
                      alert_status, AlertSize.mid,
                      Priority.LOWER, VisualAlert.none, AudibleAlert.none, 5.),
@@ -256,7 +256,7 @@ def torque_nn_load_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
   model_name = CP.lateralTuning.torque.nnModelName
   if model_name in ("", "mock"):
     return Alert(
-      "NN Lateral Controller Not Loaded",
+      "Neural Lateral Controller Not Loaded",
       '⚙️ -> "sunnypilot" for more details',
       AlertStatus.userPrompt, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.prompt, 6.0)
@@ -267,7 +267,7 @@ def torque_nn_load_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
     alert_size = AlertSize.mid if fuzzy else AlertSize.small
     audible_alert = AudibleAlert.prompt if fuzzy else AudibleAlert.none
     return Alert(
-      "NN Lateral Controller Loaded",
+      "Neural Lateral Controller Loaded",
       alert_text_2,
       alert_status, alert_size,
       Priority.LOW, VisualAlert.none, audible_alert, 6.0)
@@ -424,11 +424,10 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.stockAeb: {
     ET.PERMANENT: Alert(
-      "BRAKE!",
-      "Stock AEB: Risk of Collision",
-      AlertStatus.critical, AlertSize.full,
-      Priority.HIGHEST, VisualAlert.fcw, AudibleAlert.none, 2.),
-    ET.NO_ENTRY: NoEntryAlert("Stock AEB: Risk of Collision"),
+      "Your car forwarded a collision warning.",
+      "We just wanted to let you know that it sucks.",
+      AlertStatus.userPrompt, AlertSize.mid,
+      Priority.HIGHEST, VisualAlert.none, AudibleAlert.none, 2.),
   },
 
   EventName.fcw: {
@@ -547,33 +546,33 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.preLaneChangeLeft: {
     ET.WARNING: Alert(
-      "Steer Left to Start Lane Change Once Safe",
-      "",
-      AlertStatus.normal, AlertSize.small,
+      "Auto Lane Change Suspended!",
+      "Manually steer to the left to override this.",
+      AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .1, alert_rate=0.75),
   },
 
   EventName.preLaneChangeRight: {
     ET.WARNING: Alert(
-      "Steer Right to Start Lane Change Once Safe",
-      "",
-      AlertStatus.normal, AlertSize.small,
+      "Auto Lane Change Suspended!",
+      "Manually steer to the right to override this.",
+      AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, .1, alert_rate=0.75),
   },
 
   EventName.laneChangeBlocked: {
     ET.WARNING: Alert(
-      "Car Detected in Blindspot",
-      "",
-      AlertStatus.userPrompt, AlertSize.small,
+      "Auto Lane Change Blocked!",
+      "Object has been detected in your blind spot.",
+      AlertStatus.userPrompt, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.prompt, .1),
   },
 
   EventName.laneChangeRoadEdge: {
     ET.WARNING: Alert(
-      "Lane Change Unavailable: Road Edge",
-      "",
-      AlertStatus.userPrompt, AlertSize.small,
+      "Auto Lane Change Blocked!",
+      "The model has detected the edge of the road.",
+      AlertStatus.userPrompt, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.prompt, .1),
   },
 
@@ -587,16 +586,16 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.manualSteeringRequired: {
     ET.WARNING: Alert(
-      "Automatic Lane Centering is OFF",
-      "Manual Steering Required",
+      "Steering Assist: OFF",
+      "Manual steering is required.",
       AlertStatus.normal, AlertSize.mid,
-      Priority.LOW, VisualAlert.none, AudibleAlert.disengage, 1.),
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.disengage, 1.),
   },
 
   EventName.manualLongitudinalRequired: {
     ET.WARNING: Alert(
-      "Smart/Adaptive Cruise Control is OFF",
-      "Manual Gas/Brakes Required",
+      "Adaptive Cruise Control: OFF",
+      "Manual acceleration and braking is required.",
       AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, 1.),
   },
@@ -669,9 +668,9 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.speedLimitActive: {
     ET.WARNING: Alert(
-      "Set speed changed to match posted speed limit",
-      "",
-      AlertStatus.normal, AlertSize.small,
+      "MAX Speed Adjustment",
+      "Your max speed has been updated (Speed Limit + Offset)",
+      AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, 3.),
   },
 
@@ -742,11 +741,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       AlertStatus.normal, AlertSize.none,
       Priority.MID, VisualAlert.none, AudibleAlert.none, .2, 0., 0.),
     ET.NO_ENTRY: NoEntryAlert("Brake Hold Active"),
-  },
-
-  EventName.parkBrake: {
-    ET.USER_DISABLE: EngagementAlert(AudibleAlert.disengage),
-    ET.NO_ENTRY: NoEntryAlert("Parking Brake Engaged"),
   },
 
   EventName.pedalPressed: {
@@ -848,24 +842,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("System Overheated"),
   },
 
-  EventName.wrongGear: {
-    ET.SOFT_DISABLE: user_soft_disable_alert("Gear not D"),
-    ET.NO_ENTRY: NoEntryAlert("Gear not D"),
-  },
-
-  EventName.silentWrongGear: {
-    ET.SOFT_DISABLE: Alert(
-      "Gear not D",
-      "openpilot Unavailable",
-      AlertStatus.normal, AlertSize.mid,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, 0., 2., 3.),
-    ET.NO_ENTRY: Alert(
-      "Gear not D",
-      "openpilot Unavailable",
-      AlertStatus.normal, AlertSize.mid,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, 0., 2., 3.),
-  },
-
   # This alert is thrown when the calibration angles are outside of the acceptable range.
   # For example if the device is pointed too much to the left or the right.
   # Usually this can only be solved by removing the mount from the windshield completely,
@@ -887,16 +863,6 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.PERMANENT: calibration_incomplete_alert,
     ET.SOFT_DISABLE: soft_disable_alert("Device Remount Detected: Recalibrating"),
     ET.NO_ENTRY: NoEntryAlert("Remount Detected: Recalibrating"),
-  },
-
-  EventName.doorOpen: {
-    ET.SOFT_DISABLE: user_soft_disable_alert("Door Open"),
-    ET.NO_ENTRY: NoEntryAlert("Door Open"),
-  },
-
-  EventName.seatbeltNotLatched: {
-    ET.SOFT_DISABLE: user_soft_disable_alert("Seatbelt Unlatched"),
-    ET.NO_ENTRY: NoEntryAlert("Seatbelt Unlatched"),
   },
 
   EventName.espDisabled: {
