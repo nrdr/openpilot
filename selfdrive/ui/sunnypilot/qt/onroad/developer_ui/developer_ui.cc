@@ -161,7 +161,7 @@ UiElement DeveloperUi::getFrictionCoefficientFiltered(float friction_coefficient
   QString value = QString::number(friction_coefficient_filtered, 'f', 3);
   QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Friction:", "(Auto-calibrating for your car)", color);
+  return UiElement(value, "Friction:", "", color);
 }
 
 // Add Lateral Acceleration Factor Raw from torqued // compile
@@ -171,7 +171,7 @@ UiElement DeveloperUi::getLatAccelFactorFiltered(float lat_accel_factor_filtered
   QString value = QString::number(lat_accel_factor_filtered, 'f', 3);
   QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Max:", "", color);
+  return UiElement(value, "Max Lateral (m/s²):", "(Auto-Calibrating)", color);
 }
 
 // Add Steering Torque from Car EPS
