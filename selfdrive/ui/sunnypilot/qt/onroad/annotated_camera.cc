@@ -824,7 +824,7 @@ int AnnotatedCameraWidgetSP::drawNewDevUi(QPainter &p, int x, int y, const QStri
 }
 
 void AnnotatedCameraWidgetSP::drawNewDevUi2(QPainter &p, int x, int y) {
-  int rw = 350;
+  int rw = 300; // rebuild ui
   int ry = y;
 
   UiElement steeringTorqueEpsElement = DeveloperUi::getSteeringTorqueEps(steeringTorqueEps);
