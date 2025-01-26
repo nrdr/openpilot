@@ -118,7 +118,7 @@ UiElement DeveloperUi::getSteeringAngleDesiredDeg(bool mads_enabled, bool lat_ac
   return UiElement(value, "Desired Angle", "", color);
 }
 
-// Add Device Memory (RAM) Usage
+// Add Device Memory (RAM) Usage // Will this change help???
 // Unit: Percent
 UiElement DeveloperUi::getMemoryUsagePercent(int memory_usage_percent) {
   QString value = QString("%1%2").arg(QString::number(memory_usage_percent, 'd', 0)).arg("%");
