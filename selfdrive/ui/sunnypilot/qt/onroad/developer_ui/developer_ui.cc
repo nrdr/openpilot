@@ -92,9 +92,9 @@ UiElement DeveloperUi::getActualLateralAccel(float curvature, float v_ego, float
   double actualLateralAccel = (curvature * pow(v_ego, 2)) - (roll * 9.81);
 
   QString value = QString::number(actualLateralAccel, 'f', 2);
-  QColor color = (mads_enabled && lat_active) ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
+  QColor color = (mads_enabled && lat_active) ? QColor(255, 255, 255, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "ACTUAL LAT", "m/s²", color);
+  return UiElement(value, "Lateral Accel", "m/s²", color);
 }
 
 // Add Desired Steering Angle when using PID
@@ -161,7 +161,7 @@ UiElement DeveloperUi::getFrictionCoefficientFiltered(float friction_coefficient
   QString value = QString::number(friction_coefficient_filtered, 'f', 3);
   QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "FRIC.", "", color);
+  return UiElement(value, "Learned Friction", "", color);
 }
 
 // Add Lateral Acceleration Factor Raw from torqued
@@ -170,16 +170,16 @@ UiElement DeveloperUi::getLatAccelFactorFiltered(float lat_accel_factor_filtered
   QString value = QString::number(lat_accel_factor_filtered, 'f', 3);
   QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "L.A.", "m/s²", color);
+  return UiElement(value, "Learned Max", "m/s²", color);
 }
 
 // Add Steering Torque from Car EPS
 // Unit: Newton Meters
 UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
-  QString value = ("");
+  QString value = QString::number(std::fabs(steering_torque_eps), 'f', 1);
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "", "Openpilot build v01.08.2025.05.39, authored by Brett Pakkala. All rights reserved.", color);
+  return UiElement(value, "Torque", "N·dm", color);
 }
 
 // Add Bearing Degree and Direction from Car (Compass)

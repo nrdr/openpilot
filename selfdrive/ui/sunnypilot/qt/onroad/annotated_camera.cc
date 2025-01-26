@@ -799,9 +799,8 @@ void AnnotatedCameraWidgetSP::drawRightDevUi(QPainter &p, int x, int y) {
   rh += drawDevUiRight(p, x, ry, steeringAngleDegElement.value, steeringAngleDegElement.label, steeringAngleDegElement.units, steeringAngleDegElement.color);
   ry = y + rh;
 
-  UiElement steeringAngleDesiredDegElement = DeveloperUi::getSteeringAngleDesiredDeg(madsEnabled, latActive, steerAngleDesired, angleSteers);
-  rh += drawDevUiRight(p, x, ry, steeringAngleDesiredDegElement.value, steeringAngleDesiredDegElement.label, steeringAngleDesiredDegElement.units, steeringAngleDesiredDegElement.color);
-  ry = y + rh;
+  UiElement actualLateralAccelElement = DeveloperUi::getActualLateralAccel(curvature, vEgo, roll, madsEnabled, latActive);
+  rh += drawDevUiRight(p, x, ry, actualLateralAccelElement.value, actualLateralAccelElement.label, actualLateralAccelElement.units, actualLateralAccelElement.color);
 
   UiElement altitudeElement = DeveloperUi::getAltitude(gpsAccuracy, altitude);
   rh += drawDevUiRight(p, x, ry, altitudeElement.value, altitudeElement.label, altitudeElement.units, altitudeElement.color);
@@ -826,12 +825,14 @@ int AnnotatedCameraWidgetSP::drawNewDevUi(QPainter &p, int x, int y, const QStri
 void AnnotatedCameraWidgetSP::drawNewDevUi2(QPainter &p, int x, int y) {
   int rw = 90;
 
-  //#UiElement vEgoLeadElement = DeveloperUi::getVEgoLead(lead_status, lead_v_rel, vEgo, is_metric, speedUnit);
-  //w += drawNewDevUi(p, rw, y, vEgoLeadElement.value, vEgoLeadElement.label, vEgoLeadElement.units, vEgoLeadElement.color);
-
   UiElement steeringTorqueEpsElement = DeveloperUi::getSteeringTorqueEps(steeringTorqueEps);
   rw += drawNewDevUi(p, rw, y, steeringTorqueEpsElement.value, steeringTorqueEpsElement.label, steeringTorqueEpsElement.units, steeringTorqueEpsElement.color);
 
+  UiElement frictionCoefficientFilteredElement = DeveloperUi::getFrictionCoefficientFiltered(frictionCoefficientFiltered, liveValid);
+  rw += drawNewDevUi(p, rw, y, frictionCoefficientFilteredElement.value, frictionCoefficientFilteredElement.label, frictionCoefficientFilteredElement.units, frictionCoefficientFilteredElement.color);
+
+  UiElement latAccelFactorFilteredElement = DeveloperUi::getLatAccelFactorFiltered(latAccelFactorFiltered, liveValid);
+  rw += drawNewDevUi(p, rw, y, latAccelFactorFilteredElement.value, latAccelFactorFilteredElement.label, latAccelFactorFilteredElement.units, latAccelFactorFilteredElement.color);
 }
 
 // ############################## DEV UI END ##############################

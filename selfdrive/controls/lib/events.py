@@ -229,7 +229,7 @@ def startup_master_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
   if "REPLAY" in os.environ:
     branch = "replay"
 
-  return StartupAlert("Openpilot Initialized", branch, alert_status=AlertStatus.normal)
+  return StartupAlert("Welcome to Openpilot", "Tap the speed to change driving settings.", alert_status=AlertStatus.normal)
 
 def below_engage_speed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int) -> Alert:
   return NoEntryAlert(f"Drive above {get_display_speed(CP.minEnableSpeed, metric)} to engage")
@@ -267,8 +267,8 @@ def torque_nn_load_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
     alert_size = AlertSize.mid if fuzzy else AlertSize.small
     audible_alert = AudibleAlert.prompt if fuzzy else AudibleAlert.none
     return Alert(
-      "Neural Lateral Controller Loaded",
-      alert_text_2,
+      "Neural Net Lateral Controller Loaded",
+      "This provides smoother and more precise steering.",
       alert_status, alert_size,
       Priority.LOW, VisualAlert.none, audible_alert, 6.0)
 
@@ -944,8 +944,8 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.accFaulted: {
     ET.WARNING: Alert(
-      "Openpilot could not block stock system in time!",
-      "This may or may not cause problems. Use at your own risk.",
+      "Openpilot cannot send brake commands!",
+      "The stock system was not blocked in time. Restart vehicle.",
       AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, 1.),
   },
@@ -1066,7 +1066,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.speedTooLow: {
     ET.IMMEDIATE_DISABLE: Alert(
-      "openpilot Canceled",
+      "Openpilot Canceled",
       "Speed too low",
       AlertStatus.normal, AlertSize.mid,
       Priority.HIGH, VisualAlert.none, AudibleAlert.disengage, 3.),
