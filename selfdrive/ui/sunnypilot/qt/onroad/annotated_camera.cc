@@ -827,7 +827,7 @@ void AnnotatedCameraWidgetSP::drawNewDevUi2(QPainter &p, int x, int y) {
   int rw = 300; // compile
 
   UiElement actualLateralAccelElement = DeveloperUi::getActualLateralAccel(curvature, vEgo, roll, madsEnabled, latActive);
-  rw += drawDevUiRight(p, rw, y, actualLateralAccelElement.value, actualLateralAccelElement.label, actualLateralAccelElement.units, actualLateralAccelElement.color);
+  rw += drawNewDevUi(p, rw, y, actualLateralAccelElement.value, actualLateralAccelElement.label, actualLateralAccelElement.units, actualLateralAccelElement.color);
 
   UiElement latAccelFactorFilteredElement = DeveloperUi::getLatAccelFactorFiltered(latAccelFactorFiltered, liveValid);
   rw += drawNewDevUi(p, rw, y, latAccelFactorFilteredElement.value, latAccelFactorFilteredElement.label, latAccelFactorFilteredElement.units, latAccelFactorFilteredElement.color);
