@@ -121,7 +121,7 @@ void AnnotatedCameraWidgetSP::updateButtonsLayout(bool is_rhd) {
     buttons_layout->addSpacing(onroad_settings_btn->isVisible() ? 216 : 0);
   } else {
     buttons_layout->addSpacing(onroad_settings_btn->isVisible() ? 100 : 0);
-    buttons_layout->addWidget(onroad_settings_btn, 200, Qt::AlignBottom | Qt::AlignLeft);
+    buttons_layout->addWidget(onroad_settings_btn, 0, Qt::AlignBottom | Qt::AlignLeft);
 
     buttons_layout->addStretch(1);
 
