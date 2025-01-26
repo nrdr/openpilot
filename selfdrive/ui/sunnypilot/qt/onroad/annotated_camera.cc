@@ -824,7 +824,7 @@ int AnnotatedCameraWidgetSP::drawNewDevUi(QPainter &p, int x, int y, const QStri
 }
 
 void AnnotatedCameraWidgetSP::drawNewDevUi2(QPainter &p, int x, int y) {
-  int rw = 10;
+  int rw = 250;
   int ry = y;
 
   UiElement steeringTorqueEpsElement = DeveloperUi::getSteeringTorqueEps(steeringTorqueEps);
@@ -838,6 +838,10 @@ void AnnotatedCameraWidgetSP::drawNewDevUi2(QPainter &p, int x, int y) {
   UiElement frictionCoefficientFilteredElement = DeveloperUi::getFrictionCoefficientFiltered(frictionCoefficientFiltered, liveValid);
   rw += drawNewDevUi(p, rw, y, frictionCoefficientFilteredElement.value, frictionCoefficientFilteredElement.label, frictionCoefficientFilteredElement.units, frictionCoefficientFilteredElement.color);
   ry = y + rw;
+
+  rw += 25;
+  p.setBrush(QColor(0, 0, 0, 0));
+  QRect ldu(x, y, rw, 50);
 }
 
 // ############################## DEV UI END ##############################
