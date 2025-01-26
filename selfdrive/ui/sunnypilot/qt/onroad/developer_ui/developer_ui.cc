@@ -94,7 +94,7 @@ UiElement DeveloperUi::getActualLateralAccel(float curvature, float v_ego, float
   QString value = QString::number(actualLateralAccel, 'f', 2);
   QColor color = (mads_enabled && lat_active) ? QColor(255, 255, 255, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Lateral Accel", "m/s²", color);
+  return UiElement(value, "Torque Controller:", "m/s²", color);
 }
 
 // Add Desired Steering Angle when using PID
@@ -161,7 +161,7 @@ UiElement DeveloperUi::getFrictionCoefficientFiltered(float friction_coefficient
   QString value = QString::number(friction_coefficient_filtered, 'f', 3);
   QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Friction:", "(Learning)", color);
+  return UiElement(value, "Friction:", "(Auto-calibrating for your car)", color);
 }
 
 // Add Lateral Acceleration Factor Raw from torqued
@@ -170,7 +170,7 @@ UiElement DeveloperUi::getLatAccelFactorFiltered(float lat_accel_factor_filtered
   QString value = QString::number(lat_accel_factor_filtered, 'f', 3);
   QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Max Torque:", "(Learning)", color);
+  return UiElement(value, "Recorded:", "", color);
 }
 
 // Add Steering Torque from Car EPS
@@ -179,7 +179,7 @@ UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
   QString value = QString::number(std::fabs(steering_torque_eps), 'f', 1);
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Torque:", "N·dm", color);
+  return UiElement(value, "Applied Torque:", "N·dm", color);
 }
 
 // Add Bearing Degree and Direction from Car (Compass)
