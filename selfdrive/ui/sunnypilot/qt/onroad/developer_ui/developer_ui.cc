@@ -171,7 +171,7 @@ UiElement DeveloperUi::getLatAccelFactorFiltered(float lat_accel_factor_filtered
   QString value = QString::number(lat_accel_factor_filtered, 'f', 3);
   QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "Max:", "", color);
+  return UiElement(value, "Max:", "", color0);
 }
 
 // Add Steering Torque from Car EPS
