@@ -164,7 +164,7 @@ UiElement DeveloperUi::getFrictionCoefficientFiltered(float friction_coefficient
   return UiElement(value, "Friction:", "(Auto-calibrating for your car)", color);
 }
 
-// Add Lateral Acceleration Factor Raw from torqued
+// Add Lateral Acceleration Factor Raw from torqued // compile
 // Unit: m/s²
 UiElement DeveloperUi::getLatAccelFactorFiltered(float lat_accel_factor_filtered, bool live_valid) {
   QString value = QString::number(lat_accel_factor_filtered, 'f', 3);
