@@ -150,7 +150,7 @@ def create_ui_commands(packer, CAN, CP, enabled, pcm_speed, hud, is_metric, acc_
       'CRUISE_SPEED': hud.v_cruise,
       'ENABLE_MINI_CAR': 1 if enabled else 0,
       # only moves the lead car without ACC_ON
-      'HUD_DISTANCE': get_object_gap(lead_distance), # 5: >30, m, 4: 25-30 m, 3: 20-25 m, 2: < 20 m, 0: no lead
+      'HUD_DISTANCE': (hud.lead_distance_bars + 1) % 4,  # wraps to 0 at 4 bars
       'IMPERIAL_UNIT': int(not is_metric),
       'HUD_LEAD': 2 if enabled and hud.lead_visible else 1 if enabled else 0,
       'SET_ME_X01_2': 1,
@@ -162,6 +162,7 @@ def create_ui_commands(packer, CAN, CP, enabled, pcm_speed, hud, is_metric, acc_
       acc_hud_values['FCM_OFF_2'] = 0
     else:
       # Shows the distance bars, TODO: stock camera shows updates temporarily while disabled
+      acc_hud_values['ACC_ON'] = int(enabled)
       acc_hud_values['PCM_SPEED'] = pcm_speed * CV.MS_TO_KPH
       acc_hud_values['PCM_GAS'] = hud.pcm_accel
       acc_hud_values['SET_ME_X01'] = 1
@@ -215,25 +216,3 @@ def spam_buttons_command(packer, CAN, button_val, car_fingerprint):
   # send buttons to camera on radarless cars
   bus = CAN.camera if car_fingerprint in HONDA_BOSCH_RADARLESS else CAN.pt
   return packer.make_can_msg("SCM_BUTTONS", bus, values)
-
-def get_object_gap(lead_distance: float) -> int:
-  if lead_distance <= 0:
-    return 0
-
-  # Define distance ranges and corresponding values.
-  ranges = [(30, 4),
-            (25, 3),
-            (20, 2),
-            (0,  1)]
-
-  # The next function scans through 'ranges' in ascending order,
-  # returning the associated distance range for the first range
-  # whose lower bound is exceeded by lead_distance.
-  #
-  # If lead_distance does not exceed any bounds, it defaults to 4 (no lead).
-  #
-  # For example: if lead_distance is 22, then 3 (20-25 m) is returned.
-  # This is because 22 is greater than the lower bound of this range (20),
-  # but does not exceed the next range's lower bound (25).
-  return next((gap for dist, gap in ranges if lead_distance > dist), 4)
-
