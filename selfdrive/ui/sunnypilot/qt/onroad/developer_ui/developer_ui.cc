@@ -161,7 +161,7 @@ UiElement DeveloperUi::getFrictionCoefficientFiltered(float friction_coefficient
   QString value = QString::number(friction_coefficient_filtered, 'f', 3);
   QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "/////", "Live Torque // Learned Max Torque // Learned Friction", color);
+  return UiElement(value, "Friction:", "(Learning)", color);
 }
 
 // Add Lateral Acceleration Factor Raw from torqued
@@ -170,7 +170,7 @@ UiElement DeveloperUi::getLatAccelFactorFiltered(float lat_accel_factor_filtered
   QString value = QString::number(lat_accel_factor_filtered, 'f', 3);
   QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "/////", "m/s²", color);
+  return UiElement(value, "Max Torque:", "(Learning)", color);
 }
 
 // Add Steering Torque from Car EPS
@@ -179,7 +179,7 @@ UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
   QString value = QString::number(std::fabs(steering_torque_eps), 'f', 1);
   QColor color = QColor(255, 255, 255, 255);
 
-  return UiElement(value, "", "N·dm", color);
+  return UiElement(value, "Torque:", "N·dm", color);
 }
 
 // Add Bearing Degree and Direction from Car (Compass)
