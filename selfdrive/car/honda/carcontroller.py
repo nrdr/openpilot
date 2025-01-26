@@ -154,6 +154,7 @@ class CarController(CarControllerBase):
     self.v_tsc = 0
     self.m_tsc = 0
     self.steady_speed = 0
+    self.lead_distance = 0
 
   def update(self, CC, CS, now_nanos):
     if not self.CP.pcmCruiseSpeed:
@@ -320,11 +321,15 @@ class CarController(CarControllerBase):
               self.gas = 0.0
             can_sends.append(create_gas_interceptor_command(self.packer, self.gas, self.frame // 2))
 
+      # Parse lead distance from radarState and display the corresponding distance in the car's cluster
+      if self.CP.openpilotLongitudinalControl and self.sm.updated['radarState'] and self.frame % 5 == 0:
+        self.lead_distance = self.calculate_lead_distance(hud_control)
+
     # Send dashboard UI commands.
     if self.frame % 10 == 0:
       hud = HUDData(int(pcm_accel), int(round(hud_v_cruise)), hud_control.leadVisible,
                     hud_control.lanesVisible, fcw_display, acc_alert, steer_required, hud_control.leadDistanceBars, CS.madsEnabled and not CC.latActive)
-      can_sends.extend(hondacan.create_ui_commands(self.packer, self.CAN, self.CP, CC.enabled and CS.out.cruiseState.enabled, pcm_speed, hud, CS.is_metric, CS.acc_hud, CS.lkas_hud, CC.latActive))
+      can_sends.extend(hondacan.create_ui_commands(self.packer, self.CAN, self.CP, CC.enabled and CS.out.cruiseState.enabled, pcm_speed, hud, CS.is_metric, CS.acc_hud, CS.lkas_hud, CC.latActive, self.lead_distance))
 
       if self.CP.openpilotLongitudinalControl and self.CP.carFingerprint not in HONDA_BOSCH:
         self.speed = pcm_speed
