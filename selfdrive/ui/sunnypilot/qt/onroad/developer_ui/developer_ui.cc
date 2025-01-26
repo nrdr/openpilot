@@ -161,7 +161,7 @@ UiElement DeveloperUi::getFrictionCoefficientFiltered(float friction_coefficient
   QString value = QString::number(friction_coefficient_filtered, 'f', 3);
   QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "", "      Lateral Accel//Max Lateral Accel//Friction", color);
+  return UiElement(value, "", "         Lateral Accel//Max Lateral Accel//Friction", color);
 }
 
 // Add Lateral Acceleration Factor Raw from torqued // compile
