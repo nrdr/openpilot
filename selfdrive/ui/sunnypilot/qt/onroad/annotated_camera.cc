@@ -800,7 +800,7 @@ void AnnotatedCameraWidgetSP::drawRightDevUi(QPainter &p, int x, int y) {
   ry = y + rh;
 
   UiElement steeringTorqueEpsElement = DeveloperUi::getSteeringTorqueEps(steeringTorqueEps);
-  rh += drawNewDevUi(p, x, ry, steeringTorqueEpsElement.value, steeringTorqueEpsElement.label, steeringTorqueEpsElement.units, steeringTorqueEpsElement.color);
+  rh += drawDevUiRight(p, x, ry, steeringTorqueEpsElement.value, steeringTorqueEpsElement.label, steeringTorqueEpsElement.units, steeringTorqueEpsElement.color);
   ry = y + rh;
 
   UiElement altitudeElement = DeveloperUi::getAltitude(gpsAccuracy, altitude);
