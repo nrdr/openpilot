@@ -136,10 +136,10 @@ TogglesPanelSP::TogglesPanelSP(SettingsWindow *parent) : TogglesPanel(parent) {
   };
 
 
-  std::vector<QString> longi_button_texts{tr("Hurry"), tr("Standard"), tr("Chill"), tr("Econ")};
+  std::vector<QString> longi_button_texts{tr("Standard"), tr("Chill"), tr("Econ"), tr("Hurry")};
   long_personality_setting = new ButtonParamControlSP("LongitudinalPersonality", tr("Driving Personality"),
-                                          tr("Standard is recommended. In moderate/aggressive mode, sunnypilot will follow lead cars closer and be more aggressive with the gas and brake. "
-                                             "In relaxed mode sunnypilot will stay further away from lead cars. On supported cars, you can cycle through these personalities with "
+                                          tr("Driving style profiles that change following distance, acceleration, and jerk factor of the vehicle."
+                                             "On supported cars, you can cycle through these personalities with "
                                              "your steering wheel distance button."),
                                           "",
                                           longi_button_texts,
@@ -149,9 +149,9 @@ TogglesPanelSP::TogglesPanelSP(SettingsWindow *parent) : TogglesPanel(parent) {
   // accel controller
   std::vector<QString> accel_personality_texts{tr("Dynamic"), tr("Dynamic"), tr("Dynamic"), tr("Stock")};
   accel_personality_setting = new ButtonParamControlSP("AccelPersonality", tr("Acceleration Personality"),
-                                          tr("Normal is recommended. In sport mode, sunnypilot will provide aggressive acceleration for a dynamic driving experience. "
-                                             "In eco mode, sunnypilot will apply smoother and more relaxed acceleration. On supported cars, you can cycle through these "
-                                             "acceleration personality within Onroad Settings on the driving screen."),
+                                          tr("These profiles will automatically sync with the personality from above."
+                                             "Should you want to disable this for some reason, choose stock."
+                                             "Otherwise, they should be left alone. This is mostly automatic."),
                                           "",
                                           accel_personality_texts);
   accel_personality_setting->showDescription();

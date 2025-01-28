@@ -44,7 +44,7 @@ const int UI_ROAD_NAME_MARGIN_X = 14;
 
 struct FeatureStatusText {
   const QStringList dlp_list_text = { "Laneful",    "Laneless", "Auto"};
-  const QStringList gac_list_text = { "Hurry ⚡", "Standard", "Chill ❄️", "Econ 🌿"};
+  const QStringList gac_list_text = { "Standard", "Chill ❄️", "Econ 🌿", "Hurry ⚡"};
   const QStringList slc_list_text = { "Inactive",   "Temp Off", "Adapting", "Active", "Pre-Active"};
 };
 

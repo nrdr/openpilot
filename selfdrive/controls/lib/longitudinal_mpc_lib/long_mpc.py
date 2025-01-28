@@ -59,13 +59,13 @@ STOP_DISTANCE = 6.0
 
 def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.aggressive):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
-    return 1.0
+    return 0.8 # 1 bar. Last logic was 1.0
   elif personality==custom.LongitudinalPersonalitySP.standard:
-    return 1.0
+    return 1.0 # 4 bar. Last logic was 1.0
   elif personality==custom.LongitudinalPersonalitySP.moderate:
-    return 0.9
+    return 1.0 # 3 bar. Last logic was 0.9
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
-    return 0.8
+    return 0.9 # 2 bar. Last logic was 0.8
   elif personality==custom.LongitudinalPersonalitySP.overtake:
     return 0.1
   else:
@@ -74,32 +74,32 @@ def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.aggressive):
 
 def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.aggressive):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
-    return 2.2
+    return 0.7 # 1 bar. Last logic was 2.2
   elif personality==custom.LongitudinalPersonalitySP.standard:
-    return 1.7
+    return 2.2 # 4 bar. Last logic was 1.7
   elif personality==custom.LongitudinalPersonalitySP.moderate:
-    return 1.2
+    return 1.7 # 3 bar. Last logic was 1.2
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
-    return 0.7
+    return 1.2 # 2 bar. Last logic was 0.7
   elif personality==custom.LongitudinalPersonalitySP.overtake:
     return 0.1
   else:
     raise NotImplementedError("Longitudinal personality not supported")
 
-# Last updated: September 29, 2024
+# Last updated: Jan 28, 2025 by nrdr
 def get_dynamic_personality(v_ego, personality=custom.LongitudinalPersonalitySP.aggressive):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
     x_vel =  [0,    8.,   17.,   27.7]
-    y_dist = [2.0, 2.2,  2.2,  2.2]
+    y_dist = [2.8, 1.8,  0.8,  0.5]
   elif personality==custom.LongitudinalPersonalitySP.standard:
     x_vel =  [0,    8.,   17.,   27.7]
-    y_dist = [2.8, 2.2,  2.0,  1.7]
+    y_dist = [2.0, 2.2,  2.2,  2.2]
   elif personality==custom.LongitudinalPersonalitySP.moderate:
     x_vel =  [0,    8.,   17.,   27.7]
-    y_dist = [2.8, 1.8,  1.5,  1.2]
+    y_dist = [2.8, 2.2,  2.0,  1.7]
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
     x_vel =  [0,    8.,   17.,   27.7]
-    y_dist = [2.8, 1.8,  0.8,  0.5]
+    y_dist = [2.8, 1.8,  1.5,  1.2]
   elif personality==custom.LongitudinalPersonalitySP.overtake:
     x_vel =  [0, 40.2]
     y_dist = [0.1, 0.1]

@@ -355,16 +355,16 @@ void OptionWidget::updateGapAdjustCruise(QString param) {
   auto lp = atoi(params.get(param.toStdString()).c_str());
 
   if (lp == 0) {
-    title_text = "Hurry ⚡";
+    title_text = "Standard";
     icon_color = "#ff4b4b";
   } else if (lp == 1) {
-    title_text = "Standard";
+    title_text = "Chill ❄️";
     icon_color = "#fcff4b";
   } else if (lp == 2) {
-    title_text = "Chill ❄️";
+    title_text = "Econ 🌿";
     icon_color = "#4bff66";
   } else if (lp == 3) {
-    title_text = "Econ 🌿";
+    title_text = "Hurry ⚡";
     icon_color = "#6a0ac9";
   }
 
