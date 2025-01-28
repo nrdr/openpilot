@@ -998,8 +998,8 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
   const int drop_shadow_size = 4;
   const int eclipse_x_offset = 25;
   const int eclipse_y_offset = 20;
-  const int w = 16;
-  const int h = 16;
+  const int w = 20;
+  const int h = 20;
 
   const bool longitudinal = hasLongitudinalControl(car_params);
 
