@@ -147,7 +147,7 @@ TogglesPanelSP::TogglesPanelSP(SettingsWindow *parent) : TogglesPanel(parent) {
   long_personality_setting->showDescription();
 
   // accel controller
-  std::vector<QString> accel_personality_texts{tr("Sport"), tr("Normal"), tr("Eco"), tr("Stock")};
+  std::vector<QString> accel_personality_texts{tr("Dynamic"), tr("Dynamic"), tr("Dynamic"), tr("Stock")};
   accel_personality_setting = new ButtonParamControlSP("AccelPersonality", tr("Acceleration Personality"),
                                           tr("Normal is recommended. In sport mode, sunnypilot will provide aggressive acceleration for a dynamic driving experience. "
                                              "In eco mode, sunnypilot will apply smoother and more relaxed acceleration. On supported cars, you can cycle through these "
