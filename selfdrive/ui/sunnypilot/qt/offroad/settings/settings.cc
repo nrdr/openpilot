@@ -136,7 +136,7 @@ TogglesPanelSP::TogglesPanelSP(SettingsWindow *parent) : TogglesPanel(parent) {
   };
 
 
-  std::vector<QString> longi_button_texts{tr("Aggressive"), tr("Moderate"), tr("Standard"), tr("Relaxed")};
+  std::vector<QString> longi_button_texts{tr("Hurry"), tr("Standard"), tr("Chill"), tr("Econ")};
   long_personality_setting = new ButtonParamControlSP("LongitudinalPersonality", tr("Driving Personality"),
                                           tr("Standard is recommended. In moderate/aggressive mode, sunnypilot will follow lead cars closer and be more aggressive with the gas and brake. "
                                              "In relaxed mode sunnypilot will stay further away from lead cars. On supported cars, you can cycle through these personalities with "
