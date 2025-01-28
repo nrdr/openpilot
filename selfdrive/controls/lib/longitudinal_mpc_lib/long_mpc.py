@@ -57,7 +57,7 @@ T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 COMFORT_BRAKE = 2.5
 STOP_DISTANCE = 6.0
 
-def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.standard):
+def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.relaxed):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
     return 1.0
   elif personality==custom.LongitudinalPersonalitySP.standard:
@@ -72,7 +72,7 @@ def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.standard):
     raise NotImplementedError("Longitudinal personality not supported")
 
 
-def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.standard):
+def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.relaxed):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
     return 2.2
   elif personality==custom.LongitudinalPersonalitySP.standard:
@@ -82,12 +82,12 @@ def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.standard):
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
     return 0.7
   elif personality==custom.LongitudinalPersonalitySP.overtake:
-    return 0.25
+    return 0.1
   else:
     raise NotImplementedError("Longitudinal personality not supported")
 
 # Last updated: September 29, 2024
-def get_dynamic_personality(v_ego, personality=custom.LongitudinalPersonalitySP.standard):
+def get_dynamic_personality(v_ego, personality=custom.LongitudinalPersonalitySP.relaxed):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
     x_vel =  [0,    8.,   17.,   27.7]
     y_dist = [2.0, 2.2,  2.2,  2.2]
@@ -99,10 +99,10 @@ def get_dynamic_personality(v_ego, personality=custom.LongitudinalPersonalitySP.
     y_dist = [2.8, 1.8,  1.5,  1.2]
   elif personality==custom.LongitudinalPersonalitySP.aggressive:
     x_vel =  [0,    8.,   17.,   27.7]
-    y_dist = [2.8, 1.8,  1.2,  0.7]
+    y_dist = [2.8, 1.8,  0.8,  0.5]
   elif personality==custom.LongitudinalPersonalitySP.overtake:
     x_vel =  [0, 40.2]
-    y_dist = [0.25, 0.25]
+    y_dist = [0.1, 0.1]
   else:
     raise NotImplementedError("Dynamic personality not supported")
   return np.interp(v_ego, x_vel, y_dist)
