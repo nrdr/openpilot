@@ -770,7 +770,7 @@ void AnnotatedCameraWidgetSP::drawCenteredLeftText(QPainter &p, int x, int y, co
 }
 
 int AnnotatedCameraWidgetSP::drawDevUiRight(QPainter &p, int x, int y, const QString &value, const QString &label, const QString &units, QColor &color) {
-  p.setFont(InterFont(30 * 2, QFont::Bold));
+  p.setFont(InterFont(30 * 2, QFont::Black));
   drawColoredText(p, x + 92, y + 80, value, color);
 
   p.setFont(InterFont(28, QFont::Bold));
@@ -817,14 +817,14 @@ void AnnotatedCameraWidgetSP::drawRightDevUi(QPainter &p, int x, int y) {
 }
 
 int AnnotatedCameraWidgetSP::drawNewDevUi(QPainter &p, int x, int y, const QString &value, const QString &label, const QString &units, QColor &color) {
-  p.setFont(InterFont(38, QFont::Bold));
+  p.setFont(InterFont(38, QFont::Black));
   drawCenteredLeftText(p, x, y, label, whiteColor(), value, units, color);
 
   return 430;
 }
 
 void AnnotatedCameraWidgetSP::drawNewDevUi2(QPainter &p, int x, int y) {
-  int rw = 80;
+  int rw = 200;
 
   UiElement aEgoElement = DeveloperUi::getAEgo(aEgo);
   rw += drawNewDevUi(p, rw, y, aEgoElement.value, aEgoElement.label, aEgoElement.units, aEgoElement.color);
