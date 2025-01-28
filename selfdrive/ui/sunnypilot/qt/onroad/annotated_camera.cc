@@ -826,6 +826,9 @@ int AnnotatedCameraWidgetSP::drawNewDevUi(QPainter &p, int x, int y, const QStri
 void AnnotatedCameraWidgetSP::drawNewDevUi2(QPainter &p, int x, int y) {
   int rw = 80;
 
+  UiElement aEgoElement = DeveloperUi::getAEgo(aEgo);
+  rw += drawNewDevUi(p, rw, y, aEgoElement.value, aEgoElement.label, aEgoElement.units, aEgoElement.color);
+
   UiElement actualLateralAccelElement = DeveloperUi::getActualLateralAccel(curvature, vEgo, roll, madsEnabled, latActive);
   rw += drawNewDevUi(p, rw, y, actualLateralAccelElement.value, actualLateralAccelElement.label, actualLateralAccelElement.units, actualLateralAccelElement.color);
 

@@ -41,7 +41,7 @@ UiElement DeveloperUi::getDRel(bool lead_status, float lead_d_rel) {
   if (lead_status) {
     // Orange if close, Red if very close
     if (lead_d_rel < 5) {
-      color = QColor(255, 0, 0, 255);
+      color = QColor(46, 111, 64, 255);
     } else if (lead_d_rel < 15) {
       color = QColor(255, 188, 0, 255);
     }
@@ -62,7 +62,7 @@ UiElement DeveloperUi::getVRel(bool lead_status, float lead_v_rel, bool is_metri
     if (lead_v_rel < -4.4704) {
       color = QColor(255, 0, 0, 255);
     } else if (lead_v_rel < 0) {
-      color = QColor(255, 188, 0, 255);
+      color = QColor(46, 111, 64, 255);
     }
   }
 
@@ -73,7 +73,7 @@ UiElement DeveloperUi::getVRel(bool lead_status, float lead_v_rel, bool is_metri
 // Unit: Degrees
 UiElement DeveloperUi::getSteeringAngleDeg(float angle_steers, bool mads_enabled, bool lat_active) {
   QString value = QString("%1%2%3").arg(QString::number(angle_steers, 'f', 1)).arg("°").arg("");
-  QColor color = (mads_enabled && lat_active) ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
+  QColor color = (mads_enabled && lat_active) ? QColor(46, 111, 64, 255) : QColor(46, 111, 64, 255);
 
   // Red if large steering angle
   // Orange if moderate steering angle
@@ -92,9 +92,9 @@ UiElement DeveloperUi::getActualLateralAccel(float curvature, float v_ego, float
   double actualLateralAccel = (curvature * pow(v_ego, 2)) - (roll * 9.81);
 
   QString value = QString::number(actualLateralAccel, 'f', 2);
-  QColor color = (mads_enabled && lat_active) ? QColor(255, 255, 255, 255) : QColor(255, 255, 255, 255);
+  QColor color = (mads_enabled && lat_active) ? QColor(46, 111, 64, 255) : QColor(46, 111, 64, 255);''
 
-  return UiElement(value, "", "(m/s²)", color);
+  return UiElement(value, "", "LATERAL", color);
 }
 
 // Add Desired Steering Angle when using PID
@@ -122,7 +122,7 @@ UiElement DeveloperUi::getSteeringAngleDesiredDeg(bool mads_enabled, bool lat_ac
 // Unit: Percent
 UiElement DeveloperUi::getMemoryUsagePercent(int memory_usage_percent) {
   QString value = QString("%1%2").arg(QString::number(memory_usage_percent, 'd', 0)).arg("%");
-  QColor color = (memory_usage_percent > 85) ? QColor(255, 188, 0, 255) : QColor(255, 255, 255, 255);
+  QColor color = (memory_usage_percent > 85) ? QColor(255, 188, 0, 255) : QColor(46, 111, 64, 255);
 
   return UiElement(value, "Memory", "", color);
 }
@@ -131,16 +131,16 @@ UiElement DeveloperUi::getMemoryUsagePercent(int memory_usage_percent) {
 // Unit: m/s²
 UiElement DeveloperUi::getAEgo(float a_ego) {
   QString value = QString::number(a_ego, 'f', 1);
-  QColor color = QColor(255, 255, 255, 255);
+  QColor color = QColor(46, 111, 64, 255);
 
-  return UiElement(value, "Gravity Force", "m/s²", color);
+  return UiElement(value, "", "LONG", color);
 }
 
 // Add Relative Velocity to Primary Lead Car
 // Unit: kph if metric, else mph
 UiElement DeveloperUi::getVEgoLead(bool lead_status, float lead_v_rel, float v_ego, bool is_metric, const QString &speed_unit) {
   QString value = lead_status ? QString::number((lead_v_rel + v_ego) * (is_metric ? MS_TO_KPH : MS_TO_MPH), 'f', 0) : "-";
-  QColor color = QColor(255, 255, 255, 255);
+  QColor color = QColor(46, 111, 64, 255);
 
   if (lead_status) {
     // Red if approaching faster than 10mph
@@ -159,9 +159,9 @@ UiElement DeveloperUi::getVEgoLead(bool lead_status, float lead_v_rel, float v_e
 // Unit: None
 UiElement DeveloperUi::getFrictionCoefficientFiltered(float friction_coefficient_filtered, bool live_valid) {
   QString value = QString::number(friction_coefficient_filtered, 'f', 3);
-  QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
+  QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(46, 111, 64, 255);
 
-  return UiElement(value, "", "         Lateral Accel//Max Lateral Accel//Friction", color);
+  return UiElement(value, "", "FRICTION", color);
 }
 
 // Add Lateral Acceleration Factor Raw from torqued // compile
@@ -169,16 +169,16 @@ UiElement DeveloperUi::getFrictionCoefficientFiltered(float friction_coefficient
 // Force Compile
 UiElement DeveloperUi::getLatAccelFactorFiltered(float lat_accel_factor_filtered, bool live_valid) {
   QString value = QString::number(lat_accel_factor_filtered, 'f', 3);
-  QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(255, 255, 255, 255);
+  QColor color = live_valid ? QColor(0, 255, 0, 255) : QColor(46, 111, 64, 255);
 
-  return UiElement(value, "", "(m/s²)", color);
+  return UiElement(value, "", "MAX LAT", color);
 }
 
 // Add Steering Torque from Car EPS
 // Unit: Newton Meters
 UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
   QString value = QString::number(std::fabs(steering_torque_eps), 'f', 1);
-  QColor color = QColor(255, 255, 255, 255);
+  QColor color = QColor(46, 111, 64, 255);
 
   return UiElement(value, "Applied Torque", "N·dm", color);
 }
@@ -187,7 +187,7 @@ UiElement DeveloperUi::getSteeringTorqueEps(float steering_torque_eps) {
 // Unit: Meters
 UiElement DeveloperUi::getBearingDeg(float bearing_accuracy_deg, float bearing_deg) {
   QString value = (bearing_accuracy_deg != 180.00) ? QString("%1%2%3").arg(QString::number(bearing_deg, 'd', 0)).arg("°").arg("") : "-";
-  QColor color = QColor(255, 255, 255, 255);
+  QColor color = QColor(46, 111, 64, 255);
   QString dir_value;
 
   if (bearing_accuracy_deg != 180.00) {
@@ -219,7 +219,7 @@ UiElement DeveloperUi::getBearingDeg(float bearing_accuracy_deg, float bearing_d
 // Unit: Meters
 UiElement DeveloperUi::getAltitude(float gps_accuracy, float altitude) {
   QString value = (gps_accuracy != 0.00) ? QString::number(altitude, 'f', 1) : "-";
-  QColor color = QColor(255, 255, 255, 255);
+  QColor color = QColor(46, 111, 64, 255);
 
   return UiElement(value, "Elevation", "m", color);
 }
