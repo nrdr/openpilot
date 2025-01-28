@@ -92,7 +92,7 @@ UiElement DeveloperUi::getActualLateralAccel(float curvature, float v_ego, float
   double actualLateralAccel = (curvature * pow(v_ego, 2)) - (roll * 9.81);
 
   QString value = QString::number(actualLateralAccel, 'f', 2);
-  QColor color = (mads_enabled && lat_active) ? QColor(46, 111, 64, 255) : QColor(46, 111, 64, 255);''
+  QColor color = (mads_enabled && lat_active) ? QColor(46, 111, 64, 255) : QColor(46, 111, 64, 255);
 
   return UiElement(value, "", "LATERAL", color);
 }
