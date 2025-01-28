@@ -45,10 +45,10 @@ class AccelController:
     self._personality = AccelPersonality.stock
 
   def _dp_calc_cruise_accel_limits(self, v_ego: float) -> tuple[float, float]:
-    if self._personality == AccelPersonality.eco:
+    if self._personality == custom.LongitudinalPersonalitySP.relaxed:
       min_v = _DP_CRUISE_MIN_V_ECO
       max_v = _DP_CRUISE_MAX_V_ECO
-    elif self._personality == AccelPersonality.sport:
+    elif self._personality == custom.LongitudinalPersonalitySP.aggressive:
       min_v = _DP_CRUISE_MIN_V_SPORT
       max_v = _DP_CRUISE_MAX_V_SPORT
     else:
