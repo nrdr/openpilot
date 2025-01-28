@@ -351,20 +351,20 @@ void OptionWidget::updateDynamicLaneProfile(QString param) {
 void OptionWidget::updateGapAdjustCruise(QString param) {
   auto icon_color = "#3B4356";
   auto title_text = "";
-  auto subtitle_text = "Driving Personality";
+  auto subtitle_text = "Follow Distance";
   auto lp = atoi(params.get(param.toStdString()).c_str());
 
   if (lp == 0) {
-    title_text = "Standard";
+    title_text = "Medium";
     icon_color = "#ff4b4b";
   } else if (lp == 1) {
-    title_text = "Chill ❄️";
+    title_text = "Far";
     icon_color = "#fcff4b";
   } else if (lp == 2) {
-    title_text = "Econ 🌿";
+    title_text = "Relaxed";
     icon_color = "#4bff66";
   } else if (lp == 3) {
-    title_text = "Hurry ⚡";
+    title_text = "Short";
     icon_color = "#6a0ac9";
   }
 
@@ -380,7 +380,7 @@ void OptionWidget::updateGapAdjustCruise(QString param) {
 void OptionWidget::updateAccelerationPersonality(QString param) {
   auto icon_color = "#3B4356";
   auto title_text = "";
-  auto subtitle_text = "Acceleration Personality";
+  auto subtitle_text = "Speed Profile";
   auto ap = atoi(params.get(param.toStdString()).c_str());
 
   if (ap == 0) {
