@@ -384,10 +384,16 @@ void OptionWidget::updateAccelerationPersonality(QString param) {
   auto ap = atoi(params.get(param.toStdString()).c_str());
 
   if (ap == 0) {
-    title_text = "Automatic";
+    title_text = "Sport";
     icon_color = "#ff4b4b";
+  } else if (ap == 1) {
+    title_text = "Normal";
+    icon_color = "#fcff4b";
+  } else if (ap == 2) {
+    title_text = "Eco";
+    icon_color = "#4bff66";
   } else if (ap == 3) {
-    title_text = "Off";
+    title_text = "Stock";
     icon_color = "#6a0ac9";
   }
 
