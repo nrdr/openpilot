@@ -94,7 +94,7 @@ UiElement DeveloperUi::getActualLateralAccel(float curvature, float v_ego, float
   QString value = QString::number(actualLateralAccel, 'f', 2);
   QColor color = (mads_enabled && lat_active) ? QColor(255, 255, 255, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "", "◄ Force ► (m/s²)", color);
+  return UiElement(value, "", "◄ Force ►", color);
 }
 
 // Add Desired Steering Angle when using PID
@@ -133,7 +133,7 @@ UiElement DeveloperUi::getAEgo(float a_ego) {
   QString value = QString::number(a_ego, 'f', 1);
   QColor color = QColor(0, 255, 255, 255);
 
-  return UiElement(value, "", "▲ Force ▼ (m/s²)", color);
+  return UiElement(value, "", "▲ Force ▼", color);
 }
 
 // Add Relative Velocity to Primary Lead Car
