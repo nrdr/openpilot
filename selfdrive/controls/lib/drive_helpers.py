@@ -155,7 +155,7 @@ class VCruiseHelper:
 
     v_cruise_delta = 1. if is_metric else IMPERIAL_INCREMENT
     v_cruise_delta_mltplr = 10 if is_metric else 5
-
+    v_cruise_delta_mltplrsingle = IMPERIAL_INCREMENT
 
     for b in CS.buttonEvents:
       if b.type.raw in self.button_timers and not b.pressed:
@@ -187,13 +187,13 @@ class VCruiseHelper:
     if not self.button_change_states[button_type]["enabled"]:
       return
 
-    pressed_value = (1 if long_press else v_cruise_delta_mltplr) if reverse_acc else (v_cruise_delta_mltplr if long_press else 1)
+    pressed_value = (v_cruise_delta_mltplrsingle if long_press else v_cruise_delta_mltplr) if reverse_acc else (v_cruise_delta_mltplr if long_press else v_cruise_delta_mltplrsingle)
     long_press_state = not long_press if reverse_acc else long_press
     v_cruise_delta = v_cruise_delta * pressed_value
-    if long_press_state and self.v_cruise_kph % v_cruise_delta != 0:  # partial interval
+    if self.v_cruise_kph % v_cruise_delta != 0:  # partial interval
       self.v_cruise_kph = CRUISE_NEAREST_FUNC[button_type](self.v_cruise_kph / v_cruise_delta) * v_cruise_delta
     else:
-      self.v_cruise_kph = CRUISE_NEAREST_FUNC[button_type](self.v_cruise_kph / v_cruise_delta) * v_cruise_delta # For Honda always do partial otherwise error
+      self.v_cruise_kph += v_cruise_delta * CRUISE_INTERVAL_SIGN[button_type]
 
     # If set is pressed while overriding, clip cruise speed to minimum of vEgo
     if CS.gasPressed and button_type in (ButtonType.decelCruise, ButtonType.setCruise):
