@@ -994,8 +994,8 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
   const FeatureStatusColor feature_color;
   const QColor text_color = whiteColor();
   const QColor shadow_color = blackColor(38);
-  const int text_height = 34;
-  const int drop_shadow_size = 2;
+  const int text_height = 44;
+  const int drop_shadow_size = 4;
   const int eclipse_x_offset = 25;
   const int eclipse_y_offset = 20;
   const int w = 16;
