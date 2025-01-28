@@ -235,7 +235,7 @@ class CarController(CarControllerBase):
                                                       CS.CP.openpilotLongitudinalControl))
 
     # wind brake from air resistance decel at high speed
-    wind_brake = interp(CS.out.vEgo, [0.0, 2.3, 35.0], [0.001, 0.002, 0.8])
+    wind_brake = interp(CS.out.vEgo, [0.0, 2.3, 35.0], [0.001, 0.002, 0.15])
     # all of this is only relevant for HONDA NIDEC
     max_accel = interp(CS.out.vEgo, self.params.NIDEC_MAX_ACCEL_BP, self.params.NIDEC_MAX_ACCEL_V)
     # TODO this 1.44 is just to maintain previous behavior
@@ -314,9 +314,9 @@ class CarController(CarControllerBase):
             # Sending non-zero gas when OP is not enabled will cause the PCM not to respond to throttle as expected
             # when you do enable.
             if CC.longActive:
-              self.gas = clip(gas_mult * (gas - brake + wind_brake * 3 / 4), 0., 1.)
+              self.gas = clip(gas_mult * gas, 0., 1.)
             else:
-              wind_brake = 0.0 # Fix controls surging when cruise engaged
+              wind_brake - 0.0 # fix car surging on engagement
               self.gas = 0.0
             can_sends.append(create_gas_interceptor_command(self.packer, self.gas, self.frame // 2))
 
