@@ -73,7 +73,7 @@ UiElement DeveloperUi::getVRel(bool lead_status, float lead_v_rel, bool is_metri
 // Unit: Degrees
 UiElement DeveloperUi::getSteeringAngleDeg(float angle_steers, bool mads_enabled, bool lat_active) {
   QString value = QString("%1%2%3").arg(QString::number(angle_steers, 'f', 1)).arg("°").arg("");
-  QColor color = (mads_enabled && lat_active) ? QColor(255, 255, 255, 255); : QColor(255, 255, 255, 255);
+  QColor color = (mads_enabled && lat_active) ? QColor(255, 255, 255, 255) : QColor(255, 255, 255, 255);
 
   // Red if large steering angle
   // Orange if moderate steering angle
@@ -92,7 +92,7 @@ UiElement DeveloperUi::getActualLateralAccel(float curvature, float v_ego, float
   double actualLateralAccel = (curvature * pow(v_ego, 2)) - (roll * 9.81);
 
   QString value = QString::number(actualLateralAccel, 'f', 2);
-  QColor color = (mads_enabled && lat_active) ? QColor(0, 255, 255, 255); : QColor(0, 255, 255, 255);;
+  QColor color = (mads_enabled && lat_active) ? QColor(0, 255, 255, 255) : QColor(0, 255, 255, 255);
 
   return UiElement(value, "", "LATERAL", color);
 }
