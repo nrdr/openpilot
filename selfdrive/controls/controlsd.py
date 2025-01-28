@@ -782,7 +782,7 @@ class Controls:
     hudControl.speedVisible = self.enabled_long
     hudControl.lanesVisible = self.enabled
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
-    hudControl.leadDistanceBars = PERSONALITY_MAPPING.get(self.personality, log.LongitudinalPersonality.relaxed) - 1
+    hudControl.leadDistanceBars = PERSONALITY_MAPPING.get(self.personality, log.LongitudinalPersonality.aggressive) + 1
 
     hudControl.rightLaneVisible = True
     hudControl.leftLaneVisible = True
@@ -895,7 +895,7 @@ class Controls:
     controlsState.startMonoTime = int(start_time * 1e9)
     controlsState.forceDecel = bool(force_decel)
     controlsState.experimentalMode = self.experimental_mode
-    controlsState.personality = PERSONALITY_MAPPING.get(self.personality, log.LongitudinalPersonality.relaxed)
+    controlsState.personality = PERSONALITY_MAPPING.get(self.personality, log.LongitudinalPersonality.aggressive)
 
     lat_tuning = self.CP.lateralTuning.which()
     if self.joystick_mode:

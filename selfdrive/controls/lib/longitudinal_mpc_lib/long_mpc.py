@@ -57,7 +57,7 @@ T_DIFFS = np.diff(T_IDXS, prepend=[0.])
 COMFORT_BRAKE = 2.5
 STOP_DISTANCE = 6.0
 
-def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.relaxed):
+def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.aggressive:
   if personality==custom.LongitudinalPersonalitySP.relaxed:
     return 1.0
   elif personality==custom.LongitudinalPersonalitySP.standard:
@@ -72,7 +72,7 @@ def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.relaxed):
     raise NotImplementedError("Longitudinal personality not supported")
 
 
-def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.relaxed):
+def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.aggressive):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
     return 2.2
   elif personality==custom.LongitudinalPersonalitySP.standard:
@@ -87,7 +87,7 @@ def get_T_FOLLOW(personality=custom.LongitudinalPersonalitySP.relaxed):
     raise NotImplementedError("Longitudinal personality not supported")
 
 # Last updated: September 29, 2024
-def get_dynamic_personality(v_ego, personality=custom.LongitudinalPersonalitySP.relaxed):
+def get_dynamic_personality(v_ego, personality=custom.LongitudinalPersonalitySP.aggressive):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
     x_vel =  [0,    8.,   17.,   27.7]
     y_dist = [2.0, 2.2,  2.2,  2.2]
