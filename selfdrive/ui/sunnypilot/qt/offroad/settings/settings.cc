@@ -136,7 +136,7 @@ TogglesPanelSP::TogglesPanelSP(SettingsWindow *parent) : TogglesPanel(parent) {
   };
 
 
-  std::vector<QString> longi_button_texts{tr("Hurry"), tr("Standard"), tr("Chill"), tr("Econ")};
+  std::vector<QString> longi_button_texts{tr("Aggressive"), tr("Moderate"), tr("Standard"), tr("Relaxed")};
   long_personality_setting = new ButtonParamControlSP("LongitudinalPersonality", tr("Driving Personality"),
                                           tr("Standard is recommended. In moderate/aggressive mode, sunnypilot will follow lead cars closer and be more aggressive with the gas and brake. "
                                              "In relaxed mode sunnypilot will stay further away from lead cars. On supported cars, you can cycle through these personalities with "
@@ -145,6 +145,16 @@ TogglesPanelSP::TogglesPanelSP(SettingsWindow *parent) : TogglesPanel(parent) {
                                           longi_button_texts,
                                           380);
   long_personality_setting->showDescription();
+
+  // accel controller
+  std::vector<QString> accel_personality_texts{tr("Sport"), tr("Normal"), tr("Eco"), tr("Stock")};
+  accel_personality_setting = new ButtonParamControlSP("AccelPersonality", tr("Acceleration Personality"),
+                                          tr("Normal is recommended. In sport mode, sunnypilot will provide aggressive acceleration for a dynamic driving experience. "
+                                             "In eco mode, sunnypilot will apply smoother and more relaxed acceleration. On supported cars, you can cycle through these "
+                                             "acceleration personality within Onroad Settings on the driving screen."),
+                                          "",
+                                          accel_personality_texts);
+  accel_personality_setting->showDescription();
 
   // set up uiState update for personality setting
   QObject::connect(uiStateSP(), &UIStateSP::uiUpdate, this, &TogglesPanelSP::updateState);
