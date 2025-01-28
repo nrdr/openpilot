@@ -51,7 +51,7 @@ FCA_V_CRUISE_MIN = {
 }
 HONDA_V_CRUISE_MIN = {
   True: 0,
-  False: int( * CV.MPH_TO_KPH),
+  False: int(0 * CV.MPH_TO_KPH),
 }
 HYUNDAI_V_CRUISE_MIN = {
   True: 30,

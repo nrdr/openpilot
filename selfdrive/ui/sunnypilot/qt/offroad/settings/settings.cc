@@ -147,7 +147,7 @@ TogglesPanelSP::TogglesPanelSP(SettingsWindow *parent) : TogglesPanel(parent) {
   long_personality_setting->showDescription();
 
   // accel controller
-  std::vector<QString> accel_personality_texts{tr("Dynamic"), tr("Dynamic"), tr("Dynamic"), tr("Stock")};
+  std::vector<QString> accel_personality_texts{tr("Sport"), tr("Normal"), tr("Eco"), tr("Stock")};
   accel_personality_setting = new ButtonParamControlSP("AccelPersonality", tr("Acceleration Personality"),
                                           tr("These profiles will automatically sync with the personality from above."
                                              "Should you want to disable this for some reason, choose stock."
