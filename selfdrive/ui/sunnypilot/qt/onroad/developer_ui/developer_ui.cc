@@ -131,7 +131,7 @@ UiElement DeveloperUi::getMemoryUsagePercent(int memory_usage_percent) {
 // Unit: m/s²
 UiElement DeveloperUi::getAEgo(float a_ego) {
   QString value = QString::number(a_ego, 'f', 1);
-  QColor color = QColor(0, 255, 255, 255);
+  QColor color = QColor(255, 255, 255, 255);
 
   return UiElement(value, "", "▲ Force ▼", color);
 }
