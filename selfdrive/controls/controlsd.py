@@ -747,7 +747,7 @@ class Controls:
     if self.CP.openpilotLongitudinalControl:
       if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
         if not self.experimental_mode_update:
-          self.personality = (self.personality - 1) % 3
+          self.personality = (self.personality - 1) % 4
           self.params.put_nonblocking('LongitudinalPersonality', str(self.personality))
         self.experimental_mode_update = False
 
