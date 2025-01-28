@@ -94,7 +94,7 @@ UiElement DeveloperUi::getActualLateralAccel(float curvature, float v_ego, float
   QString value = QString::number(actualLateralAccel, 'f', 2);
   QColor color = (mads_enabled && lat_active) ? QColor(255, 255, 255, 255) : QColor(255, 255, 255, 255);
 
-  return UiElement(value, "", "◄ G-Force ►", color0);
+  return UiElement(value, "", "◄ G-Force ►", color);
 }
 
 // Add Desired Steering Angle when using PID
