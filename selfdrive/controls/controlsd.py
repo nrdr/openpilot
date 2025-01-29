@@ -743,12 +743,11 @@ class Controls:
         self.params.put_bool_nonblocking("ExperimentalMode", self.experimental_mode)
         self.experimental_mode_update = True
 
-    # decrement personality on distance button press
+    # increase personality on distance button press
     if self.CP.openpilotLongitudinalControl:
       if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
         if not self.experimental_mode_update:
           self.personality = (self.personality + 1) % 4
-          self.accel_personality = (self.accel_personality + 1) % 4
           self.params.put_nonblocking('LongitudinalPersonality', str(self.personality))
         self.experimental_mode_update = False
 

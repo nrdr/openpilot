@@ -319,6 +319,7 @@ void AnnotatedCameraWidgetSP::updateState(const UIStateSP &s) {
 
   // TODO: Add toggle variables to cereal, and parse from cereal
   longitudinalPersonality = s.scene.longitudinal_personality;
+  accelerationPersonality = scene.longitudinal_accel_personality;
   dynamicLaneProfile = s.scene.dynamic_lane_profile;
   const auto mpc_source = lp_sp.getMpcSource();
   mpcSource = mpc_source == cereal::MpcSource::BLENDED ? QString(tr("Neural Network")) : QString(tr("Legacy"));
@@ -1024,14 +1025,19 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
     y += text_height;
   };
 
+  // Accel Personality
+  if (longitudinal) {
+    drawFeatureStatusElement(longitudinalPersonality, feature_text.acc_list_text, feature_color.acc_list_color, longitudinal, "N/A", "Personality:");
+  }
+
   // Driving Personality / Gap Adjust Cruise
   if (longitudinal) {
-    drawFeatureStatusElement(longitudinalPersonality, feature_text.gac_list_text, feature_color.gac_list_color, longitudinal, "N/A", "Personality");
+    drawFeatureStatusElement(longitudinalPersonality, feature_text.gac_list_text, feature_color.gac_list_color, longitudinal, "N/A", "Distance:");
   }
 
   // Dynamic Lane Profile
   if (drivingModelGen == cereal::ModelGeneration::ONE) {
-    drawFeatureStatusElement(dynamicLaneProfile, feature_text.dlp_list_text, feature_color.dlp_list_color, true, "OFF", "Laneline Policy");
+    drawFeatureStatusElement(dynamicLaneProfile, feature_text.dlp_list_text, feature_color.dlp_list_color, true, "OFF", "Laneline Policy:");
   }
 
   // TODO: Add toggle variables to cereal, and parse from cereal

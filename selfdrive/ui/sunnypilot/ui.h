@@ -44,13 +44,15 @@ const int UI_ROAD_NAME_MARGIN_X = 14;
 
 struct FeatureStatusText {
   const QStringList dlp_list_text = { "Laneful",    "Laneless", "Auto"};
-  const QStringList gac_list_text = { "Medium", "Far", "Relaxed", "Short"};
+  const QStringList gac_list_text = { "1.0 seconds", "1.5 seconds", "2.0 seconds", "0.5 seconds"};
+  const QStringList acc_list_text = { "Hurry", "Standard", "Chill", "Default"};
   const QStringList slc_list_text = { "Inactive",   "Temp Off", "Adapting", "Active", "Pre-Active"};
 };
 
 struct FeatureStatusColor {
   const QStringList dlp_list_color = { "#2020f8",      "#0df87a",  "#0df8f8"            };
   const QStringList gac_list_color = { "#ff4b4b",      "#fcff4b",  "#4bff66", "#6a0ac9" };
+  const QStringList acc_list_text = { "#ff4b4b",      "#fcff4b",  "#4bff66", "#6a0ac9" };
   const QStringList slc_list_color = { "#ffffff",      "#ffffff",  "#fcff4b", "#4bff66", "#fcff4b" };
 };
 
