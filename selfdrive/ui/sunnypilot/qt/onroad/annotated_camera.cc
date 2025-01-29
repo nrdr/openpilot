@@ -319,7 +319,7 @@ void AnnotatedCameraWidgetSP::updateState(const UIStateSP &s) {
 
   // TODO: Add toggle variables to cereal, and parse from cereal
   longitudinalPersonality = s.scene.longitudinal_personality;
-  accelerationPersonality = scene.longitudinal_accel_personality;
+  accelerationPersonality = s.scene.longitudinal_accel_personality;
   dynamicLaneProfile = s.scene.dynamic_lane_profile;
   const auto mpc_source = lp_sp.getMpcSource();
   mpcSource = mpc_source == cereal::MpcSource::BLENDED ? QString(tr("Neural Network")) : QString(tr("Legacy"));
