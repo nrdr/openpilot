@@ -1027,7 +1027,7 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
 
   // Accel Personality
   if (longitudinal) {
-    drawFeatureStatusElement(longitudinalPersonality, feature_text.acc_list_text, feature_color.acc_list_color, longitudinal, "N/A", "Personality:");
+    drawFeatureStatusElement(accelerationPersonality, feature_text.acc_list_text, feature_color.acc_list_color, longitudinal, "N/A", "Personality:");
   }
 
   // Driving Personality / Gap Adjust Cruise
