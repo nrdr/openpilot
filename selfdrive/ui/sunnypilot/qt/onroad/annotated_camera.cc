@@ -584,7 +584,7 @@ void AnnotatedCameraWidgetSP::drawHud(QPainter &p) {
   if (!hideBottomIcons && featureStatusToggle) {
     int x = UI_BORDER_SIZE * 2 + (rightHandDM ? 600 : 370);
     int feature_status_text_x = rightHandDM ? rect().right() - x : x;
-    drawFeatureStatusText(p, feature_status_text_x, rect().bottom() - 260 - rn_offset);
+    drawFeatureStatusText(p, feature_status_text_x, rect().bottom() - 180 - rn_offset);
   }
 
   p.restore();
