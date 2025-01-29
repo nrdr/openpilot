@@ -52,7 +52,7 @@ struct FeatureStatusText {
 struct FeatureStatusColor {
   const QStringList dlp_list_color = { "#2020f8",      "#0df87a",  "#0df8f8"            };
   const QStringList gac_list_color = { "#ff4b4b",      "#fcff4b",  "#4bff66", "#6a0ac9" };
-  const QStringList acc_list_text = { "#ff4b4b",      "#fcff4b",  "#4bff66", "#6a0ac9" };
+  const QStringList acc_list_color = { "#ff4b4b",      "#fcff4b",  "#4bff66", "#6a0ac9" };
   const QStringList slc_list_color = { "#ffffff",      "#ffffff",  "#fcff4b", "#4bff66", "#fcff4b" };
 };
 
