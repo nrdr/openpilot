@@ -155,18 +155,6 @@ void OnroadSettings::changeDynamicLaneProfile() {
   refresh();
 }
 
-void OnroadSettings::changeGapAdjustCruise() {
-  UISceneSP &scene = uiStateSP()->scene;
-  const auto cp = (*uiStateSP()->sm)["carParams"].getCarParams();
-  bool can_change = hasLongitudinalControl(cp);
-  if (can_change) {
-    scene.longitudinal_personality--;
-    scene.longitudinal_personality = scene.longitudinal_personality < 0 ? 3 : scene.longitudinal_personality;
-    params.put("LongitudinalPersonality", std::to_string(scene.longitudinal_personality));
-  }
-  refresh();
-}
-
 void OnroadSettings::changeAccelerationPersonality() {
   UISceneSP &scene = uiStateSP()->scene;
   const auto cp = (*uiStateSP()->sm)["carParams"].getCarParams();
@@ -175,6 +163,18 @@ void OnroadSettings::changeAccelerationPersonality() {
     scene.longitudinal_accel_personality--;
     scene.longitudinal_accel_personality = scene.longitudinal_accel_personality < 0 ? 3 : scene.longitudinal_accel_personality;
     params.put("AccelPersonality", std::to_string(scene.longitudinal_accel_personality));
+  }
+  refresh();
+}
+
+void OnroadSettings::changeGapAdjustCruise() {
+  UISceneSP &scene = uiStateSP()->scene;
+  const auto cp = (*uiStateSP()->sm)["carParams"].getCarParams();
+  bool can_change = hasLongitudinalControl(cp);
+  if (can_change) {
+    scene.longitudinal_personality--;
+    scene.longitudinal_personality = scene.longitudinal_personality < 0 ? 3 : scene.longitudinal_personality;
+    params.put("LongitudinalPersonality", std::to_string(scene.longitudinal_personality));
   }
   refresh();
 }

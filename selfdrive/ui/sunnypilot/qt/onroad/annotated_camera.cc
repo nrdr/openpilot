@@ -1004,7 +1004,7 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
 
   const bool longitudinal = hasLongitudinalControl(car_params);
 
-  p.setFont(InterFont(32, QFont::Bold));
+  p.setFont(InterFont(42, QFont::Bold));
 
   // Define a function to draw a feature status button
   auto drawFeatureStatusElement = [&](int value, const QStringList& text_list, const QStringList& color_list, bool condition, const QString& off_text, const QString& label) {
@@ -1027,17 +1027,17 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
 
   // Accel Personality
   if (longitudinal) {
-    drawFeatureStatusElement(accelerationPersonality, feature_text.acc_list_text, feature_color.acc_list_color, longitudinal, "N/A", "Personality:");
+    drawFeatureStatusElement(accelerationPersonality, feature_text.acc_list_text, feature_color.acc_list_color, longitudinal, "N/A", "Speed Profile");
   }
 
   // Driving Personality / Gap Adjust Cruise
   if (longitudinal) {
-    drawFeatureStatusElement(longitudinalPersonality, feature_text.gac_list_text, feature_color.gac_list_color, longitudinal, "N/A", "Distance:");
+    drawFeatureStatusElement(longitudinalPersonality, feature_text.gac_list_text, feature_color.gac_list_color, longitudinal, "N/A", "Following Profile");
   }
 
   // Dynamic Lane Profile
   if (drivingModelGen == cereal::ModelGeneration::ONE) {
-    drawFeatureStatusElement(dynamicLaneProfile, feature_text.dlp_list_text, feature_color.dlp_list_color, true, "OFF", "Laneline Policy:");
+    drawFeatureStatusElement(dynamicLaneProfile, feature_text.dlp_list_text, feature_color.dlp_list_color, true, "OFF", "Laneline Policy");
   }
 
   // TODO: Add toggle variables to cereal, and parse from cereal
