@@ -111,7 +111,7 @@ SunnypilotPanel::SunnypilotPanel(QWidget *parent) : QFrame(parent) {
     },
     {
       "TorqueLateralJerk",
-      tr("NNLC Controller Lite"),
+      tr("Lateral Jerk with Torque Lateral Control (Alpha)"),
       tr("Utilizes limited lateral jerk control for improved steering response, leveraging stock torque lateral controller capabilities. Designed to mimic NNLC behavior without training models or data collection."),
       "../assets/offroad/icon_blank.png",
     },
