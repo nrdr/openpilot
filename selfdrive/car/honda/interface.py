@@ -126,13 +126,13 @@ class CarInterface(CarInterfaceBase):
         # stock filter output values:     0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108
         # modified filter output values:  0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0400, 0x0480
         # note: max request allowed is 4096, but request is capped at 3840 in firmware, so modifications result in 2x max
-        ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x4EC0, 0x5A00]
-        ret.lateralParams.torqueV = [0x0, 0x200, 0x300, 0x478, 0x5EC, 0x800, 0xA00, 0xE00, 0xF00]
+        ret.lateralParams.torqueBP = [0, 2880, 5760, 8640, 11520, 14400, 17280, 20160, 23040]
+        ret.lateralParams.torqueV = [0, 480, 960, 1440, 1920, 2400, 2880, 3360, 3840]
         ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]]
       else:
-        ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x4EC0, 0x5A00]
-        ret.lateralParams.torqueV = [0x0, 0x200, 0x300, 0x478, 0x5EC, 0x800, 0xA00, 0xE00, 0xF00]
-        ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[1.1], [0.33]]
+        ret.lateralParams.torqueBP = [0, 2880, 5760, 8640, 11520, 14400, 17280, 20160, 23040]
+        ret.lateralParams.torqueV = [0, 480, 960, 1440, 1920, 2400, 2880, 3360, 3840]
+        ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]]
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL, CAR.HONDA_CIVIC_2022):
       if eps_modified:
