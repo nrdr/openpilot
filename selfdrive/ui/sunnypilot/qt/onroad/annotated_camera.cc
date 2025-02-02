@@ -584,7 +584,7 @@ void AnnotatedCameraWidgetSP::drawHud(QPainter &p) {
   if (!hideBottomIcons && featureStatusToggle) {
     int x = UI_BORDER_SIZE * 2 + (rightHandDM ? 600 : 370);
     int feature_status_text_x = rightHandDM ? rect().right() - x : x;
-    drawFeatureStatusText(p, feature_status_text_x, rect().bottom() - 220 - rn_offset);
+    drawFeatureStatusText(p, feature_status_text_x, rect().bottom() - 250 - rn_offset);
   }
 
   p.restore();
@@ -995,7 +995,7 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
   const FeatureStatusColor feature_color;
   const QColor text_color = whiteColor();
   const QColor shadow_color = blackColor(38);
-  const int text_height = 50;
+  const int text_height = 45;
   const int drop_shadow_size = 4;
   const int eclipse_x_offset = 25;
   const int eclipse_y_offset = 20;
