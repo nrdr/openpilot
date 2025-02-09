@@ -944,7 +944,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.accFaulted: {
     ET.WARNING: Alert(
-      "Openpilot cannot send brake commands!",
+      "Openpilot may not operate correctly.",
       "The stock system was not blocked in time. Restart vehicle.",
       AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlert.none, 1.),
