@@ -42,7 +42,7 @@ class CarInterface(CarInterfaceBase):
     # The default is a linear relationship between torque and lateral acceleration (accounting for road roll and steering friction)
     friction = get_friction(lateral_accel_error, lateral_accel_deadzone, FRICTION_THRESHOLD, torque_params, friction_compensation)
     if abs(latcontrol_inputs.lateral_acceleration) > threshold_lat_accel:
-      modded_lat_accel_factor = float(torque_params.latAccelFactor) * mod_factor
+      modded_lat_accel_factor = float(torque_params.latAccelFactor) / mod_factor
       excess_lat_accel = abs(latcontrol_inputs.lateral_acceleration) - threshold_lat_accel
       torque = float(np.sign(latcontrol_inputs.lateral_acceleration)) * threshold_lat_accel / float(torque_params.latAccelFactor)
       torque += float(np.sign(latcontrol_inputs.lateral_acceleration)) * excess_lat_accel / modded_lat_accel_factor
