@@ -307,6 +307,16 @@ SunnypilotPanel::SunnypilotPanel(QWidget *parent) : QFrame(parent) {
     list->addItem(toggle);
     toggles[param.toStdString()] = toggle;
 
+  if (param == "TorquedOverride") {
+      // Control: FRICTION
+      list->addItem(friction);
+
+      // Controls: LAT_ACCEL_FACTOR
+      list->addItem(lat_accel_factor);
+
+      list->addItem(horizontal_line());
+    }
+
     if (param == "EnableMads") {
       list->addItem(madsSettingsLayout);
 
@@ -336,16 +346,6 @@ SunnypilotPanel::SunnypilotPanel(QWidget *parent) : QFrame(parent) {
 
     if (param == "CustomOffsets") {
       list->addItem(customOffsetsSettingsLayout);
-      list->addItem(horizontal_line());
-    }
-
-    if (param == "TorquedOverride") {
-      // Control: FRICTION
-      list->addItem(friction);
-
-      // Controls: LAT_ACCEL_FACTOR
-      list->addItem(lat_accel_factor);
-
       list->addItem(horizontal_line());
     }
   }
