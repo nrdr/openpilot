@@ -28,6 +28,10 @@ LOW_SPEED_X = [0, 10, 20, 30]
 LOW_SPEED_Y = [40, 5, 1, 0]
 LOW_SPEED_Y_NN = [40, 5, 1, 0]
 
+# Full friction at or below ||0.6 m/s^2||, no friction at or above ||0.8 m/s^2||
+FRICTION_X = [0.4, 0.6] # m/s^2 lateral acceleration
+FRICTION_Y = [1.0, 0.0]
+
 LAT_PLAN_MIN_IDX = 5
 
 
@@ -265,11 +269,13 @@ class LatControlTorque(LatControl):
         torque_from_measurement = self.torque_from_lateral_accel(LatControlInputs(measurement, roll_compensation, CS.vEgo, CS.aEgo), self.torque_params,
                                                                  lateral_jerk_measurement, lateral_accel_deadzone, friction_compensation=self.use_lateral_jerk, gravity_adjusted=False)
         pid_log.error = torque_from_setpoint - torque_from_measurement
+        # Downscale friction input error based on the desired lateral acceleration
         error = desired_lateral_accel - actual_lateral_accel
         if self.use_lateral_jerk:
           friction_input = self.lat_accel_friction_factor * error + self.lat_jerk_friction_factor * lookahead_lateral_jerk
         else:
-          friction_input = error
+          friction_input = desired_lateral_accel - actual_lateral_accel
+          friction_input *= np.interp(abs(desired_lateral_accel), FRICTION_X, FRICTION_Y)
         ff = self.torque_from_lateral_accel(LatControlInputs(gravity_adjusted_lateral_accel, roll_compensation, CS.vEgo, CS.aEgo), self.torque_params,
                                             friction_input, lateral_accel_deadzone, friction_compensation=True,
                                             gravity_adjusted=True)
