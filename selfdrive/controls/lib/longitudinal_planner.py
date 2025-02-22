@@ -161,7 +161,7 @@ class LongitudinalPlanner:
 
     overtaking_accel_engaged = sm['controlsStateSP'].overtakingAccelerationAssist
     # override accel using Accel Controller
-    if self.accel_controller.is_enabled(accel_personality=custom.AccelerationPersonality.stock if overtaking_accel_engaged else
+    if self.accel_controller.is_enabled(accel_personality=custom.AccelerationPersonality.sport if overtaking_accel_engaged else
                                                           sm['controlsStateSP'].accelPersonality):
       # get min, max from accel controller
       min_limit, max_limit = self.accel_controller.get_accel_limits(v_ego, accel_limits)

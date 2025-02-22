@@ -846,7 +846,7 @@ class Controls:
     self.prev_overtaking_accel_allowed = self.overtaking_accel_allowed
     if not self.overtaking_accel_allowed and not self.prev_overtaking_accel_allowed:
       self.overtaking_accel_blocked = False
-    self.overtaking_accel_allowed = ((blinker_svs.laneChangeDirection == LaneChangeDirection.right) or
+    self.overtaking_accel_allowed = ((blinker_svs.laneChangeDirection == LaneChangeDirection.right and dm_state.isRHD) or
                                      (blinker_svs.laneChangeDirection == LaneChangeDirection.left)) and \
                                     (blinker_svs.laneChangeState in (LaneChangeState.preLaneChange, LaneChangeState.laneChangeStarting)) and \
                                     not self.overtaking_accel_blocked
