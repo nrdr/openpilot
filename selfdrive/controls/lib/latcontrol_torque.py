@@ -25,8 +25,8 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 # move it at all, this is compensated for too.
 
 LOW_SPEED_X = [0, 10, 20, 30]
-LOW_SPEED_Y = [40, 12, 0, 0]
-LOW_SPEED_Y_NN = [40, 12, 0, 0]
+LOW_SPEED_Y = [12, 3, 1, 0]
+LOW_SPEED_Y_NN = [12, 3, 1, 0]
 
 # Full friction at or below ||0.6 m/s^2||, no friction at or above ||0.8 m/s^2||
 FRICTION_X = [0.4, 0.6] # m/s^2 lateral acceleration
@@ -101,7 +101,7 @@ class LatControlTorque(LatControl):
       # Note that LAT_PLAN_MIN_IDX is defined above and is used in order to prevent
       # using a "future" value that is actually planned to occur before the "current" desired
       # value, which is offset by the steerActuatorDelay.
-      self.friction_look_ahead_v = [1.4, 2.0] # how many seconds in the future to look ahead in [0, ~2.1] in 0.1 increments
+      self.friction_look_ahead_v = [2.4, 3.0] # how many seconds in the future to look ahead in [0, ~2.1] in 0.1 increments
       self.friction_look_ahead_bp = [9.0, 30.0] # corresponding speeds in m/s in [0, ~40] in 1.0 increments
 
       # Scaling the lateral acceleration "friction response" could be helpful for some.
