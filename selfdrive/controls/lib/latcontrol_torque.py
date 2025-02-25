@@ -24,9 +24,9 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 # friction in the steering wheel that needs to be overcome to
 # move it at all, this is compensated for too.
 
-LOW_SPEED_X = [0, 5, 11, 12, 20, 30]
-LOW_SPEED_Y = [100, 40, 30, 2, 1, 0]
-LOW_SPEED_Y_NN = [100, 40, 30, 2, 1, 0]
+LOW_SPEED_X = [0, 10, 20, 30]
+LOW_SPEED_Y = [30, 17, 10, 0]
+LOW_SPEED_Y_NN = [12, 3, 1, 0]
 
 # Full friction at or below ||0.6 m/s^2||, no friction at or above ||0.8 m/s^2||
 FRICTION_X = [0.4, 0.6] # m/s^2 lateral acceleration
