@@ -111,7 +111,7 @@ class CarInterface(CarInterfaceBase):
       # ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
       # honda values noted above
       ret.longitudinalTuning.kiBP = [0.,  5.,   12.,  20.,  27.,  36.]
-      ret.longitudinalTuning.kiV = [2.5, 2.6, 2.77, 2.4, 2.2, 2.1]
+      ret.longitudinalTuning.kiV = [0.2, 0.3, 0.4, 0.5, 2.0, 2.5]
 
     eps_modified = False
     for fw in car_fw:
