@@ -54,12 +54,12 @@ T_IDXS_LST = [index_function(idx, max_val=MAX_T, max_idx=N) for idx in range(N+1
 T_IDXS = np.array(T_IDXS_LST)
 FCW_IDXS = T_IDXS < 5.0
 T_DIFFS = np.diff(T_IDXS, prepend=[0.])
-COMFORT_BRAKE = 2.5
+COMFORT_BRAKE = 1.5
 STOP_DISTANCE = 6.0
 
 def get_jerk_factor(personality=custom.LongitudinalPersonalitySP.aggressive):
   if personality==custom.LongitudinalPersonalitySP.relaxed:
-    return 0.8 # 1 bar. Last logic was 1.0
+    return 0.2 # 1 bar. Last logic was 1.0
   elif personality==custom.LongitudinalPersonalitySP.standard:
     return 1.5 # 4 bar. Last logic was 1.0
   elif personality==custom.LongitudinalPersonalitySP.moderate:
