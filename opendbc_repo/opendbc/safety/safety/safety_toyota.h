@@ -4,32 +4,39 @@
 
 // Stock longitudinal
 #define TOYOTA_BASE_TX_MSGS \
-  {0x191, 0, 8}, {0x412, 0, 8}, {0x343, 0, 8}, {0x1D2, 0, 8},  /* LKAS + LTA + ACC & PCM cancel cmds */  \
+  {0x191, 0, 8, false}, {0x412, 0, 8, false}, {0x1D2, 0, 8, false},  /* LKAS + LTA + PCM cancel cmd */  \
 
 #define TOYOTA_COMMON_TX_MSGS \
   TOYOTA_BASE_TX_MSGS \
-  {0x2E4, 0, 5}, \
+  {0x2E4, 0, 5, true}, \
+  {0x343, 0, 8, false},  /* ACC cancel cmd */  \
 
 #define TOYOTA_COMMON_SECOC_TX_MSGS \
   TOYOTA_BASE_TX_MSGS \
-  {0x2E4, 0, 8}, {0x131, 0, 8}, \
+  {0x2E4, 0, 8, true}, {0x131, 0, 8, false}, \
+  {0x343, 0, 8, false},  /* ACC cancel cmd */  \
 
-#define TOYOTA_COMMON_LONG_TX_MSGS                                                                                                          \
-  TOYOTA_COMMON_TX_MSGS                                                                                                                     \
-  {0x283, 0, 7}, {0x2E6, 0, 8}, {0x2E7, 0, 8}, {0x33E, 0, 7}, {0x344, 0, 8}, {0x365, 0, 7}, {0x366, 0, 7}, {0x4CB, 0, 8},  /* DSU bus 0 */  \
-  {0x128, 1, 6}, {0x141, 1, 4}, {0x160, 1, 8}, {0x161, 1, 7}, {0x470, 1, 4},  /* DSU bus 1 */                                               \
-  {0x411, 0, 8},  /* PCS_HUD */                                                                                                             \
-  {0x750, 0, 8},  /* radar diagnostic address */                                                                                            \
+#define TOYOTA_COMMON_LONG_TX_MSGS                                                                                                                                                                  \
+  TOYOTA_COMMON_TX_MSGS                                                                                                                                                                             \
+  {0x283, 0, 7, false}, {0x2E6, 0, 8, false}, {0x2E7, 0, 8, false}, {0x33E, 0, 7, false}, {0x344, 0, 8, false}, {0x365, 0, 7, false}, {0x366, 0, 7, false}, {0x4CB, 0, 8, false},  /* DSU bus 0 */  \
+  {0x128, 1, 6, false}, {0x141, 1, 4, false}, {0x160, 1, 8, false}, {0x161, 1, 7, false}, {0x470, 1, 4, false},  /* DSU bus 1 */                                                                    \
+  {0x411, 0, 8, false},  /* PCS_HUD */                                                                                                                                                              \
+  {0x750, 0, 8, false},  /* radar diagnostic address */                                                                                                                                             \
+  {0x343, 0, 8, true},  /* ACC */                                                                                                                                                                   \
 
 #define TOYOTA_COMMON_RX_CHECKS(lta)                                                                          \
   {.msg = {{ 0xaa, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 83U}, { 0 }, { 0 }}},  \
   {.msg = {{0x260, 0, 8, .ignore_counter = true, .quality_flag = (lta), .frequency = 50U}, { 0 }, { 0 }}},    \
 
-#define TOYOTA_RX_CHECKS(lta)                                                                          \
-  TOYOTA_COMMON_RX_CHECKS(lta)                                                                         \
-  {.msg = {{0x1D2, 0, 8, .ignore_counter = true, .frequency = 33U}, { 0 }, { 0 }}},                    \
-  {.msg = {{0x224, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 40U},           \
-           {0x226, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 40U}, { 0 }}},  \
+#define TOYOTA_RX_CHECKS(lta)                                                                                  \
+  TOYOTA_COMMON_RX_CHECKS(lta)                                                                                 \
+  {.msg = {{0x1D2, 0, 8, .ignore_counter = true, .frequency = 33U}, { 0 }, { 0 }}},                            \
+  {.msg = {{0x226, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 40U},  { 0 }, { 0 }}},  \
+
+#define TOYOTA_ALT_BRAKE_RX_CHECKS(lta)                                                                       \
+  TOYOTA_COMMON_RX_CHECKS(lta)                                                                                \
+  {.msg = {{0x1D2, 0, 8, .ignore_counter = true, .frequency = 33U}, { 0 }, { 0 }}},                           \
+  {.msg = {{0x224, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 40U}, { 0 }, { 0 }}},  \
 
 #define TOYOTA_SECOC_RX_CHECKS                                                                                \
   TOYOTA_COMMON_RX_CHECKS(false)                                                                              \
@@ -393,8 +400,8 @@ static safety_config toyota_init(uint16_t param) {
   toyota_alt_brake = GET_FLAG(param, TOYOTA_PARAM_ALT_BRAKE);
   toyota_stock_longitudinal = GET_FLAG(param, TOYOTA_PARAM_STOCK_LONGITUDINAL);
   toyota_lta = GET_FLAG(param, TOYOTA_PARAM_LTA);
-  enable_gas_interceptor = GET_FLAG(param, TOYOTA_PARAM_GAS_INTERCEPTOR);
   toyota_dbc_eps_torque_factor = param & TOYOTA_EPS_FACTOR;
+  enable_gas_interceptor = GET_FLAG(param, TOYOTA_PARAM_GAS_INTERCEPTOR);
 
   // Gas interceptor should not be used if openpilot is not controlling longitudinal
   if (toyota_stock_longitudinal) {
@@ -457,14 +464,8 @@ static safety_config toyota_init(uint16_t param) {
   return ret;
 }
 
-static int toyota_fwd_hook(int bus_num, int addr) {
-
-  int bus_fwd = -1;
-
-  if (bus_num == 0) {
-    bus_fwd = 2;
-  }
-
+static bool toyota_fwd_hook(int bus_num, int addr) {
+  bool block_msg = false;
   if (bus_num == 2) {
     // block stock lkas messages and stock acc messages (if OP is doing ACC)
     // in TSS2, 0x191 is LTA which we need to block to avoid controls collision
@@ -473,13 +474,10 @@ static int toyota_fwd_hook(int bus_num, int addr) {
     is_lkas_msg |= toyota_secoc && (addr == 0x131);
     // in TSS2 the camera does ACC as well, so filter 0x343
     bool is_acc_msg = (addr == 0x343);
-    bool block_msg = is_lkas_msg || (is_acc_msg && !toyota_stock_longitudinal);
-    if (!block_msg) {
-      bus_fwd = 0;
-    }
+    block_msg = is_lkas_msg || (is_acc_msg && !toyota_stock_longitudinal);
   }
 
-  return bus_fwd;
+  return block_msg;
 }
 
 const safety_hooks toyota_hooks = {

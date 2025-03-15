@@ -241,14 +241,16 @@ def migrate_gpsLocation(msgs):
 
 @migration(inputs=["deviceState", "initData"])
 def migrate_deviceState(msgs):
+  init_data = next((m.initData for _, m in msgs if m.which() == 'initData'), None)
+  device_state = next((m.deviceState for _, m in msgs if m.which() == 'deviceState'), None)
+  if init_data is None or device_state is None:
+    return [], [], []
+
   ops = []
-  dt = None
   for i, msg in msgs:
-    if msg.which() == 'initData':
-      dt = msg.initData.deviceType
     if msg.which() == 'deviceState':
       n = msg.as_builder()
-      n.deviceState.deviceType = dt
+      n.deviceState.deviceType = init_data.deviceType
       ops.append((i, n.as_reader()))
   return ops, [], []
 
@@ -270,7 +272,7 @@ def migrate_pandaStates(msgs):
   # TODO: safety param migration should be handled automatically
   safety_param_migration = {
     "TOYOTA_PRIUS": EPS_SCALE["TOYOTA_PRIUS"] | ToyotaSafetyFlags.STOCK_LONGITUDINAL,
-    "TOYOTA_RAV4": EPS_SCALE["TOYOTA_RAV4"] | ToyotaSafetyFlags.ALT_BRAKE | ToyotaSafetyFlags.GAS_INTERCEPTOR,
+    "TOYOTA_RAV4": EPS_SCALE["TOYOTA_RAV4"] | ToyotaSafetyFlags.ALT_BRAKE,
     "KIA_EV6": HyundaiSafetyFlags.EV_GAS | HyundaiSafetyFlags.CANFD_LKA_STEERING,
   }
   # TODO: get new Ford route
