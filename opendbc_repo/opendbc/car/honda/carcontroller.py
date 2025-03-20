@@ -2,11 +2,10 @@ import numpy as np
 from collections import namedtuple
 
 from opendbc.can.packer import CANPacker
-from opendbc.car import create_gas_interceptor_command
+from opendbc.car import create_gas_interceptor_command, rate_limit
 from opendbc.car.honda import hondacan
 from opendbc.car.honda.values import CruiseButtons, VISUAL_HUD, HONDA_BOSCH, HONDA_BOSCH_RADARLESS, HONDA_NIDEC_ALT_PCM_ACCEL, CarControllerParams
 from opendbc.car.interfaces import CarControllerBase
-from opendbc.selfdrive.controls.lib.drive_helpers import rate_limit
 
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
 LongCtrlState = structs.CarControl.Actuators.LongControlState
