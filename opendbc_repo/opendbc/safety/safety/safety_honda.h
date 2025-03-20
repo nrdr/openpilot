@@ -402,8 +402,11 @@ static safety_config honda_nidec_init(uint16_t param) {
       {.msg = {{0x201, 0, 6, .ignore_checksum = true, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}},
     };
 
-    enable_gas_interceptor ? SET_RX_CHECKS(honda_common_interceptor_rx_checks, ret) : \
-                             SET_RX_CHECKS(honda_common_rx_checks, ret);
+    if (enable_gas_interceptor) {
+      SET_RX_CHECKS(honda_common_interceptor_rx_checks, ret);
+    } else {
+      SET_RX_CHECKS(honda_common_rx_checks, ret);
+    }
   }
 
   if (enable_gas_interceptor) {
