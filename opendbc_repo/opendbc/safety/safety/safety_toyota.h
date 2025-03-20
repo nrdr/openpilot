@@ -81,7 +81,7 @@ static bool toyota_get_quality_flag_valid(const CANPacket_t *to_push) {
   return valid;
 }
 
-static void toyota_rx_hook(const CANPacket_t *to_push) {
+static bool toyota_rx_hook(const CANPacket_t *to_push) {
   if (GET_BUS(to_push) == 0U) {
     int addr = GET_ADDR(to_push);
 
@@ -172,12 +172,6 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
       // TODO: remove this, only left in for gas_interceptor_prev test
       gas_interceptor_prev = gas_interceptor;
     }
-
-    bool stock_ecu_detected = addr == 0x2E4;  // STEERING_LKA
-    if (!toyota_stock_longitudinal && (addr == 0x343)) {
-      stock_ecu_detected = true;  // ACC_CONTROL
-    }
-    generic_rx_checks(stock_ecu_detected);
   }
 }
 
