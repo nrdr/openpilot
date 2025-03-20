@@ -32,11 +32,11 @@
            {0x226, 0, 8, .ignore_checksum = true, .ignore_counter = true, .frequency = 40U}, { 0 }}},  \
 
 #define TOYOTA_COMMON_RX_CHECKS(lta)                                                                        \
-  {.msg = {{ 0xaa, 0, 8, .check_checksum = false, .frequency = 83U}, { 0 }, { 0 }}},                        \
-  {.msg = {{0x260, 0, 8, .check_checksum = true, .quality_flag = (lta), .frequency = 50U}, { 0 }, { 0 }}},  \
-  {.msg = {{0x1D2, 0, 8, .check_checksum = true, .frequency = 33U}, { 0 }, { 0 }}},                         \
-  {.msg = {{0x224, 0, 8, .check_checksum = false, .frequency = 40U},                                        \
-           {0x226, 0, 8, .check_checksum = false, .frequency = 40U}, { 0 }}},                               \
+  {.msg = {{ 0xaa, 0, 8, .ignore_checksum = true, .frequency = 83U}, { 0 }, { 0 }}},                        \
+  {.msg = {{0x260, 0, 8, .ignore_checksum = false, .quality_flag = (lta), .frequency = 50U}, { 0 }, { 0 }}},  \
+  {.msg = {{0x1D2, 0, 8, .ignore_checksum = false, .frequency = 33U}, { 0 }, { 0 }}},                         \
+  {.msg = {{0x224, 0, 8, .ignore_checksum = true, .frequency = 40U},                                        \
+           {0x226, 0, 8, .ignore_checksum = true, .frequency = 40U}, { 0 }}},                               \
 
 #define TOYOTA_SECOC_RX_CHECKS                                                                                \
   TOYOTA_COMMON_RX_CHECKS(false)                                                                              \
@@ -436,7 +436,7 @@ static safety_config toyota_init(uint16_t param) {
     if (enable_gas_interceptor) {
       static RxCheck toyota_lta_interceptor_rx_checks[] = {
         TOYOTA_COMMON_RX_CHECKS(true)
-        {.msg = {{0x201, 0, 6, .check_checksum = false, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}},
+        {.msg = {{0x201, 0, 6, .ignore_checksum = true, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}},
       };
       SET_RX_CHECKS(toyota_lta_interceptor_rx_checks, ret);
     } else {
@@ -451,7 +451,7 @@ static safety_config toyota_init(uint16_t param) {
     if (enable_gas_interceptor) {
       static RxCheck toyota_lka_interceptor_rx_checks[] = {
         TOYOTA_COMMON_RX_CHECKS(false)
-        {.msg = {{0x201, 0, 6, .check_checksum = false, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}},
+        {.msg = {{0x201, 0, 6, .ignore_checksum = true, .max_counter = 15U, .frequency = 50U}, { 0 }, { 0 }}},
       };
       SET_RX_CHECKS(toyota_lka_interceptor_rx_checks, ret);
     } else {
