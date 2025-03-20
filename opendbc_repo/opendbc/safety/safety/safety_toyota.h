@@ -81,7 +81,7 @@ static bool toyota_get_quality_flag_valid(const CANPacket_t *to_push) {
   return valid;
 }
 
-static bool toyota_rx_hook(const CANPacket_t *to_push) {
+static void toyota_rx_hook(const CANPacket_t *to_push) {
   if (GET_BUS(to_push) == 0U) {
     int addr = GET_ADDR(to_push);
 
