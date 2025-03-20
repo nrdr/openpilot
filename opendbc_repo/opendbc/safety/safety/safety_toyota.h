@@ -161,6 +161,11 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
 
     // sample gas interceptor
     if ((addr == 0x201) && enable_gas_interceptor) {
+      // panda interceptor threshold needs to be equivalent to openpilot threshold to avoid controls mismatches
+      // If thresholds are mismatched then it is possible for panda to see the gas fall and rise while openpilot is in the pre-enabled state
+      // Threshold calculated from DBC gains: round((((15 + 75.555) / 0.159375) + ((15 + 151.111) / 0.159375)) / 2) = 805
+      const int TOYOTA_GAS_INTERCEPTOR_THRSLD = 805;
+
       int gas_interceptor = TOYOTA_GET_INTERCEPTOR(to_push);
       gas_pressed = gas_interceptor > TOYOTA_GAS_INTERCEPTOR_THRSLD;
 
@@ -383,11 +388,6 @@ static safety_config toyota_init(uint16_t param) {
   const uint32_t TOYOTA_PARAM_STOCK_LONGITUDINAL = 2UL << TOYOTA_PARAM_OFFSET;
   const uint32_t TOYOTA_PARAM_LTA = 4UL << TOYOTA_PARAM_OFFSET;
 
-  // panda interceptor threshold needs to be equivalent to openpilot threshold to avoid controls mismatches
-  // If thresholds are mismatched then it is possible for panda to see the gas fall and rise while openpilot is in the pre-enabled state
-  // Threshold calculated from DBC gains: round((((15 + 75.555) / 0.159375) + ((15 + 151.111) / 0.159375)) / 2) = 805
-  const int TOYOTA_GAS_INTERCEPTOR_THRSLD = 805;
-
 
 #ifdef ALLOW_DEBUG
   const uint32_t TOYOTA_PARAM_SECOC = 8UL << TOYOTA_PARAM_OFFSET;
@@ -413,8 +413,11 @@ static safety_config toyota_init(uint16_t param) {
       SET_TX_MSGS(TOYOTA_TX_MSGS, ret);
     }
   } else {
-    enable_gas_interceptor ? SET_TX_MSGS(TOYOTA_INTERCEPTOR_TX_MSGS, ret) : \
-                             SET_TX_MSGS(TOYOTA_LONG_TX_MSGS, ret);
+    if (enable_gas_interceptor) {
+      SET_TX_MSGS(TOYOTA_INTERCEPTOR_TX_MSGS, ret);
+    } else {
+      SET_TX_MSGS(TOYOTA_LONG_TX_MSGS, ret);
+    }
   }
 
   if (toyota_secoc) {
