@@ -137,6 +137,7 @@ static void toyota_rx_hook(const CANPacket_t *to_push) {
         if (!enable_gas_interceptor) {
           gas_pressed = !GET_BIT(to_push, 4U);  // PCM_CRUISE.GAS_RELEASED
         }
+      }
       if (!toyota_alt_brake && (addr == 0x226)) {
         brake_pressed = GET_BIT(to_push, 37U);  // BRAKE_MODULE.BRAKE_PRESSED (toyota_nodsu_pt_generated.dbc)
       }
