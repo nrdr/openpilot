@@ -265,7 +265,7 @@ class CAR(Platforms):
   HONDA_PILOT_2019 = HondaNidecPlatformConfig(
     [HondaCarDocs("Honda Pilot 2019", min_steer_speed=1. * CV.MPH_TO_MS)],
     CarSpecs(mass=4306 * CV.LB_TO_KG, wheelbase=2.82, centerToFrontRatio=0.439, steerRatio=16.0, tireStiffnessFactor=0.444),  # as spec
-    dbc_dict('honda_pilot_elite_2019_can_generated', 'acura_ilx_2016_nidec'),
+    radar_dbc_dict('honda_pilot_elite_2019_can_generated'),
     flags=HondaFlags.NIDEC_ALT_SCM_MESSAGES,
   )
   HONDA_RIDGELINE = HondaNidecPlatformConfig(
