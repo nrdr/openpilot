@@ -368,7 +368,7 @@ static safety_config honda_nidec_init(uint16_t param) {
         {.msg = {{0x1FA, 2, 8, .max_counter = 3U, .frequency = 50U}, { 0 }, { 0 }}},  // BRAKE_COMMAND
       };
 
-      SET_RX_CHECKS(honda_common_rx_checks, ret);
+      SET_RX_CHECKS(honda_nidec_common_rx_checks, ret);
     }
   }
 
