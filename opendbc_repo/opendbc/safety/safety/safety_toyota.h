@@ -379,7 +379,7 @@ static safety_config toyota_init(uint16_t param) {
 
   static const CanMsg TOYOTA_INTERCEPTOR_TX_MSGS[] = {
     TOYOTA_COMMON_LONG_TX_MSGS
-    {0x200, 0, 6},  // gas interceptor
+    {0x200, 0, 6, false},  // gas interceptor
   };
 
   // safety param flags
