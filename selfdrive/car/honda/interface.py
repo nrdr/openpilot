@@ -36,7 +36,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   def torque_from_lateral_accel_modded(self, latcontrol_inputs: LatControlInputs, torque_params: car.CarParams.LateralTorqueTuning, lateral_accel_error: float, lateral_accel_deadzone: float, friction_compensation: bool, gravity_adjusted: bool) -> float:
-    threshold = 0.8
+    threshold = 0.888888
     threshold_lat_accel = 1/torque_params.latAccelFactor * threshold
     mod_factor = 2.0 # Lateral Accel
     # The default is a linear relationship between torque and lateral acceleration (accounting for road roll and steering friction)
