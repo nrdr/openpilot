@@ -13,8 +13,8 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 V_CRUISE_MIN = 0
 V_CRUISE_MAX = 250
 V_CRUISE_UNSET = 255
-V_CRUISE_INITIAL = 104.608
-V_CRUISE_INITIAL_EXPERIMENTAL_MODE = 105
+V_CRUISE_INITIAL = 0
+V_CRUISE_INITIAL_EXPERIMENTAL_MODE = 0
 IMPERIAL_INCREMENT = round(CV.MPH_TO_KPH, 1)  # round here to avoid rounding errors incrementing set speed
 
 MIN_SPEED = 1.0
