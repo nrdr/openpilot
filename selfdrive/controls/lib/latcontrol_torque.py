@@ -101,13 +101,13 @@ class LatControlTorque(LatControl):
       # Note that LAT_PLAN_MIN_IDX is defined above and is used in order to prevent
       # using a "future" value that is actually planned to occur before the "current" desired
       # value, which is offset by the steerActuatorDelay.
-      self.friction_look_ahead_v = [1.6, 2.0] # how many seconds in the future to look ahead in [0, ~2.1] in 0.1 increments
+      self.friction_look_ahead_v = [1.4, 2.0] # how many seconds in the future to look ahead in [0, ~2.1] in 0.1 increments
       self.friction_look_ahead_bp = [9.0, 30.0] # corresponding speeds in m/s in [0, ~40] in 1.0 increments
 
       # Scaling the lateral acceleration "friction response" could be helpful for some.
       # Increase for a stronger response, decrease for a weaker response.
-      self.lat_jerk_friction_factor = 0.6
-      self.lat_accel_friction_factor = 0.5 # in [0, 3], in 0.05 increments. 3 is arbitrary safety limit
+      self.lat_jerk_friction_factor = 0.4
+      self.lat_accel_friction_factor = 0.7 # in [0, 3], in 0.05 increments. 3 is arbitrary safety limit
 
       # precompute time differences between ModelConstants.T_IDXS
       self.t_diffs = np.diff(ModelConstants.T_IDXS)
