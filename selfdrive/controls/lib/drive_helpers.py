@@ -108,7 +108,7 @@ class VCruiseHelper:
       self._update_v_cruise_min(is_metric)
 
     if CS.cruiseState.available:
-      if not self.CP.pcmCruise or not self.CP.pcmCruiseSpeed:
+      if self.CP.pcmCruise or self.CP.pcmCruiseSpeed:
         # if stock cruise is completely disabled, then we can use our own set speed logic
         self._update_v_cruise_non_pcm(CS, enabled, is_metric, reverse_acc)
         self._update_v_cruise_slc(long_plan_sp)
