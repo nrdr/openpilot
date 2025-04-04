@@ -101,9 +101,9 @@ HUDData = namedtuple("HUDData",
                       "lanes_visible", "fcw", "acc_alert", "steer_required", "lead_distance_bars", "dashed_lanes"])
 
 
-def rate_limit_steer(CS, new_steer, last_steer):
+def rate_limit_steer(new_steer, last_steer):
   # TODO just hardcoded ramp to min/max in 0.33s for all Honda
-  MAX_DELTA = 1 * DT_CTRL if CS.out.vEgo > 22.352 else 2.5 * DT_CTRL
+  MAX_DELTA = 2.5 * DT_CTRL
   return clip(new_steer, last_steer - MAX_DELTA, last_steer + MAX_DELTA)
 
 
