@@ -105,13 +105,13 @@ SunnypilotPanel::SunnypilotPanel(QWidget *parent) : QFrame(parent) {
     },
     {
       "EnforceTorqueLateral",
-      tr("Enforce Torque Lateral Control"),
+      tr("Force Torque Controller ON"),
       tr("Enable this to enforce sunnypilot to steer with Torque lateral control."),
       "../assets/offroad/icon_blank.png",
     },
     {
       "TorqueLateralJerk",
-      tr("Lateral Jerk with Torque Lateral Control (Alpha)"),
+      tr("Torque Controller: Intelligent Feed-Forward"),
       tr("Utilizes limited lateral jerk control for improved steering response, leveraging stock torque lateral controller capabilities. Designed to mimic NNLC behavior without training models or data collection."),
       "../assets/offroad/icon_blank.png",
     },
