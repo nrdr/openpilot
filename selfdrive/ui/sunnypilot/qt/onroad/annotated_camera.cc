@@ -590,7 +590,7 @@ void AnnotatedCameraWidgetSP::drawHud(QPainter &p) {
   p.restore();
 }
 
-void AnnotatedCameraWidgetSP::drawText(QPainter &p, int x, int y, const QString &text, int alph) {
+void AnnotatedCameraWidgetSP::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
   QRect real_rect = p.fontMetrics().boundingRect(text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
 
