@@ -584,13 +584,13 @@ void AnnotatedCameraWidgetSP::drawHud(QPainter &p) {
   if (!hideBottomIcons && featureStatusToggle) {
     int x = UI_BORDER_SIZE * 2 + (rightHandDM ? 600 : 370);
     int feature_status_text_x = rightHandDM ? rect().right() - x : x;
-    drawFeatureStatusText(p, feature_status_text_x, rect().bottom() - 245 - rn_offset);
+    drawFeatureStatusText(p, feature_status_text_x, rect().bottom() - 220 - rn_offset);
   }
 
   p.restore();
 }
 
-void AnnotatedCameraWidgetSP::drawText(QPainter &p, int x, int y, const QString &text, int alpha) {
+void AnnotatedCameraWidgetSP::drawText(QPainter &p, int x, int y, const QString &text, int alph) {
   QRect real_rect = p.fontMetrics().boundingRect(text);
   real_rect.moveCenter({x, y - real_rect.height() / 2});
 
