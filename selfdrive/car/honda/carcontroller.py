@@ -100,12 +100,19 @@ HUDData = namedtuple("HUDData",
                      ["pcm_accel", "v_cruise", "lead_visible",
                       "lanes_visible", "fcw", "acc_alert", "steer_required", "lead_distance_bars", "dashed_lanes"])
 
+def rate_limit_steer(new_steer, last_steer, speed):
+  # Define the maximum delta at higher speeds
+  max_delta = 3 * DT_CTRL
+  
+  # Define the speed threshold (25 MPH in m/s)
+  speed_threshold = 25 * CV.MPH_TO_MS
 
-def rate_limit_steer(new_steer, last_steer):
-  # TODO just hardcoded ramp to min/max in 0.33s for all Honda
-  MAX_DELTA = 2.75 * DT_CTRL
-  return clip(new_steer, last_steer - MAX_DELTA, last_steer + MAX_DELTA)
+  # Adjust MAX_DELTA based on speed, reducing it as speed drops below the threshold
+  if speed < speed_threshold:
+    reduction_factor = (speed_threshold - speed) / speed_threshold
+    max_delta -= reduction_factor * max_delta
 
+  return clip(new_steer, last_steer - max_delta, last_steer + max_delta)
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_name, CP, VM):
