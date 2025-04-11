@@ -111,7 +111,7 @@ class CarInterface(CarInterfaceBase):
       # ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
       # honda values noted above
       ret.longitudinalTuning.kiBP = [0.,  5.,   12.,  20.,  27.,  36.]
-      ret.longitudinalTuning.kiV = [1.8, 0.44, 0.77, 1.4, 1.6, 1.7]
+      ret.longitudinalTuning.kiV = [1.2, 1.4, 1.5, 1.55, 1.6, 1.7]
 
     eps_modified = False
     for fw in car_fw:
@@ -130,8 +130,8 @@ class CarInterface(CarInterfaceBase):
         ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x4EC0, 0x5A00]
         ret.lateralParams.torqueV = [0x0, 0x200, 0x300, 0x478, 0x5EC, 0x800, 0xA00, 0xE00, 0xF00]
         # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]], [[0.15], [0.05]]
-        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 22, 27], [0.25, 0.275, 0.3]]
-        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 22, 27], [0.07, 0.09, 0.1]]
+        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 17, 22], [0.75, 0.1, 0.3]]
+        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 17, 22], [0.025, 0.05, 0.1]]
       else:
         ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
         ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x4EC0, 0x5A00]
