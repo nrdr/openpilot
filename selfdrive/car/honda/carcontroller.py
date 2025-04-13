@@ -102,10 +102,10 @@ HUDData = namedtuple("HUDData",
 
 def rate_limit_steer(new_steer, last_steer, speed):
   # Define the maximum delta at higher speeds
-  max_delta = 2.75 * DT_CTRL
+  max_delta = 2 * DT_CTRL
   
   # Define the speed threshold (25 MPH in m/s)
-  speed_threshold = 25 * CV.MPH_TO_MS
+  speed_threshold = 45 * CV.MPH_TO_MS
 
   # Adjust MAX_DELTA based on speed, reducing it as speed drops below the threshold
   if speed < speed_threshold:
