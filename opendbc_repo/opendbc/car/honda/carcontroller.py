@@ -233,7 +233,7 @@ class CarController(CarControllerBase):
             # Sending non-zero gas when OP is not enabled will cause the PCM not to respond to throttle as expected
             # when you do enable.
             if CC.longActive:
-              self.gas = clip(gas_mult * (gas - brake + wind_brake * 3 / 4), 0., 1.)
+              self.gas = np.clip(gas_mult * (gas - brake + wind_brake * 3 / 4), 0., 1.)
             else:
               self.gas = 0.0
             can_sends.append(create_gas_interceptor_command(self.packer, self.gas, self.frame // 2))
