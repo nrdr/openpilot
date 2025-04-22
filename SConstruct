@@ -239,8 +239,9 @@ if os.environ.get('SCONS_PROGRESS'):
 
 # Cython build environment
 py_include = sysconfig.get_paths()['include']
+cpython_include = py_include + '/cpython'
 envCython = env.Clone()
-envCython["CPPPATH"] += [py_include, np.get_include()]
+envCython["CPPPATH"] += [py_include, cpython_include, np.get_include()]
 envCython["CCFLAGS"] += ["-Wno-#warnings", "-Wno-shadow", "-Wno-deprecated-declarations"]
 envCython["CCFLAGS"].remove("-Werror")
 

@@ -1,4 +1,4 @@
-import ctypes, subprocess, pathlib, tempfile
+import ctypes, subprocess, pathlib, tempfile, platform
 from tinygrad.device import Compiled, Compiler, MallocAllocator
 from tinygrad.helpers import cpu_time_execution, cpu_objdump
 from tinygrad.renderer.cstyle import ClangRenderer
@@ -12,8 +12,12 @@ class ClangCompiler(Compiler):
   def compile(self, src:str) -> bytes:
     # TODO: remove file write. sadly clang doesn't like the use of /dev/stdout here
     with tempfile.NamedTemporaryFile(delete=True) as output_file:
-      subprocess.check_output(['clang', '-shared', *self.args, '-O2', '-Wall', '-Werror', '-x', 'c', '-fPIC', '-ffreestanding', '-nostdlib',
-                               '-', '-o', str(output_file.name)], input=src.encode('utf-8'))
+      compile_args = ['clang', '-shared', *self.args, '-O2', '-Wall', '-Werror', '-x', 'c', '-fPIC']
+      # Don't use -nostdlib on macOS as it requires linking with libSystem.dylib
+      if platform.system() != 'Darwin':
+        compile_args.extend(['-ffreestanding', '-nostdlib'])
+      compile_args.extend(['-', '-o', str(output_file.name)])
+      subprocess.check_output(compile_args, input=src.encode('utf-8'))
       return pathlib.Path(output_file.name).read_bytes()
 
   def disassemble(self, lib:bytes): return cpu_objdump(lib, self.objdump_tool)
