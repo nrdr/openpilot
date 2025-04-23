@@ -5,9 +5,10 @@ import tqdm
 import traceback
 from argparse import ArgumentParser
 from typing import List
+from opendbc.car.structs import CarParams
 from panda.format.x5a import x5a
 from panda import Panda
-from panda.python.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE
+from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE
 from unittest import mock
 
 def auto_int(i):
@@ -63,11 +64,11 @@ def decrypt(fw, ops):
   plain, _ = fw.decrypt(decoder)
   return plain
 
-def get_uds_client(can_addr, debug):
+def get_uds_client(can_addr):
   try:
     panda = Panda(disable_checks=True)
-    panda.set_safety_mode(Panda.SAFETY_ELM327)
-    uds_client = UdsClient(panda, can_addr, debug=False)
+    panda.set_safety_mode(CarParams.SafetyModel.elm327)
+    uds_client = UdsClient(panda, can_addr)
     print("Using real client")
   except Exception:
     mock_helper = mock.patch('panda.python.uds.UdsClient', autospec=True)
@@ -107,7 +108,7 @@ if __name__ == "__main__":
 
   can_addr = get_can_address(fw)
   print("Connecting to CAN address 0x{:08X}".format(can_addr))
-  uds_client = get_uds_client(can_addr, args.debug)
+  uds_client = get_uds_client(can_addr)
 
   debug_output: List[int] = list()
 
