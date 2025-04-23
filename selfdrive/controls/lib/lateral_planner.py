@@ -177,7 +177,8 @@ class LateralPlanner:
     if not self.model_use_lateral_planner:
       self.road_edge = get_road_edge(sm['carState'], md, self.edge_toggle)
 
-  def get_dynamic_lane_profile(self, longitudinal_plan_sp):
+  def get_dynamic_lane_profile(self, longitudinal_plan_sp, sm):
+    v_ego_car = sm['carState'].vEgo
     if self.dynamic_lane_profile == 1:
       return True
     elif self.dynamic_lane_profile == 0:
