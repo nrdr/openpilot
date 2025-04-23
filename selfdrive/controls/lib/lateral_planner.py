@@ -179,7 +179,7 @@ class LateralPlanner:
 
   def get_dynamic_lane_profile(self, longitudinal_plan_sp, sm):
     v_ego_car = sm['carState'].vEgo
-   city_streets = v_ego_car < 50 * CV.MPH_TO_MS
+    city_streets = v_ego_car < 50 * CV.MPH_TO_MS
     if self.dynamic_lane_profile == 1:
       return True
     elif self.dynamic_lane_profile == 0:
