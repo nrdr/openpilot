@@ -322,7 +322,7 @@ void AnnotatedCameraWidgetSP::updateState(const UIStateSP &s) {
   accelerationPersonality = s.scene.longitudinal_accel_personality;
   dynamicLaneProfile = s.scene.dynamic_lane_profile;
   const auto mpc_source = lp_sp.getMpcSource();
-  mpcSource = mpc_source == cereal::MpcSource::BLENDED ? QString(tr("Neural Network")) : QString(tr("Legacy"));
+  mpcSource = mpc_source == cereal::MpcSource::BLENDED ? QString(tr("Hybrid (ON)")) : QString(tr("Hybrid (Standby)"));
 
   static int reverse_delay = 0;
   bool reverse_allowed = false;
