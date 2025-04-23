@@ -1051,7 +1051,7 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
     p.setBrush(dec_color);
     p.drawEllipse(dec_btn);
     QString dec_status_text;
-    dec_status_text.sprintf("Software Stack: %s\n", dynamicExperimentalControlToggle ? (experimentalMode ? QString(mpcSource).toStdString().c_str() : QString("Disabled").toStdString().c_str()) : "Standby");
+    dec_status_text.sprintf("Long Policy: %s\n", dynamicExperimentalControlToggle ? (experimentalMode ? QString(mpcSource).toStdString().c_str() : QString("Standard").toStdString().c_str()) : "Hybrid (Standby)");
     p.setPen(QPen(shadow_color, 2));
     p.drawText(x + drop_shadow_size, y + drop_shadow_size, dec_status_text);
     p.setPen(QPen(text_color, 2));
