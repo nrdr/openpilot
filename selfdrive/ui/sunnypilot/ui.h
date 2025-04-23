@@ -43,7 +43,7 @@ Last updated: July 29, 2024
 const int UI_ROAD_NAME_MARGIN_X = 14;
 
 struct FeatureStatusText {
-  const QStringList dlp_list_text = { "Laneful",    "Laneless", "Auto"};
+  const QStringList dlp_list_text = { "Laneful",    "End to End", "Hybrid"};
   const QStringList gac_list_text = { "1.0 (s)", "1.5 (s)", "2.0 (s)", "0.5 (s)"};
   const QStringList acc_list_text = { "Hurry", "Standard", "Chill", "Default"};
   const QStringList slc_list_text = { "Inactive",   "Temp Off", "Adapting", "Active", "Pre-Active"};
