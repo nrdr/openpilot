@@ -1037,7 +1037,7 @@ void AnnotatedCameraWidgetSP::drawFeatureStatusText(QPainter &p, int x, int y) {
 
   // Dynamic Lane Profile
   if (drivingModelGen == cereal::ModelGeneration::ONE) {
-    drawFeatureStatusElement(dynamicLaneProfile, feature_text.dlp_list_text, feature_color.dlp_list_color, true, "OFF", "Laneline Policy");
+    drawFeatureStatusElement(dynamicLaneProfile, feature_text.dlp_list_text, feature_color.dlp_list_color, true, "OFF", "Lateral Policy");
   }
 
   // TODO: Add toggle variables to cereal, and parse from cereal
