@@ -100,10 +100,12 @@ if __name__ == "__main__":
   parser.add_argument("-c", "--checksum-offsets", nargs="*", default=[0xa000, 0x1d000, 0x4ff00], type=auto_int)
   parser.add_argument("--debug", action="store_true", help="Enable debug output")
   parser.add_argument("--danger", action="store_true", help="Run in danger mode that actually performs mutating actions")
+  parser.add_argument("--skip-checksum", action="store_true", help="Skip the firmware checksum validation in the flasher. The EPS will still perform its own validations so flashing could fail if the checksums aren't valid")
   args = parser.parse_args()
 
   fw = x5a(read_file(args.rwd))
-  validate_fw(fw, args.cipher_ops, args.checksum_offsets)
+  if not args.skip_checksum:
+    validate_fw(fw, args.cipher_ops, args.checksum_offsets)
 
   print(fw)
 
