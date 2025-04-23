@@ -185,7 +185,7 @@ class LateralPlanner:
     elif self.dynamic_lane_profile == 2:
       # laneless while lane change in progress
       if self.DH.lane_change_state in (LaneChangeState.laneChangeStarting, LaneChangeState.laneChangeFinishing):
-        return True
+        return False
       # only while lane change is off
       elif self.DH.lane_change_state == LaneChangeState.off:
         # laneline probability too low, we switch to laneless mode
@@ -198,6 +198,8 @@ class LateralPlanner:
            or not self.vision_curve_laneless):
           self.dynamic_lane_profile_status_buffer = False
         if self.dynamic_lane_profile_status_buffer:  # in buffer mode, always laneless
+          return True
+        if v_ego_car < 22.352:
           return True
     return False
 
