@@ -124,14 +124,14 @@ class LateralPlanner:
         self.LP.rll_prob *= self.DH.lane_change_ll_prob
       self.d_path_w_lines_xyz = self.LP.get_d_path(self.v_ego, self.t_idxs, self.path_xyz)
 
-      low_speed = v_ego_car < 10 * CV.MPH_TO_MS
+      low_speed = v_ego_car < 50 * CV.MPH_TO_MS
 
-      if not self.get_dynamic_lane_profile(sm['longitudinalPlanSP']) and not low_speed:
+      if not self.get_dynamic_lane_profile(sm['longitudinalPlanSP']) or not low_speed:
         self.path_xyz = self.d_path_w_lines_xyz
-        self.dynamic_lane_profile_status = False
+        self.dynamic_lane_profile_status = False # laneful
       else:
         self.path_xyz[:, 1] += self.LP.path_offset
-        self.dynamic_lane_profile_status = True
+        self.dynamic_lane_profile_status = True # laneless
 
       if not self.dynamic_lane_profile_status:
         self.lat_mpc.set_weights(PATH_COST, LATERAL_MOTION_COST,
@@ -178,7 +178,6 @@ class LateralPlanner:
       self.road_edge = get_road_edge(sm['carState'], md, self.edge_toggle)
 
   def get_dynamic_lane_profile(self, longitudinal_plan_sp):
-    city_streets = v_ego_car < 50 * CV.MPH_TO_MS
     if self.dynamic_lane_profile == 1:
       return True
     elif self.dynamic_lane_profile == 0:
@@ -191,7 +190,7 @@ class LateralPlanner:
       elif self.DH.lane_change_state == LaneChangeState.off:
         # laneline probability too low, we switch to laneless mode
         if (self.LP.rll_prob) < 0.6 \
-          or ((longitudinal_plan_sp.visionCurrentLatAcc > 1.0 or longitudinal_plan_sp.visionMaxPredLatAcc > 1.0 or city_streets)
+          or ((longitudinal_plan_sp.visionCurrentLatAcc > 1.0 or longitudinal_plan_sp.visionMaxPredLatAcc > 1.0)
            and self.vision_curve_laneless):
           self.dynamic_lane_profile_status_buffer = True
         if (self.LP.rll_prob) > 0.8 \
