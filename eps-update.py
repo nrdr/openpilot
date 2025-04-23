@@ -64,11 +64,11 @@ def decrypt(fw, ops):
   plain, _ = fw.decrypt(decoder)
   return plain
 
-def get_uds_client(can_addr):
+def get_uds_client(can_addr, bus):
   try:
     panda = Panda(disable_checks=True)
     panda.set_safety_mode(CarParams.SafetyModel.elm327)
-    uds_client = UdsClient(panda, can_addr)
+    uds_client = UdsClient(panda, can_addr, bus=bus)
     print("Using real client")
   except Exception:
     mock_helper = mock.patch('panda.python.uds.UdsClient', autospec=True)
@@ -95,6 +95,7 @@ def get_can_address(fw):
 if __name__ == "__main__":
   parser = ArgumentParser()
   parser.add_argument("rwd", help="RWD firmware file to flash")
+  parser.add_argument("-b", "--bus", default=0, type=auto_int, help="CAN bus number")
   parser.add_argument("-o", "--cipher-ops", default="+^-", help="Operand list for firmware encryption cipher")
   parser.add_argument("-c", "--checksum-offsets", nargs="*", default=[0xa000, 0x1d000, 0x4ff00], type=auto_int)
   parser.add_argument("--debug", action="store_true", help="Enable debug output")
@@ -108,7 +109,7 @@ if __name__ == "__main__":
 
   can_addr = get_can_address(fw)
   print("Connecting to CAN address 0x{:08X}".format(can_addr))
-  uds_client = get_uds_client(can_addr)
+  uds_client = get_uds_client(can_addr, args.bus)
 
   debug_output: List[int] = list()
 
