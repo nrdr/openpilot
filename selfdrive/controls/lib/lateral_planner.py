@@ -192,7 +192,7 @@ class LateralPlanner:
       elif self.DH.lane_change_state == LaneChangeState.off:
         # laneline probability too low, we switch to laneless mode
         if (self.LP.rll_prob) < 0.6 \
-          or ((longitudinal_plan_sp.visionCurrentLatAcc > 1.0 or longitudinal_plan_sp.visionMaxPredLatAcc > 1.0)
+          or ((longitudinal_plan_sp.visionCurrentLatAcc > 1.0 or longitudinal_plan_sp.visionMaxPredLatAcc > 1.0 or low_speed)
            and self.vision_curve_laneless):
           self.dynamic_lane_profile_status_buffer = True
         if (self.LP.rll_prob) > 0.8 \
