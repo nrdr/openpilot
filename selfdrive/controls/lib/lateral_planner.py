@@ -177,8 +177,7 @@ class LateralPlanner:
     if not self.model_use_lateral_planner:
       self.road_edge = get_road_edge(sm['carState'], md, self.edge_toggle)
 
-  def get_dynamic_lane_profile(self, longitudinal_plan_sp, sm):
-    v_ego_car = sm['carState'].vEgo
+  def get_dynamic_lane_profile(self, longitudinal_plan_sp):
     if self.dynamic_lane_profile == 1:
       return True
     elif self.dynamic_lane_profile == 0:
@@ -199,8 +198,6 @@ class LateralPlanner:
            or not self.vision_curve_laneless):
           self.dynamic_lane_profile_status_buffer = False
         if self.dynamic_lane_profile_status_buffer:  # in buffer mode, always laneless
-          return True
-        if v_ego_car < 22.352:
           return True
     return False
 
