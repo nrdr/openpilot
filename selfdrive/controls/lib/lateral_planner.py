@@ -128,10 +128,10 @@ class LateralPlanner:
 
       if low_speed:
         self.path_xyz = self.d_path_w_lines_xyz
-        self.dynamic_lane_profile_status = False
+        self.dynamic_lane_profile_status = True
       else:
         self.path_xyz[:, 1] += self.LP.path_offset
-        self.dynamic_lane_profile_status = True
+        self.dynamic_lane_profile_status = False
         
 
       if not self.dynamic_lane_profile_status:
