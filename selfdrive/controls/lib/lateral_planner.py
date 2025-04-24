@@ -126,12 +126,13 @@ class LateralPlanner:
 
       low_speed = v_ego_car < 50 * CV.MPH_TO_MS
 
-      if not self.get_dynamic_lane_profile(sm['longitudinalPlanSP']) or not low_speed:
+      if low_speed:
         self.path_xyz = self.d_path_w_lines_xyz
-        self.dynamic_lane_profile_status = False # laneful
+        self.dynamic_lane_profile_status = False
       else:
         self.path_xyz[:, 1] += self.LP.path_offset
-        self.dynamic_lane_profile_status = True # laneless
+        self.dynamic_lane_profile_status = True
+        
 
       if not self.dynamic_lane_profile_status:
         self.lat_mpc.set_weights(PATH_COST, LATERAL_MOTION_COST,
