@@ -1173,13 +1173,13 @@ void AnnotatedCameraWidgetSP::drawLaneLines(QPainter &painter, const UIStateSP *
 
   if (madsEnabled || car_state.getCruiseState().getEnabled()) {
     if (steerOverride && latActive) {
-      bg.setColorAt(0.0, QColor::fromHslF(360 / 360., 1.0, 1.0, 0.7));
-      bg.setColorAt(0.5, QColor::fromHslF(360 / 360., 1.0, 1.0, 0.7));
-      bg.setColorAt(1.0, QColor::fromHslF(360 / 360., 1.0, 1.0, 0.7));
+      bg.setColorAt(0.0, QColor::fromHslF(360 / 360., 1.0, 1.0, 0.4));
+      bg.setColorAt(0.5, QColor::fromHslF(360 / 360., 1.0, 1.0, 0.4));
+      bg.setColorAt(1.0, QColor::fromHslF(360 / 360., 1.0, 1.0, 0.4));
     } else if (car_state.getCruiseState().getEnabled()) {
-      bg.setColorAt(0.0, QColor::fromHslF(224 / 360., 0.82, 0.49, 0.7));
-      bg.setColorAt(0.5, QColor::fromHslF(224 / 360., 0.82, 0.49, 0.7));
-      bg.setColorAt(1.0, QColor::fromHslF(224 / 360., 0.82, 0.49, 0.7));
+      bg.setColorAt(0.0, QColor::fromHslF(224 / 360., 0.82, 0.49, 0.4));
+      bg.setColorAt(0.5, QColor::fromHslF(224 / 360., 0.82, 0.49, 0.4));
+      bg.setColorAt(1.0, QColor::fromHslF(224 / 360., 0.82, 0.49, 0.4));
     } else if (exp_mode_path) {
       // The first half of track_vertices are the points for the right side of the path
       const auto &acceleration = sm["modelV2"].getModelV2().getAcceleration().getX();
@@ -1207,9 +1207,9 @@ void AnnotatedCameraWidgetSP::drawLaneLines(QPainter &painter, const UIStateSP *
       }
 
     } else {
-      bg.setColorAt(0.0, QColor::fromHslF(120 / 360., 0.60, 0.34, 0.7)); // #238b23
-      bg.setColorAt(0.5, QColor::fromHslF(120 / 360., 0.60, 0.34, 0.7)); // #238b23
-      bg.setColorAt(1.0, QColor::fromHslF(120 / 360., 0.60, 0.34, 0.7)); // #238b23
+      bg.setColorAt(0.0, QColor::fromHslF(120 / 360., 0.60, 0.34, 0.4)); // #238b23
+      bg.setColorAt(0.5, QColor::fromHslF(120 / 360., 0.60, 0.34, 0.4)); // #238b23
+      bg.setColorAt(1.0, QColor::fromHslF(120 / 360., 0.60, 0.34, 0.4)); // #238b23
     }
   } else {
     bg.setColorAt(1.0, whiteColor(255));
