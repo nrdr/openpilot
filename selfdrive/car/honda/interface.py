@@ -36,7 +36,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   def torque_from_lateral_accel_modded(self, latcontrol_inputs: LatControlInputs, torque_params: car.CarParams.LateralTorqueTuning, lateral_accel_error: float, lateral_accel_deadzone: float, friction_compensation: bool, gravity_adjusted: bool) -> float:
-    threshold = 0.7143
+    threshold = 0.9
     threshold_lat_accel = 1/torque_params.latAccelFactor * threshold
     mod_factor = 2.0 # Lateral Accel
     # The default is a linear relationship between torque and lateral acceleration (accounting for road roll and steering friction)
@@ -132,7 +132,6 @@ class CarInterface(CarInterfaceBase):
         # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]], [[0.15], [0.05]]
         ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 17, 22], [0.3, 0.3, 0.3]] # 3x [[0.1575], [0.05175]]
         ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 17, 22], [0.1, 0.1, 0.1]]
-        ret.steerRatio = 14.02
       else:
         ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
         ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x4EC0, 0x5A00]
