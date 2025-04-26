@@ -132,7 +132,7 @@ class CarInterface(CarInterfaceBase):
         # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]], [[0.15], [0.05]]
         ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 17, 22], [0.3, 0.3, 0.3]] # 3x [[0.1575], [0.05175]]
         ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 17, 22], [0.1, 0.1, 0.1]]
-        ret.steerRatio = 10.93
+        ret.steerRatio = 14.02
       else:
         ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
         ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x4EC0, 0x5A00]
