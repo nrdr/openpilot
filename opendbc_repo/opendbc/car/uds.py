@@ -747,12 +747,13 @@ class UdsClient:
       raise ValueError(f'invalid response data identifier: {hex(resp_id)} expected: {hex(data_identifier_type)}')
     return resp[2:]
 
-  def read_memory_by_address(self, memory_address: int, memory_size: int, memory_address_bytes: int = 4, memory_size_bytes: int = 1):
+  def read_memory_by_address(self, memory_address: int, memory_size: int, memory_address_bytes: int = 4, memory_size_bytes: int = 1, custom_header: bytes = b''):
+    data = custom_header
     if memory_address_bytes < 1 or memory_address_bytes > 4:
       raise ValueError(f'invalid memory_address_bytes: {memory_address_bytes}')
     if memory_size_bytes < 1 or memory_size_bytes > 4:
       raise ValueError(f'invalid memory_size_bytes: {memory_size_bytes}')
-    data = bytes([memory_size_bytes << 4 | memory_address_bytes])
+    data += bytes([memory_size_bytes << 4 | memory_address_bytes])
 
     if memory_address >= 1 << (memory_address_bytes * 8):
       raise ValueError(f'invalid memory_address: {memory_address}')
