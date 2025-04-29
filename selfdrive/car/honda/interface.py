@@ -37,7 +37,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   def torque_from_lateral_accel_modded(self, latcontrol_inputs: LatControlInputs, torque_params: car.CarParams.LateralTorqueTuning, lateral_accel_error: float, lateral_accel_deadzone: float, friction_compensation: bool, gravity_adjusted: bool) -> float:
-    threshold = 0.9
+    threshold = 0.8
     threshold_lat_accel = 1/torque_params.latAccelFactor * threshold
     mod_factor = 2.0 # Lateral Accel
     # The default is a linear relationship between torque and lateral acceleration (accounting for road roll and steering friction)
@@ -127,14 +127,14 @@ class CarInterface(CarInterfaceBase):
         # stock filter output values:     0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108
         # modified filter output values:  0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0400, 0x0480
         # note: max request allowed is 4096, but request is capped at 3840 in firmware, so modifications result in 2x max
-        ret.lateralTuning.pid.kf = 0.00006 # conservative feed-forward
+        ret.lateralTuning.pid.kf = 0.00002 # conservative feed-forward
         ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x6540, 0x7080]
         ret.lateralParams.torqueV = [0x0, 0x200, 0x300, 0x478, 0x5EC, 0x800, 0xA00, 0xE00, 0xF00]
         # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]], [[0.15], [0.05]]
-        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 17, 22], [0.3, 0.3, 0.3]] # 3x [[0.1575], [0.05175]]
-        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 17, 22], [0.1, 0.1, 0.1]]
+        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 17, 22], [0.1, 0.15, 0.2]] # 3x [[0.1575], [0.05175]]
+        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 17, 22], [0.09, 0.05, 0.02]]
       else:
-        ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
+        ret.lateralTuning.pid.kf = 0.00002  # conservative feed-forward
         ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x6540, 0x7080]
         ret.lateralParams.torqueV = [0x0, 0x200, 0x300, 0x478, 0x5EC, 0x800, 0xA00, 0xE00, 0xF00]
         ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]] # force modded values always on this fork
