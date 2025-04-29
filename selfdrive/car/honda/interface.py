@@ -28,6 +28,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.BOSCH_ACCEL_MIN, CarControllerParams.BOSCH_ACCEL_MAX
     elif CP.enableGasInterceptorDEPRECATED:
       return CarControllerParams.NIDEC_ACCEL_MIN, CarControllerParams.NIDEC_ACCEL_MAX
+    # try doing this backwards
     else:
       # NIDECs don't allow acceleration near cruise_speed,
       # so limit limits of pid to prevent windup
