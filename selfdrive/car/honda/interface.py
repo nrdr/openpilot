@@ -27,7 +27,10 @@ class CarInterface(CarInterfaceBase):
     if CP.carFingerprint in HONDA_BOSCH:
       return CarControllerParams.BOSCH_ACCEL_MIN, CarControllerParams.BOSCH_ACCEL_MAX
     elif CP.enableGasInterceptorDEPRECATED:
-      return CarControllerParams.NIDEC_ACCEL_MIN, CarControllerParams.NIDEC_ACCEL_MAX
+      # Alt approach to long where car gently stops accel near the set speed for comfort
+      ACCEL_MAX_VALS = [CarControllerParams.NIDEC_ACCEL_MAX, 0.0]
+      ACCEL_MAX_BP = [cruise_speed - 0.044, cruise_speed + 0.044]
+      return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
     else:
       # NIDECs don't allow acceleration near cruise_speed,
       # so limit limits of pid to prevent windup
