@@ -242,7 +242,7 @@ class CarController(CarControllerBase):
                                                       CS.CP.openpilotLongitudinalControl))
 
     # wind brake from air resistance decel at high speed
-    wind_brake = interp(CS.out.vEgo, [0.0, 2.3, 17.8816, 29.0576], [0.001, 0.002, 0.003, 2.2352])
+    wind_brake = interp(CS.out.vEgo, [0.0, 2.3, 17.8816, 29.0576], [0.001, 0.002, 0.003, 0.67056])
     # all of this is only relevant for HONDA NIDEC
     max_accel = interp(CS.out.vEgo, self.params.NIDEC_MAX_ACCEL_BP, self.params.NIDEC_MAX_ACCEL_V)
     # TODO this 1.44 is just to maintain previous behavior
