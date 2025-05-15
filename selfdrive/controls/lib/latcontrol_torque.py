@@ -25,12 +25,12 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 # move it at all, this is compensated for too.
 
 LOW_SPEED_X = [0, 10, 20, 30]
-LOW_SPEED_Y = [40, 20, 1, 0]
+LOW_SPEED_Y = [50, 40, 1, 0]
 LOW_SPEED_Y_NN = [12, 3, 1, 0]
 
 # Tim's Default: Full friction at or below ||0.6 m/s^2||, no friction at or above ||0.8 m/s^2||
-FRICTION_X = [0.0, 0.8, 1.0, 1.2] # m/s^2 lateral acceleration
-FRICTION_Y = [3.0, 2.5, 1.0, 0.8] # Dynamic Friction
+FRICTION_X = [0.0, 0.6, 0.8] # m/s^2 lateral acceleration
+FRICTION_Y = [4.0, 3.0, 1.0] # Dynamic Friction
 
 LAT_PLAN_MIN_IDX = 5
 
