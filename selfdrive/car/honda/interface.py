@@ -127,12 +127,9 @@ class CarInterface(CarInterfaceBase):
         # stock filter output values:     0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108
         # modified filter output values:  0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0400, 0x0480
         # note: max request allowed is 4096, but request is capped at 3840 in firmware, so modifications result in 2x max
-        ret.lateralTuning.pid.kf = 0.00003 # conservative feed-forward
-        ret.lateralParams.torqueBP = [0x0000, 0x0E10, 0x1C20, 0x2A30, 0x3840, 0x4650, 0x5460, 0x6270, 0x7080]
-        ret.lateralParams.torqueV = [0x0, 0x1E0, 0x3C0, 0x5A0, 0x780, 0x960, 0xB40, 0xD20, 0xF00]
-        # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]], [[0.15], [0.05]]
-        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 17, 22, 27], [0.15, 0.15, 0.15, 0.15]] # 3x [[0.1575], [0.05175]]
-        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 17, 22], [0.05, 0.05, 0.05, 0.05]]
+        ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 2560, 8000], [0, 2560, 3840]]
+        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 4.4704, 13.4112, 20.1168], [0.60, 0.40, 0.30, 0.30]]   # 0 / 10 / 30 / 45 MPH
+        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 4.4704, 13.4112, 20.1168], [0.20, 0.12, 0.10, 0.10]]  # 0 / 10 / 30 / 45 MPH
       else:
         ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
         ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x6540, 0x7080]
