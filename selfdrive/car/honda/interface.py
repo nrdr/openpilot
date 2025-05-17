@@ -52,7 +52,7 @@ class CarInterface(CarInterfaceBase):
     return torque + friction
 
   def torque_from_lateral_accel(self) -> TorqueFromLateralAccelCallbackType:
-    if not self.CP.enableGasInterceptorDEPRECATED:
+    if self.CP.enableGasInterceptorDEPRECATED:
       return self.torque_from_lateral_accel_modded
     else:
       return self.torque_from_lateral_accel_linear
