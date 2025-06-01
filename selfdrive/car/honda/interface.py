@@ -134,8 +134,8 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.pid.kf = 0.00006
         ret.lateralParams.torqueBP = [0, 2560, 10240]
         ret.lateralParams.torqueV = [0, 2560, 3840]
-        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 4.4704, 13.4112, 20.1168], [0.125, 0.125, 0.175, 0.3]]   # 0 / 10 / 30 / 45 MPH
-        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 4.4704, 13.4112, 20.1168], [0.041, 0.041, 0.041, 0.1]]  # 0 / 10 / 30 / 45 MPH
+        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 4.4704, 13.4112, 20.1168], [0.3, 0.3, 0.3, 0.3]]   # 0 / 10 / 30 / 45 MPH
+        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 4.4704, 13.4112, 20.1168], [0.1, 0.1, 0.1, 0.1]]  # 0 / 10 / 30 / 45 MPH
       else:
         ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
         ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x6540, 0x8700]
