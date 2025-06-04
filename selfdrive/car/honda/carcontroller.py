@@ -101,18 +101,13 @@ HUDData = namedtuple("HUDData",
                       "lanes_visible", "fcw", "acc_alert", "steer_required", "lead_distance_bars", "dashed_lanes"])
 
 def rate_limit_steer(new_steer, last_steer, speed):
-  # Define the maximum delta at higher speeds
-  max_delta = 25 * DT_CTRL
+  # Time constant parameters
+  # Adjust alpha dynamically based on speed if desired
+  base_tau = 0.2  # Time constant in seconds
+  alpha = DT_CTRL / (base_tau + DT_CTRL)  # Alpha for first-order low-pass
 
-  # Define the speed threshold (25 MPH in m/s)
-  speed_threshold = 15 * CV.MPH_TO_MS
-
-  # Adjust MAX_DELTA based on speed, reducing it as speed drops below the threshold
-  if speed < speed_threshold:
-    reduction_factor = 24
-    max_delta -= reduction_factor * DT_CTRL
-
-  return clip(new_steer, last_steer - max_delta, last_steer + max_delta)
+  # Simple low-pass filter
+  return alpha * new_steer + (1 - alpha) * last_steer
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_name, CP, VM):
