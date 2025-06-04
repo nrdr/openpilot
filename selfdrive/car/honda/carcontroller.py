@@ -105,11 +105,11 @@ def rate_limit_steer(new_steer, last_steer, speed):
   max_delta = 100 * DT_CTRL
 
   # Define the speed threshold (25 MPH in m/s)
-  speed_threshold = 100 * CV.MPH_TO_MS
+  speed_threshold = 15 * CV.MPH_TO_MS
 
   # Adjust MAX_DELTA based on speed, reducing it as speed drops below the threshold
   if speed < speed_threshold:
-    reduction_factor = 1
+    reduction_factor = 99
     max_delta -= reduction_factor * DT_CTRL
 
   return clip(new_steer, last_steer - max_delta, last_steer + max_delta)
