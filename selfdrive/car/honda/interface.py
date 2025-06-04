@@ -132,28 +132,8 @@ class CarInterface(CarInterfaceBase):
         # ret.lateralParams.torqueBP = [0, 2327, 3525, 4119, 4511, 5131, 5760, 22464, 25344]
         # ret.lateralParams.torqueV = [0, 512, 768, 1144, 1516, 2048, 2560, 3584, 3840]
         ret.lateralTuning.pid.kf = 0.00006
-        ret.lateralParams.torqueBP = [
-            0x0000,  #    0
-            0x0917,  # 2327
-            0x0DC5,  # 3525
-            0x1017,  # 4119
-            0x119F,  # 4511
-            0x180F,  # 6159
-            0x2461,  # 9313
-            0x30B3,  #12467
-            0x74C4   #29892
-        ]
-        ret.lateralParams.torqueV = [
-            0x000,  #    0
-            0x200,  #  512
-            0x300,  #  768
-            0x400,  # 1024
-            0x500,  # 1280
-            0x800,  # 2048
-            0xB00,  # 2816
-            0xD00,  # 3328
-            0xF00   # 3840
-        ]
+        ret.lateralParams.torqueBP = [0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x180F, 0x2461, 0x30B3, 0x74C4]  # [0, 2327, 3525, 4119, 4511, 6159, 9313, 12467, 29892]
+        ret.lateralParams.torqueV = [0x0, 0x190, 0x280, 0x3A0, 0x4F0, 0x700, 0x960, 0xD80, 0xF00]
         ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 4.4704, 13.4112, 20.1168], [0.6, 0.3, 0.3, 0.3]]   # 0 / 10 / 30 / 45 MPH
         ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 4.4704, 13.4112, 20.1168], [0.3, 0.1, 0.1, 0.1]]  # 0 / 10 / 30 / 45 MPH
       else:
