@@ -152,7 +152,7 @@ class DesireHelper:
       # LaneChangeState.laneChangeFinishing
       elif self.lane_change_state == LaneChangeState.laneChangeFinishing:
         # fade in laneline over 2s
-        self.lane_change_ll_prob = min(self.lane_change_ll_prob + DT_MDL * 0.4, 0.5)
+        self.lane_change_ll_prob = min(self.lane_change_ll_prob + DT_MDL * 0.2, 0.2)
 
         if self.lane_change_ll_prob > 0.99:
           self.lane_change_direction = LaneChangeDirection.none
