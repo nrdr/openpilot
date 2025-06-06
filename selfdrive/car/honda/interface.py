@@ -37,7 +37,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   def torque_from_lateral_accel_modded(self, latcontrol_inputs: LatControlInputs, torque_params: car.CarParams.LateralTorqueTuning, lateral_accel_error: float, lateral_accel_deadzone: float, friction_compensation: bool, gravity_adjusted: bool) -> float:
-    threshold = 2.0
+    threshold = 0.5
     threshold_lat_accel = 1/torque_params.latAccelFactor * threshold
     mod_factor = 2.0 # Lateral Accel
     # The default is a linear relationship between torque and lateral acceleration (accounting for road roll and steering friction)
@@ -131,11 +131,11 @@ class CarInterface(CarInterfaceBase):
         # ret.lateralParams.torqueV =   [0x0, 0x200, 0x300, 0x478, 0x5EC, 0x800, 0xA00, 0xE00, 0xF00] (hexdecimal)
         # ret.lateralParams.torqueBP = [0, 2327, 3525, 4119, 4511, 5131, 5760, 22464, 25344]
         # ret.lateralParams.torqueV = [0, 512, 768, 1144, 1516, 2048, 2560, 3584, 3840]
-        ret.lateralTuning.pid.kf = 0.00008
+        ret.lateralTuning.pid.kf = 0.00005
         ret.lateralParams.torqueBP = [0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x180F, 0x2461, 0x30B3, 0x74C4]  # [0, 2327, 3525, 4119, 4511, 6159, 9313, 12467, 29892]
         ret.lateralParams.torqueV = [0x0, 0x190, 0x280, 0x3A0, 0x4F0, 0x700, 0x960, 0xD80, 0xF00]
-        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 11.176, 35.7632], [0.15, 0.3, 0.3]]  # 0 / 25 / 80 MPH
-        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 11.176, 35.7632], [0.05, 0.1, 0.1]]  # 0 / 25 / 80 MPH
+        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 11.176, 35.7632], [0.15, 0.3, 0.2]]  # 0 / 25 / 80 MPH
+        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 11.176, 35.7632], [0.05, 0.1, 0.0667]]  # 0 / 25 / 80 MPH
       else:
         ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
         ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x6540, 0x8700]
