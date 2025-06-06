@@ -52,7 +52,7 @@ class CarInterface(CarInterfaceBase):
     return torque + friction
 
   def torque_from_lateral_accel(self) -> TorqueFromLateralAccelCallbackType:
-    if not self.CP.enableGasInterceptorDEPRECATED:
+    if self.CP.enableGasInterceptorDEPRECATED:
       return self.torque_from_lateral_accel_modded
     else:
       return self.torque_from_lateral_accel_linear
@@ -97,7 +97,7 @@ class CarInterface(CarInterfaceBase):
     # For modeling details, see p.198-200 in "The Science of Vehicle Dynamics (2014), M. Guiggiani"
     ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0], [0]]
     ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0.], [0.]]
-    ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
+    ret.lateralTuning.pid.kf = 0.00003  # conservative feed-forward
 
     if candidate in HONDA_BOSCH:
       ret.longitudinalActuatorDelay = 0.5 # s
