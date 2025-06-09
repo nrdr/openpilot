@@ -99,12 +99,13 @@ HUDData = namedtuple("HUDData",
                      ["pcm_accel", "v_cruise", "lead_visible",
                       "lanes_visible", "fcw", "acc_alert", "steer_required", "lead_distance_bars"])
 
-
 def rate_limit_steer(new_steer, last_steer):
-  # TODO just hardcoded ramp to min/max in 0.33s for all Honda
-  MAX_DELTA = 3 * DT_CTRL
-  return clip(new_steer, last_steer - MAX_DELTA, last_steer + MAX_DELTA)
+  # Speed params can be adjusted if needed
+  base_tau = 0.2  # Time constant in seconds
+  alpha = DT_CTRL / (base_tau + DT_CTRL)  # Alpha for first-order low-pass
 
+  # Simple low-pass filter
+  return alpha * new_steer + (1 - alpha) * last_steer
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_name, CP, FPCP, VM):
@@ -131,7 +132,7 @@ class CarController(CarControllerBase):
     actuators = CC.actuators
     hud_control = CC.hudControl
     conversion = hondacan.get_cruise_speed_conversion(self.CP.carFingerprint, CS.is_metric)
-    hud_v_cruise = hud_control.setSpeed / conversion if hud_control.speedVisible else 255
+    hud_v_cruise = 255
     pcm_cancel_cmd = CC.cruiseControl.cancel
 
     if CC.longActive:

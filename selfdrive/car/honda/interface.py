@@ -90,18 +90,28 @@ class CarInterface(CarInterfaceBase):
         eps_modified = True
 
     if candidate == CAR.HONDA_CIVIC:
+      # FROM THE FIRMWARE 39990-TEG-A010, THE FOLLOWING MODIFICATIONS ARE BEING USED:
+      # data_old =
+      #'0x0028', #speed_clamp_lo
+      #'0x0000, 0x0917, 0x0DC5, 0x1017, 0x119f, 0x140b, 0x1680, 0x1680, 0x1680', # torque_table row 1
+      # data-new =
+      #'0x0000',  # speed_clamp_lo
+      #'0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x69EF, 0x752F',  # torque_table row 1
       if eps_modified:
-        # stock request input values:     0x0000, 0x00DE, 0x014D, 0x01EF, 0x0290, 0x0377, 0x0454, 0x0610, 0x06EE
-        # stock request output values:    0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x1680, 0x1680
-        # modified request output values: 0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x2880, 0x3180
-        # stock filter output values:     0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108
-        # modified filter output values:  0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0400, 0x0480
-        # note: max request allowed is 4096, but request is capped at 3840 in firmware, so modifications result in 2x max
-        ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 2560, 8000], [0, 2560, 3840]]
-        ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]]
+        ret.lateralParams.torqueBP = [0, 2560, 30000] # Modified Honda EPS Firmware
+        ret.lateralParams.torqueV  = [0, 2560, 3840] # Modified Honda EPS Firmware
+        ret.lateralTuning.init('torque')
+        ret.lateralTuning.torque.useSteeringAngle = True
+        ret.lateralTuning.torque.kp = 1.0
+        ret.lateralTuning.torque.kf = 1.0
+        ret.lateralTuning.torque.ki = 0.1
+        ret.lateralTuning.torque.friction = 0.25458812851328544
+        ret.lateralTuning.torque.latAccelFactor = 3.305779125557104
       else:
-        ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 2560], [0, 2560]]
-        ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[1.1], [0.33]]
+        ret.lateralTuning.pid.kf = 0.00006  # Default feed-forward
+        ret.lateralParams.torqueBP = [0, 2560] # Stock Honda EPS Firmware
+        ret.lateralParams.torqueV = [0, 2560] # Stock Honda EPS Firmware
+        ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[1.1], [0.33]] # Stock Honda EPS Firmware
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL, CAR.HONDA_CIVIC_2022):
       if eps_modified:
@@ -178,7 +188,13 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate == CAR.HONDA_PILOT:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]]
+      ret.lateralTuning.init('torque')
+      ret.lateralTuning.torque.useSteeringAngle = True
+      ret.lateralTuning.torque.kp = 1.0
+      ret.lateralTuning.torque.kf = 1.0
+      ret.lateralTuning.torque.ki = 0.1
+      ret.lateralTuning.torque.friction = 0.21351430733218763
+      ret.lateralTuning.torque.latAccelFactor = 1.7262026201812795
 
     elif candidate == CAR.HONDA_RIDGELINE:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
