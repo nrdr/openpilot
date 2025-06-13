@@ -32,7 +32,6 @@ import sys
 import struct
 import argparse
 from pathlib import Path
-from typing import Tuple, Optional
 
 # Memory locations for cruise control speeds
 CRUISE_SPEED_LOCATIONS = {
@@ -121,7 +120,7 @@ def tally_words(data: bytes, start_offset: int, end_offset: int) -> int:
     return checksum & 0xFFFF
 
 
-def calculate_honda_checksum(firmware_data: bytes, verbose: bool = True) -> Tuple[int, dict]:
+def calculate_honda_checksum(firmware_data: bytes, verbose: bool = True) -> tuple[int, dict]:
     """
     Calculates the Honda ECM checksum using the same algorithm as the firmware.
 
@@ -294,7 +293,7 @@ def read_current_cruise_speeds(firmware_data: bytes, verbose: bool) -> dict:
 
     return speeds
 
-def read_current_checksum(firmware_data: bytes, verbose: bool) -> Optional[int]:
+def read_current_checksum(firmware_data: bytes, verbose: bool) -> int | None:
     """
     Reads the current checksum from the firmware.
 
@@ -376,7 +375,7 @@ def verify_firmware_checksum(firmware_data: bytes, verbose: bool) -> bool:
     return passed
 
 def update_cruise_speed(firmware_data: bytearray, memory_addr: int, new_speed_kmh: float,
-                       verbose: bool, expected_current_kmh: Optional[float] = None) -> bool:
+                       verbose: bool, expected_current_kmh: float | None = None) -> bool:
     """
     Updates a cruise control speed value in the firmware.
 
@@ -531,7 +530,7 @@ Examples:
     print()
 
     # Load firmware
-    print(f"Loading firmware...")
+    print("Loading firmware...")
     try:
         with open(firmware_file, 'rb') as f:
             firmware_data = bytearray(f.read())
@@ -542,11 +541,8 @@ Examples:
     print(f"Firmware size: {len(firmware_data):,} bytes (0x{len(firmware_data):x})")
     print()
 
-    # Read current settings
     current_speeds = read_current_cruise_speeds(firmware_data, verbose=args.verbose)
-    current_checksum = read_current_checksum(firmware_data, verbose=args.verbose)
 
-    # Verify current checksum
     print("\n" + "=" * 50)
     checksum_valid = verify_firmware_checksum(firmware_data, verbose=args.verbose)
 
@@ -559,17 +555,14 @@ Examples:
                 print("Aborted.")
                 return 1
 
-    # If verify-only mode, stop here
     if args.verify_only:
         print("\nVerification complete!")
         return 0 if checksum_valid else 1
 
-    # Check if any changes are requested
     if args.min_speed is None:
         print("\nNo changes requested. Use --min-speed to specify new speed value.")
         return 0
 
-    # Confirm changes
     print("\n" + "=" * 50)
     print("PROPOSED CHANGES:")
     if args.min_speed is not None:
@@ -582,19 +575,15 @@ Examples:
             print("Aborted.")
             return 0
 
-    # Apply patches
     print("\n" + "=" * 50)
     print("APPLYING PATCHES:")
 
     success = True
 
-    # Update minimum cruise speed if requested
     if args.min_speed is not None:
-        # Get current speed for verification
         current_min_speed = current_speeds.get("CRUISE_CONTROL_MIN_SPEED_KPH")
 
-        # Update both locations
-        for addr, name in CRUISE_SPEED_LOCATIONS.items():
+        for addr, _name in CRUISE_SPEED_LOCATIONS.items():
             if not update_cruise_speed(firmware_data, addr, args.min_speed, args.verbose, current_min_speed):
                 success = False
                 break
