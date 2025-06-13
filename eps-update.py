@@ -32,6 +32,7 @@ def validate_fw(fw_encrypted, cipher_ops, block_end_addrs):
   s = 0 # sum at each checksum should be 0 so we don't need to reset it
   start = 0
   end = max(block_end_addrs)
+  j = start  # Initialize j to handle empty range case
   for i in range(start, end, 4):
     j = i+4
     s += struct.unpack('<I', fw[i:j])[0]
@@ -113,7 +114,7 @@ if __name__ == "__main__":
   print("Connecting to CAN address 0x{:08X}".format(can_addr))
   uds_client = get_uds_client(can_addr, args.bus)
 
-  debug_output: List[int] = list()
+  debug_output: List[bytes | None] = list()
 
   print("tester present ...")
   uds_client.tester_present()
@@ -131,6 +132,8 @@ if __name__ == "__main__":
     data = uds_client.security_access(ACCESS_TYPE.REQUEST_SEED)
     debug_output = debug_output + [data]
     secret_key = get_seed_secret(fw, app_id)
+    if data is None:
+      raise ValueError("Security access request returned no seed data")
     key = calculate_session_key(secret_key, data[-2:])
     print("key = ", key)
 
@@ -210,5 +213,5 @@ if __name__ == "__main__":
     uds_client.assert_has_calls(calls)
 
     if args.debug:
-      print("\nDebug output:") 
+      print("\nDebug output:")
       print(*debug_output, sep="\n")
