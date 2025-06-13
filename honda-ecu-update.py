@@ -21,11 +21,9 @@ Author: Generated based on reverse engineering of Honda ECU firmware
 """
 
 import os
-import struct
 import tqdm
 import traceback
 from argparse import ArgumentParser
-from typing import List, Optional
 from opendbc.car.structs import CarParams
 from panda import Panda
 from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE
@@ -132,7 +130,7 @@ def get_uds_client(can_addr, bus):
     return uds_client
 
 def write_firmware_to_ecu(uds_client: UdsClient, firmware_data: bytes, start_address: int = 0xa0010000,
-                         max_chunk_size: int = 0x20, debug_output: Optional[List] = None) -> bool:
+                         max_chunk_size: int = 0x20, debug_output: list | None = None) -> bool:
     """
     Write firmware data to ECU using UDS transfer services
 
@@ -241,7 +239,7 @@ def setup_ecu_connection(args):
     print(f"Connecting to CAN address 0x{args.can_id:03X}")
     return get_uds_client(args.can_id, args.bus)
 
-def initialize_ecu_communication(uds_client, debug_output: List):
+def initialize_ecu_communication(uds_client, debug_output: list):
     """
     Initialize ECU communication with tester present and extended diagnostic session
 
@@ -257,7 +255,7 @@ def initialize_ecu_communication(uds_client, debug_output: List):
     if data is not None:
         debug_output.append(data)
 
-def perform_security_access(uds_client, args, debug_output: List) -> bool:
+def perform_security_access(uds_client, args, debug_output: list) -> bool:
     """
     Perform security access procedure with the ECU
 
@@ -300,7 +298,7 @@ def perform_security_access(uds_client, args, debug_output: List) -> bool:
         print("Invalid seed response from ECU. Cannot proceed.")
         return False
 
-def setup_programming_session(uds_client, debug_output: List):
+def setup_programming_session(uds_client, debug_output: list):
     """
     Setup programming session on the ECU
 
@@ -313,7 +311,7 @@ def setup_programming_session(uds_client, debug_output: List):
     if data is not None:
         debug_output.append(data)
 
-def perform_firmware_update(uds_client, firmware_data: bytes, args, debug_output: List) -> bool:
+def perform_firmware_update(uds_client, firmware_data: bytes, args, debug_output: list) -> bool:
     """
     Perform the actual firmware update operations
 
@@ -356,7 +354,7 @@ def perform_firmware_update(uds_client, firmware_data: bytes, args, debug_output
         print("Firmware update failed!")
         return False
 
-def handle_debug_output(args, debug_output: List):
+def handle_debug_output(args, debug_output: list):
     """
     Handle debug output display
 
@@ -415,7 +413,7 @@ def main():
     firmware_data = load_and_validate_firmware(args)
     uds_client = setup_ecu_connection(args)
 
-    debug_output: List[bytes | None] = []
+    debug_output: list[bytes | None] = []
 
     try:
         initialize_ecu_communication(uds_client, debug_output)
