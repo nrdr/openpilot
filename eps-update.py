@@ -4,7 +4,6 @@ import struct
 import tqdm
 import traceback
 from argparse import ArgumentParser
-from typing import List
 from opendbc.car.structs import CarParams
 from panda.format.x5a import x5a
 from panda import Panda
@@ -38,10 +37,10 @@ def validate_fw(fw_encrypted, cipher_ops, block_end_addrs):
     s += struct.unpack('<I', fw[i:j])[0]
     s &= 0xFFFFFFFF
     if j in block_end_addrs:
-      assert s == 0, 'Checksum failed for block ending 0x{:08X}'.format(j)
-      print('Checksum passed for block ending 0x{:08X}'.format(j))
+      assert s == 0, f'Checksum failed for block ending 0x{j:08X}'
+      print(f'Checksum passed for block ending 0x{j:08X}')
 
-  assert s == 0, 'Checksum failed for block ending 0x{:08X}'.format(j)
+  assert s == 0, f'Checksum failed for block ending 0x{j:08X}'
 
 
 def calculate_session_key(const_bytes, seed_bytes):
@@ -87,7 +86,7 @@ def get_seed_secret(fw, app_id):
     if headers[3].values[i].value == app_id:
       return headers[4].values[i].value
 
-  raise RuntimeError("Couldn't find software seed for software application ID {}".format(app_id))
+  raise RuntimeError(f"Couldn't find software seed for software application ID {app_id}")
 
 def get_can_address(fw):
   return 0x18da00f1 | struct.unpack('!B', fw.file_headers[2].values[0].value)[0] << 8
@@ -111,10 +110,10 @@ if __name__ == "__main__":
   print(fw)
 
   can_addr = get_can_address(fw)
-  print("Connecting to CAN address 0x{:08X}".format(can_addr))
+  print(f"Connecting to CAN address 0x{can_addr:08X}")
   uds_client = get_uds_client(can_addr, args.bus)
 
-  debug_output: List[bytes | None] = list()
+  debug_output: list[bytes | None] = list()
 
   print("tester present ...")
   uds_client.tester_present()
@@ -122,7 +121,7 @@ if __name__ == "__main__":
   try:
     print("Getting software version")
     app_id = uds_client.read_data_by_identifier(DATA_IDENTIFIER_TYPE.APPLICATION_SOFTWARE_IDENTIFICATION)
-    print("Application Software ID = {}".format(app_id))
+    print(f"Application Software ID = {app_id}")
 
     print("Set diagnostic session type to 3 (extended diagnostic)")
     data = uds_client.diagnostic_session_control(SESSION_TYPE.EXTENDED_DIAGNOSTIC)
