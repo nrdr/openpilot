@@ -71,7 +71,7 @@ def get_uds_client(can_addr, bus):
     uds_client = UdsClient(panda, can_addr, bus=bus)
     print("Using real client")
   except Exception:
-    mock_helper = mock.patch('panda.python.uds.UdsClient', autospec=True)
+    mock_helper = mock.patch('opendbc.car.uds.UdsClient', autospec=True)
     uds_client = mock_helper.start()
     uds_client.security_access.return_value = b'1234'
     uds_client.request_download.return_value = 514
@@ -198,15 +198,15 @@ if __name__ == "__main__":
     calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY)]
     calls += [call.write_data_by_identifier(DATA_IDENTIFIER_TYPE.FLASH_DECRYPTION_KEY, fw.keys)]
     calls += [call.request_download(0x10000, 0x50000)]
-    calls += [call.transfer_data(0, fw.firmware_encrypted[0][0:512])]
-    calls += [call.transfer_data(1, fw.firmware_encrypted[0][512:1024])]
+    calls += [call.transfer_data(1, fw.firmware_encrypted[0][0:512])]
+    calls += [call.transfer_data(2, fw.firmware_encrypted[0][512:1024])]
     uds_client.assert_has_calls(calls)
 
     num_blocks = -(len(fw.firmware_encrypted[0]) // -512) # sneaky math ceil
     assert uds_client.transfer_data.call_count == num_blocks
 
     calls = []
-    calls += [call.transfer_data(num_blocks - 1, fw.firmware_encrypted[0][((num_blocks-1)*512):])]
+    calls += [call.transfer_data(num_blocks % 0xFF - 2, fw.firmware_encrypted[0][((num_blocks-1)*512):])]
     calls += [call.request_transfer_exit()]
     calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)]
     uds_client.assert_has_calls(calls)

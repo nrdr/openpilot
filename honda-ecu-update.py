@@ -21,11 +21,13 @@ Author: Generated based on reverse engineering of Honda ECU firmware
 """
 
 import os
+import struct
 import tqdm
 import traceback
 from argparse import ArgumentParser
 from opendbc.car.structs import CarParams
 from panda import Panda
+from panda.format.x5a import x5a
 from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE
 from unittest import mock
 
@@ -68,45 +70,39 @@ def calculate_security_key_level1(seed: bytes) -> bytes:
     Returns:
         2-byte key for the security access
     """
-    # Convert seed to integer (big endian) - should be 2 bytes
     if len(seed) != 2:
         raise ValueError(f"Expected 2-byte seed, got {len(seed)} bytes")
 
     seed_int = int.from_bytes(seed, byteorder='big')
 
-    # Constants extracted from the firmware analysis (simple mode when DAT_6000e602 == 0)
     SALT_ADDER = 0x9dd6
     MULTIPLIER = 0x8fff
     MODULUS = 0xfedc
 
-    # Calculate the two components
-    uVar1 = (seed_int + SALT_ADDER) & 0xffff
-    uVar2 = (seed_int * MULTIPLIER) % MODULUS
+    a = (seed_int + SALT_ADDER) & 0xffff
+    b = (seed_int * MULTIPLIER) % MODULUS
 
-    # Calculate final key using XOR
-    key = uVar1 ^ uVar2
-    key = key & 0xFFFF  # Ensure it's a 16-bit value
+    key = (a ^ b) & 0xFFFF
 
-    # Convert back to bytes (big endian)
     return key.to_bytes(2, byteorder='big')
 
-def validate_firmware_checksum(firmware_data: bytes) -> bool:
+def validate_firmware(firmware: x5a) -> bool:
     """
-    Validate Honda ECU firmware checksum using the Honda-specific algorithm
+    Validate Honda ECU firmware
 
     Args:
         firmware_data: The firmware binary data
 
     Returns:
-        True if checksum is valid, False otherwise
+        True if firmware is valid, False otherwise
     """
-    # This would implement the Honda checksum validation algorithm
-    # For now, we'll do a basic length check
-    if len(firmware_data) < 0x10000:
+    assert len(firmware.firmware_blocks) == 1
+    length = len(firmware.firmware_encrypted[0])
+    print(f"Firmware size: {length} bytes (0x{length:08x})")
+    if length < 0x10000:
         print("Warning: Firmware file seems too small")
         return False
 
-    print(f"Firmware size: {len(firmware_data)} bytes (0x{len(firmware_data):08x})")
     return True
 
 def get_uds_client(can_addr, bus):
@@ -122,23 +118,20 @@ def get_uds_client(can_addr, bus):
         uds_client.security_access.return_value = b'\x00\x01\x02'  # 2-byte seed + status byte
         uds_client.diagnostic_session_control.return_value = b'\x50\x02'
         uds_client.routine_control.return_value = b'\x71\x01'
-        uds_client.request_download.return_value = 0x200  # 512 byte max chunk size
+        uds_client.request_download.return_value = 0x200 + 2 # 512 byte max chunk size + header
         uds_client.transfer_data.return_value = b'\x76\x01'
         uds_client.request_transfer_exit.return_value = b'\x77'
         print("Using mock client")
 
     return uds_client
 
-def write_firmware_to_ecu(uds_client: UdsClient, firmware_data: bytes, start_address: int = 0xa0010000,
-                         max_chunk_size: int = 0x20, debug_output: list | None = None) -> bool:
+def write_firmware_to_ecu(uds_client: UdsClient, firmware: x5a, debug_output: list | None = None) -> bool:
     """
     Write firmware data to ECU using UDS transfer services
 
     Args:
         uds_client: UDS client instance
-        firmware_data: Firmware binary data
-        start_address: Starting memory address for firmware
-        max_chunk_size: Maximum chunk size for transfer (Honda ECU limit is typically 32 bytes)
+        firmware: Firmware binary data
         debug_output: Optional list to collect debug information
 
     Returns:
@@ -148,26 +141,24 @@ def write_firmware_to_ecu(uds_client: UdsClient, firmware_data: bytes, start_add
         debug_output = []
 
     try:
-        print("Requesting download...")
-        length = len(firmware_data)
-        response = uds_client.request_download(start_address, length)
+    # Write firmware to ECU
+        print("Requesting download")
+        assert len(firmware.firmware_blocks) == 1
+        block = firmware.firmware_blocks[0]
+        length = block["length"]
+        response = uds_client.request_download(block["start"], length)
         if debug_output is not None and response is not None:
             debug_output.append(response)
 
-        # Honda ECU typically has smaller chunk sizes than EPS
-        if isinstance(response, int):
-            max_chunk_size = min(max_chunk_size, response - 2)  # subtract header bytes
-
-        print(f"Using chunk size: {max_chunk_size} bytes")
+        max_chunk_size = response - 2  # subtract header bytes
 
         with tqdm.tqdm(total=length, unit='B', unit_scale=True) as t:
             cursor = 0
             seq = 1
             while cursor < length:
                 block_size = min(max_chunk_size, length - cursor)
-                chunk_data = firmware_data[cursor:cursor + block_size]
 
-                data = uds_client.transfer_data(seq, chunk_data)
+                data = uds_client.transfer_data(seq, firmware.firmware_encrypted[0][cursor:cursor+block_size])
                 if debug_output is not None and data is not None:
                     debug_output.append(data)
 
@@ -191,16 +182,13 @@ def parse_arguments():
     parser = ArgumentParser(description="Honda ECU Firmware Update Tool")
     parser.add_argument("firmware", help="Honda ECU firmware file (.bin)")
     parser.add_argument("-b", "--bus", default=0, type=auto_int, help="CAN bus number")
-    parser.add_argument("--can-id", default=0x7E0, type=auto_int, help="ECU CAN address")
-    parser.add_argument("--start-address", default=0xa0010000, type=auto_int, help="Firmware start address")
-    parser.add_argument("--chunk-size", default=0x20, type=auto_int, help="Transfer chunk size (max 32 bytes for Honda)")
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
     parser.add_argument("--danger", action="store_true", help="Run in danger mode that actually performs mutating actions")
     parser.add_argument("--skip-checksum", action="store_true", help="Skip firmware checksum validation")
     parser.add_argument("--skip-security", action="store_true", help="Skip security access (if ECU is already unlocked)")
     return parser.parse_args()
 
-def load_and_validate_firmware(args) -> bytes:
+def load_and_validate_firmware(args) -> x5a:
     """
     Load firmware file and validate its checksum
 
@@ -214,19 +202,29 @@ def load_and_validate_firmware(args) -> bytes:
         SystemExit: If firmware validation fails
     """
     print(f"Reading firmware file: {args.firmware}")
-    firmware_data = read_file(args.firmware)
+    firmware = x5a(read_file(args.firmware))
 
     if not args.skip_checksum:
         print("Validating firmware checksum...")
-        if not validate_firmware_checksum(firmware_data):
+        if not validate_firmware(firmware):
             print("Firmware checksum validation failed!")
             exit(1)
         print("Firmware checksum validation passed")
 
-    print(f"Firmware size: {len(firmware_data)} bytes")
-    return firmware_data
+    return firmware
 
-def setup_ecu_connection(args):
+def get_seed_secret(fw: x5a, app_id: bytes):
+    headers = fw.file_headers
+    for i in range(len(headers[4].values)):
+        if headers[3].values[i].value == app_id:
+            return headers[4].values[i].value
+
+    raise RuntimeError(f"Couldn't find software seed for software application ID {app_id}")
+
+def get_can_address(fw):
+    return 0x18da00f1 | struct.unpack('!B', fw.file_headers[2].values[0].value)[0] << 8
+
+def setup_ecu_connection(fw: x5a, bus: int):
     """
     Establish connection to the ECU via CAN
 
@@ -236,8 +234,9 @@ def setup_ecu_connection(args):
     Returns:
         UDS client instance
     """
-    print(f"Connecting to CAN address 0x{args.can_id:03X}")
-    return get_uds_client(args.can_id, args.bus)
+    can_addr = get_can_address(fw)
+    print(f"Connecting to CAN address 0x{can_addr:08X}")
+    return get_uds_client(can_addr, bus)
 
 def initialize_ecu_communication(uds_client, debug_output: list):
     """
@@ -311,13 +310,13 @@ def setup_programming_session(uds_client, debug_output: list):
     if data is not None:
         debug_output.append(data)
 
-def perform_firmware_update(uds_client, firmware_data: bytes, args, debug_output: list) -> bool:
+def perform_firmware_update(uds_client, firmware: x5a, args, debug_output: list) -> bool:
     """
     Perform the actual firmware update operations
 
     Args:
         uds_client: UDS client instance
-        firmware_data: Firmware binary data
+        firmware_data: Firmware in x5a format
         args: Parsed command line arguments
         debug_output: List to collect debug information
 
@@ -337,9 +336,11 @@ def perform_firmware_update(uds_client, firmware_data: bytes, args, debug_output
     if data is not None:
         debug_output.append(data)
 
-    # Write firmware to ECU
-    success = write_firmware_to_ecu(uds_client, firmware_data, args.start_address,
-                                   args.chunk_size, debug_output)
+    print("Setting firmware decryption key")
+    data = uds_client.write_data_by_identifier(DATA_IDENTIFIER_TYPE.FLASH_DECRYPTION_KEY, firmware.keys)
+    debug_output = debug_output + [data]
+
+    success = write_firmware_to_ecu(uds_client, firmware, debug_output)
 
     if success:
         print("Checking programming dependencies...")
@@ -367,7 +368,7 @@ def handle_debug_output(args, debug_output: list):
         for i, data in enumerate(debug_output):
             print(f"{i}: {data}")
 
-def validate_mock_calls(uds_client, args, firmware_data: bytes):
+def validate_mock_calls(uds_client, args, firmware: x5a):
     """
     Validate mock UDS client calls for testing purposes
 
@@ -397,23 +398,32 @@ def validate_mock_calls(uds_client, args, firmware_data: bytes):
     ])
 
     if args.danger:
-        expected_calls.extend([
-            call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY),
-            call.request_download(args.start_address, len(firmware_data)),
-            call.request_transfer_exit(),
-            call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES),
-        ])
+
+            expected_calls += call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY),
+            expected_calls += [call.write_data_by_identifier(DATA_IDENTIFIER_TYPE.FLASH_DECRYPTION_KEY, firmware.keys)]
+            expected_calls += call.request_download(firmware.firmware_blocks[0]["start"], len(firmware.firmware_encrypted[0])),
+            expected_calls += [call.transfer_data(1, firmware.firmware_encrypted[0][0:512])]
+            expected_calls += [call.transfer_data(2, firmware.firmware_encrypted[0][512:1024])]
+            uds_client.assert_has_calls(expected_calls)
+
+            num_blocks = -(len(firmware.firmware_encrypted[0]) // -512) # sneaky math ceil
+            assert uds_client.transfer_data.call_count == num_blocks
+
+            expected_calls = []
+            expected_calls += [call.transfer_data(num_blocks % 0xFF - 2, firmware.firmware_encrypted[0][((num_blocks-1)*512):])]
+            expected_calls += call.request_transfer_exit()
+            expected_calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)]
 
     uds_client.assert_has_calls(expected_calls)
-    print("Mock validation passed!")
+    print("mock validation passed!")
 
 def main():
-    """Main function to coordinate the Honda ECU firmware update process"""
+    """main function to coordinate the honda ecu firmware update process"""
     args = parse_arguments()
-    firmware_data = load_and_validate_firmware(args)
-    uds_client = setup_ecu_connection(args)
+    firmware = load_and_validate_firmware(args)
+    uds_client = setup_ecu_connection(firmware, args.bus)
 
-    debug_output: list[bytes | None] = []
+    debug_output: list[bytes] = []
 
     try:
         initialize_ecu_communication(uds_client, debug_output)
@@ -422,7 +432,7 @@ def main():
 
         setup_programming_session(uds_client, debug_output)
 
-        if not perform_firmware_update(uds_client, firmware_data, args, debug_output):
+        if not perform_firmware_update(uds_client, firmware, args, debug_output):
             return 1
     except Exception as e:
         print(f"Error during firmware update: {e}")
@@ -433,7 +443,7 @@ def main():
     finally:
         handle_debug_output(args, debug_output)
 
-    validate_mock_calls(uds_client, args, firmware_data)
+    validate_mock_calls(uds_client, args, firmware)
 
     return 0
 
