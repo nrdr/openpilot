@@ -206,7 +206,7 @@ if __name__ == "__main__":
     assert uds_client.transfer_data.call_count == num_blocks
 
     calls = []
-    calls += [call.transfer_data(num_blocks % 0xFF - 2, fw.firmware_encrypted[0][((num_blocks-1)*512):])]
+    calls += [call.transfer_data(num_blocks & 0xFF - 1, fw.firmware_encrypted[0][((num_blocks-1)*512):])]
     calls += [call.request_transfer_exit()]
     calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)]
     uds_client.assert_has_calls(calls)

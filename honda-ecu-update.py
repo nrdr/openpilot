@@ -52,17 +52,9 @@ def read_file(fn) -> bytes:
 
     return f_data
 
-def calculate_security_key_level1(seed: bytes) -> bytes:
+def calculate_session_key(const_bytes: bytes, seed_bytes: bytes) -> bytes:
     """
-    Calculate the security key for level 1 based on the decompiled verify_security_key_level1 function
-
-    The function implements the exact algorithm from the ECU firmware:
-
-    1. The seed is a 2-byte value (16-bit)
-    2. Two calculations are performed:
-       - uVar1 = (seed + 0x9dd6) & 0xffff
-       - uVar2 = (seed * 0x8fff) % 0xfedc
-    3. The final key is: uVar1 XOR uVar2
+    Calculate the security key for level 1 based on the constants from the RWD
 
     Args:
         seed: 2-byte seed from ECU
@@ -70,21 +62,15 @@ def calculate_security_key_level1(seed: bytes) -> bytes:
     Returns:
         2-byte key for the security access
     """
-    if len(seed) != 2:
-        raise ValueError(f"Expected 2-byte seed, got {len(seed)} bytes")
+    k0, k1, k2 = struct.unpack('!HHH', const_bytes)
+    seed = struct.unpack('!H', seed_bytes)[0]
+    if k2 == 0:
+        k2 = 0x10000
 
-    seed_int = int.from_bytes(seed, byteorder='big')
-
-    SALT_ADDER = 0x9dd6
-    MULTIPLIER = 0x8fff
-    MODULUS = 0xfedc
-
-    a = (seed_int + SALT_ADDER) & 0xffff
-    b = (seed_int * MULTIPLIER) % MODULUS
-
-    key = (a ^ b) & 0xFFFF
-
-    return key.to_bytes(2, byteorder='big')
+    key = (seed + k0) ^ (seed * k1) % k2
+    key_bytes = struct.pack('!H', key)
+    print(f"Calculated key: {key_bytes.hex().upper()}")
+    return key_bytes
 
 def validate_firmware(firmware: x5a) -> bool:
     """
@@ -121,6 +107,7 @@ def get_uds_client(can_addr, bus):
         uds_client.request_download.return_value = 0x200 + 2 # 512 byte max chunk size + header
         uds_client.transfer_data.return_value = b'\x76\x01'
         uds_client.request_transfer_exit.return_value = b'\x77'
+        uds_client.read_data_by_identifier.return_value = b'37805-RLV-L010\x00\x00'
         print("Using mock client")
 
     return uds_client
@@ -154,7 +141,7 @@ def write_firmware_to_ecu(uds_client: UdsClient, firmware: x5a, debug_output: li
 
         with tqdm.tqdm(total=length, unit='B', unit_scale=True) as t:
             cursor = 0
-            seq = 1
+            seq = 0
             while cursor < length:
                 block_size = min(max_chunk_size, length - cursor)
 
@@ -238,38 +225,46 @@ def setup_ecu_connection(fw: x5a, bus: int):
     print(f"Connecting to CAN address 0x{can_addr:08X}")
     return get_uds_client(can_addr, bus)
 
-def initialize_ecu_communication(uds_client, debug_output: list):
+def initialize_ecu_communication(uds_client, debug_output: list) -> bytes:
     """
     Initialize ECU communication with tester present and extended diagnostic session
 
     Args:
         uds_client: UDS client instance
         debug_output: List to collect debug information
+
+    Returns:
+        Firmware application ID
     """
     print("Sending tester present...")
     uds_client.tester_present()
+    print("Reading software version")
+    data = uds_client.read_data_by_identifier(DATA_IDENTIFIER_TYPE.APPLICATION_SOFTWARE_IDENTIFICATION)
+    if data is not None:
+        debug_output.append(data)
+
+    app_id = data
+    print(f"Application Software ID = {app_id}")
 
     print("Setting diagnostic session to EXTENDED_DIAGNOSTIC...")
     data = uds_client.diagnostic_session_control(SESSION_TYPE.EXTENDED_DIAGNOSTIC)
     if data is not None:
         debug_output.append(data)
 
-def perform_security_access(uds_client, args, debug_output: list) -> bool:
+    return app_id
+
+def perform_security_access(uds_client: UdsClient, app_id: bytes, firmware: x5a, debug_output: list) -> bool:
     """
     Perform security access procedure with the ECU
 
     Args:
         uds_client: UDS client instance
-        args: Parsed command line arguments
+        firmware: Firmware struct
         debug_output: List to collect debug information
 
     Returns:
-        True if security access successful or skipped, False if failed
+        True if security access successful, False if failed
     """
-    if args.skip_security:
-        print("Skipping security access as requested...")
-        return True
-
     print("Requesting seed for security level 1...")
     data = uds_client.security_access(ACCESS_TYPE.REQUEST_SEED)
     if data is not None:
@@ -281,11 +276,10 @@ def perform_security_access(uds_client, args, debug_output: list) -> bool:
 
         print(f"Received seed: {seed.hex().upper()}")
 
-        # Calculate the security key
-        key = calculate_security_key_level1(seed)
-        print(f"Calculated key: {key.hex().upper()}")
+        secret_key = get_seed_secret(firmware, app_id)
+        key = calculate_session_key(secret_key, seed)
 
-        # Send the key for level 1
+
         print("Sending key for security level 1...")
         data = uds_client.security_access(ACCESS_TYPE.SEND_KEY, key)
         if data is not None:
@@ -310,24 +304,18 @@ def setup_programming_session(uds_client, debug_output: list):
     if data is not None:
         debug_output.append(data)
 
-def perform_firmware_update(uds_client, firmware: x5a, args, debug_output: list) -> bool:
+def perform_firmware_update(uds_client, firmware: x5a, debug_output: list) -> bool:
     """
     Perform the actual firmware update operations
 
     Args:
         uds_client: UDS client instance
         firmware_data: Firmware in x5a format
-        args: Parsed command line arguments
         debug_output: List to collect debug information
 
     Returns:
         True if firmware update successful, False otherwise
     """
-    if not args.danger:
-        print("Safe mode: stopping before mutating actions")
-        print("Use --danger flag to actually perform firmware update")
-        return True
-
     print("WARNING: Performing actual firmware update!")
 
     # Erase flash memory
@@ -344,8 +332,7 @@ def perform_firmware_update(uds_client, firmware: x5a, args, debug_output: list)
 
     if success:
         print("Checking programming dependencies...")
-        data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START,
-                                        ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)
+        data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)
         if data is not None:
             debug_output.append(data)
 
@@ -384,34 +371,32 @@ def validate_mock_calls(uds_client, args, firmware: x5a):
 
     expected_calls = [
         call.tester_present(),
+        call.read_data_by_identifier(DATA_IDENTIFIER_TYPE.APPLICATION_SOFTWARE_IDENTIFICATION),
         call.diagnostic_session_control(SESSION_TYPE.EXTENDED_DIAGNOSTIC),
     ]
 
     if not args.skip_security:
-        expected_calls.extend([
+        expected_calls += [
             call.security_access(ACCESS_TYPE.REQUEST_SEED),
             call.security_access(ACCESS_TYPE.SEND_KEY, ANY),
-        ])
+        ]
 
-    expected_calls.extend([
-        call.diagnostic_session_control(SESSION_TYPE.PROGRAMMING),
-    ])
+    expected_calls += [call.diagnostic_session_control(SESSION_TYPE.PROGRAMMING)]
 
     if args.danger:
-
-            expected_calls += call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY),
+            expected_calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY)]
             expected_calls += [call.write_data_by_identifier(DATA_IDENTIFIER_TYPE.FLASH_DECRYPTION_KEY, firmware.keys)]
-            expected_calls += call.request_download(firmware.firmware_blocks[0]["start"], len(firmware.firmware_encrypted[0])),
-            expected_calls += [call.transfer_data(1, firmware.firmware_encrypted[0][0:512])]
-            expected_calls += [call.transfer_data(2, firmware.firmware_encrypted[0][512:1024])]
+            expected_calls += [call.request_download(firmware.firmware_blocks[0]["start"], len(firmware.firmware_encrypted[0]))]
+            expected_calls += [call.transfer_data(0, firmware.firmware_encrypted[0][0:512])]
+            expected_calls += [call.transfer_data(1, firmware.firmware_encrypted[0][512:1024])]
             uds_client.assert_has_calls(expected_calls)
 
             num_blocks = -(len(firmware.firmware_encrypted[0]) // -512) # sneaky math ceil
             assert uds_client.transfer_data.call_count == num_blocks
 
             expected_calls = []
-            expected_calls += [call.transfer_data(num_blocks % 0xFF - 2, firmware.firmware_encrypted[0][((num_blocks-1)*512):])]
-            expected_calls += call.request_transfer_exit()
+            expected_calls += [call.transfer_data((num_blocks & 0xFF) - 1, firmware.firmware_encrypted[0][((num_blocks-1)*512):])]
+            expected_calls += [call.request_transfer_exit()]
             expected_calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)]
 
     uds_client.assert_has_calls(expected_calls)
@@ -426,14 +411,23 @@ def main():
     debug_output: list[bytes] = []
 
     try:
-        initialize_ecu_communication(uds_client, debug_output)
-        if not perform_security_access(uds_client, args, debug_output):
-            return 1
+        app_id = initialize_ecu_communication(uds_client, debug_output)
+        if args.skip_security:
+            print("Skipping security access as requested...")
+        else:
+            if not perform_security_access(uds_client, app_id, firmware, debug_output):
+                return 1
 
         setup_programming_session(uds_client, debug_output)
 
-        if not perform_firmware_update(uds_client, firmware, args, debug_output):
+        if not args.danger:
+            print("Safe mode: stopping before mutating actions")
+            print("Use --danger flag to actually perform firmware update")
+            return 2
+
+        if not perform_firmware_update(uds_client, firmware, debug_output):
             return 1
+
     except Exception as e:
         print(f"Error during firmware update: {e}")
         if args.debug:
