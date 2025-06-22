@@ -134,8 +134,7 @@ def write_firmware_to_ecu(uds_client: UdsClient, firmware: x5a, debug_output: li
         block = firmware.firmware_blocks[0]
         length = block["length"]
         response = uds_client.request_download(block["start"], length)
-        if debug_output is not None and response is not None:
-            debug_output.append(response)
+        debug_output += [response]
 
         max_chunk_size = response - 2  # subtract header bytes
 
@@ -145,9 +144,7 @@ def write_firmware_to_ecu(uds_client: UdsClient, firmware: x5a, debug_output: li
             while cursor < length:
                 block_size = min(max_chunk_size, length - cursor)
 
-                data = uds_client.transfer_data(seq, firmware.firmware_encrypted[0][cursor:cursor+block_size])
-                if debug_output is not None and data is not None:
-                    debug_output.append(data)
+                uds_client.transfer_data(seq, firmware.firmware_encrypted[0][cursor:cursor+block_size])
 
                 seq = (seq + 1) & 0xFF
                 cursor += block_size
@@ -155,8 +152,7 @@ def write_firmware_to_ecu(uds_client: UdsClient, firmware: x5a, debug_output: li
 
         print("Requesting transfer exit...")
         data = uds_client.request_transfer_exit()
-        if debug_output is not None and data is not None:
-            debug_output.append(data)
+        debug_output += [data]
 
         return True
 
@@ -208,7 +204,7 @@ def get_seed_secret(fw: x5a, app_id: bytes):
 
     raise RuntimeError(f"Couldn't find software seed for software application ID {app_id}")
 
-def get_can_address(fw):
+def get_can_address(fw: x5a) -> int:
     return 0x18da00f1 | struct.unpack('!B', fw.file_headers[2].values[0].value)[0] << 8
 
 def setup_ecu_connection(fw: x5a, bus: int):
@@ -240,8 +236,7 @@ def initialize_ecu_communication(uds_client, debug_output: list) -> bytes:
     uds_client.tester_present()
     print("Reading software version")
     data = uds_client.read_data_by_identifier(DATA_IDENTIFIER_TYPE.APPLICATION_SOFTWARE_IDENTIFICATION)
-    if data is not None:
-        debug_output.append(data)
+    debug_output += [data]
 
     app_id = data
     print(f"Application Software ID = {app_id}")
@@ -249,7 +244,7 @@ def initialize_ecu_communication(uds_client, debug_output: list) -> bytes:
     print("Setting diagnostic session to EXTENDED_DIAGNOSTIC...")
     data = uds_client.diagnostic_session_control(SESSION_TYPE.EXTENDED_DIAGNOSTIC)
     if data is not None:
-        debug_output.append(data)
+        debug_output += [data]
 
     return app_id
 
@@ -268,7 +263,7 @@ def perform_security_access(uds_client: UdsClient, app_id: bytes, firmware: x5a,
     print("Requesting seed for security level 1...")
     data = uds_client.security_access(ACCESS_TYPE.REQUEST_SEED)
     if data is not None:
-        debug_output.append(data)
+        debug_output += [data]
 
     if data and len(data) >= 3:
         # Extract the 2-byte seed (level 1 uses 2-byte seed)
@@ -283,7 +278,7 @@ def perform_security_access(uds_client: UdsClient, app_id: bytes, firmware: x5a,
         print("Sending key for security level 1...")
         data = uds_client.security_access(ACCESS_TYPE.SEND_KEY, key)
         if data is not None:
-            debug_output.append(data)
+            debug_output += [data]
 
         print("Security access granted!")
         return True
@@ -302,9 +297,9 @@ def setup_programming_session(uds_client, debug_output: list):
     print("Setting diagnostic session to PROGRAMMING...")
     data = uds_client.diagnostic_session_control(SESSION_TYPE.PROGRAMMING)
     if data is not None:
-        debug_output.append(data)
+        debug_output += [data]
 
-def perform_firmware_update(uds_client, firmware: x5a, debug_output: list) -> bool:
+def perform_firmware_update(uds_client: UdsClient, firmware: x5a, debug_output: list) -> bool:
     """
     Perform the actual firmware update operations
 
@@ -322,11 +317,10 @@ def perform_firmware_update(uds_client, firmware: x5a, debug_output: list) -> bo
     print("Erasing flash memory...")
     data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY)
     if data is not None:
-        debug_output.append(data)
+        debug_output += [data]
 
     print("Setting firmware decryption key")
-    data = uds_client.write_data_by_identifier(DATA_IDENTIFIER_TYPE.FLASH_DECRYPTION_KEY, firmware.keys)
-    debug_output = debug_output + [data]
+    uds_client.write_data_by_identifier(DATA_IDENTIFIER_TYPE.FLASH_DECRYPTION_KEY, firmware.keys)
 
     success = write_firmware_to_ecu(uds_client, firmware, debug_output)
 
@@ -334,7 +328,7 @@ def perform_firmware_update(uds_client, firmware: x5a, debug_output: list) -> bo
         print("Checking programming dependencies...")
         data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)
         if data is not None:
-            debug_output.append(data)
+            debug_output += [data]
 
         print("Firmware update completed successfully!")
         return True
