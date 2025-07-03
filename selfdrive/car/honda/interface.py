@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import numpy as np
 from cereal import car, custom
 from panda import Panda
 from openpilot.common.conversions import Conversions as CV
@@ -7,8 +8,9 @@ from openpilot.selfdrive.car.honda.hondacan import CanBus
 from openpilot.selfdrive.car.honda.values import CarControllerParams, CruiseButtons, CruiseSettings, HondaFlags, CAR, HONDA_BOSCH, \
                                                  HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_RADARLESS
 from openpilot.selfdrive.car import create_button_events, get_safety_config
-from openpilot.selfdrive.car.interfaces import CarInterfaceBase
+from openpilot.selfdrive.car.interfaces import CarInterfaceBase, TorqueFromLateralAccelCallbackType, FRICTION_THRESHOLD, LatControlInputs
 from openpilot.selfdrive.car.disable_ecu import disable_ecu
+from openpilot.selfdrive.controls.lib.drive_helpers import get_friction
 
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -37,6 +39,28 @@ class CarInterface(CarInterfaceBase):
       ACCEL_MAX_VALS = [CarControllerParams.NIDEC_ACCEL_MAX, 0.2]
       ACCEL_MAX_BP = [cruise_speed - 2., cruise_speed - .2]
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
+
+  def torque_from_lateral_accel_modded(self, latcontrol_inputs: LatControlInputs, torque_params: car.CarParams.LateralTorqueTuning,
+                                       lateral_accel_error: float, lateral_accel_deadzone: float, friction_compensation: bool, gravity_adjusted: bool) -> float:
+    threshold = 0.8
+    threshold_lat_accel = 1/torque_params.latAccelFactor * threshold
+    mod_factor = 2.25 # <-- CHANGE THIS
+    # The default is a linear relationship between torque and lateral acceleration (accounting for road roll and steering friction)
+    friction = get_friction(lateral_accel_error, lateral_accel_deadzone, FRICTION_THRESHOLD, torque_params, friction_compensation)
+    if abs(latcontrol_inputs.lateral_acceleration) > threshold_lat_accel:
+      modded_lat_accel_factor = float(torque_params.latAccelFactor) * mod_factor
+      excess_lat_accel = abs(latcontrol_inputs.lateral_acceleration) - threshold_lat_accel
+      torque = float(np.sign(latcontrol_inputs.lateral_acceleration)) * threshold_lat_accel / float(torque_params.latAccelFactor)
+      torque += float(np.sign(latcontrol_inputs.lateral_acceleration)) * excess_lat_accel / modded_lat_accel_factor
+    else:
+      torque = latcontrol_inputs.lateral_acceleration / float(torque_params.latAccelFactor)
+    return torque + friction
+
+  def torque_from_lateral_accel(self) -> TorqueFromLateralAccelCallbackType:
+    if self.CP.flags & HondaFlags.EPS_MODIFIED:
+      return self.torque_from_lateral_accel_modded
+    else:
+      return self.torque_from_lateral_accel_linear
 
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, frogpilot_toggles):
@@ -92,10 +116,9 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalTuning.kiBP = [0., 5., 35.]
       ret.longitudinalTuning.kiV = [0.6, 0.4, 0.25]
 
-    eps_modified = False
     for fw in car_fw:
       if fw.ecu == "eps" and b"," in fw.fwVersion:
-        eps_modified = True
+        ret.flags |= HondaFlags.EPS_MODIFIED.value
 
     if candidate == CAR.HONDA_CIVIC:
       # FROM THE FIRMWARE 39990-TEG-A010, THE FOLLOWING MODIFICATIONS ARE BEING USED:
@@ -105,7 +128,7 @@ class CarInterface(CarInterfaceBase):
       # data-new =
       #'0x0000',  # speed_clamp_lo
       #'0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x69EF, 0x752F',  # torque_table row 1
-      if eps_modified:
+      if ret.flags & HondaFlags.EPS_MODIFIED:
         ret.lateralParams.torqueBP = [0, 2560, 30000] # Modified Honda EPS Firmware
         ret.lateralParams.torqueV  = [0, 2560, 3840] # Modified Honda EPS Firmware
         ret.lateralTuning.init('torque')
@@ -122,7 +145,7 @@ class CarInterface(CarInterfaceBase):
         ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[1.1], [0.33]] # Stock Honda EPS Firmware
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL, CAR.HONDA_CIVIC_2022):
-      if eps_modified:
+      if ret.flags & HondaFlags.EPS_MODIFIED:
         ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 2564, 8000], [0, 2564, 3840]]
         ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.09]]  # 2.5x Modded EPS
       else:
@@ -132,7 +155,7 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.HONDA_ACCORD:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
 
-      if eps_modified:
+      if ret.flags & HondaFlags.EPS_MODIFIED:
         ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.09]]
       else:
         ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.6], [0.18]]
@@ -147,7 +170,7 @@ class CarInterface(CarInterfaceBase):
       ret.wheelSpeedFactor = 1.025
 
     elif candidate == CAR.HONDA_CRV_5G:
-      if eps_modified:
+      if ret.flags & HondaFlags.EPS_MODIFIED:
         # stock request input values:     0x0000, 0x00DB, 0x01BB, 0x0296, 0x0377, 0x0454, 0x0532, 0x0610, 0x067F
         # stock request output values:    0x0000, 0x0500, 0x0A15, 0x0E6D, 0x1100, 0x1200, 0x129A, 0x134D, 0x1400
         # modified request output values: 0x0000, 0x0500, 0x0A15, 0x0E6D, 0x1100, 0x1200, 0x1ACD, 0x239A, 0x2800
@@ -218,7 +241,7 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate == CAR.HONDA_CLARITY:
       ret.safetyConfigs[0].safetyParam |= Panda.FLAG_HONDA_CLARITY
-      if eps_modified:
+      if ret.flags & HondaFlags.EPS_MODIFIED:
         for fw in car_fw:
           if fw.ecu == "eps" and b"-" not in fw.fwVersion and b"," in fw.fwVersion:
             ret.lateralTuning.pid.kf = 0.00004
