@@ -57,14 +57,15 @@ class FrogPilotVCruise:
       self.csc_target = v_cruise
 
     # Mike's extended lead linear braking
-    if self.frogpilot_planner.lead_one.vLead < v_ego > CRUISING_SPEED and sm["controlsState"].enabled and self.frogpilot_planner.tracking_lead and frogpilot_toggles.human_following:
-      if not self.frogpilot_planner.frogpilot_following.following_lead:
-        decel_rate = (v_ego - self.frogpilot_planner.lead_one.vLead)**2 / self.frogpilot_planner.lead_one.dRel
-        self.braking_target = max(v_ego - (decel_rate * DT_MDL), self.frogpilot_planner.lead_one.vLead + CRUISING_SPEED)
-      else:
-        self.braking_target = v_cruise
-    else:
-      self.braking_target = v_cruise
+    self.braking_target = v_cruise
+    if v_ego > CRUISING_SPEED and sm["controlsState"].enabled and self.frogpilot_planner.tracking_lead and frogpilot_toggles.human_following:
+      lead = self.frogpilot_planner.lead_one
+      tFollow = self.frogpilot_planner.frogpilot_following.t_follow
+      dFollow = max(lead.dRel - lead.vLead * (tFollow + 0.5), 1e-6)
+      if (lead.vLead + dFollow / v_ego) < v_ego and lead.dRel < 125:
+        decelRate = (lead.vRel ** 2) / (2 * dFollow) * 2
+        brake_speed = v_ego - (decelRate - lead.aLeadK)
+        self.braking_target = float(max(CRUISING_SPEED, brake_speed, lead.vLead))
 
     # Pfeiferj's Speed Limit Controller
     self.slc.frogpilot_toggles = frogpilot_toggles
