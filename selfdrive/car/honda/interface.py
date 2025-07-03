@@ -25,7 +25,10 @@ class CarInterface(CarInterfaceBase):
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
     if CP.carFingerprint in HONDA_BOSCH:
       return CarControllerParams.BOSCH_ACCEL_MIN, CarControllerParams.BOSCH_ACCEL_MAX
-    elif CP.enableGasInterceptor:
+    elif CP.enableGasInterceptor and CP.carFingerprint == CAR.HONDA_CLARITY:
+      CLARITY_PEDAL_MAX = 4.0
+      return CarControllerParams.NIDEC_ACCEL_MIN, CLARITY_PEDAL_MAX
+    elif CP.enableGasInterceptor and CP.carFingerprint != CAR.HONDA_CLARITY:
       return CarControllerParams.NIDEC_ACCEL_MIN, CarControllerParams.NIDEC_ACCEL_MAX
     else:
       # NIDECs don't allow acceleration near cruise_speed,
@@ -79,10 +82,14 @@ class CarInterface(CarInterfaceBase):
       ret.longitudinalActuatorDelay = 0.5 # s
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
-    else:
-      # default longitudinal tuning for all hondas
+    elif ret.enableGasInterceptor:
+      # default longitudinal tuning for all hondas with GasInterceptor
       ret.longitudinalTuning.kiBP = [0., 5., 35.]
       ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
+    else:
+      # modified longitudinal tuning for all hondas without GasInterceptor
+      ret.longitudinalTuning.kiBP = [0., 5., 35.]
+      ret.longitudinalTuning.kiV = [0.6, 0.4, 0.25]
 
     eps_modified = False
     for fw in car_fw:

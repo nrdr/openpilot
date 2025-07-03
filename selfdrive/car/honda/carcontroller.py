@@ -238,12 +238,19 @@ class CarController(CarControllerBase):
           self.brake = apply_brake / self.params.NIDEC_BRAKE_MAX
 
           if self.CP.enableGasInterceptor:
-            # way too aggressive at low speed without this
-            gas_mult = interp(CS.out.vEgo, [0., 10.], [0.4, 1.0])
-            # send exactly zero if apply_gas is zero. Interceptor will send the max between read value and apply_gas.
-            # This prevents unexpected pedal range rescaling
-            # Sending non-zero gas when OP is not enabled will cause the PCM not to respond to throttle as expected
-            # when you do enable.
+            # Non-hardcoded approaches to this conditional statement require an import of CAR from openpilot.selfdrive.car.honda.values or a creation
+            # of a new flag in openpilot.selfdrive.car.honda.values and an import of that flag. Since this is a Clarity-specific tune, a hardcode seems
+            # reasonable here. If in the future, CAR is imported, this statement can check against CAR.HONDA_CLARITY instead of the current string value
+            if self.CP.carFingerprint == "HONDA_CLARITY":
+              # mike8643 Clarity Long Tune Interpolation
+              gas_mult = 1
+            else:
+              # way too aggressive at low speed without this
+              gas_mult = interp(CS.out.vEgo, [0., 10.], [0.4, 1.0])
+              # send exactly zero if apply_gas is zero. Interceptor will send the max between read value and apply_gas.
+              # This prevents unexpected pedal range rescaling
+              # Sending non-zero gas when OP is not enabled will cause the PCM not to respond to throttle as expected
+              # when you do enable.
             if CC.longActive:
               self.gas = clip(gas_mult * (gas - brake + wind_brake * 3 / 4), 0., 1.)
             else:
