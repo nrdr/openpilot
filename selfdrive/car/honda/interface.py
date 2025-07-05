@@ -129,7 +129,7 @@ class CarInterface(CarInterfaceBase):
       #'0x0000',  # speed_clamp_lo
       #'0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x69EF, 0x752F',  # torque_table row 1
       if ret.flags & HondaFlags.EPS_MODIFIED:
-        ret.lateralParams.torqueBP = [0, 2560, 30000] # Modified Honda EPS Firmware
+        ret.lateralParams.torqueBP = [0, 2560, 8000] # Modified Honda EPS Firmware
         ret.lateralParams.torqueV  = [0, 2560, 3840] # Modified Honda EPS Firmware
         ret.lateralTuning.init('torque')
         ret.lateralTuning.torque.useSteeringAngle = True
