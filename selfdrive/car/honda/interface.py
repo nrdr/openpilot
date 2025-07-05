@@ -121,19 +121,16 @@ class CarInterface(CarInterfaceBase):
         ret.flags |= HondaFlags.EPS_MODIFIED.value
 
     if candidate == CAR.HONDA_CIVIC:
-      # FROM THE FIRMWARE 39990-TEG-A010, THE FOLLOWING MODIFICATIONS ARE BEING USED THANKS TO CHATGPT:
-      # data_old =
-      #'0x0028', #speed_clamp_lo
-      #'0x0000, 0x0917, 0x0DC5, 0x1017, 0x119f, 0x140b, 0x1680, 0x1680, 0x1680', # torque_table row 1
-      # data-new =
-      #'0x0000',  # speed_clamp_lo
-      #'0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x69EF, 0x752F',  # torque_table row 1
       if ret.flags & HondaFlags.EPS_MODIFIED:
-        ret.lateralParams.torqueBP = [0, 5760, 12672, 29999]
-        ret.lateralParams.torqueV  = [0, 2560, 3600, 3840]
-        ret.lateralTuning.pid.kf = 0.00004
-        ret.lateralTuning.pid.kpV = [0.1575]
-        ret.lateralTuning.pid.kiV = [0.0515]
+        ret.lateralParams.torqueV = [0, 3072, 6144, 9216, 14400, 18432, 21504, 24576, 28800]  # Actual EPS Values
+        ret.lateralParams.torqueBP = [0, 192, 512, 1024, 1920, 2560, 3072, 3584, 3840]
+        ret.lateralTuning.init('torque')
+        ret.lateralTuning.torque.useSteeringAngle = True
+        ret.lateralTuning.torque.kp = 1.0
+        ret.lateralTuning.torque.kf = 1.0
+        ret.lateralTuning.torque.ki = 0.1
+        ret.lateralTuning.torque.friction = 0.125
+        ret.lateralTuning.torque.latAccelFactor = 3.3
       else:
         ret.lateralTuning.pid.kf = 0.00006  # Default feed-forward
         ret.lateralParams.torqueBP = [0, 2560] # Stock Honda EPS Firmware
