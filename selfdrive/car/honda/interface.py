@@ -131,13 +131,7 @@ class CarInterface(CarInterfaceBase):
       if ret.flags & HondaFlags.EPS_MODIFIED:
         ret.lateralParams.torqueBP = [0, 2560, 8000] # Modified Honda EPS Firmware
         ret.lateralParams.torqueV  = [0, 2560, 3840] # Modified Honda EPS Firmware
-        ret.lateralTuning.init('torque')
-        ret.lateralTuning.torque.useSteeringAngle = True
-        ret.lateralTuning.torque.kp = 1.0
-        ret.lateralTuning.torque.kf = 1.0
-        ret.lateralTuning.torque.ki = 0.1
-        ret.lateralTuning.torque.friction = 0.25458812851328544
-        ret.lateralTuning.torque.latAccelFactor = 3.305779125557104
+        ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.3], [0.1]]
       else:
         ret.lateralTuning.pid.kf = 0.00006  # Default feed-forward
         ret.lateralParams.torqueBP = [0, 2560] # Stock Honda EPS Firmware
