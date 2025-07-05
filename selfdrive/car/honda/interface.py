@@ -129,11 +129,11 @@ class CarInterface(CarInterfaceBase):
       #'0x0000',  # speed_clamp_lo
       #'0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x69EF, 0x752F',  # torque_table row 1
       if ret.flags & HondaFlags.EPS_MODIFIED:
-        ret.lateralParams.torqueBP = [0, 2560, 3840] # Modified Honda EPS Firmware
-        ret.lateralParams.torqueV  = [0, 1152, 3840] # Modified Honda EPS Firmware
-        ret.lateralTuning.pid.kf = 0.00005  # conservative feed-forward
-        ret.lateralTuning.pid.kpV = [0.3]
-        ret.lateralTuning.pid.kiV = [0.1]
+        ret.lateralParams.torqueBP = [0, 2560, 11520, 20160, 29999]
+        ret.lateralParams.torqueV  = [0, 960, 1920, 2880, 3840]
+        ret.lateralTuning.pid.kf = 0.00001818  # matching your current conservative ff
+        ret.lateralTuning.pid.kpV = [0.12]
+        ret.lateralTuning.pid.kiV = [0.04]
       else:
         ret.lateralTuning.pid.kf = 0.00006  # Default feed-forward
         ret.lateralParams.torqueBP = [0, 2560] # Stock Honda EPS Firmware
