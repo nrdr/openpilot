@@ -29,7 +29,8 @@ class CarInterface(CarInterfaceBase):
       CLARITY_PEDAL_MAX = 4.0
       return CarControllerParams.NIDEC_ACCEL_MIN, CLARITY_PEDAL_MAX
     elif CP.enableGasInterceptor and CP.carFingerprint != CAR.HONDA_CLARITY:
-      return CarControllerParams.NIDEC_ACCEL_MIN, CarControllerParams.NIDEC_ACCEL_MAX
+      HONDA_PEDAL_MAX = 4.0
+      return CarControllerParams.NIDEC_ACCEL_MIN, HONDA_PEDAL_MAX
     else:
       # NIDECs don't allow acceleration near cruise_speed,
       # so limit limits of pid to prevent windup

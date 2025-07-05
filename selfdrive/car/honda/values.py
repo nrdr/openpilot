@@ -260,7 +260,7 @@ class CAR(Platforms):
     flags=HondaFlags.NIDEC_ALT_SCM_MESSAGES,
   )
   HONDA_CIVIC = HondaNidecPlatformConfig(
-    [HondaCarDocs("Honda Civic 2016-18", min_steer_speed=12. * CV.MPH_TO_MS, video_link="https://youtu.be/-IkImTe1NYE")],
+    [HondaCarDocs("Honda Civic 2016-18", min_steer_speed=0. * CV.MPH_TO_MS, video_link="https://youtu.be/-IkImTe1NYE")],
     CarSpecs(mass=1326, wheelbase=2.70, centerToFrontRatio=0.4, steerRatio=15.38),  # 10.93 is end-to-end spec
     dbc_dict('honda_civic_touring_2016_can_generated', 'acura_ilx_2016_nidec'),
   )
