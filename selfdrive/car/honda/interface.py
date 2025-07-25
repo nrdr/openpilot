@@ -37,7 +37,7 @@ class CarInterface(CarInterfaceBase):
       return CarControllerParams.NIDEC_ACCEL_MIN, interp(current_speed, ACCEL_MAX_BP, ACCEL_MAX_VALS)
 
   def torque_from_lateral_accel_modded(self, latcontrol_inputs: LatControlInputs, torque_params: car.CarParams.LateralTorqueTuning, lateral_accel_error: float, lateral_accel_deadzone: float, friction_compensation: bool, gravity_adjusted: bool) -> float:
-    threshold = 0.5
+    threshold = 0.8
     threshold_lat_accel = 1/torque_params.latAccelFactor * threshold
     mod_factor = 2.0 # Lateral Accel
     # The default is a linear relationship between torque and lateral acceleration (accounting for road roll and steering friction)
@@ -121,21 +121,38 @@ class CarInterface(CarInterfaceBase):
 
     if candidate == CAR.HONDA_CIVIC:
       if eps_modified:
-        # stock request input values:     0x0000, 0x00DE, 0x014D, 0x01EF, 0x0290, 0x0377, 0x0454, 0x0610, 0x06EE
-        # stock request output values:    0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x1680, 0x1680
-        # modified request output values: 0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x2880, 0x3180
-        # stock filter output values:     0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108
-        # modified filter output values:  0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0400, 0x0480
-        # note: max request allowed is 4096, but request is capped at 3840 in firmware, so modifications result in 2x max
-        # ret.lateralParams.torqueBP =  [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x57C0, 0x6300] (hexdecimal)
-        # ret.lateralParams.torqueV =   [0x0, 0x200, 0x300, 0x478, 0x5EC, 0x800, 0xA00, 0xE00, 0xF00] (hexdecimal)
-        # ret.lateralParams.torqueBP = [0, 2327, 3525, 4119, 4511, 5131, 5760, 22464, 25344]
-        # ret.lateralParams.torqueV = [0, 512, 768, 1144, 1516, 2048, 2560, 3584, 3840]
-        ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
-        ret.lateralParams.torqueBP = [0x0000, 0x0917, 0x0DC5, 0x1017, 0x119F, 0x140B, 0x2D00, 0x4800, 0x7080]
-        ret.lateralParams.torqueV  = [0x0000, 0x0190, 0x0280, 0x03A0, 0x04F0, 0x0660, 0x0960, 0x0C80, 0x0F00]
-        ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 11.176, 35.7632], [0.3, 0.3, 0.3]]  # 0 / 25 / 80 MPH
-        ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0, 11.176, 35.7632], [0.1, 0.1, 0.1]]  # 0 / 25 / 80 MPH
+      # Best practices for tuning modified Civic EPS firmware (written by Brett Pakkala aka Aragon).
+      # As a general rule of thumb, beyond 2X~, larger values change the ramp-up and ramp-down rate, but not the maximum torque.
+      # Therefore, if one is going above 2X~, it's best to start with 2X tuning values anyway and work your way down in increments of 10% until things feel smooth, if needed.
+      #
+      # The TorqueBP and TorqueV params work as follows: TorqueBP is the actual torque value listed in your EPS firmware file. 
+      # However, when sending a value to the car, the car only accepts values from 0 to 3840 — 0% being 0 and 100% being 3840. This is TorqueV.
+      # We can mold these values to spread out the torque applied so that Openpilot understands that the relationship is not linear.
+      #
+      # Proportional (P), Integral (I), and Feed-forward (F) TUNING TIPS:
+      # When tuning, the kp, ki, and kf should be changed at the same rate. For example, if you lower one value by 10%, lower all three by 10%.
+      # If you alter TorqueBP in a certain way, ki/kp/kf should be altered in the opposite way. For example, if you divide TorqueBP by 2, multiply kp/ki/kf by 2.
+      # Sometimes kf (feed-forward) can cause issues such as mild sway. It can be beneficial to try lowering this value separately from the rest, or setting it to 0 if nothing else works.
+      #
+      # Torque Controller TUNING TIPS:
+      # The torque controller uses basic PIF params alongside the lateral acceleration factor and friction params. 
+      # Those PIF params can be found here: selfdrive/car/interfaces.py (line 267).
+      # Lateral acceleration and friction params default to the ones found here: selfdrive/car/torque_data/params.toml
+      # Since the torque controller expects a linear response, an additional function was created above in this file (line 39) to adjust the lateral acceleration factor once a certain threshold is crossed.
+      # This makes it more in line with what a typical non-linear EPS firmware mod provides.
+      # If manually tuning the lateral acceleration factor, note that lowering it will make Openpilot think you have less overall torque — thus turning earlier. Raising it will have the opposite effect.
+      # Friction is a form of error correction. For very precise steering, turn friction very high — but this may cause many micro-corrections. For smoother response, lower friction. Adjust to your liking.
+      #
+      # LOW-PASS FILTER TUNING TIPS:
+      # The low-pass filter located in selfdrive/car/honda/carcontroller.py (line 105) might create a delayed response depending on the other tuning params. 
+      # Feel free to revert it back to the stock version (listed below):
+      # def rate_limit_steer(new_steer, last_steer):
+      #   MAX_DELTA = 3 * DT_CTRL
+      #   return clip(new_steer, last_steer - MAX_DELTA, last_steer + MAX_DELTA)
+        ret.lateralParams.torqueBP = [0, 2560, 32767] # Max 16-bit torque.
+        ret.lateralParams.torqueV = [0, 2560, 3840] # Value that gets sent to the EPS.
+        ret.lateralTuning.pid.kf = 0.00003  # Modified feed-forward.
+        ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.15], [0.05]] # Corresponding tuning
       else:
         ret.lateralTuning.pid.kf = 0.00006  # conservative feed-forward
         ret.lateralParams.torqueBP = [0x0, 0x917, 0xDC5, 0x1017, 0x119F, 0x140B, 0x1680, 0x6540, 0x8700]
