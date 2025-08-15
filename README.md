@@ -21,15 +21,15 @@ Table of Contents
 
 ---
 
-As of May 2025, we are updating the way branches are named and how links are generated. We had intially intended to use a branch naming system similar to openpilot and sunnypilot where there was a "stable" or "release" branch which included all fully vetted code, and then "staging" or "beta" branches with new code that would eventually move into the stable/release branches.  However as we evolved we found everyone liked being able to bounce between newer and older branches to compare features and control. Moving forwards all releases will simply be named bp-"feature release number" as an example "staging-1.1" which features the bluepilot 1.1 features (custom tuning) will become "bp-1.1".  We will not delete older branches so that anyone can go back and view older code for references.  Branches that no longer work properly will be denoted as -depricated.
+As of May 2025, we are updating the way branches are named and how links are generated. We had intially intended to use a branch naming system similar to openpilot and sunnypilot where there was a "stable" or "release" branch which included all fully vetted code, and then "staging" or "beta" branches with new code that would eventually move into the stable/release branches.  However as we evolved we found everyone liked being able to bounce between newer and older branches to compare features and control. Moving forwards all releases will simply be named bp-"feature release number" as an example "staging-1.1" which features the bluepilot 1.1 features (custom tuning) will become "bp-1.1".  We will not delete older branches so that anyone can go back and view older code for references.  Branches that no longer work properly will be denoted as -deprecated.
 
 To install any version of bleupilot, use the following URL formula (URL is case sensitive)
 
-installer.comaa.ai/BluePilotDev/"branch name"
+installer.comma.ai/BluePilotDev/"branch name"  
 
 For example
 
-installer.comma.ai/BluePilotDev/bp-2.1
+installer.comma.ai/BluePilotDev/bp-2.1 
 
 will install the bp-2.1 branch.  Branches known to no longer work due to changes in the comma codebase will be apended with -deprecated so it will be obvious they will not install or work correctly.
 
@@ -114,17 +114,15 @@ The following settings and tuning are available in the BluePilot menu (after com
 - [**Show Stop Indicator Overlay**] - Add a stop sign on the UI where OpenPilot has detect a stop or redlight.  Great for knowing what experimental mode detected.
 - [**Show Hands Free UI**] - This setting enables the hands free Blue Cruise dash.  This will only work in vehicles with a digital dash that can display the icon.  Known to work in Mach E, Lightning, Ranger, and F150s with digital dash.
 - [**Send Lane Depature Signals**] - This sends the lane depature alerts to the dash on vehicles with a supporting dash.
-- [**Send Driver Monitor Signals**] For vehicles with the Blue Cruise dash, this will send the pay attention alerts to the dash.
 - [**Enable Human Turn Detection**] - This setting enables the human turn detection logic.  This will help prevent the EPAS from winding up and fighting to keep turning after the car has straightened up.  Makes experimental mode and MADS safer to use.
 - [**Lane Change Factor**] - This is a tunable reduction in lane change signal to enable less aggressive lane changes.  Lower numbers equal slower lane changes.  Too low and the lane chagne might fail.
 - [**Use Custom Tuning Profile**] - There are 2 preset tuning profiles which are automatically selected based on the vehicle driven (CAN or CANFD). Toggling this parameter will enable custom tuning values for lateral control
 - [**Predicted Curvature Blend Ratio Low**] - This setting allows for a blend of desired curvature and predicted curvature on straight aways to achieve smoother signals.  Lower numbers will make steering more aggressive.  To tune this value begin to increase the blend ratio until the car starts to "wander" or experience a slow ping pong effect at highway speeds.  If using advanced lateral control, leave it at a wander, it is not desired for this number to be low enough for complete control, because if the signal is too strong it will conflict with the other signals. If not using advanced lateral control, then lower the PC Blend Ratio back down until wadnering stops. Default Values are CANFD = 0.65, CAN = 0.4
 - [**Predicted Curvature Blend Ratio High**] - This setting allows for a blend of desired curvature and predicted curvature in curves to achieve smoother signals.  Lower numbers will make steering more aggressive.  To tune this value begin to decrease the blend ratio until the car starts to ping pong inside of curves, then increase slightly until the behavior stops. Default Values are CANFD = 0.4, CAN = 0.2
-- [**Enable Advanced Lateral Control**] - This settings enables the OEM style logic with path_offset and path_angle variables.  This allows for custom in lane positioning. Disabling this setting will revert to only using curvature and curvature_rate which was the previous behavior in bluepilot 1.0
+- [**Enable Advanced Lane Positioning**] - This settings enables the OEM style logic with path_offset and path_angle variables.  This allows for custom in lane positioning. Disabling this setting will revert to only using curvature and curvature_rate which was the previous behavior in bluepilot 1.0
 - [**Enable Legacy Style Lanefull Mode**] - This setting enables the legacy style lanefull mode which will use lane lines to determine the ideal path for the vehicle rather than Commas model.  This setting is only applicable when linelines are strong and the lane width is not too wide.
 - [**In lane offset**] - This setting allows for custom in lane positioning.  Negative numbers will move the car to the left, positive numbers will move the car to the right.
-- [**Path Angle Amplitude**] - This setting controls how aggressive the path_angle signal is applied to correct for deviations from the ideal path.  To tune this number, first find the ideal value of PREDICTED CURVATURE BLEND RATIO, then begin to increase until the car starts to feel "twitchy" or experiences a very fast ping pong effect at highway speeds.  Then reduce the number until the car is smooth and stable. Default Values are CANFD = 1.8, CAN = 7.5
-- [**Path Angle in-Curve Reduction**] - This setting controls how aggressive the path_angle signal is applied to correct for deviations from the ideal path while in curves. It is a fraction of the amount of path angle applied on straightaways.  To tune this number, first find the ideal value of PATH ANGLE AMPLITUDE, then begin to increase until the car starts to feel "twitchy" or experience a very fast ping pong effect in curves at highway speeds.  Then reduce the number until the car is smooth and stable in curves at highway speeds. Default Values are CANFD = 0.00, CAN = 0.20
+- [**Low Curvature PID Gain**] - This setting controls how aggressive the path_angle signal is applied to correct for deviations from the ideal path.  Default Values are CANFD = 3.0, CAN = 5.0
 
 </details>
 
