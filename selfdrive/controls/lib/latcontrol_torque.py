@@ -1,6 +1,7 @@
 from math import radians
 
 from cereal import log
+from opendbc.car.honda.values import CAR
 from opendbc.car.lateral import FRICTION_THRESHOLD, get_friction
 from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
@@ -23,6 +24,8 @@ from roenpilot.common.numpy_fast import interp
 
 LOW_SPEED_X = [0, 10, 20, 30]
 LOW_SPEED_Y = [15, 13, 10, 5]
+LOW_SPEED_Y_CLARITY = [30, 15, 10, 5]
+LOW_SPEED_Y_CIVIC = [40, 20, 10, 5]
 
 
 class LatControlTorque(LatControl):
@@ -37,6 +40,9 @@ class LatControlTorque(LatControl):
     self.steering_angle_deadzone_deg = self.torque_params.steeringAngleDeadzoneDeg
 
     self.extension = LatControlTorqueExt(self, CP, CP_SP, CI)
+
+    # specific car fingerprint
+    self.carFingerprint = CP.carFingerprint
 
   def update_live_torque_params(self, latAccelFactor, latAccelOffset, friction):
     self.torque_params.latAccelFactor = latAccelFactor
@@ -66,7 +72,14 @@ class LatControlTorque(LatControl):
       actual_lateral_accel = actual_curvature * CS.vEgo ** 2
       lateral_accel_deadzone = curvature_deadzone * CS.vEgo ** 2
 
-      low_speed_factor = interp(CS.vEgo, LOW_SPEED_X, LOW_SPEED_Y)**2
+      if self.carFingerprint == CAR.HONDA_CLARITY:
+        lsfinterp = interp(CS.vEgo, LOW_SPEED_X, LOW_SPEED_Y_CLARITY)
+      elif self.carFingerprint == CAR.HONDA_CIVIC:
+        lsfinterp = interp(CS.vEgo, LOW_SPEED_X, LOW_SPEED_Y_CIVIC)
+      else:
+        lsfinterp = interp(CS.vEgo, LOW_SPEED_X, LOW_SPEED_Y)
+
+      low_speed_factor = lsfinterp * lsfinterp
       setpoint = desired_lateral_accel + low_speed_factor * desired_curvature
       measurement = actual_lateral_accel + low_speed_factor * actual_curvature
       gravity_adjusted_lateral_accel = desired_lateral_accel - roll_compensation
