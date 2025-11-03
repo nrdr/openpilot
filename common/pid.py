@@ -2,7 +2,9 @@ import numpy as np
 from numbers import Number
 
 class PIDController:
-  def __init__(self, k_p, k_i, k_f=0., k_d=0., pos_limit=1e308, neg_limit=-1e308, rate=100):
+  def __init__(self, k_p, k_i, k_f=0., k_d=0.,
+              pos_limit=1e308, neg_limit=-1e308, rate=100,
+              pos_p_limit=None, neg_p_limit=None):
     self._k_p = k_p
     self._k_i = k_i
     self._k_d = k_d
@@ -15,6 +17,9 @@ class PIDController:
       self._k_d = [[0], [self._k_d]]
 
     self.set_limits(pos_limit, neg_limit)
+
+    self.pos_p_limit = pos_p_limit
+    self.neg_p_limit = neg_p_limit
 
     self.i_rate = 1.0 / rate
     self.speed = 0.0
@@ -47,6 +52,11 @@ class PIDController:
   def update(self, error, error_rate=0.0, speed=0.0, feedforward=0., freeze_integrator=False):
     self.speed = speed
     self.p = float(error) * self.k_p
+    if self.pos_p_limit is not None and self.p > self.pos_p_limit:
+      self.p = self.pos_p_limit
+    elif self.neg_p_limit is not None and self.p < self.neg_p_limit:
+      self.p = self.neg_p_limit
+
     self.f = feedforward * self.k_f
     self.d = error_rate * self.k_d
 

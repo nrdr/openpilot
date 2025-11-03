@@ -52,9 +52,11 @@ class LongControl:
     self.CP = CP
     self.CP_SP = CP_SP
     self.long_control_state = LongCtrlState.off
+    pos_p_limit = 0.0 # if params("NoPositivePResponse") else None # put parameter-based control here
     self.pid = PIDController((CP.longitudinalTuning.kpBP, CP.longitudinalTuning.kpV),
                              (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV),
-                             k_f=CP.longitudinalTuning.kf, rate=1 / DT_CTRL)
+                             k_f=CP.longitudinalTuning.kf, rate=1 / DT_CTRL,
+                             pos_p_limit=pos_p_limit)
     self.last_output_accel = 0.0
 
   def reset(self):
