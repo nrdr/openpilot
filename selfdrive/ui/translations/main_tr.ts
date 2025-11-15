@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">TORK %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">TEHLİKE FAKTÖRÜ</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% of</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">Sürüş Kişilikleri</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">Havada Geçirilen Süre:</translation>
     </message>
 </context>
 <context>
@@ -2606,6 +2618,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">Bir hata oluştu: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">Karakterler: 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3215,10 +3231,6 @@ It will reset in %1 hours and %2 minutes.</source>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">%1 girin</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">Girilen anahtar geçersiz veya çok kısa!</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5022,6 +5034,10 @@ Geliştirici - Tecrübeli meraklılar için yüksek özelleştirilebilir ayarlar
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;Yol kenarı kalınlığını ayarlayın.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Varsayılan, MUTCD şerit çizgisi genişliği standardı olan 10 santimetrenin yarısına karşılık gelir.</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">Boylamsal MPC: Tehlike Faktörü</translation>
     </message>
 </context>
 <context>

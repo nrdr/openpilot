@@ -430,14 +430,14 @@ FrogPilotLongitudinalPanel::FrogPilotLongitudinalPanel(FrogPilotSettingsWindow *
               weatherKeyControl->setVisibleButton(1, false);
             }
           } else {
-            QString key = InputDialog::getText(tr("Enter your \"OpenWeatherMap\" key"), this).trimmed();
-            if (key.length() == 32) {
-              params.put("WeatherToken", key.toStdString());
+            int keyLength = 32;
+            QString currentKey = QString::fromStdString(params.get("WeatherToken"));
+            QString newKey = InputDialog::getText(tr("Enter your \"OpenWeatherMap\" key"), this, tr("Characters: 0/%1").arg(keyLength), false, -1, currentKey, keyLength).trimmed();
+            if (!newKey.isEmpty()) {
+              params.put("WeatherToken", newKey.toStdString());
 
               weatherKeyControl->setText(0, tr("REMOVE"));
               weatherKeyControl->setVisibleButton(1, true);
-            } else if (!key.isEmpty()) {
-              ConfirmationDialog::alert(tr("Invalid key!"), this);
             }
           }
         } else {

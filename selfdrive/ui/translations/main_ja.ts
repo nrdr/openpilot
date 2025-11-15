@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">トルク %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">危険要因</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% の</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">運転の個性</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">天候での経過時間</translation>
     </message>
 </context>
 <context>
@@ -2606,6 +2618,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">エラーが発生しました: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">文字数: 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3214,10 +3230,6 @@ It will reset in %1 hours and %2 minutes.</source>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">%1 を入力してください</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">入力したキーが無効か短すぎます！</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5021,6 +5033,10 @@ Developer - こだわりのある上級者向けの高度にカスタマイズ�
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;道路端の太さを設定します。&lt;/b&gt;&lt;br&gt;&lt;br&gt;デフォルトは、MUTCDの車線線幅標準10センチメートルの半分に一致します。</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">縦方向MPC：危険係数</translation>
     </message>
 </context>
 <context>

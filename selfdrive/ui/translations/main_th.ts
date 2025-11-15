@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">แรงบิด %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">ปัจจัยอันตราย</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% ของ</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">ลักษณะการขับขี่</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">เวลาที่ใช้ในสภาพอากาศ</translation>
     </message>
 </context>
 <context>
@@ -2606,6 +2618,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">เกิดข้อผิดพลาด: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">อักขระ: 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3216,10 +3232,6 @@ It will reset in %1 hours and %2 minutes.</source>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">ป้อน %1 ของคุณ</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">คีย์ที่ป้อนไม่ถูกต้องหรือสั้นเกินไป!</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5023,6 +5035,10 @@ Developer - Highly customizable settings for seasoned enthusiasts</source>
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;ตั้งค่าความหนาของขอบถนน&lt;/b&gt;&lt;br&gt;&lt;br&gt;ค่าเริ่มต้นเท่ากับครึ่งหนึ่งของมาตรฐานความกว้างเส้นแบ่งช่องจราจรของ MUTCD ที่ 10 เซนติเมตร</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">MPC ตามยาว: ปัจจัยอันตราย</translation>
     </message>
 </context>
 <context>

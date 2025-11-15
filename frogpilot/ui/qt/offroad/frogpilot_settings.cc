@@ -304,7 +304,7 @@ void FrogPilotSettingsWindow::updateVariables() {
     hasPedal = CP.getEnableGasInterceptor();
     hasRadar = !CP.getRadarUnavailable();
     hasSDSU = frogpilot_toggles.value("has_sdsu").toBool();
-    hasSNG = hasOpenpilotLongitudinal && CP.getAutoResumeSng();
+    hasSNG = CP.getAutoResumeSng();
     hasZSS = frogpilot_toggles.value("has_zss").toBool();
     isAngleCar = CP.getSteerControlType() == cereal::CarParams::SteerControlType::ANGLE;
     isBolt = carFingerprint == "CHEVROLET_BOLT_CC" || carFingerprint == "CHEVROLET_BOLT_EUV";
@@ -322,7 +322,7 @@ void FrogPilotSettingsWindow::updateVariables() {
     longitudinalActuatorDelay = CP.getLongitudinalActuatorDelay();
     startAccel = CP.getStartAccel();
     steerActuatorDelay = CP.getSteerActuatorDelay();
-    steerKp = CP.getLateralTuning().which() == cereal::CarParams::LateralTuning::PID ? CP.getLateralTuning().getPid().getKpV()[0] : 1.0;
+    steerKp = 1.0;
     steerRatio = CP.getSteerRatio();
     stopAccel = CP.getStopAccel();
     stoppingDecelRate = CP.getStoppingDecelRate();

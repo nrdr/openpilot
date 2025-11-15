@@ -660,15 +660,19 @@ void FrogPilotDataPanel::updateStatsLabels(FrogPilotListWidget *labelsList) {
     {"Month", {tr("Month"), "other"}},
     {"Overrides", {tr("Total Overrides"), "count"}},
     {"OverrideTime", {tr("Time Overriding openpilot"), "time"}},
+    {"PersonalityTimes", {tr("Driving Personalities:"), "other"}},
     {"RandomEvents", {tr("Random Events:"), "other"}},
     {"StandstillTime", {tr("Time Stopped"), "time"}},
     {"StopLightTime", {tr("Time Spent at Stoplights"), "time"}},
-    {"TrackedTime", {tr("Total Time Tracked"), "time"}}
+    {"TrackedTime", {tr("Total Time Tracked"), "time"}},
+    {"WeatherTimes", {tr("Time Spent in Weather:"), "other"}}
   };
 
   static QSet<QString> parent_keys = {
     "ModelTimes",
-    "RandomEvents"
+    "PersonalityTimes",
+    "RandomEvents",
+    "WeatherTimes"
   };
 
   static QSet<QString> percentage_keys = {
@@ -742,7 +746,18 @@ void FrogPilotDataPanel::updateStatsLabels(FrogPilotListWidget *labelsList) {
     QString label_text = key_map.value(key).first;
     QString type = key_map.value(key).second;
 
-    if (key == "CruiseSpeedTimes" && value.isObject()) {
+    if (key == "AEBEvents") {
+      QJsonObject totalEvents = stats.value("TotalEvents").toObject();
+
+      QString trimmed_label = label_text;
+      if (trimmed_label.startsWith(tr("Total "))) {
+        trimmed_label = trimmed_label.mid(6);
+      }
+      QString display_value = format_number(totalEvents.value("stockAeb").toInt(0) + totalEvents.value("fcw").toInt(0)) + " " + trimmed_label;
+
+      labelsList->addItem(new LabelControl(label_text, display_value, "", this));
+
+    } else if (key == "CruiseSpeedTimes" && value.isObject()) {
       QJsonObject speeds = value.toObject();
 
       double max_time = -1.0;
@@ -783,6 +798,9 @@ void FrogPilotDataPanel::updateStatsLabels(FrogPilotListWidget *labelsList) {
         } else if (key == "RandomEvents") {
           display_a = random_events_map.value(a, a);
           display_b = random_events_map.value(b, b);
+        } else if (key == "WeatherTimes") {
+          display_a = a.left(1).toUpper() + a.mid(1);
+          display_b = b.left(1).toUpper() + b.mid(1);
         } else {
           display_a = a;
           display_b = b;
@@ -791,17 +809,23 @@ void FrogPilotDataPanel::updateStatsLabels(FrogPilotListWidget *labelsList) {
       });
 
       for (const QString &subkey : subkeys) {
+        if (subkey == "Unknown") {
+          continue;
+        }
+
         QString display_subkey;
         if (key == "ModelTimes") {
           display_subkey = processModelName(subkey);
         } else if (key == "RandomEvents") {
           display_subkey = random_events_map.value(subkey, subkey);
+        } else if (key == "WeatherTimes") {
+          display_subkey = subkey.left(1).toUpper() + subkey.mid(1);
         } else {
           display_subkey = subkey;
         }
 
         QString subvalue;
-        if (key == "ModelTimes") {
+        if (key == "ModelTimes" || key == "PersonalityTimes" || key == "WeatherTimes") {
           subvalue = format_time(subobj.value(subkey).toDouble());
         } else {
           subvalue = subobj.value(subkey).toVariant().toString().isEmpty() ? "0" : format_number(subobj.value(subkey).toInt());

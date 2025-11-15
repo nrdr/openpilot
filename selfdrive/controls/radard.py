@@ -110,8 +110,8 @@ class Track:
       "radarTrackId": self.identifier,
     }
 
-  def potential_adjacent_lead(self, left: bool, standstill: bool, model_data: capnp._DynamicStructReader):
-    if standstill or self.vLead < 1 or self.leadTrackID == self.identifier:
+  def potential_adjacent_lead(self, left: bool, model_data: capnp._DynamicStructReader):
+    if self.vLeadK < 1 or self.leadTrackID == self.identifier:
       return False
 
     far_left_lane = interp(self.dRel, model_data.laneLines[0].x, model_data.laneLines[0].y)
@@ -119,22 +119,19 @@ class Track:
     right_lane = interp(self.dRel, model_data.laneLines[2].x, model_data.laneLines[2].y)
     far_right_lane = interp(self.dRel, model_data.laneLines[3].x, model_data.laneLines[3].y)
 
-    self.leadLeft = far_left_lane < -self.yRel < left_lane
-    self.leadRight = right_lane < -self.yRel < far_right_lane
+    self.leadLeft = far_left_lane < -self.yRel < left_lane and self.dRel < model_data.position.x[-1]
+    self.leadRight = right_lane < -self.yRel < far_right_lane and self.dRel < model_data.position.x[-1]
 
     if left:
       return self.leadLeft
     else:
       return self.leadRight
 
-  def potential_far_lead(self, standstill: bool, model_data: capnp._DynamicStructReader):
-    if standstill or self.vLead < 1:
-      return False
-
+  def potential_far_lead(self, lead_msg: capnp._DynamicStructReader, model_data: capnp._DynamicStructReader):
     left_lane = interp(self.dRel, model_data.laneLines[1].x, model_data.laneLines[1].y)
     right_lane = interp(self.dRel, model_data.laneLines[2].x, model_data.laneLines[2].y)
 
-    if left_lane < -self.yRel < right_lane:
+    if left_lane < -self.yRel < right_lane and self.dRel < model_data.position.x[-1] and (self.vLeadK > 1 or lead_msg.prob > 0.25):
       self.radarfulFilter.update(1)
       return True
     else:
@@ -214,7 +211,7 @@ def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, v_ego: floa
 
 
 def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], lead_msg: capnp._DynamicStructReader,
-             model_v_ego: float, model_data: capnp._DynamicStructReader, standstill: bool,
+             model_v_ego: float, model_data: capnp._DynamicStructReader,
              frogpilot_plan: capnp._DynamicStructReader, frogpilot_toggles: SimpleNamespace,
              low_speed_override: bool = True) -> dict[str, Any]:
   # Determine leads, this is where the essential logic happens
@@ -239,7 +236,7 @@ def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], lead_msg: capn
         lead_dict = closest_track.get_RadarState()
 
     if not lead_dict['status'] and len(tracks) > 0:
-      far_lead_tracks = [c for c in tracks.values() if c.potential_far_lead(standstill, model_data) and c.radarfulFilter.x >= THRESHOLD]
+      far_lead_tracks = [c for c in tracks.values() if c.potential_far_lead(lead_msg, model_data) and c.radarfulFilter.x >= THRESHOLD]
       if len(far_lead_tracks) > 0:
         closest_track = min(far_lead_tracks, key=lambda c: c.dRel)
         lead_dict = closest_track.get_RadarState()
@@ -253,10 +250,10 @@ def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], lead_msg: capn
   return lead_dict
 
 
-def get_adjacent_lead(tracks: dict[int, Track], standstill: bool, model_data: capnp._DynamicStructReader, left: bool = True) -> dict[str, Any]:
+def get_adjacent_lead(tracks: dict[int, Track], model_data: capnp._DynamicStructReader, left: bool = True) -> dict[str, Any]:
   lead_dict = {'status': False}
 
-  adjacent_tracks = [c for c in tracks.values() if c.potential_adjacent_lead(left, standstill, model_data)]
+  adjacent_tracks = [c for c in tracks.values() if c.potential_adjacent_lead(left, model_data)]
   if len(adjacent_tracks) > 0:
     closest_track = min(adjacent_tracks, key=lambda c: c.dRel)
     lead_dict = closest_track.get_RadarState()
@@ -336,12 +333,12 @@ class RadarD:
       model_v_ego = self.v_ego
     leads_v3 = sm['modelV2'].leadsV3
     if len(leads_v3) > 1:
-      self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, sm['modelV2'], sm['carState'].standstill, sm['frogpilotPlan'], self.frogpilot_toggles, low_speed_override=True)
-      self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, sm['modelV2'], sm['carState'].standstill, sm['frogpilotPlan'], self.frogpilot_toggles, low_speed_override=False)
+      self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, sm['modelV2'], sm['frogpilotPlan'], self.frogpilot_toggles, low_speed_override=True)
+      self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, sm['modelV2'], sm['frogpilotPlan'], self.frogpilot_toggles, low_speed_override=False)
 
     if (self.frogpilot_toggles.adjacent_lead_tracking or self.frogpilot_toggles.human_lane_changes) and self.ready:
-      self.frogpilot_radar_state.leadLeft = get_adjacent_lead(self.tracks, sm['carState'].standstill, sm['modelV2'], left=True)
-      self.frogpilot_radar_state.leadRight = get_adjacent_lead(self.tracks, sm['carState'].standstill, sm['modelV2'], left=False)
+      self.frogpilot_radar_state.leadLeft = get_adjacent_lead(self.tracks, sm['modelV2'], left=True)
+      self.frogpilot_radar_state.leadRight = get_adjacent_lead(self.tracks, sm['modelV2'], left=False)
 
     # Update FrogPilot variables
     if sm['frogpilotPlan'].togglesUpdated:

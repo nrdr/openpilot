@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">TORQUE %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">FATOR DE PERIGO</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% de</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">Personalidades de Condução</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">Tempo gasto em clima:</translation>
     </message>
 </context>
 <context>
@@ -2606,6 +2618,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">Ocorreu um erro: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">Caracteres: 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3216,10 +3232,6 @@ Ele será reiniciado em %1 horas e %2 minutos.</translation>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">Insira seu %1</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">A chave inserida é inválida ou muito curta!</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5023,6 +5035,10 @@ Desenvolvedor - Configurações altamente personalizáveis para entusiastas expe
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;Defina a espessura da borda da estrada.&lt;/b&gt;&lt;br&gt;&lt;br&gt;O padrão corresponde à metade do padrão de largura de faixa do MUTCD de 10 centímetros.</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">MPC Longitudinal: Fator de Perigo</translation>
     </message>
 </context>
 <context>

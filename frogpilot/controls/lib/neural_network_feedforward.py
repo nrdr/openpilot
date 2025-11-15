@@ -14,7 +14,6 @@ from openpilot.common.numpy_fast import interp
 from openpilot.common.params import Params
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
-from openpilot.selfdrive.controls.lib.latcontrol_torque import KD, KI, KP
 from openpilot.selfdrive.controls.lib.pid import PIDController
 from openpilot.selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 from openpilot.selfdrive.modeld.constants import ModelConstants
@@ -175,7 +174,7 @@ class LatControlNNFF(LatControl):
     self.nnff_loaded = self.lat_torque_nn_model is not None
 
     self.torque_params = CP.lateralTuning.torque
-    self.pid = PIDController(KP, KI, k_d=KD,
+    self.pid = PIDController(self.torque_params.kp, self.torque_params.ki,
                              pos_limit=self.steer_max, neg_limit=-self.steer_max)
     self.torque_from_lateral_accel = CI.torque_from_lateral_accel()
     self.use_steering_angle = self.torque_params.useSteeringAngle

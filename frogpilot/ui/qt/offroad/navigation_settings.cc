@@ -52,18 +52,14 @@ FrogPilotNavigationPanel::FrogPilotNavigationPanel(FrogPilotSettingsWindow *pare
           updateButtons();
         }
       } else {
-        QString key = InputDialog::getText(tr("Enter your Public Mapbox Key"), this).trimmed();
+        int minKeyLength = 80;
+        QString key = InputDialog::getText(tr("Enter your Public Mapbox Key"), this, "", false, minKeyLength).trimmed();
         if (!key.isEmpty()) {
           if (!key.startsWith("pk.")) {
             key = "pk." + key;
           }
-          if (key.length() >= 80) {
-            params.put("MapboxPublicKey", key.toStdString());
-
-            updateButtons();
-          } else {
-            ConfirmationDialog::alert(tr("Inputted key is invalid or too short!"), this);
-          }
+          params.put("MapboxPublicKey", key.toStdString());
+          updateButtons();
         }
       }
     } else {
@@ -103,18 +99,14 @@ FrogPilotNavigationPanel::FrogPilotNavigationPanel(FrogPilotSettingsWindow *pare
           updateButtons();
         }
       } else {
-        QString key = InputDialog::getText(tr("Enter your Secret Mapbox Key"), this).trimmed();
+        int minKeyLength = 80;
+        QString key = InputDialog::getText(tr("Enter your Secret Mapbox Key"), this, "", false, minKeyLength).trimmed();
         if (!key.isEmpty()) {
           if (!key.startsWith("sk.")) {
             key = "sk." + key;
           }
-          if (key.length() >= 80) {
-            params.put("MapboxSecretKey", key.toStdString());
-
-            updateButtons();
-          } else {
-            ConfirmationDialog::alert(tr("Inputted key is invalid or too short!"), this);
-          }
+          params.put("MapboxSecretKey", key.toStdString());
+          updateButtons();
         }
       }
     } else {
@@ -325,16 +317,12 @@ void FrogPilotNavigationPanel::createKeyControl(ButtonControl *&control, const Q
   control = new ButtonControl(label, "", tr("<b>Manage your \"%1\".</b>").arg(label));
   QObject::connect(control, &ButtonControl::clicked, [=] {
     if (control->text() == tr("ADD")) {
-      QString key = InputDialog::getText(tr("Enter your %1").arg(label), this).trimmed();
-
-      if (!key.startsWith(prefix)) {
-        key = prefix + key;
-      }
-
-      if (key.length() >= minLength) {
+      QString key = InputDialog::getText(tr("Enter your %1").arg(label), this, "", false, minLength).trimmed();
+      if (!key.isEmpty()) {
+        if (!key.startsWith(prefix)) {
+          key = prefix + key;
+        }
         params.put(paramKey, key.toStdString());
-      } else {
-        ConfirmationDialog::alert(tr("Inputted key is invalid or too short!"), this);
       }
     } else {
       if (FrogPilotConfirmationDialog::yesorno(tr("Remove your %1?").arg(label), this)) {

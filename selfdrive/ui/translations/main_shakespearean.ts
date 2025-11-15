@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">TORQUE %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">PERILOUS FACTOR</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -970,6 +974,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% of</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">Driving Dispositions:</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">Time Bestow’d in Tempest:</translation>
     </message>
 </context>
 <context>
@@ -2615,6 +2627,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">An error hath occurred: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">Characters: 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3225,10 +3241,6 @@ It shall reset in %1 hours and %2 minutes.</translation>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">Enter thy %1</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">The key thou hast entered is invalid or too brief!</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5038,6 +5050,10 @@ Developer - Most customizable settings for well-tried enthusiasts</translation>
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;The default doth match half the MUTCD lane-line width standard of 10 centimeters.</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">Longitudinal MPC: Peril Factor</translation>
     </message>
 </context>
 <context>

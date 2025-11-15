@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">PAR %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">FACTOR DE PELIGRO</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% de</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">Personalidades de conducción</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">Tiempo en el clima</translation>
     </message>
 </context>
 <context>
@@ -2606,6 +2618,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">Ocurrió un error: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">Caracteres: 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3215,10 +3231,6 @@ Se restablecerá en %1 horas y %2 minutos.</translation>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">Introduce tu %1</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">¡La clave introducida es inválida o demasiado corta!</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5022,6 +5034,10 @@ Desarrollador: configuración altamente personalizable para entusiastas veterano
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;Establece el grosor del borde de la carretera.&lt;/b&gt;&lt;br&gt;&lt;br&gt;El valor predeterminado coincide con la mitad del estándar MUTCD de ancho de línea de carril de 10 centímetros.</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">MPC longitudinal: factor de peligro</translation>
     </message>
 </context>
 <context>

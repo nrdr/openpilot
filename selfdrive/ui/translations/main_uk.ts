@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation>МОМЕНТ %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">ФАКТОР НЕБЕЗПЕКИ</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% від</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">Стилі водіння</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">Час, проведений у погодних умовах:</translation>
     </message>
 </context>
 <context>
@@ -2606,6 +2618,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">Сталася помилка: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">Символи: 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3124,10 +3140,6 @@
     <message>
         <source>Enter your %1</source>
         <translation>Введіть ваш %1</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation>Введений ключ недійсний або занадто короткий!</translation>
     </message>
     <message>
         <source>REMOVE</source>
@@ -5023,6 +5035,10 @@ Developer - Highly customizable settings for seasoned enthusiasts</source>
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation>&lt;b&gt;Встановіть товщину краю дороги.&lt;/b&gt;&lt;br&gt;&lt;br&gt;За замовчуванням встановлюється половина стандартної ширини смуги руху MUTCD, яка становить 10 сантиметрів.</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">Поздовжній MPC: Фактор небезпеки</translation>
     </message>
 </context>
 <context>

@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">Quack! TORQUE % — waddle-whoosh!</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">QUACK DANGER FACTOR WADDLE!</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">Quack % of quack!</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">Quack-Quack Driving Personalities: Waddle!</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">Quack Time in Weather: Waddle Waddle!</translation>
     </message>
 </context>
 <context>
@@ -2608,6 +2620,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">Quack! An error splashed in: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">Quack-acters: 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3218,10 +3234,6 @@ Waddle back later—resets in %1 hours and %2 minutes.</translation>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">Quack! Waddle in your %1</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">Quack! That key’s invalid or too short, waddley-woot!</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5025,6 +5037,10 @@ Developer - Ultra-custom settings for seasoned duckthusiasts</translation>
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;Quack! Set the road-edge thickness, waddlers.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default quacks to half the MUTCD lane-line width standard of 10 centimeters.</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">Longitudinal MPC: Quack! Danger Factor 🦆</translation>
     </message>
 </context>
 <context>

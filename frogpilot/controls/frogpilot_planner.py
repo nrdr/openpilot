@@ -4,7 +4,7 @@ import math
 
 import cereal.messaging as messaging
 
-from cereal import car, log
+from cereal import log
 from openpilot.common.conversions import Conversions as CV
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import DT_MDL
@@ -28,9 +28,6 @@ class FrogPilotPlanner:
     self.frogpilot_following = FrogPilotFollowing(self)
     self.frogpilot_vcruise = FrogPilotVCruise(self)
     self.frogpilot_weather = WeatherChecker()
-
-    with car.CarParams.from_bytes(params.get("CarParams", block=True)) as msg:
-      self.CP = msg
 
     self.tracking_lead_filter = FirstOrderFilter(0, 0.5, DT_MDL)
 
@@ -87,8 +84,6 @@ class FrogPilotPlanner:
 
       params_memory.remove("LastGPSPosition")
 
-    self.lateral_acceleration = v_ego**2 * (sm["carState"].steeringAngleDeg - sm["liveParameters"].angleOffsetDeg) * CV.DEG_TO_RAD / (self.CP.steerRatio * self.CP.wheelbase)
-
     check_lane_width = frogpilot_toggles.adjacent_paths or frogpilot_toggles.adjacent_path_metrics or frogpilot_toggles.blind_spot_path or frogpilot_toggles.lane_detection
     if check_lane_width and v_ego >= frogpilot_toggles.minimum_lane_change_speed:
       self.lane_width_left = calculate_lane_width(sm["modelV2"].laneLines[0], sm["modelV2"].laneLines[1], sm["modelV2"].roadEdges[0])
@@ -96,6 +91,8 @@ class FrogPilotPlanner:
     else:
       self.lane_width_left = 0
       self.lane_width_right = 0
+
+    self.lateral_acceleration = v_ego**2 * sm["controlsState"].curvature
 
     self.lateral_check = v_ego >= frogpilot_toggles.pause_lateral_below_speed
     self.lateral_check |= not (sm["carState"].leftBlinker or sm["carState"].rightBlinker) and frogpilot_toggles.pause_lateral_below_signal
@@ -134,6 +131,7 @@ class FrogPilotPlanner:
 
     frogpilotPlan.accelerationJerk = A_CHANGE_COST * self.frogpilot_following.acceleration_jerk
     frogpilotPlan.accelerationJerkStock = A_CHANGE_COST * self.frogpilot_following.base_acceleration_jerk
+    frogpilotPlan.dangerFactor = self.frogpilot_following.danger_factor
     frogpilotPlan.dangerJerk = DANGER_ZONE_COST * self.frogpilot_following.danger_jerk
     frogpilotPlan.speedJerk = J_EGO_COST * self.frogpilot_following.speed_jerk
     frogpilotPlan.speedJerkStock = J_EGO_COST * self.frogpilot_following.base_speed_jerk

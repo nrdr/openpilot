@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">DREHMOMENT %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">GEFAHRENFAKTOR</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% von</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">Fahrprofile:</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">Verbrachte Zeit bei Wetterbedingungen:</translation>
     </message>
 </context>
 <context>
@@ -2606,6 +2618,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">Ein Fehler ist aufgetreten: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">Zeichen: 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3216,10 +3232,6 @@ Es wird in %1 Stunden und %2 Minuten zurückgesetzt.</translation>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">Geben Sie Ihr %1 ein</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">Eingegebener Schlüssel ist ungültig oder zu kurz!</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5023,6 +5035,10 @@ Entwickler – Hochgradig anpassbare Einstellungen für versierte Enthusiasten</
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;Stellen Sie die Randstreifendicke ein.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Standard entspricht der Hälfte des MUTCD-Standards für Fahrbahnmarkierungsbreite von 10 Zentimetern.</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">Längsdynamik-MPC: Gefahrenfaktor</translation>
     </message>
 </context>
 <context>

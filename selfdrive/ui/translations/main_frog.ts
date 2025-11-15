@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">Ribbit TORQUE % croak</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">RIBBIT DANGER FACTOR CROAK</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">Ribbit % of croak</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">Ribbit Rides: Croak-sonalities!</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">Ribbit! Time Spent in Weather, croak!</translation>
     </message>
 </context>
 <context>
@@ -2606,6 +2618,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">Ribbit! An error croaked up: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">Ribbit: 0/%1 croak</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3216,10 +3232,6 @@ It’ll reset in %1 hours and %2 minutes.</translation>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">Ribbit! Enter your %1, croak.</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">Ribbit! That key’s no good or too tiny, croak!</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5023,6 +5035,10 @@ Developer - Highly customizable settings for seasoned swamp pros</translation>
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;Croak! Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default ribbits to half the MUTCD lane-line width standard of 10 centimeters.</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">Ribbit-longitudinal MPC: Danger Factor, croak!</translation>
     </message>
 </context>
 <context>

@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">扭矩 %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">危險因素</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% 的</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">駕駛風格：</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">在天氣中的花費時間：</translation>
     </message>
 </context>
 <context>
@@ -2606,6 +2618,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">發生錯誤：%1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">字元：0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3216,10 +3232,6 @@ It will reset in %1 hours and %2 minutes.</source>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">輸入您的 %1</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">輸入的金鑰無效或過短！</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5023,6 +5035,10 @@ Developer - 為資深愛好者提供高度自訂的設定</translation>
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;設定道路邊緣粗細。&lt;/b&gt;&lt;br&gt;&lt;br&gt;預設值相當於符合 MUTCD 車道線標準 10 公分的一半。</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">縱向 MPC：危險因子</translation>
     </message>
 </context>
 <context>

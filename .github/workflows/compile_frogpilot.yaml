@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       runner:
-        description: "Select the runner"
+        description: "Select runner"
         required: true
         default: "c3"
         type: choice
@@ -14,22 +14,22 @@ on:
       not_vetted:
         description: "This branch is not vetted"
         required: false
-        default: "false"
+        default: false
         type: boolean
       publish_frogpilot:
         description: "Push to FrogPilot"
         required: false
-        default: "false"
+        default: false
         type: boolean
       publish_staging:
         description: "Push to FrogPilot-Staging"
         required: false
-        default: "false"
+        default: false
         type: boolean
       publish_testing:
         description: "Push to FrogPilot-Testing"
         required: false
-        default: "false"
+        default: false
         type: boolean
       publish_custom_branch:
         description: "Push to custom branch:"
@@ -39,18 +39,18 @@ on:
       update_translations:
         description: "Update missing/outdated translations"
         required: false
-        default: "false"
+        default: false
         type: boolean
       vet_existing_translations:
         description: "Vet existing translations"
         required: false
-        default: "false"
+        default: false
         type: boolean
 
 env:
-  BASEDIR: "${{ github.workspace }}"
+  BASEDIR: ${{ github.workspace }}
   BUILD_DIR: /data/openpilot
-  OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
 jobs:
   get_branch:
@@ -61,19 +61,16 @@ jobs:
       branch: ${{ steps.get_branch.outputs.branch }}
       python_version: ${{ steps.get_python_version.outputs.python_version }}
     steps:
-      - name: Determine Current Branch on Runner
+      - name: Get Current Branch
         id: get_branch
         run: |
           cd $BUILD_DIR
+          echo "branch=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
 
-          BRANCH=$(git rev-parse --abbrev-ref HEAD)
-          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-
-      - name: Get Python Version from Runner
+      - name: Get Python Version
         id: get_python_version
         run: |
-          PYTHON_VERSION=$(tr -d '[:space:]' < "$BUILD_DIR/.python-version")
-          echo "python_version=$PYTHON_VERSION" >> $GITHUB_OUTPUT
+          echo "python_version=$(tr -d '[:space:]' < "$BUILD_DIR/.python-version")" >> $GITHUB_OUTPUT
 
   translate:
     if: inputs.update_translations
@@ -100,29 +97,28 @@ jobs:
       - name: Set Up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "${{ needs.get_branch.outputs.python_version }}"
+          python-version: ${{ needs.get_branch.outputs.python_version }}
 
       - name: Install Dependencies
-        run: pip install requests
-
-      - name: Install Qt5 Tools
-        run: sudo apt update && sudo apt install -y qttools5-dev-tools
+        run: |
+          pip install requests
+          sudo apt update && sudo apt install -y qttools5-dev-tools
 
       - name: Update Translations
         run: python selfdrive/ui/update_translations.py --vanish
 
       - name: Update Missing Translations
         continue-on-error: true
-        run: python selfdrive/ui/translations/auto_translate.py --all-files
         timeout-minutes: 300
+        run: python selfdrive/ui/translations/auto_translate.py --all-files
 
       - name: Vet Existing Translations
-        if: github.event.inputs.vet_existing_translations == 'true'
+        if: inputs.vet_existing_translations
         continue-on-error: true
-        run: python selfdrive/ui/translations/auto_translate.py --all-files --vet-translations
         timeout-minutes: 300
+        run: python selfdrive/ui/translations/auto_translate.py --all-files --vet-translations
 
-      - name: Commit and Push Translation Updates
+      - name: Commit and Push Translations
         run: |
           if git diff --quiet selfdrive/ui/translations/*.ts; then
             echo "No translation updates detected."
@@ -136,9 +132,7 @@ jobs:
           git push --force origin ${{ needs.get_branch.outputs.branch }}
 
   build_and_push:
-    needs:
-      - get_branch
-      - translate
+    needs: [get_branch, translate]
     if: always()
     runs-on:
       - self-hosted
@@ -149,27 +143,23 @@ jobs:
       run:
         working-directory: ${{ env.BUILD_DIR }}
     steps:
-      - name: Configure Git Identity
+      - name: Configure Git
         run: |
           git config --global http.postBuffer 104857600
-
           git config --global user.name "James"
           git config --global user.email "91348155+FrogAi@users.noreply.github.com"
-
-      - name: Update Repository
-        run: |
           git remote set-url origin https://${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/FrogAi/FrogPilot.git
 
-          if [ "${{ github.event.inputs.update_translations }}" = "true" ]; then
-            git fetch origin ${{ needs.get_branch.outputs.branch }}
-            git reset --hard FETCH_HEAD
-          fi
-
-      - name: Take Ownership of Build
+      - name: Sync Translation Updates
+        if: inputs.update_translations
         run: |
-          sudo chown -R $(whoami):$(whoami) .
+          git fetch origin ${{ needs.get_branch.outputs.branch }}
+          git reset --hard FETCH_HEAD
 
-      - name: Finalize Build
+      - name: Take Ownership of Build Directory
+        run: sudo chown -R $(whoami):$(whoami) .
+
+      - name: Clean Build Artifacts
         run: |
           rm -f .clang-tidy
           rm -f .dockerignore
@@ -215,7 +205,6 @@ jobs:
           rm -rf teleoprtc_repo/
 
           find .github -mindepth 1 -maxdepth 1 ! -name 'workflows' -exec rm -rf {} +
-
           find .github/workflows -mindepth 1 ! \( \
             -type f \( \
               -name 'compile_frogpilot.yaml' -o \
@@ -233,8 +222,6 @@ jobs:
           find third_party/ -name '*x86*' -exec rm -rf {} +
           find third_party/ -name '*Darwin*' -exec rm -rf {} +
 
-          find tools/ -mindepth 1 -maxdepth 1 ! \( -name '__init__.py' -o -name 'bodyteleop' -o -name 'lib' -o -name 'scripts' \) -exec rm -rf {} +
-
           find . -name 'SConstruct' -delete
           find . -name 'SConscript' -delete
 
@@ -244,34 +231,32 @@ jobs:
           find . -type f -regex '.*matlab.*\.md' -delete
 
           touch prebuilt
+          [ "${{ inputs.not_vetted }}" = "true" ] && touch not_vetted || true
 
-          if [ "${{ github.event.inputs.not_vetted }}" = "true" ]; then
-            touch not_vetted
-          fi
-
-      - name: Add the update_date file
-        if: github.event.inputs.publish_staging == 'true'
+      - name: Add Update Date File
+        if: inputs.publish_staging
+        continue-on-error: true
         run: |
-          curl -fLsS https://raw.githubusercontent.com/FrogAi/FrogPilot/FrogPilot-Staging/.github/update_date -o .github/update_date || echo "No update_date found, skipping."
+          curl -fLsS https://raw.githubusercontent.com/FrogAi/FrogPilot/FrogPilot-Staging/.github/update_date -o .github/update_date || echo "No update_date found, skipping..."
 
-      - name: Commit Build
+      - name: Commit and Push Build
         run: |
           git add -f .
           git commit -m "Compile FrogPilot"
           git push --force origin HEAD
 
-          if [ "${{ github.event.inputs.publish_frogpilot }}" = "true" ]; then
-            git push --force origin HEAD:"FrogPilot"
+          if [ "${{ inputs.publish_frogpilot }}" = "true" ]; then
+            git push --force origin HEAD:FrogPilot
           fi
 
-          if [ "${{ github.event.inputs.publish_staging }}" = "true" ]; then
-            git push --force origin HEAD:"FrogPilot-Staging"
+          if [ "${{ inputs.publish_staging }}" = "true" ]; then
+            git push --force origin HEAD:FrogPilot-Staging
           fi
 
-          if [ "${{ github.event.inputs.publish_testing }}" = "true" ]; then
-            git push --force origin HEAD:"FrogPilot-Testing"
+          if [ "${{ inputs.publish_testing }}" = "true" ]; then
+            git push --force origin HEAD:FrogPilot-Testing
           fi
 
-          if [ -n "${{ github.event.inputs.publish_custom_branch }}" ]; then
-            git push --force origin HEAD:"${{ github.event.inputs.publish_custom_branch }}"
+          if [ -n "${{ inputs.publish_custom_branch }}" ]; then
+            git push --force origin HEAD:"${{ inputs.publish_custom_branch }}"
           fi

@@ -42,6 +42,8 @@ class WeatherChecker:
   def __init__(self):
     self.is_daytime = False
 
+    self.api_25_calls = 0
+    self.api_3_calls = 0
     self.increase_following_distance = 0
     self.increase_stopped_distance = 0
     self.reduce_acceleration = 0
@@ -147,10 +149,12 @@ class WeatherChecker:
 
       for attempt in range(1, MAX_RETRIES + 1):
         try:
+          self.api_3_calls += 1
           response = self.session.get("https://api.openweathermap.org/data/3.0/onecall", params=params, timeout=10)
           if response.status_code == 429:
             fallback_params = params.copy()
             fallback_params.pop("exclude", None)
+            self.api_25_calls += 1
             fallback_response = self.session.get("https://api.openweathermap.org/data/2.5/weather", params=fallback_params, timeout=10)
             fallback_response.raise_for_status()
             return fallback_response.json()

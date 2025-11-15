@@ -117,6 +117,7 @@ void DeveloperSidebar::updateState(const UIState &s, const FrogPilotUIState &fs)
   accelerationStatus = ItemStatus(QPair<QString, QString>(tr("ACCEL"), QString::number(acceleration, 'f', 2) + accelerationUnit), metricColor);
   accelerationJerkStatus = ItemStatus(QPair<QString, QString>(tr("ACCEL JERK"), QString::number(frogpilotPlan.getAccelerationJerk())), metricColor);
   actuatorAccelerationStatus = ItemStatus(QPair<QString, QString>(tr("ACT ACCEL"), QString::number(carControl.getActuators().getAccel() * accelerationConversion, 'f', 2) + accelerationUnit), metricColor);
+  dangerFactorStatus = ItemStatus(QPair<QString, QString>(tr("DANGER %"), QString::number(frogpilotPlan.getDangerFactor(), 'f', 2)), metricColor);
   dangerJerkStatus = ItemStatus(QPair<QString, QString>(tr("DANGER JERK"), QString::number(frogpilotPlan.getDangerJerk())), metricColor);
   delayStatus = ItemStatus(QPair<QString, QString>(tr("STEER DELAY"), QString::number(liveDelay.getLateralDelay(), 'f', 5)), metricColor);
   frictionStatus = ItemStatus(QPair<QString, QString>(tr("FRICTION"), QString::number(liveTorqueParameters.getFrictionCoefficientFiltered(), 'f', 5)), metricColor);
@@ -153,9 +154,10 @@ void DeveloperSidebar::paintEvent(QPaintEvent *event) {
   metricMap.insert(10, &steerAngleStatus);
   metricMap.insert(11, &torqueStatus);
   metricMap.insert(12, &actuatorAccelerationStatus);
-  metricMap.insert(13, &accelerationJerkStatus);
-  metricMap.insert(14, &dangerJerkStatus);
-  metricMap.insert(15, &speedJerkStatus);
+  metricMap.insert(13, &dangerFactorStatus);
+  metricMap.insert(14, &accelerationJerkStatus);
+  metricMap.insert(15, &dangerJerkStatus);
+  metricMap.insert(16, &speedJerkStatus);
 
   int count = 0;
   for (size_t i = 0; i < metricAssignments.size(); ++i) {

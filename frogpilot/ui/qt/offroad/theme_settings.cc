@@ -599,9 +599,12 @@ FrogPilotThemesPanel::FrogPilotThemesPanel(FrogPilotSettingsWindow *parent) : Fr
           params.put("StartupMessageTop", frogpilotTop.toStdString());
           params.put("StartupMessageBottom", frogpilotBottom.toStdString());
         } else if (id == 2) {
+          QString currentTop = QString::fromStdString(params.get("StartupMessageTop"));
           QString newTop = InputDialog::getText(tr("Enter the text for the top half"), this, tr("Characters: 0/%1").arg(maxLengthTop), false, -1, currentTop, maxLengthTop).trimmed();
           if (!newTop.isEmpty()) {
             params.put("StartupMessageTop", newTop.toStdString());
+
+            QString currentBottom = QString::fromStdString(params.get("StartupMessageBottom"));
             QString newBottom = InputDialog::getText(tr("Enter the text for the bottom half"), this, tr("Characters: 0/%1").arg(maxLengthBottom), false, -1, currentBottom, maxLengthBottom).trimmed();
             if (!newBottom.isEmpty()) {
               params.put("StartupMessageBottom", newBottom.toStdString());

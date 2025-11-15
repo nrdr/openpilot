@@ -211,9 +211,10 @@ FrogPilotVisualsPanel::FrogPilotVisualsPanel(FrogPilotSettingsWindow *parent) : 
         {10, tr("Lateral Control: Steering Angle")},
         {11, tr("Lateral Control: Torque % Used")},
         {12, tr("Longitudinal Control: Actuator Acceleration Output")},
-        {13, tr("Longitudinal MPC Jerk: Acceleration")},
-        {14, tr("Longitudinal MPC Jerk: Danger Zone")},
-        {15, tr("Longitudinal MPC Jerk: Speed Control")},
+        {13, tr("Longitudinal MPC: Danger Factor")},
+        {14, tr("Longitudinal MPC Jerk: Acceleration")},
+        {15, tr("Longitudinal MPC Jerk: Danger Zone")},
+        {16, tr("Longitudinal MPC Jerk: Speed Control")},
       };
 
       ButtonControl *metricToggle = new ButtonControl(title, tr("SELECT"), desc);

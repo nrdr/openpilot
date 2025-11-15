@@ -404,6 +404,9 @@ void Device::setAwake(bool on) {
 void Device::resetInteractiveTimeout(int timeout, int timeout_onroad) {
   if (timeout == -1) {
     timeout = (ignition_on ? 10 : 30);
+  } else {
+    // FrogPilot variables
+    timeout = (ignition_on ? timeout_onroad : timeout);
   }
   interactive_timeout = timeout * UI_FREQ;
 }

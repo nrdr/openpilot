@@ -51,7 +51,7 @@ class SpeedLimitController:
 
   @property
   def experimental_mode(self):
-    return self.frogpilot_toggles.slc_fallback_experimental_mode and self.target == 0
+    return self.target == 0 and self.frogpilot_toggles.slc_fallback_experimental_mode
 
   @property
   def offset(self):

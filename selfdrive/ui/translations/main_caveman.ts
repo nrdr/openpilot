@@ -254,6 +254,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">TORQUE %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">DANGER FACTOR</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -966,6 +970,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% of</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">Drive Personality:</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">Time Spent in Sky Mood:</translation>
     </message>
 </context>
 <context>
@@ -2608,6 +2620,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">Error happen: %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">Marks: 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3218,10 +3234,6 @@ It reset in %1 hour and %2 minute.</translation>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">You put %1</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">Key bad or too short!</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5029,6 +5041,10 @@ Developer - Many custom setting for seasoned enthusiast</translation>
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;Set road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default same as half MUTCD lane-line width standard, 10 centimeters.</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">Longitudinal MPC: Danger Factor</translation>
     </message>
 </context>
 <context>

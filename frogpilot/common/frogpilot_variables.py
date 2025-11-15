@@ -22,7 +22,6 @@ from openpilot.selfdrive.car.mock.values import CAR as MOCK
 from openpilot.selfdrive.car.subaru.values import SubaruFlags
 from openpilot.selfdrive.car.toyota.values import ToyotaFlags, ToyotaFrogPilotFlags
 from openpilot.selfdrive.controls.lib.desire_helper import LANE_CHANGE_SPEED_MIN
-from openpilot.selfdrive.controls.lib.latcontrol_torque import KP
 from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.system.hardware import HARDWARE
 from openpilot.system.hardware.power_monitoring import VBATT_PAUSE_CHARGING
@@ -88,6 +87,26 @@ BUTTON_FUNCTIONS = {
   "PAUSE_LONGITUDINAL": 4,
   "EXPERIMENTAL_MODE": 5,
   "TRAFFIC_MODE": 6
+}
+
+DEVELOPER_SIDEBAR_METRICS = {
+  "NONE": 0,
+  "ACCELERATION_CURRENT": 1,
+  "ACCELERATION_MAX": 2,
+  "AUTOTUNE_ACTUATOR_DELAY": 3,
+  "AUTOTUNE_FRICTION": 4,
+  "AUTOTUNE_LATERAL_ACCELERATION": 5,
+  "AUTOTUNE_STEER_RATIO": 6,
+  "AUTOTUNE_STIFFNESS_FACTOR": 7,
+  "ENGAGEMENT_LATERAL": 8,
+  "ENGAGEMENT_LONGITUDINAL": 9,
+  "LATERAL_STEERING_ANGLE": 10,
+  "LATERAL_TORQUE_USED": 11,
+  "LONGITUDINAL_ACTUATOR_ACCELERATION": 12,
+  "LONGITUDINAL_MPC_DANGER_FACTOR": 13,
+  "LONGITUDINAL_MPC_JERK_ACCELERATION": 14,
+  "LONGITUDINAL_MPC_JERK_DANGER_ZONE": 15,
+  "LONGITUDINAL_MPC_JERK_SPEED_CONTROL": 16
 }
 
 EXCLUDED_KEYS = {
@@ -608,7 +627,7 @@ class FrogPilotVariables:
     startAccel = CP.startAccel
     stopAccel = CP.stopAccel
     steerActuatorDelay = CP.steerActuatorDelay
-    steerKp = CP.lateralTuning.pid.kp if CP.lateralTuning.which() == "pid" else KP
+    steerKp = CP.lateralTuning.torque.kp
     steerRatio = CP.steerRatio
     toggle.stoppingDecelRate = CP.stoppingDecelRate
     taco_hacks_allowed = CP.safetyConfigs[0].safetyModel == SafetyModel.hyundaiCanfd
@@ -649,7 +668,7 @@ class FrogPilotVariables:
     toggle.steerRatio = np.clip(params.get_float("SteerRatio"), steerRatio * 0.5, steerRatio * 1.5) if advanced_lateral_tuning and tuning_level >= level["SteerRatio"] else steerRatio
     toggle.use_custom_steerRatio = bool(round(toggle.steerRatio, 2) != round(steerRatio, 2)) and not toggle.force_auto_tune or toggle.force_auto_tune_off
 
-    advanced_longitudinal_tuning = params.get_bool("AdvancedLongitudinalTune") if tuning_level >= level["AdvancedLongitudinalTune"] else default.get_bool("AdvancedLongitudinalTune")
+    advanced_longitudinal_tuning = toggle.openpilot_longitudinal and (params.get_bool("AdvancedLongitudinalTune") if tuning_level >= level["AdvancedLongitudinalTune"] else default.get_bool("AdvancedLongitudinalTune"))
     toggle.longitudinalActuatorDelay = np.clip(params.get_float("LongitudinalActuatorDelay"), 0, 1) if advanced_longitudinal_tuning and tuning_level >= level["LongitudinalActuatorDelay"] else longitudinalActuatorDelay
     toggle.max_desired_acceleration = np.clip(params.get_float("MaxDesiredAcceleration"), 0.1, 4.0) if advanced_longitudinal_tuning and tuning_level >= level["MaxDesiredAcceleration"] else default.get_float("MaxDesiredAcceleration")
     toggle.startAccel = np.clip(params.get_float("StartAccel"), 0, 4) if advanced_longitudinal_tuning and tuning_level >= level["StartAccel"] else startAccel
@@ -768,13 +787,13 @@ class FrogPilotVariables:
     toggle.storage_used_metrics = developer_metrics and (params.get_bool("ShowStorageUsed") if tuning_level >= level["ShowStorageUsed"] else default.get_bool("ShowStorageUsed")) and not toggle.debug_mode
     toggle.use_si_metrics = developer_metrics and (params.get_bool("UseSI") if tuning_level >= level["UseSI"] else default.get_bool("UseSI")) or toggle.debug_mode
     toggle.developer_sidebar = toggle.developer_ui and (params.get_bool("DeveloperSidebar") if tuning_level >= level["DeveloperSidebar"] else default.get_bool("DeveloperSidebar")) or toggle.debug_mode
-    toggle.developer_sidebar_metric1 = params.get_int("DeveloperSidebarMetric1") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric1"] else 1 if toggle.debug_mode else default.get_int("DeveloperSidebarMetric1")
-    toggle.developer_sidebar_metric2 = params.get_int("DeveloperSidebarMetric2") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric2"] else 3 if toggle.debug_mode else default.get_int("DeveloperSidebarMetric2")
-    toggle.developer_sidebar_metric3 = params.get_int("DeveloperSidebarMetric3") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric3"] else 4 if toggle.debug_mode else default.get_int("DeveloperSidebarMetric3")
-    toggle.developer_sidebar_metric4 = params.get_int("DeveloperSidebarMetric4") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric4"] else 5 if toggle.debug_mode else default.get_int("DeveloperSidebarMetric4")
-    toggle.developer_sidebar_metric5 = params.get_int("DeveloperSidebarMetric5") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric5"] else 6 if toggle.debug_mode else default.get_int("DeveloperSidebarMetric5")
-    toggle.developer_sidebar_metric6 = params.get_int("DeveloperSidebarMetric6") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric6"] else 7 if toggle.debug_mode else default.get_int("DeveloperSidebarMetric6")
-    toggle.developer_sidebar_metric7 = params.get_int("DeveloperSidebarMetric7") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric7"] else 11 if toggle.debug_mode else default.get_int("DeveloperSidebarMetric7")
+    toggle.developer_sidebar_metric1 = params.get_int("DeveloperSidebarMetric1") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric1"] else DEVELOPER_SIDEBAR_METRICS["ACCELERATION_CURRENT"] if toggle.debug_mode else default.get_int("DeveloperSidebarMetric1")
+    toggle.developer_sidebar_metric2 = params.get_int("DeveloperSidebarMetric2") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric2"] else DEVELOPER_SIDEBAR_METRICS["AUTOTUNE_ACTUATOR_DELAY"] if toggle.debug_mode else default.get_int("DeveloperSidebarMetric2")
+    toggle.developer_sidebar_metric3 = params.get_int("DeveloperSidebarMetric3") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric3"] else DEVELOPER_SIDEBAR_METRICS["AUTOTUNE_FRICTION"] if toggle.debug_mode else default.get_int("DeveloperSidebarMetric3")
+    toggle.developer_sidebar_metric4 = params.get_int("DeveloperSidebarMetric4") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric4"] else DEVELOPER_SIDEBAR_METRICS["AUTOTUNE_LATERAL_ACCELERATION"] if toggle.debug_mode else default.get_int("DeveloperSidebarMetric4")
+    toggle.developer_sidebar_metric5 = params.get_int("DeveloperSidebarMetric5") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric5"] else DEVELOPER_SIDEBAR_METRICS["AUTOTUNE_STEER_RATIO"] if toggle.debug_mode else default.get_int("DeveloperSidebarMetric5")
+    toggle.developer_sidebar_metric6 = params.get_int("DeveloperSidebarMetric6") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric6"] else DEVELOPER_SIDEBAR_METRICS["AUTOTUNE_STIFFNESS_FACTOR"] if toggle.debug_mode else default.get_int("DeveloperSidebarMetric6")
+    toggle.developer_sidebar_metric7 = params.get_int("DeveloperSidebarMetric7") if toggle.developer_sidebar and tuning_level >= level["DeveloperSidebarMetric7"] else DEVELOPER_SIDEBAR_METRICS["LATERAL_TORQUE_USED"] if toggle.debug_mode else default.get_int("DeveloperSidebarMetric7")
     developer_widgets = toggle.developer_ui and params.get_bool("DeveloperWidgets") if tuning_level >= level["DeveloperWidgets"] else default.get_bool("DeveloperWidgets")
     toggle.adjacent_lead_tracking = has_radar and ((developer_widgets and params.get_bool("AdjacentLeadsUI") if tuning_level >= level["AdjacentLeadsUI"] else default.get_bool("AdjacentLeadsUI")) or toggle.debug_mode)
     toggle.radar_tracks = has_radar and ((developer_widgets and params.get_bool("RadarTracksUI") if tuning_level >= level["RadarTracksUI"] else default.get_bool("RadarTracksUI")) or toggle.debug_mode)
@@ -832,9 +851,9 @@ class FrogPilotVariables:
     toggle.holiday_themes = params.get_bool("HolidayThemes") if tuning_level >= level["HolidayThemes"] else default.get_bool("HolidayThemes")
     toggle.current_holiday_theme = holiday_theme if toggle.holiday_themes else "stock"
 
-    toggle.honda_alt_Tune = toggle.car_make == "honda" and honda_nidec and (params.get_bool("HondaAltTune") if tuning_level >= level["HondaAltTune"] else default.get_bool("HondaAltTune"))
-    toggle.honda_low_speed_pedal = toggle.car_make == "honda" and toggle.has_pedal and (params.get_bool("HondaLowSpeedPedal") if tuning_level >= level["HondaLowSpeedPedal"] else default.get_bool("HondaLowSpeedPedal"))
-    toggle.honda_nidec_max_brake = toggle.car_make == "honda" and honda_nidec and (params.get_bool("HondaMaxBrake") if tuning_level >= level["HondaMaxBrake"] else default.get_bool("HondaMaxBrake"))
+    toggle.honda_alt_Tune = toggle.openpilot_longitudinal and toggle.car_make == "honda" and honda_nidec and (params.get_bool("HondaAltTune") if tuning_level >= level["HondaAltTune"] else default.get_bool("HondaAltTune"))
+    toggle.honda_low_speed_pedal = toggle.openpilot_longitudinal and toggle.car_make == "honda" and toggle.has_pedal and (params.get_bool("HondaLowSpeedPedal") if tuning_level >= level["HondaLowSpeedPedal"] else default.get_bool("HondaLowSpeedPedal"))
+    toggle.honda_nidec_max_brake = toggle.openpilot_longitudinal and toggle.car_make == "honda" and honda_nidec and (params.get_bool("HondaMaxBrake") if tuning_level >= level["HondaMaxBrake"] else default.get_bool("HondaMaxBrake"))
 
     toggle.lane_changes = params.get_bool("LaneChanges") if tuning_level >= level["LaneChanges"] else default.get_bool("LaneChanges")
     toggle.lane_change_delay = params.get_float("LaneChangeTime") if toggle.lane_changes and tuning_level >= level["LaneChangeTime"] else default.get_float("LaneChangeTime")
@@ -934,7 +953,7 @@ class FrogPilotVariables:
     toggle.pause_lateral_below_speed = params.get_int("PauseLateralSpeed") * speed_conversion if quality_of_life_lateral and tuning_level >= level["PauseLateralSpeed"] else default.get_int("PauseLateralSpeed") * CV.MPH_TO_MS
     toggle.pause_lateral_below_signal = toggle.pause_lateral_below_speed != 0 and (params.get_bool("PauseLateralOnSignal") if tuning_level >= level["PauseLateralOnSignal"] else default.get_bool("PauseLateralOnSignal"))
 
-    quality_of_life_longitudinal = params.get_bool("QOLLongitudinal") if tuning_level >= level["QOLLongitudinal"] else default.get_bool("QOLLongitudinal")
+    quality_of_life_longitudinal = toggle.openpilot_longitudinal and (params.get_bool("QOLLongitudinal") if tuning_level >= level["QOLLongitudinal"] else default.get_bool("QOLLongitudinal"))
     toggle.cruise_increase = params.get_int("CustomCruise") if quality_of_life_longitudinal and not pcm_cruise and tuning_level >= level["CustomCruise"] else default.get_int("CustomCruise")
     toggle.cruise_increase_long = params.get_int("CustomCruiseLong") if quality_of_life_longitudinal and not pcm_cruise and tuning_level >= level["CustomCruiseLong"] else default.get_int("CustomCruiseLong")
     toggle.force_stops = quality_of_life_longitudinal and (params.get_bool("ForceStops") if tuning_level >= level["ForceStops"] else default.get_bool("ForceStops"))

@@ -253,6 +253,10 @@
         <source>TORQUE %</source>
         <translation type="gpt-5-generated">COUPLE %</translation>
     </message>
+    <message>
+        <source>DANGER FACTOR</source>
+        <translation type="gpt-5-generated">FACTEUR DE DANGER</translation>
+    </message>
 </context>
 <context>
     <name>DevicePanel</name>
@@ -965,6 +969,14 @@
     <message>
         <source>% of </source>
         <translation type="gpt-5-generated">% de</translation>
+    </message>
+    <message>
+        <source>Driving Personalities:</source>
+        <translation type="gpt-5-generated">Personnalités de conduite</translation>
+    </message>
+    <message>
+        <source>Time Spent in Weather:</source>
+        <translation type="gpt-5-generated">Temps passé par météo</translation>
     </message>
 </context>
 <context>
@@ -2606,6 +2618,10 @@
         <source>An error occurred: %1</source>
         <translation type="gpt-5-generated">Une erreur s’est produite : %1</translation>
     </message>
+    <message>
+        <source>Characters: 0/%1</source>
+        <translation type="gpt-5-generated">Caractères : 0/%1</translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotManageControl</name>
@@ -3215,10 +3231,6 @@ Elle sera réinitialisée dans %1 heures et %2 minutes.</translation>
     <message>
         <source>Enter your %1</source>
         <translation type="gpt-5-generated">Saisissez votre %1</translation>
-    </message>
-    <message>
-        <source>Inputted key is invalid or too short!</source>
-        <translation type="gpt-5-generated">La clé saisie est invalide ou trop courte !</translation>
     </message>
     <message>
         <source>Remove your %1?</source>
@@ -5022,6 +5034,10 @@ Développeur – Paramètres hautement personnalisables pour passionnés chevron
     <message>
         <source>&lt;b&gt;Set the road-edge thickness.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Default matches half of the MUTCD lane-line width standard of 10 centimeters.</source>
         <translation type="gpt-5-generated">&lt;b&gt;Réglez l’épaisseur du bord de route.&lt;/b&gt;&lt;br&gt;&lt;br&gt;La valeur par défaut correspond à la moitié de la largeur standard des lignes de voie du MUTCD, soit 10 centimètres.</translation>
+    </message>
+    <message>
+        <source>Longitudinal MPC: Danger Factor</source>
+        <translation type="gpt-5-generated">MPC longitudinal : facteur de danger</translation>
     </message>
 </context>
 <context>

@@ -4,7 +4,7 @@ import random
 from openpilot.common.conversions import Conversions as CV
 from openpilot.common.realtime import DT_MDL
 from openpilot.selfdrive.controls.lib.desire_helper import TurnDirection
-from openpilot.selfdrive.controls.lib.events import ET, EventName, FrogPilotEventName, Events
+from openpilot.selfdrive.controls.lib.events import ET, EVENT_NAME, FROGPILOT_EVENT_NAME, EventName, FrogPilotEventName, Events
 from openpilot.selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 
 from openpilot.frogpilot.common.frogpilot_variables import CRUISING_SPEED, NON_DRIVING_GEARS, params, params_memory
@@ -34,8 +34,8 @@ class FrogPilotEvents:
     self.played_events = set()
 
   def update(self, v_cruise, sm, frogpilot_toggles):
-    self.event_names = {event.name for event in sm["onroadEvents"]}
-    self.frogpilot_event_names = {event.name for event in sm["frogpilotOnroadEvents"]}
+    current_alert = sm["controlsState"].alertType
+    current_frogpilot_alert = sm["frogpilotControlsState"].alertType
 
     alerts_empty = all(sm[state].alertText1 == "" and sm[state].alertText2 == "" for state in ["controlsState", "frogpilotControlsState"])
 
@@ -75,7 +75,7 @@ class FrogPilotEvents:
     else:
       self.stopped_for_light = False
 
-    if "holidayActive" not in self.played_events and self.startup_seen and alerts_empty and frogpilot_toggles.current_holiday_theme != "stock" and len(self.events) == 0:
+    if "holidayActive" not in self.played_events and self.startup_seen and alerts_empty and len(self.events) == 0 and frogpilot_toggles.current_holiday_theme != "stock":
       self.events.add(FrogPilotEventName.holidayActive)
 
       self.played_events.add("holidayActive")
@@ -135,13 +135,13 @@ class FrogPilotEvents:
           self.random_event_playing = True
           self.played_events.add("dejaVuCurve")
 
-      if "hal9000" not in self.played_events and (sm["controlsState"].alertType == ET.NO_ENTRY or sm["frogpilotControlsState"].alertType == ET.NO_ENTRY):
+      if "hal9000" not in self.played_events and (ET.NO_ENTRY in current_alert or ET.NO_ENTRY in current_frogpilot_alert):
         self.events.add(FrogPilotEventName.hal9000)
 
         self.random_event_playing = True
         self.played_events.add("hal9000")
 
-      if (EventName.steerSaturated in self.event_names or FrogPilotEventName.goatSteerSaturated in self.frogpilot_event_names):
+      if f"{EVENT_NAME[EventName.steerSaturated]}/" in current_alert or f"{FROGPILOT_EVENT_NAME[FrogPilotEventName.goatSteerSaturated]}/" in current_frogpilot_alert:
         event_choices = []
         if "firefoxSteerSaturated" not in self.played_events:
           event_choices.append("firefoxSteerSaturated")
@@ -178,21 +178,22 @@ class FrogPilotEvents:
         self.random_event_playing = True
         self.played_events.add("vCruise69")
 
-      if (EventName.fcw in self.event_names or EventName.stockAeb in self.event_names):
+      if f"{EVENT_NAME[EventName.fcw]}/" in current_alert or f"{EVENT_NAME[EventName.stockAeb]}/" in current_alert:
         event_choices = []
         if "toBeContinued" not in self.played_events:
           event_choices.append("toBeContinued")
         if "yourFrogTriedToKillMe" not in self.played_events:
           event_choices.append("yourFrogTriedToKillMe")
 
-        event_choice = random.choice(event_choices)
-        if event_choice == "toBeContinued":
-          self.events.add(FrogPilotEventName.toBeContinued)
-        elif event_choice == "yourFrogTriedToKillMe":
-          self.events.add(FrogPilotEventName.yourFrogTriedToKillMe)
+        if event_choices:
+          event_choice = random.choice(event_choices)
+          if event_choice == "toBeContinued":
+            self.events.add(FrogPilotEventName.toBeContinued)
+          elif event_choice == "yourFrogTriedToKillMe":
+            self.events.add(FrogPilotEventName.yourFrogTriedToKillMe)
 
-        self.random_event_playing = True
-        self.played_events.add(event_choice)
+          self.random_event_playing = True
+          self.played_events.add(event_choice)
 
       if "youveGotMail" not in self.played_events and sm["frogpilotCarState"].alwaysOnLateralEnabled and not self.always_on_lateral_enabled_previously:
         if random.random() < RANDOM_EVENTS_CHANCE:
@@ -203,7 +204,7 @@ class FrogPilotEvents:
 
       self.always_on_lateral_enabled_previously = sm["frogpilotCarState"].alwaysOnLateralEnabled
 
-    if frogpilot_toggles.speed_limit_changed_alert and self.frogpilot_planner.frogpilot_vcruise.slc.speed_limit_changed_timer == DT_MDL:
+    if self.frogpilot_planner.frogpilot_vcruise.slc.speed_limit_changed_timer == DT_MDL and frogpilot_toggles.speed_limit_changed_alert:
       self.events.add(FrogPilotEventName.speedLimitChanged)
 
     self.startup_seen |= sm["frogpilotControlsState"].alertText1 == frogpilot_toggles.startup_alert_top and sm["frogpilotControlsState"].alertText2 == frogpilot_toggles.startup_alert_bottom
