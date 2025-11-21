@@ -69,6 +69,13 @@ TogglesPanel::TogglesPanel(SettingsWindow *parent) : ListWidget(parent) {
       true,
     },
     {
+      "EnableStreamer",
+      tr("Enable Live Streaming"),
+      tr("Enable real-time video streaming capabilities for remote access and monitoring."),
+      "../assets/icons/monitoring.png",
+      true,
+    },
+    {
       "IsMetric",
       tr("Use Metric System"),
       tr("Display speed in km/h instead of mph."),

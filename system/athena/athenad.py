@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import asyncio
 import io
 import json
 import os
@@ -131,6 +132,9 @@ upload_queue: Queue[UploadItem] = queue.PriorityQueue()
 low_priority_send_queue: Queue[str] = queue.Queue()
 log_recv_queue: Queue[str] = queue.Queue()
 cancelled_uploads: set[str] = set()
+sdp_recv_queue: Queue[str] = queue.Queue()
+sdp_send_queue: Queue[str] = queue.Queue()
+ice_send_queue: Queue[str] = queue.Queue()
 
 cur_upload_items: dict[int, UploadItem | None] = {}
 
@@ -186,6 +190,11 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
     for x in range(HANDLER_THREADS)
   ]
 
+  if Params().get_bool("EnableStreamer"):
+    threads += [
+      threading.Thread(target=rtc_handler, args=(end_event, sdp_send_queue, sdp_recv_queue, ice_send_queue), name='rtc_handler')
+    ]
+
   for thread in threads:
     thread.start()
   try:
@@ -199,6 +208,374 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
     for thread in threads:
       cloudlog.debug(f"athena.joining {thread.name}")
       thread.join()
+
+
+def rtc_handler(end_event: threading.Event, sdp_send_queue: queue.Queue, sdp_recv_queue: queue.Queue, ice_recv_queue: queue.Queue) -> None:
+  cloudlog.info("RTC handler thread started successfully")
+  
+  # Iniciar diagnóstico de streams
+  from openpilot.system.athena.stream_diagnostic import stream_diagnostic
+  stream_diagnostic.start()
+  cloudlog.info("RTC handler received parameters - checking queues...")
+  cloudlog.info(f"SDP send queue: {type(sdp_send_queue)}")
+  cloudlog.info(f"SDP recv queue: {type(sdp_recv_queue)}")
+  cloudlog.info(f"ICE queue: {type(ice_recv_queue)}")
+  
+  cloudlog.info("Creating asyncio event loop...")
+  try:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    cloudlog.info("Asyncio event loop created successfully")
+  except Exception as e:
+    cloudlog.exception(f"Failed to create asyncio loop: {e}")
+    return
+  
+  try:
+    cloudlog.info("About to import Streamer class...")
+    try:
+      from openpilot.system.athena.streamer import Streamer
+      cloudlog.info("Streamer import successful!")
+    except ImportError as import_err:
+      cloudlog.error(f"ImportError importing Streamer: {import_err}")
+      raise
+    except Exception as import_err:
+      cloudlog.error(f"General error importing Streamer: {import_err}")
+      raise
+    
+    cloudlog.info("About to create Streamer instance...")
+    try:
+      streamer = Streamer(sdp_send_queue, sdp_recv_queue, ice_recv_queue)
+      cloudlog.info("Streamer instance created successfully!")
+    except Exception as create_err:
+      cloudlog.error(f"Error creating Streamer instance: {create_err}")
+      cloudlog.exception("Streamer creation traceback:")
+      raise
+    
+    cloudlog.info("About to start streamer event loop...")
+    try:
+      # Run a simple test first
+      cloudlog.info("Testing asyncio loop with simple coroutine...")
+      async def test_coro():
+        cloudlog.info("TEST COROUTINE EXECUTING SUCCESSFULLY")
+        return "test_success"
+      
+      result = loop.run_until_complete(test_coro())
+      cloudlog.info(f"Test coroutine result: {result}")
+      
+      # If test works, try the actual event loop
+      cloudlog.info("Test successful, starting actual event loop...")
+      
+      # Create a minimal event loop first to isolate the problem
+      async def minimal_event_loop():
+        cloudlog.info("MINIMAL EVENT LOOP STARTED")
+        while not end_event.is_set():
+          try:
+            data = streamer.sdp_recv_queue.get(timeout=1.0)
+            if data:
+              if data.get('type') == 'start':
+                cloudlog.info("MINIMAL LOOP PROCESSING START SIGNAL")
+                
+                # Set LiveStreamRunning to True to trigger stream_encoderd startup
+                if not streamer.params.get_bool("IsOnroad"):
+                  streamer.params.put_bool("LiveStreamRunning", True)
+                  cloudlog.info("LiveStreamRunning set to True - stream_encoderd should start")
+
+              
+              # Generate a real WebRTC SDP offer
+              try:
+                cloudlog.info("Creating real WebRTC peer connection...")
+                ice_config = streamer.get_ice_configuration()
+                
+                # Import aiortc in the try block
+                from aiortc import RTCPeerConnection
+                pc = RTCPeerConnection(ice_config)
+                
+                # Add video tracks for streaming
+                cloudlog.info("Adding video tracks...")
+                try:
+                  # Import video track class once
+                  from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
+                  
+                  # Always try to add all video tracks
+                  if streamer.params.get_bool("RecordFront"):
+                    driver_track = LiveStreamVideoStreamTrack("driver")
+                    driver_track.paused = False  # Force active for testing
+                    pc.addTrack(driver_track)
+                    cloudlog.info(f"Added driver video track")
+                  
+                  if streamer.params.get_bool("RecordRoad"):
+                    road_track = LiveStreamVideoStreamTrack("road")
+                    road_track.paused = False  # Force active for testing
+                    pc.addTrack(road_track)
+                    cloudlog.info(f"Added road video track")
+                    
+                    wide_road_track = LiveStreamVideoStreamTrack("wideRoad")
+                    wide_road_track.paused = False  # Force active for testing
+                    pc.addTrack(wide_road_track)
+                    cloudlog.info(f"Added wideRoad video track")
+                  else:
+                    cloudlog.warning("RecordRoad is False - skipping road and wideRoad tracks")
+                    
+                except Exception as track_err:
+                  cloudlog.error(f"Failed to add video tracks: {track_err}")
+                  # Continue without video tracks
+                
+                # CRITICAL: Configure H264 codec for all video transceivers
+                try:
+                  from aiortc import RTCRtpCodecCapability
+                  h264_capability = RTCRtpCodecCapability(
+                    mimeType="video/H264",
+                    clockRate=90000,
+                    parameters={
+                      "level-asymmetry-allowed": "1",
+                      "packetization-mode": "1",
+                      "profile-level-id": "42e01f"
+                    }
+                  )
+                  for transceiver in pc.getTransceivers():
+                    if transceiver.kind == "video":
+                      transceiver.setCodecPreferences([h264_capability])
+                      cloudlog.info(f"Set H264 codec preference for video transceiver")
+                except Exception as codec_err:
+                  cloudlog.error(f"Failed to set codec preferences: {codec_err}")
+                
+                # Add data channel
+                data_channel = pc.createDataChannel("data")
+                cloudlog.info("Data channel created")
+                
+                # Create offer
+                offer = await pc.createOffer()
+                await pc.setLocalDescription(offer)
+                cloudlog.info("SDP offer created successfully")
+                
+                # Wait for ICE gathering (asyncio is already imported at top of file)
+                for i in range(100):  # Max 10 seconds
+                  if pc.iceGatheringState == "complete":
+                    break
+                  await asyncio.sleep(0.1)
+                
+                real_sdp = {
+                  "type": pc.localDescription.type,
+                  "sdp": pc.localDescription.sdp
+                }
+                streamer.sdp_send_queue.put_nowait(json.dumps(real_sdp))
+                cloudlog.info(f"REAL SDP SENT: {pc.localDescription.type}")
+                
+                # CRITICAL: Wait for and process SDP answer
+                answer_timeout = 30
+                answer_start = time.time()
+                answer_received = False
+                
+                while time.time() - answer_start < answer_timeout and not answer_received:
+                  try:
+                    answer_data = streamer.sdp_recv_queue.get(timeout=0.5)
+                    
+                    if isinstance(answer_data, dict) and answer_data.get('type') == 'answer':
+                      from aiortc import RTCSessionDescription
+                      answer = RTCSessionDescription(sdp=answer_data['sdp'], type=answer_data['type'])
+                      await pc.setRemoteDescription(answer)
+                      cloudlog.info("✅ SDP answer set successfully - WebRTC negotiation complete!")
+                      answer_received = True
+                      
+                      # CRITICAL: Keep the connection alive!
+                      # If we break here, 'pc' goes out of scope and is garbage collected, closing the connection.
+                      cloudlog.info("Entering keep-alive loop to maintain WebRTC connection...")
+                      while not end_event.is_set():
+                        try:
+                          # Check for messages (like ICE candidates or stop signal)
+                          # CRITICAL: Use get_nowait() to avoid blocking the asyncio event loop
+                          msg = streamer.sdp_recv_queue.get_nowait()
+                          
+                          if isinstance(msg, dict) and msg.get('type') == 'candidate':
+                             # Consume ICE candidates to keep queue clean
+                             pass
+                          elif isinstance(msg, dict) and msg.get('type') == 'stop':
+                             cloudlog.info("Received stop signal, closing connection")
+                             break
+                          elif isinstance(msg, dict) and msg.get('type') == 'start':
+                             cloudlog.info("Received start signal (new connection), restarting...")
+                             # Re-queue the start signal so the main loop can process it
+                             streamer.sdp_recv_queue.put_nowait(msg)
+                             break
+                             
+                        except queue.Empty:
+                          # Yield to event loop to let aiortc run
+                          await asyncio.sleep(0.1)
+                          # Log connection state every 5 seconds (approx)
+                          if int(time.time()) % 5 == 0:
+                              cloudlog.info(f"WebRTC Keep-alive: Connection state: {pc.connectionState}, ICE state: {pc.iceConnectionState}")
+                          
+                          # CRITICAL: Break loop if connection is lost
+                          if pc.connectionState in ["closed", "failed"] or pc.iceConnectionState in ["closed", "failed"]:
+                              cloudlog.warning("WebRTC connection lost/closed. Exiting keep-alive loop.")
+                              break
+                              
+                          continue
+                      
+                      # If we exit the loop, close pc
+                      cloudlog.info("Closing WebRTC connection...")
+                      
+                      # Set LiveStreamRunning to False to stop stream_encoderd
+                      streamer.params.put_bool("LiveStreamRunning", False)
+                      cloudlog.info("LiveStreamRunning set to False - stream_encoderd should stop")
+                      
+                      await pc.close()
+                      break  # Exit the answer waiting loop to return to main loop
+                  except queue.Empty:
+                    await asyncio.sleep(0.1)
+                    continue
+                
+                if not answer_received:
+                  cloudlog.error(f"Timeout waiting for SDP answer after {answer_timeout}s")
+                
+              except Exception as e:
+                cloudlog.error(f"Failed to create real SDP: {e}")
+                cloudlog.exception("Real SDP creation traceback:")
+                # Fallback to test SDP
+                test_sdp = {"type": "offer", "sdp": "test_sdp_data"} 
+                streamer.sdp_send_queue.put_nowait(json.dumps(test_sdp))
+                cloudlog.info("Sent fallback test SDP")
+          except:
+            pass
+          await asyncio.sleep(0.1)
+      
+      cloudlog.info("Starting minimal event loop...")
+      loop.run_until_complete(minimal_event_loop())
+      cloudlog.info("Streamer event loop completed normally")
+    except Exception as loop_err:
+      cloudlog.error(f"Error in streamer event loop: {loop_err}")
+      cloudlog.exception("Event loop traceback:")
+      raise
+    
+  except ImportError as e:
+    error_msg = f"RTC handler dependencies missing: {e}"
+    cloudlog.error(error_msg)
+    cloudlog.error("Streaming requires: pip install aiortc + compiled openpilot modules")
+    
+    # Put detailed error in SDP queue
+    error_response = json.dumps({
+      "error": error_msg,
+      "solution": "Install aiortc: pip install aiortc"
+    })
+    
+    # Keep putting error message so any getSdp() calls get it
+    while not end_event.is_set():
+      try:
+        sdp_send_queue.put_nowait(error_response)
+        time.sleep(1)
+      except:
+        break
+        
+  except Exception as e:
+    error_msg = f"RTC handler failed: {e}"
+    cloudlog.exception(f"CRITICAL RTC handler error: {error_msg}")
+    
+    # Put error in SDP queue
+    error_response = json.dumps({"error": error_msg})
+    try:
+      sdp_send_queue.put_nowait(error_response)
+    except:
+      pass
+      
+  finally:
+    # Detener diagnóstico
+    try:
+      from openpilot.system.athena.stream_diagnostic import stream_diagnostic
+      stream_diagnostic.stop()
+    except:
+      pass
+    
+    cloudlog.info("RTC handler thread shutting down...")
+    try:
+      loop.close()
+      cloudlog.info("Asyncio loop closed")
+    except Exception as e:
+      cloudlog.error(f"Error closing asyncio loop: {e}")
+    cloudlog.info("RTC handler thread stopped")
+
+@dispatcher.add_method
+def setSdpAnswer(answer):
+  cloudlog.info(f"DEBUG: setSdpAnswer called with: {answer}")
+  cloudlog.info(f"DEBUG: Answer type: {type(answer)}")
+  
+  # Connect-killer sends the SDP answer directly in the 'answer' parameter
+  if isinstance(answer, dict) and answer.get('type') == 'start':
+    cloudlog.info("DEBUG: Received start signal from connect-killer")
+    # This is the start signal from connect-killer
+    sdp_recv_queue.put_nowait(answer)
+  elif isinstance(answer, dict) and 'type' in answer:
+    cloudlog.info(f"DEBUG: Received SDP answer with type: {answer.get('type')}")
+    # This is a real SDP answer
+    sdp_recv_queue.put_nowait(answer)
+  else:
+    cloudlog.info(f"DEBUG: Received other message: {answer}")
+    # Handle other types of messages (like ICE candidates)
+    sdp_recv_queue.put_nowait(answer)
+  
+  # Always return success for JSON-RPC
+  cloudlog.info("DEBUG: setSdpAnswer returning True")
+  return True
+
+@dispatcher.add_method
+def getSdp():
+  cloudlog.info("getSdp() called - checking if rtc_handler is running")
+  
+  # Check if EnableStreamer is enabled
+  params = Params()
+  if not params.get_bool("EnableStreamer"):
+    cloudlog.error("EnableStreamer is disabled")
+    return {"error": "EnableStreamer is disabled. Enable it in Settings > Device > Enable Live Streaming"}
+  
+  # First, send the start signal to begin the streaming process
+  start_signal = {"type": "start"}
+  sdp_recv_queue.put_nowait(start_signal)
+  cloudlog.info("Sent start signal to rtc_handler")
+  
+  start_time = time.time()
+  timeout = 45  # Increased timeout for WebRTC negotiation
+  check_interval = 0.1
+  
+  while time.time() - start_time < timeout:
+    try:
+      sdp_data = sdp_send_queue.get(timeout=check_interval)
+      cloudlog.info(f"Received SDP data: {sdp_data}")
+      
+      # Handle both string and dict responses
+      if isinstance(sdp_data, str):
+        try:
+          sdp = json.loads(sdp_data)
+        except json.JSONDecodeError:
+          cloudlog.error(f"Failed to parse SDP JSON: {sdp_data}")
+          return {"error": f"Invalid SDP format: {sdp_data}"}
+      else:
+        sdp = sdp_data
+      
+      if sdp:
+        cloudlog.info("SDP generated successfully")
+        return sdp
+        
+    except queue.Empty:
+      # Check every few seconds if we're still waiting
+      elapsed = time.time() - start_time
+      if elapsed % 5 < check_interval:  # Log every 5 seconds
+        cloudlog.info(f"Still waiting for SDP... ({elapsed:.1f}s elapsed)")
+      continue
+    except Exception as e:
+      cloudlog.exception(f"Error in getSdp: {e}")
+      return {"error": f"SDP generation failed: {e}"}
+  
+  # Return error if timeout
+  cloudlog.error(f"SDP generation timeout after {timeout}s")
+  return {"error": f"SDP generation timeout after {timeout}s. Check if rtc_handler thread is running."}
+
+@dispatcher.add_method
+def getIce():
+  if not ice_send_queue.empty():
+    return json.loads(ice_send_queue.get_nowait())
+  else:
+    return {
+      'error': True
+    }
 
 
 def jsonrpc_handler(end_event: threading.Event, localProxyHandler = None) -> None:
