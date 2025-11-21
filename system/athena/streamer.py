@@ -1,10 +1,16 @@
 import asyncio
-import threading
 import json
+import logging
 import queue
 import subprocess
-import logging
+import threading
 import time
+from typing import Optional
+
+from openpilot.common.api import Api, api_get
+from openpilot.common.params import Params
+from openpilot.common.swaglog import cloudlog
+import cereal.messaging as messaging
 
 try:
     from aiortc import (
@@ -17,78 +23,13 @@ except ImportError:
     HAS_AIORTC = False
 
 try:
-    import cereal.messaging as messaging
     from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
-    from openpilot.system.manager.process_config import NativeProcess
-    from openpilot.common.params import Params
-    from openpilot.common.api import Api, api_get
-    from openpilot.common.swaglog import cloudlog
-    HAS_CEREAL = True
+    HAS_VIDEO_TRACK = True
 except ImportError:
-    HAS_CEREAL = False
+    HAS_VIDEO_TRACK = False
 
-# Configure logging
-# logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def create_offer(pc: RTCPeerConnection) -> None:
-  """
-  Create an SDP offer and set it as the local description of the provided PeerConnection.
-  """
-  if not pc:
-    logger.error("PeerConnection is None, cannot create offer.")
-    return
-  try:
-    offer: RTCSessionDescription = await pc.createOffer()
-    await pc.setLocalDescription(offer)
-    logger.info("Created and set local SDP offer.")
-    cloudlog.info(f"SDP OFFER:\n{offer.sdp}")
-  except Exception:
-    logger.exception("Failed to create or set local SDP offer:")
-    if pc:
-      await pc.close()
-
-async def set_answer(pc: RTCPeerConnection, data: dict) -> None:
-  """
-  Set the remote answer SDP on the provided PeerConnection.
-  """
-  if not pc:
-    logger.error("PeerConnection is None, cannot set answer.")
-    return
-  try:
-    if 'sdp' not in data or 'type' not in data:
-      raise ValueError("Answer data is missing 'sdp' or 'type' field.")
-    logger.debug("Received answer data: %s", data)
-    answer = RTCSessionDescription(sdp=data['sdp'], type=data['type'])
-    cloudlog.info(f"SDP ANSWER:\n{answer.sdp}")
-    await pc.setRemoteDescription(answer)
-    logger.info("Successfully set remote answer description.")
-  except Exception:
-    logger.exception("Failed to set remote answer. Data: %s", data)
-    if pc:
-      await pc.close()
-
-async def set_candidate(pc: RTCPeerConnection, candidate_data: dict) -> None:
-  """
-  Add a remote ICE candidate to the provided PeerConnection.
-  """
-  if not pc:
-    logger.error("PeerConnection is None, cannot set candidate.")
-    return
-  logger.debug("Received candidate data: %s", candidate_data)
-  try:
-    if "candidate" not in candidate_data:
-      raise ValueError("Candidate data missing 'candidate' field.")
-    candidate_sdp = candidate_data["candidate"]
-    parsed_candidate = candidate_from_sdp(candidate_sdp)
-    parsed_candidate.sdpMid = candidate_data.get("sdpMid", None)
-    parsed_candidate.sdpMLineIndex = candidate_data.get("sdpMLineIndex", None)
-    await pc.addIceCandidate(parsed_candidate)
-    logger.info("Added remote ICE candidate.")
-  except Exception:
-    logger.exception("Failed to add ICE candidate:")
-    if pc:
-      await pc.close()
 
 def capture_pane(session_window_pane: str) -> str | None:
   """
@@ -115,40 +56,20 @@ class ControllerHandler:
   Safety-focused handler for Xbox controller inputs using asyncio
   """
   def __init__(self, safety_timeout=0.5):
-    """
-    Initialize the controller handler with safety timeout
-
-    Args:
-        safety_timeout: Time in seconds after which controls return to neutral if no input received
-    """
     self.last_input_time = time.time()
     self.throttle = 0.0
     self.steering = 0.0
     self.safety_timeout = safety_timeout
     self.input_active = False
     self.lock = asyncio.Lock()
-
-    # Monitor task will be created when start_safety_monitor is called
     self.safety_monitor_task = None
     self.running = True
-
     self.joystick_sock = messaging.pub_sock('testJoystick')
-
     logger.info("Controller handler initialized with safety timeout: %.2f seconds", safety_timeout)
 
   async def handle_controller_message(self, message_data):
-    """
-    Process controller input message from frontend
-
-    Args:
-        message_data: JSON data with controller inputs
-
-    Returns:
-        bool: True if message was handled, False otherwise
-    """
     try:
       data = message_data
-
       if data.get('action') != 'controller':
         return False
 
@@ -159,9 +80,8 @@ class ControllerHandler:
         self.input_active = True
 
       # Log the received input
-      logger.info(f"Controller input: throttle={self.throttle:.2f}, steering={self.steering:.2f}")
+      # logger.info(f"Controller input: throttle={self.throttle:.2f}, steering={self.steering:.2f}")
 
-      # Here you would call your vehicle control functions
       await self.apply_control(self.throttle, self.steering)
       return True
 
@@ -170,36 +90,21 @@ class ControllerHandler:
       return False
 
   async def apply_control(self, throttle, steering):
-    """
-    Apply control values to the vehicle
-
-    Args:
-        throttle: Throttle value (-1.0 to 1.0)
-        steering: Steering value (-1.0 to 1.0)
-    """
-    # TODO: Implement your actual vehicle control code here
-    # This is a placeholder - replace with your actual vehicle control mechanism
-    logger.debug(f"Applied control: throttle={throttle:.2f}, steering={steering:.2f}")
+    # logger.debug(f"Applied control: throttle={throttle:.2f}, steering={steering:.2f}")
     dat = messaging.new_message('testJoystick')
     dat.testJoystick.axes = [throttle, steering]
     dat.testJoystick.buttons = [False]
     self.joystick_sock.send(dat.to_bytes())
 
   async def shutdown(self):
-    """
-    Shutdown the controller handler safely
-    """
     logger.info("Shutting down controller handler")
     self.running = False
-
     if self.safety_monitor_task and not self.safety_monitor_task.done():
       self.safety_monitor_task.cancel()
       try:
         await self.safety_monitor_task
       except asyncio.CancelledError:
         pass
-
-    # Ensure controls are set to neutral when shutting down
     async with self.lock:
       self.throttle = 0.0
       self.steering = 0.0
@@ -209,328 +114,220 @@ class ControllerHandler:
 class Streamer:
   def __init__(self, sdp_send_queue: queue.Queue, sdp_recv_queue: queue.Queue, ice_send_queue: queue.Queue):
     logger.info("Initializing Streamer instance.")
-    
-    # Check dependencies first
+
     if not HAS_AIORTC:
         logger.error("aiortc not available. Install with: pip install aiortc")
         raise ImportError("aiortc is required for streaming functionality")
-    
-    if not HAS_CEREAL:
-        logger.error("cereal/openpilot modules not available")
-        raise ImportError("openpilot modules are required for streaming functionality")
-    
-    self.lock = asyncio.Lock()
-    self.pc: RTCPeerConnection | None = None
-    self.data_channel: RTCDataChannel | None = None
+
     self.sdp_send_queue = sdp_send_queue
     self.sdp_recv_queue = sdp_recv_queue
     self.ice_send_queue = ice_send_queue
     self.params = Params()
     self.onroad = self.params.get_bool("IsOnroad")
+
     dongle_id = self.params.get("DongleId")
     if isinstance(dongle_id, bytes):
         dongle_id = dongle_id.decode('utf8')
     self.api = Api(dongle_id)
+
     self.controller_handler = ControllerHandler(safety_timeout=0.5)
-    # Initialize video tracks
     self.tracks: dict[str, LiveStreamVideoStreamTrack] = {}
-    if self.params.get_bool("RecordFront"):
-      self.tracks["driver"] = LiveStreamVideoStreamTrack("driver")
-    if self.params.get_bool("RecordRoad"):
-      self.tracks["road"] = LiveStreamVideoStreamTrack("road")
-      self.tracks["wideRoad"] = LiveStreamVideoStreamTrack("wideRoad")
-
-  def add_tracks(self) -> None:
-    """
-    Add video tracks to the PeerConnection with H264 codec preferences.
-    """
-    if not self.pc:
-      logger.error("Cannot add tracks without a PeerConnection.")
-      return
-    try:
-      for track in self.tracks.values():
-        # Allow streaming based on user preference
-        allow_onroad_streaming = self.params.get_bool("AllowOnroadStreaming")
-        if allow_onroad_streaming:
-            track.paused = False  # Force tracks to be active for live streaming
-        else:
-            track.paused |= self.onroad  # Original behavior - pause when onroad
-        
-        # Add track - aiortc will create transceiver automatically
-        sender = self.pc.addTrack(track)
-      
-      # Configure H264 codec on all transceivers
-      h264_capability = RTCRtpCodecCapability(
-        mimeType="video/H264",
-        clockRate=90000,
-        parameters={
-          "level-asymmetry-allowed": "1",
-          "packetization-mode": "1",
-          "profile-level-id": "42e01f"
-        }
-      )
-      for transceiver in self.pc.getTransceivers():
-        if transceiver.kind == "video":
-          transceiver.setCodecPreferences([h264_capability])
-      
-      logger.info("All video tracks added successfully.")
-    except Exception:
-      logger.exception("Failed to add tracks:")
-      if self.pc:
-        asyncio.ensure_future(self.pc.close())
-
-  def send_track_states(self) -> None:
-    """
-    Send the current track pause states via the data channel.
-    """
-    if not self.data_channel:
-      logger.warning("Data channel not established. Cannot send track states.")
-      return
-    track_state = {
-      "trackState": {name: track.paused for name, track in self.tracks.items()}
-    }
-    try:
-      self.data_channel.send(json.dumps(track_state))
-      logger.debug("Sent updated track states: %s", track_state)
-    except Exception:
-      logger.exception("Failed to send track states:")
-
-  def attach_event_handlers(self):
-
-    def on_open():
-      self.send_track_states()
-
-    def on_message(message: str):
-      logger.debug("Received data channel message: %s", message)
-      try:
-        msg = json.loads(message)
-        action = msg.get("action")
-        track_type = msg.get("trackType")
-        updated = False
-
-        if action == "controller":
-          # Process controller input and apply controls with safety measures
-          if not self.params.get_bool("JoystickDebugMode"):
-            self.params.put_bool("JoystickDebugMode", True)
-          asyncio.create_task(self.controller_handler.handle_controller_message(msg))
-          return # Don't send track states
-
-        if action in ("startTrack", "stopTrack") and track_type in self.tracks:
-          self.tracks[track_type].paused = (action == "stopTrack")
-          updated = True
-          logger.info("Track '%s' %s", track_type, "stopped" if self.tracks[track_type].paused else "started")
-        elif action == "captureTmux":
-          capture_result = capture_pane("comma:0.0")
-          if capture_result:
-            try:
-              self.data_channel.send(capture_result) # type: ignore[union-attr]
-              logger.debug("Sent tmux capture result.")
-            except Exception:
-              logger.exception("Failed to send tmux capture result:")
-          else:
-            logger.warning("No tmux capture result to send.")
-        if updated:
-          self.send_track_states()
-      except Exception:
-        logger.exception("Error handling data channel message:")
-
-    async def on_close():
-      logger.info("Data channel closed. Stopping streamer...")
-      await self.stop()
-
-    async def on_negotiationneeded():
-      logger.debug("Negotiation needed. Creating new SDP offer.")
-      await create_offer(self.pc)
-
-    self.pc.on("negotiationneeded", on_negotiationneeded)
-    self.data_channel.on("open", on_open)
-    self.data_channel.on("message", on_message)
-    self.data_channel.on("close", on_close)
+    self.pc: Optional[RTCPeerConnection] = None
+    self.data_channel: Optional[RTCDataChannel] = None
 
   def get_ice_configuration(self):
-    #TODO for privacy, we can disable the turn server and always use the stun server. This kind of enforces a local connection for when on hotspot.
     try:
-      ice_servers_data = api_get('/v1/iceservers', timeout=5,access_token=self.api.get_token()).content
+      ice_servers_data = api_get('/v1/iceservers', timeout=5, access_token=self.api.get_token()).content
       ice_servers = [
-        RTCIceServer(urls=server["urls"],username=server["username"],credential=server["credential"])
+        RTCIceServer(urls=server["urls"], username=server["username"], credential=server["credential"])
         for server in json.loads(ice_servers_data)
       ]
     except Exception:
       logger.exception("Failed to fetch ICE servers:")
-      # Fallback to Google STUN server
-      ice_servers = [
-        RTCIceServer(urls="stun:stun.l.google.com:19302"),
-      ]
+      ice_servers = [RTCIceServer(urls="stun:stun.l.google.com:19302")]
+
     configuration = RTCConfiguration(iceServers=ice_servers)
-    logger.debug("RTCConfiguration: %s", configuration)
     return configuration
 
-  async def build(self):
-    logger.info("Starting WebRTC build process...")
-    
-    logger.info("Getting ICE configuration...")
-    ice_config = self.get_ice_configuration()
-    logger.info(f"ICE configuration obtained: {len(ice_config.iceServers)} servers")
-    
-    logger.info("Creating RTCPeerConnection...")
-    self.pc = RTCPeerConnection(ice_config)
-    logger.info("RTCPeerConnection created successfully")
-    
-    logger.info("Adding video tracks...")
-    self.add_tracks()
-    
-    logger.info("Creating data channel...")
-    self.data_channel = self.pc.createDataChannel("data")
-    logger.info("Data channel created successfully")
-    
-    logger.info("Attaching event handlers...")
-    self.attach_event_handlers()
-    
-    logger.info("Creating SDP offer...")
-    await create_offer(self.pc)
-    logger.info("SDP offer creation completed")
-    
-    logger.info("Waiting for local description...")
-    timeout_counter = 0
-    while not self.pc.localDescription:
-      await asyncio.sleep(0.1)
-      timeout_counter += 1
-      if timeout_counter > 100:  # 10 seconds
-        logger.error("Timeout waiting for local description")
-        raise TimeoutError("Local description timeout")
-    logger.info("Local description ready")
-    
-    logger.info("Waiting for ICE gathering to complete...")
-    ice_timeout = 0
-    while self.pc.iceGatheringState != "complete":
-      await asyncio.sleep(0.1)
-      ice_timeout += 1
-      if ice_timeout > 300:  # 30 seconds
-        logger.warning(f"ICE gathering timeout, current state: {self.pc.iceGatheringState}")
-        break  # Continue anyway
-    logger.info(f"ICE gathering finished, state: {self.pc.iceGatheringState}")
-    
-    message = json.dumps({
-      'type': self.pc.localDescription.type,
-      'sdp': self.pc.localDescription.sdp,
-    })
-    logger.info("Sending SDP message to queue...")
-    self.sdp_send_queue.put_nowait(message)
-    logger.info("SDP message sent successfully!")
+  def attach_data_channel_handlers(self):
+    if not self.data_channel:
+        return
 
-  async def stop(self) -> None:
-    """
-    Stop the PeerConnection, camera, encoder, and clean up state.
-    """
-    async with self.lock:
-      logger.info("Stopping streamer...")
-      self.params.put_bool("LiveStreamRunning", False)
-      self.params.put_bool("JoystickDebugMode", False)
-      try:
-        # Clear any pending messages in sdp_send_queue
-        while not self.sdp_send_queue.empty():
-          self.sdp_send_queue.get()
-        if self.data_channel is not None:
-          self.data_channel.close()
-          self.data_channel = None
-        if self.pc:
-          await self.pc.close()
-          self.pc = None
-        await asyncio.sleep(1)
-        logger.info("Streamer stopped successfully.")
-      except Exception:
-        logger.exception("Error during stop:", )
+    def on_open():
+        pass
+
+    def on_message(message: str):
+        try:
+            msg = json.loads(message)
+            action = msg.get("action")
+
+            if action == "controller":
+                if not self.params.get_bool("JoystickDebugMode"):
+                    self.params.put_bool("JoystickDebugMode", True)
+                asyncio.create_task(self.controller_handler.handle_controller_message(msg))
+            elif action == "captureTmux":
+                capture_result = capture_pane("comma:0.0")
+                if capture_result:
+                    try:
+                        self.data_channel.send(capture_result)
+                    except Exception:
+                        pass
+        except Exception:
+            logger.exception("Error handling data channel message:")
+
+    self.data_channel.on("open", on_open)
+    self.data_channel.on("message", on_message)
 
   async def event_loop(self, end_event: threading.Event):
-    """
-    Main event loop that processes signaling messages and maintains the PeerConnection.
-    Runs until end_event is set.
-    """
-    logger.info("EVENT LOOP ENTRY POINT - Function started")
-    await asyncio.sleep(0.1)  # Test async
-    logger.info("EVENT LOOP - Async test passed")
-    
-    logger.info("STARTING EVENT LOOP - Initializing components...")
-    
-    # Skip camera/encoder for now to test the basic loop
-    logger.info("Skipping camera and encoder processes for testing...")
-    # try:
-    #   logger.info("Creating camera and encoder processes...")
-    #   self.camera = NativeProcess("camerad", "system/camerad", ["./camerad"], True)
-    #   self.encoder = NativeProcess("encoderd", "system/loggerd", ["./encoderd", "--stream"], True)
-    #   logger.info("Native processes for camera and encoder initialized successfully")
-    # except Exception as e:
-    #   logger.error(f"Failed to initialize camera/encoder: {e}")
-    #   logger.exception("Camera/encoder initialization traceback:")
-    #   # Continue anyway - maybe the processes are already running
-    logger.info("Starting main event loop...")
-    stop_states = ['failed', 'closed']
-    connecting_states = ['connecting', 'new']
-    loop_iteration = 0
+    cloudlog.info("Streamer event loop started")
+
     while not end_event.is_set():
-      loop_iteration += 1
-      if loop_iteration % 10 == 1:  # Log every 10 iterations
-        logger.info(f"Event loop iteration {loop_iteration}")
-      self.onroad = self.params.get_bool("IsOnroad") # support some functions while onroad
       try:
+        # Wait for start signal
         try:
-          # Use blocking get with timeout instead of get_nowait to avoid missing messages
-          data = self.sdp_recv_queue.get(timeout=0.1 if self.pc else 1.0)
-          logger.info(f"RECEIVED SIGNALING MESSAGE: {data}")
+          data = self.sdp_recv_queue.get(timeout=1.0)
         except queue.Empty:
-          # Check for messages more frequently when no connection
-          if not self.pc:
-            logger.debug("No messages in queue, continuing...")
-          data = None
-        except Exception as e:
-          logger.error(f"Error getting message from queue: {e}")
-          data = None
-        if data:
-          interaction_timeout = 6000 # interaction_timeout 10mins
-          match data.get('type'):
-            case 'start':
-              try:
-                logger.info("Processing 'start' signal - beginning WebRTC build process...")
-                await asyncio.wait_for(self.build(), timeout=30)
-                logger.info("WebRTC build completed successfully!")
-                connection_timeout = 600 # 1min
-                if not self.onroad:
-                  self.params.put_bool("LiveStreamRunning", True)
-                  logger.info("LiveStreamRunning set to True (not onroad)")
-                else:
-                  logger.info("Onroad detected - LiveStreamRunning not set")
-              except asyncio.TimeoutError:
-                logger.error("WebRTC build timed out after 30 seconds")
-                await self.stop()
-              except Exception:
-                logger.exception("Error during 'start' handling:")
-                await self.stop()
-            case 'answer':
-              await set_answer(self.pc, data)
-            case 'candidate' if 'candidate' in data:
-              await set_candidate(self.pc, data['candidate'])
-            case 'bye':
-              await self.stop()
-        else:
-          await asyncio.sleep(0.1 if self.pc else 2)
-        if self.pc:
-          transeivers = self.pc.getTransceivers()
-          dtls_state = None
-          if len(transeivers):
-            dtls_state = transeivers[0].receiver.transport.state
-          if self.pc.connectionState in stop_states or dtls_state in stop_states:
-            raise TimeoutError("The connection ended")
-          if self.pc.connectionState in connecting_states or dtls_state in connecting_states:
-            if connection_timeout:
-              connection_timeout -= 1
-            else:
-              raise TimeoutError("Connection took too long to establish. Closing")
-          if interaction_timeout:
-            interaction_timeout -= 1
+          await asyncio.sleep(0.1)
+          continue
+
+        if not data or data.get('type') != 'start':
+          continue
+
+        cloudlog.info("Processing start signal")
+
+        # Set LiveStreamRunning
+        if not self.params.get_bool("IsOnroad"):
+          self.params.put_bool("LiveStreamRunning", True)
+          cloudlog.info("LiveStreamRunning set to True")
+
+        # Create PeerConnection
+        cloudlog.info("Creating WebRTC peer connection...")
+        ice_config = self.get_ice_configuration()
+        self.pc = RTCPeerConnection(ice_config)
+
+        # Add video tracks
+        cloudlog.info("Adding video tracks...")
+        try:
+          if HAS_VIDEO_TRACK:
+            if self.params.get_bool("RecordFront"):
+              driver_track = LiveStreamVideoStreamTrack("driver")
+              driver_track.paused = False
+              self.pc.addTrack(driver_track)
+              cloudlog.info("Added driver video track")
+
+            if self.params.get_bool("RecordRoad"):
+              road_track = LiveStreamVideoStreamTrack("road")
+              road_track.paused = False
+              self.pc.addTrack(road_track)
+              cloudlog.info("Added road video track")
+
+              wide_road_track = LiveStreamVideoStreamTrack("wideRoad")
+              wide_road_track.paused = False
+              self.pc.addTrack(wide_road_track)
+              cloudlog.info("Added wideRoad video track")
           else:
-            self.data_channel.send("bye") # type: ignore[union-attr]
-            raise TimeoutError("Interaction timeout. Closing")
-      except Exception:
-        logger.exception("Stopping:")
-        await self.stop()
-    await self.stop()
+            cloudlog.error("LiveStreamVideoStreamTrack not available")
+        except Exception as e:
+          cloudlog.error(f"Failed to add video tracks: {e}")
+
+        # Configure H264
+        try:
+          h264_capability = RTCRtpCodecCapability(
+            mimeType="video/H264",
+            clockRate=90000,
+            parameters={
+              "level-asymmetry-allowed": "1",
+              "packetization-mode": "1",
+              "profile-level-id": "42e01f"
+            }
+          )
+          for transceiver in self.pc.getTransceivers():
+            if transceiver.kind == "video":
+              transceiver.setCodecPreferences([h264_capability])
+        except Exception as e:
+          cloudlog.error(f"Failed to set codec preferences: {e}")
+
+        # Create Data Channel
+        self.data_channel = self.pc.createDataChannel("data")
+        self.attach_data_channel_handlers()
+        cloudlog.info("Data channel created")
+
+        # Create Offer
+        offer = await self.pc.createOffer()
+        await self.pc.setLocalDescription(offer)
+        cloudlog.info("SDP offer created")
+
+        # Wait for ICE gathering
+        for _ in range(100):
+          if self.pc.iceGatheringState == "complete":
+            break
+          await asyncio.sleep(0.1)
+
+        # Send SDP
+        real_sdp = {
+          "type": self.pc.localDescription.type,
+          "sdp": self.pc.localDescription.sdp
+        }
+        self.sdp_send_queue.put_nowait(json.dumps(real_sdp))
+        cloudlog.info(f"SDP sent: {self.pc.localDescription.type}")
+
+        # Wait for Answer
+        answer_timeout = 30
+        answer_start = time.time()
+        answer_received = False
+
+        while time.time() - answer_start < answer_timeout and not answer_received:
+          try:
+            answer_data = self.sdp_recv_queue.get(timeout=0.5)
+
+            if isinstance(answer_data, dict) and answer_data.get('type') == 'answer':
+              answer = RTCSessionDescription(sdp=answer_data['sdp'], type=answer_data['type'])
+              await self.pc.setRemoteDescription(answer)
+              cloudlog.info("SDP answer set - WebRTC negotiation complete!")
+              answer_received = True
+
+              # Keep-alive loop
+              cloudlog.info("Entering keep-alive loop...")
+              while not end_event.is_set():
+                try:
+                  msg = self.sdp_recv_queue.get_nowait()
+
+                  if isinstance(msg, dict):
+                    if msg.get('type') == 'candidate':
+                      pass # Handle candidate if needed
+                    elif msg.get('type') == 'stop':
+                      cloudlog.info("Received stop signal")
+                      break
+                    elif msg.get('type') == 'start':
+                      cloudlog.info("Received start signal (restart)")
+                      self.sdp_recv_queue.put_nowait(msg)
+                      break
+                except queue.Empty:
+                  await asyncio.sleep(0.1)
+
+                  if self.pc.connectionState in ["closed", "failed"] or self.pc.iceConnectionState in ["closed", "failed"]:
+                    cloudlog.warning("WebRTC connection lost")
+                    break
+                  continue
+
+              # Cleanup
+              cloudlog.info("Closing WebRTC connection...")
+              self.params.put_bool("LiveStreamRunning", False)
+              self.params.put_bool("JoystickDebugMode", False)
+              await self.pc.close()
+              self.pc = None
+              break # Exit answer wait loop
+
+          except queue.Empty:
+            await asyncio.sleep(0.1)
+            continue
+
+        if not answer_received:
+          cloudlog.error(f"Timeout waiting for SDP answer after {answer_timeout}s")
+          if self.pc:
+            await self.pc.close()
+            self.pc = None
+
+      except Exception as e:
+        cloudlog.exception(f"Error in streamer event loop: {e}")
+        await asyncio.sleep(1)
