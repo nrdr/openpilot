@@ -1,0 +1,95 @@
+{
+  "versions": {
+    "5.0.0": {
+      "agnos_version": "13.1",
+      "changes": [
+        "All of the latest upstream SunnyPilot changes",
+        "BluePilot Portal: New React-based Progressive Web App (PWA) for device management",
+        "BluePilot Portal: Home Dashboard with system status, drive stats, and disk space visualization",
+        "BluePilot Portal: Routes Management with video playback, GPS maps, and camera exports",
+        "BluePilot Portal: Settings Panel for configuring all parameters from browser with WebSocket updates",
+        "BluePilot Portal: Diagnostics Panel with real-time TMUX streaming and parameter browser",
+        "New BluePilot sidebar with WiFi status display and improved network information",
+        "Enhanced Onroad UI: Improved lane lines, road edges, and path rendering with glow effects and smoother curve tracking",
+        "Completely redesigned settings menu with reorganized panels for better navigation",
+        "New Software Panel with integrated updater, branch management, and model selection",
+        "Added Routes Panel with video playback support (beta) for viewing dashcam footage",
+        "Model info widget and enhanced drive stats widget for onroad display",
+        "Developer UI: New customizable debug panel with adjustable settings",
+        "Brightness control system with perceptual brightness correction for better viewing",
+        "Enhanced overlay system: Refactored HUD rendering for better performance and modularity",
+        "Brake status indicator: Now uses brake light CAN signal when available for more accurate display",
+        "Network Panel: WiFi management with connection status, signal strength, and SSID detection",
+        "Crash detection hooks: Better error reporting and stacktrace collection for debugging",
+        "Added option to bypass BluePilot lateral controls for testing purposes",
+        "Web-based routes viewer for logs and cereal data with stop functionality",
+        "Onroad display behavior controls: dimming percentage and timeout settings",
+        "OSM Panel: OpenStreetMap integration improvements",
+        "Models Panel: Easy switching between different driving models",
+        "Ford: Human Turn Detection latch increased to 3.0 seconds for better turn handling",
+        "Ford: Improved EPAS wind-up prevention during human turns",
+        "Ford: Better yaw threshold handling at 12.5 m/s"
+      ],
+      "fixes": [
+        "Fixed BPSelection control description text display in settings",
+        "Fixed radar overlay speed unit matching with system settings",
+        "Fixed BP Updater crashes on built branches without submodules",
+        "Fixed HybridDriveBatteryGauge calculations for more accurate battery percentage display",
+        "Fixed hybrid gauge scaling when sidebar is visible",
+        "Fixed sunnylink card display issues in sidebar",
+        "Fixed onroad debug panel width utilization for better screen usage",
+        "Fixed brightness control system interactions and perceptual brightness",
+        "Fixed menu system JSON parsing and control visibility conditions",
+        "Fixed WiFi SSID detection and display in sidebar",
+        "Fixed stop sign overlay positioning and rendering",
+        "Fixed lane line mapping using model transform for better accuracy",
+        "Improved thread safety and exception handling in sidebar rendering",
+        "Fixed alert overlay styling to match the rest of the UI",
+        "General stability improvements and bug fixes throughout the UI",
+        "Fixed web server crash on first enable by installing dependencies in background",
+        "Fixed WiFi connection handling to check for known connections before prompting for passwords",
+        "Ford: Fixed blocked messages after human turn reset",
+        "Ford: Fixed message blocking issues during speed transitions in panda safety",
+        "Ford: Fixed Ford Escape MK4.5 naming (ESCAPE_MK5 to ESCAPE_MK4_5)"
+      ],
+      "removals": [
+        "Removed the GForce Meter from the HUD (overlay system replaced it)",
+        "Removed quiet mode feature from menus",
+        "Removed constant fan animation from sidebar (now shows memory only)",
+        "Removed OnlyOnroadWhenInGear feature"
+      ],
+      "known_issues": [
+        "Routes Panel video playback is in beta and may have performance issues on some devices"
+      ]
+    },
+    "4.0.0": {
+      "agnos_version": "12.0",
+      "changes": [
+        "Added this recent changes dialog functionality to offroad transition in UI",
+        "Added the fan demand percentage to the sidebar.  Just tap on the memory card to toggle it",
+        "Enhanced stop sign detection and rendering with improved vehicle state checks and visual effects",
+        "Refactored HybridDriveGauge and HybridBatteryGauge with enhanced automotive styling",
+        "Added a new GForceMeter to the HUD",
+        "Enhanced stop sign rendering with improved position and size smoothing",
+        "Refactored lead tracking logic with enhanced stability requirements",
+        "Complete rewrite of advanced lateral control.  In-lane position is now handle stand-alone and is smoother",
+        "Updates to lateral control logic to incorporate dynamic lag calculation",
+        "Reset low speed torque limits to match bp-2.1",
+        "Updated 'steering limited exceeded' warning logic to reduce false alerts",
+        "Added a new parameter to control the speed color when the brake is pressed",
+        "Added restriction to the calibration that require the car to have 2 valid lane lines before starting the calibration",
+        "Latest Upstream SunnyPilot changes"
+      ],
+      "fixes": [
+        "Fixed compilation errors in BluePilot UI components",
+        "Performance improvements to hopefully fix the random UI restarts",
+        "Enhanced stop detection and rendering with improved data validation",
+        "Latest Upstream SunnyPilot fixes"
+      ],
+      "removals": [
+        "Disabled routes panel for now until we get FFMpeg hardware decoding working then it will be added back and allow for video playback like a dashcam"
+      ],
+      "known_issues": []
+    }
+  }
+}

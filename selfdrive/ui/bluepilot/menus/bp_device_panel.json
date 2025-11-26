@@ -1,0 +1,270 @@
+{
+  "_comment": "BluePilot Device Settings - Standardized UI for device controls migrated from SunnyPilot",
+  "menuName": "Device",
+  "menuIcon": "icon_device.png",
+  "menuDescription": "Device Settings",
+  "persistentParams": [],
+  "clearOnManagerStartParams": [],
+  "clearOnOnroadTransitionParams": [],
+  "clearOnOffroadTransitionParams": [],
+  "groups": [
+    {
+      "groupName": "quickActionsGroup",
+      "title": "Quick Actions",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "OffroadMode",
+          "title": "Always Offroad",
+          "desc": "Prevent the device from going onroad. When enabled, openpilot will not engage.",
+          "confirm": true,
+          "confirm_text": "Are you sure you want to toggle Always Offroad mode?",
+          "confirm_yes_text": "Yes",
+          "confirm_no_text": "No",
+          "dynamic_title": true,
+          "titles": {
+            "enabled": "Exit Always Offroad",
+            "disabled": "Enable Always Offroad"
+          },
+          "dynamic_styling": true,
+          "styles": {
+            "enabled": {
+              "background_color": "#E22C2C"
+            },
+            "disabled": {
+              "background_color": "#393939"
+            }
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "QuietMode",
+          "title": "Quiet Mode",
+          "desc": "Mutes all notification sounds."
+        },
+        {
+          "type": "command_button",
+          "title": "Driver Camera Preview",
+          "desc": "Preview the driver-facing camera.",
+          "button_text": "PREVIEW",
+          "action": "show_driver_camera",
+          "webSupported": false
+        },
+        {
+          "type": "command_button",
+          "title": "Training Guide",
+          "desc": "Review the training guide to learn how to use openpilot.",
+          "button_text": "REVIEW",
+          "action": "show_training_guide",
+          "confirm": true,
+          "confirm_text": "Are you sure you want to review the training guide?",
+          "confirm_yes_text": "Review",
+          "confirm_no_text": "Cancel",
+          "connect_signal": "reviewTrainingGuide",
+          "webSupported": false
+        },
+        {
+          "type": "command_button",
+          "title": "Language",
+          "desc": "Change the language of the device.",
+          "button_text": "CHANGE",
+          "action": "show_language_selector",
+          "connect_signal": "showLanguageSelector",
+          "webSupported": false
+        },
+        {
+          "type": "command_button",
+          "title": "Regulatory",
+          "desc": "View regulatory and compliance information.",
+          "button_text": "VIEW",
+          "action": "show_regulatory",
+          "connect_signal": "showRegulatory",
+          "webSupported": false
+        },
+        {
+          "type": "command_button",
+          "title": "Reset Settings",
+          "desc": "Reset all settings to their default values. This cannot be undone.",
+          "button_text": "RESET",
+          "action": "reset_settings",
+          "confirm": true,
+          "confirm_text": "Are you sure you want to reset all sunnypilot settings to default? Once the settings are reset, there is no going back.",
+          "confirm_yes_text": "Reset",
+          "confirm_no_text": "Cancel"
+        },
+        {
+          "type": "file_viewer",
+          "path": "CHANGELOGS_BP.md",
+          "title": "BluePilot Changelog",
+          "desc": "View the latest changes and updates for BluePilot",
+          "header": "BluePilot Changelog",
+          "webSupported": false,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "recent_changes",
+          "title": "Recent Changes",
+          "desc": "View recent changes and updates for the current version",
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "calibrationGroup",
+      "title": "Calibration",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "command_button",
+          "title": "Reset Calibration",
+          "desc": "openpilot is continuously calibrating, resetting is rarely required. Resetting calibration will restart openpilot if the car is powered on.",
+          "button_text": "RESET",
+          "action": "remove_params",
+          "params": [
+            "CalibrationParams",
+            "LiveTorqueParameters",
+            "LiveParameters"
+          ],
+          "confirm": true,
+          "confirm_text": "Are you sure you want to reset calibration?",
+          "confirm_yes_text": "Reset",
+          "confirm_no_text": "Cancel"
+        }
+      ]
+    },
+
+    {
+      "groupName": "deviceSettingsGroup",
+      "title": "Device Settings",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "selection",
+          "param": "MaxTimeOffroad",
+          "title": "Max Time Offroad",
+          "desc": "Device will automatically shutdown after set time once the engine is turned off. (30h is the default)",
+          "options": [
+            { "name": "Always On", "value": "0" },
+            { "name": "5m", "value": "5" },
+            { "name": "10m", "value": "10" },
+            { "name": "15m", "value": "15" },
+            { "name": "30m", "value": "30" },
+            { "name": "1h", "value": "60" },
+            { "name": "2h", "value": "120" },
+            { "name": "3h", "value": "180" },
+            { "name": "5h", "value": "300" },
+            { "name": "10h", "value": "600" },
+            { "name": "24h", "value": "1440" },
+            { "name": "30h (default)", "value": "1800", "default": true }
+          ]
+        },
+        {
+          "type": "segmented_control",
+          "param": "DeviceBootMode",
+          "title": "Wake-Up Behavior",
+          "desc": "Controls state of the device after boot/sleep.<br><br>⁍ Default: Device will boot/wake-up normally & will be ready to engage.<br>⁍ Offroad: Device will be in Always Offroad mode after boot/wake-up.",
+          "options": [
+            { "name": "Default", "value": "0", "default": true },
+            { "name": "Offroad", "value": "1" }
+          ]
+        }
+      ]
+    },
+    {
+      "groupName": "deviceInfoGroup",
+      "title": "Device/Software Info",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "static_param_display",
+          "param": "DongleId",
+          "title": "Dongle ID",
+          "desc": "",
+          "webSupported": false
+        },
+        {
+          "type": "static_param_display",
+          "param": "HardwareSerial",
+          "title": "Serial",
+          "desc": "",
+          "webSupported": false
+        },
+        {
+          "type": "file_param_display",
+          "file": "../../BPVERSION",
+          "title": "BluePilot Version",
+          "desc": "",
+          "prefix": "v",
+          "webSupported": false
+        },
+        {
+          "type": "file_param_display",
+          "file": "COMMA_VERSION",
+          "title": "Openpilot Version",
+          "desc": "",
+          "webSupported": false
+        }
+      ]
+    },
+    {
+      "groupName": "powerGroup",
+      "title": "Power",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "command_button",
+          "title": "Reboot",
+          "desc": "Reboot the device.",
+          "button_text": "REBOOT",
+          "action": "set_param",
+          "param": "DoReboot",
+          "value": "1",
+          "confirm": true,
+          "confirm_text": "Are you sure you want to reboot?",
+          "confirm_yes_text": "Reboot",
+          "confirm_no_text": "Cancel",
+          "button_style": {
+            "background_color": "#FF8C00",
+            "background_color_pressed": "#FFA500",
+            "text_color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "command_button",
+          "title": "Power Off",
+          "desc": "Power off the device.",
+          "button_text": "POWER OFF",
+          "action": "set_param",
+          "param": "DoShutdown",
+          "value": "1",
+          "confirm": true,
+          "confirm_text": "Are you sure you want to power off?",
+          "confirm_yes_text": "Power Off",
+          "confirm_no_text": "Cancel",
+          "button_style": {
+            "background_color": "#E22C2C",
+            "background_color_pressed": "#FF2424",
+            "text_color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "restart_ui",
+          "title": "Restart Interface",
+          "desc": "Restart the sunnypilot user interface to apply changes or resolve display issues.",
+          "button_text": "RESTART UI",
+          "confirm": true,
+          "confirm_text": "Are you sure you want to restart the user interface?<br><br>The interface will be unavailable for a few seconds.",
+          "confirm_yes_text": "Restart",
+          "confirm_no_text": "Cancel"
+        }
+      ]
+    }
+  ]
+}

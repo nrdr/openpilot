@@ -1,0 +1,350 @@
+{
+  "type": "base",
+  "menuName": "Vehicle",
+  "menuIcon": "../../sunnypilot/selfdrive/assets/offroad/icon_vehicle.svg",
+  "menuDescription": "Vehicle Settings and Platform Selection",
+  "groups": [
+    {
+      "groupName": "platformSelectionGroup",
+      "title": "Platform Selection",
+      "controls": [
+        {
+          "type": "platform_display",
+          "title": "Current Vehicle",
+          "desc": "Shows the active vehicle fingerprint with priority:\n1. BluePilot Ford Vehicle Selector (if set)\n2. SunnyPilot Manual Selection (if set)\n3. Auto-detected from CAN fingerprint\n\n🟢 = Auto-fingerprinted | 🔵 = Manual Selection | 🟡 = Unrecognized",
+          "value_param": "VehiclePlatformDisplay",
+          "value_color": "#0086E9"
+        },
+        {
+          "type": "selection",
+          "param": "FordSelectedVehicleModel",
+          "title": "BluePilot Ford Vehicle Selector",
+          "desc": "Force fingerprint for Ford vehicles to exit Dashcam Mode. This setting has priority over SunnyPilot manual selection.\n\n🔵 Select your specific Ford/Lincoln vehicle model to override automatic detection.",
+          "requiresReboot": false,
+          "options": [
+            {
+              "name": "Auto Detect",
+              "value": ""
+            },
+            {
+              "name": "Ford Bronco Sport (2021-2024)",
+              "value": "FORD_BRONCO_SPORT_MK1"
+            },
+            {
+              "name": "Ford Edge (2019-2024)",
+              "value": "FORD_EDGE_MK2"
+            },
+            {
+              "name": "Ford Escape (2020-2022)",
+              "value": "FORD_ESCAPE_MK4"
+            },
+            {
+              "name": "Ford Escape (2023-2025)",
+              "value": "FORD_ESCAPE_MK4_5"
+            },
+            {
+              "name": "Ford Expedition (2022-2024)",
+              "value": "FORD_EXPEDITION_MK4"
+            },
+            {
+              "name": "Ford Explorer (2020-2024)",
+              "value": "FORD_EXPLORER_MK6"
+            },
+            {
+              "name": "Ford F-150 (2021-2023)",
+              "value": "FORD_F_150_MK14"
+            },
+            {
+              "name": "Ford F-150 Lightning (2022-2025)",
+              "value": "FORD_F_150_LIGHTNING_MK1"
+            },
+            {
+              "name": "Ford Maverick 1st Gen",
+              "value": "FORD_MAVERICK_MK1"
+            },
+            {
+              "name": "Ford Mustang Mach-E (2021-2024)",
+              "value": "FORD_MUSTANG_MACH_E_MK1"
+            },
+            {
+              "name": "Ford Ranger (2023-2024)",
+              "value": "FORD_RANGER_MK2"
+            },
+            {
+              "name": "Lincoln Aviator (2020-2024)",
+              "value": "FORD_EXPLORER_MK6"
+            },
+            {
+              "name": "Lincoln Corsair (2020-2022)",
+              "value": "FORD_ESCAPE_MK4"
+            },
+            {
+              "name": "Lincoln Corsair (2023-2025)",
+              "value": "FORD_ESCAPE_MK4_5"
+            },
+            {
+              "name": "Lincoln Nautilus (2019-2024)",
+              "value": "FORD_EDGE_MK2"
+            },
+            {
+              "name": "Lincoln Navigator (2022-2024)",
+              "value": "FORD_EXPEDITION_MK4"
+            }
+          ]
+        },
+        {
+          "type": "command_button",
+          "title": "Manual Vehicle Selection",
+          "desc": "Search for and manually select your vehicle if automatic fingerprinting fails or you want to override the detected vehicle.",
+          "button_text": "SEARCH",
+          "action": "search_platform"
+        },
+        {
+          "type": "command_button",
+          "title": "Remove Manual Selection",
+          "desc": "Remove the manually selected vehicle (BluePilot or SunnyPilot) and return to automatic fingerprinting.",
+          "button_text": "REMOVE",
+          "action": "remove_platform",
+          "visibleConditions": {
+            "anyConditionsTrue": [
+              { "paramExists": "FordSelectedVehicleModel" },
+              { "paramExists": "CarPlatformBundle" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "hyundaiSettingsGroup",
+      "title": "Hyundai Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "selection",
+          "param": "HyundaiLongitudinalTuning",
+          "title": "Custom Longitudinal Tuning",
+          "desc": "",
+          "dynamic_desc": true,
+          "descriptions": {
+            "off": "This feature provides customized longitudinal control tuning for supported Hyundai/Kia/Genesis vehicles.\n\n<b>Off:</b> Use default longitudinal controls.",
+            "dynamic": "This feature provides customized longitudinal control tuning for supported Hyundai/Kia/Genesis vehicles.\n\n<b>Dynamic:</b> Smooth, dynamic response that adapts to driving conditions.\n• Better for highway cruising\n• More gradual acceleration/deceleration\n• Comfortable for passengers",
+            "predictive": "This feature provides customized longitudinal control tuning for supported Hyundai/Kia/Genesis vehicles.\n\n<b>Predictive:</b> Quick, responsive behavior for city driving.\n• Better for stop-and-go traffic\n• Faster reaction to lead vehicle changes\n• More aggressive acceleration/deceleration",
+            "disabled": "Start the vehicle to check compatibility.\nThis feature requires openpilot longitudinal control to be available."
+          },
+          "description_conditions": {
+            "off": {
+              "paramValueEquals": {
+                "HyundaiLongitudinalTuning": "0"
+              }
+            },
+            "dynamic": {
+              "paramValueEquals": {
+                "HyundaiLongitudinalTuning": "1"
+              }
+            },
+            "predictive": {
+              "paramValueEquals": {
+                "HyundaiLongitudinalTuning": "2"
+              }
+            },
+            "disabled": {
+              "anyConditionsTrue": [
+                { "isOffroad": true },
+                { "hasLongitudinalControl": false }
+              ]
+            }
+          },
+          "options": [
+            {
+              "value": "0",
+              "label": "Off",
+              "default": true
+            },
+            {
+              "value": "1",
+              "label": "Dynamic"
+            },
+            {
+              "value": "2",
+              "label": "Predictive"
+            }
+          ],
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "isOnroad": true },
+              { "hasLongitudinalControl": true }
+            ]
+          },
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "hyundai" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "fordSettingsGroup",
+      "title": "Ford Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "Ford-Specific Controls",
+          "desc": "This section is reserved for Ford-specific vehicle settings. BluePilot provides extensive Ford-specific tuning through other panels (Steering, Cruise, Visuals).\n\nNo additional Ford-specific controls are currently required here.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "ford" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "toyotaSettingsGroup",
+      "title": "Toyota Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "Toyota-Specific Controls",
+          "desc": "This section is reserved for Toyota-specific vehicle settings.\n\nNo Toyota-specific controls are currently defined.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "toyota" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "gmSettingsGroup",
+      "title": "GM Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "GM-Specific Controls",
+          "desc": "This section is reserved for GM-specific vehicle settings.\n\nNo GM-specific controls are currently defined.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "gm" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "hondaSettingsGroup",
+      "title": "Honda Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "Honda-Specific Controls",
+          "desc": "This section is reserved for Honda-specific vehicle settings.\n\nNo Honda-specific controls are currently defined.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "honda" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "chryslerSettingsGroup",
+      "title": "Chrysler Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "Chrysler-Specific Controls",
+          "desc": "This section is reserved for Chrysler-specific vehicle settings.\n\nNo Chrysler-specific controls are currently defined.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "chrysler" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "mazdaSettingsGroup",
+      "title": "Mazda Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "Mazda-Specific Controls",
+          "desc": "This section is reserved for Mazda-specific vehicle settings.\n\nNo Mazda-specific controls are currently defined.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "mazda" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "nissanSettingsGroup",
+      "title": "Nissan Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "Nissan-Specific Controls",
+          "desc": "This section is reserved for Nissan-specific vehicle settings.\n\nNo Nissan-specific controls are currently defined.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "nissan" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "subaruSettingsGroup",
+      "title": "Subaru Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "Subaru-Specific Controls",
+          "desc": "This section is reserved for Subaru-specific vehicle settings.\n\nNo Subaru-specific controls are currently defined.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "subaru" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "volkswagenSettingsGroup",
+      "title": "Volkswagen Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "Volkswagen-Specific Controls",
+          "desc": "This section is reserved for Volkswagen-specific vehicle settings.\n\nNo Volkswagen-specific controls are currently defined.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "volkswagen" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "teslaSettingsGroup",
+      "title": "Tesla Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "Tesla-Specific Controls",
+          "desc": "This section is reserved for Tesla-specific vehicle settings.\n\nNo Tesla-specific controls are currently defined.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "tesla" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "rivianSettingsGroup",
+      "title": "Rivian Settings",
+      "hidden": true,
+      "controls": [
+        {
+          "type": "static_text",
+          "title": "Rivian-Specific Controls",
+          "desc": "This section is reserved for Rivian-specific vehicle settings.\n\nNo Rivian-specific controls are currently defined.",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "brandEquals": "rivian" }]
+          }
+        }
+      ]
+    }
+  ]
+}

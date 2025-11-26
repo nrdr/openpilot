@@ -1,0 +1,316 @@
+{
+  "_comment": "BluePilot Visuals Settings - Merged from SunnyPilot VisualsPanel + existing BP Visuals menu",
+  "menuName": "Visuals",
+  "menuIcon": "../../sunnypilot/selfdrive/assets/offroad/icon_visuals.svg",
+  "menuDescription": "Visual Display Settings",
+  "persistentParams": [],
+  "clearOnManagerStartParams": [],
+  "clearOnOnroadTransitionParams": [],
+  "clearOnOffroadTransitionParams": [],
+  "groups": [
+    {
+      "groupName": "displayPreferencesGroup",
+      "title": "Display Preferences",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "BluepilotShowEnhancedOnroadUI",
+          "title": "Enhanced Onroad UI",
+          "desc": "[BluePilot] Enable enhanced lane lines, road edges, and path rendering with glow effects and curve smoothing."
+        }
+      ]
+    },
+    {
+      "groupName": "pathAndModelGroup",
+      "title": "Path and Model Display",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "selection",
+          "param": "CustomModelPathColor",
+          "title": "Custom Model Path Color",
+          "desc": "[BluePilot] Customize the color of the driving path overlay",
+          "options": [
+            { "name": "Stock", "value": "Stock", "default": true },
+            { "name": "Rainbow", "value": "Rainbow" },
+            { "name": "Blue", "value": "Blue" },
+            { "name": "Green", "value": "Green" },
+            { "name": "Purple", "value": "Purple" },
+            { "name": "Orange", "value": "Orange" },
+            { "name": "Red", "value": "Red" },
+            { "name": "Cyan", "value": "Cyan" },
+            { "name": "Yellow", "value": "Yellow" }
+          ]
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefShowAnimatedWheelAngle",
+          "title": "Show Animated Steer Angle Icon",
+          "desc": "[BluePilot] Animates Comma icon based on steering angle."
+        },
+        {
+          "type": "toggle",
+          "param": "ShowBrakeStatus",
+          "title": "Show Brake Status",
+          "desc": "[BluePilot] Changes the speed color to red when the brake is pressed.<br/>(This setting is only tested on F150s at this time.)"
+        },
+        {
+          "type": "toggle",
+          "param": "BlindSpot",
+          "title": "Show Blind Spot Warnings",
+          "desc": "Enabling this will display warnings when a vehicle is detected in your blind spot as long as your car has BSM supported."
+        },
+        {
+          "type": "toggle",
+          "param": "ShowStopIndicatorOverlay",
+          "title": "Show Stop Indicator Overlay",
+          "desc": "[BluePilot] Displays a stop indicator overlay when it detects a stop point."
+        },
+        {
+          "type": "toggle",
+          "param": "ShowWideCameraAtLowSpeed",
+          "title": "Show Wide Camera at Low Speed",
+          "desc": "[BluePilot] Show the wide camera at low speed.",
+          "conditions": {
+            "git_remote": ["any"]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "RainbowMode",
+          "title": "Enable Tesla Rainbow Mode",
+          "desc": "A beautiful rainbow effect on the path the model wants to take.<br/><i>It <b>does not</b> affect driving in any way.</i>"
+        },
+        {
+          "type": "toggle",
+          "param": "RoadNameToggle",
+          "title": "Display Road Name",
+          "desc": "Displays the name of the road the car is traveling on. The OpenStreetMap database of the location must be downloaded from the OSM panel to fetch the road name."
+        },
+        {
+          "type": "toggle",
+          "param": "TrueVEgoUI",
+          "title": "Speedometer: Always Display True Speed",
+          "desc": "Always display the true vehicle current speed from wheel speed sensors."
+        },
+        {
+          "type": "toggle",
+          "param": "HideVEgoUI",
+          "title": "Speedometer: Hide from Onroad Screen",
+          "desc": "When enabled, the speedometer on the onroad screen is not displayed."
+        },
+        {
+          "type": "toggle",
+          "param": "ShowTurnSignals",
+          "title": "Display Turn Signals",
+          "desc": "When enabled, visual turn indicators are drawn on the HUD."
+        }
+      ]
+    },
+    {
+      "groupName": "radarAndOverlayGroup",
+      "title": "Radar and Overlay Settings",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordPrefShowRadarLeadOverlay",
+          "title": "Show Radar Lead Vehicle Overlay",
+          "desc": "[BluePilot] Displays radar data lead vehicle overlay."
+        },
+        {
+          "type": "segmented_control",
+          "param": "FordPrefRadarOverlaySize",
+          "title": "Radar Lead Vehicle Overlay Size",
+          "desc": "[BluePilot] Adjusts the size of the radar lead vehicle overlay",
+          "options": [
+            { "name": "Small", "value": "1", "default": true },
+            { "name": "Medium", "value": "2" },
+            { "name": "Large", "value": "3" },
+            { "name": "Ex-Large", "value": "4" }
+          ],
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "git_remote": ["any"] },
+              { "git_branch": [] },
+              {
+                "paramIsTrue": "FordPrefShowRadarLeadOverlay",
+                "reason": "Requires Radar Lead Vehicle Overlay to be enabled"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "hybridDataGroup",
+      "title": "Hybrid Vehicle Data",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordPrefHybridDriveOverlay",
+          "title": "Show Hybrid Electric Data Overlays",
+          "desc": "[BluePilot] Displays hybrid electric vehicle data.",
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsTrue": "FordPrefHevDataAvailable",
+                "reason": "Vehicle does not support hybrid electric data"
+              }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefHybridBatteryOverlay",
+          "title": "Show Hybrid Battery Data Overlays",
+          "desc": "[BluePilot] Displays hybrid battery data.",
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsTrue": "FordPrefHybridDriveOverlay",
+                "reason": "Requires Hybrid Electric Data Overlays to be enabled"
+              },
+              {
+                "paramIsTrue": "FordPrefHevDataAvailable",
+                "reason": "Vehicle does not support hybrid electric data"
+              },
+              {
+                "paramIsTrue": "FordPrefHevBattDataAvailable",
+                "reason": "Vehicle does not support hybrid battery data"
+              }
+            ]
+          }
+        },
+        {
+          "type": "segmented_control",
+          "param": "FordPrefHybridDriveGaugeSize",
+          "title": "Hybrid Drive Gauge Size",
+          "desc": "[BluePilot] Adjusts the size of the hybrid drive gauge",
+          "options": [
+            { "name": "Small", "value": "1", "default": true },
+            { "name": "Medium", "value": "2" },
+            { "name": "Large", "value": "3" }
+          ],
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsTrue": "FordPrefHybridDriveOverlay",
+                "reason": "Requires Hybrid Electric Data Overlays to be enabled"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "metersAndTimersGroup",
+      "title": "Meters and Timers",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "ShowGForceMeter",
+          "title": "Show G-Force Meter",
+          "desc": "[BluePilot] Displays a g-force meter when onroad.",
+          "hidden": true,
+          "_comment": "DISABLED: G-Force meter disabled for performance/consistency issues"
+        },
+        {
+          "type": "toggle",
+          "param": "StandstillTimer",
+          "title": "Enable Standstill Timer",
+          "desc": "Show a timer on the HUD when the car is at a standstill."
+        }
+      ]
+    },
+    {
+      "groupName": "alertsAndChimesGroup",
+      "title": "Alerts and Chimes",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "BPUseBluepilotAlerts",
+          "title": "Enable BluePilot Alert UI",
+          "desc": "[BluePilot] Enable BluePilot visual alert design with modern styling, smooth animations, and enhanced readability."
+        },
+        {
+          "type": "toggle",
+          "param": "GreenLightAlert",
+          "title": "Green Traffic Light Alert (Beta)",
+          "desc": "A chime and on-screen alert will play when the traffic light you are waiting for turns green and you have no vehicle in front of you.<br><h4>Note: This chime is only designed as a notification. It is the driver's responsibility to observe their environment and make decisions accordingly.</h4><br>"
+        },
+        {
+          "type": "toggle",
+          "param": "LeadDepartAlert",
+          "title": "Lead Departure Alert (Beta)",
+          "desc": "A chime and on-screen alert will play when you are stopped, and the vehicle in front of you start moving.<br><h4>Note: This chime is only designed as a notification. It is the driver's responsibility to observe their environment and make decisions accordingly.</h4><br>"
+        }
+      ]
+    },
+    {
+      "groupName": "advancedDisplayGroup",
+      "title": "Advanced Display",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "segmented_control",
+          "param": "ChevronInfo",
+          "title": "Display Metrics Below Chevron",
+          "desc": "Display useful metrics below the chevron that tracks the lead car (only applicable to cars with openpilot longitudinal control).",
+          "showDescBottom": true,
+          "options": [
+            { "name": "Off", "value": "0", "default": true },
+            { "name": "Distance", "value": "1" },
+            { "name": "Speed", "value": "2" },
+            { "name": "Time", "value": "3" },
+            { "name": "All", "value": "4" }
+          ],
+          "dynamic_desc": true,
+          "descriptions": {
+            "default": "Display useful metrics below the chevron that tracks the lead car (only applicable to cars with openpilot longitudinal control).",
+            "offroad": "Start the vehicle to check vehicle compatibility.",
+            "noLong": "This feature requires openpilot longitudinal control to be available."
+          },
+          "description_conditions": {
+            "offroad": {
+              "isOffroad": true
+            },
+            "noLong": {
+              "allConditionsTrue": [
+                { "isOnroad": true },
+                { "hasLongitudinalControl": false }
+              ]
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "isOnroad": true,
+                "reason": "Start the vehicle to enable this setting"
+              },
+              {
+                "hasLongitudinalControl": true,
+                "reason": "Requires openpilot longitudinal control"
+              }
+            ]
+          }
+        },
+        {
+          "type": "segmented_control",
+          "param": "DevUIInfo",
+          "title": "Developer UI",
+          "desc": "Display real-time parameters and metrics from various sources.",
+          "options": [
+            { "name": "Off", "value": "0", "default": true },
+            { "name": "Right", "value": "1" },
+            { "name": "Right && Bottom", "value": "2" }
+          ]
+        }
+      ]
+    }
+  ]
+}

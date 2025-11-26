@@ -1,0 +1,109 @@
+{
+  "_comment": "BluePilot Network Settings - WiFi, Tethering, and Cellular management with BP styling",
+  "_implementation_notes": {
+    "wifi_list": "Creates BPWifiListControl widget that contains WifiManager instance",
+    "command_buttons": "Use connect_signal to trigger methods on BPWifiListControl (connectHiddenNetwork, scanNetworks, changeTetheringPassword, editApn)",
+    "wifi_metered": "Custom segmented control that interacts directly with WifiManager via NetworkManager (not param-based)",
+    "signal_connectors": "Search up widget tree to find BPWifiListControl for cross-group communication"
+  },
+  "menuName": "BP Network",
+  "menuIcon": "icon_network.png",
+  "menuDescription": "Network Settings",
+  "persistentParams": [],
+  "clearOnManagerStartParams": [],
+  "clearOnOnroadTransitionParams": [],
+  "clearOnOffroadTransitionParams": [],
+  "groups": [
+    {
+      "groupName": "wifiNetworksGroup",
+      "title": "Available Wi-Fi Networks",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "wifi_list",
+          "title": "Wi-Fi Networks",
+          "desc": "Click a network to connect. Tap FORGET on connected networks to remove them."
+        }
+      ]
+    },
+    {
+      "groupName": "wifiManagementGroup",
+      "title": "Wi-Fi Management",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "command_button",
+          "title": "Hidden Network",
+          "desc": "Connect to a hidden Wi-Fi network by entering SSID",
+          "button_text": "CONNECT",
+          "connect_signal": "connectHiddenNetwork"
+        },
+        {
+          "type": "command_button",
+          "title": "Scan for Networks",
+          "desc": "Manually scan for available Wi-Fi networks",
+          "button_text": "SCAN",
+          "connect_signal": "scanNetworks"
+        },
+        {
+          "_note": "WiFi metered uses a custom segmented control (not param-based)",
+          "type": "wifi_metered",
+          "title": "Wi-Fi Network Metered",
+          "desc": "Prevent large data uploads when on a metered Wi-Fi connection"
+        }
+      ]
+    },
+    {
+      "groupName": "tetheringGroup",
+      "title": "Tethering",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "EnableTethering",
+          "title": "Wi-Fi Tethering",
+          "desc": "Share your internet connection with other devices"
+        },
+        {
+          "type": "command_button",
+          "title": "Tethering Password",
+          "desc": "Change the password for the Wi-Fi hotspot",
+          "button_text": "CHANGE",
+          "connect_signal": "changeTetheringPassword",
+          "visibleConditions": {
+            "allConditionsTrue": [{ "paramIsTrue": "EnableTethering" }]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "cellularGroup",
+      "title": "Cellular Settings",
+      "enableResetButton": false,
+      "conditions": {
+        "hardware_type": ["tici"]
+      },
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "GsmRoaming",
+          "title": "Enable Roaming",
+          "desc": "Allow cellular data when roaming"
+        },
+        {
+          "type": "toggle",
+          "param": "GsmMetered",
+          "title": "Cellular Metered",
+          "desc": "Prevent large uploads on metered connection"
+        },
+        {
+          "type": "command_button",
+          "title": "APN Setting",
+          "desc": "Configure Access Point Name for cellular data",
+          "button_text": "EDIT",
+          "connect_signal": "editApn"
+        }
+      ]
+    }
+  ]
+}

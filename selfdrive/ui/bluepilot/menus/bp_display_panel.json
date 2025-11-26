@@ -1,0 +1,133 @@
+{
+  "type": "base",
+  "menuName": "Display",
+  "menuIcon": "../../sunnypilot/selfdrive/assets/offroad/icon_display.png",
+  "menuDescription": "Display and Screen Settings",
+  "groups": [
+    {
+      "groupName": "screenBrightnessGroup",
+      "title": "Screen Brightness",
+      "controls": [
+        {
+          "type": "segmented_control",
+          "param": "BPUiTextSize",
+          "title": "UI Text Size",
+          "desc": "Controls the size of text in BluePilot menus and controls.<br><br>You will be prompted to restart the UI after changing this setting.",
+          "options": [
+            { "name": "Small", "value": "0" },
+            { "name": "Medium", "value": "1", "default": true },
+            { "name": "Large", "value": "2" }
+          ]
+        },
+        {
+          "type": "toggle",
+          "param": "OnroadScreenOffControl",
+          "title": "Onroad Screen: Reduced Brightness",
+          "desc": "Turn off device screen or reduce brightness after driving starts. It automatically brightens again when screen is touched or a visible alert is displayed."
+        },
+        {
+          "type": "selection",
+          "param": "OnroadScreenOffTimer",
+          "title": "Onroad Brightness Delay",
+          "desc": "Time delay before turning off or dimming the screen during driving.",
+          "options": [
+            { "name": "15 seconds", "value": "15" },
+            { "name": "30 seconds", "value": "30", "default": true },
+            { "name": "1 minute", "value": "60" },
+            { "name": "2 minutes", "value": "120" },
+            { "name": "3 minutes", "value": "180" },
+            { "name": "4 minutes", "value": "240" },
+            { "name": "5 minutes", "value": "300" },
+            { "name": "6 minutes", "value": "360" },
+            { "name": "7 minutes", "value": "420" },
+            { "name": "8 minutes", "value": "480" },
+            { "name": "9 minutes", "value": "540" },
+            { "name": "10 minutes", "value": "600" }
+          ],
+          "visibleConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsTrue": "OnroadScreenOffControl",
+                "reason": "Requires Onroad Screen: Reduced Brightness to be enabled"
+              }
+            ]
+          }
+        },
+        {
+          "type": "selection",
+          "param": "OnroadScreenOffBrightness",
+          "title": "Onroad Brightness",
+          "desc": "Brightness level when screen is dimmed. Set to 0 to turn screen completely off.",
+          "options": [
+            { "name": "Screen Off", "value": "0", "default": true },
+            { "name": "10%", "value": "10" },
+            { "name": "20%", "value": "20" },
+            { "name": "30%", "value": "30" },
+            { "name": "40%", "value": "40" },
+            { "name": "50%", "value": "50" },
+            { "name": "60%", "value": "60" },
+            { "name": "70%", "value": "70" },
+            { "name": "80%", "value": "80" },
+            { "name": "90%", "value": "90" },
+            { "name": "100%", "value": "100" }
+          ],
+          "visibleConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsTrue": "OnroadScreenOffControl",
+                "reason": "Requires Onroad Screen Brightness to be enabled"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "globalSettingsGroup",
+      "title": "Global Settings",
+      "controls": [
+        {
+          "type": "selection",
+          "param": "Brightness",
+          "title": "Global Brightness",
+          "desc": "Overrides the brightness of the device. This applies to both onroad and offroad screens.",
+          "options": [
+            { "name": "Auto (Dark)", "value": "1" },
+            { "name": "Auto", "value": "0", "default": true },
+            { "name": "10%", "value": "10" },
+            { "name": "20%", "value": "20" },
+            { "name": "30%", "value": "30" },
+            { "name": "40%", "value": "40" },
+            { "name": "50%", "value": "50" },
+            { "name": "60%", "value": "60" },
+            { "name": "70%", "value": "70" },
+            { "name": "80%", "value": "80" },
+            { "name": "90%", "value": "90" },
+            { "name": "100%", "value": "100" }
+          ]
+        },
+        {
+          "type": "selection",
+          "param": "InteractivityTimeout",
+          "title": "Interactivity Timeout",
+          "desc": "Apply a custom timeout for settings UI.<br>This is the time after which settings UI closes automatically if user is not interacting with the screen.",
+          "options": [
+            { "name": "Default", "value": "0", "default": true },
+            { "name": "10 seconds", "value": "10" },
+            { "name": "20 seconds", "value": "20" },
+            { "name": "30 seconds", "value": "30" },
+            { "name": "40 seconds", "value": "40" },
+            { "name": "50 seconds", "value": "50" },
+            { "name": "1 minute", "value": "60" },
+            { "name": "1 minute 10 seconds", "value": "70" },
+            { "name": "1 minute 20 seconds", "value": "80" },
+            { "name": "1 minute 30 seconds", "value": "90" },
+            { "name": "1 minute 40 seconds", "value": "100" },
+            { "name": "1 minute 50 seconds", "value": "110" },
+            { "name": "2 minutes", "value": "120" }
+          ]
+        }
+      ]
+    }
+  ]
+}

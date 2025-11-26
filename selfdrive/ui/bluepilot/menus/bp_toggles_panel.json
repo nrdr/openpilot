@@ -1,0 +1,372 @@
+{
+  "_comment": "BluePilot Toggles Panel - Core sunnypilot toggle settings",
+  "menuName": "Toggles",
+  "menuIcon": "../../sunnypilot/selfdrive/assets/offroad/icon_toggle.png",
+  "menuDescription": "Core sunnypilot Settings and Features",
+  "persistentParams": [],
+  "clearOnManagerStartParams": [],
+  "clearOnOnroadTransitionParams": [],
+  "clearOnOffroadTransitionParams": [],
+  "groups": [
+    {
+      "groupName": "systemPreferencesGroup",
+      "title": "System Preferences:",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "selection",
+          "param": "FordSelectedVehicleModel",
+          "title": "Vehicle Model",
+          "desc": "This will force the FINGERPRINT for the vehicle so it exits the Dashcam Mode and allows the vehicle to drive.",
+          "requiresReboot": true,
+          "hidden": true,
+          "options": [
+            {
+              "name": "Auto Detect",
+              "value": ""
+            },
+            {
+              "name": "Ford Bronco Sport (2021-2024)",
+              "value": "FORD_BRONCO_SPORT_MK1"
+            },
+            {
+              "name": "Ford Edge (2019-2024)",
+              "value": "FORD_EDGE_MK2"
+            },
+            {
+              "name": "Lincoln Nautilus (2019-2024)",
+              "value": "FORD_EDGE_MK2"
+            },
+            {
+              "name": "Ford Explorer (2020-2024)",
+              "value": "FORD_EXPLORER_MK6"
+            },
+            {
+              "name": "Lincoln Aviator (2020-2024)",
+              "value": "FORD_EXPLORER_MK6"
+            },
+            {
+              "name": "Ford Escape (2020-2022)",
+              "value": "FORD_ESCAPE_MK4"
+            },
+            {
+              "name": "Lincoln Corsair (2020-2022)",
+              "value": "FORD_ESCAPE_MK4"
+            },
+            {
+              "name": "Ford Escape (2023-2025)",
+              "value": "FORD_ESCAPE_MK4_5"
+            },
+            {
+              "name": "Lincoln Corsair (2023-2025)",
+              "value": "FORD_ESCAPE_MK4_5"
+            },
+            {
+              "name": "Ford F-150 (2021-2023)",
+              "value": "FORD_F_150_MK14"
+            },
+            {
+              "name": "Ford F-150 Lightning (2022-2025)",
+              "value": "FORD_F_150_LIGHTNING_MK1"
+            },
+            {
+              "name": "Ford Expedition (2022-2024)",
+              "value": "FORD_EXPEDITION_MK4"
+            },
+            {
+              "name": "Lincoln Navigator (2022-2024)",
+              "value": "FORD_EXPEDITION_MK4"
+            },
+            {
+              "name": "Ford Mustang Mach-E (2021-2024)",
+              "value": "FORD_MUSTANG_MACH_E_MK1"
+            },
+
+            {
+              "name": "Ford Maverick 1st Gen",
+              "value": "FORD_MAVERICK_MK1"
+            },
+            {
+              "name": "Ford Ranger (2023-2024)",
+              "value": "FORD_RANGER_MK2"
+            }
+          ],
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "coreTogglesGroup",
+      "title": "Core Settings",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "OpenpilotEnabledToggle",
+          "title": "Enable sunnypilot",
+          "desc": "Use the sunnypilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature.",
+          "icon": "../assets/icons/chffr_wheel.png",
+          "needs_restart": true,
+          "dynamic_desc": true,
+          "descriptions": {
+            "default": "Use the sunnypilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature.",
+            "needs_restart": "Use the sunnypilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature. Changing this setting will restart openpilot if the car is powered on."
+          },
+          "description_conditions": {
+            "needs_restart": {
+              "paramNotLocked": "OpenpilotEnabledToggle"
+            }
+          },
+          "enableConditions": {
+            "paramNotLocked": "OpenpilotEnabledToggle",
+            "reason": "Setting is locked"
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "ExperimentalMode",
+          "title": "Experimental Mode",
+          "desc": "openpilot defaults to driving in chill mode. Experimental mode enables alpha-level features that aren't ready for chill mode.",
+          "icon": "../assets/icons/experimental_white.svg",
+          "active_icon": "../assets/icons/experimental.svg",
+          "confirm": true,
+          "confirm_text": "openpilot defaults to driving in <b>chill mode</b>. Experimental mode enables <b>alpha-level features</b> that aren't ready for chill mode. Experimental features are listed below:<br><br><h4>End-to-End Longitudinal Control</h4><br>Let the driving model control the gas and brakes. openpilot will drive as it thinks a human would, including stopping for red lights and stop signs. Since the driving model decides the speed to drive, the set speed will only act as an upper bound. This is an alpha quality feature; mistakes should be expected.<br><h4>New Driving Visualization</h4><br>The driving visualization will transition to the road-facing wide-angle camera at low speeds to better show some turns. The Experimental mode logo will also be shown in the top right corner.",
+          "confirm_yes_text": "Enable",
+          "confirm_no_text": "Cancel",
+          "auto_reset_value": "0",
+          "enableConditions": {
+            "anyConditionsTrue": [
+              {
+                "hasCarParams": false,
+                "reason": "Start the vehicle to enable this setting"
+              },
+              {
+                "hasLongitudinalControl": true,
+                "reason": "Requires longitudinal control"
+              },
+              {
+                "allConditionsTrue": [
+                  {
+                    "hasAlphaLongitudinalAvailable": true,
+                    "reason": "Requires alpha longitudinal to be available"
+                  },
+                  {
+                    "isNotReleaseBranch": true,
+                    "reason": "Only available on development branches"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "DynamicExperimentalControl",
+          "title": "Enable Dynamic Experimental Control",
+          "desc": "Enable toggle to allow the model to determine when to use sunnypilot ACC or sunnypilot End to End Longitudinal.",
+          "icon": "../assets/offroad/icon_blank.png"
+        }
+      ]
+    },
+    {
+      "groupName": "drivingBehaviorGroup",
+      "title": "Driving Behavior",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "DisengageOnAccelerator",
+          "title": "Disengage on Accelerator Pedal",
+          "desc": "When enabled, pressing the accelerator pedal will disengage sunnypilot.",
+          "icon": "../assets/icons/disengage_on_accelerator.svg"
+        },
+        {
+          "type": "segmented_control",
+          "param": "LongitudinalPersonality",
+          "title": "Driving Personality",
+          "desc": "Standard is recommended. In aggressive mode, sunnypilot will follow lead cars closer and be more aggressive with the gas and brake. In relaxed mode sunnypilot will stay further away from lead cars. On supported cars, you can cycle through these personalities with your steering wheel distance button.",
+          "showDescBottom": true,
+          "icon": "../assets/icons/speed_limit.png",
+          "options": [
+            { "name": "Aggressive", "value": "0" },
+            { "name": "Standard", "value": "1", "default": true },
+            { "name": "Relaxed", "value": "2" }
+          ],
+          "dynamic_desc": true,
+          "descriptions": {
+            "default": "Standard is recommended. In aggressive mode, sunnypilot will follow lead cars closer and be more aggressive with the gas and brake. In relaxed mode sunnypilot will stay further away from lead cars. On supported cars, you can cycle through these personalities with your steering wheel distance button.",
+            "no_car": "Please start the vehicle to check compatibility.",
+            "no_longitudinal": "This feature requires longitudinal control to be available."
+          },
+          "description_conditions": {
+            "no_car": {
+              "isOffroad": true,
+              "reason": "Start the vehicle to check compatibility"
+            },
+            "no_longitudinal": {
+              "allConditionsTrue": [
+                { "isOnroad": true },
+                {
+                  "hasLongitudinalControl": false,
+                  "reason": "Requires longitudinal control"
+                }
+              ]
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "isOnroad": true,
+                "reason": "Start the vehicle to enable this setting"
+              },
+              {
+                "hasLongitudinalControl": true,
+                "reason": "Requires longitudinal control"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "safetyGroup",
+      "title": "Safety",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "IsLdwEnabled",
+          "title": "Enable Lane Departure Warnings",
+          "desc": "Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line without a turn signal activated while driving over 31 mph (50 km/h).",
+          "icon": "../assets/icons/warning.png"
+        },
+        {
+          "type": "toggle",
+          "param": "AlwaysOnDM",
+          "title": "Always-On Driver Monitoring",
+          "desc": "Enable driver monitoring even when sunnypilot is not engaged.",
+          "icon": "../assets/icons/monitoring.png"
+        }
+      ]
+    },
+    {
+      "groupName": "clusterPreferencesGroup",
+      "title": "BluePilot Cluster Preferences:",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordPrefSendHandsFreeCanMsg",
+          "title": "Show Hands-Free UI (On Supported Vehicles)",
+          "desc": "[BLUEPILOT] Enables hands-free UI for supported vehicles.",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefLaneDepartCanMsg",
+          "title": "Send Lane Departure Signals to Vehicle",
+          "desc": "[BLUEPILOT] Send Openpilot lane departure signals for native cluster alerts.",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "recordingGroup",
+      "title": "Recording",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "RecordFront",
+          "title": "Record and Upload Driver Camera",
+          "desc": "Upload data from the driver facing camera and help improve the driver monitoring algorithm.",
+          "icon": "../assets/icons/monitoring.png",
+          "needs_restart": true,
+          "dynamic_desc": true,
+          "descriptions": {
+            "default": "Upload data from the driver facing camera and help improve the driver monitoring algorithm.",
+            "needs_restart": "Upload data from the driver facing camera and help improve the driver monitoring algorithm. Changing this setting will restart openpilot if the car is powered on."
+          },
+          "description_conditions": {
+            "needs_restart": {
+              "paramNotLocked": "RecordFront"
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "paramNotLocked": "RecordFront",
+                "reason": "Setting is locked"
+              }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "RecordAudio",
+          "title": "Record and Upload Microphone Audio",
+          "desc": "Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect.",
+          "icon": "../assets/icons/microphone.png",
+          "needs_restart": true,
+          "dynamic_desc": true,
+          "descriptions": {
+            "default": "Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect.",
+            "needs_restart": "Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect. Changing this setting will restart openpilot if the car is powered on."
+          },
+          "description_conditions": {
+            "needs_restart": {
+              "paramNotLocked": "RecordAudio"
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "paramNotLocked": "RecordAudio",
+                "reason": "Setting is locked"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "unitsGroup",
+      "title": "Units",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "IsMetric",
+          "title": "Use Metric System",
+          "desc": "Display speed in km/h instead of mph.",
+          "icon": "../assets/icons/metric.png"
+        }
+      ]
+    },
+    {
+      "groupName": "bluepilotSystemGroup",
+      "title": "BluePilot System",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "DisableGPSAlert",
+          "title": "Disable GPS Alert",
+          "desc": "[BluePilot] Disable the GPS alert. This is useful if you don't want to be alerted when the GPS signal is weak because of how your comma device is mounted.",
+          "hidden": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,377 @@
+{
+  "type": "base",
+  "menuName": "Cruise",
+  "menuIcon": "../assets/icons/speed_limit.png",
+  "menuDescription": "Longitudinal Control and Cruise Settings",
+  "groups": [
+    {
+      "groupName": "cruiseControlGroup",
+      "title": "Cruise Control",
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "IntelligentCruiseButtonManagement",
+          "title": "Intelligent Cruise Button Management (ICBM) (Alpha)",
+          "desc": "When enabled, sunnypilot will attempt to manage the built-in cruise control buttons by emulating button presses for limited longitudinal control.",
+          "icon": "",
+          "confirmation": true,
+          "dynamic_desc": true,
+          "descriptions": {
+            "default": "When enabled, sunnypilot will attempt to manage the built-in cruise control buttons by emulating button presses for limited longitudinal control.",
+            "unavailable_has_long": "Intelligent Cruise Button Management is currently unavailable on this platform. Disable the openpilot Longitudinal Control (alpha) toggle to allow Intelligent Cruise Button Management.",
+            "unavailable_default_long": "Intelligent Cruise Button Management is currently unavailable on this platform. openpilot Longitudinal Control is the default longitudinal control for this platform.",
+            "unavailable_generic": "Intelligent Cruise Button Management is currently unavailable on this platform.",
+            "offroad": "Start the vehicle to check vehicle compatibility."
+          },
+          "description_conditions": {
+            "offroad": {
+              "isOffroad": true
+            },
+            "unavailable_has_long": {
+              "allConditionsTrue": [
+                {
+                  "isOnroad": true
+                },
+                {
+                  "hasIntelligentCruiseButtonManagement": false
+                },
+                {
+                  "hasLongitudinalControl": true
+                },
+                {
+                  "hasAlphaLongitudinalAvailable": true
+                }
+              ]
+            },
+            "unavailable_default_long": {
+              "allConditionsTrue": [
+                {
+                  "isOnroad": true
+                },
+                {
+                  "hasIntelligentCruiseButtonManagement": false
+                },
+                {
+                  "hasLongitudinalControl": true
+                },
+                {
+                  "hasAlphaLongitudinalAvailable": false
+                }
+              ]
+            },
+            "unavailable_generic": {
+              "allConditionsTrue": [
+                {
+                  "isOnroad": true
+                },
+                {
+                  "hasIntelligentCruiseButtonManagement": false
+                }
+              ]
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "isOffroad": true,
+                "reason": "Requires offroad"
+              },
+              {
+                "hasIntelligentCruiseButtonManagement": true,
+                "reason": "Requires ICBM"
+              },
+              {
+                "hasLongitudinalControl": false,
+                "reason": "Requires no openpilot longitudinal control"
+              }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "DynamicExperimentalControl",
+          "title": "Dynamic Experimental Control (DEC)",
+          "desc": "Enable toggle to allow the model to determine when to use sunnypilot ACC or sunnypilot End to End Longitudinal.",
+          "icon": "",
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "hasLongitudinalControl": true,
+                "reason": "Requires openpilot longitudinal control"
+              }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "SmartCruiseControlVision",
+          "title": "Smart Cruise Control - Vision",
+          "desc": "Use vision path predictions to estimate the appropriate speed to drive through turns ahead.",
+          "icon": "",
+          "dynamic_desc": false,
+          "enableConditions": {
+            "anyConditionsTrue": [
+              {
+                "hasLongitudinalControl": true,
+                "reason": "Requires openpilot longitudinal control"
+              },
+              {
+                "hasIntelligentCruiseButtonManagement": true,
+                "reason": "Requires ICBM"
+              }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "SmartCruiseControlMap",
+          "title": "Smart Cruise Control - Map",
+          "desc": "Use map data to estimate the appropriate speed to drive through turns ahead.",
+          "icon": "",
+          "dynamic_desc": false,
+          "enableConditions": {
+            "anyConditionsTrue": [
+              {
+                "hasLongitudinalControl": true,
+                "reason": "Requires openpilot longitudinal control"
+              },
+              {
+                "hasIntelligentCruiseButtonManagement": true,
+                "reason": "Requires ICBM"
+              }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "CustomAccIncrementsEnabled",
+          "title": "Custom ACC Speed Increments",
+          "desc": "Enable custom Short & Long press increments for cruise speed increase/decrease.",
+          "icon": "",
+          "dynamic_desc": true,
+          "descriptions": {
+            "offroad": "Start the vehicle to check vehicle compatibility.",
+            "no_longitudinal": "This feature can only be used with openpilot longitudinal control enabled.",
+            "pcm_cruise_disabled": "This feature is not supported on this platform due to vehicle limitations.",
+            "default": "Enable custom Short & Long press increments for cruise speed increase/decrease."
+          },
+          "description_conditions": {
+            "offroad": {
+              "isOffroad": true
+            },
+            "no_longitudinal": {
+              "allConditionsTrue": [
+                {
+                  "isOnroad": true
+                },
+                {
+                  "hasLongitudinalControl": false
+                },
+                {
+                  "isICBMAvailable": false
+                }
+              ]
+            },
+            "pcm_cruise_disabled": {
+              "allConditionsTrue": [
+                {
+                  "isOnroad": true
+                },
+                {
+                  "anyConditionsTrue": [
+                    {
+                      "hasLongitudinalControl": true
+                    },
+                    {
+                      "hasIntelligentCruiseButtonManagement": true
+                    }
+                  ]
+                },
+                {
+                  "isPcmCruise": true
+                }
+              ]
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "isOnroad": true,
+                "reason": "Requires onroad"
+              },
+              {
+                "anyConditionsTrue": [
+                  {
+                    "allConditionsTrue": [
+                      {
+                        "hasLongitudinalControl": true,
+                        "reason": "Requires openpilot longitudinal control"
+                      },
+                      {
+                        "isPcmCruise": false,
+                        "reason": "Requires PCM cruise disabled"
+                      }
+                    ]
+                  },
+                  {
+                    "hasIntelligentCruiseButtonManagement": true,
+                    "reason": "Requires ICBM"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "speedLimitGroup",
+      "title": "Speed Limit",
+      "controls": [
+        {
+          "type": "segmented_control",
+          "param": "SpeedLimitMode",
+          "title": "Speed Limit",
+          "desc": "",
+          "icon": "",
+          "showDescBottom": true,
+          "options": [
+            {
+              "name": "Off",
+              "value": "0",
+              "desc": "Disables the Speed Limit functions.",
+              "default": true
+            },
+            {
+              "name": "Information",
+              "value": "1",
+              "desc": "Displays the current road's speed limit."
+            },
+            {
+              "name": "Warning",
+              "value": "2",
+              "desc": "Provides a warning when exceeding the current road's speed limit."
+            },
+            {
+              "name": "Assist",
+              "value": "3",
+              "desc": "Adjusts the vehicle's cruise speed based on the current road's speed limit when operating the +/- buttons.",
+              "enableConditions": {
+                "anyConditionsTrue": [
+                  {
+                    "hasLongitudinalControl": true,
+                    "reason": "Requires openpilot longitudinal control"
+                  },
+                  {
+                    "hasIntelligentCruiseButtonManagement": true,
+                    "reason": "Requires ICBM"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "type": "segmented_control",
+          "param": "SpeedLimitPolicy",
+          "title": "Speed Limit Source",
+          "desc": "",
+          "icon": "",
+          "showDescBottom": true,
+          "options": [
+            {
+              "name": "Car\nOnly",
+              "value": "0",
+              "desc": "Use only the car's built-in speed limit data."
+            },
+            {
+              "name": "Map\nOnly",
+              "value": "1",
+              "desc": "Use only map data for speed limit information.",
+              "default": true
+            },
+            {
+              "name": "Car\nFirst",
+              "value": "2",
+              "desc": "Prefer car data, fall back to map if unavailable."
+            },
+            {
+              "name": "Map\nFirst",
+              "value": "3",
+              "desc": "Prefer map data, fall back to car if unavailable."
+            },
+            {
+              "name": "Combined\nData",
+              "value": "4",
+              "desc": "Use both car and map data together."
+            }
+          ]
+        },
+        {
+          "type": "segmented_control",
+          "param": "SpeedLimitOffsetType",
+          "title": "Speed Limit Offset",
+          "desc": "",
+          "icon": "",
+          "showDescBottom": true,
+          "options": [
+            {
+              "name": "None",
+              "value": "0",
+              "desc": "No Offset",
+              "default": true
+            },
+            {
+              "name": "Fixed",
+              "value": "1",
+              "desc": "Adds a fixed offset [Speed Limit + Offset]"
+            },
+            {
+              "name": "Percent",
+              "value": "2",
+              "desc": "Adds a percent offset [Speed Limit + (Offset % Speed Limit)]"
+            }
+          ]
+        },
+        {
+          "type": "integer",
+          "param": "SpeedLimitValueOffset",
+          "title": "Fixed Offset Value",
+          "desc": "Fixed speed offset value in mph/km/h",
+          "min": -30,
+          "max": 30,
+          "increment": 1,
+          "unit": "mph",
+          "visibleConditions": {
+            "allConditionsTrue": [
+              {
+                "paramValueEquals": {
+                  "SpeedLimitOffsetType": "1"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "integer",
+          "param": "SpeedLimitValueOffset",
+          "title": "Percent Offset Value",
+          "desc": "Percent offset value (e.g., 10 = +10%)",
+          "min": -50,
+          "max": 50,
+          "increment": 5,
+          "unit": "%",
+          "visibleConditions": {
+            "allConditionsTrue": [
+              {
+                "paramValueEquals": {
+                  "SpeedLimitOffsetType": "2"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

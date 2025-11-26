@@ -1,0 +1,569 @@
+{
+  "type": "base",
+  "menuName": "Steering",
+  "menuIcon": "../../sunnypilot/selfdrive/assets/offroad/icon_lateral.png",
+  "menuDescription": "Steering and Lateral Control Settings",
+  "groups": [
+    {
+      "groupName": "madsGroup",
+      "title": "MADS (Modular Assistive Driving System)",
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "Mads",
+          "title": "Modular Assistive Driving System (MADS)",
+          "desc": "Enable the beloved MADS feature. Disable toggle to revert back to stock sunnypilot engagement/disengagement.",
+          "icon": "../assets/offroad/icon_blank.png",
+          "confirm": true,
+          "dynamic_desc": true,
+          "descriptions": {
+            "no_car": "Start the vehicle to check compatibility.\n\nEnables independent engagements of Automatic Lane Centering (ALC) and Adaptive Cruise Control (ACC).",
+            "limited_compatibility": "This platform supports limited MADS settings.\n\nEnables independent engagements of Automatic Lane Centering (ALC) and Adaptive Cruise Control (ACC).",
+            "full_compatibility": "This platform supports all MADS settings.\n\nEnables independent engagements of Automatic Lane Centering (ALC) and Adaptive Cruise Control (ACC).",
+            "default": "Enables independent engagements of Automatic Lane Centering (ALC) and Adaptive Cruise Control (ACC)."
+          },
+          "description_conditions": {
+            "no_car": {
+              "hasCarParams": false
+            },
+            "limited_compatibility": {
+              "allConditionsTrue": [
+                { "hasCarParams": true },
+                { "isMadsLimitedBrand": true }
+              ]
+            },
+            "full_compatibility": {
+              "allConditionsTrue": [
+                { "hasCarParams": true },
+                { "isMadsLimitedBrand": false }
+              ]
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "isOffroad": true, "reason": "Requires offroad" }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "MadsMainCruiseAllowed",
+          "title": "Toggle with Main Cruise",
+          "desc": "Note: For vehicles without LFA/LKAS button, disabling this will prevent lateral control engagement.",
+          "icon": "../assets/offroad/icon_blank.png",
+          "dynamic_desc": true,
+          "descriptions": {
+            "no_car": "Start the vehicle to check vehicle compatibility.\n\nNote: For vehicles without LFA/LKAS button, disabling this will prevent lateral control engagement.",
+            "limited_brand": "This feature defaults to OFF, and does not allow selection due to vehicle limitations.\n\nNote: For vehicles without LFA/LKAS button, disabling this will prevent lateral control engagement.",
+            "default": "Note: For vehicles without LFA/LKAS button, disabling this will prevent lateral control engagement."
+          },
+          "description_conditions": {
+            "no_car": {
+              "hasCarParams": false
+            },
+            "limited_brand": {
+              "isMadsLimitedBrand": true
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "isMadsLimitedBrand": false,
+                "reason": "Mads limited brand is not allowed"
+              }
+            ]
+          },
+          "visibleConditions": {
+            "allConditionsTrue": [{ "paramIsTrue": "Mads" }]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "MadsUnifiedEngagementMode",
+          "title": "Unified Engagement Mode (UEM)",
+          "desc": "Engage lateral and longitudinal control with cruise control engagement.\n\nNote: Once lateral control is engaged via UEM, it will remain engaged until it is manually disabled via the MADS button or car shut off.",
+          "icon": "../assets/offroad/icon_blank.png",
+          "dynamic_desc": true,
+          "descriptions": {
+            "no_car": "Start the vehicle to check vehicle compatibility.\n\nEngage lateral and longitudinal control with cruise control engagement.\n\nNote: Once lateral control is engaged via UEM, it will remain engaged until it is manually disabled via the MADS button or car shut off.",
+            "limited_brand": "This feature defaults to ON, and does not allow selection due to vehicle limitations.\n\nEngage lateral and longitudinal control with cruise control engagement.\n\nNote: Once lateral control is engaged via UEM, it will remain engaged until it is manually disabled via the MADS button or car shut off.",
+            "default": "Engage lateral and longitudinal control with cruise control engagement.\n\nNote: Once lateral control is engaged via UEM, it will remain engaged until it is manually disabled via the MADS button or car shut off."
+          },
+          "description_conditions": {
+            "no_car": {
+              "hasCarParams": false
+            },
+            "limited_brand": {
+              "isMadsLimitedBrand": true
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "isMadsLimitedBrand": false,
+                "reason": "Mads limited brand is not allowed"
+              }
+            ]
+          },
+          "visibleConditions": {
+            "allConditionsTrue": [{ "paramIsTrue": "Mads" }]
+          }
+        },
+        {
+          "type": "segmented_control",
+          "param": "MadsSteeringMode",
+          "title": "Steering Mode on Brake Pedal",
+          "desc": "Choose how Automatic Lane Centering (ALC) behaves after the brake pedal is manually pressed in sunnypilot.",
+          "icon": "../assets/offroad/icon_blank.png",
+          "showDescBottom": true,
+          "options": [
+            {
+              "name": "Remain Active",
+              "value": "0",
+              "desc": "Remain Active: ALC will remain active when the brake pedal is pressed."
+            },
+            {
+              "name": "Pause",
+              "value": "1",
+              "desc": "Pause: ALC will pause when the brake pedal is pressed."
+            },
+            {
+              "name": "Disengage",
+              "value": "2",
+              "desc": "Disengage: ALC will disengage when the brake pedal is pressed."
+            }
+          ],
+          "dynamic_desc": true,
+          "descriptions": {
+            "no_car": "Start the vehicle to check vehicle compatibility.\n\nChoose how Automatic Lane Centering (ALC) behaves after the brake pedal is manually pressed in sunnypilot.",
+            "limited_brand": "This platform only supports Disengage mode due to vehicle limitations.\n\nChoose how Automatic Lane Centering (ALC) behaves after the brake pedal is manually pressed in sunnypilot.",
+            "default": "Choose how Automatic Lane Centering (ALC) behaves after the brake pedal is manually pressed in sunnypilot."
+          },
+          "description_conditions": {
+            "no_car": {
+              "hasCarParams": false
+            },
+            "limited_brand": {
+              "isMadsLimitedBrand": true
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsTrue": "Mads",
+                "reason": "Requires MADS to be enabled"
+              },
+              { "isOffroad": true, "reason": "Requires offroad" },
+              {
+                "hasCarParams": true,
+                "reason": "Start the vehicle to enable this setting"
+              },
+              {
+                "isMadsLimitedBrand": false,
+                "reason": "Mads limited brand is not allowed"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "laneChangeGroup",
+      "title": "Lane Change",
+      "controls": [
+        {
+          "type": "selection",
+          "param": "AutoLaneChangeTimer",
+          "title": "Auto Lane Change by Blinker",
+          "desc": "Set a timer to delay the auto lane change operation when the blinker is used. No nudge on the steering wheel is required to auto lane change if a timer is set. Default is Nudge.\n\nPlease use caution when using this feature. Only use the blinker when traffic and road conditions permit.",
+          "icon": "../assets/offroad/icon_blank.png",
+          "options": [
+            { "name": "Off", "value": "-1" },
+            { "name": "Nudge", "value": "0", "default": true },
+            { "name": "Nudgeless", "value": "1" },
+            { "name": "0.5 s", "value": "2" },
+            { "name": "1 s", "value": "3" },
+            { "name": "2 s", "value": "4" },
+            { "name": "3 s", "value": "5" }
+          ]
+        },
+        {
+          "type": "toggle",
+          "param": "AutoLaneChangeBsmDelay",
+          "title": "Auto Lane Change: Delay with Blind Spot",
+          "desc": "Toggle to enable a delay timer for seamless lane changes when blind spot monitoring (BSM) detects a obstructing vehicle, ensuring safe maneuvering.",
+          "icon": "../assets/offroad/icon_blank.png",
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "hasBlindSpotMonitoring": true,
+                "reason": "Requires blind spot monitoring"
+              },
+              {
+                "paramValueGreaterThan": {
+                  "AutoLaneChangeTimer": 0
+                },
+                "reason": "Auto lane change timer must be nudgeless or greater than 0s"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "blinkerPauseGroup",
+      "title": "Blinker Pause Lateral",
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "BlinkerPauseLateralControl",
+          "title": "Pause Lateral Control with Blinker",
+          "desc": "Pause lateral control with blinker when traveling below the desired speed selected.",
+          "icon": "../assets/offroad/icon_blank.png"
+        },
+        {
+          "type": "selection",
+          "param": "BlinkerMinLateralControlSpeed",
+          "title": "Minimum Speed for Blinker Pause",
+          "desc": "Speed below which lateral control will pause when blinker is active",
+          "unit": "mph",
+          "unitMetric": "km/h",
+          "options": [
+            { "name": "0 {unit}", "value": "0" },
+            { "name": "5 {unit}", "value": "5" },
+            { "name": "10 {unit}", "value": "10" },
+            { "name": "15 {unit}", "value": "15" },
+            { "name": "20 {unit}", "value": "20" },
+            { "name": "25 {unit}", "value": "25" },
+            { "name": "30 {unit}", "value": "30" },
+            { "name": "35 {unit}", "value": "35" },
+            { "name": "40 {unit}", "value": "40", "default": true },
+            { "name": "45 {unit}", "value": "45" },
+            { "name": "50 {unit}", "value": "50" },
+            { "name": "55 {unit}", "value": "55" },
+            { "name": "60 {unit}", "value": "60" },
+            { "name": "65 {unit}", "value": "65" },
+            { "name": "70 {unit}", "value": "70" },
+            { "name": "75 {unit}", "value": "75" },
+            { "name": "80 {unit}", "value": "80" }
+          ],
+          "visibleConditions": {
+            "allConditionsTrue": [
+              { "paramIsTrue": "BlinkerPauseLateralControl" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "torqueControlGroup",
+      "title": "Torque Lateral Control",
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "EnforceTorqueControl",
+          "title": "Enforce Torque Lateral Control",
+          "desc": "Enable this to enforce sunnypilot to steer with Torque lateral control.",
+          "icon": "../assets/offroad/icon_blank.png",
+          "dynamic_desc": true,
+          "descriptions": {
+            "angle_steering": "This vehicle uses angle-based steering and cannot use torque control.",
+            "nnlc_active": "Neural Network Lateral Control is enabled. Disable NNLC to use torque control.",
+            "default": "Enable this to enforce sunnypilot to steer with Torque lateral control."
+          },
+          "description_conditions": {
+            "angle_steering": {
+              "isAngleSteering": true
+            },
+            "nnlc_active": {
+              "paramIsTrue": "NeuralNetworkLateralControl"
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "isOffroad": true, "reason": "Requires offroad" },
+              {
+                "isAngleSteering": false,
+                "reason": "Requires angle-based steering"
+              },
+              {
+                "paramIsFalse": "NeuralNetworkLateralControl",
+                "reason": "Requires Neural Network Lateral Control to be disabled"
+              }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "LiveTorqueParamsToggle",
+          "title": "Self-Tune",
+          "desc": "Enables self-tune for Torque lateral control for platforms that do not use Torque lateral control by default.",
+          "icon": "../assets/offroad/icon_blank.png",
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "isOffroad": true, "reason": "Requires offroad" }
+            ]
+          },
+          "visibleConditions": {
+            "allConditionsTrue": [{ "paramIsTrue": "EnforceTorqueControl" }]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "LiveTorqueParamsRelaxedToggle",
+          "title": "Less Restrict Settings for Self-Tune (Beta)",
+          "desc": "Less strict settings when using Self-Tune. This allows torqued to be more forgiving when learning values.",
+          "icon": "../assets/offroad/icon_blank.png",
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "isOffroad": true, "reason": "Requires offroad" }
+            ]
+          },
+          "visibleConditions": {
+            "allConditionsTrue": [
+              { "paramIsTrue": "EnforceTorqueControl" },
+              { "paramIsTrue": "LiveTorqueParamsToggle" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "nnlcGroup",
+      "title": "Neural Network Lateral Control",
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "NeuralNetworkLateralControl",
+          "title": "Neural Network Lateral Control (NNLC)",
+          "desc": "Formerly known as \"NNFF\", this replaces the lateral \"torque\" controller with one using a neural network trained on each car's (actually, each separate EPS firmware) driving data for increased controls accuracy.\n\nReach out to the sunnypilot team in the following channel at the sunnypilot Discord server with feedback, or to provide log data for your car if your car is currently unsupported: #tuning-nnlc",
+          "icon": "../assets/offroad/icon_blank.png",
+          "confirm": true,
+          "dynamic_desc": true,
+          "descriptions": {
+            "check_compatibility": "Start the car to check car compatibility.\n\nFormerly known as \"NNFF\", this replaces the lateral \"torque\" controller with one using a neural network trained on each car's (actually, each separate EPS firmware) driving data for increased controls accuracy.\n\nReach out to the sunnypilot team in the following channel at the sunnypilot Discord server with feedback, or to provide log data for your car if your car is currently unsupported: #tuning-nnlc",
+            "not_available": "NNLC is currently not available on this platform.\n\nThis platform uses angle-based steering and is not compatible with NNLC.",
+            "torque_enforced": "Enforce Torque Lateral Control is enabled. Disable it to use NNLC.\n\nFormerly known as \"NNFF\", this replaces the lateral \"torque\" controller with one using a neural network trained on each car's (actually, each separate EPS firmware) driving data for increased controls accuracy.",
+            "default": "Formerly known as \"NNFF\", this replaces the lateral \"torque\" controller with one using a neural network trained on each car's (actually, each separate EPS firmware) driving data for increased controls accuracy.\n\nReach out to the sunnypilot team in the following channel at the sunnypilot Discord server with feedback, or to provide log data for your car if your car is currently unsupported: #tuning-nnlc"
+          },
+          "description_conditions": {
+            "check_compatibility": {
+              "hasCarParams": false
+            },
+            "not_available": {
+              "allConditionsTrue": [
+                { "hasCarParams": true },
+                { "isAngleSteering": true }
+              ]
+            },
+            "torque_enforced": {
+              "paramIsTrue": "EnforceTorqueControl"
+            }
+          },
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "isOffroad": true, "reason": "Requires offroad" },
+              {
+                "isAngleSteering": false,
+                "reason": "Requires angle-based steering"
+              },
+              {
+                "paramIsFalse": "EnforceTorqueControl",
+                "reason": "Requires enforce torque control to be disabled"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "bluepilotLateralGroup",
+      "title": "BluePilot Lateral Controls",
+      "enableResetButton": true,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordPrefDisableBP_lat_UI",
+          "title": "Disable BluePilot Lateral Controls",
+          "desc": "[BluePilot] Use stock openpilot lateral controls",
+          "hidden": false
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefHumanTurnDetectionEnable",
+          "title": "Enable Human Turn Detection",
+          "desc": "[BluePilot] Reset steering so you don't fight the wheel making manual turns.",
+          "hidden": false,
+          "enableConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsFalse": "FordPrefDisableBP_lat_UI",
+                "reason": "Requires BluePilot Lateral Controls to be enabled"
+              }
+            ]
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningLaneChgFactorHigh",
+          "title": "Lane Change Factor High",
+          "desc": "[BluePilot] Adjust lane change curvature aggressiveness (lower = slower).",
+          "hidden": false,
+          "min": 0.0,
+          "max": 1.0,
+          "increment": 0.05,
+          "division": 100.0,
+          "visibleConditions": {
+            "allConditionsTrue": [
+              { "paramIsFalse": "FordPrefDisableBP_lat_UI" }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordLatTuningTuningCustomProfile",
+          "title": "Use Custom Tuning Profile",
+          "desc": "[BluePilot] Use custom tuning profile for advanced lateral control",
+          "hidden": false,
+          "visibleConditions": {
+            "allConditionsTrue": [
+              { "paramIsFalse": "FordPrefDisableBP_lat_UI" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "curvatureBlendGroup",
+      "title": "Curvature Blend Settings",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "float",
+          "param": "FordLatTuningPCBlendRatio_low_C",
+          "title": "Predicted Curvature Blend Ratio Low",
+          "desc": "[BluePilot] Adjust the blend ratio of predicted curvature in straightaways.",
+          "hidden": false,
+          "min": 0.0,
+          "max": 1.0,
+          "increment": 0.05,
+          "division": 100.0,
+          "visibleConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsFalse": "FordPrefDisableBP_lat_UI"
+              },
+              {
+                "paramIsTrue": "FordLatTuningTuningCustomProfile"
+              }
+            ]
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningPCBlendRatio_high_C",
+          "title": "Predicted Curvature Blend Ratio High",
+          "desc": "[BluePilot] Adjust the blend ratio of predicted curvature in curves.",
+          "hidden": false,
+          "min": 0.0,
+          "max": 1.0,
+          "increment": 0.05,
+          "division": 100.0,
+          "visibleConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsFalse": "FordPrefDisableBP_lat_UI"
+              },
+              {
+                "paramIsTrue": "FordLatTuningTuningCustomProfile"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "lanePositioningGroup",
+      "title": "Lane Positioning",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordLatTuningEnableLanePositioning",
+          "title": "Enable Advanced Lane Positioning",
+          "desc": "[BluePilot] Allows custom lane positioning and lanefull.",
+          "hidden": false,
+          "visibleConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsFalse": "FordPrefDisableBP_lat_UI"
+              }
+            ]
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningCustomPathOffset",
+          "title": "In Lane Offset",
+          "desc": "[BluePilot] Adjusts lane position - left (-) / right (+)",
+          "hidden": false,
+          "min": -0.5,
+          "max": 0.5,
+          "increment": 0.01,
+          "division": 100.0,
+          "visibleConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsTrue": "FordLatTuningEnableLanePositioning"
+              },
+              {
+                "paramIsFalse": "FordPrefDisableBP_lat_UI"
+              }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordLatTuningEnableLanefullMode",
+          "title": "Enable Lane Full Mode",
+          "desc": "[BluePilot] Enable Auto Lanefull Mode similar to legacy SunnyPilot",
+          "hidden": false,
+          "visibleConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsTrue": "FordLatTuningEnableLanePositioning"
+              },
+              {
+                "paramIsFalse": "FordPrefDisableBP_lat_UI"
+              }
+            ]
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningLCPIDGainUI",
+          "title": "Low Curvature PID Gain",
+          "desc": "[BluePilot] Adjust the gain of the PID controller for low curvature",
+          "hidden": false,
+          "min": 0.0,
+          "max": 10.0,
+          "increment": 0.1,
+          "division": 100.0,
+          "visibleConditions": {
+            "allConditionsTrue": [
+              {
+                "paramIsTrue": "FordLatTuningTuningCustomProfile"
+              },
+              {
+                "paramIsTrue": "FordLatTuningEnableLanePositioning"
+              },
+              {
+                "paramIsFalse": "FordPrefDisableBP_lat_UI"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
