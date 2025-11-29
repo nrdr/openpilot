@@ -440,27 +440,44 @@ FrogPilotLongitudinalPanel::FrogPilotLongitudinalPanel(FrogPilotSettingsWindow *
               weatherKeyControl->setVisibleButton(1, true);
             }
           }
-        } else {
+        } else if (id == 1) {
           weatherKeyControl->setValue(tr("Testing..."));
 
-          QString key = QString::fromStdString(params.get("WeatherToken"));
-          QString url = QString("https://api.openweathermap.org/data/2.5/weather?lat=42.4293&lon=-83.9850&appid=%1").arg(key);
+          QString key = QString::fromStdString(params.get("WeatherToken")).trimmed();
+          QString url30 = QString("https://api.openweathermap.org/data/3.0/onecall?lat=42.4293&lon=-83.9850&exclude=current,minutely,hourly,daily,alerts&appid=%1").arg(key);
 
-          QNetworkRequest request(url);
+          QNetworkRequest request(url30);
           QNetworkReply *reply = networkManager->get(request);
-          connect(reply, &QNetworkReply::finished, [=]() {
-            weatherKeyControl->setValue("");
-
-            QString message;
-            if (reply->error() == QNetworkReply::NoError) {
-              message = tr("Key is valid!");
-            } else if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 401) {
-              message = tr("Invalid key!");
-            } else {
-              message = tr("An error occurred: %1").arg(reply->errorString());
-            }
-            ConfirmationDialog::alert(message, this);
+          QObject::connect(reply, &QNetworkReply::finished, this, [=]() {
             reply->deleteLater();
+
+            if (reply->error() == QNetworkReply::NoError) {
+              weatherKeyControl->setValue("");
+              ConfirmationDialog::alert(tr("Key is valid!"), this);
+              return;
+            }
+
+            int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            if (status == 401 || status == 403) {
+              QString url25 = QString("https://api.openweathermap.org/data/2.5/weather?lat=42.4293&lon=-83.9850&appid=%1").arg(key);
+
+              QNetworkRequest request25(url25);
+              QNetworkReply *reply25 = networkManager->get(request25);
+              QObject::connect(reply25, &QNetworkReply::finished, this, [=]() {
+                reply25->deleteLater();
+
+                weatherKeyControl->setValue("");
+                if (reply25->error() == QNetworkReply::NoError) {
+                  ConfirmationDialog::alert(tr("Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the \"One Call API 3.0\" plan!"), this);
+                } else {
+                   int status25 = reply25->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                   ConfirmationDialog::alert(tr("Invalid key! (Error: %1)").arg(status25), this);
+                }
+              });
+            } else {
+              weatherKeyControl->setValue("");
+              ConfirmationDialog::alert(tr("An error occurred: %1").arg(reply->errorString()), this);
+            }
           });
         }
       });

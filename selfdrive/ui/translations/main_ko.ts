@@ -254,8 +254,8 @@
         <translation type="gpt-5-generated">토크 %</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">위험 요소</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">위험 %</translation>
     </message>
 </context>
 <context>
@@ -1556,16 +1556,16 @@
         <translation type="gpt-5-generated">신경망 순전파 (NNFF)</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco의 "Neural Network FeedForward" 모델 컨트롤러로, 차량 데이터로 학습된 더 부드러운 모델 기반 조향을 제공합니다.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco의 "Neural Network FeedForward" 컨트롤러.&lt;/b&gt; 훈련된 신경망 모델을 사용해 차량 속도, 롤, 과거/미래 계획 경로 데이터를 기반으로 조향 토크를 예측하여 더 부드러운 모델 기반 조향을 제공합니다.</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation>부드러운 곡선 핸들링</translation>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">신경망 순전파 (NNFF) 라이트</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;커브에서 조향을 부드럽게 하기 위한 Twilsonco의 토크 기반 조정.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco의 "Neural Network FeedForward" 컨트롤러의 경량 버전입니다.&lt;/b&gt; 전체 모델의 "look-ahead" 계획 측면 저크 로직을 사용해 커브에서 조향 조정을 더 부드럽게 하지만, 토크 계산에 전체 신경망은 사용하지 않습니다.</translation>
     </message>
 </context>
 <context>
@@ -2595,10 +2595,6 @@
         <translation type="gpt-5-generated">제거</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">유효하지 않은 키!</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">키를 정말 제거하시겠습니까?</translation>
     </message>
@@ -2621,6 +2617,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">문자: 0/%1</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">귀하의 키는 버전 2.5에서 유효하지만, 버전 3.0이 강력히 권장됩니다! "One Call API 3.0" 요금제에 가입해 주세요!</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">유효하지 않은 키입니다! (오류: %1)</translation>
     </message>
 </context>
 <context>

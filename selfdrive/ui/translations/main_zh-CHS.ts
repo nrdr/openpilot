@@ -254,8 +254,8 @@
         <translation type="gpt-5-generated">扭矩 %</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">危险因素</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">危险 %</translation>
     </message>
 </context>
 <context>
@@ -1556,16 +1556,16 @@
         <translation type="gpt-5-generated">神经网络前馈（NNFF）</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco 的“Neural Network FeedForward”模型控制器，基于模型的更平顺转向，使用您车辆的数据进行训练。&lt;/b&gt;</translation>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco 的“Neural Network FeedForward”控制器。&lt;/b&gt;使用训练过的神经网络模型，基于车辆速度、横滚以及过去/未来的规划路径数据预测转向扭矩，实现更平顺的基于模型的转向。</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation type="gpt-5-generated">平稳弯道处理</translation>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">神经网络前馈（NNFF）精简版</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco 基于扭矩的调整，用于在弯道中平滑转向。&lt;/b&gt;</translation>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco 的“神经网络前馈”控制器的轻量版。&lt;/b&gt; 使用来自完整模型的“前瞻”规划横向加加速度逻辑，以在弯道中平滑转向调整，但不使用完整神经网络进行扭矩计算。</translation>
     </message>
 </context>
 <context>
@@ -2595,10 +2595,6 @@
         <translation type="gpt-5-generated">移除</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">密钥无效！</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">您确定要移除您的密钥吗？</translation>
     </message>
@@ -2621,6 +2617,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">字符：0/%1</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">您的密钥适用于版本 2.5，但强烈建议使用版本 3.0！请订阅“One Call API 3.0”方案！</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">密钥无效！（错误：%1）</translation>
     </message>
 </context>
 <context>

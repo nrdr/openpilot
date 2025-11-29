@@ -254,8 +254,8 @@
         <translation type="gpt-5-generated">TORK %</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">TEHLİKE FAKTÖRÜ</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">TEHLİKE %</translation>
     </message>
 </context>
 <context>
@@ -1556,16 +1556,16 @@
         <translation type="gpt-5-generated">Sinir Ağı İleri Besleme (NNFF)</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco’nun “Neural Network FeedForward” model denetleyicisi: aracınızın verileriyle eğitilmiş, daha pürüzsüz, modele dayalı direksiyon.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco'nun "Neural Network FeedForward" denetleyicisi.&lt;/b&gt; Daha pürüzsüz, modele dayalı direksiyon için araç hızı, yalpa ve geçmiş/gelecek planlanan yol verilerine göre direksiyon torkunu tahmin etmek üzere eğitilmiş bir sinir ağı modeli kullanır.</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation type="gpt-5-generated">Yumuşak Viraj Yönetimi</translation>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">Sinir Ağı İleri Besleme (NNFF) Lite</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Virajlarda direksiyonu yumuşatmak için Twilsonco’nun torka dayalı ayarlamaları.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco'nun "Neural Network FeedForward" kontrolörünün hafifletilmiş bir sürümü.&lt;/b&gt; Virajlarda direksiyon ayarlamalarını yumuşatmaya yardımcı olmak için tam modeldeki "look-ahead" planlı yanal sarsıntı mantığını kullanır, ancak tork hesaplaması için tam sinir ağını kullanmaz.</translation>
     </message>
 </context>
 <context>
@@ -2595,10 +2595,6 @@
         <translation type="gpt-5-generated">KALDIR</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">Geçersiz anahtar!</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">Anahtarınızı kaldırmak istediğinizden emin misiniz?</translation>
     </message>
@@ -2621,6 +2617,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">Karakterler: 0/%1</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">Anahtarınız sürüm 2.5 için geçerli, ancak sürüm 3.0 şiddetle önerilir! Lütfen "One Call API 3.0" planına abone olun!</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">Geçersiz anahtar! (Hata: %1)</translation>
     </message>
 </context>
 <context>

@@ -254,8 +254,8 @@
         <translation>МОМЕНТ %</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">ФАКТОР НЕБЕЗПЕКИ</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">НЕБЕЗПЕКА %</translation>
     </message>
 </context>
 <context>
@@ -1360,10 +1360,6 @@
         <translation>Нейронна мережа прямого поширення (NNFF)</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation>Плавне керування поворотами</translation>
-    </message>
-    <message>
         <source>Quality of Life</source>
         <translation>Якість життя</translation>
     </message>
@@ -1532,14 +1528,6 @@
         <translation>&lt;b&gt;Коли рухаєтесь зі швидкістю нижче мінімальної швидкості зміни смуги руху з увімкненим поворотником, примушує OpenPilot вважати що ви збираєтесь повернути ліворуч/праворуч.&lt;/b&gt;</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation>&lt;b&gt;Контролер моделі «Neural Network FeedForward» від Twilsonco для більш плавного, кермування від моделі, навченій на даних вашого автомобіля.&lt;/b&gt;</translation>
-    </message>
-    <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation>&lt;b&gt;Регулювання Twilsonco на основі крутного моменту для плавного кермування у вигинах шляху.&lt;/b&gt;</translation>
-    </message>
-    <message>
         <source>&lt;b&gt;Steering control changes to fine-tune how openpilot drives.&lt;/b&gt;</source>
         <translation>&lt;b&gt;Зміни в кермуванні для точного підлаштування роботи openpilot.&lt;/b&gt;</translation>
     </message>
@@ -1566,6 +1554,18 @@
     <message>
         <source>Reset &lt;b&gt;Steer Ratio&lt;/b&gt; to its default value?</source>
         <translation>Скинути &lt;b&gt;Коеф. кермув.&lt;/b&gt; до значення за замовчуванням?</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Контролер Twilsonco "Neural Network FeedForward".&lt;/b&gt; Використовує навчлену модель нейронної мережі для прогнозування крутного моменту керма на основі швидкості автомобіля, крену та даних про запланований шлях у минулому/майбутньому для плавнішого, модельного кермування.</translation>
+    </message>
+    <message>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">Полегшена пряма передача нейромережі (NNFF)</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Легка версія контролера Twilsonco "Neural Network FeedForward".&lt;/b&gt; Використовує логіку запланованого латерального ривка з випередженням з повної моделі, щоб згладжувати коригування кермування в поворотах, але не використовує повну нейромережу для розрахунку крутного моменту.</translation>
     </message>
 </context>
 <context>
@@ -2595,10 +2595,6 @@
         <translation type="gpt-5-generated">ВИДАЛИТИ</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">Недійсний ключ!</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">Ви впевнені, що хочете видалити свій ключ?</translation>
     </message>
@@ -2621,6 +2617,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">Символи: 0/%1</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">Ваш ключ дійсний для версії 2.5, але версію 3.0 настійно рекомендовано! Будь ласка, оформіть підписку на план "One Call API 3.0"!</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">Неприпустимий ключ! (Помилка: %1)</translation>
     </message>
 </context>
 <context>

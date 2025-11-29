@@ -254,8 +254,8 @@
         <translation type="gpt-5-generated">แรงบิด %</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">ปัจจัยอันตราย</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">อันตราย %</translation>
     </message>
 </context>
 <context>
@@ -1556,16 +1556,16 @@
         <translation type="gpt-5-generated">การป้อนเดินหน้าเครือข่ายประสาท (NNFF)</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;คอนโทรลเลอร์โมเดล "Neural Network FeedForward" ของ Twilsonco สำหรับการบังคับเลี้ยวที่นุ่มนวลยิ่งขึ้นแบบอิงโมเดล โดยฝึกด้วยข้อมูลจากรถของคุณ&lt;/b&gt;</translation>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;ตัวควบคุม "Neural Network FeedForward" ของ Twilsonco&lt;/b&gt; ใช้แบบจำลองเครือข่ายประสาทที่ผ่านการฝึกเพื่อทำนายแรงบิดพวงมาลัยโดยอิงจากความเร็วรถ ม้วนตัวรถ และข้อมูลเส้นทางที่วางแผนไว้ทั้งในอดีต/อนาคต เพื่อการบังคับเลี้ยวที่ราบรื่นและอิงแบบจำลองมากขึ้น</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation type="gpt-5-generated">การควบคุมโค้งอย่างราบรื่น</translation>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">เครือข่ายประสาทป้อนหน้า (NNFF) รุ่น Lite</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;การปรับตามแรงบิดของ Twilsonco เพื่อทำให้การบังคับเลี้ยวในโค้งนุ่มนวลขึ้น&lt;/b&gt;</translation>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;เวอร์ชันน้ำหนักเบาของคอนโทรลเลอร์ "Neural Network FeedForward" ของ Twilsonco&lt;/b&gt; ใช้ตรรกะแรงกระตุกด้านข้างแบบ "มองล่วงหน้า" จากโมเดลฉบับเต็มเพื่อช่วยให้การปรับพวงมาลัยในโค้งราบรื่นขึ้น แต่ไม่ใช้โครงข่ายประสาทเต็มรูปแบบสำหรับการคำนวณแรงบิด</translation>
     </message>
 </context>
 <context>
@@ -2595,10 +2595,6 @@
         <translation type="gpt-5-generated">เอาออก</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">คีย์ไม่ถูกต้อง!</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">คุณแน่ใจหรือไม่ว่าต้องการลบกุญแจของคุณ?</translation>
     </message>
@@ -2621,6 +2617,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">อักขระ: 0/%1</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">คีย์ของคุณใช้ได้กับเวอร์ชัน 2.5 แต่เวอร์ชัน 3.0 ได้รับคำแนะนำอย่างยิ่ง! โปรดสมัครแผน "One Call API 3.0"!</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">คีย์ไม่ถูกต้อง! (ข้อผิดพลาด: %1)</translation>
     </message>
 </context>
 <context>

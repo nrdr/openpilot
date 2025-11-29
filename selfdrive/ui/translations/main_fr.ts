@@ -254,8 +254,8 @@
         <translation type="gpt-5-generated">COUPLE %</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">FACTEUR DE DANGER</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">DANGER %</translation>
     </message>
 </context>
 <context>
@@ -1556,16 +1556,16 @@
         <translation type="gpt-5-generated">Propagation avant du réseau neuronal (NNFF)</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Contrôleur de modèle « Neural Network FeedForward » de Twilsonco pour une direction plus fluide, basée sur le modèle et entraînée sur les données de votre véhicule.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Contrôleur « Neural Network FeedForward » de Twilsonco.&lt;/b&gt; Utilise un modèle de réseau neuronal entraîné pour prédire le couple de direction en fonction de la vitesse du véhicule, du roulis et des données de trajectoire planifiée passées/futures, afin d’obtenir une direction plus fluide basée sur le modèle.</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation type="gpt-5-generated">Gestion fluide des virages</translation>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">Propagation avant réseau neuronal (NNFF) Lite</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Ajustements basés sur le couple de Twilsonco pour adoucir la direction dans les virages.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Une version légère du contrôleur « Neural Network FeedForward » de Twilsonco.&lt;/b&gt; Utilise la logique de saccade latérale « look-ahead » planifiée du modèle complet pour aider à lisser les ajustements de direction dans les virages, mais n’utilise pas le réseau neuronal complet pour le calcul du couple.</translation>
     </message>
 </context>
 <context>
@@ -2595,10 +2595,6 @@
         <translation type="gpt-5-generated">RETIRER</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">Clé invalide !</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">Êtes-vous sûr de vouloir supprimer votre clé ?</translation>
     </message>
@@ -2621,6 +2617,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">Caractères : 0/%1</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">Votre clé est valide pour la version 2.5, mais la version 3.0 est fortement recommandée ! Veuillez vous abonner au plan « One Call API 3.0 » !</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">Clé invalide ! (Erreur : %1)</translation>
     </message>
 </context>
 <context>

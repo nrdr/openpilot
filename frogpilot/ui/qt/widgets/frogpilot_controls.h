@@ -16,7 +16,7 @@
 bool useKonikServer();
 
 void loadGif(const QString &gifPath, QSharedPointer<QMovie> &movie, const QSize &size, QWidget *parent);
-void loadImage(const QString &basePath, QPixmap &pixmap, QSharedPointer<QMovie> &movie, const QSize &size, QWidget *parent, Qt::AspectRatioMode aspectRatioMode = Qt::KeepAspectRatio);
+void loadImage(const QString &basePath, QPixmap &pixmap, QSharedPointer<QMovie> &movie, const QSize &size, QWidget *parent);
 void openDescriptions(bool forceOpenDescriptions, std::map<QString, AbstractControl*> toggles);
 void updateFrogPilotToggles();
 

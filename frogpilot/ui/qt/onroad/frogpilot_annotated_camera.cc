@@ -26,6 +26,7 @@ FrogPilotAnnotatedCameraWidget::FrogPilotAnnotatedCameraWidget(QWidget *parent) 
   loadGif("../../frogpilot/assets/other_images/experimental_mode_icon.gif", experimentalModeIcon, QSize(btn_size / 2, btn_size / 2), this);
   loadGif("../../frogpilot/assets/other_images/weather_clear_day.gif", weatherClearDay, QSize(btn_size / 2, btn_size / 2), this);
   loadGif("../../frogpilot/assets/other_images/weather_clear_night.gif", weatherClearNight, QSize(btn_size / 2, btn_size / 2), this);
+  loadGif("../../frogpilot/assets/other_images/weather_low_visibility.gif", weatherLowVisibility, QSize(btn_size / 2, btn_size / 2), this);
   loadGif("../../frogpilot/assets/other_images/weather_rain.gif", weatherRain, QSize(btn_size / 2, btn_size / 2), this);
   loadGif("../../frogpilot/assets/other_images/weather_snow.gif", weatherSnow, QSize(btn_size / 2, btn_size / 2), this);
 
@@ -1016,6 +1017,8 @@ void FrogPilotAnnotatedCameraWidget::paintWeather(QPainter &p, const cereal::Fro
     icon = weatherRain;
   } else if (weatherId >= 600 && weatherId <= 622) {
     icon = weatherSnow;
+  } else if (weatherId >= 701 && weatherId <= 762) {
+    icon = weatherLowVisibility;
   } else if (weatherId == 800) {
     icon = frogpilotPlan.getWeatherDaytime() ? weatherClearDay : weatherClearNight;
   }

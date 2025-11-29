@@ -17,37 +17,42 @@ bool useKonikServer() {
   return use_konik;
 }
 
-void loadGif(const QString &gifPath, QSharedPointer<QMovie> &movie, const QSize &size, QWidget *parent) {
-  if (!movie.isNull()) {
-    QObject::disconnect(movie.data(), nullptr, parent, nullptr);
+void clearMovie(QSharedPointer<QMovie> &movie, QWidget *parent) {
+  if (movie) {
+    QObject::disconnect(movie.data(), &QMovie::frameChanged, parent, nullptr);
     movie->stop();
-    movie.clear();
+    movie.reset();
   }
+}
+
+void loadGif(const QString &gifPath, QSharedPointer<QMovie> &movie, const QSize &size, QWidget *parent) {
+  clearMovie(movie, parent);
+
+  movie = QSharedPointer<QMovie>::create(gifPath, QByteArray(), parent);
+  movie->setCacheMode(QMovie::CacheAll);
+  movie->setScaledSize(size);
+
+  QObject::connect(movie.data(), &QMovie::frameChanged, parent, [parent]() {
+    if (parent->isVisible()) {
+      parent->update();
+    }
+  }, Qt::UniqueConnection);
+
+  movie->start();
+}
+
+void loadImage(const QString &basePath, QPixmap &pixmap, QSharedPointer<QMovie> &movie, const QSize &size, QWidget *parent) {
+  const QString gifPath = basePath + ".gif";
 
   if (QFileInfo::exists(gifPath)) {
-    movie = QSharedPointer<QMovie>::create(gifPath, QByteArray(), parent);
-    movie->setCacheMode(QMovie::CacheAll);
-    movie->setScaledSize(size);
-    QObject::connect(movie.data(), &QMovie::frameChanged, parent, [parent](int) { parent->update(); }, Qt::UniqueConnection);
-    movie->start();
+    pixmap = QPixmap();
+    loadGif(gifPath, movie, size, parent);
+  } else {
+    clearMovie(movie, parent);
+    pixmap = QPixmap(basePath + ".png").scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
   }
 
   parent->update();
-}
-
-void loadImage(const QString &basePath, QPixmap &pixmap, QSharedPointer<QMovie> &movie, const QSize &size, QWidget *parent, Qt::AspectRatioMode aspectRatioMode) {
-  QString gifPath = basePath + ".gif";
-  if (QFileInfo::exists(gifPath)) {
-    loadGif(gifPath, movie, size, parent);
-  } else {
-    if (!movie.isNull()) {
-      QObject::disconnect(movie.data(), nullptr, parent, nullptr);
-      movie->stop();
-      movie.clear();
-    }
-    pixmap = QPixmap(basePath + ".png").scaled(size, aspectRatioMode, Qt::SmoothTransformation);
-    parent->update();
-  }
 }
 
 void openDescriptions(bool forceOpenDescriptions, std::map<QString, AbstractControl*> toggles) {

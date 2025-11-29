@@ -126,6 +126,7 @@ private:
   QSharedPointer<QMovie> experimentalModeIcon;
   QSharedPointer<QMovie> weatherClearDay;
   QSharedPointer<QMovie> weatherClearNight;
+  QSharedPointer<QMovie> weatherLowVisibility;
   QSharedPointer<QMovie> weatherRain;
   QSharedPointer<QMovie> weatherSnow;
 

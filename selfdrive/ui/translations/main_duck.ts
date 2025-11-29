@@ -254,8 +254,8 @@
         <translation type="gpt-5-generated">Quack! TORQUE % — waddle-whoosh!</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">QUACK DANGER FACTOR WADDLE!</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">Quack! DANGER % — waddle careful!</translation>
     </message>
 </context>
 <context>
@@ -1558,16 +1558,16 @@
         <translation type="gpt-5-generated">Quack-quack Neural Network Feedforward (NNFF), waddle on!</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Quack! Twilsonco’s “Neural Network FeedForward” model quacks you smoother, model-based steering, waddled on your vehicle’s own data.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Quack! Twilsonco’s “Neural Network FeedForward” controller.&lt;/b&gt; Waddle on a trained neural net to quack out steering torque from speed, roll, and past/future path crumbs for smoother, model-based steering—quack!</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation type="gpt-5-generated">Quack-Smooth Waddle Curve Handling</translation>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">Quack! Neural Network Feedforward (NNFF) Lite—waddle-speed mode!</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Quack! Twilsonco’s torque tweaks to smooth out steering in curves, waddle-waddle.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Quack! A feather-light take on Twilsonco’s “Neural Network FeedForward” controller.&lt;/b&gt; Waddle-waddle: it uses the “look-ahead” planned lateral jerk logic from the full model to smooth steering in curves, but skips the full neural network for torque quack-culation.</translation>
     </message>
 </context>
 <context>
@@ -2597,10 +2597,6 @@
         <translation type="gpt-5-generated">Quack! REMOVE!</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">Quack! Invalid key, squawk!</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">Quack! You sure you want to pluck out your key? Waddle yes or no?</translation>
     </message>
@@ -2623,6 +2619,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">Quack-acters: 0/%1</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">Quack! Your key fits version 2.5, but version 3.0 is the top duck pick! Waddle on over and subscribe to the "One Call API 3.0" plan!</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">Quack! Invalid key! (Error: %1)</translation>
     </message>
 </context>
 <context>

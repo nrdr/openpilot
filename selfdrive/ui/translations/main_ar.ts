@@ -254,8 +254,8 @@
         <translation type="gpt-5-generated">عزم</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">عامل الخطر</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">خطر %</translation>
     </message>
 </context>
 <context>
@@ -1556,16 +1556,16 @@
         <translation type="gpt-5-generated">التغذية الأمامية للشبكة العصبية (NNFF)</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;وحدة تحكم نموذج Twilsonco "Neural Network FeedForward" لتوجيه أكثر سلاسة قائم على النموذج، مُدرَّبة على بيانات مركبتك.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;وحدة التحكم «Neural Network FeedForward» الخاصة بـ Twilsonco.&lt;/b&gt; تستخدم نموذج شبكة عصبية مدرّبة للتنبؤ بعزم التوجيه بناءً على سرعة المركبة، والميل، وبيانات المسار المخططة السابقة/اللاحقة لقيادة أكثر سلاسة قائمة على النموذج.</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation type="gpt-5-generated">التعامل السلس مع المنحنيات</translation>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">التغذية الأمامية للشبكة العصبية (NNFF) لايت</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;تعديلات Twilsonco المعتمدة على العزم لتنعيم التوجيه في المنعطفات.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;إصدار خفيف من متحكم Twilsonco "Neural Network FeedForward".&lt;/b&gt; يستخدم منطق التسارع الجانبي المتوقع "look-ahead" من النموذج الكامل للمساعدة في تنعيم تعديلات التوجيه في المنحنيات، لكنه لا يستخدم شبكة عصبية كاملة لحساب العزم.</translation>
     </message>
 </context>
 <context>
@@ -2595,10 +2595,6 @@
         <translation type="gpt-5-generated">إزالة</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">مفتاح غير صالح!</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">هل أنت متأكد أنك تريد إزالة مفتاحك؟</translation>
     </message>
@@ -2621,6 +2617,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">عدد الأحرف: 0/%1</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">مفتاحك صالح للإصدار 2.5، لكن الإصدار 3.0 موصى به بشدة! يُرجى الاشتراك في خطة "One Call API 3.0"!</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">مفتاح غير صالح! (خطأ: %1)</translation>
     </message>
 </context>
 <context>

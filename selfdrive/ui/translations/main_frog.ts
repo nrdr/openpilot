@@ -254,8 +254,8 @@
         <translation type="gpt-5-generated">Ribbit TORQUE % croak</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">RIBBIT DANGER FACTOR CROAK</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">DANGER % — ribbit!</translation>
     </message>
 </context>
 <context>
@@ -1556,16 +1556,16 @@
         <translation type="gpt-5-generated">Ribbit Neural Network Feedforward (NNFF) croak</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Ribbit! Twilsonco’s "Neural Network FeedForward" model controller for smoother, model-based steering, trained on your vehicle’s data. Croak.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Ribbit! Twilsonco’s “Neural Network FeedForward” controller.&lt;/b&gt; Croak! Uses a trained neural network to guess steering torque from vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation type="gpt-5-generated">Ribbit-smooth curve handling, croak!</translation>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">Ribbit Neural Network Feedforward (NNFF) Lite, croak!</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Ribbit! Twilsonco’s torque tweaks smooth steering through curves, croak.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Ribbit! A lightweight tadpole of Twilsonco’s “Neural Network FeedForward” controller.&lt;/b&gt; Croak! Uses the “look-ahead” planned lateral jerk logic from the full model to smooth steering in curves, but skips the full neural network for torque calculation.</translation>
     </message>
 </context>
 <context>
@@ -2595,10 +2595,6 @@
         <translation type="gpt-5-generated">Ribbit! REMOVE</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">Ribbit! Bad key, croak!</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">Ribbit! You sure you want to toss your key in the pond? Croak?</translation>
     </message>
@@ -2621,6 +2617,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">Ribbit: 0/%1 croak</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">Ribbit! Your key fits version 2.5, croak, but version 3.0 is best for big leaps! Please subscribe to the "One Call API 3.0" plan!</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">Croak! Bad key! (Error: %1)</translation>
     </message>
 </context>
 <context>

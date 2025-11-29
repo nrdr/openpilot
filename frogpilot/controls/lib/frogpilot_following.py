@@ -82,6 +82,7 @@ class FrogPilotFollowing:
       accelerating_offset = float(np.clip(STOP_DISTANCE - v_ego, 1, distance_factor))
 
       self.acceleration_jerk /= accelerating_offset
+      self.danger_factor -= ((v_lead - v_ego) / 100)
       self.speed_jerk /= accelerating_offset
       self.t_follow /= accelerating_offset
 
@@ -90,10 +91,9 @@ class FrogPilotFollowing:
       distance_factor = max(lead_distance - (v_lead * self.t_follow), 1)
       braking_offset = float(np.clip(min(v_ego - v_lead, v_lead) - COMFORT_BRAKE, 1, distance_factor))
 
-      self.danger_factor += (braking_offset / 100)
-
       if lead_distance >= 100:
         far_lead_offset = max(lead_distance - (v_ego * self.t_follow) - STOP_DISTANCE, 0)
         braking_offset += far_lead_offset
 
+      self.danger_factor += ((v_ego - v_lead) / 100)
       self.t_follow /= braking_offset

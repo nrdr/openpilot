@@ -151,7 +151,8 @@ class WeatherChecker:
         try:
           self.api_3_calls += 1
           response = self.session.get("https://api.openweathermap.org/data/3.0/onecall", params=params, timeout=10)
-          if response.status_code == 429:
+
+          if response.status_code in (401, 403, 429):
             fallback_params = params.copy()
             fallback_params.pop("exclude", None)
             self.api_25_calls += 1

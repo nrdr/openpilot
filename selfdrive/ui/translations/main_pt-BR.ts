@@ -254,8 +254,8 @@
         <translation type="gpt-5-generated">TORQUE %</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">FATOR DE PERIGO</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">PERIGO %</translation>
     </message>
 </context>
 <context>
@@ -1556,16 +1556,16 @@
         <translation type="gpt-5-generated">Propagação Direta da Rede Neural (NNFF)</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Controlador de modelo "Neural Network FeedForward" de Twilsonco para direção mais suave, baseada em modelo, treinado com os dados do seu veículo.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Controlador "Neural Network FeedForward" de Twilsonco.&lt;/b&gt; Usa um modelo de rede neural treinado para prever o torque de direção com base na velocidade do veículo, rolagem e dados de trajetória planejada passados/futuros para uma direção mais suave, baseada em modelo.</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation type="gpt-5-generated">Manuseio Suave de Curvas</translation>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">Propagação Direta de Rede Neural (NNFF) Lite</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Ajustes baseados em torque do Twilsonco para suavizar a direção em curvas.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Uma versão leve do controlador "Neural Network FeedForward" de Twilsonco.&lt;/b&gt; Usa a lógica de "look-ahead" de aceleração lateral planejada do modelo completo para ajudar a suavizar os ajustes de direção em curvas, mas não usa a rede neural completa para o cálculo de torque.</translation>
     </message>
 </context>
 <context>
@@ -2595,10 +2595,6 @@
         <translation type="gpt-5-generated">REMOVER</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">Chave inválida!</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">Tem certeza de que deseja remover sua chave?</translation>
     </message>
@@ -2621,6 +2617,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">Caracteres: 0/%1</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">Sua chave é válida para a versão 2.5, mas a versão 3.0 é altamente recomendada! Assine o plano "One Call API 3.0"!</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">Chave inválida! (Erro: %1)</translation>
     </message>
 </context>
 <context>

@@ -255,8 +255,8 @@
         <translation type="gpt-5-generated">TORQUE %</translation>
     </message>
     <message>
-        <source>DANGER FACTOR</source>
-        <translation type="gpt-5-generated">DANGER FACTOR</translation>
+        <source>DANGER %</source>
+        <translation type="gpt-5-generated">DANGER %</translation>
     </message>
 </context>
 <context>
@@ -1557,16 +1557,16 @@
         <translation type="gpt-5-generated">Neural Network Feedforward (NNFF)</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" model controller for smoother, model-based steering trained on your vehicle's data.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco "Neural Network FeedForward" model brain make steer smooth. It learn from your car data.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses a trained neural network model to predict steering torque based on vehicle speed, roll, and past/future planned path data for smoother, model-based steering.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco "Neural Network FeedForward" controller.&lt;/b&gt; Use trained brain net. It guess steer torque from car speed, roll, and past/future path. Make steer smooth. Model brain steer.</translation>
     </message>
     <message>
-        <source>Smooth Curve Handling</source>
-        <translation type="gpt-5-generated">Smooth Curve Handle</translation>
+        <source>Neural Network Feedforward (NNFF) Lite</source>
+        <translation type="gpt-5-generated">Neural Network Feedforward (NNFF) Lite go fast, no heavy brain</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Twilsonco's torque-based adjustments to smoothen out steering in curves.&lt;/b&gt;</source>
-        <translation type="gpt-5-generated">&lt;b&gt;Twilsonco make torque tweak. Steering smooth in curve.&lt;/b&gt;</translation>
+        <source>&lt;b&gt;A lightweight version of Twilsonco's "Neural Network FeedForward" controller.&lt;/b&gt; Uses the "look-ahead" planned lateral jerk logic from the full model to help smoothen steering adjustments in curves, but does not use the full neural network for torque calculation.</source>
+        <translation type="gpt-5-generated">&lt;b&gt;Light version of Twilsonco "Neural Network FeedForward" controller.&lt;/b&gt; Use "look-ahead" plan lateral jerk from big model. Make steer smooth in curve. No use full neural net for torque math.</translation>
     </message>
 </context>
 <context>
@@ -2597,10 +2597,6 @@
         <translation type="gpt-5-generated">REMOVE</translation>
     </message>
     <message>
-        <source>Invalid key!</source>
-        <translation type="gpt-5-generated">Key bad!</translation>
-    </message>
-    <message>
         <source>Are you sure you want to remove your key?</source>
         <translation type="gpt-5-generated">You sure want remove key?</translation>
     </message>
@@ -2623,6 +2619,14 @@
     <message>
         <source>Characters: 0/%1</source>
         <translation type="gpt-5-generated">Marks: 0/%1</translation>
+    </message>
+    <message>
+        <source>Your key is valid for version 2.5, but version 3.0 is highly recommended! Please subscribe to the "One Call API 3.0" plan!</source>
+        <translation type="gpt-5-generated">Your key good for version 2.5, but version 3.0 much better. You subscribe to "One Call API 3.0" plan now.</translation>
+    </message>
+    <message>
+        <source>Invalid key! (Error: %1)</source>
+        <translation type="gpt-5-generated">Bad key! (Error: %1)</translation>
     </message>
 </context>
 <context>
