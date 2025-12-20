@@ -385,6 +385,13 @@ int set_safety_hooks(uint16_t mode, uint16_t param) {
       current_safety_config.rx_checks[j].status = (RxStatus){0};
     }
   }
+
+  // FrogPilot variables
+  lkas_on = false;
+  lkas_pressed_prev = false;
+
+  cruise_main_prev = 0;
+
   return set_status;
 }
 

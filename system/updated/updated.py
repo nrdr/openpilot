@@ -180,7 +180,7 @@ def init_overlay() -> None:
   cloudlog.info(f"git diff output:\n{git_diff}")
 
 
-def finalize_update(params) -> None:
+def finalize_update() -> None:
   """Take the current OverlayFS merged view and finalize a copy outside of
   OverlayFS, ready to be swapped-in at BASEDIR. Copy using shutil.copytree"""
 
@@ -196,15 +196,14 @@ def finalize_update(params) -> None:
   run(["git", "reset", "--hard"], FINALIZED)
   run(["git", "submodule", "foreach", "--recursive", "git", "reset", "--hard"], FINALIZED)
 
-  if params.get_bool("IsOffroad"):
-    cloudlog.info("Starting git cleanup in finalized update")
-    t = time.monotonic()
-    try:
-      run(["git", "gc"], FINALIZED)
-      run(["git", "lfs", "prune"], FINALIZED)
-      cloudlog.event("Done git cleanup", duration=time.monotonic() - t)
-    except subprocess.CalledProcessError:
-      cloudlog.exception(f"Failed git cleanup, took {time.monotonic() - t:.3f} s")
+  cloudlog.info("Starting git cleanup in finalized update")
+  t = time.monotonic()
+  try:
+    run(["git", "gc"], FINALIZED)
+    run(["git", "lfs", "prune"], FINALIZED)
+    cloudlog.event("Done git cleanup", duration=time.monotonic() - t)
+  except subprocess.CalledProcessError:
+    cloudlog.exception(f"Failed git cleanup, took {time.monotonic() - t:.3f} s")
 
   if os.path.isfile(BACKUP_PATH):
     os.remove(BACKUP_PATH)
@@ -410,7 +409,7 @@ class Updater:
 
     # Create the finalized, ready-to-swap update
     self.params.put("UpdaterState", "finalizing update...")
-    finalize_update(self.params)
+    finalize_update()
     cloudlog.info("finalize success!")
 
     self.params.put("Updated", datetime.datetime.now().astimezone(ZoneInfo('America/Phoenix')).strftime("%B %d, %Y - %I:%M%p"))
@@ -494,8 +493,11 @@ def main() -> None:
           elif wait_helper.user_request == UserRequest.CHECK:
             cloudlog.info("skipping fetch, only checking")
           else:
-            updater.fetch_update()
-            write_time_to_param(params, "UpdaterLastFetchTime")
+            if manual_update_requested or params.get_bool("IsOffroad"):
+              updater.fetch_update()
+              write_time_to_param(params, "UpdaterLastFetchTime")
+            else:
+              cloudlog.info("skipping fetch, vehicle is onroad")
         update_failed_count = 0
       except subprocess.CalledProcessError as e:
         cloudlog.event(
@@ -520,14 +522,7 @@ def main() -> None:
 
       # infrequent attempts if we successfully updated recently
       wait_helper.user_request = UserRequest.NONE
-      if not frogpilot_toggles.automatic_updates:
-        delay = 60 * 60 * 24 * 365 * 100
-      else:
-        if update_failed_count > 0 and updater.has_internet:
-          delay = 5 * 60
-        else:
-          delay = 1.5 * 60 * 60
-      wait_helper.sleep(delay)
+      wait_helper.sleep(60*60*24*365*100)
 
 
 if __name__ == "__main__":

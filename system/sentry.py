@@ -1,6 +1,7 @@
 """Install exception handler for process crash."""
 import os
 import sentry_sdk
+import subprocess
 import traceback
 from datetime import datetime
 from enum import Enum
@@ -55,6 +56,40 @@ def capture_exception(*args, crash_log=True, **kwargs) -> None:
     sentry_sdk.flush()  # https://github.com/getsentry/sentry-python/issues/291
   except Exception:
     cloudlog.exception("sentry exception")
+
+
+def capture_memory_usage() -> None:
+  try:
+    memory_available = 0
+    total_memory = 0
+
+    with open("/proc/meminfo", "r") as f:
+      for line in f:
+        if "MemTotal" in line:
+          total_memory = int(line.split()[1])
+        elif "MemAvailable" in line:
+          memory_available = int(line.split()[1])
+        if total_memory and memory_available:
+          break
+
+    if not total_memory:
+      cloudlog.error("Failed to read memory info")
+      return
+
+    used_memory = total_memory - memory_available
+    total_memory_usage_percent = (used_memory / total_memory) * 100
+
+    output = subprocess.check_output(["ps", "-eo", "rss,%mem,pid,args", "--sort=-rss"], encoding="utf-8")
+    formatted_output = "\n".join(output.split('\n')[:21])
+
+    with sentry_sdk.push_scope() as scope:
+      scope.set_extra("memory_usage", formatted_output)
+      scope.set_extra("total_memory_usage_percent", f"{total_memory_usage_percent:.1f}%")
+      sentry_sdk.capture_message("Low Memory Detected", level="warning")
+      sentry_sdk.flush()
+
+  except Exception:
+    cloudlog.exception("failed to capture memory usage")
 
 
 def set_tag(key: str, value: str) -> None:

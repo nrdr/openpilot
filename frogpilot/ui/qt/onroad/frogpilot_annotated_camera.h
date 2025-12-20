@@ -54,7 +54,6 @@ public:
 
   QSize defaultSize;
 
-  QString accelerationUnit;
   QString leadDistanceUnit;
   QString leadSpeedUnit;
   QString signalStyle;

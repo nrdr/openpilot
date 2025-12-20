@@ -2,7 +2,7 @@
 import requests
 import tempfile
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from openpilot.frogpilot.common.frogpilot_utilities import delete_file, is_url_pingable
@@ -17,15 +17,18 @@ def check_github_rate_limit(session):
     response.raise_for_status()
     rate_limit_info = response.json()
 
-    remaining = rate_limit_info["rate"]["remaining"]
+    rate_info = rate_limit_info.get("resources", {}).get("core", {})
+    remaining = rate_info.get("remaining", 0)
     print(f"GitHub API Requests Remaining: {remaining}")
-    if remaining > 0:
-      return True
 
-    reset_time = datetime.utcfromtimestamp(rate_limit_info["rate"]["reset"]).strftime("%Y-%m-%d %H:%M:%S")
-    print("GitHub rate limit reached")
-    print(f"GitHub Rate Limit Resets At (UTC): {reset_time}")
-    return False
+    if remaining <= 0:
+      reset_timestamp = rate_info.get("reset", 0)
+      reset_time = datetime.fromtimestamp(reset_timestamp, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+      print("GitHub rate limit reached")
+      print(f"GitHub Rate Limit Resets At (UTC): {reset_time}")
+      return False
+    return True
+
   except requests.exceptions.RequestException as exception:
     print(f"Error checking GitHub rate limit: {exception}")
     return False

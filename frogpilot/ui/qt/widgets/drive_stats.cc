@@ -89,7 +89,7 @@ void DriveStats::updateStatsForLabel(const QJsonObject &obj, StatsLabels &labels
 }
 
 void DriveStats::updateFrogPilotStatsForLabel(StatsLabels &labels) {
-  QJsonObject frogpilot_stats = QJsonDocument::fromJson(QString::fromStdString(params.get("FrogPilotStats")).toUtf8()).object();
+  QJsonObject frogpilot_stats = QJsonDocument::fromJson(QByteArray::fromStdString(params.get("FrogPilotStats"))).object();
 
   labels.distance->setText(QString::number(int(frogpilot_stats.value("FrogPilotMeters").toDouble() * (isMetric ? 0.001 : METER_TO_MILE))));
   labels.distance_unit->setText(isMetric ? tr("KM") : tr("Miles"));
@@ -104,5 +104,5 @@ void DriveStats::updateStats() {
   updateStatsForLabel(json["week"].toObject(), week);
   updateFrogPilotStatsForLabel(frogPilot);
 
-  params.put(konik ? "KonikMinutes" : "openpilotMinutes", QString::number((int)(json["all"].toObject()["minutes"].toDouble())).toStdString());
+  params.putIntNonBlocking(konik ? "KonikMinutes" : "openpilotMinutes", json["all"].toObject()["minutes"].toDouble());
 }

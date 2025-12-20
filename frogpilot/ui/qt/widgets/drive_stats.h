@@ -18,9 +18,9 @@ public:
 private:
   void addStatsLayouts(const QString &title, StatsLabels &labels, bool FrogPilot = false);
   void showEvent(QShowEvent *event) override;
+  void updateFrogPilotStatsForLabel(StatsLabels &labels);
   void updateStats();
   void updateStatsForLabel(const QJsonObject &obj, StatsLabels &labels);
-  void updateFrogPilotStatsForLabel(StatsLabels &labels);
 
   bool isMetric;
   bool konik;

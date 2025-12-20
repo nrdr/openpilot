@@ -34,7 +34,6 @@ public:
   bool hasZSS = false;
   bool isAngleCar = false;
   bool isBolt = false;
-  bool isC3 = false;
   bool isGM = true;
   bool isHKG = true;
   bool isHKGCanFd = true;

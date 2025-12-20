@@ -8,66 +8,64 @@ on:
         required: true
 
 env:
-  BRANCH: FrogPilot-Staging
-  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  GIT_EMAIL: "91348155+FrogAi@users.noreply.github.com"
+  GIT_NAME: "James"
+  TARGET_BRANCH: "FrogPilot-Staging"
+  UPDATE_FILE_PATH: ".github/update_date"
 
 jobs:
-  schedule-update:
+  schedule_update:
     runs-on: ubuntu-latest
     steps:
-      - name: Configure Git Identity
-        run: |
-          git config --global user.name "James"
-          git config --global user.email "91348155+FrogAi@users.noreply.github.com"
-
-      - name: Checkout ${{ env.BRANCH }}
-        uses: actions/checkout@v3
+      - name: Checkout Target Branch
+        uses: actions/checkout@v4
         with:
-          persist-credentials: false
-          ref: ${{ env.BRANCH }}
+          ref: ${{ env.TARGET_BRANCH }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           fetch-depth: 3
 
-      - name: Schedule Update for ${{ github.event.inputs.scheduled_date }}
+      - name: Configure Git Identity
         run: |
-          echo "${{ github.event.inputs.scheduled_date }}" > .github/update_date
-          git add .github/update_date
+          git config --global user.name "$GIT_NAME"
+          git config --global user.email "$GIT_EMAIL"
 
-      - name: Get Target Commit (Second Most Recent)
+      - name: Write Schedule Date
+        env:
+          SCHEDULED_DATE: ${{ github.event.inputs.scheduled_date }}
+        run: |
+          echo "$SCHEDULED_DATE" > "$UPDATE_FILE_PATH"
+          git add "$UPDATE_FILE_PATH"
+
+      - name: Get Target Commit Data
         id: get_target
         run: |
           TARGET_COMMIT=$(git rev-parse HEAD~1)
-
           AUTHOR_DATE=$(git show -s --format=%aD "$TARGET_COMMIT")
           COMMITTER_DATE=$(git show -s --format=%cD "$TARGET_COMMIT")
 
-          echo "AUTHOR_DATE=$AUTHOR_DATE" >> $GITHUB_ENV
-          echo "COMMITTER_DATE=$COMMITTER_DATE" >> $GITHUB_ENV
-          echo "TARGET_COMMIT=$TARGET_COMMIT" >> $GITHUB_ENV
+          echo "AUTHOR_DATE=$AUTHOR_DATE" >> "$GITHUB_ENV"
+          echo "COMMITTER_DATE=$COMMITTER_DATE" >> "$GITHUB_ENV"
+          echo "TARGET_COMMIT=$TARGET_COMMIT" >> "$GITHUB_ENV"
 
-      - name: Create Fixup Commit if Changes Exist
+      - name: Create Fixup Commit
         id: fixup_commit
         run: |
           if git diff --cached --quiet; then
-            echo "No changes to commit."
+            echo "No changes detected."
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Changes found, creating fixup commit."
-            git commit --fixup="${{ env.TARGET_COMMIT }}"
+            echo "Changes detected. Creating fixup commit."
+            git commit --fixup="$TARGET_COMMIT"
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Autosquash Fixup into Target Commit
+      - name: Autosquash and Restore Timestamps
         if: steps.fixup_commit.outputs.has_changes == 'true'
         run: |
           GIT_SEQUENCE_EDITOR=: git rebase --autosquash -i HEAD~3
+          git rebase --exec "GIT_COMMITTER_DATE='$COMMITTER_DATE' git commit --amend --no-edit --date='$AUTHOR_DATE'" HEAD~2
 
-      - name: Restore Timestamps on Final Two Commits
+      - name: Push Changes
         if: steps.fixup_commit.outputs.has_changes == 'true'
         run: |
-          git rebase --exec "GIT_COMMITTER_DATE='${{ env.COMMITTER_DATE }}' git commit --amend --no-edit --date='${{ env.AUTHOR_DATE }}'" HEAD~2
-
-      - name: Push Updated ${{ env.BRANCH }} Branch
-        if: steps.fixup_commit.outputs.has_changes == 'true'
-        run: |
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
-          git push origin "${{ env.BRANCH }}" --force-with-lease
+          git push origin "$TARGET_BRANCH" --force-with-lease

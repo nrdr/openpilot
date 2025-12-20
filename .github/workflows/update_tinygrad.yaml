@@ -4,76 +4,92 @@ on:
   workflow_dispatch:
     inputs:
       runner:
-        description: "Select the runner"
-        required: true
-        default: "c3"
+        description: "Select runner"
         type: choice
         options:
           - c3
           - c3x
+        default: "c3"
+        required: true
+
+env:
+  GIT_EMAIL: "91348155+FrogAi@users.noreply.github.com"
+  GIT_NAME: "James"
+  GITLAB_REPO_DIR: "FrogPilot-Resources"
+  GITLAB_URL: "gitlab.com/FrogAi/FrogPilot-Resources.git"
+  OPENPILOT_DIR: "/data/openpilot"
 
 jobs:
   update_tinygrad:
-    name: Update Tinygrad
-    runs-on:
-      - self-hosted
-      - ${{ github.event.inputs.runner }}
-
+    runs-on: [self-hosted, "${{ inputs.runner }}"]
     steps:
-      - name: Get version
+      - name: Get Version
         id: get_version
         run: |
-          VERSION=$(grep -oP '^VERSION\s*=\s*"\K[^"]+' /data/openpilot/frogpilot/assets/model_manager.py)
+          VERSION=$(grep -oP '^VERSION\s*=\s*"\K[^"]+' "$OPENPILOT_DIR/frogpilot/assets/model_manager.py")
           echo "VERSION=$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Clone GitLab repo
+      - name: Setup Workspace and Clone GitLab
+        id: setup
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
-          rm -rf /data/tmp/frogpilot_tinygrad
-          mkdir -p /data/tmp/frogpilot_tinygrad
-          cd /data/tmp/frogpilot_tinygrad
+          WORK_DIR="$RUNNER_TEMP/frogpilot_tinygrad"
+          rm -rf "$WORK_DIR" && mkdir -p "$WORK_DIR"
+          echo "work_dir=$WORK_DIR" >> "$GITHUB_OUTPUT"
 
-          git clone --depth 1 --branch Tinygrad "https://oauth2:${GITLAB_TOKEN}@gitlab.com/FrogAi/FrogPilot-Resources.git"
+          cd "$WORK_DIR"
+          git clone --depth 1 --branch Tinygrad "https://oauth2:${GITLAB_TOKEN}@$GITLAB_URL"
 
       - name: Create Tinygrad Archive
+        working-directory: ${{ env.OPENPILOT_DIR }}
+        env:
+          WORK_DIR: ${{ steps.setup.outputs.work_dir }}
+          VERSION: ${{ steps.get_version.outputs.version }}
         run: |
           set -euo pipefail
-          cd /data/openpilot
 
-          ARCHIVE_DIR="/data/tmp/frogpilot_tinygrad/FrogPilot-Resources"
-          ARCHIVE_NAME="Tinygrad_${{ steps.get_version.outputs.version }}.tar.gz"
+          ARCHIVE_DEST="$WORK_DIR/$GITLAB_REPO_DIR"
+          ARCHIVE_NAME="Tinygrad_$VERSION.tar.gz"
 
-          TMPDIR="$(mktemp -d)"
-          touch "$TMPDIR/SConscript"
+          DUMMY_DIR=$(mktemp -d)
+          touch "$DUMMY_DIR/SConscript"
 
-          tar -czf "$ARCHIVE_NAME" \
+          tar -czf "$ARCHIVE_DEST/$ARCHIVE_NAME" \
             --exclude="*.a" \
             --exclude="*.o" \
             --exclude="*.onnx" \
             --exclude="*__pycache__*" \
             --exclude="*tests*" \
-            --exclude="frogpilot/tinygrad_modeld/SConscript" \
-            frogpilot/tinygrad_modeld tinygrad_repo \
-            -C "$TMPDIR" \
-            --transform 's|^SConscript$|frogpilot/tinygrad_modeld/SConscript|' \
+            --exclude="selfdrive/modeld/SConscript" \
+            selfdrive/modeld tinygrad_repo \
+            -C "$DUMMY_DIR" \
+            --transform 's|^SConscript$|selfdrive/modeld/SConscript|' \
             SConscript
 
-          mv "$ARCHIVE_NAME" "$ARCHIVE_DIR/"
-          rm -rf "$TMPDIR"
+          rm -rf "$DUMMY_DIR"
 
-      - name: Push updated Tinygrad
+      - name: Push Updated Tinygrad
+        working-directory: ${{ steps.setup.outputs.work_dir }}/${{ env.GITLAB_REPO_DIR }}
+        env:
+          VERSION: ${{ steps.get_version.outputs.version }}
         run: |
-          cd /data/tmp/frogpilot_tinygrad/FrogPilot-Resources
-
-          git config user.name "James"
-          git config user.email "91348155+FrogAi@users.noreply.github.com"
+          git config user.name "$GIT_NAME"
+          git config user.email "$GIT_EMAIL"
 
           git add Tinygrad_*.tar.gz
-          git commit -m "Updated Tinygrad: ${{ steps.get_version.outputs.version }}" || echo "No changes to commit"
-          git push origin Tinygrad
 
-      - name: Cleanup temporary files
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Updated Tinygrad: $VERSION"
+            git push origin Tinygrad
+          fi
+
+      - name: Cleanup Temporary Files
+        if: always()
+        env:
+          WORK_DIR: ${{ steps.setup.outputs.work_dir }}
         run: |
-          rm -rf /data/tmp/frogpilot_tinygrad
+          rm -rf "$WORK_DIR"

@@ -85,13 +85,13 @@ def calculate_lane_width(lane, current_lane, road_edge=None):
   current_y = np.asarray(current_lane.y)
 
   lane_y_interp = np.interp(current_x, np.asarray(lane.x), np.asarray(lane.y))
-  distance_to_lane = np.mean(np.abs(current_y - lane_y_interp))
+  distance_to_lane = np.median(np.abs(current_y - lane_y_interp))
 
   if road_edge is None:
     return float(distance_to_lane)
 
   road_edge_y_interp = np.interp(current_x, np.asarray(road_edge.x), np.asarray(road_edge.y))
-  distance_to_road_edge = np.mean(np.abs(current_y - road_edge_y_interp))
+  distance_to_road_edge = np.median(np.abs(current_y - road_edge_y_interp))
 
   if distance_to_road_edge < distance_to_lane:
     return 0.0
@@ -194,12 +194,11 @@ def extract_zip(zip_file, extract_path):
 def flash_panda():
   for serial in Panda.list():
     try:
-      panda = Panda(serial)
-      panda.reset(enter_bootstub=True)
-      panda.flash()
-      panda.close()
+      with Panda(serial=serial) as panda:
+        print(f"Flashing Panda {serial}")
+        panda.flash()
     except Exception as exception:
-      print(f"Error flashing Panda {serial}: {exception}")
+      print(f"Failed to flash Panda {serial}: {exception}")
       sentry.capture_exception(exception)
 
   params_memory.remove("FlashPanda")
@@ -210,12 +209,22 @@ def get_lock_status(can_parser, can_sock):
   return can_parser.vl["DOOR_LOCKS"]["LOCK_STATUS"]
 
 def is_url_pingable(url):
-  headers = {"User-Agent": "frogpilot-ping-test/1.0 (https://github.com/FrogAi/FrogPilot)"}
+  if not url:
+    return False
+
+  if not hasattr(is_url_pingable, "session"):
+    is_url_pingable.session = requests.Session()
+    is_url_pingable.session.headers.update({"User-Agent": "frogpilot-ping-test/1.0 (https://github.com/FrogAi/FrogPilot)"})
+
   try:
-    response = requests.head(url, headers=headers, timeout=10, allow_redirects=True)
+    response = is_url_pingable.session.head(url, timeout=10, allow_redirects=True)
     if response.status_code in (405, 501):
-      response = requests.get(url, headers=headers, timeout=10, allow_redirects=True, stream=True)
-    return response.ok
+      response = is_url_pingable.session.get(url, timeout=10, allow_redirects=True, stream=True)
+
+    is_accessible = response.ok
+    response.close()
+    return is_accessible
+
   except (requests.exceptions.ConnectionError, requests.exceptions.SSLError):
     return False
   except requests.exceptions.RequestException as error:
@@ -237,15 +246,19 @@ def lock_doors(lock_doors_timer, sm):
   can_parser = CANParser("toyota_nodsu_pt_generated", [("DOOR_LOCKS", 3)], bus=0)
   can_sock = messaging.sub_sock("can", timeout=100)
 
+  pm = messaging.PubMaster(["sendcan"])
+
   while True:
     sm.update()
 
     if any(ps.ignitionLine or ps.ignitionCan for ps in sm["pandaStates"] if ps.pandaType != log.PandaState.PandaType.unknown):
       break
 
-    with Panda(disable_checks=True) as panda:
-      panda.set_safety_mode(panda.SAFETY_TOYOTA)
-      panda.can_send(0x750, LOCK_CMD, 0)
+    sendcan_send = messaging.new_message("sendcan", 1)
+    sendcan_send.sendcan[0].address = 0x750
+    sendcan_send.sendcan[0].dat = LOCK_CMD
+    sendcan_send.sendcan[0].src = 0
+    pm.send("sendcan", sendcan_send)
 
     time.sleep(1)
 
@@ -253,17 +266,16 @@ def lock_doors(lock_doors_timer, sm):
     if lock_status == 0:
       break
 
-def run_cmd(cmd, success_message, fail_message, report=True, env=None):
+def run_cmd(cmd, success_message, fail_message, env=None, report=True):
   try:
     result = subprocess.run(cmd, capture_output=True, check=True, env=env, text=True)
     print(success_message)
     return result.stdout.strip()
-  except subprocess.CalledProcessError as error:
-    print(f"Command failed with return code {error.returncode}")
-    if error.stderr:
-      print(f"Error Output: {error.stderr.strip()}")
+  except subprocess.CalledProcessError as exception:
+    print(f"Command failed with error: {exception.stderr}")
+    print(fail_message)
     if report:
-      sentry.capture_exception(error)
+      sentry.capture_exception(exception.stderr)
     return None
   except Exception as exception:
     print(f"Unexpected error occurred: {exception}")
@@ -315,7 +327,7 @@ def update_maps(now):
 
 def update_openpilot():
   def update_available():
-    run_cmd(["pkill", "-SIGUSR1", "-f", "system.updated.updated"], "Updater check signal sent", "Failed to send updater check signal", report=False)
+    run_cmd(["pkill", "-SIGUSR1", "-f", "system.updated.updated"], "Checking for updates...", "Failed to check for update...", report=False)
 
     while params.get("UpdaterState", encoding="utf-8") != "checking...":
       time.sleep(1)
@@ -326,10 +338,10 @@ def update_openpilot():
     if not params.get_bool("UpdaterFetchAvailable"):
       return False
 
-    while params.get("UpdaterState", encoding="utf-8") != "idle":
+    while params.get_bool("IsOnroad") or running_threads.get("lock_doors", threading.Thread()).is_alive():
       time.sleep(60)
 
-    run_cmd(["pkill", "-SIGHUP", "-f", "system.updated.updated"], "Updater refresh signal sent", "Failed to send updater refresh signal", report=False)
+    run_cmd(["pkill", "-SIGHUP", "-f", "system.updated.updated"], "Update available, downloading...", "Failed to download update...", report=False)
 
     while not params.get_bool("UpdateAvailable"):
       time.sleep(60)
@@ -339,11 +351,11 @@ def update_openpilot():
   if params.get("UpdaterState", encoding="utf-8") != "idle":
     return
 
+  while params.get_bool("IsOnroad") or running_threads.get("lock_doors", threading.Thread()).is_alive():
+    time.sleep(60)
+
   if not update_available():
     return
-
-  while params.get_bool("IsOnroad") or params_memory.get_bool("UpdateSpeedLimits") or running_threads.get("lock_doors", threading.Thread()).is_alive():
-    time.sleep(60)
 
   while True:
     if not update_available():

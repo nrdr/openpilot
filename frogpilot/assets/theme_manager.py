@@ -317,7 +317,7 @@ class ThemeManager:
       "fourth_of_july": date(year, 7, 4),
       "halloween_week": date(year, 10, 31),
       "thanksgiving_week": ThemeManager.calculate_thanksgiving(year),
-      "christmas_week": date(year, 12, 21)
+      "christmas_week": date(year, 12, 25)
     }
 
   def handle_verification_failure(self, extension, theme_component, theme_name, asset_param, theme_path, download_path, frogpilot_toggles):

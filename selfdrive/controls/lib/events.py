@@ -372,7 +372,7 @@ def holiday_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, 
   }
 
   return Alert(
-    holiday_messages.get(frogpilot_toggles.current_holiday_theme),
+    holiday_messages.get(frogpilot_toggles.current_holiday_theme, ""),
     "",
     AlertStatus.normal, AlertSize.small,
     Priority.LOWEST, VisualAlert.none, FrogPilotAudibleAlert.startup, 5.)

@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 import numpy as np
 
-from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import CRUISE_MIN_ACCEL
 from openpilot.selfdrive.controls.lib.longitudinal_planner import ACCEL_MIN, get_max_accel
 
 from openpilot.frogpilot.common.frogpilot_variables import CITY_SPEED_LIMIT
 
-A_CRUISE_MIN_ECO =   CRUISE_MIN_ACCEL / 2
-A_CRUISE_MIN_SPORT = CRUISE_MIN_ACCEL * 2
+A_CRUISE_MIN_ECO =   ACCEL_MIN / 2
+A_CRUISE_MIN_SPORT = ACCEL_MIN * 2
 
                   # MPH = [0.0,  11,  22,  34,  45,  56,  89]
 A_CRUISE_MAX_BP_CUSTOM =  [0.0,  5., 10., 15., 20., 25., 40.]
@@ -82,4 +81,4 @@ class FrogPilotAcceleration:
       elif frogpilot_toggles.deceleration_profile == 2:
         self.min_accel = A_CRUISE_MIN_SPORT
       else:
-        self.min_accel = CRUISE_MIN_ACCEL
+        self.min_accel = ACCEL_MIN

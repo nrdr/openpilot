@@ -412,19 +412,15 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
   QObject::connect(close_btn, &QPushButton::clicked, [this]() {
     if (subSubSubPanelOpen) {
       closeSubSubSubPanel();
-
       subSubSubPanelOpen = false;
     } else if (subSubPanelOpen) {
       closeSubSubPanel();
-
       subSubPanelOpen = false;
     } else if (subPanelOpen) {
       closeSubPanel();
-
       subPanelOpen = false;
     } else if (panelOpen) {
       closePanel();
-
       panelOpen = false;
     } else {
       closeSettings();
@@ -533,21 +529,21 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
         }
       }
 
-      if (panelOpen) {
-        closePanel();
-        panelOpen = false;
-      }
-      if (subPanelOpen) {
-        closeSubPanel();
-        subPanelOpen = false;
+      if (subSubSubPanelOpen) {
+        closeSubSubSubPanel();
+        subSubSubPanelOpen = false;
       }
       if (subSubPanelOpen) {
         closeSubSubPanel();
         subSubPanelOpen = false;
       }
-      if (subSubSubPanelOpen) {
-        closeSubSubSubPanel();
-        subSubSubPanelOpen = false;
+      if (subPanelOpen) {
+        closeSubPanel();
+        subPanelOpen = false;
+      }
+      if (panelOpen) {
+        closePanel();
+        panelOpen = false;
       }
       btn->setChecked(true);
       panel_widget->setCurrentWidget(w);

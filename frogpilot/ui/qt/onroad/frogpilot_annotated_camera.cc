@@ -12,23 +12,23 @@ FrogPilotAnnotatedCameraWidget::FrogPilotAnnotatedCameraWidget(QWidget *parent) 
   mapDataIcon = loadPixmap("../../frogpilot/assets/other_images/offline_maps_icon.png", {btn_size / 2, btn_size / 2});
   navigationIcon = loadPixmap("../../frogpilot/assets/other_images/navigation_icon.png", {btn_size / 2, btn_size / 2});
   nextMapsIcon = loadPixmap("../../frogpilot/assets/other_images/next_maps_icon.png", {btn_size / 2, btn_size / 2});
-  pausedIcon = loadPixmap("../../frogpilot/assets/other_images/paused_icon.png", {btn_size / 2, btn_size / 2});
-  speedIcon = loadPixmap("../../frogpilot/assets/other_images/speed_icon.png", {btn_size / 2, btn_size / 2});
+  pausedIcon = loadPixmap("../../frogpilot/assets/other_images/paused_icon.png", {widget_size, widget_size});
+  speedIcon = loadPixmap("../../frogpilot/assets/other_images/speed_icon.png", {widget_size, widget_size});
   stopSignImg = loadPixmap("../../frogpilot/assets/other_images/stop_sign.png", {btn_size, btn_size});
-  turnIcon = loadPixmap("../../frogpilot/assets/other_images/turn_icon.png", {btn_size / 2, btn_size / 2});
+  turnIcon = loadPixmap("../../frogpilot/assets/other_images/turn_icon.png", {widget_size, widget_size});
 
-  loadGif("../../frogpilot/assets/other_images/curve_icon.gif", cemCurveIcon, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/lead_icon.gif", cemLeadIcon, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/speed_icon.gif", cemSpeedIcon, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/light_icon.gif", cemStopIcon, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/turn_icon.gif", cemTurnIcon, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/chill_mode_icon.gif", chillModeIcon, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/experimental_mode_icon.gif", experimentalModeIcon, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/weather_clear_day.gif", weatherClearDay, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/weather_clear_night.gif", weatherClearNight, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/weather_low_visibility.gif", weatherLowVisibility, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/weather_rain.gif", weatherRain, QSize(btn_size / 2, btn_size / 2), this);
-  loadGif("../../frogpilot/assets/other_images/weather_snow.gif", weatherSnow, QSize(btn_size / 2, btn_size / 2), this);
+  loadGif("../../frogpilot/assets/other_images/curve_icon.gif", cemCurveIcon, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/lead_icon.gif", cemLeadIcon, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/speed_icon.gif", cemSpeedIcon, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/light_icon.gif", cemStopIcon, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/turn_icon.gif", cemTurnIcon, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/chill_mode_icon.gif", chillModeIcon, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/experimental_mode_icon.gif", experimentalModeIcon, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/weather_clear_day.gif", weatherClearDay, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/weather_clear_night.gif", weatherClearNight, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/weather_low_visibility.gif", weatherLowVisibility, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/weather_rain.gif", weatherRain, QSize(widget_size, widget_size), this);
+  loadGif("../../frogpilot/assets/other_images/weather_snow.gif", weatherSnow, QSize(widget_size, widget_size), this);
 
   QObject::connect(animationTimer, &QTimer::timeout, [this] {
     animationFrameIndex = (animationFrameIndex + 1) % totalFrames;
@@ -46,29 +46,6 @@ FrogPilotAnnotatedCameraWidget::FrogPilotAnnotatedCameraWidget(QWidget *parent) 
 }
 
 void FrogPilotAnnotatedCameraWidget::showEvent(QShowEvent *event) {
-  FrogPilotUIState &fs = *frogpilotUIState();
-  QJsonObject &frogpilot_toggles = fs.frogpilot_toggles;
-  UIState &s = *uiState();
-  UIScene &scene = s.scene;
-
-  if (scene.is_metric || frogpilot_toggles.value("use_si_metrics").toBool()) {
-    accelerationUnit = tr(" m/s²");
-    leadDistanceUnit = tr(" meters");
-    leadSpeedUnit = frogpilot_toggles.value("use_si_metrics").toBool() ? tr(" m/s") : tr(" km/h");
-
-    distanceConversion = 1.0f;
-    speedConversion = scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
-    speedConversionMetrics = frogpilot_toggles.value("use_si_metrics").toBool() ? 1.0f : MS_TO_KPH;
-  } else {
-    accelerationUnit = tr(" ft/s²");
-    leadDistanceUnit = tr(" feet");
-    leadSpeedUnit = tr(" mph");
-
-    distanceConversion = METER_TO_FOOT;
-    speedConversion = MS_TO_MPH;
-    speedConversionMetrics = MS_TO_MPH;
-  }
-
   updateSignals();
 }
 
@@ -139,10 +116,29 @@ void FrogPilotAnnotatedCameraWidget::updateSignals() {
 }
 
 void FrogPilotAnnotatedCameraWidget::updateState(const FrogPilotUIState &fs, const QJsonObject &frogpilot_toggles) {
+  const UIState &s = *uiState();
+  const UIScene &scene = s.scene;
+
   const FrogPilotUIScene &frogpilot_scene = fs.frogpilot_scene;
   const SubMaster &fpsm = *(fs.sm);
 
   const cereal::FrogPilotPlan::Reader &frogpilotPlan = fpsm["frogpilotPlan"].getFrogpilotPlan();
+
+  if (scene.is_metric || frogpilot_toggles.value("use_si_metrics").toBool()) {
+    leadDistanceUnit = tr(" meters");
+    leadSpeedUnit = frogpilot_toggles.value("use_si_metrics").toBool() ? tr(" m/s") : tr(" km/h");
+
+    distanceConversion = 1.0f;
+    speedConversion = scene.is_metric ? MS_TO_KPH : MS_TO_MPH;
+    speedConversionMetrics = frogpilot_toggles.value("use_si_metrics").toBool() ? 1.0f : MS_TO_KPH;
+  } else {
+    leadDistanceUnit = tr(" feet");
+    leadSpeedUnit = tr(" mph");
+
+    distanceConversion = METER_TO_FOOT;
+    speedConversion = MS_TO_MPH;
+    speedConversionMetrics = MS_TO_MPH;
+  }
 
   float speedLimitOffset = frogpilotPlan.getSlcSpeedLimitOffset() * speedConversion;
 

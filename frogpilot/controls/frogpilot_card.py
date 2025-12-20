@@ -3,7 +3,7 @@ from cereal import car, custom
 from openpilot.selfdrive.controls.lib.drive_helpers import CRUISE_LONG_PRESS
 from openpilot.selfdrive.controls.lib.events import ET
 
-from openpilot.frogpilot.common.frogpilot_variables import NON_DRIVING_GEARS, params, params_memory
+from openpilot.frogpilot.common.frogpilot_variables import ERROR_LOGS_PATH, NON_DRIVING_GEARS, params, params_memory
 
 ButtonType = car.CarState.ButtonEvent.Type
 FrogPilotButtonType = custom.FrogPilotCarState.ButtonEvent.Type
@@ -34,6 +34,8 @@ class FrogPilotCard:
     self.traffic_mode_enabled = False
 
     self.gap_counter = 0
+
+    self.error_log = ERROR_LOGS_PATH / "error.txt"
 
   def update_distance_button(self, sm):
     if sm["carControl"].longActive and self.car.frogpilot_toggles.experimental_mode_via_distance:
@@ -100,6 +102,7 @@ class FrogPilotCard:
     self.always_on_lateral_enabled &= sm["liveCalibration"].calPerc >= 1
     self.always_on_lateral_enabled &= (ET.IMMEDIATE_DISABLE not in sm["controlsState"].alertType + sm["frogpilotControlsState"].alertType) or self.car.frogpilot_toggles.frogs_go_moo
     self.always_on_lateral_enabled &= not (carState.brakePressed and carState.vEgo < self.car.frogpilot_toggles.always_on_lateral_pause_speed) or carState.standstill
+    self.always_on_lateral_enabled &= not self.error_log.is_file() or self.car.frogpilot_toggles.frogs_go_moo
 
     if sm.updated["frogpilotPlan"] or any(be.type in (ButtonType.accelCruise, ButtonType.resumeCruise) for be in carState.buttonEvents):
       self.accel_pressed = any(be.type in (ButtonType.accelCruise, ButtonType.resumeCruise) for be in carState.buttonEvents)

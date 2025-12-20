@@ -427,10 +427,6 @@ void FrogPilotVehiclesPanel::updateToggles() {
       setVisible &= parent->isHondaNidec;
     }
 
-    else if (key == "LockDoorsTimer") {
-      setVisible &= !parent->isC3;
-    }
-
     else if (key == "SNGHack") {
       setVisible &= !parent->hasPedal && !parent->hasSNG;
     }

@@ -632,19 +632,17 @@ FrogPilotDataPanel::FrogPilotDataPanel(FrogPilotSettingsWindow *parent) : FrogPi
 void FrogPilotDataPanel::updateStatsLabels(FrogPilotListWidget *labelsList) {
   labelsList->clear();
 
-  QJsonObject stats = QJsonDocument::fromJson(QString::fromStdString(params.get("FrogPilotStats")).toUtf8()).object();
+  QJsonObject stats = QJsonDocument::fromJson(QByteArray::fromStdString(params.get("FrogPilotStats"))).object();
 
-  static QSet<QString> ignored_keys = {
-    "Month"
-  };
-
-  static QMap<QString, QPair<QString, QString>> key_map = {
+  static QMap<QString, QPair<QString, QString>> keyMap = {
     {"AEBEvents", {tr("Total Emergency Brake Alerts"), "count"}},
-    {"AOLTime", {tr("Time Using \"Always On Lateral\""), "time"}},
+    {"AOLTime", {tr("Time Using \"Always On Lateral\""), "timePercent"}},
     {"CruiseSpeedTimes", {tr("Favorite Set Speed"), "speed"}},
+    {"CurrentMonthsMeters", {tr("Distance Driven This Month"), "distance"}},
+    {"DayTime", {tr("Time Driving (Daytime)"), "timePercent"}},
     {"Disengages", {tr("Total Disengagements"), "count"}},
     {"Engages", {tr("Total Engagements"), "count"}},
-    {"ExperimentalModeTime", {tr("Time Using \"Experimental Mode\""), "time"}},
+    {"ExperimentalModeTime", {tr("Time Using \"Experimental Mode\""), "timePercent"}},
     {"FrogChirps", {tr("Total Frog Chirps"), "count"}},
     {"FrogHops", {tr("Total Frog Hops"), "count"}},
     {"FrogPilotDrives", {tr("Total Drives"), "count"}},
@@ -653,39 +651,23 @@ void FrogPilotDataPanel::updateStatsLabels(FrogPilotListWidget *labelsList) {
     {"FrogSqueaks", {tr("Total Frog Squeaks"), "count"}},
     {"GoatScreams", {tr("Total Goat Screams"), "count"}},
     {"HighestAcceleration", {tr("Highest Acceleration Rate"), "accel"}},
-    {"LateralTime", {tr("Time Using Lateral Control"), "time"}},
+    {"LateralTime", {tr("Time Using Lateral Control"), "timePercent"}},
     {"LongestDistanceWithoutOverride", {tr("Longest Distance Without an Override"), "distance"}},
-    {"LongitudinalTime", {tr("Time Using Longitudinal Control"), "time"}},
-    {"ModelTimes", {tr("Driving Models:"), "other"}},
+    {"LongitudinalTime", {tr("Time Using Longitudinal Control"), "timePercent"}},
+    {"ModelTimes", {tr("Driving Models:"), "parent"}},
     {"Month", {tr("Month"), "other"}},
+    {"NightTime", {tr("Time Driving (Nighttime)"), "timePercent"}},
     {"Overrides", {tr("Total Overrides"), "count"}},
-    {"OverrideTime", {tr("Time Overriding openpilot"), "time"}},
-    {"PersonalityTimes", {tr("Driving Personalities:"), "other"}},
-    {"RandomEvents", {tr("Random Events:"), "other"}},
-    {"StandstillTime", {tr("Time Stopped"), "time"}},
-    {"StopLightTime", {tr("Time Spent at Stoplights"), "time"}},
+    {"OverrideTime", {tr("Time Overriding openpilot"), "timePercent"}},
+    {"PersonalityTimes", {tr("Driving Personalities:"), "parent"}},
+    {"RandomEvents", {tr("Random Events:"), "parent"}},
+    {"StandstillTime", {tr("Time Stopped"), "timePercent"}},
+    {"StopLightTime", {tr("Time Spent at Stoplights"), "timePercent"}},
     {"TrackedTime", {tr("Total Time Tracked"), "time"}},
-    {"WeatherTimes", {tr("Time Spent in Weather:"), "other"}}
+    {"WeatherTimes", {tr("Time Driven (Weather):"), "parent"}}
   };
 
-  static QSet<QString> parent_keys = {
-    "ModelTimes",
-    "PersonalityTimes",
-    "RandomEvents",
-    "WeatherTimes"
-  };
-
-  static QSet<QString> percentage_keys = {
-    "AOLTime",
-    "ExperimentalModeTime",
-    "LateralTime",
-    "LongitudinalTime",
-    "OverrideTime",
-    "StandstillTime",
-    "StopLightTime"
-  };
-
-  static QMap<QString, QString> random_events_map = {
+  static QMap<QString, QString> randomEventsMap = {
     {"accel30", tr("UwUs")},
     {"accel35", tr("Loch Ness Encounters")},
     {"accel40", tr("Visits to 1955")},
@@ -700,12 +682,14 @@ void FrogPilotDataPanel::updateStatsLabels(FrogPilotListWidget *labelsList) {
     {"youveGotMail", tr("Total Mail Received")}
   };
 
-  QStringList keys = key_map.keys();
-  std::sort(keys.begin(), keys.end(), [&](const QString &a, const QString &b) {
-    return key_map.value(a).first.toLower() < key_map.value(b).first.toLower();
-  });
+  static QSet<QString> ignoredKeys = {
+    "Month"
+  };
 
-  double tracked_time = stats.contains("TrackedTime") ? stats.value("TrackedTime").toDouble() : 0.0;
+  QStringList keys = keyMap.keys();
+  std::sort(keys.begin(), keys.end(), [&](const QString &a, const QString &b) {
+    return keyMap.value(a).first.toLower() < keyMap.value(b).first.toLower();
+  });
 
   std::function<QString(double)> format_number = [&](double number) {
     return QLocale().toString(number);
@@ -725,141 +709,146 @@ void FrogPilotDataPanel::updateStatsLabels(FrogPilotListWidget *labelsList) {
   };
 
   std::function<QString(int)> format_time = [&](int seconds) {
-    static int seconds_in_day = 60 * 60 * 24;
-    static int seconds_in_hour = 60 * 60;
+    static int secondsInDay = 60 * 60 * 24;
+    static int secondsInHour = 60 * 60;
 
-    int days = seconds / seconds_in_day;
-    int hours = (seconds % seconds_in_day) / seconds_in_hour;
-    int minutes = (seconds % seconds_in_hour) / 60;
+    int days = seconds / secondsInDay;
+    int hours = (seconds % secondsInDay) / secondsInHour;
+    int minutes = (seconds % secondsInHour) / 60;
 
     QString result;
-    if (days > 0) result += format_number(days) + (days == 1 ? tr(" day ") : tr(" days "));
-    if (hours > 0 || days > 0) result += format_number(hours) + (hours == 1 ? tr(" hour ") : tr(" hours "));
+    if (days > 0) {
+      result += format_number(days) + (days == 1 ? tr(" day ") : tr(" days "));
+    }
+    if (hours > 0 || days > 0) {
+      result += format_number(hours) + (hours == 1 ? tr(" hour ") : tr(" hours "));
+    }
     result += format_number(minutes) + (minutes == 1 ? tr(" minute") : tr(" minutes"));
     return result.trimmed();
   };
 
+  double trackedTime = stats.contains("TrackedTime") ? stats.value("TrackedTime").toDouble() : 0.0;
+
   for (const QString &key : keys) {
-    if (ignored_keys.contains(key)) continue;
+    if (ignoredKeys.contains(key)) {
+      continue;
+    }
 
     QJsonValue value = stats.contains(key) ? stats.value(key) : QJsonValue(0);
-    QString label_text = key_map.value(key).first;
-    QString type = key_map.value(key).second;
+    QString labelText = keyMap.value(key).first;
+    QString type = keyMap.value(key).second;
 
     if (key == "AEBEvents") {
       QJsonObject totalEvents = stats.value("TotalEvents").toObject();
 
-      QString trimmed_label = label_text;
-      if (trimmed_label.startsWith(tr("Total "))) {
-        trimmed_label = trimmed_label.mid(6);
+      QString trimmedLabel = labelText;
+      QString prefix = tr("Total ");
+      if (trimmedLabel.startsWith(prefix)) {
+        trimmedLabel = trimmedLabel.mid(prefix.length());
       }
-      QString display_value = format_number(totalEvents.value("stockAeb").toInt(0) + totalEvents.value("fcw").toInt(0)) + " " + trimmed_label;
+      QString displayValue = format_number(totalEvents.value("stockAeb").toInt(0) + totalEvents.value("fcw").toInt(0)) + " " + trimmedLabel;
 
-      labelsList->addItem(new LabelControl(label_text, display_value, "", this));
+      labelsList->addItem(new LabelControl(labelText, displayValue, "", this));
 
     } else if (key == "CruiseSpeedTimes" && value.isObject()) {
       QJsonObject speeds = value.toObject();
 
-      double max_time = -1.0;
-      QString best_speed;
-      for (QJsonObject::const_iterator it = speeds.begin(); it != speeds.end(); ++it) {
-        double time = it.value().toDouble();
-        if (time > max_time) {
-          best_speed = it.key();
-          max_time = time;
+      double maxTime = -1.0;
+      QString bestSpeed;
+      for (const QString &speedKey : speeds.keys()) {
+        double time = speeds.value(speedKey).toDouble();
+        if (time > maxTime) {
+          bestSpeed = speedKey;
+          maxTime = time;
         }
       }
 
-      QString display_speed;
+      QString displaySpeed;
       if (isMetric) {
-        display_speed = QString::number(qRound(best_speed.toDouble() * MS_TO_KPH)) + " " + tr("km/h");
+        displaySpeed = QString::number(qRound(bestSpeed.toDouble() * MS_TO_KPH)) + " " + tr("km/h");
       } else {
-        display_speed = QString::number(qRound(best_speed.toDouble() * MS_TO_MPH)) + " " + tr("mph");
+        displaySpeed = QString::number(qRound(bestSpeed.toDouble() * MS_TO_MPH)) + " " + tr("mph");
       }
 
-      labelsList->addItem(new LabelControl(label_text, display_speed + " (" + format_time(max_time) + ")", "", this));
-    } else if (parent_keys.contains(key) && value.isObject()) {
-      labelsList->addItem(new LabelControl(label_text, "", "", this));
+      labelsList->addItem(new LabelControl(labelText, displaySpeed + " (" + format_time(maxTime) + ")", "", this));
+    } else if (type == "parent" && value.isObject()) {
+      labelsList->addItem(new LabelControl(labelText, "", "", this));
 
-      QJsonObject subobj = value.toObject();
-      QStringList subkeys;
+      QJsonObject subObject = value.toObject();
+      QStringList subKeys;
 
       if (key == "RandomEvents") {
-        subkeys = random_events_map.keys();
+        subKeys = randomEventsMap.keys();
       } else {
-        subkeys = subobj.keys();
+        subKeys = subObject.keys();
       }
 
-      std::sort(subkeys.begin(), subkeys.end(), [&](const QString &a, const QString &b) {
-        QString display_a, display_b;
-        if (key == "ModelTimes") {
-          display_a = processModelName(a);
-          display_b = processModelName(b);
-        } else if (key == "RandomEvents") {
-          display_a = random_events_map.value(a, a);
-          display_b = random_events_map.value(b, b);
-        } else if (key == "WeatherTimes") {
-          display_a = a.left(1).toUpper() + a.mid(1);
-          display_b = b.left(1).toUpper() + b.mid(1);
+      std::sort(subKeys.begin(), subKeys.end(), [&](const QString &a, const QString &b) {
+        QString displayA, displayB;
+        if (key == "RandomEvents") {
+          displayA = randomEventsMap.value(a, a);
+          displayB = randomEventsMap.value(b, b);
         } else {
-          display_a = a;
-          display_b = b;
+          displayA = a;
+          displayB = b;
         }
-        return display_a.toLower() < display_b.toLower();
+        return displayA.toLower() < displayB.toLower();
       });
 
-      for (const QString &subkey : subkeys) {
+      for (const QString &subkey : subKeys) {
         if (subkey == "Unknown") {
           continue;
         }
 
-        QString display_subkey;
+        QString displaySubKey;
         if (key == "ModelTimes") {
-          display_subkey = processModelName(subkey);
+          displaySubKey = processModelName(subkey);
         } else if (key == "RandomEvents") {
-          display_subkey = random_events_map.value(subkey, subkey);
+          displaySubKey = randomEventsMap.value(subkey, subkey);
         } else if (key == "WeatherTimes") {
-          display_subkey = subkey.left(1).toUpper() + subkey.mid(1);
+          displaySubKey = subkey.left(1).toUpper() + subkey.mid(1);
         } else {
-          display_subkey = subkey;
+          displaySubKey = subkey;
         }
 
         QString subvalue;
-        if (key == "ModelTimes" || key == "PersonalityTimes" || key == "WeatherTimes") {
-          subvalue = format_time(subobj.value(subkey).toDouble());
+        if (key.endsWith("Times")) {
+          subvalue = format_time(subObject.value(subkey).toDouble());
         } else {
-          subvalue = subobj.value(subkey).toVariant().toString().isEmpty() ? "0" : format_number(subobj.value(subkey).toInt());
+          subvalue = format_number(subObject.value(subkey).toInt(0));
         }
 
-        labelsList->addItem(new LabelControl("     " + display_subkey, subvalue, "", this));
+        labelsList->addItem(new LabelControl("     " + displaySubKey, subvalue, "", this));
       }
     } else {
-      QString display_value;
+      QString displayValue;
       if (type == "accel") {
-        display_value = QString::number(value.toDouble(), 'f', 2) + " " + tr("m/s²");
+        displayValue = QString::number(value.toDouble(), 'f', 2) + " " + tr("m/s²");
       } else if (type == "count") {
-        QString trimmed_label = label_text;
-        if (trimmed_label.startsWith(tr("Total "))) {
-          trimmed_label = trimmed_label.mid(6);
+        QString trimmedLabel = labelText;
+        QString prefix = tr("Total ");
+        if (trimmedLabel.startsWith(prefix)) {
+          trimmedLabel = trimmedLabel.mid(prefix.length());
         }
-        display_value = format_number(value.toInt()) + " " + trimmed_label;
+        displayValue = format_number(value.toInt()) + " " + trimmedLabel;
       } else if (type == "distance") {
-        display_value = format_distance(value.toDouble());
-      } else if (type == "time") {
-        display_value = format_time(value.toDouble());
+        displayValue = format_distance(value.toDouble());
+      } else if (type == "time" || type == "timePercent") {
+        displayValue = format_time(value.toDouble());
       } else {
-        display_value = value.toVariant().toString().isEmpty() ? "0" : value.toVariant().toString();
+        QString stringValue = value.toVariant().toString();
+        displayValue = stringValue.isEmpty() ? "0" : stringValue;
       }
 
-      labelsList->addItem(new LabelControl(label_text, display_value, "", this));
+      labelsList->addItem(new LabelControl(labelText, displayValue, "", this));
 
-      if (percentage_keys.contains(key)) {
+      if (type == "timePercent") {
         int percent = 0;
-        if (tracked_time > 0.0) {
-          percent = (value.toDouble() * 100.0) / tracked_time;
+        if (trackedTime > 0.0) {
+          percent = (value.toDouble() * 100.0) / trackedTime;
         }
 
-        labelsList->addItem(new LabelControl(tr("% of ") + label_text, format_number(percent) + "%", "", this));
+        labelsList->addItem(new LabelControl(tr("% of ") + labelText, format_number(percent) + "%", "", this));
       }
     }
   }
