@@ -17,6 +17,7 @@ from opendbc.car.carlog import carlog
 from opendbc.car.fw_versions import ObdCallback
 from opendbc.car.car_helpers import get_car, interfaces
 from opendbc.car.interfaces import CarInterfaceBase, RadarInterfaceBase
+from opendbc.car.honda.values import CAR
 from openpilot.selfdrive.pandad import can_capnp_to_list, can_list_to_can_capnp
 from openpilot.selfdrive.car.cruise import VCruiseHelper
 from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_capnp
@@ -30,6 +31,9 @@ EventName = log.OnroadEvent.EventName
 
 # forward
 carlog.addHandler(ForwardingHandler(cloudlog))
+
+SPEED_BIAS_DEFAULT = 1.0
+SPEED_BIAS_CLARITY = 1.0
 
 
 def obd_callback(params: Params) -> ObdCallback:
@@ -180,6 +184,10 @@ class Car:
 
     self.v_cruise_helper = VCruiseHelper(self.CP, self.CP_SP)
 
+    # Vehicle-scoped control-only bias:
+    # This adjusts the control target without changing the displayed/cluster set speed.
+    self.speed_bias = SPEED_BIAS_CLARITY if self.CP.carFingerprint == CAR.HONDA_CLARITY else SPEED_BIAS_DEFAULT
+
     self.is_metric = self.params.get_bool("IsMetric")
     self.experimental_mode = self.params.get_bool("ExperimentalMode")
 
@@ -219,8 +227,8 @@ class Car:
       # Use CarState w/ buttons from the step selfdrived enables on
       self.v_cruise_helper.initialize_v_cruise(self.CS_prev, self.experimental_mode, self.dynamic_experimental_control)
 
-    # TODO: mirror the carState.cruiseState struct?
-    CS.vCruise = float(self.v_cruise_helper.v_cruise_kph)
+    # Bias the *control* target while preserving the user-visible/cluster set speed.
+    CS.vCruise = float(self.v_cruise_helper.v_cruise_kph) * self.speed_bias
     CS.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
 
     return CS, CS_SP, RD
@@ -271,8 +279,8 @@ class Car:
     """control update loop, driven by carControl"""
 
     if not self.initialized_prev:
-      # Initialize CarInterface, once controls are ready
-      # TODO: this can make us miss at least a few cycles when doing an ECU knockout
+      # Initialize CarInterface, once controls are ready.
+      # This reduces startup complexity but may skip a small number of control cycles during ECU transitions.
       self.CI.init(self.CP, self.CP_SP, *self.can_callbacks)
       # signal pandad to switch to car safety mode
       self.params.put_bool_nonblocking("ControlsReady", True)

@@ -35,6 +35,10 @@ REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
 TESTING_CLOSET = "TESTING_CLOSET" in os.environ
 
+# Driver monitoring is intentionally disabled in this build.
+# When disabled, selfdrived must not subscribe to driver monitoring sockets, otherwise CommIssue will trigger.
+DISABLE_DM = True
+
 LONGITUDINAL_PERSONALITY_MAP = {v: k for k, v in log.LongitudinalPersonality.schema.enumerants.items()}
 
 ThermalStatus = log.DeviceState.ThermalStatus
@@ -95,12 +99,20 @@ class SelfdriveD(CruiseHelper):
     if REPLAY:
       # no vipc in replay will make them ignored anyways
       ignore += ['roadCameraState', 'wideRoadCameraState']
-    self.sm = messaging.SubMaster(['deviceState', 'pandaStates', 'peripheralState', 'modelV2', 'liveCalibration',
-                                   'carOutput', 'driverMonitoringState', 'longitudinalPlan', 'livePose', 'liveDelay',
-                                   'managerState', 'liveParameters', 'radarState', 'liveTorqueParameters',
-                                   'controlsState', 'carControl', 'driverAssistance', 'alertDebug', 'userBookmark', 'audioFeedback',
-                                   'modelDataV2SP', 'longitudinalPlanSP'] + \
-                                   self.camera_packets + self.sensor_packets + self.gps_packets,
+
+    sub_services = [
+      'deviceState', 'pandaStates', 'peripheralState', 'modelV2', 'liveCalibration',
+      'carOutput', 'driverMonitoringState', 'longitudinalPlan', 'livePose', 'liveDelay',
+      'managerState', 'liveParameters', 'radarState', 'liveTorqueParameters',
+      'controlsState', 'carControl', 'driverAssistance', 'alertDebug', 'userBookmark', 'audioFeedback',
+      'modelDataV2SP', 'longitudinalPlanSP',
+    ] + self.camera_packets + self.sensor_packets + self.gps_packets
+
+    if DISABLE_DM:
+      # Driver monitoring is intentionally disabled; do not subscribe to DM outputs.
+      sub_services = [s for s in sub_services if s != 'driverMonitoringState']
+
+    self.sm = messaging.SubMaster(sub_services,
                                   ignore_alive=ignore, ignore_avg_freq=ignore,
                                   ignore_valid=ignore, frequency=int(1/DT_CTRL))
 
@@ -214,7 +226,8 @@ class SelfdriveD(CruiseHelper):
       self.events.add(EventName.resumeBlocked)
 
     if not self.CP.notCar:
-      self.events.add_from_msg(self.sm['driverMonitoringState'].events)
+      if 'driverMonitoringState' in self.sm.valid:
+        self.events.add_from_msg(self.sm['driverMonitoringState'].events)
       self.events_sp.add_from_msg(self.sm['longitudinalPlanSP'].events)
 
     # Add car events, ignore if CAN isn't valid
