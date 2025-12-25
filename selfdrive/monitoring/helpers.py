@@ -133,7 +133,9 @@ class DriverMonitoring:
     self.settings = settings
 
     # init driver status
-    self.wheelpos_learner = RunningStatFilter()
+    # FIX A: make wheelpos learner bounded
+    self.wheelpos_learner = RunningStatFilter(max_trackable=self.settings._WHEELPOS_FILTER_MIN_COUNT * 20)
+
     self.pose = DriverPose(self.settings._POSE_OFFSET_MAX_COUNT)
     self.blink = DriverBlink()
     self.eev1 = 0.
@@ -251,7 +253,10 @@ class DriverMonitoring:
     # calibrates only when there's movement and either face detected
     if car_speed > self.settings._WHEELPOS_CALIB_MIN_SPEED and (driver_state.leftDriverData.faceProb > self.settings._FACE_THRESHOLD or
                                           driver_state.rightDriverData.faceProb > self.settings._FACE_THRESHOLD):
-      self.wheelpos_learner.push_and_update(rhd_pred)
+      # FIX B: only learn until converged; no need to keep pushing forever
+      if self.wheelpos_learner.filtered_stat.n <= self.settings._WHEELPOS_FILTER_MIN_COUNT:
+        self.wheelpos_learner.push_and_update(rhd_pred)
+
     if self.wheelpos_learner.filtered_stat.n > self.settings._WHEELPOS_FILTER_MIN_COUNT:
       self.wheel_on_right = self.wheelpos_learner.filtered_stat.M > self.settings._WHEELPOS_THRESHOLD
     else:

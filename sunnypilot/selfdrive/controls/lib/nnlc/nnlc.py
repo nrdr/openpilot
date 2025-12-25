@@ -19,7 +19,7 @@ from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import MOCK_MODEL_
 from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.model import NNTorqueModel
 
 LOW_SPEED_X = [0, 10, 20, 30]
-LOW_SPEED_Y = [12, 3, 1, 0]
+LOW_SPEED_Y = [30, 15, 10, 5]
 
 
 # At a given roll, if pitch magnitude increases, the

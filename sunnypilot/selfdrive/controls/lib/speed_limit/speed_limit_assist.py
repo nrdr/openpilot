@@ -44,9 +44,17 @@ CRUISE_BUTTONS_PLUS = (ButtonType.accelCruise, ButtonType.resumeCruise)
 CRUISE_BUTTONS_MINUS = (ButtonType.decelCruise, ButtonType.setCruise)
 CRUISE_BUTTON_CONFIRM_HOLD = 0.5  # secs.
 
+# -----------------------------------------------------------------------------
+# Control-only speed bias:
+# - Cluster/UI set speed stays the same
+# - Actual control target is reduced by 1.25%
+# -----------------------------------------------------------------------------
+SPEED_BIAS = 0.9875  # 1.25% slower
+
 
 class SpeedLimitAssist:
   _speed_limit_final_last: float
+  _speed_limit_final_last_ctrl: float
   _distance: float
   v_ego: float
   a_ego: float
@@ -80,6 +88,7 @@ class SpeedLimitAssist:
     self._has_speed_limit = False
     self._speed_limit = 0.
     self._speed_limit_final_last = 0.
+    self._speed_limit_final_last_ctrl = 0.
     self.speed_limit_prev = 0.
     self.speed_limit_final_last_conv = 0
     self.prev_speed_limit_final_last_conv = 0
@@ -127,10 +136,12 @@ class SpeedLimitAssist:
 
   def get_v_target_from_control(self) -> float:
     if self._has_speed_limit:
+      # When SLA is in control, we output the *control* target (biased),
+      # while all cluster confirmation logic still uses the unbiased target.
       if self.pcm_op_long and self.is_enabled:
-        return self._speed_limit_final_last
+        return self._speed_limit_final_last_ctrl
       if not self.pcm_op_long and self.is_active:
-        return self._speed_limit_final_last
+        return self._speed_limit_final_last_ctrl
 
     # Fallback
     return V_CRUISE_UNSET
@@ -176,9 +187,14 @@ class SpeedLimitAssist:
     speed_conv = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
     self.v_cruise_cluster = v_cruise_cluster
 
-    # Update current velocity offset (error)
-    self.v_offset = self._speed_limit_final_last - self.v_ego
+    # Control-only bias: keep the cluster and confirmations tied to the unbiased value,
+    # but drive slightly under it.
+    self._speed_limit_final_last_ctrl = self._speed_limit_final_last * SPEED_BIAS
 
+    # Update current velocity offset (error) using the *control* target
+    self.v_offset = self._speed_limit_final_last_ctrl - self.v_ego
+
+    # Conversions used for confirm logic/UI comparisons should remain unbiased
     self.speed_limit_final_last_conv = round(self._speed_limit_final_last * speed_conv)
     self.v_cruise_cluster_conv = round(self.v_cruise_cluster * speed_conv)
 
@@ -191,13 +207,9 @@ class SpeedLimitAssist:
 
   @property
   def apply_confirm_speed_threshold(self) -> bool:
-    # below CST: always require user confirmation
-    if self.v_cruise_cluster_below_confirm_speed_threshold:
-      return True
-
-    # at/above CST:
-    # - new speed limit >= CST: auto change
-    # - new speed limit < CST: user confirmation required
+  # Require confirmation only when the NEW speed limit is below CST.
+  # This preserves the existing behavior above CST, but allows auto changes
+  # at low speeds when the limit is >= CST.
     return bool(self.speed_limit_final_last_conv < CONFIRM_SPEED_THRESHOLD[self.is_metric])
 
   def get_current_acceleration_as_target(self) -> float:
@@ -378,8 +390,8 @@ class SpeedLimitAssist:
         elif self.speed_limit_prev > 0 and self._speed_limit > 0:
           self.update_active_event(events_sp)
 
-  def update(self, long_enabled: bool, long_override: bool, v_ego: float, a_ego: float, v_cruise_cluster: float, speed_limit: float,
-             speed_limit_final_last: float, has_speed_limit: bool, distance: float, events_sp: EventsSP) -> None:
+  def update(self, long_enabled: bool, long_override: bool, v_ego: float, a_ego: float, v_cruise_cluster: float,
+             speed_limit: float, speed_limit_final_last: float, has_speed_limit: bool, distance: float, events_sp: EventsSP) -> None:
     self.long_enabled = long_enabled
     self.v_ego = v_ego
     self.a_ego = a_ego
