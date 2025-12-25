@@ -5,6 +5,7 @@ from openpilot.common.numpy_fast import clip, interp
 from openpilot.common.realtime import DT_CTRL
 from opendbc.can.packer import CANPacker
 from openpilot.selfdrive.car import create_gas_interceptor_command
+from openpilot.selfdrive.car.common.conversions import Conversions as CV
 from openpilot.selfdrive.car.honda import hondacan
 from openpilot.selfdrive.car.honda.values import CruiseButtons, VISUAL_HUD, HONDA_BOSCH, HONDA_BOSCH_RADARLESS, HONDA_NIDEC_ALT_PCM_ACCEL, CarControllerParams
 from openpilot.selfdrive.car.interfaces import CarControllerBase
@@ -130,6 +131,15 @@ class CarController(CarControllerBase):
     self.brake = 0.0
     self.last_steer = 0.0
 
+    self.steer_lpf = 0.0
+
+    # Driver override behavior for steer LPF:
+    # - While the driver is steering (and for a short hold after), force OP steer to 0
+    #   and reset the filter state to avoid "push back" when the driver releases.
+    # - This force-to-0 behavior is applied only below the configured speed threshold.
+    self.driver_override_until_nanos = 0
+    self.override_hold_s = 0.35
+
   def update(self, CC, CS, now_nanos, frogpilot_toggles):
     actuators = CC.actuators
     hud_control = CC.hudControl
@@ -144,8 +154,55 @@ class CarController(CarControllerBase):
       accel = 0.0
       gas, brake = 0.0, 0.0
 
-    # *** rate limit steer ***
-    limited_steer = rate_limit_steer(actuators.steer, self.last_steer)
+    # *** steer command conditioning (low-pass filter + driver override) ***
+    steer_cmd = actuators.steer
+
+    if CC.latActive:
+      steering_pressed = CS.out.steeringPressed
+      below_override_cutoff = CS.out.vEgo < (20.0 * CV.MPH_TO_MS)
+
+      if below_override_cutoff:
+        if steering_pressed:
+          self.driver_override_until_nanos = now_nanos + int(self.override_hold_s * 1e9)
+
+        bypass = now_nanos < self.driver_override_until_nanos
+
+        if bypass:
+          steer_cmd = 0.0
+          self.steer_lpf = 0.0
+          self.last_steer = 0.0
+        else:
+          tau = 0.20
+          alpha = DT_CTRL / (tau + DT_CTRL)
+
+          if steer_cmd * self.steer_lpf < 0.0:
+            self.steer_lpf = steer_cmd
+          else:
+            self.steer_lpf = alpha * steer_cmd + (1.0 - alpha) * self.steer_lpf
+
+          steer_cmd = self.steer_lpf
+      else:
+        self.driver_override_until_nanos = 0
+
+        if steering_pressed:
+          self.steer_lpf = steer_cmd
+        else:
+          tau = 0.20
+          alpha = DT_CTRL / (tau + DT_CTRL)
+
+          if steer_cmd * self.steer_lpf < 0.0:
+            self.steer_lpf = steer_cmd
+          else:
+            self.steer_lpf = alpha * steer_cmd + (1.0 - alpha) * self.steer_lpf
+
+          steer_cmd = self.steer_lpf
+    else:
+      self.steer_lpf = 0.0
+      self.last_steer = 0.0
+      self.driver_override_until_nanos = 0
+
+    # *** rate limit steer after conditioning ***
+    limited_steer = rate_limit_steer(steer_cmd, self.last_steer)
     self.last_steer = limited_steer
 
     # *** apply brake hysteresis ***
@@ -243,12 +300,8 @@ class CarController(CarControllerBase):
           self.brake = apply_brake / self.params.NIDEC_BRAKE_MAX
 
           if self.CP.enableGasInterceptor:
-            # way too aggressive at low speed without this
+            # Scale gas at low speed to reduce aggressiveness with the gas interceptor.
             gas_mult = 1.0 if frogpilot_toggles.honda_low_speed_pedal else interp(CS.out.vEgo, [0., 10.], [0.4, 1.0])
-            # send exactly zero if apply_gas is zero. Interceptor will send the max between read value and apply_gas.
-            # This prevents unexpected pedal range rescaling
-            # Sending non-zero gas when OP is not enabled will cause the PCM not to respond to throttle as expected
-            # when you do enable.
             if CC.longActive:
               self.gas = clip(gas_mult * (gas - brake + wind_brake * 3 / 4), 0., 1.)
             else:
