@@ -20,6 +20,15 @@ SpeedLimitSource = custom.LongitudinalPlanSP.SpeedLimit.Source
 
 ALL_SOURCES = tuple(SpeedLimitSource.schema.enumerants.values())
 
+# -----------------------------------------------------------------------------
+# Speed limit "advance" behavior (resolver-side):
+# Pretend we are closer than we really are so the rest of the stack begins adapting earlier.
+# Apply ONLY for DOWNWARD changes to avoid pre-accelerating before an increase.
+# -----------------------------------------------------------------------------
+SPEED_LIMIT_ADVANCE_TIME = 10.0    # seconds early
+MAX_ADVANCE_DISTANCE = 300.0       # meters cap (prevents excessive lookahead at high speeds)
+MIN_ADVANCE_SPEED = 2.5            # m/s (~5.6 mph). avoid weirdness creeping/near standstill
+
 
 class SpeedLimitResolver:
   limit_solutions: dict[custom.LongitudinalPlanSP.SpeedLimit.Source, float]
@@ -38,10 +47,9 @@ class SpeedLimitResolver:
     self.frame = -1
 
     self._gps_location_service = get_gps_location_service(self.params)
-    self.limit_solutions = {}  # Store for speed limit solutions from different sources
-    self.distance_solutions = {}  # Store for distance to current speed limit start for different sources
+    self.limit_solutions = {}      # speed limit solutions (m/s) by source
+    self.distance_solutions = {}   # distance to current speed limit start (m) by source
 
-    self.policy = self.params.get("SpeedLimitPolicy", return_default=True)
     self.policy = get_sanitize_int_param(
       "SpeedLimitPolicy",
       Policy.min().value,
@@ -132,6 +140,30 @@ class SpeedLimitResolver:
 
     self._calculate_map_data_limits(sm, speed_limit, next_speed_limit)
 
+  def _advance_distance_for_downward_change(self,
+                                           distance: float,
+                                           current_limit: float,
+                                           next_limit: float) -> float:
+    """
+    Reduce distance so adaptation begins earlier for a DOWNWARD speed limit change.
+    This is deliberately conservative and does not apply for increases.
+    """
+    if distance <= 0.0:
+      return distance
+    if self.v_ego <= MIN_ADVANCE_SPEED:
+      return distance
+    if next_limit <= 0.0:
+      return distance
+    if current_limit <= 0.0:
+      return distance
+
+    # Only advance when the upcoming limit is lower than the current limit.
+    if next_limit >= current_limit:
+      return distance
+
+    lookahead = min(self.v_ego * SPEED_LIMIT_ADVANCE_TIME, MAX_ADVANCE_DISTANCE)
+    return max(0.0, distance - lookahead)
+
   def _calculate_map_data_limits(self, sm: messaging.SubMaster, speed_limit: float, next_speed_limit: float) -> None:
     gps_data = sm[self._gps_location_service]
     map_data = sm['liveMapDataSP']
@@ -139,28 +171,53 @@ class SpeedLimitResolver:
     distance_since_fix = self.v_ego * (time.monotonic() - gps_data.unixTimestampMillis * 1e-3)
     distance_to_speed_limit_ahead = max(0., map_data.speedLimitAheadDistance - distance_since_fix)
 
+    # Default: current limit applies now.
     self.limit_solutions[SpeedLimitSource.map] = speed_limit
     self.distance_solutions[SpeedLimitSource.map] = 0.
 
-    # FIXME-SP: this is not working as expected
-    if 0. < next_speed_limit < self.v_ego:
-      adapt_time = (next_speed_limit - self.v_ego) / LIMIT_ADAPT_ACC
-      adapt_distance = self.v_ego * adapt_time + 0.5 * LIMIT_ADAPT_ACC * adapt_time ** 2
+    # Only consider the "ahead" limit when it is a real, downward change relative to current limit,
+    # and when ego speed is above the ahead limit (i.e., adaptation is necessary).
+    if not (next_speed_limit > 0. and speed_limit > 0.):
+      return
+    if next_speed_limit >= speed_limit:
+      return
+    if self.v_ego <= next_speed_limit:
+      return
+    if distance_to_speed_limit_ahead <= 0.:
+      return
 
-      if distance_to_speed_limit_ahead <= adapt_distance:
-        self.limit_solutions[SpeedLimitSource.map] = next_speed_limit
-        self.distance_solutions[SpeedLimitSource.map] = distance_to_speed_limit_ahead
+    # Compute the distance required to decelerate from v_ego down to next_speed_limit.
+    # Use LIMIT_ADAPT_ACC as a magnitude (m/s^2) so this works regardless of sign conventions.
+    decel = float(abs(LIMIT_ADAPT_ACC))
+    if decel < 1e-3:
+      return
+
+    dv = float(self.v_ego - next_speed_limit)  # m/s, positive
+    adapt_time = dv / decel                    # seconds, positive
+
+    # Distance under constant deceleration: d = v*t - 0.5*a*t^2
+    adapt_distance = self.v_ego * adapt_time - 0.5 * decel * adapt_time ** 2
+    if adapt_distance <= 0.:
+      return
+
+    # Apply resolver-side "advance distance" for downward changes (starts adapting earlier).
+    distance_for_gate = self._advance_distance_for_downward_change(distance_to_speed_limit_ahead, speed_limit, next_speed_limit)
+
+    if distance_for_gate <= adapt_distance:
+      self.limit_solutions[SpeedLimitSource.map] = next_speed_limit
+      self.distance_solutions[SpeedLimitSource.map] = distance_for_gate
 
   def _get_source_solution_according_to_policy(self) -> custom.LongitudinalPlanSP.SpeedLimit.Source:
     sources_for_policy = self._policy_to_sources_map[self.policy]
 
     if self.policy != Policy.combined:
-      # They are ordered in the order of preference, so we pick the first that's non-zero
+      # Ordered by preference; pick the first non-zero.
       for source in sources_for_policy:
         if self.limit_solutions[source] > 0.:
           return source
       return SpeedLimitSource.none
 
+    # Combined: choose the minimum non-zero limit.
     sources_with_limits = [(s, limit) for s, limit in [(s, self.limit_solutions[s]) for s in sources_for_policy] if limit > 0.]
     if sources_with_limits:
       return min(sources_with_limits, key=lambda x: x[1])[0]
@@ -168,7 +225,7 @@ class SpeedLimitResolver:
     return SpeedLimitSource.none
 
   def _resolve_limit_sources(self, sm: messaging.SubMaster) -> tuple[float, float, custom.LongitudinalPlanSP.SpeedLimit.Source]:
-    """Get limit solutions from each data source"""
+    """Get limit solutions from each data source."""
     self._get_from_car_state(sm)
     self._get_from_map_data(sm)
 

@@ -8,6 +8,7 @@ import numpy as np
 
 from cereal import car, custom
 from opendbc.car import structs
+from opendbc.car.honda.values import CAR
 from openpilot.common.constants import CV
 from openpilot.common.params import Params
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import get_minimum_set_speed
@@ -21,9 +22,23 @@ CRUISE_BUTTON_TIMER = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0,
                        ButtonType.setCruise: 0, ButtonType.resumeCruise: 0,
                        ButtonType.cancel: 0, ButtonType.mainCruise: 0}
 
-V_CRUISE_MIN = 8
-V_CRUISE_MAX = 145
+V_CRUISE_MIN = 0
+V_CRUISE_MAX = 241.402
 V_CRUISE_UNSET = 255
+
+# Clarity imperial cluster MPH rounding ladder model.
+HONDA_MPH_PER_KPH = 0.6233
+HONDA_MPH_OFFSET = 0.0995
+
+
+def _honda_kph_to_mph(kph: float) -> int:
+  """Convert KPH to the integer MPH value the Honda cluster would display."""
+  return int(round(kph * HONDA_MPH_PER_KPH + HONDA_MPH_OFFSET))
+
+
+def _honda_mph_to_kph(mph: float) -> float:
+  """Inverse mapping to a KPH value that will round/display as the requested MPH on the cluster."""
+  return (float(mph) - HONDA_MPH_OFFSET) / HONDA_MPH_PER_KPH
 
 
 def update_manual_button_timers(CS: car.CarState, button_timers: dict[car.CarState.ButtonEvent.Type, int]) -> None:
@@ -54,6 +69,9 @@ class VCruiseHelperSP:
 
     self.enable_button_timers = CRUISE_BUTTON_TIMER
 
+    # Persist the last unit mode so SLA quantization can match update_v_cruise behavior.
+    self.is_metric = True
+
     # Speed Limit Assist
     self.sla_state = SpeedLimitAssistState.disabled
     self.prev_sla_state = SpeedLimitAssistState.disabled
@@ -74,7 +92,7 @@ class VCruiseHelperSP:
       v_cruise_delta = v_cruise_delta * (5 if long_press else 1)
       return long_press, v_cruise_delta
 
-    # Apply user-specified multipliers to the base increment
+    # Apply user-specified multipliers to the base increment.
     short_increment = np.clip(self.short_increment, 1, 10)
     long_increment = np.clip(self.long_increment, 1, 10)
 
@@ -108,13 +126,26 @@ class VCruiseHelperSP:
     return enabled
 
   def update_speed_limit_assist(self, is_metric, LP_SP: custom.LongitudinalPlanSP) -> None:
+    # Persist unit mode so SLA quantization can match the active display mode.
+    self.is_metric = is_metric
+
     resolver = LP_SP.speedLimit.resolver
     self.has_speed_limit = resolver.speedLimitValid or resolver.speedLimitLastValid
     self.speed_limit_final_last = LP_SP.speedLimit.resolver.speedLimitFinalLast
     self.speed_limit_final_last_kph = self.speed_limit_final_last * CV.MS_TO_KPH
     self.sla_state = LP_SP.speedLimit.assist.state
-    self.req_plus, self.req_minus = compare_cluster_target(self.v_cruise_cluster_kph * CV.KPH_TO_MS,
-                                                           self.speed_limit_final_last, is_metric)
+
+    is_clarity = self.CP.carFingerprint == CAR.HONDA_CLARITY
+
+    # Clarity imperial: perform confirmation comparisons in the same integer MPH space as the cluster ladder.
+    if (not is_metric) and is_clarity:
+      cluster_mph = _honda_kph_to_mph(float(self.v_cruise_cluster_kph))
+      limit_mph = _honda_kph_to_mph(float(self.speed_limit_final_last_kph))
+      self.req_plus = limit_mph > cluster_mph
+      self.req_minus = limit_mph < cluster_mph
+    else:
+      self.req_plus, self.req_minus = compare_cluster_target(self.v_cruise_cluster_kph * CV.KPH_TO_MS,
+                                                             self.speed_limit_final_last, is_metric)
 
   @property
   def update_speed_limit_final_last_changed(self) -> bool:
@@ -132,7 +163,15 @@ class VCruiseHelperSP:
   def update_speed_limit_assist_v_cruise_non_pcm(self) -> None:
     if self.sla_state in SLA_ACTIVE_STATES and (self.prev_sla_state not in SLA_ACTIVE_STATES or
                                                 self.update_speed_limit_final_last_changed):
-      self.v_cruise_kph = np.clip(round(self.speed_limit_final_last_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
+      v_new_kph = float(round(self.speed_limit_final_last_kph, 1))
+
+      # Clarity imperial: snap SLA-injected set speeds onto the same MPH ladder used by the cluster.
+      is_clarity = self.CP.carFingerprint == CAR.HONDA_CLARITY
+      if (not self.is_metric) and is_clarity:
+        mph = _honda_kph_to_mph(v_new_kph)
+        v_new_kph = _honda_mph_to_kph(mph)
+
+      self.v_cruise_kph = np.clip(round(v_new_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
 
     self.prev_sla_state = self.sla_state
     self.prev_speed_limit_final_last_kph = self.speed_limit_final_last_kph

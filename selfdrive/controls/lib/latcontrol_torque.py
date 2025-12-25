@@ -34,6 +34,13 @@ JERK_GAIN = 0.3
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 VERSION = 1
 
+# Different friction on straights:
+# Fade friction as desired lateral accel increases (curvier roads)
+# Full friction at/under ~0.6 m/s^2, reduced friction at/over ~0.8 m/s^2
+FRICTION_X = [0.4, 0.6]    # m/s^2 desired lateral accel magnitude
+FRICTION_Y = [1.0, 0.25]   # scale applied to friction input
+
+
 class LatControlTorque(LatControl):
   def __init__(self, CP, CP_SP, CI, dt):
     super().__init__(CP, CP_SP, CI, dt)
@@ -44,9 +51,12 @@ class LatControlTorque(LatControl):
     self.update_limits()
     self.steering_angle_deadzone_deg = self.torque_params.steeringAngleDeadzoneDeg
     self.lat_accel_request_buffer_len = int(LAT_ACCEL_REQUEST_BUFFER_SECONDS / self.dt)
-    self.lat_accel_request_buffer = deque([0.] * self.lat_accel_request_buffer_len , maxlen=self.lat_accel_request_buffer_len)
+    self.lat_accel_request_buffer = deque([0.] * self.lat_accel_request_buffer_len, maxlen=self.lat_accel_request_buffer_len)
     self.lookahead_frames = int(JERK_LOOKAHEAD_SECONDS / self.dt)
     self.jerk_filter = FirstOrderFilter(0.0, 1 / (2 * np.pi * LP_FILTER_CUTOFF_HZ), self.dt)
+
+    # Friction fade on blinker (disable during lane changes)
+    self.friction_scale = FirstOrderFilter(1.0, 0.25, self.dt)
 
     self.extension = LatControlTorqueExt(self, CP, CP_SP, CI)
 
@@ -86,9 +96,24 @@ class LatControlTorque(LatControl):
     desired_lateral_jerk = self.jerk_filter.update(raw_lateral_jerk)
     gravity_adjusted_future_lateral_accel = future_desired_lateral_accel - roll_compensation
     ff = gravity_adjusted_future_lateral_accel
+
     # latAccelOffset corrects roll compensation bias from device roll misalignment relative to car roll
     ff -= self.torque_params.latAccelOffset
-    ff += get_friction(error + JERK_GAIN * desired_lateral_jerk, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
+
+    # Copy older behavior:
+    # 1) Disable friction on lane changes (blinker fade)
+    lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))
+    target_scale = 0.0 if lane_change else 1.0
+    friction_scale = float(self.friction_scale.update(target_scale))
+
+    # 2) Variable friction on turns (scale friction input down as desired lateral accel rises)
+    desired_lataccel_mag = abs(future_desired_lateral_accel)
+    friction_error_scale = float(np.interp(desired_lataccel_mag, FRICTION_X, FRICTION_Y))
+
+    # Keep newer jerk-aware friction input, but apply older turn-scaling to the error component
+    friction_input = (error * friction_error_scale) + (JERK_GAIN * desired_lateral_jerk)
+    friction = get_friction(friction_input, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
+    ff += friction_scale * friction
 
     if not active:
       output_torque = 0.0
@@ -103,16 +128,18 @@ class LatControlTorque(LatControl):
 
       # Lateral acceleration torque controller extension updates
       # Overrides pid_log.error and output_torque
-      pid_log, output_torque = self.extension.update(CS, VM, self.pid, params, ff, pid_log, setpoint, measurement, calibrated_pose, roll_compensation,
-                                                     future_desired_lateral_accel, measurement, lateral_accel_deadzone, gravity_adjusted_future_lateral_accel,
-                                                     desired_curvature, measured_curvature, steer_limited_by_safety, output_torque)
+      pid_log, output_torque = self.extension.update(
+        CS, VM, self.pid, params, ff, pid_log, setpoint, measurement, calibrated_pose, roll_compensation,
+        future_desired_lateral_accel, measurement, lateral_accel_deadzone, gravity_adjusted_future_lateral_accel,
+        desired_curvature, measured_curvature, steer_limited_by_safety, output_torque
+      )
 
       pid_log.active = True
       pid_log.p = float(self.pid.p)
       pid_log.i = float(self.pid.i)
       pid_log.d = float(self.pid.d)
       pid_log.f = float(self.pid.f)
-      pid_log.output = float(-output_torque) # TODO: log lat accel?
+      pid_log.output = float(-output_torque)  # TODO: log lat accel?
       pid_log.actualLateralAccel = float(measurement)
       pid_log.desiredLateralAccel = float(setpoint)
       pid_log.desiredLateralJerk = float(desired_lateral_jerk)
