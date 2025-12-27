@@ -430,10 +430,10 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventName.steerSaturated: {
     ET.WARNING: Alert(
-      "Take Control",
-      "Turn Exceeds Steering Limit",
-      AlertStatus.userPrompt, AlertSize.mid,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 2.),
+      "Power Steering Torque Limit",
+      "Apply force to steering wheel",
+      AlertStatus.normal, AlertSize.mid,
+      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 2.),
   },
 
   # Thrown when the fan is driven at >50% but is not rotating
