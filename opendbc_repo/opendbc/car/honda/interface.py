@@ -286,8 +286,8 @@ class CarInterface(CarInterfaceBase):
           if fw.ecu == "eps" and b"-" not in fw.fwVersion and b"," in fw.fwVersion:						
             stock_cp.lateralParams.torqueBP = [0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x3C00]
             stock_cp.lateralParams.torqueV = [0x0, 0x100, 0x200, 0x300, 0x400, 0x600, 0x800, 0xA00, 0xF00]
-            stock_cp.lateralTuning.pid.kf = 0.00007	
-            stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.22], [0.035]]
+            stock_cp.lateralTuning.pid.kf = 0.00004
+            stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.2], [0.0667]]
           elif fw.ecu == "eps" and b"-" in fw.fwVersion and b"," in fw.fwVersion:
             stock_cp.lateralParams.torqueBP = [0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x2800]
             stock_cp.lateralParams.torqueV = [0x0, 0x100, 0x200, 0x300, 0x400, 0x600, 0x800, 0xA00, 0xF00]
