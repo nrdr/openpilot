@@ -79,13 +79,26 @@ def get_uds_client(can_addr, debug):
 
   return uds_client
 
+def _canon_app_id(x: bytes) -> bytes:
+  # Keep null padding out of the comparison
+  x = x.rstrip(b"\x00")
+  # Treat separators as equivalent
+  x = x.replace(b",", b"-").replace(b".", b"-")
+  return x
+
 def get_seed_secret(fw, app_id):
   headers = fw.file_headers
-  for i in range(len(headers[4].values)):
-    if headers[3].values[i].value == app_id:
+  want = _canon_app_id(app_id)
+
+  for i in range(min(len(headers[3].values), len(headers[4].values))):
+    have = _canon_app_id(headers[3].values[i].value)
+    if have == want:
       return headers[4].values[i].value
 
-  raise RuntimeError("Couldn't find software seed for software application ID {}".format(app_id))
+  # Helpful debug
+  candidates = [headers[3].values[i].value for i in range(len(headers[3].values))]
+  raise RuntimeError(f"Couldn't find software seed for software application ID {app_id}. "
+                     f"Header candidates: {candidates}")
 
 def get_can_address(fw):
   return 0x18da00f1 | struct.unpack('!B', fw.file_headers[2].values[0].value)[0] << 8
