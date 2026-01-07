@@ -4,6 +4,7 @@ from cereal import log
 from opendbc.car.honda.values import CAR
 from opendbc.car.lateral import FRICTION_THRESHOLD, get_friction
 from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY
+from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.common.pid import PIDController
 
@@ -43,6 +44,10 @@ class LatControlTorque(LatControl):
 
     # specific car fingerprint
     self.carFingerprint = CP.carFingerprint
+
+    # Smoothly fade friction out/in around blinkers to avoid a step in torque
+    # FirstOrderFilter(initial_value, tau_seconds, dt_seconds)
+    self.friction_scale = FirstOrderFilter(1.0, 0.25, 0.01)
 
   def update_live_torque_params(self, latAccelFactor, latAccelOffset, friction):
     self.torque_params.latAccelFactor = latAccelFactor
@@ -89,7 +94,15 @@ class LatControlTorque(LatControl):
       ff = gravity_adjusted_lateral_accel
       # latAccelOffset corrects roll compensation bias from device roll misalignment relative to car roll
       ff -= self.torque_params.latAccelOffset
-      ff += get_friction(desired_lateral_accel - actual_lateral_accel, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
+
+      # Disable (fade out) friction when either blinker is on to make lane changes/manual lane moves smoother
+      lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))
+      target_scale = 0.0 if lane_change else 1.0
+      friction_scale = float(self.friction_scale.update(target_scale))
+
+      friction = get_friction(desired_lateral_accel - actual_lateral_accel,
+                              lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
+      ff += friction_scale * friction
 
       freeze_integrator = steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
       output_lataccel = self.pid.update(pid_log.error,
