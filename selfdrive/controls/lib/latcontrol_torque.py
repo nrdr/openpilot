@@ -23,9 +23,9 @@ from roenpilot.common.numpy_fast import interp
 # move it at all, this is compensated for too.
 
 LOW_SPEED_X = [0, 10, 20, 30]
-LOW_SPEED_Y = [10, 0, 0, 0]
-LOW_SPEED_Y_CLARITY = [10, 0, 0, 0]
-LOW_SPEED_Y_CIVIC = [10, 0, 0, 0]
+LOW_SPEED_Y = [20, 0, 0, 0]
+LOW_SPEED_Y_CLARITY = [20, 0, 0, 0]
+LOW_SPEED_Y_CIVIC = [20, 0, 0, 0]
 
 
 class LatControlTorque(LatControl):
