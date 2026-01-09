@@ -32,7 +32,6 @@ KP_INTERP =      [250, 120, 65,  30, 11.5, 5.5, 3.5, 2.0, KP]
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 
-# Keep a version field for logs if you want to track changes
 # VERSION = 0
 
 
@@ -46,18 +45,26 @@ class LatControlTorque(LatControl):
     self.torque_from_lateral_accel = CI.torque_from_lateral_accel()
     self.lateral_accel_from_torque = CI.lateral_accel_from_torque()
 
-    # Use a simple PID; we'll dynamically update kp each cycle from the schedule.
-    # This avoids depending on a schedule-aware PIDController signature.
-    self.pid = PIDController(KP, KI, k_f=self.torque_params.kf)
+    # IMPORTANT FIX:
+    # PIDController supports scheduled gains by passing [bp, values].
+    # DO NOT try to set self.pid.kp later; PID uses self._k_p internally.
+    self.pid = PIDController(
+      [INTERP_SPEEDS, KP_INTERP],   # scheduled k_p
+      KI,                           # k_i (constant OK)
+      k_f=self.torque_params.kf,    # keep your feedforward gain behavior
+      k_d=KD,                       # 0.0
+      rate=1 / self.dt
+    )
+
     self.update_limits()
     self.steering_angle_deadzone_deg = self.torque_params.steeringAngleDeadzoneDeg
 
     self.extension = LatControlTorqueExt(self, CP, CP_SP, CI)
 
-    # specific car fingerprint
+    # specific car fingerprint (kept in case needing per-car KP schedules later)
     self.carFingerprint = CP.carFingerprint
 
-    # Keep your friction fade around blinkers (Comma removed this, but it's nice)
+    # Friction fade on blinker
     self.friction_scale = FirstOrderFilter(1.0, 0.25, self.dt)
 
     # Comma-style latency compensation state
@@ -82,32 +89,22 @@ class LatControlTorque(LatControl):
     self.pid.set_limits(self.lateral_accel_from_torque(self.steer_max, self.torque_params),
                         self.lateral_accel_from_torque(-self.steer_max, self.torque_params))
 
+  # This is NOT used to set gains anymore.
   def _kp_for_speed(self, v_ego: float) -> float:
-    # Using your numpy_fast interp so behavior matches your ecosystem
     return float(interp(v_ego, INTERP_SPEEDS, KP_INTERP))
 
   def _pid_update_compat(self, error: float, measurement_rate: float, ff: float, speed: float, freeze_integrator: bool):
     """
-    Call PIDController.update in a way that won't explode if the PIDController
-    signature differs. Comma currently has KD=0, so measurement_rate is mostly
-    for future-proofing and won't change output much today.
+    Your PIDController already supports error_rate, so we can call it directly.
+    KD is 0.0 right now, so measurement_rate won't change output today, but it's correct.
     """
-    # dynamic low speed P gain (Comma-style)
-    self.pid.kp = self._kp_for_speed(speed)
-
-    try:
-      # Some PIDController versions accept (error, error_rate, ...)
-      return self.pid.update(error,
-                             -measurement_rate,
-                             feedforward=ff,
-                             speed=speed,
-                             freeze_integrator=freeze_integrator)
-    except TypeError:
-      # Older/simple signature
-      return self.pid.update(error,
-                             feedforward=ff,
-                             speed=speed,
-                             freeze_integrator=freeze_integrator)
+    return self.pid.update(
+      error,
+      error_rate=-measurement_rate,
+      speed=speed,
+      feedforward=ff,
+      freeze_integrator=freeze_integrator
+    )
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
              calibrated_pose, curvature_limited, lat_delay=None):
@@ -116,7 +113,7 @@ class LatControlTorque(LatControl):
       self.update_limits()
 
     pid_log = log.ControlsState.LateralTorqueState.new_message()
-    # pid_log.version = VERSION
+    # pid_log.version = VERSION  # your schema doesn't have this field
 
     if not active:
       output_torque = 0.0
@@ -160,7 +157,7 @@ class LatControlTorque(LatControl):
     error = setpoint - measurement
 
     # -------------------------------------------------------------------------
-    # Feedforward + friction (kept your blinker fade)
+    # Feedforward + friction (kept blinker fade)
     # -------------------------------------------------------------------------
     ff = gravity_adjusted_future_lateral_accel
     # latAccelOffset corrects roll compensation bias from device roll misalignment relative to car roll
@@ -206,7 +203,7 @@ class LatControlTorque(LatControl):
     pid_log.output = float(-output_torque)
     pid_log.actualLateralAccel = float(measurement)
     pid_log.desiredLateralAccel = float(setpoint)
-    #pid_log.desiredLateralJerk = float(desired_lateral_jerk)
+    # pid_log.desiredLateralJerk = float(desired_lateral_jerk)  # your schema doesn't have this field
     pid_log.saturated = bool(self._check_saturation(self.steer_max - abs(output_torque) < 1e-3,
                                                     CS, steer_limited_by_safety, curvature_limited))
 
