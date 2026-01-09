@@ -23,10 +23,13 @@ from roenpilot.common.numpy_fast import interp
 # friction in the steering wheel that needs to be overcome to
 # move it at all, this is compensated for too.
 
-LOW_SPEED_X = [0, 10, 20, 30]
-LOW_SPEED_Y = [15, 0, 0, 0]
-LOW_SPEED_Y_CLARITY = [15, 0, 0, 0]
-LOW_SPEED_Y_CIVIC = [15, 0, 0, 0]
+LOW_SPEED_X = [1, 1.5, 2.0, 3.0, 5, 7.5, 10, 15, 30]
+LOW_SPEED_Y = [250, 120, 65, 30, 11.5, 5.5, 3.5, 2.0, 1.0]
+LOW_SPEED_Y_CLARITY = [250, 120, 65, 30, 11.5, 5.5, 3.5, 2.0, 1.0]
+LOW_SPEED_Y_CIVIC = [250, 120, 65, 30, 11.5, 5.5, 3.5, 2.0, 1.0]
+
+#[1, 1.5, 2.0, 3.0, 5, 7.5, 10, 15, 30]
+#[250, 120, 65, 30, 11.5, 5.5, 3.5, 2.0, 1.0]
 
 
 class LatControlTorque(LatControl):
