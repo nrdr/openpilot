@@ -33,7 +33,7 @@ LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 
 # Keep a version field for logs if you want to track changes
-VERSION = 0
+# VERSION = 0
 
 
 class LatControlTorque(LatControl):
@@ -116,7 +116,7 @@ class LatControlTorque(LatControl):
       self.update_limits()
 
     pid_log = log.ControlsState.LateralTorqueState.new_message()
-    pid_log.version = VERSION
+    # pid_log.version = VERSION
 
     if not active:
       output_torque = 0.0
