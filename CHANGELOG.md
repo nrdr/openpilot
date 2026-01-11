@@ -1,6 +1,10 @@
-sunnypilot update by Aragon7777 (01.09.2025)
+sunnypilot update by Aragon7777 (01.10.2026)
 ========================
-* Try linear EPS mod tuning in car interface (Honda)
-* New lane change logic that disables parts of the Torque Controller while active for smoother response
-* New driver override logic for seamless transitions
-* Apply Comma's newest low speed boost logic on the Torque Controller (NEW)
+* Linear tuning adjustments for modded Honda EPS
+* New lane change logic that disables friction during a lane change to avoid harshness
+* Fixed driver override logic for seamless transitions. (UPDATED 01.10.2026)
+* Apply Comma's newest low speed blend logic on the Torque Controller
+* Add specific tuning for Gas Pedal Interceptor cars and fixing false positives on user override
+* Fixed a mismatch with Honda cluster set speed and what appears on openpilot for openpilot ACC users
+* Added improvements and low speed tweaks for openpilot ACC users
+* Minor alert changes (less annoying!)
