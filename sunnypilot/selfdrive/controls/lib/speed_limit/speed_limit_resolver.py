@@ -15,6 +15,7 @@ from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD, get_sanitize_int_param
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import LIMIT_MAX_MAP_DATA_AGE, LIMIT_ADAPT_ACC
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Policy, OffsetType
+from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import quantize_speed
 
 SpeedLimitSource = custom.LongitudinalPlanSP.SpeedLimit.Source
 
@@ -75,7 +76,11 @@ class SpeedLimitResolver:
     self.speed_limit_offset = 0.
 
   def update_speed_limit_states(self) -> None:
+    # Apply offset in m/s space
     self.speed_limit_final = self.speed_limit + self.speed_limit_offset
+
+    # Quantize to whole-number mph/kph (stored as m/s)
+    self.speed_limit_final = quantize_speed(self.speed_limit_final, self.is_metric, step=1)
 
     if self.speed_limit > 0.:
       self.speed_limit_last = self.speed_limit

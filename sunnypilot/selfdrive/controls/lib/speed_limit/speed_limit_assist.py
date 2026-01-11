@@ -16,7 +16,11 @@ from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import PCM_LONG_REQUIRED_MAX_SET_SPEED, CONFIRM_SPEED_THRESHOLD
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode
-from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import compare_cluster_target, set_speed_limit_assist_availability
+from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import (
+  compare_cluster_target,
+  set_speed_limit_assist_availability,
+  quantize_speed,
+)
 
 ButtonType = car.CarState.ButtonEvent.Type
 EventNameSP = custom.OnroadEventSP.EventName
@@ -175,6 +179,9 @@ class SpeedLimitAssist:
   def update_calculations(self, v_cruise_cluster: float) -> None:
     speed_conv = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
     self.v_cruise_cluster = v_cruise_cluster
+
+    # Ensure "final last" speed is always whole mph/kph (in m/s units internally)
+    self._speed_limit_final_last = quantize_speed(self._speed_limit_final_last, self.is_metric, step=1)
 
     # Update current velocity offset (error)
     self.v_offset = self._speed_limit_final_last - self.v_ego

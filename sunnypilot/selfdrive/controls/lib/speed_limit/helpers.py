@@ -11,6 +11,24 @@ from openpilot.common.params import Params
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode as SpeedLimitMode
 
 
+def quantize_speed(v_ms: float, is_metric: bool, step: int = 1) -> float:
+  """
+  Snap speed to an integer step in display units (mph/kph), then return in m/s.
+
+  - step=1 => whole mph or whole kph
+  - Uses round-to-nearest behavior.
+  """
+  if v_ms <= 0.:
+    return v_ms
+
+  if is_metric:
+    v_disp = round((v_ms * CV.MS_TO_KPH) / step) * step
+    return v_disp * CV.KPH_TO_MS
+  else:
+    v_disp = round((v_ms * CV.MS_TO_MPH) / step) * step
+    return v_disp * CV.MPH_TO_MS
+
+
 def compare_cluster_target(v_cruise_cluster: float, target_set_speed: float, is_metric: bool) -> tuple[bool, bool]:
   speed_conv = CV.MS_TO_KPH if is_metric else CV.MS_TO_MPH
   v_cruise_cluster_conv = round(v_cruise_cluster * speed_conv)
