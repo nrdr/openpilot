@@ -433,7 +433,7 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       "Power Steering Torque Limit",
       "Apply force to steering wheel",
       AlertStatus.normal, AlertSize.mid,
-      Priority.LOW, VisualAlert.steerRequired, AudibleAlert.none, 2.),
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, 2.),
   },
 
   # Thrown when the fan is driven at >50% but is not rotating
