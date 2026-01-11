@@ -8,3 +8,4 @@ sunnypilot update by Aragon7777 (01.10.2026)
 * Fixed a mismatch with Honda cluster set speed and what appears on openpilot for openpilot ACC users
 * Added improvements and low speed tweaks for openpilot ACC users
 * Minor alert changes (less annoying!)
+* Bosch Gas Lookup Adjustment (NEW)
