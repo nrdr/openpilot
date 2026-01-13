@@ -32,7 +32,13 @@ KP_INTERP =      [250, 120, 65,  30, 11.5, 5.5, 3.5, 2.0, KP]
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 
-# VERSION = 0
+# -----------------------------------------------------------------------------
+# Different friction on straights:
+# Fade friction as desired lateral accel increases (curvier roads)
+# Full friction at/under ~0.6 m/s^2, no friction at/over ~0.8 m/s^2
+# -----------------------------------------------------------------------------
+FRICTION_X = [0.4, 0.6]   # m/s^2 desired lateral accel magnitude
+FRICTION_Y = [1.0, 0.25]   # scale applied to friction input
 
 
 class LatControlTorque(LatControl):
@@ -113,7 +119,6 @@ class LatControlTorque(LatControl):
       self.update_limits()
 
     pid_log = log.ControlsState.LateralTorqueState.new_message()
-    # pid_log.version = VERSION  # your schema doesn't have this field
 
     if not active:
       output_torque = 0.0
@@ -168,8 +173,13 @@ class LatControlTorque(LatControl):
     target_scale = 0.0 if lane_change else 1.0
     friction_scale = float(self.friction_scale.update(target_scale))
 
+    # "Different friction on straights": downscale friction input error based on desired lateral accel magnitude
+    desired_lataccel_mag = abs(future_desired_lateral_accel)
+    friction_error_scale = float(np.interp(desired_lataccel_mag, FRICTION_X, FRICTION_Y))
+    friction_input = error * friction_error_scale
+
     # Comma-style: friction is a function of error (setpoint - measurement)
-    friction = get_friction(error, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
+    friction = get_friction(friction_input, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
     ff += friction_scale * friction
 
     # -------------------------------------------------------------------------
@@ -203,7 +213,6 @@ class LatControlTorque(LatControl):
     pid_log.output = float(-output_torque)
     pid_log.actualLateralAccel = float(measurement)
     pid_log.desiredLateralAccel = float(setpoint)
-    # pid_log.desiredLateralJerk = float(desired_lateral_jerk)  # your schema doesn't have this field
     pid_log.saturated = bool(self._check_saturation(self.steer_max - abs(output_torque) < 1e-3,
                                                     CS, steer_limited_by_safety, curvature_limited))
 
