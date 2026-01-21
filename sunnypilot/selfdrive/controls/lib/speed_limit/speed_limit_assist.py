@@ -238,7 +238,7 @@ class SpeedLimitAssist:
       self.state = SpeedLimitAssistState.pending
 
   def _update_non_pcm_long_confirmed_state(self) -> bool:
-    if self.target_set_speed_confirmed:
+    if self._has_speed_limit:
       return True
 
     if self.state != SpeedLimitAssistState.preActive:
