@@ -207,13 +207,9 @@ class SpeedLimitAssist:
 
   @property
   def apply_confirm_speed_threshold(self) -> bool:
-    # below CST: always require user confirmation
-    if self.v_cruise_cluster_below_confirm_speed_threshold:
-      return True
-
-    # at/above CST:
-    # - new speed limit >= CST: auto change
-    # - new speed limit < CST: user confirmation required
+  # Require confirmation only when the NEW speed limit is below CST.
+  # This preserves the existing behavior above CST, but allows auto changes
+  # at low speeds when the limit is >= CST.
     return bool(self.speed_limit_final_last_conv < CONFIRM_SPEED_THRESHOLD[self.is_metric])
 
   def get_current_acceleration_as_target(self) -> float:
