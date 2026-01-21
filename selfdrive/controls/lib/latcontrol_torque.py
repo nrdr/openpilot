@@ -38,7 +38,7 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 # Full friction at/under ~0.6 m/s^2, no friction at/over ~0.8 m/s^2
 # -----------------------------------------------------------------------------
 FRICTION_X = [0.4, 0.6]   # m/s^2 desired lateral accel magnitude
-FRICTION_Y = [1.0, 0.25]   # scale applied to friction input
+FRICTION_Y = [2.0, 0.25]   # scale applied to friction input
 
 
 class LatControlTorque(LatControl):
