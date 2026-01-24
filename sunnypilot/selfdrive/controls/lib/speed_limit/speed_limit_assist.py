@@ -49,7 +49,7 @@ CRUISE_BUTTON_CONFIRM_HOLD = 0.5  # secs.
 # - Cluster/UI set speed stays the same
 # - Actual control target is reduced by 1.25%
 # -----------------------------------------------------------------------------
-SPEED_BIAS = 0.9875  # 1.25% slower
+SPEED_BIAS = 1.0 # Bosch does not need an offset right now
 
 
 class SpeedLimitAssist:
