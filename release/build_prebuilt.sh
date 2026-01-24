@@ -40,11 +40,8 @@ echo "[-] Building T=$SECONDS"
 export PYTHONPATH="$BUILD_DIR"
 scons -j"$(nproc)" --minimal
 
-if [ -z "${PANDA_DEBUG_BUILD:-}" ]; then
-  CERT=/data/pandaextra/certs/release RELEASE=1 scons -j"$(nproc)" panda/
-else
-  scons -j"$(nproc)" panda/
-fi
+# Build panda (no Comma release certs on community devices)
+scons -j"$(nproc)" panda/
 
 echo "[-] Ensuring no submodules in release"
 if test "$(git submodule--helper list | wc -l)" -gt "0"; then
