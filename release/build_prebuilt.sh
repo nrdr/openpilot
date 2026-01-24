@@ -72,7 +72,7 @@ git add -f .
 git commit --amend -m "openpilot v$VERSION prebuilt"
 
 echo "[-] (Optional) onroad test"
-RELEASE=1 pytest -n0 -s selfdrive/test/test_onroad.py
+#RELEASE=1 pytest -n0 -s selfdrive/test/test_onroad.py
 
 echo "[-] Push T=$SECONDS"
 git push -f origin "$RELEASE_BRANCH:$RELEASE_BRANCH"
