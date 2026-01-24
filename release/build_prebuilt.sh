@@ -18,7 +18,7 @@ rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 git init
-git remote add origin git@github.com:nrdr/openpilot.git
+git remote add origin https://github.com/nrdr/openpilot.git
 git checkout --orphan "$RELEASE_BRANCH"
 
 echo "[-] Copying release files T=$SECONDS"
