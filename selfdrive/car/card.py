@@ -226,7 +226,7 @@ class Car:
     # TODO: mirror the carState.cruiseState struct?
     # Bias actual driven speed without changing the displayed/cluster set speed.
     # 1.25% decrease => multiply by 0.9875
-    SPEED_BIAS = 0.9875
+    SPEED_BIAS = 1.0 # Bosch
     CS.vCruise = float(self.v_cruise_helper.v_cruise_kph) * SPEED_BIAS
     CS.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
 
