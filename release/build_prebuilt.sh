@@ -80,4 +80,7 @@ RELEASE=1 pytest -n0 -s selfdrive/test/test_onroad.py
 echo "[-] Push T=$SECONDS"
 git push -f origin "$RELEASE_BRANCH:$RELEASE_BRANCH"
 
+echo "[-] Removing local prebuilt tree to avoid long-term storage"
+rm -rf "$BUILD_DIR"
+
 echo "[-] done T=$SECONDS"
