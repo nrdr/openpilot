@@ -25,6 +25,27 @@ V_CRUISE_MIN = 0
 V_CRUISE_MAX = 241.402
 V_CRUISE_UNSET = 255
 
+# Honda cluster MPH rounding quirks (legacy behavior)
+HONDA_MPH_PER_KPH = 0.6233
+HONDA_MPH_OFFSET = 0.0995
+
+
+def _is_honda_cp(CP) -> bool:
+  # Prefer CP.brand when available, fall back to carName if your fork uses it
+  brand = getattr(CP, "brand", "")
+  if isinstance(brand, str) and brand.lower() == "honda":
+    return True
+  car_name = getattr(CP, "carName", "")
+  return isinstance(car_name, str) and car_name.lower() == "honda"
+
+
+def _honda_kph_to_mph(kph: float) -> int:
+  return int(round(kph * HONDA_MPH_PER_KPH + HONDA_MPH_OFFSET))
+
+
+def _honda_mph_to_kph(mph: float) -> float:
+  return (float(mph) - HONDA_MPH_OFFSET) / HONDA_MPH_PER_KPH
+
 
 def update_manual_button_timers(CS: car.CarState, button_timers: dict[car.CarState.ButtonEvent.Type, int]) -> None:
   # increment timer for buttons still pressed
@@ -53,6 +74,9 @@ class VCruiseHelperSP:
     self.long_increment = self.params.get("CustomAccLongPressIncrement", return_default=True)
 
     self.enable_button_timers = CRUISE_BUTTON_TIMER
+
+    # Remember last unit mode so SLA can quantize correctly even when called out-of-band
+    self.is_metric = True
 
     # Speed Limit Assist
     self.sla_state = SpeedLimitAssistState.disabled
@@ -108,13 +132,21 @@ class VCruiseHelperSP:
     return enabled
 
   def update_speed_limit_assist(self, is_metric, LP_SP: custom.LongitudinalPlanSP) -> None:
+    # Persist unit mode so SLA-set-speed quantization can match
+    self.is_metric = is_metric
+
     resolver = LP_SP.speedLimit.resolver
     self.has_speed_limit = resolver.speedLimitValid or resolver.speedLimitLastValid
     self.speed_limit_final_last = LP_SP.speedLimit.resolver.speedLimitFinalLast
     self.speed_limit_final_last_kph = self.speed_limit_final_last * CV.MS_TO_KPH
     self.sla_state = LP_SP.speedLimit.assist.state
+
+    # IMPORTANT: Honda imperial cluster uses a non-linear mph ladder; use Honda mapping for comparisons
+    honda_imperial = (not is_metric) and _is_honda_cp(self.CP)
     self.req_plus, self.req_minus = compare_cluster_target(self.v_cruise_cluster_kph * CV.KPH_TO_MS,
-                                                           self.speed_limit_final_last, is_metric)
+                                                           self.speed_limit_final_last,
+                                                           is_metric,
+                                                           honda_imperial=honda_imperial)
 
   @property
   def update_speed_limit_final_last_changed(self) -> bool:
@@ -132,7 +164,15 @@ class VCruiseHelperSP:
   def update_speed_limit_assist_v_cruise_non_pcm(self) -> None:
     if self.sla_state in SLA_ACTIVE_STATES and (self.prev_sla_state not in SLA_ACTIVE_STATES or
                                                 self.update_speed_limit_final_last_changed):
-      self.v_cruise_kph = np.clip(round(self.speed_limit_final_last_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
+      # Default: round to 0.1 kph
+      v_new_kph = float(round(self.speed_limit_final_last_kph, 1))
+
+      # Honda imperial: snap onto the same MPH ladder we use for button presses
+      if (not self.is_metric) and _is_honda_cp(self.CP):
+        mph = _honda_kph_to_mph(v_new_kph)
+        v_new_kph = _honda_mph_to_kph(mph)
+
+      self.v_cruise_kph = np.clip(round(v_new_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
 
     self.prev_sla_state = self.sla_state
     self.prev_speed_limit_final_last_kph = self.speed_limit_final_last_kph
