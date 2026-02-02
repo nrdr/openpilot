@@ -14,10 +14,13 @@ V_CRUISE_MAX = 145
 V_CRUISE_UNSET = 255
 V_CRUISE_INITIAL = 40
 V_CRUISE_INITIAL_EXPERIMENTAL_MODE = 105
-IMPERIAL_INCREMENT = round(CV.MPH_TO_KPH, 1)  # round here to avoid rounding errors incrementing set speed
+
+# round here to avoid rounding errors incrementing set speed
+IMPERIAL_INCREMENT = round(CV.MPH_TO_KPH, 1)
 
 ButtonEvent = car.CarState.ButtonEvent
 ButtonType = car.CarState.ButtonEvent.Type
+
 CRUISE_LONG_PRESS = 50
 CRUISE_NEAREST_FUNC = {
   ButtonType.accelCruise: math.ceil,
@@ -29,15 +32,18 @@ CRUISE_INTERVAL_SIGN = {
 }
 
 # Honda cluster MPH rounding quirks (legacy behavior)
+# These are the same constants used in the 2021 fix.
 HONDA_MPH_PER_KPH = 0.6233
 HONDA_MPH_OFFSET = 0.0995
 
 
 def _honda_kph_to_mph(kph: float) -> int:
+  # Convert KPH to the MPH integer Honda would display
   return int(round(kph * HONDA_MPH_PER_KPH + HONDA_MPH_OFFSET))
 
 
 def _honda_mph_to_kph(mph: float) -> float:
+  # Inverse mapping back to a KPH value that will round/display correctly on Honda clusters
   return (float(mph) - HONDA_MPH_OFFSET) / HONDA_MPH_PER_KPH
 
 
@@ -51,11 +57,17 @@ class VCruiseHelper(VCruiseHelperSP):
     self.button_timers = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0}
     self.button_change_states = {btn: {"standstill": False, "enabled": False} for btn in self.button_timers}
 
+    # Store units here so initialize_v_cruise can use the same mode as update_v_cruise
+    self.is_metric = True
+
   @property
   def v_cruise_initialized(self):
     return self.v_cruise_kph != V_CRUISE_UNSET
 
   def update_v_cruise(self, CS, enabled, is_metric):
+    # Persist for initialize_v_cruise
+    self.is_metric = is_metric
+
     self.v_cruise_kph_last = self.v_cruise_kph
 
     self.get_minimum_set_speed(is_metric)
@@ -72,6 +84,7 @@ class VCruiseHelper(VCruiseHelperSP):
 
         self.update_button_timers(CS, enabled)
       else:
+        # PCM cruise: use car-provided speeds
         self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
         self.v_cruise_cluster_kph = CS.cruiseState.speedCluster * CV.MS_TO_KPH
         if CS.cruiseState.speed == 0:
@@ -124,11 +137,11 @@ class VCruiseHelper(VCruiseHelperSP):
     if self.update_speed_limit_assist_pre_active_confirmed(button_type):
       return
 
-    # --- Honda imperial rounding fix (Spektor56 2021 logic, modernized) ---
-    # Only apply when:
-    # - we are running in imperial display mode
-    # - Honda platform
+    # --- Honda imperial rounding fix (2021 logic, modernized) ---
+    # Apply when:
     # - non-PCM (we're synthesizing the set speed)
+    # - imperial display
+    # - Honda platform
     is_honda = getattr(self.CP, "carName", "") == "honda"
     if (not is_metric) and is_honda:
       # Work in MPH integer space using Honda's rounding behavior, then convert back to KPH.
@@ -138,7 +151,7 @@ class VCruiseHelper(VCruiseHelperSP):
       base_delta_mph = 1.0
       round_to_nearest, delta_mph = VCruiseHelperSP.update_v_cruise_delta(self, long_press, base_delta_mph)
 
-      # If user chose 5/10 style increments, snap to nearest bucket on long presses (same spirit as stock)
+      # If user chose 5/10 style increments, snap to nearest bucket on long presses
       if round_to_nearest and (cur_mph % int(delta_mph) != 0):
         cur_mph = CRUISE_NEAREST_FUNC[button_type](cur_mph / delta_mph) * int(delta_mph)
       else:
@@ -150,13 +163,16 @@ class VCruiseHelper(VCruiseHelperSP):
         cur_mph = max(cur_mph, ego_mph)
 
       # Convert back to a KPH target that will display correctly on Honda cluster rounding
-      self.v_cruise_kph = _honda_mph_to_kph(cur_mph)
-      self.v_cruise_kph = np.clip(round(self.v_cruise_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
+      v_new_kph = _honda_mph_to_kph(cur_mph)
+      self.v_cruise_kph = np.clip(round(v_new_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
+
+      # Keep cluster display aligned with target
+      self.v_cruise_cluster_kph = self.v_cruise_kph
       return
     # --- end Honda fix ---
 
     # Default behavior for everyone else:
-    v_cruise_delta = 1. if is_metric else IMPERIAL_INCREMENT
+    v_cruise_delta = 1.0 if is_metric else IMPERIAL_INCREMENT
 
     long_press, v_cruise_delta = VCruiseHelperSP.update_v_cruise_delta(self, long_press, v_cruise_delta)
     if long_press and self.v_cruise_kph % v_cruise_delta != 0:  # partial interval
@@ -193,6 +209,15 @@ class VCruiseHelper(VCruiseHelperSP):
     if any(b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) for b in CS.buttonEvents) and self.v_cruise_initialized:
       self.v_cruise_kph = self.v_cruise_kph_last
     else:
-      self.v_cruise_kph = int(round(np.clip(CS.vEgo * CV.MS_TO_KPH, initial, V_CRUISE_MAX)))
+      # Default init from ego speed
+      v_init_kph = float(np.clip(CS.vEgo * CV.MS_TO_KPH, initial, V_CRUISE_MAX))
+
+      # Snap initial value onto Honda's MPH ladder when in imperial on Honda
+      is_honda = getattr(self.CP, "carName", "") == "honda"
+      if (not self.is_metric) and is_honda:
+        init_mph = _honda_kph_to_mph(v_init_kph)
+        v_init_kph = _honda_mph_to_kph(init_mph)
+
+      self.v_cruise_kph = np.clip(round(v_init_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
 
     self.v_cruise_cluster_kph = self.v_cruise_kph
