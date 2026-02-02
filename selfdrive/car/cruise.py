@@ -28,6 +28,18 @@ CRUISE_INTERVAL_SIGN = {
   ButtonType.decelCruise: -1,
 }
 
+# Honda cluster MPH rounding quirks (legacy behavior)
+HONDA_MPH_PER_KPH = 0.6233
+HONDA_MPH_OFFSET = 0.0995
+
+
+def _honda_kph_to_mph(kph: float) -> int:
+  return int(round(kph * HONDA_MPH_PER_KPH + HONDA_MPH_OFFSET))
+
+
+def _honda_mph_to_kph(mph: float) -> float:
+  return (float(mph) - HONDA_MPH_OFFSET) / HONDA_MPH_PER_KPH
+
 
 class VCruiseHelper(VCruiseHelperSP):
   def __init__(self, CP, CP_SP):
@@ -54,7 +66,10 @@ class VCruiseHelper(VCruiseHelperSP):
         # if stock cruise is completely disabled, then we can use our own set speed logic
         self._update_v_cruise_non_pcm(CS, _enabled, is_metric)
         self.update_speed_limit_assist_v_cruise_non_pcm()
+
+        # For non-PCM, what we control is also what we want to show by default
         self.v_cruise_cluster_kph = self.v_cruise_kph
+
         self.update_button_timers(CS, enabled)
       else:
         self.v_cruise_kph = CS.cruiseState.speed * CV.MS_TO_KPH
@@ -77,8 +92,6 @@ class VCruiseHelper(VCruiseHelperSP):
 
     long_press = False
     button_type = None
-
-    v_cruise_delta = 1. if is_metric else IMPERIAL_INCREMENT
 
     for b in CS.buttonEvents:
       if b.type.raw in self.button_timers and not b.pressed:
@@ -110,6 +123,40 @@ class VCruiseHelper(VCruiseHelperSP):
     # False: Allow set speed changes as SLA is not requesting user confirmation
     if self.update_speed_limit_assist_pre_active_confirmed(button_type):
       return
+
+    # --- Honda imperial rounding fix (Spektor56 2021 logic, modernized) ---
+    # Only apply when:
+    # - we are running in imperial display mode
+    # - Honda platform
+    # - non-PCM (we're synthesizing the set speed)
+    is_honda = getattr(self.CP, "carName", "") == "honda"
+    if (not is_metric) and is_honda:
+      # Work in MPH integer space using Honda's rounding behavior, then convert back to KPH.
+      cur_mph = _honda_kph_to_mph(float(self.v_cruise_kph))
+
+      # Base delta is 1 MPH step (then VCruiseHelperSP applies custom short/long multipliers)
+      base_delta_mph = 1.0
+      round_to_nearest, delta_mph = VCruiseHelperSP.update_v_cruise_delta(self, long_press, base_delta_mph)
+
+      # If user chose 5/10 style increments, snap to nearest bucket on long presses (same spirit as stock)
+      if round_to_nearest and (cur_mph % int(delta_mph) != 0):
+        cur_mph = CRUISE_NEAREST_FUNC[button_type](cur_mph / delta_mph) * int(delta_mph)
+      else:
+        cur_mph += int(delta_mph) * CRUISE_INTERVAL_SIGN[button_type]
+
+      # If set is pressed while overriding, clip cruise speed to minimum of vEgo
+      if CS.gasPressed and button_type in (ButtonType.decelCruise, ButtonType.setCruise):
+        ego_mph = _honda_kph_to_mph(CS.vEgo * CV.MS_TO_KPH)
+        cur_mph = max(cur_mph, ego_mph)
+
+      # Convert back to a KPH target that will display correctly on Honda cluster rounding
+      self.v_cruise_kph = _honda_mph_to_kph(cur_mph)
+      self.v_cruise_kph = np.clip(round(self.v_cruise_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
+      return
+    # --- end Honda fix ---
+
+    # Default behavior for everyone else:
+    v_cruise_delta = 1. if is_metric else IMPERIAL_INCREMENT
 
     long_press, v_cruise_delta = VCruiseHelperSP.update_v_cruise_delta(self, long_press, v_cruise_delta)
     if long_press and self.v_cruise_kph % v_cruise_delta != 0:  # partial interval
