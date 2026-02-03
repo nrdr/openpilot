@@ -9,8 +9,8 @@ from openpilot.sunnypilot.selfdrive.car.cruise_ext import VCruiseHelperSP
 # WARNING: this value was determined based on the model's training distribution,
 #          model predictions above this speed can be unpredictable
 # V_CRUISE's are in kph
-V_CRUISE_MIN = 8
-V_CRUISE_MAX = 145
+V_CRUISE_MIN = 0
+V_CRUISE_MAX = 243
 V_CRUISE_UNSET = 255
 V_CRUISE_INITIAL = 40
 V_CRUISE_INITIAL_EXPERIMENTAL_MODE = 105
