@@ -57,7 +57,7 @@ class LongControl:
     else:
       return self.pid_standard
 
-  def update(self, active, CS, a_target, should_stop, accel_limits, personality):
+  def update(self, active, CS, a_target, should_stop, accel_limits, personality=None):
     """Update longitudinal control. This updates the state machine and runs a PID loop"""
 
     # --- live personality PID switching ---
