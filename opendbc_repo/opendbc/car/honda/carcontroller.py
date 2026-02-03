@@ -161,7 +161,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         v_set_mps = hud_control.setSpeed
         speed_error = v_set_mps - CS.out.vEgo
 
-        OVERSPEED_DEADBAND_MPS = 2.0  # ≈ 0.7 mph, tune 0.2–0.5
+        OVERSPEED_DEADBAND_MPS = 1.0  # ≈ 0.7 mph, tune 0.2–0.5
         if abs(speed_error) < OVERSPEED_DEADBAND_MPS:
           speed_error = 0.0
 
