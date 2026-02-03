@@ -1,94 +1,114 @@
-import numpy as np
-from cereal import car
-from openpilot.common.realtime import DT_CTRL
-from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
-from openpilot.common.pid import PIDController
-from openpilot.selfdrive.modeld.constants import ModelConstants
-
-CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
-
-LongCtrlState = car.CarControl.Actuators.LongControlState
-
-
-def long_control_state_trans(CP, CP_SP, active, long_control_state, v_ego,
-                             should_stop, brake_pressed, cruise_standstill):
-  # Gas Interceptor
-  cruise_standstill = cruise_standstill and not CP_SP.enableGasInterceptor
-
-  stopping_condition = should_stop
-  starting_condition = (not should_stop and
-                        not cruise_standstill and
-                        not brake_pressed)
-  started_condition = v_ego > CP.vEgoStarting
-
-  if not active:
-    long_control_state = LongCtrlState.off
-
-  else:
-    if long_control_state == LongCtrlState.off:
-      if not starting_condition:
-        long_control_state = LongCtrlState.stopping
-      else:
-        if starting_condition and CP.startingState:
-          long_control_state = LongCtrlState.starting
-        else:
-          long_control_state = LongCtrlState.pid
-
-    elif long_control_state == LongCtrlState.stopping:
-      if starting_condition and CP.startingState:
-        long_control_state = LongCtrlState.starting
-      elif starting_condition:
-        long_control_state = LongCtrlState.pid
-
-    elif long_control_state in [LongCtrlState.starting, LongCtrlState.pid]:
-      if stopping_condition:
-        long_control_state = LongCtrlState.stopping
-      elif started_condition:
-        long_control_state = LongCtrlState.pid
-  return long_control_state
-
 class LongControl:
   def __init__(self, CP, CP_SP):
     self.CP = CP
     self.CP_SP = CP_SP
     self.long_control_state = LongCtrlState.off
-    pos_p_limit = 0.0 # if params("NoPositivePResponse") else None # put parameter-based control here
-    self.pid = PIDController((CP.longitudinalTuning.kpBP, CP.longitudinalTuning.kpV),
-                             (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV),
-                             k_f=CP.longitudinalTuning.kf, rate=1 / DT_CTRL,
-                             pos_p_limit=pos_p_limit)
+
+    pos_p_limit = 0.0  # if params("NoPositivePResponse") else None
+
+    # --- Profile gain sets ---
+    # Standard uses CP.longitudinalTuning
+    std_kp = (CP.longitudinalTuning.kpBP, CP.longitudinalTuning.kpV)
+    std_ki = (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV)
+    std_kf = CP.longitudinalTuning.kf
+
+    # NOTE: Fill these with YOUR known-good, road-tested values.
+    # Keep BP arrays identical across profiles to avoid weirdness.
+    rel_kp = std_kp
+    rel_ki = (CP.longitudinalTuning.kiBP, [v / 2.0 for v in CP.longitudinalTuning.kiV])
+    rel_kf = std_kf
+
+    agg_kp = std_kp
+    agg_ki = (CP.longitudinalTuning.kiBP, [v * 3.0 for v in CP.longitudinalTuning.kiV])
+    agg_kf = std_kf
+
+    self.pid_relaxed = PIDController(rel_kp, rel_ki, k_f=rel_kf, rate=1 / DT_CTRL, pos_p_limit=pos_p_limit)
+    self.pid_standard = PIDController(std_kp, std_ki, k_f=std_kf, rate=1 / DT_CTRL, pos_p_limit=pos_p_limit)
+    self.pid_aggressive = PIDController(agg_kp, agg_ki, k_f=agg_kf, rate=1 / DT_CTRL, pos_p_limit=pos_p_limit)
+
+    self.pid = self.pid_standard
+    self._last_personality = None
+
+    # Output smoothing after profile switch (prevents “slam gas/brake”)
+    self._switch_timer_s = 0.0
+    self._switch_ramp_s = 2.0          # 1.0–3.0 is a good range
+    self._switch_max_delta = 0.25      # m/s^2 per update during ramp (tune)
+
     self.last_output_accel = 0.0
 
   def reset(self):
-    self.pid.reset()
+    self.pid_relaxed.reset()
+    self.pid_standard.reset()
+    self.pid_aggressive.reset()
+    self._switch_timer_s = 0.0
 
-  def update(self, active, CS, a_target, should_stop, accel_limits):
+  def _select_pid(self, personality):
+    # Personality enum comes from cereal/log in most forks.
+    # We compare by int to avoid import issues.
+    if personality is None:
+      return self.pid_standard
+
+    p = int(personality)
+    # These numeric values are typically: relaxed=0, standard=1, aggressive=2
+    if p == 0:
+      return self.pid_relaxed
+    elif p == 2:
+      return self.pid_aggressive
+    else:
+      return self.pid_standard
+
+  def update(self, active, CS, a_target, should_stop, accel_limits, personality=None):
     """Update longitudinal control. This updates the state machine and runs a PID loop"""
+
+    # --- live personality PID switching ---
+    if personality is not None and personality != self._last_personality:
+      new_pid = self._select_pid(personality)
+      if new_pid is not self.pid:
+        # Reset integrator on switch to avoid surprise stored error
+        new_pid.reset()
+        self.pid = new_pid
+
+        # Start output ramp window so accel doesn't jump
+        self._switch_timer_s = self._switch_ramp_s
+
+      self._last_personality = personality
+
+    # Limits always apply to whichever PID is active
     self.pid.neg_limit = accel_limits[0]
     self.pid.pos_limit = accel_limits[1]
 
-    self.long_control_state = long_control_state_trans(self.CP, self.CP_SP, active, self.long_control_state, CS.vEgo,
-                                                       should_stop, CS.brakePressed,
-                                                       CS.cruiseState.standstill)
+    self.long_control_state = long_control_state_trans(
+      self.CP, self.CP_SP, active, self.long_control_state, CS.vEgo,
+      should_stop, CS.brakePressed, CS.cruiseState.standstill
+    )
+
     if self.long_control_state == LongCtrlState.off:
       self.reset()
-      output_accel = 0.
+      output_accel = 0.0
 
     elif self.long_control_state == LongCtrlState.stopping:
       output_accel = self.last_output_accel
       if output_accel > self.CP.stopAccel:
         output_accel = min(output_accel, 0.0)
         output_accel -= self.CP.stoppingDecelRate * DT_CTRL
-      self.reset()
+      self.pid.reset()
 
     elif self.long_control_state == LongCtrlState.starting:
       output_accel = self.CP.startAccel
-      self.reset()
+      self.pid.reset()
 
     else:  # LongCtrlState.pid
       error = a_target - CS.aEgo
-      output_accel = self.pid.update(error, speed=CS.vEgo,
-                                     feedforward=a_target)
+      output_accel = self.pid.update(error, speed=CS.vEgo, feedforward=a_target)
 
-    self.last_output_accel = np.clip(output_accel, accel_limits[0], accel_limits[1])
+    # --- ramp output accel right after profile switch ---
+    output_accel = float(np.clip(output_accel, accel_limits[0], accel_limits[1]))
+
+    if self._switch_timer_s > 0.0:
+      self._switch_timer_s = max(0.0, self._switch_timer_s - DT_CTRL)
+      lo = self.last_output_accel - self._switch_max_delta
+      hi = self.last_output_accel + self._switch_max_delta
+      output_accel = float(np.clip(output_accel, lo, hi))
+
+    self.last_output_accel = output_accel
     return self.last_output_accel
