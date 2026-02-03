@@ -151,29 +151,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     hill_brake = math.sin(self.pitch) * ACCELERATION_DUE_TO_GRAVITY
 
     if CC.longActive:
-      accel = float(actuators.accel)
-
-      # -------------------------------------------------
-      # Hard speed guard: never gas above set speed,
-      # never brake below set speed
-      # -------------------------------------------------
-      if hud_control.speedVisible and hud_control.setSpeed > 0.1:
-        v_set_mps = hud_control.setSpeed
-        speed_error = v_set_mps - CS.out.vEgo
-
-        OVERSPEED_DEADBAND_MPS = 0.3  # ≈ 0.7 mph, tune 0.2–0.5
-        if abs(speed_error) < OVERSPEED_DEADBAND_MPS:
-          speed_error = 0.0
-
-        # Above set speed → forbid positive accel
-        if speed_error < 0.0:
-          accel = min(accel, 0.0)
-
-        # Below set speed → forbid braking
-        elif speed_error > 0.0:
-          accel = max(accel, 0.0)
-
-      gas, brake = compute_gas_brake(accel, CS.out.vEgo, self.CP.carFingerprint)
+      accel = actuators.accel
+      gas, brake = compute_gas_brake(actuators.accel, CS.out.vEgo, self.CP.carFingerprint)
     else:
       accel = 0.0
       gas, brake = 0.0, 0.0
