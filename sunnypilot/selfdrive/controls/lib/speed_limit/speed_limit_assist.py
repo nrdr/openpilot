@@ -51,6 +51,15 @@ CRUISE_BUTTON_CONFIRM_HOLD = 0.5  # secs.
 # -----------------------------------------------------------------------------
 SPEED_BIAS = 0.99375  # 1.25% slower + 50% for GPS
 
+# -----------------------------------------------------------------------------
+# Speed limit "advance" behavior:
+# Pretend we are closer than we really are so SLA begins adapting earlier.
+# Apply ONLY for DOWNWARD changes to avoid pre-accelerating before an increase.
+# -----------------------------------------------------------------------------
+SPEED_LIMIT_ADVANCE_TIME = 10.0    # seconds early
+MAX_ADVANCE_DISTANCE = 300.0       # meters cap (prevents silly lookahead at high speeds)
+MIN_ADVANCE_SPEED = 2.5            # m/s (~5.6 mph). avoid weirdness creeping/near standstill
+
 
 class SpeedLimitAssist:
   _speed_limit_final_last: float
@@ -207,9 +216,9 @@ class SpeedLimitAssist:
 
   @property
   def apply_confirm_speed_threshold(self) -> bool:
-  # Require confirmation only when the NEW speed limit is below CST.
-  # This preserves the existing behavior above CST, but allows auto changes
-  # at low speeds when the limit is >= CST.
+    # Require confirmation only when the NEW speed limit is below CST.
+    # This preserves the existing behavior above CST, but allows auto changes
+    # at low speeds when the limit is >= CST.
     return bool(self.speed_limit_final_last_conv < CONFIRM_SPEED_THRESHOLD[self.is_metric])
 
   def get_current_acceleration_as_target(self) -> float:
@@ -242,8 +251,7 @@ class SpeedLimitAssist:
 
     honda_imperial = (not self.is_metric) and (getattr(self.CP, "brand", "").lower() == "honda" or getattr(self.CP, "carName", "").lower() == "honda")
     req_plus, req_minus = compare_cluster_target(self.v_cruise_cluster, self._speed_limit_final_last, self.is_metric,
-                                            honda_imperial=honda_imperial)
-
+                                                honda_imperial=honda_imperial)
 
     return self._get_button_release(req_plus, req_minus)
 
@@ -393,6 +401,40 @@ class SpeedLimitAssist:
         elif self.speed_limit_prev > 0 and self._speed_limit > 0:
           self.update_active_event(events_sp)
 
+  def _get_advanced_distance(self,
+                            distance: float,
+                            v_cruise_cluster: float,
+                            speed_limit: float,
+                            speed_limit_final_last: float,
+                            has_speed_limit: bool) -> float:
+    """
+    Returns an "advanced" distance so the controller begins adapting earlier.
+    Gated to ONLY apply for DOWNWARD changes to avoid speeding up early.
+    """
+    if not has_speed_limit or speed_limit_final_last <= 0.0:
+      return distance
+
+    # Only advance if the upcoming limit is below the current set speed
+    below_set_speed = speed_limit_final_last < v_cruise_cluster
+
+    # If `speed_limit` is a valid current/active limit, also require upcoming < current.
+    # If it's unknown (<=0), don't block the feature.
+    below_current_limit = (speed_limit > 0.0 and speed_limit_final_last < speed_limit) or (speed_limit <= 0.0)
+
+    apply_advance = below_set_speed and below_current_limit
+    if not apply_advance:
+      return distance
+
+    # Avoid doing this at very low speeds / standstill creep.
+    if self.v_ego <= MIN_ADVANCE_SPEED:
+      return distance
+
+    if distance <= 0.0:
+      return distance
+
+    lookahead = min(self.v_ego * SPEED_LIMIT_ADVANCE_TIME, MAX_ADVANCE_DISTANCE)
+    return max(0.0, distance - lookahead)
+
   def update(self, long_enabled: bool, long_override: bool, v_ego: float, a_ego: float, v_cruise_cluster: float,
              speed_limit: float, speed_limit_final_last: float, has_speed_limit: bool, distance: float, events_sp: EventsSP) -> None:
     self.long_enabled = long_enabled
@@ -402,7 +444,9 @@ class SpeedLimitAssist:
     self._has_speed_limit = has_speed_limit
     self._speed_limit = speed_limit
     self._speed_limit_final_last = speed_limit_final_last
-    self._distance = distance
+
+    # Apply "10s early" distance only for downward speed limit changes
+    self._distance = self._get_advanced_distance(distance, v_cruise_cluster, speed_limit, speed_limit_final_last, has_speed_limit)
 
     self.update_params()
     self.update_calculations(v_cruise_cluster)
