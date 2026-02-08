@@ -34,7 +34,7 @@ CRUISE_INTERVAL_SIGN = {
 # Honda cluster MPH rounding quirks (legacy behavior)
 # These are the same constants used in the 2021 fix.
 HONDA_MPH_PER_KPH = 0.6233
-HONDA_MPH_OFFSET = 0.0995
+HONDA_MPH_OFFSET = 1.0 # Bosch
 
 
 def _honda_kph_to_mph(kph: float) -> int:
