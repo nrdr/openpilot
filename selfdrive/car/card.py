@@ -223,10 +223,8 @@ class Car:
       # Use CarState w/ buttons from the step selfdrived enables on
       self.v_cruise_helper.initialize_v_cruise(self.CS_prev, self.experimental_mode, self.dynamic_experimental_control)
 
-    # TODO: mirror the carState.cruiseState struct?
-    # Bias actual driven speed without changing the displayed/cluster set speed.
-    # 1.25% decrease => multiply by 0.9875
-    SPEED_BIAS = 0.99375
+    # GOAL: Try to find the average between GPS speed and car speed, and drive in the middle.
+    SPEED_BIAS = 0.997
     CS.vCruise = float(self.v_cruise_helper.v_cruise_kph) * SPEED_BIAS
     CS.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
 

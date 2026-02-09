@@ -72,8 +72,6 @@ class LongControl:
     self.pid.reset()
 
   def _ki_scale_for_personality(self, personality) -> float:
-    # Your requested behavior:
-    # relaxed = /2, standard = copy, aggressive = *3
     if personality == log.LongitudinalPersonality.relaxed:
       return 0.5
     if personality == log.LongitudinalPersonality.standard:
