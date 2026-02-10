@@ -72,14 +72,13 @@ class LongControl:
     self.pid.reset()
 
   def _ki_scale_for_personality(self, personality) -> float:
-    # Your requested behavior:
-    # relaxed = /2, standard = copy, aggressive = *3
+    # Sensible gains for PCM Accel cars. TODO: Make a clause for ret.GasPedalInterceptor
     if personality == log.LongitudinalPersonality.relaxed:
       return 0.5
     if personality == log.LongitudinalPersonality.standard:
-      return 1.0
+      return 0.75
     if personality == log.LongitudinalPersonality.aggressive:
-      return 3.0
+      return 1.0
     return 1.0
 
   def _apply_live_personality_tune(self, personality) -> None:
