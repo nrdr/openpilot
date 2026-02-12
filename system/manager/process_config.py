@@ -16,6 +16,15 @@ from openpilot.sunnypilot.sunnylink.utils import sunnylink_need_register, sunnyl
 WEBCAM = os.getenv("USE_WEBCAM") is not None
 DISABLE_DM = True
 
+def get_bool_safe(params: Params, key: str, default: bool = False) -> bool:
+  """
+  Read a boolean param key safely. Returns `default` if the key is missing.
+  """
+  try:
+    return params.get_bool(key)
+  except Exception:
+    return default
+
 def driverview(started: bool, params: Params, CP: car.CarParams) -> bool:
   return started or params.get_bool("IsDriverViewEnabled") or params.get_bool("LiveStreamRunning")
 
@@ -113,7 +122,14 @@ procs = [
 
   NativeProcess("loggerd", "system/loggerd", ["./loggerd"], logging),
   NativeProcess("encoderd", "system/loggerd", ["./encoderd"], only_onroad),
-  NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"], lambda started, params, CP: notcar(started, params, CP) or params.get_bool("LiveStreamRunning")),
+
+  NativeProcess(
+    "stream_encoderd",
+    "system/loggerd",
+    ["./encoderd", "--stream"],
+    lambda started, params, CP: notcar(started, params, CP) or get_bool_safe(params, "LiveStreamRunning"),
+  ),
+
   PythonProcess("logmessaged", "system.logmessaged", always_run),
 
   NativeProcess("camerad", "system/camerad", ["./camerad"], driverview, enabled=not WEBCAM),
