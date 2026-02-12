@@ -46,7 +46,7 @@ CRUISE_BUTTON_CONFIRM_HOLD = 0.5  # secs.
 # control behavior.
 # -----------------------------------------------------------------------------
 SPEED_BIAS_DEFAULT = 1.0
-SPEED_BIAS_CLARITY = 0.9875
+SPEED_BIAS_CLARITY = 1.0
 
 
 class SpeedLimitAssist:

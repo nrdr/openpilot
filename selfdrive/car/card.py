@@ -33,7 +33,7 @@ EventName = log.OnroadEvent.EventName
 carlog.addHandler(ForwardingHandler(cloudlog))
 
 SPEED_BIAS_DEFAULT = 1.0
-SPEED_BIAS_CLARITY = 0.9875
+SPEED_BIAS_CLARITY = 1.0
 
 
 def obd_callback(params: Params) -> ObdCallback:
