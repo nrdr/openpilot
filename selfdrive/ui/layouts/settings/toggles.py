@@ -33,7 +33,6 @@ DESCRIPTIONS = {
   ),
   "AlwaysOnDM": tr_noop("Enable driver monitoring even when openpilot is not engaged."),
   "RecordFront": tr_noop("Upload data from the driver-facing camera to improve the driver monitoring algorithm."),
-  "AllowOnroadStreaming": tr_noop("Allow live streaming while the vehicle is driving. Enable this to view cameras remotely while onroad."),
   "IsMetric": tr_noop("Display speed in km/h instead of mph."),
   "RecordAudio": tr_noop("Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect."),
 }

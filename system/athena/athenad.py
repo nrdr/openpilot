@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import asyncio
 import io
 import json
 import os
@@ -132,9 +131,6 @@ upload_queue: Queue[UploadItem] = queue.PriorityQueue()
 low_priority_send_queue: Queue[str] = queue.Queue()
 log_recv_queue: Queue[str] = queue.Queue()
 cancelled_uploads: set[str] = set()
-sdp_recv_queue: Queue[str] = queue.Queue()
-sdp_send_queue: Queue[str] = queue.Queue()
-ice_send_queue: Queue[str] = queue.Queue()
 
 cur_upload_items: dict[int, UploadItem | None] = {}
 
@@ -190,11 +186,6 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
     for x in range(HANDLER_THREADS)
   ]
 
-  if Params().get_bool("EnableStreamer"):
-    threads += [
-      threading.Thread(target=rtc_handler, args=(end_event, sdp_send_queue, sdp_recv_queue, ice_send_queue), name='rtc_handler')
-    ]
-
   for thread in threads:
     thread.start()
   try:
@@ -208,140 +199,6 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
     for thread in threads:
       cloudlog.debug(f"athena.joining {thread.name}")
       thread.join()
-
-
-def rtc_handler(end_event: threading.Event, sdp_send_queue: queue.Queue, sdp_recv_queue: queue.Queue, ice_recv_queue: queue.Queue) -> None:
-  cloudlog.info("RTC handler thread started")
-
-  # Start stream diagnostic
-  try:
-    from openpilot.system.athena.stream_diagnostic import stream_diagnostic
-    stream_diagnostic.start()
-  except ImportError:
-    pass
-
-  loop = asyncio.new_event_loop()
-  asyncio.set_event_loop(loop)
-
-  try:
-    from openpilot.system.athena.streamer import Streamer
-    streamer = Streamer(sdp_send_queue, sdp_recv_queue, ice_recv_queue)
-    loop.run_until_complete(streamer.event_loop(end_event))
-  except ImportError as e:
-    cloudlog.error(f"RTC handler dependencies missing: {e}")
-    # Put detailed error in SDP queue
-    error_response = json.dumps({
-      "error": f"RTC handler dependencies missing: {e}",
-      "solution": "Install aiortc: pip install aiortc"
-    })
-    try:
-      sdp_send_queue.put_nowait(error_response)
-    except Exception:
-      pass
-  except Exception as e:
-    cloudlog.exception(f"RTC handler failed: {e}")
-    # Put error in SDP queue
-    error_response = json.dumps({"error": f"RTC handler failed: {e}"})
-    try:
-      sdp_send_queue.put_nowait(error_response)
-    except Exception:
-      pass
-  finally:
-    try:
-      from openpilot.system.athena.stream_diagnostic import stream_diagnostic
-      stream_diagnostic.stop()
-    except ImportError:
-      pass
-
-    try:
-      loop.close()
-    except Exception:
-      pass
-    cloudlog.info("RTC handler thread stopped")
-
-@dispatcher.add_method
-def setSdpAnswer(answer):
-  cloudlog.info(f"DEBUG: setSdpAnswer called with: {answer}")
-  cloudlog.info(f"DEBUG: Answer type: {type(answer)}")
-
-  # Connect-killer sends the SDP answer directly in the 'answer' parameter
-  if isinstance(answer, dict) and answer.get('type') == 'start':
-    cloudlog.info("DEBUG: Received start signal from connect-killer")
-    # This is the start signal from connect-killer
-    sdp_recv_queue.put_nowait(answer)
-  elif isinstance(answer, dict) and 'type' in answer:
-    cloudlog.info(f"DEBUG: Received SDP answer with type: {answer.get('type')}")
-    # This is a real SDP answer
-    sdp_recv_queue.put_nowait(answer)
-  else:
-    cloudlog.info(f"DEBUG: Received other message: {answer}")
-    # Handle other types of messages (like ICE candidates)
-    sdp_recv_queue.put_nowait(answer)
-
-  # Always return success for JSON-RPC
-  cloudlog.info("DEBUG: setSdpAnswer returning True")
-  return True
-
-@dispatcher.add_method
-def getSdp():
-  cloudlog.info("getSdp() called - checking if rtc_handler is running")
-
-  # Check if EnableStreamer is enabled
-  params = Params()
-  if not params.get_bool("EnableStreamer"):
-    cloudlog.error("EnableStreamer is disabled")
-    return {"error": "EnableStreamer is disabled. Enable it in Settings > Device > Enable Live Streaming"}
-
-  # First, send the start signal to begin the streaming process
-  start_signal = {"type": "start"}
-  sdp_recv_queue.put_nowait(start_signal)
-  cloudlog.info("Sent start signal to rtc_handler")
-
-  start_time = time.time()
-  timeout = 45  # Increased timeout for WebRTC negotiation
-  check_interval = 0.1
-
-  while time.time() - start_time < timeout:
-    try:
-      sdp_data = sdp_send_queue.get(timeout=check_interval)
-      cloudlog.info(f"Received SDP data: {sdp_data}")
-
-      # Handle both string and dict responses
-      if isinstance(sdp_data, str):
-        try:
-          sdp = json.loads(sdp_data)
-        except json.JSONDecodeError:
-          cloudlog.error(f"Failed to parse SDP JSON: {sdp_data}")
-          return {"error": f"Invalid SDP format: {sdp_data}"}
-      else:
-        sdp = sdp_data
-
-      if sdp:
-        cloudlog.info("SDP generated successfully")
-        return sdp
-
-    except queue.Empty:
-      # Check every few seconds if we're still waiting
-      elapsed = time.time() - start_time
-      if elapsed % 5 < check_interval:  # Log every 5 seconds
-        cloudlog.info(f"Still waiting for SDP... ({elapsed:.1f}s elapsed)")
-      continue
-    except Exception as e:
-      cloudlog.exception(f"Error in getSdp: {e}")
-      return {"error": f"SDP generation failed: {e}"}
-
-  # Return error if timeout
-  cloudlog.error(f"SDP generation timeout after {timeout}s")
-  return {"error": f"SDP generation timeout after {timeout}s. Check if rtc_handler thread is running."}
-
-@dispatcher.add_method
-def getIce():
-  if not ice_send_queue.empty():
-    return json.loads(ice_send_queue.get_nowait())
-  else:
-    return {
-      'error': True
-    }
 
 
 def jsonrpc_handler(end_event: threading.Event, localProxyHandler = None) -> None:
