@@ -35,16 +35,11 @@ class LatControlTorque(LatControl):
     self.torque_from_lateral_accel = CI.torque_from_lateral_accel()
     self.lateral_accel_from_torque = CI.lateral_accel_from_torque()
 
-    # Feedforward gain was removed from the capnp schema on newer builds.
-    # Preserve legacy behavior by falling back to a safe default.
+    # Feedforward gain was removed from some builds' capnp schema and/or PID API.
+    # Preserve legacy behavior by scaling the feedforward term externally.
     self.kf = float(getattr(self.torque_params, "kf", 0.5))
 
-    self.pid = PIDController(
-      [INTERP_SPEEDS, KP_INTERP],
-      KI,
-      k_f=self.kf,
-      rate=1/self.dt
-    )
+    self.pid = PIDController([INTERP_SPEEDS, KP_INTERP], KI, rate=1/self.dt)
 
     self.update_limits()
     self.steering_angle_deadzone_deg = self.torque_params.steeringAngleDeadzoneDeg
@@ -67,7 +62,6 @@ class LatControlTorque(LatControl):
     self.torque_params.latAccelOffset = latAccelOffset
     self.torque_params.friction = friction
 
-    # If kf ever returns in the schema (or via override), track it.
     self.kf = float(getattr(self.torque_params, "kf", self.kf))
 
     self.update_limits()
@@ -99,9 +93,7 @@ class LatControlTorque(LatControl):
 
     roll_compensation = params.roll * ACCELERATION_DUE_TO_GRAVITY
 
-    curvature_deadzone = abs(
-      VM.calc_curvature(math.radians(self.steering_angle_deadzone_deg), CS.vEgo, 0.0)
-    )
+    curvature_deadzone = abs(VM.calc_curvature(math.radians(self.steering_angle_deadzone_deg), CS.vEgo, 0.0))
     lateral_accel_deadzone = curvature_deadzone * CS.vEgo ** 2
 
     delay_frames = int(np.clip(lat_delay / self.dt + 1, 1, self.lat_accel_request_buffer_len))
@@ -141,10 +133,13 @@ class LatControlTorque(LatControl):
 
       freeze_integrator = steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
 
+      # Apply legacy feedforward scaling externally to preserve prior tuning behavior.
+      ff_pid = ff * self.kf
+
       output_lataccel = self.pid.update(
         pid_log.error,
         speed=CS.vEgo,
-        feedforward=ff,
+        feedforward=ff_pid,
         freeze_integrator=freeze_integrator
       )
 
