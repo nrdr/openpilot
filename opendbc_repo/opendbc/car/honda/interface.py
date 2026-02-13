@@ -379,10 +379,10 @@ class CarInterface(CarInterfaceBase):
             # 10240 max stable 2x request
             # 32767 max EVER. Really powerful
             # 0, 2184, 4369, 6553, 8738, 13107, 17476, 21845, 32767 # current table
-            stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 800, 1600, 2600, 3840], [0, 300, 611, 1200, 3840]]
+            stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 2400, 3200, 3840], [0, 611, 1800, 3840]]
             stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.07875], [0.025875]]
           elif fw.ecu == "eps" and b"-" in fw.fwVersion and b"," in fw.fwVersion:
-            stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 800, 1600, 2600, 3840], [0, 300, 611, 1200, 3840]]
+            stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 2400, 3200, 3840], [0, 611, 1800, 3840]]
             stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.07875], [0.025875]]
       else:
         stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 2560], [0, 2560]]
