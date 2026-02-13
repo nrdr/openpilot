@@ -24,7 +24,7 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 VERSION = 1
 
 FRICTION_X = [0.4, 0.6]
-FRICTION_Y = [1.0, 0.25]
+FRICTION_Y = [1.0, 1.0] # Turn this off temporarily
 
 
 class LatControlTorque(LatControl):
@@ -37,7 +37,7 @@ class LatControlTorque(LatControl):
 
     # Feedforward gain was removed from some builds' capnp schema and/or PID API.
     # Preserve legacy behavior by scaling the feedforward term externally.
-    self.kf = float(getattr(self.torque_params, "kf", 0.5))
+    self.kf = float(getattr(self.torque_params, "kf", 1.0))
 
     self.pid = PIDController([INTERP_SPEEDS, KP_INTERP], KI, rate=1/self.dt)
 
@@ -121,7 +121,7 @@ class LatControlTorque(LatControl):
     desired_lataccel_mag = abs(future_desired_lateral_accel)
     friction_error_scale = float(np.interp(desired_lataccel_mag, FRICTION_X, FRICTION_Y))
 
-    friction_input = error * friction_error_scale
+    friction_input = (error * friction_error_scale) + (JERK_GAIN * desired_lateral_jerk)
     friction = get_friction(friction_input, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
     ff += friction_scale * friction
 
