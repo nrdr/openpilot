@@ -161,39 +161,46 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     # *** rate limit steer (with low-pass filter) ***
     torque_cmd = actuators.torque
 
-    # Only filter while lateral is active; otherwise keep state sane
     if CC.latActive:
       steering_pressed = CS.out.steeringPressed
       below_override_cutoff = CS.out.vEgo < (20.0 * CV.MPH_TO_MS)
 
-      # Only apply the "cut torque to 0" override behavior below 20 mph.
-      # Above that, use the LPF behavior without the forced-zero override.
       if below_override_cutoff:
         if steering_pressed:
           self.driver_override_until_nanos = now_nanos + int(self.override_hold_s * 1e9)
+
         bypass = now_nanos < self.driver_override_until_nanos
+
+        if bypass:
+          torque_cmd = 0.0
+          self.torque_lpf = 0.0
+          self.last_torque = 0.0
+        else:
+          tau = 0.20
+          alpha = DT_CTRL / (tau + DT_CTRL)
+
+          if torque_cmd * self.torque_lpf < 0.0:
+            self.torque_lpf = torque_cmd
+          else:
+            self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+
+          torque_cmd = self.torque_lpf
       else:
-        # Prevent a latched low-speed override from carrying upward in speed.
         self.driver_override_until_nanos = 0
-        bypass = False
 
-      if bypass:
-        torque_cmd = 0.0
-        self.torque_lpf = 0.0
-        self.last_torque = 0.0
-      else:
-        tau = 0.20
-        alpha = DT_CTRL / (tau + DT_CTRL)
-
-        # Avoid smearing through sign flips.
-        if torque_cmd * self.torque_lpf < 0.0:
+        if steering_pressed:
           self.torque_lpf = torque_cmd
         else:
-          self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+          tau = 0.20
+          alpha = DT_CTRL / (tau + DT_CTRL)
 
-        torque_cmd = self.torque_lpf
+          if torque_cmd * self.torque_lpf < 0.0:
+            self.torque_lpf = torque_cmd
+          else:
+            self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+
+          torque_cmd = self.torque_lpf
     else:
-      # Prevent snap when re-engaging lateral control.
       self.torque_lpf = 0.0
       self.last_torque = 0.0
       self.driver_override_until_nanos = 0
@@ -204,6 +211,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       -self.params.STEER_DELTA_DOWN * DT_CTRL,
       self.params.STEER_DELTA_UP * DT_CTRL
     )
+
     self.last_torque = limited_torque
 
     # *** apply brake hysteresis ***
