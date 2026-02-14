@@ -43,6 +43,99 @@ from pathlib import Path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from panda.format.x5a import x5a
 
+# ──────────────────────────────────────────────────────────────────────
+# ECU firmware database
+#
+# Keyed by Honda ECU software ID (the part number stamped on the ECU
+# label and embedded in the RWD header, e.g. "37805-RLV-L090").
+#
+# All offsets are byte positions within the decrypted firmware blob
+# (i.e. absolute_address - firmware_base).
+#
+# Values determined via Ghidra reverse engineering of each firmware.
+# ──────────────────────────────────────────────────────────────────────
+ECU_FIRMWARE_DB = {
+    "37805-RLV-L090": {
+        # -- Identity --
+        "description": "Honda CR-V RW1/RW2 2.0L Hybrid, Infineon AURIX TC27x",
+        "firmware_base": 0x80000000,  # RWD image starts at pboot base
+
+        # -- ACC minimum speed calibration --
+        # Two constants enforce the 40 km/h floor via dual-channel checks:
+        #   CRUISE_CONTROL_MIN_SPEED_KPH  - gates ACC CAN command acceptance
+        #                                    and ACC permit/fault flag logic
+        #                                    (compared vs. analog wheel speed ADC)
+        #   CRUISE_MIN_SPEED_KPH_ALT      - gates sensor fault monitoring and
+        #                                    signal integrity cross-checking
+        #                                    (compared vs. CAN bus digital speed)
+        "speed_limit_patches": [
+            {
+                "name": "CRUISE_CONTROL_MIN_SPEED_KPH",
+                "offset": 0x1B1C0,
+                "expected": 0x0FA0,       # 4000 = 40.00 km/h
+                "size": 2,                # ushort, little-endian
+            },
+            {
+                "name": "CRUISE_MIN_SPEED_KPH_ALT",
+                "offset": 0x1B1C2,
+                "expected": 0x0FA0,       # 4000 = 40.00 km/h
+                "size": 2,                # short, little-endian
+            },
+        ],
+        "speed_scale": 100,               # raw_value = km/h * 100
+
+        # -- CVN (Calibration Verification Number) --
+        "cvn_block_size": 0x40000,        # 256 KB — TC27x PFlash sector size
+        "cvn_exclude_ranges": [],         # populated once CVN storage addr is known
+
+        # -- Validation --
+        "expected_firmware_size": 0x400000,  # 4 MB total (pboot + PFLASH)
+    },
+}
+
+
+def get_ecu_id_from_rwd(rwd_obj, verbose=False):
+    """
+    Extract the ECU software ID from the parsed RWD file headers.
+
+    Header 3 lists the firmware versions this RWD can update from,
+    with the last entry being the target version (e.g. "37805-RLV-L090").
+    Values are null-padded strings.
+    """
+    header_3_values = rwd_obj.get_header_3_values()
+    if not header_3_values:
+        return None
+
+    ecu_id = header_3_values[-1].strip('\x00').strip()
+    if verbose:
+        print(f"Detected ECU software ID from header 3: {ecu_id}")
+        print(f"  Update path: {' -> '.join(v.strip(chr(0)).strip() for v in header_3_values)}")
+    return ecu_id
+
+
+def lookup_ecu_config(ecu_id, verbose=False):
+    """
+    Look up ECU-specific configuration from the firmware database.
+
+    Returns the config dict or raises ValueError if the ECU is unknown.
+    """
+    if ecu_id is None:
+        raise ValueError(
+            "Could not detect ECU software ID from the RWD headers.\n" +
+            "Use --ecu-id to specify it manually (e.g. --ecu-id 37805-RLV-L090)."
+        )
+    config = ECU_FIRMWARE_DB.get(ecu_id)
+    if config is None:
+        known = ", ".join(sorted(ECU_FIRMWARE_DB.keys())) or "(none)"
+        raise ValueError(
+            f"Unknown ECU software ID: {ecu_id}\n" +
+            f"Known firmware IDs: {known}\n" +
+            "Add this ECU to ECU_FIRMWARE_DB before patching."
+        )
+    if verbose:
+        print(f"Using firmware profile: {ecu_id} — {config['description']}")
+    return config
+
 def read_rwd_file(filepath: str, verbose: bool = False) -> tuple[bytes, bool]:
     """
     Read RWD file with automatic gzip detection.
@@ -151,12 +244,13 @@ def write_rwd_file(filepath: str, data: bytes, compress: bool = False, verbose: 
 
     return str(file_path)
 
-def calculate_honda_cvn(firmware_data: bytes, verbose: bool = False) -> bytes:
+def calculate_honda_cvn(firmware_data: bytes, ecu_config: dict = None, verbose: bool = False) -> bytes:
     """
     Calculate Honda ECU Calibration Verification Number from firmware data.
 
     Args:
         firmware_data: Raw firmware binary data
+        ecu_config: ECU-specific config from ECU_FIRMWARE_DB (optional)
         verbose: Enable verbose output
 
     Returns:
@@ -169,9 +263,10 @@ def calculate_honda_cvn(firmware_data: bytes, verbose: bool = False) -> bytes:
     additive_checksum = 0
     xor_checksum = 0
 
-    # Firmware scanning parameters
-    BLOCK_SIZE = 0x3F000  # 258,048 bytes per block
+    # Firmware scanning parameters — use ECU-specific block size if available
+    BLOCK_SIZE = (ecu_config or {}).get('cvn_block_size', 0x3F000)
     CHUNK_SIZE = 32       # 32 bytes per iteration (8 × 32-bit words)
+    cvn_exclude = (ecu_config or {}).get('cvn_exclude_ranges', [])
 
     # Calculate total firmware size and number of blocks
     firmware_size = len(firmware_data)
@@ -192,6 +287,11 @@ def calculate_honda_cvn(firmware_data: bytes, verbose: bool = False) -> bytes:
 
         # Process each block in 32-byte chunks
         for chunk_offset in range(0, len(block_data), CHUNK_SIZE):
+            # Skip chunks that fall within CVN exclusion ranges
+            abs_offset = block_start + chunk_offset
+            if any(start <= abs_offset < end for start, end in cvn_exclude):
+                continue
+
             chunk_end = min(chunk_offset + CHUNK_SIZE, len(block_data))
             chunk = block_data[chunk_offset:chunk_end]
 
@@ -236,13 +336,15 @@ def calculate_honda_cvn(firmware_data: bytes, verbose: bool = False) -> bytes:
 
     return cvn_bytes
 
-def apply_firmware_patches(firmware_data: bytearray, patch_config: dict, verbose: bool = False) -> bool:
+def apply_firmware_patches(firmware_data: bytearray, patch_config: dict,
+                          ecu_config: dict = None, verbose: bool = False) -> bool:
     """
     Apply patches to firmware data based on configuration.
 
     Args:
         firmware_data: Firmware data to modify (mutable)
         patch_config: Dictionary containing patch configuration
+        ecu_config: ECU-specific config from ECU_FIRMWARE_DB
         verbose: Enable verbose output
 
     Returns:
@@ -253,26 +355,43 @@ def apply_firmware_patches(firmware_data: bytearray, patch_config: dict, verbose
     if verbose:
         print("Applying firmware patches...")
 
-    # Example: Speed limit patch
+    # Speed limit patch — uses ECU-specific offsets and validates expected values
     if 'speed_limit_kmh' in patch_config:
         speed_limit = patch_config['speed_limit_kmh']
         if verbose:
             print(f"Applying speed limit patch: {speed_limit} km/h")
 
-        # Example addresses for speed limits (these would need to be determined
-        # for specific firmware versions through reverse engineering)
-        speed_addresses = [0x1B1C0, 0x1B1C2]  # Example offsets
+        if ecu_config is None:
+            raise ValueError("Cannot apply speed limit patch without ECU firmware profile")
 
-        for addr in speed_addresses:
-            if addr < len(firmware_data) - 1:
-                # Convert km/h to raw value (typically * 100 for Honda)
-                raw_value = int(speed_limit * 100)
-                if raw_value <= 0xFFFF:
-                    old_value = struct.unpack('<H', firmware_data[addr:addr+2])[0]
-                    firmware_data[addr:addr+2] = struct.pack('<H', raw_value)
-                    if verbose:
-                        print(f"  Address 0x{addr:06X}: {old_value/100:.1f} -> {speed_limit:.1f} km/h")
-                    patches_applied = True
+        speed_patches = ecu_config['speed_limit_patches']
+        scale = ecu_config['speed_scale']
+        raw_value = int(speed_limit * scale)
+
+        if raw_value < 0 or raw_value > 0xFFFF:
+            raise ValueError(f"Speed {speed_limit} km/h out of range (raw={raw_value})")
+
+        for patch in speed_patches:
+            addr = patch['offset']
+            expected = patch['expected']
+            name = patch['name']
+
+            if addr + 1 >= len(firmware_data):
+                raise ValueError(f"Offset 0x{addr:06X} ({name}) is beyond firmware size")
+
+            actual = struct.unpack('<H', firmware_data[addr:addr+2])[0]
+            if actual != expected:
+                raise ValueError(
+                    f"Unexpected value at 0x{addr:06X} ({name}): " +
+                    f"found 0x{actual:04X} ({actual/scale:.1f} km/h), " +
+                    f"expected 0x{expected:04X} ({expected/scale:.1f} km/h). " +
+                    "Wrong firmware version?"
+                )
+
+            firmware_data[addr:addr+2] = struct.pack('<H', raw_value)
+            if verbose:
+                print(f"  {name} @ 0x{addr:06X}: {actual/scale:.1f} -> {speed_limit:.1f} km/h")
+            patches_applied = True
 
     # Example: Byte patches
     if 'byte_patches' in patch_config:
@@ -398,8 +517,22 @@ Examples:
                           help='Verify RWD file structure without modification')
     mode_group.add_argument('--search-value', default='',
                           help='Search value for encryption decoder (default: auto-detect)')
+    mode_group.add_argument('--ecu-id', default='',
+                          help='ECU software ID override (default: auto-detect from header 3)')
+    mode_group.add_argument('--list-ecus', action='store_true',
+                          help='List all supported ECU firmware IDs and exit')
 
     args = parser.parse_args()
+
+    # Handle --list-ecus before anything else
+    if args.list_ecus:
+        print("Supported ECU firmware IDs:")
+        for ecu_id, cfg in sorted(ECU_FIRMWARE_DB.items()):
+            print(f"  {ecu_id}  — {cfg['description']}")
+            for p in cfg.get('speed_limit_patches', []):
+                print(f"    {p['name']} @ 0x{p['offset']:06X} = 0x{p['expected']:04X}" +
+                      f" ({p['expected'] / cfg['speed_scale']:.1f} km/h)")
+        return 0
 
     try:
         # Read input RWD file
@@ -434,6 +567,16 @@ Examples:
                             if hasattr(value, 'value') and value.value and len(value.value) <= 16:  # Only show short values
                                 val_hex = value.value.hex().upper() if isinstance(value.value, bytes) else str(value.value)
                                 print(f"  Value {j}: {val_hex}")
+
+        # Identify the ECU firmware
+        ecu_id = args.ecu_id or get_ecu_id_from_rwd(rwd_obj, args.verbose)
+        ecu_config = None
+        if ecu_id:
+            ecu_config = ECU_FIRMWARE_DB.get(ecu_id)
+            if ecu_config and args.verbose:
+                print(f"Matched firmware profile: {ecu_id} — {ecu_config['description']}")
+            elif not ecu_config and args.verbose:
+                print(f"Warning: ECU {ecu_id} not in firmware database (raw patches still work)")
 
         # Verify-only mode
         if args.verify_only:
@@ -479,6 +622,14 @@ Examples:
         if args.verbose:
             print(f"Decrypted firmware size: {len(decrypted_firmware):,} bytes")
 
+        # Validate firmware size against ECU profile
+        if ecu_config and ecu_config.get('expected_firmware_size'):
+            expected = ecu_config['expected_firmware_size']
+            actual = len(decrypted_firmware)
+            if actual != expected:
+                print(f"Warning: Firmware size 0x{actual:X} ({actual:,} bytes) does not match " +
+                      f"expected 0x{expected:X} ({expected:,} bytes) for {ecu_id}")
+
         # Extract-only mode
         if args.extract_only:
             output_path = args.output or args.input.replace('.rwd', '_extracted.bin').replace('.gz', '')
@@ -492,6 +643,12 @@ Examples:
         patches_to_apply = False
 
         if args.patch_speed_limit:
+            if ecu_config is None:
+                raise ValueError(
+                    f"ECU '{ecu_id or '(unknown)'}' is not in the firmware database.\n" +
+                    "--patch-speed-limit requires a known ECU profile.\n" +
+                    "Use --list-ecus to see supported firmware IDs, or add this ECU to ECU_FIRMWARE_DB."
+                )
             patch_config['speed_limit_kmh'] = args.patch_speed_limit
             patches_to_apply = True
 
@@ -515,7 +672,8 @@ Examples:
         firmware_modified = False
         if patches_to_apply:
             firmware_data = bytearray(decrypted_firmware)
-            firmware_modified = apply_firmware_patches(firmware_data, patch_config, args.verbose)
+            firmware_modified = apply_firmware_patches(
+                firmware_data, patch_config, ecu_config=ecu_config, verbose=args.verbose)
             decrypted_firmware = bytes(firmware_data)
 
         # Calculate CVN for modified firmware
@@ -523,7 +681,7 @@ Examples:
         if firmware_modified:
             if args.verbose:
                 print("\nRecalculating CVN for modified firmware...")
-            cvn_data = calculate_honda_cvn(decrypted_firmware, args.verbose)
+            cvn_data = calculate_honda_cvn(decrypted_firmware, ecu_config=ecu_config, verbose=args.verbose)
 
         # Use the new firmware update workflow if we have modifications
         if firmware_modified:
