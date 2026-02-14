@@ -24,7 +24,7 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 
 # Friction scaling on straights & turns:
 FRICTION_X = [0.4, 0.6]     # m/s^2 desired lateral accel magnitude
-FRICTION_Y = [1.0, 0.25]    # scale applied to friction input error
+FRICTION_Y = [1.0, 1.0]    # scale applied to friction input error
 
 VERSION = 2
 
@@ -139,7 +139,7 @@ class LatControlTorque(LatControl):
 
     # Fade friction out during lane changes for smoother transitions.
     lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))
-    target_scale = 0.0 if lane_change else 1.0
+    target_scale = 1.0
     friction_scale = float(self.friction_scale.update(target_scale))
 
     # Reduce friction compensation on curves (keep it strongest on straights).
