@@ -4,7 +4,7 @@ from collections import namedtuple
 from opendbc.can.packer import CANPacker
 from opendbc.car import Bus, create_gas_interceptor_command, DT_CTRL, rate_limit, make_tester_present_msg, structs
 from opendbc.car.honda import hondacan
-from opendbc.car.honda.values import CruiseButtons, VISUAL_HUD, HONDA_BOSCH, HONDA_BOSCH_RADARLESS, HONDA_NIDEC_ALT_PCM_ACCEL, CarControllerParams
+from opendbc.car.honda.values import CAR, CruiseButtons, VISUAL_HUD, HONDA_BOSCH, HONDA_BOSCH_RADARLESS, HONDA_NIDEC_ALT_PCM_ACCEL, CarControllerParams
 from opendbc.car.interfaces import CarControllerBase
 
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
@@ -116,6 +116,11 @@ class CarController(CarControllerBase):
     self.brake = 0.0
     self.last_torque = 0.0
 
+    # Pilot 2019 ECU-matched state
+    self.last_accel_cmd = 0.0
+    self.last_accel_sign = 0
+    self.sign_change_counter = 0
+
   def update(self, CC, CS, now_nanos):
     actuators = CC.actuators
     hud_control = CC.hudControl
@@ -125,10 +130,31 @@ class CarController(CarControllerBase):
 
     if CC.longActive:
       accel = actuators.accel
-      gas, brake = compute_gas_brake(actuators.accel, CS.out.vEgo, self.CP.carFingerprint)
+      # Pilot 2019: rate-limit accel command (ECU ramp rates: ~5 m/s³ up, ~6 m/s³ down)
+      if self.CP.carFingerprint == CAR.HONDA_PILOT_2019:
+        accel = float(np.clip(accel, self.last_accel_cmd - 0.06, self.last_accel_cmd + 0.05))
+      self.last_accel_cmd = accel
+      gas, brake = compute_gas_brake(accel, CS.out.vEgo, self.CP.carFingerprint)
+      if self.CP.carFingerprint == CAR.HONDA_PILOT_2019:
+        # Speed-dependent coasting deadband (ECU ROM Tables 0 & 3: wide at low speed, tight at highway)
+        coast_db = float(np.interp(CS.out.vEgo, [2.5, 10.0, 20.0, 30.0], [0.08, 0.06, 0.03, 0.005]))
+        if gas < coast_db and brake < coast_db:
+          gas, brake = 0.0, 0.0
+        # Mode switch hold-off: coast briefly during gas/brake sign changes
+        accel_sign = 1 if accel > 0.05 else (-1 if accel < -0.05 else 0)
+        if accel_sign != 0 and accel_sign != self.last_accel_sign and self.last_accel_sign != 0:
+          self.sign_change_counter = 20  # 200ms coast window at 100 Hz
+        if self.sign_change_counter > 0:
+          gas, brake = 0.0, 0.0
+          self.sign_change_counter -= 1
+        if accel_sign != 0:
+          self.last_accel_sign = accel_sign
     else:
       accel = 0.0
       gas, brake = 0.0, 0.0
+      self.last_accel_cmd = 0.0
+      self.last_accel_sign = 0
+      self.sign_change_counter = 0
 
     # *** rate limit steer ***
     limited_torque = rate_limit(actuators.torque, self.last_torque, -self.params.STEER_DELTA_DOWN * DT_CTRL,
@@ -140,7 +166,9 @@ class CarController(CarControllerBase):
                                                                            CS.out.vEgo, self.CP.carFingerprint)
 
     # *** rate limit after the enable check ***
-    self.brake_last = rate_limit(pre_limit_brake, self.brake_last, -2., DT_CTRL)
+    # Pilot 2019: symmetric brake release matching ECU (1.2:1 ratio vs stock 200:1)
+    brake_release_rate = -0.012 if self.CP.carFingerprint == CAR.HONDA_PILOT_2019 else -2.
+    self.brake_last = rate_limit(pre_limit_brake, self.brake_last, brake_release_rate, DT_CTRL)
 
     # vehicle hud display, wait for one update from 10Hz 0x304 msg
     fcw_display, steer_required, acc_alert = process_hud_alert(hud_control.visualAlert)
