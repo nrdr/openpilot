@@ -189,7 +189,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         if torque_cmd * self.torque_lpf < 0.0:
           self.torque_lpf = torque_cmd
         else:
-          self.torque_lpf = torque_cmd # Disable LPF temporarily
+          self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
 
         torque_cmd = self.torque_lpf
     else:
