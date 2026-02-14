@@ -139,7 +139,7 @@ class LatControlTorque(LatControl):
 
     # Fade friction out during lane changes for smoother transitions.
     lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))
-    target_scale = 1.0
+    target_scale = 0.5 if lane_change else 1.0
     friction_scale = float(self.friction_scale.update(target_scale))
 
     # Reduce friction compensation on curves (keep it strongest on straights).
