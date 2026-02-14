@@ -24,7 +24,7 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 
 # Friction scaling on straights & turns:
 FRICTION_X = [0.4, 0.6]     # m/s^2 desired lateral accel magnitude
-FRICTION_Y = [1.0, 0.25]    # scale applied to friction input error
+FRICTION_Y = [1.0, 0.5]    # scale applied to friction input error
 
 VERSION = 2
 
