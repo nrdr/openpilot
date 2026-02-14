@@ -1,23 +1,6 @@
 #!/usr/bin/env python3
 """
 Honda ECU Firmware Update Script
-
-This script updates Honda ECU firmware using UDS (Unified Diagnostic Services) commands.
-It's based on analysis of the Honda ECU firmware and follows similar patterns to the EPS
-update script but with Honda-specific security access and firmware handling.
-
-Key differences from EPS update:
-- Uses security access level 1 (standard UDS security access)
-- Different security key calculation algorithm
-- Uses QSPI flash memory operations
-- Different UDS service handlers and session types
-
-Requirements:
-- panda package (from comma.ai): For CAN communication
-- Physical CAN connection to the ECU (using panda or other interface)
-- Honda ECU firmware file (.bin format)
-
-Author: Generated based on reverse engineering of Honda ECU firmware
 """
 
 import os
@@ -28,7 +11,7 @@ from argparse import ArgumentParser
 from opendbc.car.structs import CarParams
 from panda import Panda
 from panda.format.x5a import x5a
-from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE
+from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, RESET_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE, NegativeResponseError, MessageTimeoutError
 from unittest import mock
 
 def auto_int(i):
@@ -67,7 +50,7 @@ def calculate_session_key(const_bytes: bytes, seed_bytes: bytes) -> bytes:
     if k2 == 0:
         k2 = 0x10000
 
-    key = (seed + k0) ^ (seed * k1) % k2
+    key = ((seed + k0) & 0xFFFF) ^ ((seed * k1) % k2)
     key_bytes = struct.pack('!H', key)
     print(f"Calculated key: {key_bytes.hex().upper()}")
     return key_bytes
@@ -107,7 +90,19 @@ def get_uds_client(can_addr, bus):
         uds_client.request_download.return_value = 0x200 + 2 # 512 byte max chunk size + header
         uds_client.transfer_data.return_value = b'\x76\x01'
         uds_client.request_transfer_exit.return_value = b'\x77'
-        uds_client.read_data_by_identifier.return_value = b'37805-RLV-L010\x00\x00'
+        uds_client.ecu_reset.return_value = None
+
+        # Configure mock to return different responses based on data identifier
+        def mock_read_data_by_identifier(data_id):
+            if data_id == DATA_IDENTIFIER_TYPE.APPLICATION_SOFTWARE_IDENTIFICATION:
+                return b'37805-RLV-L010\x00\x00'
+            elif data_id == DATA_IDENTIFIER_TYPE.CALIBRATION_VERIFICATION_NUMBER:
+                # Return a mock CVN that will differ from calculated CVN to test mismatch scenario
+                return b'\x12\x34\x56\x78'  # 4-byte mock CVN
+            else:
+                return b'UNKNOWN'
+
+        uds_client.read_data_by_identifier.side_effect = mock_read_data_by_identifier
         print("Using mock client")
 
     return uds_client
@@ -128,7 +123,6 @@ def write_firmware_to_ecu(uds_client: UdsClient, firmware: x5a, debug_output: li
         debug_output = []
 
     try:
-    # Write firmware to ECU
         print("Requesting download")
         assert len(firmware.firmware_blocks) == 1
         block = firmware.firmware_blocks[0]
@@ -140,7 +134,7 @@ def write_firmware_to_ecu(uds_client: UdsClient, firmware: x5a, debug_output: li
 
         with tqdm.tqdm(total=length, unit='B', unit_scale=True) as t:
             cursor = 0
-            seq = 0
+            seq = 1
             while cursor < length:
                 block_size = min(max_chunk_size, length - cursor)
 
@@ -160,6 +154,64 @@ def write_firmware_to_ecu(uds_client: UdsClient, firmware: x5a, debug_output: li
         print(f"Error during firmware transfer: {e}")
         return False
 
+def check_firmware_cvn(uds_client: UdsClient, firmware: x5a, debug: bool = False) -> bool:
+    """
+    Check if firmware flashing is not needed by comparing CVNs.
+
+    Args:
+        uds_client: UDS client instance for ECU communication
+        firmware: Firmware data in x5a format
+        debug: Enable detailed debug output
+
+    Returns:
+        True if CVNs match
+    """
+    try:
+        print("Checking if firmware update is needed...")
+
+        # Read current CVN from ECU
+        print("Reading current CVN from ECU...")
+        try:
+            ecu_cvn_data = uds_client.read_data_by_identifier(DATA_IDENTIFIER_TYPE.CALIBRATION_VERIFICATION_NUMBER)
+            # Extract 4-byte CVN from response (skip status bytes if present)
+            ecu_cvn = ecu_cvn_data[-4:] if len(ecu_cvn_data) >= 4 else ecu_cvn_data
+
+            if debug:
+                print(f"ECU CVN: {ecu_cvn_data.hex().upper()}")
+
+        except NegativeResponseError as e:
+            if debug:
+                print(f"UDS negative response reading CVN: {e}")
+            return False
+        except MessageTimeoutError:
+            if debug:
+                print("CVN read timeout")
+            return False
+        except Exception as e:
+            if debug:
+                print(f"CVN read error: {e}")
+            return False
+
+        # Calculate CVN from firmware file
+        print("Getting CVN from firmware file...")
+        try:
+            firmware_cvn = get_cvn(firmware)
+
+            if debug:
+                print(f"Firmware CVN: {' '.join(f'{b:02X}' for b in firmware_cvn)}")
+
+        except Exception as e:
+            if debug:
+                print(f"CVN calculation error: {e}")
+            return False
+
+        return ecu_cvn == firmware_cvn
+    except Exception as e:
+        if debug:
+            print(f"Unexpected CVN check error: {e}")
+
+    return False
+
 def parse_arguments():
     """Parse and return command line arguments"""
     parser = ArgumentParser(description="Honda ECU Firmware Update Tool")
@@ -169,6 +221,7 @@ def parse_arguments():
     parser.add_argument("--danger", action="store_true", help="Run in danger mode that actually performs mutating actions")
     parser.add_argument("--skip-checksum", action="store_true", help="Skip firmware checksum validation")
     parser.add_argument("--skip-security", action="store_true", help="Skip security access (if ECU is already unlocked)")
+    parser.add_argument("--force", action="store_true", help="Force firmware flashing even if CVN indicates no update needed")
     return parser.parse_args()
 
 def load_and_validate_firmware(args) -> x5a:
@@ -203,6 +256,9 @@ def get_seed_secret(fw: x5a, app_id: bytes):
             return headers[4].values[i].value
 
     raise RuntimeError(f"Couldn't find software seed for software application ID {app_id}")
+
+def get_cvn(fw: x5a) -> bytes:
+    return fw.file_headers[1].values[0].value
 
 def get_can_address(fw: x5a) -> int:
     return 0x18da00f1 | struct.unpack('!B', fw.file_headers[2].values[0].value)[0] << 8
@@ -274,7 +330,6 @@ def perform_security_access(uds_client: UdsClient, app_id: bytes, firmware: x5a,
         secret_key = get_seed_secret(firmware, app_id)
         key = calculate_session_key(secret_key, seed)
 
-
         print("Sending key for security level 1...")
         data = uds_client.security_access(ACCESS_TYPE.SEND_KEY, key)
         if data is not None:
@@ -315,11 +370,14 @@ def perform_firmware_update(uds_client: UdsClient, firmware: x5a, debug_output: 
 
     # Erase flash memory
     print("Erasing flash memory...")
-    data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY)
+    assert len(firmware.firmware_blocks) == 1
+    block = firmware.firmware_blocks[0]
+    erase_data = struct.pack('!II', block["start"], block["length"])
+    data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY, erase_data)
     if data is not None:
         debug_output += [data]
 
-    print("Setting firmware decryption key")
+    print(f"Setting firmware decryption key: {firmware.keys}")
     uds_client.write_data_by_identifier(DATA_IDENTIFIER_TYPE.FLASH_DECRYPTION_KEY, firmware.keys)
 
     success = write_firmware_to_ecu(uds_client, firmware, debug_output)
@@ -329,6 +387,9 @@ def perform_firmware_update(uds_client: UdsClient, firmware: x5a, debug_output: 
         data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)
         if data is not None:
             debug_output += [data]
+
+        print("Resetting ECU...")
+        uds_client.ecu_reset(RESET_TYPE.HARD)
 
         print("Firmware update completed successfully!")
         return True
@@ -350,14 +411,7 @@ def handle_debug_output(args, debug_output: list):
             print(f"{i}: {data}")
 
 def validate_mock_calls(uds_client, args, firmware: x5a):
-    """
-    Validate mock UDS client calls for testing purposes
-
-    Args:
-        uds_client: UDS client instance (should be mock)
-        args: Parsed command line arguments
-        firmware_data: Firmware binary data
-    """
+    """Validate mock UDS client calls for testing purposes"""
     if not isinstance(uds_client, mock.Mock):
         return
 
@@ -369,6 +423,10 @@ def validate_mock_calls(uds_client, args, firmware: x5a):
         call.diagnostic_session_control(SESSION_TYPE.EXTENDED_DIAGNOSTIC),
     ]
 
+    # Add CVN check call unless force-flash is specified
+    if not args.force:
+        expected_calls += [call.read_data_by_identifier(DATA_IDENTIFIER_TYPE.CALIBRATION_VERIFICATION_NUMBER)]
+
     if not args.skip_security:
         expected_calls += [
             call.security_access(ACCESS_TYPE.REQUEST_SEED),
@@ -378,20 +436,23 @@ def validate_mock_calls(uds_client, args, firmware: x5a):
     expected_calls += [call.diagnostic_session_control(SESSION_TYPE.PROGRAMMING)]
 
     if args.danger:
-            expected_calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY)]
-            expected_calls += [call.write_data_by_identifier(DATA_IDENTIFIER_TYPE.FLASH_DECRYPTION_KEY, firmware.keys)]
-            expected_calls += [call.request_download(firmware.firmware_blocks[0]["start"], len(firmware.firmware_encrypted[0]))]
-            expected_calls += [call.transfer_data(0, firmware.firmware_encrypted[0][0:512])]
-            expected_calls += [call.transfer_data(1, firmware.firmware_encrypted[0][512:1024])]
-            uds_client.assert_has_calls(expected_calls)
+        erase_data = struct.pack('!II', firmware.firmware_blocks[0]["start"], firmware.firmware_blocks[0]["length"])
+        expected_calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY, erase_data)]
+        expected_calls += [call.write_data_by_identifier(DATA_IDENTIFIER_TYPE.FLASH_DECRYPTION_KEY, firmware.keys)]
+        expected_calls += [call.request_download(firmware.firmware_blocks[0]["start"], len(firmware.firmware_encrypted[0]))]
+        expected_calls += [call.transfer_data(1, firmware.firmware_encrypted[0][0:512])]
+        expected_calls += [call.transfer_data(2, firmware.firmware_encrypted[0][512:1024])]
 
-            num_blocks = -(len(firmware.firmware_encrypted[0]) // -512) # sneaky math ceil
-            assert uds_client.transfer_data.call_count == num_blocks
+        uds_client.assert_has_calls(expected_calls)
 
-            expected_calls = []
-            expected_calls += [call.transfer_data((num_blocks & 0xFF) - 1, firmware.firmware_encrypted[0][((num_blocks-1)*512):])]
-            expected_calls += [call.request_transfer_exit()]
-            expected_calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)]
+        num_blocks = -(len(firmware.firmware_encrypted[0]) // -512) # sneaky math ceil
+        assert uds_client.transfer_data.call_count == num_blocks
+
+        expected_calls = []
+        expected_calls += [call.transfer_data((num_blocks & 0xFF), firmware.firmware_encrypted[0][((num_blocks-1)*512):])]
+        expected_calls += [call.request_transfer_exit()]
+        expected_calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)]
+        expected_calls += [call.ecu_reset(RESET_TYPE.HARD)]
 
     uds_client.assert_has_calls(expected_calls)
     print("mock validation passed!")
@@ -406,6 +467,15 @@ def main():
 
     try:
         app_id = initialize_ecu_communication(uds_client, debug_output)
+
+        # CVN checking logic (unless force is specified)
+        if not args.force:
+            no_difference = check_firmware_cvn(uds_client, firmware, args.debug)
+
+            if no_difference:
+                print("Firmware update not required - exiting")
+                return 0
+
         if args.skip_security:
             print("Skipping security access as requested...")
         else:
