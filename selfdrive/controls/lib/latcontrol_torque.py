@@ -39,7 +39,7 @@ class LatControlTorque(LatControl):
 
     # Restore feedforward gain behavior when available.
     # If torque_params does not expose kf on your branch, default to 1.0.
-    kf = float(getattr(self.torque_params, "kf", 1.0))
+    kf = float(getattr(self.torque_params, "kf", 0.3))
 
     self.pid = PIDController(
       [INTERP_SPEEDS, KP_INTERP],
