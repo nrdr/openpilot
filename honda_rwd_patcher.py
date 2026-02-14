@@ -453,7 +453,7 @@ Examples:
             if args.verbose:
                 print("\nAttempting auto-crack with header 3 values...")
             # Only use header 3 values for cracking
-            firmware_candidates = rwd_obj.auto_crack_with_known_plaintext()
+            firmware_candidates = rwd_obj.auto_crack_with_header_3()
             if firmware_candidates:
                 # Get the search value that worked
                 header_3_values = rwd_obj.get_header_3_values()
@@ -474,8 +474,7 @@ Examples:
                 return 1
 
         # Get decrypted firmware
-        _ = rwd_obj.get_encoder(search_value)  # Initialize encryption LUT
-        decrypted_firmware, _ = rwd_obj.decrypt(rwd_obj._decoder)
+        decrypted_firmware, _ = rwd_obj.decrypt(rwd_obj.decoder)
 
         if args.verbose:
             print(f"Decrypted firmware size: {len(decrypted_firmware):,} bytes")
@@ -558,7 +557,7 @@ Examples:
                 print("\nNo modifications applied, regenerating original RWD file...")
 
             rwd_obj.set_unencrypted_firmware(decrypted_firmware)
-            output_data = rwd_obj.generate(search_value, cvn_data)
+            output_data = rwd_obj.generate(cvn_data)
 
         # Determine output path
         if args.output:

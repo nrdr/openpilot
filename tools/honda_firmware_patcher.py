@@ -65,9 +65,9 @@ def memory_address_to_file_offset(memory_addr: int) -> int:
     Returns:
         File offset in the firmware binary
     """
-    if 0x80000000 <= memory_addr <= 0x8fffffff:
+    if 0x80010000 <= memory_addr <= 0x8fffffff:
         return memory_addr - 0x80010000
-    elif 0xa0000000 <= memory_addr <= 0xafffffff:
+    elif 0xa0010000 <= memory_addr <= 0xafffffff:
         return memory_addr - 0xa0010000
     else:
         raise ValueError(f"Unsupported memory address: 0x{memory_addr:08x}")
@@ -193,7 +193,6 @@ def calculate_honda_checksum(firmware_data: bytes, verbose: bool = True) -> tupl
         size = (end_addr - start_addr + 1)
         end_offset = start_offset + size
 
-        # ROM ranges are all in the main firmware file (no negative offsets)
         range_checksum = tally_words(firmware_data, start_offset, end_offset)
         checksums[f'rom_range_{i}'] = range_checksum
         rom_checksum = (rom_checksum + range_checksum) & 0xFFFF
