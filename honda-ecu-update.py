@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# pylint: disable=bad-indentation
 """
 Honda ECU Firmware Update Script
 """
@@ -14,13 +15,23 @@ from panda.format.x5a import x5a
 from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, RESET_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE, NegativeResponseError, MessageTimeoutError
 from unittest import mock
 
+FLASH_BASE = 0x80000000
+FLASH_END  = 0x803FFFFF
+FLASH_SIZE = FLASH_END - FLASH_BASE + 1  # 0x400000 = 4 MB
+
+# Honda RWD "full" update covers everything except the 64KB bootloader.
+# The ECU's bootloader expects 0xA0xxxxxx (cached PFlash segment);
+# we normalize to 0x80xxxxxx for validation.
+RWD_FULL_START = 0x80010000  # normalized from 0xA0010000
+RWD_FULL_SIZE  = 0x3F0000    # 4 MB minus 64 KB bootloader
+
 def auto_int(i):
     """Convert string to integer with automatic base detection (hex, octal, decimal)"""
     return int(i, 0)
 
 def read_file(fn) -> bytes:
     """Read firmware file, supporting both regular and gzipped files"""
-    f_name, f_ext = os.path.splitext(fn)
+    _, f_ext = os.path.splitext(fn)
     if f_ext == ".gz":
         import gzip
         with gzip.open(fn, 'rb') as f:
@@ -60,17 +71,52 @@ def validate_firmware(firmware: x5a) -> bool:
     Validate Honda ECU firmware
 
     Args:
-        firmware_data: The firmware binary data
+        firmware: The firmware in x5a format
 
     Returns:
         True if firmware is valid, False otherwise
     """
     assert len(firmware.firmware_blocks) == 1
-    length = len(firmware.firmware_encrypted[0])
+    block = firmware.firmware_blocks[0]
+    start = block["start"]
+    length = block["length"]
+    end = start + length
+
     print(f"Firmware size: {length} bytes (0x{length:08x})")
-    if length < 0x10000:
-        print("Warning: Firmware file seems too small")
+    print(f"Flash region:  0x{start:08X} - 0x{end:08X}")
+
+    if length < 0x100:
+        print("Warning: Firmware file seems too small (< 256 bytes)")
         return False
+
+    # Normalize 0xA0xxxxxx cached mapping to 0x80xxxxxx for validation
+    norm_start = start
+    if (norm_start & 0xF0000000) == 0xA0000000:
+        norm_start = (norm_start & 0x0FFFFFFF) | 0x80000000
+    norm_end = norm_start + length
+
+    if norm_start < FLASH_BASE or norm_end > FLASH_END + 1:
+        print(
+            f"Error: Flash region 0x{norm_start:08X}-0x{norm_end:08X} outside PFlash range "
+            + f"0x{FLASH_BASE:08X}-0x{FLASH_END:08X}"
+        )
+        return False
+
+    # Validate 16 KB sector alignment (smallest AURIX PFlash sector)
+    SECTOR_SIZE = 0x4000  # 16 KB
+    if (norm_start - FLASH_BASE) % SECTOR_SIZE != 0:
+        print(f"Error: Start address 0x{start:08X} not aligned to 16 KB sector boundary")
+        return False
+    if length % SECTOR_SIZE != 0:
+        print(f"Error: Length 0x{length:08X} not aligned to 16 KB sector boundary")
+        return False
+
+    # Detect partial vs full flash
+    is_full = (norm_start == RWD_FULL_START and length == RWD_FULL_SIZE)
+    if is_full:
+        print(f"Mode:          FULL flash ({length // 1024} KB)")
+    else:
+        print(f"Mode:          PARTIAL flash ({length // 1024} KB)")
 
     return True
 
@@ -79,7 +125,7 @@ def get_uds_client(can_addr, bus):
     try:
         panda = Panda(disable_checks=True)
         panda.set_safety_mode(CarParams.SafetyModel.elm327)
-        uds_client = UdsClient(panda, can_addr, bus=bus)
+        uds_client = UdsClient(panda, can_addr, bus=bus, response_pending_timeout=30)
         print("Using real client")
     except Exception:
         mock_helper = mock.patch('opendbc.car.uds.UdsClient', autospec=True)
@@ -369,10 +415,24 @@ def perform_firmware_update(uds_client: UdsClient, firmware: x5a, debug_output: 
     print("WARNING: Performing actual firmware update!")
 
     # Erase flash memory
-    print("Erasing flash memory...")
     assert len(firmware.firmware_blocks) == 1
     block = firmware.firmware_blocks[0]
-    erase_data = struct.pack('!II', block["start"], block["length"])
+    start = block["start"]
+    length = block["length"]
+
+    # Normalize for comparison
+    norm_start = start
+    if (norm_start & 0xF0000000) == 0xA0000000:
+        norm_start = (norm_start & 0x0FFFFFFF) | 0x80000000
+    is_full = (norm_start == RWD_FULL_START and length == RWD_FULL_SIZE)
+
+    if is_full:
+        print(f"*** FULL FLASH: erasing entire flash ({length // 1024} KB) ***")
+    else:
+        end = start + length
+        print(f"*** PARTIAL FLASH: erasing 0x{start:08X} - 0x{end:08X} ({length // 1024} KB) ***")
+
+    erase_data = struct.pack('!II', start, length)
     data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.ERASE_MEMORY, erase_data)
     if data is not None:
         debug_output += [data]
