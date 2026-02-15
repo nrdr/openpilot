@@ -177,6 +177,7 @@ class Base(object):
                 if (search_value.encode('ascii') in decrypted) and candidate not in firmware_candidates:
                     print(f"\n✓ Found working decoder at attempt {attempts}")
                     self._decoder = decoder  # Store the working decoder
+                    self._encoder = self._create_encoder(decoder)
                     firmware_candidates.append([''.join(c) for c in candidate])
 
                     cipher_desc = f"(((i {o1['sym']} {k1['sym']}) {o2['sym']} {k2['sym']}) {o3['sym']} {k3['sym']}) & 0xFF"
@@ -277,10 +278,7 @@ class Base(object):
         """
         encoder = {}
         for encrypted_byte, decrypted_byte in decoder.items():
-            # Convert bytes to int for lookup
-            enc_int = encrypted_byte[0] if isinstance(encrypted_byte, bytes) else encrypted_byte
-            dec_int = decrypted_byte[0] if isinstance(decrypted_byte, bytes) else decrypted_byte
-            encoder[dec_int] = enc_int
+            encoder[decrypted_byte] = encrypted_byte
         return encoder
 
     def encrypt_firmware(self, unencrypted_firmware, encryption_lut):
@@ -298,10 +296,10 @@ class Base(object):
         for firmware_block in unencrypted_firmware:
             encrypted_block = bytearray()
             for byte in firmware_block:
-                byte_val = byte if isinstance(byte, int) else ord(byte)
-                if byte_val not in encryption_lut:
-                    raise ValueError(f"Byte value {byte_val} not found in encryption lookup table")
-                encrypted_block.append(encryption_lut[byte_val])
+                key = chr(byte) if isinstance(byte, int) else byte
+                if key not in encryption_lut:
+                    raise ValueError(f"Byte value {byte} not found in encryption lookup table")
+                encrypted_block.append(ord(encryption_lut[key]))
             encrypted_firmware.append(bytes(encrypted_block))
         return encrypted_firmware
 

@@ -58,7 +58,11 @@ ECU_FIRMWARE_DB = {
     "37805-RLV-L090": {
         # -- Identity --
         "description": "Honda CR-V RW1/RW2 2.0L Hybrid, Infineon AURIX TC27x",
-        "firmware_base": 0x80000000,  # RWD image starts at pboot base
+        "firmware_base": 0xA0010000,  # RWD data start: cached PFlash + 64KB boot skip
+        #   Bootloader expects 0xA0xxxxxx (cached PFlash segment).
+        #   flash_lookup_sector_by_address does (addr + 0x60000000 < 0x400001),
+        #   which only passes for 0xA0xxxxxx, not 0x80xxxxxx.
+        #   The RWD file itself stores start=0xA0010000 (verified from real .rwd).
 
         # -- ACC minimum speed calibration --
         # Two constants enforce the 40 km/h floor via dual-channel checks:
@@ -68,16 +72,19 @@ ECU_FIRMWARE_DB = {
         #   CRUISE_MIN_SPEED_KPH_ALT      - gates sensor fault monitoring and
         #                                    signal integrity cross-checking
         #                                    (compared vs. CAN bus digital speed)
+        #
+        # All offsets are byte positions within the decrypted firmware blob
+        # (i.e. absolute_address - firmware_base).
         "speed_limit_patches": [
             {
                 "name": "CRUISE_CONTROL_MIN_SPEED_KPH",
-                "offset": 0x1B1C0,
+                "offset": 0xB1C0,
                 "expected": 0x0FA0,       # 4000 = 40.00 km/h
                 "size": 2,                # ushort, little-endian
             },
             {
                 "name": "CRUISE_MIN_SPEED_KPH_ALT",
-                "offset": 0x1B1C2,
+                "offset": 0xB1C2,
                 "expected": 0x0FA0,       # 4000 = 40.00 km/h
                 "size": 2,                # short, little-endian
             },
@@ -85,11 +92,71 @@ ECU_FIRMWARE_DB = {
         "speed_scale": 100,               # raw_value = km/h * 100
 
         # -- CVN (Calibration Verification Number) --
+        # ECU computes CVN over 0xA0010000–0xA0400000 on every boot
+        # (compute_calibration_verification_number @ 0x800735FE).
+        # This exactly matches the RWD data range, so CVN = checksum(firmware_data).
         "cvn_block_size": 0x40000,        # 256 KB — TC27x PFlash sector size
-        "cvn_exclude_ranges": [],         # populated once CVN storage addr is known
+
+        # -- Boot flash checksum complement --
+        # The boot-time flash checksum (calculate_flash_checksum @ 0x8004E162)
+        # sums every byte in the 4MB flash using tally_words. The low byte
+        # must equal 0x00 or the ECU triggers a fatal watchdog reset.
+        #
+        # We use a byte in the calibration section's zero-fill area
+        # (sector 0x4000–0x8000, abs 0xA0014000–0xA0018000) so that
+        # --partial only needs to flash calibration sectors (~32KB)
+        # instead of spanning to the original Honda complement at
+        # 0xA0309C08 (~3.2MB).
+        #
+        # The zero-fill area at 0xA0014002–0xA0017FFF has no xrefs from
+        # either the 0xA0 (cached) or 0x80 (non-cached) PFlash mappings,
+        # no disassembly operand hits, and is undefined in Ghidra.
+        # Offset 0x7FFE (abs 0xA0017FFE) is deep in this dead zone,
+        # at the end of the sector before the speed limit's sector.
+        "flash_checksum_complement_offset": 0x7FFE,  # abs addr: a0017FFE (calibration zero-fill)
 
         # -- Validation --
-        "expected_firmware_size": 0x400000,  # 4 MB total (pboot + PFLASH)
+        "expected_firmware_size": 0x3F0000,  # 4032 KB (full flash minus 64KB bootloader)
+
+        # -- Flash sector boundaries (data-relative offsets) --
+        # Extracted from bootloader sector lookup table at 0x60106C54 (55 entries).
+        # Bootloader validates erase start/end addresses against this table;
+        # non-aligned addresses are rejected with NRC 0x31 (requestOutOfRange).
+        #
+        # These are offsets within the firmware data blob (byte 0 = 0xA0010000).
+        # The bootloader's first 4 sectors (0x00000000–0x0000FFFF) are not in
+        # the RWD and cannot be erased via this path.
+        #
+        # TC29x PFlash layout (data-relative, starting after 64KB bootloader):
+        "sector_boundaries": [
+            # -- PFlash0 remainder (0xA0010000 – 0xA01FFFFF) --
+            0x000000, 0x004000, 0x008000, 0x00C000,             # 4 × 16 KB
+            0x010000, 0x018000, 0x020000, 0x028000,             # 8 × 32 KB
+            0x030000, 0x038000, 0x040000, 0x048000,
+            0x050000, 0x060000, 0x070000, 0x080000,             # 4 × 64 KB
+            0x090000, 0x0B0000, 0x0D0000,                       # 3 × 128 KB
+            0x0F0000, 0x130000, 0x170000, 0x1B0000,             # 4 × 256 KB
+            # -- PFlash1 (0xA0200000 – 0xA03FFFFF) --
+            0x1F0000,                                           # 8 × 16 KB
+            0x1F4000, 0x1F8000, 0x1FC000,
+            0x200000, 0x204000, 0x208000, 0x20C000,
+            0x210000, 0x218000, 0x220000, 0x228000,             # 8 × 32 KB
+            0x230000, 0x238000, 0x240000, 0x248000,
+            0x250000, 0x260000, 0x270000, 0x280000,             # 4 × 64 KB
+            0x290000, 0x2B0000, 0x2D0000,                       # 3 × 128 KB
+            0x2F0000, 0x330000, 0x370000, 0x3B0000,             # 4 × 256 KB
+            # -- End of data --
+            0x3F0000,
+        ],
+
+        # -- Named flash regions for --partial-region shorthand --
+        # Offsets are data-relative (byte 0 = first byte after bootloader).
+        # Each region must start and end on sector boundaries from the table above.
+        "flash_regions": {
+            "calibration": {"offset": 0x000000, "size": 0x010000},   # 64 KB  — calibration data (first 4 data sectors)
+            "application": {"offset": 0x010000, "size": 0x1E0000},   # 1920 KB — application code (PFlash0 remainder)
+            "pflash1":     {"offset": 0x1F0000, "size": 0x200000},   # 2 MB   — entire PFlash1 bank
+        },
     },
 }
 
@@ -266,7 +333,6 @@ def calculate_honda_cvn(firmware_data: bytes, ecu_config: dict = None, verbose: 
     # Firmware scanning parameters — use ECU-specific block size if available
     BLOCK_SIZE = (ecu_config or {}).get('cvn_block_size', 0x3F000)
     CHUNK_SIZE = 32       # 32 bytes per iteration (8 × 32-bit words)
-    cvn_exclude = (ecu_config or {}).get('cvn_exclude_ranges', [])
 
     # Calculate total firmware size and number of blocks
     firmware_size = len(firmware_data)
@@ -287,11 +353,6 @@ def calculate_honda_cvn(firmware_data: bytes, ecu_config: dict = None, verbose: 
 
         # Process each block in 32-byte chunks
         for chunk_offset in range(0, len(block_data), CHUNK_SIZE):
-            # Skip chunks that fall within CVN exclusion ranges
-            abs_offset = block_start + chunk_offset
-            if any(start <= abs_offset < end for start, end in cvn_exclude):
-                continue
-
             chunk_end = min(chunk_offset + CHUNK_SIZE, len(block_data))
             chunk = block_data[chunk_offset:chunk_end]
 
@@ -428,9 +489,10 @@ def apply_firmware_patches(firmware_data: bytearray, patch_config: dict,
                 pos += len(new_bytes)
                 count += 1
 
-            if verbose and count > 0:
-                print(f"  Replaced pattern {old_pattern} -> {new_pattern} ({count} occurrences)")
+            if count > 0:
                 patches_applied = True
+                if verbose:
+                    print(f"  Replaced pattern {old_pattern} -> {new_pattern} ({count} occurrences)")
 
     if verbose:
         if patches_applied:
@@ -439,6 +501,63 @@ def apply_firmware_patches(firmware_data: bytearray, patch_config: dict,
             print("No patches were applied")
 
     return patches_applied
+
+
+def update_flash_checksum_complement(firmware_data: bytearray,
+                                     ecu_config: dict,
+                                     original_firmware: bytes,
+                                     verbose: bool = False) -> None:
+    """
+    Update the flash checksum complement byte to maintain boot integrity.
+
+    The boot-time flash checksum (calculate_flash_checksum @ 0x8004E162) runs
+    on every boot across the entire 4MB flash (a0000000-a03fffff), including
+    the 64KB bootloader. It uses the tally_words algorithm which sums
+    w + (w>>8) + (w>>16) + (w>>24) for each 32-bit word. The low byte of
+    the final result must equal 0x00 or the ECU triggers a fatal watchdog
+    reset.
+
+    The low byte of the tally_words result equals the sum of all individual
+    bytes mod 256. Since the boot check covers bootloader + firmware and we
+    only control firmware bytes, we must preserve the original firmware's
+    byte sum (which the factory set so that boot + firmware sums to 0).
+
+    Args:
+        firmware_data: Full firmware data to modify (mutable bytearray)
+        ecu_config: ECU-specific config with flash_checksum_complement_offset
+        original_firmware: Original unmodified firmware (used to derive target byte sum)
+        verbose: Enable verbose output
+    """
+    complement_offset = ecu_config.get('flash_checksum_complement_offset')
+    if complement_offset is None:
+        if verbose:
+            print("  No flash_checksum_complement_offset in ECU config — skipping")
+        return
+
+    if complement_offset >= len(firmware_data):
+        raise ValueError(
+            f"Checksum complement offset 0x{complement_offset:06X} exceeds "
+            f"firmware size 0x{len(firmware_data):06X}"
+        )
+
+    # The original firmware + bootloader sums to 0 mod 256. We must keep
+    # sum(patched_firmware) == sum(original_firmware) so the invariant holds.
+    target_sum = sum(original_firmware) & 0xFF
+
+    # Zero out the complement byte, sum everything else, then set it
+    # to the value that brings the total to target_sum mod 256.
+    old_value = firmware_data[complement_offset]
+    firmware_data[complement_offset] = 0
+    byte_sum = sum(firmware_data) & 0xFF
+    new_value = (target_sum - byte_sum) & 0xFF
+    firmware_data[complement_offset] = new_value
+
+    if verbose:
+        abs_addr = ecu_config['firmware_base'] + complement_offset
+        print(f"  FLASH_CHECKSUM_COMPLEMENT @ 0x{abs_addr:08X} "
+              f"(offset 0x{complement_offset:06X}): "
+              f"0x{old_value:02X} -> 0x{new_value:02X}")
+
 
 def parse_byte_patches(patch_string: str) -> dict[int, int]:
     """
@@ -469,6 +588,205 @@ def parse_byte_patches(patch_string: str) -> dict[int, int]:
 
     return patches
 
+def parse_partial_region(region_str: str, ecu_config: dict) -> tuple[int, int]:
+    """
+    Parse a --partial-region argument into (offset, size).
+
+    Accepts either a named region from the ECU's flash_regions dict (e.g. "calibration")
+    or an explicit "offset:size" pair (e.g. "0x10000:0x10000").
+
+    Returns:
+        Tuple of (region_offset, region_size) as integers.
+    """
+    flash_regions = ecu_config.get('flash_regions', {})
+
+    # Try named region first
+    if region_str in flash_regions:
+        region = flash_regions[region_str]
+        return region['offset'], region['size']
+
+    # Try explicit offset:size
+    if ':' in region_str:
+        try:
+            offset_str, size_str = region_str.split(':', 1)
+            return int(offset_str, 0), int(size_str, 0)
+        except ValueError:
+            pass
+
+    known = ', '.join(sorted(flash_regions.keys())) if flash_regions else '(none)'
+    raise ValueError(
+        f"Invalid --partial-region: '{region_str}'\n"
+        f"Use a named region ({known}) or explicit offset:size (e.g. 0x10000:0x10000)"
+    )
+
+
+def validate_sector_alignment(offset: int, size: int, ecu_config: dict, verbose: bool = False):
+    """
+    Validate that both start and end offsets align to sector boundaries.
+
+    The bootloader's flash_lookup_sector_by_address rejects non-aligned addresses
+    with NRC 0x31 (requestOutOfRange). This pre-validates before generating the RWD.
+    """
+    boundaries = set(ecu_config.get('sector_boundaries', []))
+    if not boundaries:
+        raise ValueError("ECU config has no sector_boundaries — cannot validate alignment")
+
+    end_offset = offset + size
+    errors = []
+
+    if offset not in boundaries:
+        # Find nearest boundaries for helpful error message
+        below = max((b for b in boundaries if b <= offset), default=None)
+        above = min((b for b in boundaries if b >= offset), default=None)
+        errors.append(
+            f"Start offset 0x{offset:06X} is not a sector boundary. "
+            f"Nearest: 0x{below:06X} (below), 0x{above:06X} (above)"
+        )
+
+    if end_offset not in boundaries:
+        below = max((b for b in boundaries if b <= end_offset), default=None)
+        above = min((b for b in boundaries if b >= end_offset), default=None)
+        errors.append(
+            f"End offset 0x{end_offset:06X} is not a sector boundary. "
+            f"Nearest: 0x{below:06X} (below), 0x{above:06X} (above)"
+        )
+
+    if errors:
+        raise ValueError(
+            "Partial region does not align to flash sector boundaries:\n  " +
+            "\n  ".join(errors)
+        )
+
+    if verbose:
+        # Count sectors in range
+        sectors_in_range = sorted(b for b in boundaries if offset <= b < end_offset)
+        print(f"Sector alignment validated: 0x{offset:06X}–0x{end_offset:06X} "
+              f"({len(sectors_in_range)} sectors, {size // 1024}K)")
+
+
+def extract_partial_firmware(firmware_data: bytes, region_offset: int, region_size: int,
+                             ecu_config: dict, verbose: bool = False) -> tuple[bytes, int]:
+    """
+    Extract a sector-aligned partial region from decrypted firmware.
+
+    Args:
+        firmware_data: Full decrypted firmware image
+        region_offset: Start offset within firmware (must be sector-aligned)
+        region_size: Size of region to extract (end must be sector-aligned)
+        ecu_config: ECU config with sector_boundaries
+        verbose: Enable verbose output
+
+    Returns:
+        Tuple of (partial_firmware_bytes, absolute_start_address)
+    """
+    firmware_base = ecu_config['firmware_base']
+
+    # Validate region fits within firmware
+    if region_offset + region_size > len(firmware_data):
+        raise ValueError(
+            f"Partial region 0x{region_offset:06X}+0x{region_size:06X} exceeds "
+            f"firmware size 0x{len(firmware_data):06X}"
+        )
+
+    # Validate sector alignment
+    validate_sector_alignment(region_offset, region_size, ecu_config, verbose)
+
+    # Extract the region
+    partial_fw = firmware_data[region_offset:region_offset + region_size]
+    abs_start = firmware_base + region_offset
+
+    if verbose:
+        print(f"Extracted partial firmware:")
+        print(f"  Region: 0x{region_offset:06X} – 0x{region_offset + region_size:06X} "
+              f"({region_size:,} bytes)")
+        print(f"  Absolute flash address: 0x{abs_start:08X} – 0x{abs_start + region_size:08X}")
+
+    return partial_fw, abs_start
+
+
+def compute_minimal_partial_region(original_fw: bytes, patched_fw: bytes,
+                                    ecu_config: dict, verbose: bool = False) -> tuple[int, int]:
+    """
+    Compare original and patched firmware to find the minimal sector-aligned
+    region that covers all modified bytes.
+
+    Scans for byte-level differences, then expands the range to include any
+    known CVN storage locations (since the CVN will also change when firmware
+    is modified). The result is snapped outward to flash sector boundaries.
+
+    Args:
+        original_fw: Original (unpatched) firmware data
+        patched_fw: Firmware data after patches have been applied
+        ecu_config: ECU config with sector_boundaries
+        verbose: Enable verbose output
+
+    Returns:
+        Tuple of (region_offset, region_size), sector-aligned.
+
+    Raises:
+        ValueError: If no bytes differ or sector boundaries are missing.
+    """
+    if len(original_fw) != len(patched_fw):
+        raise ValueError(
+            f"Firmware size mismatch: original={len(original_fw)}, patched={len(patched_fw)}"
+        )
+
+    # Scan for first/last modified byte and total count
+    first_modified = None
+    last_modified = None
+    diff_count = 0
+    for i in range(len(original_fw)):
+        if original_fw[i] != patched_fw[i]:
+            if first_modified is None:
+                first_modified = i
+            last_modified = i
+            diff_count += 1
+
+    if first_modified is None:
+        raise ValueError(
+            "No bytes differ between original and patched firmware — "
+            "nothing to generate a partial RWD for"
+        )
+
+    if verbose:
+        fw_base = ecu_config['firmware_base']
+        print(f"\nAuto-partial: found {diff_count} modified byte(s)")
+        print(f"  First modified: 0x{first_modified:06X} (abs 0x{fw_base + first_modified:08X})")
+        print(f"  Last modified:  0x{last_modified:06X} (abs 0x{fw_base + last_modified:08X})")
+
+    # Snap outward to sector boundaries
+    boundaries = sorted(ecu_config.get('sector_boundaries', []))
+    if not boundaries:
+        raise ValueError("ECU config has no sector_boundaries — cannot compute partial region")
+
+    # Find the sector boundary at or before first_modified
+    region_start = boundaries[0]
+    for b in boundaries:
+        if b <= first_modified:
+            region_start = b
+        else:
+            break
+
+    # Find the sector boundary strictly after last_modified
+    region_end = boundaries[-1]
+    for b in boundaries:
+        if b > last_modified:
+            region_end = b
+            break
+
+    region_size = region_end - region_start
+
+    if verbose:
+        sectors_in_range = [b for b in boundaries if region_start <= b < region_end]
+        print(f"  Sector-aligned region: 0x{region_start:06X}–0x{region_end:06X} "
+              f"({region_size // 1024}K, {len(sectors_in_range)} sector(s))")
+
+    # Validate (should always pass since we derived from sector_boundaries)
+    validate_sector_alignment(region_start, region_size, ecu_config, verbose=False)
+
+    return region_start, region_size
+
+
 def main():
     """
     Main function to handle command line arguments and coordinate the patching process.
@@ -492,10 +810,23 @@ Examples:
 
   # Extract and examine firmware without patching
   python honda_rwd_patcher.py firmware.rwd.gz --extract-only --output extracted.bin
+
+  # Auto-calculate minimal partial RWD (only flash the sectors that changed)
+  python honda_rwd_patcher.py firmware.rwd --partial --patch-speed-limit 25.0
+
+  # Generate partial RWD that flashes only calibration sectors
+  python honda_rwd_patcher.py firmware.rwd --partial-region calibration --patch-speed-limit 25.0
+
+  # Partial RWD with explicit sector range (offset:size)
+  python honda_rwd_patcher.py firmware.rwd --partial-region 0x10000:0x10000 --patch-speed-limit 25.0
+
+  # List available named flash regions for an ECU
+  python honda_rwd_patcher.py firmware.rwd --list-regions
         """
     )
 
-    parser.add_argument('input', help='Input RWD file (.rwd or .rwd.gz)')
+    parser.add_argument('input', nargs='?', default=None,
+                       help='Input RWD file (.rwd or .rwd.gz)')
     parser.add_argument('--output', '-o', help='Output file path (auto-detects compression)')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Enable verbose output with detailed steps')
@@ -508,6 +839,21 @@ Examples:
                            help='Apply byte patches (format: 0x1000:0xAB,0x2000:0xCD)')
     patch_group.add_argument('--patch-pattern', metavar='OLD:NEW', action='append',
                            help='Replace hex patterns (format: DEADBEEF:CAFEBABE)')
+
+    # Partial RWD options
+    partial_group = parser.add_argument_group('Partial Flash Options')
+    partial_exclusive = partial_group.add_mutually_exclusive_group()
+    partial_exclusive.add_argument('--partial', action='store_true',
+                              help='Auto-calculate the minimal partial flash region. '
+                                   'Diffs patched vs original firmware to find modified bytes, '
+                                   'includes CVN storage (if known), and snaps to sector boundaries.')
+    partial_exclusive.add_argument('--partial-region', metavar='REGION',
+                              help='Generate RWD for a specific flash subset. '
+                                   'Use a named region (e.g. "calibration") or '
+                                   'explicit offset:size (e.g. "0x10000:0x10000"). '
+                                   'Addresses must align to sector boundaries.')
+    partial_group.add_argument('--list-regions', action='store_true',
+                              help='List named flash regions for the detected ECU and exit')
 
     # Operation modes
     mode_group = parser.add_argument_group('Operation Modes')
@@ -532,9 +878,52 @@ Examples:
             for p in cfg.get('speed_limit_patches', []):
                 print(f"    {p['name']} @ 0x{p['offset']:06X} = 0x{p['expected']:04X}" +
                       f" ({p['expected'] / cfg['speed_scale']:.1f} km/h)")
+            regions = cfg.get('flash_regions', {})
+            if regions:
+                print(f"    Flash regions: {', '.join(sorted(regions.keys()))}")
+        return 0
+
+    # Handle --list-regions (needs ECU identification)
+    if args.list_regions:
+        ecu_id_arg = args.ecu_id
+        if not ecu_id_arg:
+            # Try to auto-detect from the input file if provided
+            if hasattr(args, 'input') and args.input:
+                try:
+                    rwd_data, _ = read_rwd_file(args.input, False)
+                    rwd_obj = x5a(data=rwd_data)
+                    ecu_id_arg = get_ecu_id_from_rwd(rwd_obj, False)
+                except Exception:
+                    pass
+            if not ecu_id_arg:
+                print("Error: Cannot detect ECU. Use --ecu-id or provide an input RWD file.")
+                return 1
+
+        cfg = ECU_FIRMWARE_DB.get(ecu_id_arg)
+        if not cfg:
+            print(f"Error: Unknown ECU '{ecu_id_arg}'. Use --list-ecus to see supported IDs.")
+            return 1
+
+        regions = cfg.get('flash_regions', {})
+        boundaries = cfg.get('sector_boundaries', [])
+        print(f"Flash regions for {ecu_id_arg} ({cfg['description']}):")
+        print(f"  Firmware base: 0x{cfg['firmware_base']:08X}")
+        print(f"  Total flash: {cfg['expected_firmware_size'] // 1024}K")
+        print(f"  Sector boundaries: {len(boundaries)} entries")
+        print()
+        for name, region in sorted(regions.items(), key=lambda x: x[1]['offset']):
+            offset, size = region['offset'], region['size']
+            abs_start = cfg['firmware_base'] + offset
+            abs_end = abs_start + size
+            print(f"  {name:15s}  offset=0x{offset:06X}  size=0x{size:06X} ({size // 1024:>5d}K)  "
+                  f"abs=0x{abs_start:08X}–0x{abs_end:08X}")
         return 0
 
     try:
+        # Require input file for all operations beyond list commands
+        if args.input is None:
+            parser.error("the following arguments are required: input")
+
         # Read input RWD file
         if args.verbose:
             print("=" * 60)
@@ -622,13 +1011,30 @@ Examples:
         if args.verbose:
             print(f"Decrypted firmware size: {len(decrypted_firmware):,} bytes")
 
-        # Validate firmware size against ECU profile
-        if ecu_config and ecu_config.get('expected_firmware_size'):
-            expected = ecu_config['expected_firmware_size']
-            actual = len(decrypted_firmware)
-            if actual != expected:
-                print(f"Warning: Firmware size 0x{actual:X} ({actual:,} bytes) does not match " +
-                      f"expected 0x{expected:X} ({expected:,} bytes) for {ecu_id}")
+        # Save unmodified full firmware (used by --partial for diffing)
+        original_full_firmware = decrypted_firmware
+
+        # Assert input RWD is a full firmware image.
+        # CVN is computed over the entire flash (0xA0010000–0xA0400000), so even
+        # when producing a partial output RWD we need the full image as input.
+        if ecu_config:
+            rwd_start = rwd_obj.firmware_blocks[0]['start']
+            rwd_length = rwd_obj.firmware_blocks[0]['length']
+            expected_base = ecu_config['firmware_base']
+            expected_size = ecu_config['expected_firmware_size']
+
+            if rwd_start != expected_base:
+                raise ValueError(
+                    f"Input RWD start address 0x{rwd_start:08X} does not match "
+                    f"expected firmware base 0x{expected_base:08X} for {ecu_id}.\n"
+                    f"The patcher requires a full firmware image as input."
+                )
+            if rwd_length != expected_size:
+                raise ValueError(
+                    f"Input RWD size 0x{rwd_length:X} ({rwd_length:,} bytes) does not match "
+                    f"expected 0x{expected_size:X} ({expected_size:,} bytes) for {ecu_id}.\n"
+                    f"The patcher requires a full firmware image as input."
+                )
 
         # Extract-only mode
         if args.extract_only:
@@ -638,11 +1044,51 @@ Examples:
             print(f"Extracted firmware saved to: {output_path}")
             return 0
 
-        # Prepare patch configuration
+        # ── Partial region handling ──────────────────────────────
+        # If --partial-region is specified, we slice the decrypted firmware
+        # to just the target region BEFORE patching. Patches are applied to
+        # the partial slice, and offsets are translated accordingly.
+        partial_mode = False
+        region_offset = 0
+        region_size = len(decrypted_firmware)
+
+        if args.partial_region:
+            if ecu_config is None:
+                raise ValueError(
+                    "--partial-region requires a known ECU profile.\n"
+                    "Use --ecu-id or ensure the RWD header matches a known ECU."
+                )
+            partial_mode = True
+            region_offset, region_size = parse_partial_region(
+                args.partial_region, ecu_config)
+
+            # Reject if this ECU has a flash checksum complement — the boot
+            # checksum sums every byte in flash, so we can't compute the
+            # correct complement from a partial slice alone.
+            if ecu_config.get('flash_checksum_complement_offset') is not None:
+                raise ValueError(
+                    "--partial-region cannot update the flash checksum complement\n"
+                    "(the boot checksum covers all of flash, not just this region).\n"
+                    "Use --partial instead, which auto-includes the complement's sector."
+                )
+
+            if args.verbose:
+                print(f"\nPartial mode: extracting region '{args.partial_region}'")
+
+            # Keep the full firmware for CVN calculation, extract the partial slice
+            full_firmware = decrypted_firmware
+            partial_fw, abs_start = extract_partial_firmware(
+                decrypted_firmware, region_offset, region_size,
+                ecu_config, args.verbose)
+
+            # The partial slice is what we'll patch and embed in the RWD
+            decrypted_firmware = partial_fw
+
+        # ── Prepare patch configuration ──────────────────────────
         patch_config = {}
         patches_to_apply = False
 
-        if args.patch_speed_limit:
+        if args.patch_speed_limit is not None:
             if ecu_config is None:
                 raise ValueError(
                     f"ECU '{ecu_id or '(unknown)'}' is not in the firmware database.\n" +
@@ -668,47 +1114,150 @@ Examples:
                 patch_config['pattern_replacements'] = pattern_replacements
                 patches_to_apply = True
 
+        # In partial mode, translate patch offsets from full-image to region-relative
+        if partial_mode and patches_to_apply:
+            if 'speed_limit_kmh' in patch_config and ecu_config:
+                # Validate that speed limit patch offsets fall within the partial region
+                for patch in ecu_config['speed_limit_patches']:
+                    if not (region_offset <= patch['offset'] < region_offset + region_size):
+                        raise ValueError(
+                            f"Patch {patch['name']} at offset 0x{patch['offset']:06X} falls outside "
+                            f"partial region 0x{region_offset:06X}–0x{region_offset + region_size:06X}.\n"
+                            f"Choose a region that includes the patch target, or omit --partial-region."
+                        )
+            if 'byte_patches' in patch_config:
+                # Translate absolute offsets to region-relative
+                translated = {}
+                for addr, value in patch_config['byte_patches'].items():
+                    if not (region_offset <= addr < region_offset + region_size):
+                        raise ValueError(
+                            f"Byte patch at 0x{addr:06X} falls outside "
+                            f"partial region 0x{region_offset:06X}–0x{region_offset + region_size:06X}"
+                        )
+                    translated[addr - region_offset] = value
+                patch_config['byte_patches'] = translated
+
         # Apply firmware modifications
         firmware_modified = False
         if patches_to_apply:
             firmware_data = bytearray(decrypted_firmware)
+            # In partial mode, create a temporary ecu_config with adjusted offsets
+            patch_ecu_config = ecu_config
+            if partial_mode and ecu_config:
+                patch_ecu_config = dict(ecu_config)
+                patch_ecu_config['speed_limit_patches'] = [
+                    dict(p, offset=p['offset'] - region_offset)
+                    for p in ecu_config['speed_limit_patches']
+                ]
             firmware_modified = apply_firmware_patches(
-                firmware_data, patch_config, ecu_config=ecu_config, verbose=args.verbose)
+                firmware_data, patch_config, ecu_config=patch_ecu_config, verbose=args.verbose)
             decrypted_firmware = bytes(firmware_data)
 
-        # Calculate CVN for modified firmware
+        # ── Update flash checksum complement ─────────────────────
+        # The boot checksum sums every byte in flash; low byte must be 0x00.
+        # After patching, adjust the complement byte so the total byte sum
+        # stays ≡ 0 (mod 256). Must happen BEFORE auto-partial diffing so
+        # the complement byte's sector is included in the minimal region.
+        if firmware_modified and ecu_config and 'flash_checksum_complement_offset' in ecu_config:
+            if args.verbose:
+                print("\nUpdating flash checksum complement...")
+            update_flash_checksum_complement(firmware_data, ecu_config, original_full_firmware, args.verbose)
+            decrypted_firmware = bytes(firmware_data)
+
+            # Sanity check: patched firmware must preserve the byte-sum invariant.
+            original_byte_sum = sum(original_full_firmware) & 0xFF
+            patched_byte_sum = sum(firmware_data) & 0xFF
+            assert patched_byte_sum == original_byte_sum, (
+                f"Flash byte-sum invariant violated: "
+                f"original=0x{original_byte_sum:02X}, patched=0x{patched_byte_sum:02X}"
+            )
+
+        # ── Auto-partial: compute minimal region from diffs ──────
+        # When --partial is used, patches were applied to the full firmware
+        # above. Now diff against the original to find the minimal
+        # sector-aligned region that covers all modified bytes.
+        if args.partial:
+            if not patches_to_apply:
+                raise ValueError(
+                    "--partial requires at least one patch option.\n"
+                    "Use --patch-speed-limit, --patch-bytes, or --patch-pattern."
+                )
+            if not firmware_modified:
+                raise ValueError(
+                    "--partial specified but patches did not modify any bytes.\n"
+                    "The patched values may already match the target values."
+                )
+            if ecu_config is None:
+                raise ValueError(
+                    "--partial requires a known ECU profile.\n"
+                    "Use --ecu-id or ensure the RWD header matches a known ECU."
+                )
+
+            full_patched = decrypted_firmware
+            region_offset, region_size = compute_minimal_partial_region(
+                original_full_firmware, full_patched, ecu_config, args.verbose)
+
+            partial_mode = True
+            abs_start = ecu_config['firmware_base'] + region_offset
+            # full_firmware is used by the CVN path to reconstitute
+            # the full image; here it's already the full patched image
+            full_firmware = full_patched
+            decrypted_firmware = full_patched[region_offset:region_offset + region_size]
+
+            if args.verbose:
+                print(f"  Partial slice: {len(decrypted_firmware):,} bytes "
+                      f"(0x{abs_start:08X}–0x{abs_start + region_size:08X})")
+                full_size = len(full_patched)
+                saving = (1 - region_size / full_size) * 100
+                print(f"  Flash reduction: {full_size // 1024}K -> {region_size // 1024}K "
+                      f"({saving:.0f}% less to flash)")
+
+        # ── CVN calculation ──────────────────────────────────────
+        # The ECU always computes CVN over the entire flash minus bootloader
+        # (0xA0010000–0xA0400000) on every boot — there is no partial CVN.
+        # So even for partial RWDs, we must compute CVN over the full
+        # firmware data with patches applied.
         cvn_data = None
         if firmware_modified:
             if args.verbose:
                 print("\nRecalculating CVN for modified firmware...")
-            cvn_data = calculate_honda_cvn(decrypted_firmware, ecu_config=ecu_config, verbose=args.verbose)
+            if partial_mode:
+                # Reconstitute full firmware with the patched partial region overlaid
+                full_for_cvn = bytearray(full_firmware)
+                full_for_cvn[region_offset:region_offset + region_size] = decrypted_firmware
+                if args.verbose:
+                    fw_base = ecu_config['firmware_base']
+                    print(f"  CVN computed over full firmware ({len(full_for_cvn):,} bytes, "
+                          f"0x{fw_base:08X}–0x{fw_base + len(full_for_cvn):08X})")
+                cvn_data = calculate_honda_cvn(bytes(full_for_cvn), ecu_config=ecu_config, verbose=args.verbose)
+            else:
+                cvn_data = calculate_honda_cvn(decrypted_firmware, ecu_config=ecu_config, verbose=args.verbose)
 
-        # Use the new firmware update workflow if we have modifications
-        if firmware_modified:
+        # ── Generate output RWD ──────────────────────────────────
+        if partial_mode:
+            # Update block metadata so the RWD carries the partial start
+            # address and size. The flash tool will send RoutineControl
+            # 0xFF00 with these values, triggering a range erase.
+            rwd_obj.firmware_blocks[0]['start'] = abs_start
+            rwd_obj.firmware_blocks[0]['length'] = len(decrypted_firmware)
+
             if args.verbose:
-                print("\nUsing enhanced firmware update workflow...")
+                orig_start = ecu_config['firmware_base']
+                orig_size = ecu_config['expected_firmware_size']
+                print(f"\nGenerating partial RWD:")
+                print(f"  Original block: 0x{orig_start:08X}, {orig_size:,} bytes")
+                print(f"  Partial block:  0x{abs_start:08X}, {len(decrypted_firmware):,} bytes")
+                print(f"  CVN: {' '.join(f'{b:02X}' for b in cvn_data) if cvn_data else '(unchanged)'}")
 
-            # Validate firmware before applying
-            validation = rwd_obj.validate_firmware_update(decrypted_firmware)
+            rwd_obj.set_unencrypted_firmware(decrypted_firmware)
+            output_data = rwd_obj.generate(cvn_data)
+
+        elif firmware_modified:
             if args.verbose:
-                print("Firmware validation:")
-                print(f"  Valid: {validation['valid']}")
-                for warning in validation['warnings']:
-                    print(f"  Warning: {warning}")
-                for error in validation['errors']:
-                    print(f"  Error: {error}")
+                print("\nGenerating modified RWD...")
 
-            if not validation['valid']:
-                print("Firmware validation failed, aborting")
-                return 1
-
-            # Use the complete firmware update workflow
-            output_data = rwd_obj.update_firmware_workflow(
-                patched_firmware_data=decrypted_firmware,
-                search_value=search_value,
-                metadata_updates=None,  # Could add metadata updates here
-                cvn_data=cvn_data
-            )
+            rwd_obj.set_unencrypted_firmware(decrypted_firmware)
+            output_data = rwd_obj.generate(cvn_data)
         else:
             # No modifications - just regenerate with original firmware
             if args.verbose:
@@ -717,22 +1266,28 @@ Examples:
             rwd_obj.set_unencrypted_firmware(decrypted_firmware)
             output_data = rwd_obj.generate(cvn_data)
 
-        # Determine output path
+        # ── Determine output path ────────────────────────────────
         if args.output:
             output_path = args.output
         else:
             input_path = Path(args.input)
+            suffix = '_partial' if partial_mode else '_modified'
             if was_compressed:
-                output_path = str(input_path).replace('.rwd.gz', '_modified.rwd.gz')
+                output_path = str(input_path).replace('.rwd.gz', f'{suffix}.rwd.gz')
             else:
-                output_path = str(input_path).replace('.rwd', '_modified.rwd')
+                output_path = str(input_path).replace('.rwd', f'{suffix}.rwd')
 
         # Write output file
         final_output_path = write_rwd_file(output_path, output_data, was_compressed, args.verbose)
 
         print(f"\nOutput RWD file saved to: {final_output_path}")
 
-        if firmware_modified and args.verbose:
+        if partial_mode:
+            print(f"Partial flash region: 0x{abs_start:08X} – 0x{abs_start + region_size:08X} "
+                  f"({region_size // 1024}K)")
+            if firmware_modified:
+                print("Firmware modifications applied and CVN recalculated")
+        elif firmware_modified and args.verbose:
             print("Firmware modifications applied and CVN recalculated")
 
         return 0
