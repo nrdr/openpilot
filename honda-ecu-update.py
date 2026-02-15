@@ -530,11 +530,13 @@ def main():
 
         # CVN checking logic (unless force is specified)
         if not args.force:
-            no_difference = check_firmware_cvn(uds_client, firmware, args.debug)
+            cvn_match = check_firmware_cvn(uds_client, firmware, args.debug)
 
-            if no_difference:
-                print("Firmware update not required - exiting")
+            if cvn_match:
+                print("CVN match: firmware update not required - exiting")
                 return 0
+            else:
+                print("Firmware and ECU CVNs differ: proceeding with flash")
 
         if args.skip_security:
             print("Skipping security access as requested...")
