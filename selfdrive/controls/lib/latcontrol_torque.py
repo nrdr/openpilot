@@ -11,9 +11,9 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.pid import PIDController
 from openpilot.selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 
-
+KF = 0.5
 KP = 1.0
-KI = 0.3
+KI = 0.1
 KD = 0.0
 
 INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5, 7.5, 10, 15, 30]
@@ -146,10 +146,13 @@ class LatControlTorque(LatControl):
     pid_log.error = float(error)
 
     freeze_integrator = steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5.0
+
+    ff_scaled = KF * ff
+
     output_lataccel = self.pid.update(
-      pid_log.error,
+      error,
       -measurement_rate,
-      feedforward=ff,
+      feedforward=ff_scaled,
       speed=CS.vEgo,
       freeze_integrator=freeze_integrator
     )

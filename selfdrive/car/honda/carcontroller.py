@@ -159,7 +159,7 @@ class CarController(CarControllerBase):
 
     if CC.latActive:
       steering_pressed = CS.out.steeringPressed
-      below_override_cutoff = CS.out.vEgo < (20.0 * CV.MPH_TO_MS)
+      below_override_cutoff = CS.out.vEgo < (100.0 * CV.MPH_TO_MS)
 
       if below_override_cutoff:
         if steering_pressed:
