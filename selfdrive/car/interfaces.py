@@ -156,8 +156,8 @@ class CarInterfaceBase(ABC):
     ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront, ret.tireStiffnessFactor)
 
     # FrogPilot variables
-    toggles_to_check = ("force_torque_controller", "nnff", "nnff_lite")
-    if ret.steerControlType != car.CarParams.SteerControlType.angle and any(getattr(frogpilot_toggles, toggle, False) for toggle in toggles_to_check):
+    # Ensure torque tuning is always initialized when using torque control.
+    if ret.steerControlType == car.CarParams.SteerControlType.torque:
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     return ret
