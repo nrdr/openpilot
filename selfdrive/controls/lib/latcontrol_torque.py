@@ -13,11 +13,11 @@ from openpilot.selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_G
 
 
 KP = 1.0
-KI = 0.3
+KI = 0.1
 KD = 0.0
 
 INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5, 7.5, 10, 15, 30]
-KP_INTERP =      [250, 120, 65,  30, 11.5, 5.5, 3.5, 2.0, KP]
+KP_INTERP     = [250, 120, 65,  30, 11.5, 5.5, 3.5, 2.0, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
@@ -41,7 +41,12 @@ class LatControlTorque(LatControl):
     self.lateral_accel_from_torque = CI.lateral_accel_from_torque()
 
     # PIDController supports scheduled gains via [breakpoints, values] and "speed=" in update().
-    self.pid = PIDController([INTERP_SPEEDS, KP_INTERP], KI, k_d=KD, rate=1 / self.dt)
+    # k_f must be explicitly provided to preserve torque feedforward gain behavior from the torque tune.
+    self.pid = PIDController([INTERP_SPEEDS, KP_INTERP],
+                             KI,
+                             k_f=self.torque_params.kf,
+                             k_d=KD,
+                             rate=1 / self.dt)
 
     self.update_limits()
     self.steering_angle_deadzone_deg = self.torque_params.steeringAngleDeadzoneDeg

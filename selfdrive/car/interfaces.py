@@ -303,8 +303,9 @@ class CarInterfaceBase(ABC):
 
     tune.init('torque')
     tune.torque.useSteeringAngle = use_steering_angle
+    tune.torque.kf = 0.5
     tune.torque.kp = 1.0
-    tune.torque.ki = 0.3
+    tune.torque.ki = 0.1
     tune.torque.kd = 0.0
     tune.torque.friction = params['FRICTION']
     tune.torque.latAccelFactor = params['LAT_ACCEL_FACTOR']
