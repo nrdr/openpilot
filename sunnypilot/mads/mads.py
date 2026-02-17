@@ -57,10 +57,12 @@ class ModularAssistiveDrivingSystem:
     self.steering_mode_on_brake = read_steering_mode_param(self.CP, self.CP_SP, self.params)
     self.unified_engagement_mode = self.params.get_bool("MadsUnifiedEngagementMode")
 
-    # One-shot LKAS auto-enable latch. This is armed when MAIN is off and triggers once
-    # when MAIN is turned on (and cruise is available). It prevents continuously re-asserting
-    # LKAS enable and allows the user to toggle LKAS off with the LKAS button.
+    # One-shot LKAS auto-enable latch:
+    # - Armed whenever MAIN is off
+    # - Requests LKAS enable when MAIN is on (and cruise is available)
+    # - Disarms only after LKAS is confirmed enabled (state machine success)
     self.auto_lkas_armed = True
+    self.enabled_prev_mads = False
 
   def read_params(self):
     self.main_enabled_toggle = self.params.get_bool("MadsMainCruiseAllowed")
@@ -160,10 +162,10 @@ class ModularAssistiveDrivingSystem:
       if not CS.cruiseState.enabled:
         self.auto_lkas_armed = True
 
-      # One-shot LKAS auto-enable when MAIN is on and cruise is available.
+      # Request LKAS auto-enable when MAIN is on and cruise is available.
+      # The latch is only disarmed once LKAS is confirmed enabled in update().
       if self.main_enabled_toggle and self.auto_lkas_armed and CS.cruiseState.enabled and CS.cruiseState.available:
         self.events_sp.add(EventNameSP.lkasEnable)
-        self.auto_lkas_armed = False
 
     for be in CS.buttonEvents:
       if be.type == ButtonType.cancel:
@@ -178,7 +180,6 @@ class ModularAssistiveDrivingSystem:
             self.events_sp.add(EventNameSP.lkasDisable)
         else:
           self.events_sp.add(EventNameSP.lkasEnable)
-          self.auto_lkas_armed = False
 
     if not CS.cruiseState.available and not self.no_main_cruise:
       self.events.remove(EventName.buttonEnable)
@@ -212,6 +213,11 @@ class ModularAssistiveDrivingSystem:
 
     if not self.CP.passive and self.selfdrive.initialized:
       self.enabled, self.active = self.state_machine.update()
+
+      # Disarm the auto-enable latch only after LKAS is confirmed enabled.
+      if self.enabled and not self.enabled_prev_mads:
+        self.auto_lkas_armed = False
+      self.enabled_prev_mads = self.enabled
 
     # Copy of previous SelfdriveD states for MADS events handling
     self.selfdrive.enabled_prev = self.selfdrive.enabled
