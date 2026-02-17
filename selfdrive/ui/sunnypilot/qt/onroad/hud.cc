@@ -283,7 +283,9 @@ void HudRendererSP::draw(QPainter &p, const QRect &surface_rect) {
     // No Alerts displayed
     else {
       e2eAlertFrame = 0;
-      if (!isStandstill) standstillElapsedTime = 0.0;
+      // Reset only when the vehicle actually moves. This avoids resetting due to transient
+      // standstill flag glitches (e.g., engine start/stop events) while stationary.
+      if (std::fabs(vEgo) > 0.25f) standstillElapsedTime = 0.0;
     }
 
     // Blinker
