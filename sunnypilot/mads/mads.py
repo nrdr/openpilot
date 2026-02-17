@@ -57,9 +57,9 @@ class ModularAssistiveDrivingSystem:
     self.steering_mode_on_brake = read_steering_mode_param(self.CP, self.CP_SP, self.params)
     self.unified_engagement_mode = self.params.get_bool("MadsUnifiedEngagementMode")
 
-    # One-shot LKAS auto-enable latch:
+    # LKAS auto-enable latch:
     # - Armed whenever MAIN is off
-    # - Requests LKAS enable when MAIN is on (and cruise is available)
+    # - Requests LKAS enable when MAIN is on and cruise is available
     # - Disarms only after LKAS is confirmed enabled (state machine success)
     self.auto_lkas_armed = True
     self.enabled_prev_mads = False
@@ -72,7 +72,6 @@ class ModularAssistiveDrivingSystem:
     # Ignore `pedalPressed` events caused by gas presses.
     if self.events.has(EventName.pedalPressed) and not (CS.gasPressed and not self.selfdrive.CS_prev.gasPressed and self.disengage_on_accelerator):
       return True
-
     return False
 
   def should_silent_lkas_enable(self, CS: structs.CarState) -> bool:
@@ -150,6 +149,15 @@ class ModularAssistiveDrivingSystem:
     # wrongCarMode alert only or actively block control
     self.get_wrong_car_mode(selfdrive_enable_events or set_speed_btns_enable)
 
+    # LKAS default-on behavior (MAIN-gated, one-shot, persistent-MAIN safe):
+    # This must run regardless of pcmEnable/buttonEnable events, since those often occur
+    # on the same frames where MAIN becomes active.
+    if not CS.cruiseState.enabled:
+      self.auto_lkas_armed = True
+
+    if self.main_enabled_toggle and self.auto_lkas_armed and CS.cruiseState.enabled and CS.cruiseState.available:
+      self.events_sp.add(EventNameSP.lkasEnable)
+
     if selfdrive_enable_events:
       if self.pedal_pressed_non_gas_pressed(CS):
         self.events_sp.add(EventNameSP.pedalPressedAlertOnly)
@@ -157,15 +165,6 @@ class ModularAssistiveDrivingSystem:
       if self.block_unified_engagement_mode():
         self.events.remove(EventName.pcmEnable)
         self.events.remove(EventName.buttonEnable)
-    else:
-      # Re-arm whenever MAIN is off so LKAS only auto-enables after the user turns MAIN on.
-      if not CS.cruiseState.enabled:
-        self.auto_lkas_armed = True
-
-      # Request LKAS auto-enable when MAIN is on and cruise is available.
-      # The latch is only disarmed once LKAS is confirmed enabled in update().
-      if self.main_enabled_toggle and self.auto_lkas_armed and CS.cruiseState.enabled and CS.cruiseState.available:
-        self.events_sp.add(EventNameSP.lkasEnable)
 
     for be in CS.buttonEvents:
       if be.type == ButtonType.cancel:
