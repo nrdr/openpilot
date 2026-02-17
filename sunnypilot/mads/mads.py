@@ -59,7 +59,7 @@ class ModularAssistiveDrivingSystem:
 
     # LKAS auto-enable latch:
     # - Armed whenever MAIN is off
-    # - Requests LKAS enable when MAIN is on and cruise is available
+    # - Requests LKAS enable when MAIN is on
     # - Disarms only after LKAS is confirmed enabled (state machine success)
     self.auto_lkas_armed = True
     self.enabled_prev_mads = False
@@ -149,13 +149,15 @@ class ModularAssistiveDrivingSystem:
     # wrongCarMode alert only or actively block control
     self.get_wrong_car_mode(selfdrive_enable_events or set_speed_btns_enable)
 
-    # LKAS default-on behavior (MAIN-gated, one-shot, persistent-MAIN safe):
-    # This must run regardless of pcmEnable/buttonEnable events, since those often occur
-    # on the same frames where MAIN becomes active.
-    if not CS.cruiseState.enabled:
+    # LKAS default-on behavior:
+    # On many ports (including Honda), cruiseState.available is the MAIN-on / ready signal.
+    # cruiseState.enabled often means "cruise actively engaged", which is not suitable for boot-time defaulting.
+    main_now = bool(CS.cruiseState.available)
+
+    if not main_now:
       self.auto_lkas_armed = True
 
-    if self.main_enabled_toggle and self.auto_lkas_armed and CS.cruiseState.enabled and CS.cruiseState.available:
+    if self.main_enabled_toggle and self.auto_lkas_armed and main_now:
       self.events_sp.add(EventNameSP.lkasEnable)
 
     if selfdrive_enable_events:
