@@ -125,6 +125,15 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.windfactor_before_brake = 0.0
     self.pitch = 0.0
 
+    self.torque_lpf = 0.0
+
+    # Driver override behavior for steer LPF:
+    # - While the driver is steering (and for a short hold after), force OP steer torque to 0
+    #   and reset the filter state to avoid "push back" when the driver releases.
+    # - This force-to-0 behavior is applied only below the configured speed threshold.
+    self.driver_override_until_nanos = 0
+    self.override_hold_s = 0.1
+
   def update(self, CC, CC_SP, CS, now_nanos):
     MadsCarController.update(self, self.CP, CC, CC_SP)
     gas_pedal_force = 0.0
@@ -149,9 +158,60 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       accel = 0.0
       gas, brake = 0.0, 0.0
 
-    # *** rate limit steer ***
-    limited_torque = rate_limit(actuators.torque, self.last_torque, -self.params.STEER_DELTA_DOWN * DT_CTRL,
-                                self.params.STEER_DELTA_UP * DT_CTRL)
+    # *** rate limit steer (with low-pass filter) ***
+    torque_cmd = actuators.torque
+
+    if CC.latActive:
+      steering_pressed = CS.out.steeringPressed
+      below_override_cutoff = CS.out.vEgo < (130.0 * CV.MPH_TO_MS)
+
+      if below_override_cutoff:
+        if steering_pressed:
+          self.driver_override_until_nanos = now_nanos + int(self.override_hold_s * 1e9)
+
+        bypass = now_nanos < self.driver_override_until_nanos
+
+        if bypass:
+          torque_cmd = 0.0
+          self.torque_lpf = 0.0
+          self.last_torque = 0.0
+        else:
+          tau = 0.10
+          alpha = DT_CTRL / (tau + DT_CTRL)
+
+          if torque_cmd * self.torque_lpf < 0.0:
+            self.torque_lpf = torque_cmd
+          else:
+            self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+
+          torque_cmd = self.torque_lpf
+      else:
+        self.driver_override_until_nanos = 0
+
+        if steering_pressed:
+          self.torque_lpf = torque_cmd
+        else:
+          tau = 0.10
+          alpha = DT_CTRL / (tau + DT_CTRL)
+
+          if torque_cmd * self.torque_lpf < 0.0:
+            self.torque_lpf = torque_cmd
+          else:
+            self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+
+          torque_cmd = self.torque_lpf
+    else:
+      self.torque_lpf = 0.0
+      self.last_torque = 0.0
+      self.driver_override_until_nanos = 0
+
+    limited_torque = rate_limit(
+      torque_cmd,
+      self.last_torque,
+      -self.params.STEER_DELTA_DOWN * DT_CTRL,
+      self.params.STEER_DELTA_UP * DT_CTRL
+    )
+
     self.last_torque = limited_torque
 
     # *** apply brake hysteresis ***
@@ -332,7 +392,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     new_actuators.accel = self.accel
     new_actuators.gas = float(self.gasfactor)
     new_actuators.brake = float(self.windfactor)
-    new_actuators.torque = self.last_torque
+    new_actuators.torque = float(self.last_torque)
     new_actuators.torqueOutputCan = apply_torque
 
     self.frame += 1
