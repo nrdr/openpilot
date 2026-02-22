@@ -12,7 +12,7 @@ from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode 
 
 # Honda cluster MPH rounding quirks (legacy behavior)
 HONDA_MPH_PER_KPH = 0.6233
-HONDA_MPH_OFFSET = 0.0995
+HONDA_MPH_OFFSET = 1.0 # Bosch
 
 
 def _honda_ms_to_mph_int(v_ms: float) -> int:

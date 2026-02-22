@@ -23,11 +23,11 @@ from roenpilot.common.numpy_fast import interp
 # and compensates actuation latency using a buffered expected lat accel and a jerk term.
 
 KP = 1.0
-KI = 0.3
+KI = 0.1
 KD = 0.0
 
 INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5, 7.5, 10, 15, 30]
-KP_INTERP =      [250, 120, 65,  30, 11.5, 5.5, 3.5, 2.0, KP]
+KP_INTERP = [250, 120, 65, 35, 11.5, 5.5, 3.5, 2.0, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
@@ -38,7 +38,7 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 # Full friction at/under ~0.6 m/s^2, no friction at/over ~0.8 m/s^2
 # -----------------------------------------------------------------------------
 FRICTION_X = [0.4, 0.6]   # m/s^2 desired lateral accel magnitude
-FRICTION_Y = [1.0, 0.25]   # scale applied to friction input
+FRICTION_Y = [1.0, 0.5]   # scale applied to friction input
 
 
 class LatControlTorque(LatControl):

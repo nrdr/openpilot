@@ -27,7 +27,7 @@ V_CRUISE_UNSET = 255
 
 # Honda cluster MPH rounding quirks (legacy behavior)
 HONDA_MPH_PER_KPH = 0.6233
-HONDA_MPH_OFFSET = 0.0995
+HONDA_MPH_OFFSET = 1.0 # Bosch
 
 
 def _is_honda_cp(CP) -> bool:
