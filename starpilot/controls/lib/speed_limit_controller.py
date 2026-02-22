@@ -34,10 +34,47 @@ OFFSET_MAP_METRIC = [
   (33.1, 38.9, "speed_limit_offset7"),  # 120–140
 ]
 
+# Honda cluster MPH rounding quirks.
+# These constants model the way many Honda clusters round MPH from a KPH internal value.
+HONDA_MPH_PER_KPH = 0.6233
+HONDA_MPH_OFFSET = 0.0995
+
+
+def _is_honda_cp(CP) -> bool:
+  """Identify Honda using CP.brand when available, with a carName fallback for forks."""
+  brand = getattr(CP, "brand", "")
+  if isinstance(brand, str) and brand.lower() == "honda":
+    return True
+
+  car_name = getattr(CP, "carName", "")
+  return isinstance(car_name, str) and car_name.lower() == "honda"
+
+
+def _honda_kph_to_mph(kph: float) -> int:
+  """Convert KPH to the integer MPH value a Honda cluster would display."""
+  return int(round(kph * HONDA_MPH_PER_KPH + HONDA_MPH_OFFSET))
+
+
+def _honda_mph_to_kph(mph: float) -> float:
+  """Inverse mapping to a KPH value that rounds back to the same Honda cluster MPH."""
+  return (float(mph) - HONDA_MPH_OFFSET) / HONDA_MPH_PER_KPH
+
+
+def _snap_honda_imperial_ms(speed_ms: float) -> float:
+  """Snap an internal m/s target onto Honda's displayed MPH ladder."""
+  if speed_ms <= 0.0:
+    return 0.0
+
+  mph = _honda_kph_to_mph(speed_ms * CV.MS_TO_KPH)
+  return _honda_mph_to_kph(mph) * CV.KPH_TO_MS
+
+
 class SpeedLimitController:
   def __init__(self, StarPilotVCruise):
     self.starpilot_planner = StarPilotVCruise.starpilot_planner
     self.starpilot_toggles = None
+
+    self.CP = getattr(self.starpilot_planner, "CP", getattr(StarPilotVCruise, "CP", None))
 
     self.calling_mapbox = False
     self.override_slc = False
@@ -91,8 +128,27 @@ class SpeedLimitController:
   def offset(self):
     if self.starpilot_toggles is None:
       return 0
+
     offset_map = OFFSET_MAP_METRIC if self.starpilot_toggles.is_metric else OFFSET_MAP_IMPERIAL
     return next((getattr(self.starpilot_toggles, offset) for low, high, offset in offset_map if low < self.target < high), 0)
+
+  @property
+  def use_honda_imperial_rounding(self):
+    if self.starpilot_toggles is None or self.starpilot_toggles.is_metric:
+      return False
+
+    return _is_honda_cp(self.CP)
+
+  @property
+  def target_with_offset_for_control(self):
+    target_with_offset = self.target + self.offset
+    if target_with_offset <= 0.0:
+      return 0.0
+
+    if self.use_honda_imperial_rounding:
+      return _snap_honda_imperial_ms(target_with_offset)
+
+    return target_with_offset
 
   def _read_next_map_speed_limit(self):
     next_map_speed_limit = self.starpilot_planner.params_memory.get("NextMapSpeedLimit") or {}
@@ -101,18 +157,21 @@ class SpeedLimitController:
         next_map_speed_limit = json.loads(next_map_speed_limit)
       except (TypeError, ValueError):
         next_map_speed_limit = {}
+
     return next_map_speed_limit if isinstance(next_map_speed_limit, dict) else {}
 
   @property
   def override_mode_enabled(self):
     if self.starpilot_toggles is None:
       return False
+
     return self.starpilot_toggles.speed_limit_controller_override_manual or self.starpilot_toggles.speed_limit_controller_override_set_speed
 
   def override_active(self, v_ego, gas_pressed):
-    target_with_offset = self.target + self.offset
+    target_with_offset = self.target_with_offset_for_control
     if target_with_offset <= 0 or not self.override_mode_enabled:
       return False
+
     return self.overridden_speed > target_with_offset or (gas_pressed and v_ego > target_with_offset)
 
   def clear_override_for_source_limit(self, desired_source, desired_target, had_override):
@@ -126,7 +185,8 @@ class SpeedLimitController:
     self.override_requires_gas_release = True
 
   def get_mapbox_speed_limit(self, now, time_validated, v_ego, sm):
-    if not self.starpilot_planner.gps_valid or not self.mapbox_token or (sm["carState"].steeringAngleDeg - sm["liveParameters"].angleOffsetDeg) >= 45:
+    steering_angle = sm["carState"].steeringAngleDeg - sm["liveParameters"].angleOffsetDeg
+    if not self.starpilot_planner.gps_valid or not self.mapbox_token or abs(steering_angle) >= 45:
       self.mapbox_limit = 0
       self.segment_distance = 0
       return
@@ -160,7 +220,7 @@ class SpeedLimitController:
             })
 
         self.mapbox_requests["total_requests"] += 1
-        self.starpilot_planner.params.put_nonblocking("MapBoxRequests", self.mapbox_requests)
+        self.starpilot_planner.params.put_nonblocking("MapBoxRequests", json.dumps(self.mapbox_requests))
 
         current_bearing = self.starpilot_planner.gps_position.get("bearing")
         current_latitude = self.starpilot_planner.gps_position.get("latitude")
@@ -197,6 +257,7 @@ class SpeedLimitController:
         if not successful:
           self.mapbox_limit = 0
           self.segment_distance = v_ego
+
       return response_data
 
     def complete_request(future):
@@ -312,6 +373,7 @@ class SpeedLimitController:
     }
     if "Vision" in configured_priorities:
       limits["Vision"] = self.vision_limit
+
     filtered_limits = {source: limit for source, limit in limits.items() if limit >= 1}
 
     if self.starpilot_toggles.speed_limit_priority_highest:
@@ -397,7 +459,7 @@ class SpeedLimitController:
         self.speed_limit_changed_timer = 0
         self.unconfirmed_speed_limit = 0
         self.starpilot_planner.params.put_nonblocking("PreviousSpeedLimit", self.target)
-        self.starpilot_planner.params_memory.put_float("SLCForceCruiseSpeed", self.target + self.offset)
+        self.starpilot_planner.params_memory.put_float("SLCForceCruiseSpeed", self.target_with_offset_for_control)
 
   def update_map_speed_limit(self, v_ego, sm):
     next_speed_limit_distance = sm["mapdOut"].nextSpeedLimitDistance
@@ -446,14 +508,16 @@ class SpeedLimitController:
     if not sm["carState"].gasPressed:
       self.override_requires_gas_release = False
 
-    self.override_slc = self.overridden_speed > self.target + self.offset > 0
-    self.override_slc |= not self.override_requires_gas_release and sm["carState"].gasPressed and v_ego > self.target + self.offset > 0
+    target_with_offset = self.target_with_offset_for_control
+
+    self.override_slc = self.overridden_speed > target_with_offset > 0
+    self.override_slc |= not self.override_requires_gas_release and sm["carState"].gasPressed and v_ego > target_with_offset > 0
 
     if self.override_slc:
       if self.starpilot_toggles.speed_limit_controller_override_manual:
         if sm["carState"].gasPressed:
           self.overridden_speed = max(v_ego + v_ego_diff, self.overridden_speed)
-        self.overridden_speed = float(np.clip(self.overridden_speed, self.target + self.offset, v_cruise + v_cruise_diff))
+        self.overridden_speed = float(np.clip(self.overridden_speed, target_with_offset, v_cruise + v_cruise_diff))
       elif self.starpilot_toggles.speed_limit_controller_override_set_speed:
         self.overridden_speed = v_cruise + v_cruise_diff
 
