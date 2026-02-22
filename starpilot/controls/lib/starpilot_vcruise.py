@@ -200,8 +200,8 @@ class StarPilotVCruise:
       slc_control_target = get_active_slc_control_target(
         starpilot_toggles.speed_limit_controller,
         getattr(starpilot_toggles, "set_speed_limit", False),
-        self.slc_target,
-        self.slc_offset,
+        self.slc.target_with_offset_for_control,
+        0.0,
         self.slc.overridden_speed,
         v_ego_diff,
       )

@@ -1,77 +1,115 @@
-# StarPilot
+# Night Rider Linear Maximum EPS Fork
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/firestar5683/StarPilot)
-[![Discord](https://img.shields.io/discord/1137853399715549214?label=Discord)](https://firestar.link/discord)
-[![Last Updated](https://img.shields.io/github/last-commit/firestar5683/StarPilot/StarPilot)](https://github.com/firestar5683/StarPilot)
-[![Wiki](https://img.shields.io/badge/Wiki-StarPilot-blue?logo=wiki)](https://wiki.firestar.link)
+## Overview
 
-**StarPilot** is a custom fork of [comma.ai's openpilot](https://comma.ai/openpilot),
-an open source driver assistance system.
+This fork supports the Linear EPS firmware modification available for select Honda platforms.
 
-whoisdomi
+Linearized EPS firmware alters the steering torque response characteristics. As a result, stock lateral tuning is not appropriate. This fork applies the required adjustments to support linear torque curves, along with additional refinements/QOL developed within the Honda Openpilot/StarPilot community.
 
-Openpilot provides
-* Automated Lane Centering
-* Adaptive Cruise Control
-* Lane Change Assist
-* Driver Monitoring *without wheel nags*
+---
 
-StarPilot adds support for many GM vehicles along with improved tuning,
-especially for radar-less (camera only) vehicles.
+## Supported Platforms
 
-StarPilot is built off of [StarPilot](https://github.com/FrogAi/StarPilot)
-and supports the major features StarPilot offers.
+- Honda Civic (Nidec)
+- Honda Civic (Bosch)
+- Honda Clarity (Nidec)
 
-StarPilot has a vibrant, welcoming community [discord](https://firestar.link/discord).
-Stop by to chat or ask questions!
+Additional EPS firmware variants may be supported as they are validated.
 
-## Documentation
+---
 
-Please see [https://wiki.firestar.link](https://wiki.firestar.link) for hardware lists,
-installation guides, and software configuration.
+## Installation
 
-## Features
+```
+installer.comma.ai/nrdr/mvl-staging-03.03.2026
+```
 
-* Full support for Comma C3, C3X, and C4
-  * C4 is currently in release testing. Join our fleet of C4 testers!
-* Model switcher with all of comma's tinygrad driving models
-* Special longitudinal planner tuning for VoACC (visual only, radar-less) vehicles
-* Galaxy: StarPilot's portal to configure your comma device using your phone from anywhere.
-Download models, change settings, update software, visualize live model outputs for tuning.
-* Always On Lateral (full time steering assist)*
-* Speed Limit Controller*
-* Learning Curve Speed Controller*
-* Conditional Experimental Mode (CEM)*
-* Driving Profiles*
-* Custom themes*
-* Alert Volume Controller*
-* Comma Pedal Interceptor support*
-* Toyota SDSU support*
-* ZSS support*
-* High quality dashcam recordings*
-* Enhanced tuning for CEM (dynamic experimental mode switching)
+---
 
-\* [Inherited from StarPilot](https://github.com/FrogAi/StarPilot#openpilot-vs-starpilot)
+## Recommended Device Configuration
 
-## GM-only Features
+The following configuration is recommended for optimal behavior with Linear EPS firmware.
 
-* Increased LKAS fault resiliency
-* ASCM_INT and SASCM support
-* Custom lateral torque controller, with special tuning for Bolts
-* 50% extra torque on 2017 Chevy Bolt
-* Improved lateral and longitudinal tuning
-* Dashboard cruise control display speed spoofing for vehicles with pedal interceptor
-* Extra steering wheel button functionality for vehicles with pedal interceptor
-* Optional toggle to boot comma when remote starting your vehicle
+### Model
 
-## Developer Features
+- **Model:** POPv1 (known simply as POP) (Good lane positioning)
+  - OPMv7 can be smoother but hugs more.
+  - GWMv9 has been tried and tested, solid legacy model.
+- **Live Learning Delay:** ON
 
-* Native and cross compilation for Windows, Mac, and Ubuntu
-* Custom AGNOS to support C3, C3X, and C4
-* To run UI on PC:
-  * `./c3` for large UI
-  * `./c4` for small UI
-* `./build` to produce cross compiled binaries for comma devices.
-Uses your comma's sysroot/toolchain
-* Toggle: "Use Precompiled Binaries" to allow switching between fast boot / editable builds
-* Custom long maneuver tests, specifically designed for regen-only vehicles
+---
+
+### Steering
+
+- **Enforce Torque Lateral Control:** ON
+
+---
+
+### Torque Control Settings
+
+- **Version:** v0.0
+  - Default provides very aggressive low speed performance but will be uncomfortable and jerky.
+- **Self Tune:** OFF
+- **Less Restrict Settings (Beta):** OFF
+- **Enable Custom Tuning:** OFF
+- **Manual Real-time Tuning:** OFF
+
+Honda Insight users (and those who want to manually tune):
+- **Version:** v0.0
+- **Self Tune:** OFF
+- **Less Restrict Settings (Beta):** OFF
+- **Enable Custom Tuning:** ON
+- **Manual Real-time Tuning:** ON
+- **LATERAL ACCELERATION FACTOR:** Start with 3.37 and work your way lower for increased response
+- **FRICTION:** Use 1.0 and lower until car feels too lazy
+
+These defaults ensure consistent behavior with linearized EPS firmware.
+
+---
+
+## Steering Assist Activation Behavior
+
+Configure steering assist activation according to preference:
+
+### Activate on Every Startup
+```
+STEERING → CUSTOMIZE MADS → TOGGLE MADS WITH CRUISE MAIN: ON
+```
+
+### Activate Only After LKAS Button Press
+```
+STEERING → CUSTOMIZE MADS → TOGGLE MADS WITH CRUISE MAIN: OFF
+```
+
+---
+
+## Drive Uploads
+
+This fork routes drive uploads through:
+
+```
+stable.konik.ai
+```
+
+---
+
+## Device Pairing / Offline Issues
+
+If the device appears offline or cannot be paired, refer to:
+
+https://community.sunnypilot.ai/t/using-stable-konik-or-any-other-hosted-routes/945
+
+---
+
+## Important Notes
+
+- While running this fork, the device communicates with `stable.konik.ai` and does not connect to Comma servers.
+- When switching to another fork, always perform a factory reset first.
+  - This preserves your Comma Connect account.
+  - It reduces the risk of pairing or account-related issues.
+
+---
+
+## Disclaimer
+
+This fork is intended for use with compatible Linear EPS firmware. Users are responsible for ensuring the correct firmware is installed prior to use. Running this fork without the appropriate EPS firmware will result in incorrect lateral control behavior.
