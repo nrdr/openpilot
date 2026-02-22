@@ -12,6 +12,7 @@ from opendbc.car.common.conversions import Conversions as CV
 from opendbc.sunnypilot.car.honda.mads import MadsCarController
 from opendbc.sunnypilot.car.honda.gas_interceptor import GasInterceptorCarController
 from opendbc.sunnypilot.car.honda.icbm import IntelligentCruiseButtonManagementInterface
+from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
 LongCtrlState = structs.CarControl.Actuators.LongControlState
@@ -94,6 +95,20 @@ def process_hud_alert(hud_alert):
   return alert_fcw, alert_steer_required
 
 
+def _clamp01(x: float) -> float:
+  return 0.0 if x <= 0.0 else (1.0 if x >= 1.0 else x)
+
+
+def _quick_start_curve(x: float) -> float:
+  """
+  Concave easing curve for ramp-in:
+  - Returns faster early, slower later.
+  - x is expected in [0, 1].
+  """
+  x = _clamp01(x)
+  return x ** 0.5
+
+
 class CarController(CarControllerBase, MadsCarController, GasInterceptorCarController, IntelligentCruiseButtonManagementInterface):
   def __init__(self, dbc_names, CP, CP_SP):
     CarControllerBase.__init__(self, dbc_names, CP, CP_SP)
@@ -104,6 +119,11 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.params = CarControllerParams(CP)
     self.CAN = hondacan.CanBus(CP)
     self.tja_control = CP.carFingerprint in HONDA_BOSCH_TJA_CONTROL
+
+    # Enable steering override behavior only when the modified EPS firmware is detected.
+    # Stock EPS cars rely on driver "assist" to achieve tighter curvature; forcing torque-to-zero
+    # and additional filtering on stock EPS can degrade lateral performance.
+    self.eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
 
     self.braking = False
     self.brake_steady = 0.
@@ -125,6 +145,24 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.windfactor_before_brake = 0.0
     self.pitch = 0.0
 
+    self.torque_lpf = 0.0
+
+    # Driver override behavior (EPS modified cars only):
+    # - On driver steering (steeringPressed rising edge): ramp torque down to 0 over override_ramp_down_s.
+    # - While driver is steering: hold torque at 0.
+    # - On release (steeringPressed falling edge): ramp torque back in over override_ramp_up_s using a
+    #   quick-start curve (first portion returns faster than the remainder).
+    # - LPF remains enabled at all speeds; during ramps we synchronize LPF state to the ramp target.
+    self.override_ramp_down_s = 0.5
+    self.override_ramp_up_s = 2.0
+    self.steering_pressed_prev = False
+    self.override_state = "normal"  # "normal" | "ramp_down" | "holding" | "ramp_up"
+    self.override_phase_start_nanos = 0
+    self.override_start_torque = 0.0
+
+    # Kept for compatibility with existing forks/tools; not used in the updated logic.
+    self.driver_override_until_nanos = 0
+
   def update(self, CC, CC_SP, CS, now_nanos):
     MadsCarController.update(self, self.CP, CC, CC_SP)
     gas_pedal_force = 0.0
@@ -143,15 +181,112 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     if CC.longActive:
       accel = actuators.accel
       if (self.CP.carFingerprint in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR, CAR.ACURA_RLX)) and (accel > max(0, CS.out.aEgo) + 0.1):
-        accel = 10000.0 # help with lagged accel until pedal tuning is inserted
+        accel = 10000.0  # help with lagged accel until pedal tuning is inserted
       gas, brake = compute_gas_brake(actuators.accel + hill_brake, CS.out.vEgo, self.CP.carFingerprint)
     else:
       accel = 0.0
       gas, brake = 0.0, 0.0
 
-    # *** rate limit steer ***
-    limited_torque = rate_limit(actuators.torque, self.last_torque, -self.params.STEER_DELTA_DOWN * DT_CTRL,
-                                self.params.STEER_DELTA_UP * DT_CTRL)
+    # *** steer command conditioning (driver interaction + low-pass filter + rate limit) ***
+    torque_cmd = actuators.torque
+
+    if CC.latActive:
+      steering_pressed = CS.out.steeringPressed
+
+      if self.eps_modified:
+        # EPS modified path: enable override ramps + LPF.
+        steering_rising = (not self.steering_pressed_prev) and steering_pressed
+        steering_falling = self.steering_pressed_prev and (not steering_pressed)
+
+        if steering_rising:
+          # Begin ramp-down from the currently commanded output torque.
+          self.override_state = "ramp_down"
+          self.override_phase_start_nanos = now_nanos
+          self.override_start_torque = float(self.torque_lpf)
+
+        if steering_pressed:
+          # While the driver is steering, either ramp down or hold at zero.
+          if self.override_state == "ramp_down":
+            fade_ns = int(self.override_ramp_down_s * 1e9)
+            dt_ns = now_nanos - self.override_phase_start_nanos
+            x = 1.0 if fade_ns <= 0 else _clamp01(float(dt_ns) / float(fade_ns))
+
+            torque_target = (1.0 - x) * self.override_start_torque
+
+            # Keep LPF state synchronized to the ramp target to avoid rubber-band feel.
+            self.torque_lpf = torque_target
+            torque_cmd = self.torque_lpf
+
+            if x >= 1.0:
+              self.override_state = "holding"
+          else:
+            # Holding phase: keep torque at zero as long as the driver continues to steer.
+            self.override_state = "holding"
+            self.torque_lpf = 0.0
+            torque_cmd = 0.0
+
+        else:
+          # Driver is not steering.
+          if steering_falling:
+            # Begin ramp-up when the driver releases the wheel.
+            self.override_state = "ramp_up"
+            self.override_phase_start_nanos = now_nanos
+
+          if self.override_state == "ramp_up":
+            fade_ns = int(self.override_ramp_up_s * 1e9)
+            dt_ns = now_nanos - self.override_phase_start_nanos
+            x = 1.0 if fade_ns <= 0 else _clamp01(float(dt_ns) / float(fade_ns))
+
+            # Quick-start ramp: first portion returns faster than the remainder.
+            scale = _quick_start_curve(x)
+            torque_target = float(torque_cmd) * scale
+
+            # During ramp-up, keep LPF state aligned with the ramp target to prevent a step when normal LPF resumes.
+            self.torque_lpf = torque_target
+            torque_cmd = self.torque_lpf
+
+            if x >= 1.0:
+              self.override_state = "normal"
+
+          if self.override_state == "normal":
+            # Normal operation: apply LPF smoothing at all speeds.
+            tau = 0.10
+            alpha = DT_CTRL / (tau + DT_CTRL)
+
+            if torque_cmd * self.torque_lpf < 0.0:
+              self.torque_lpf = torque_cmd
+            else:
+              self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+
+            torque_cmd = self.torque_lpf
+
+        self.steering_pressed_prev = steering_pressed
+
+      else:
+        # Stock EPS path: do not apply override ramps or LPF.
+        # Keep internal state synchronized to avoid discontinuities if the controller is reused.
+        self.torque_lpf = float(torque_cmd)
+        self.steering_pressed_prev = steering_pressed
+        self.override_state = "normal"
+        self.override_phase_start_nanos = 0
+        self.override_start_torque = 0.0
+
+    else:
+      self.torque_lpf = 0.0
+      self.last_torque = 0.0
+      self.driver_override_until_nanos = 0
+      self.steering_pressed_prev = False
+      self.override_state = "normal"
+      self.override_phase_start_nanos = 0
+      self.override_start_torque = 0.0
+
+    limited_torque = rate_limit(
+      torque_cmd,
+      self.last_torque,
+      -self.params.STEER_DELTA_DOWN * DT_CTRL,
+      self.params.STEER_DELTA_UP * DT_CTRL
+    )
+
     self.last_torque = limited_torque
 
     # *** apply brake hysteresis ***
@@ -184,8 +319,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     can_sends.append(hondacan.create_steering_control(self.packer, self.CAN, apply_torque, CC.latActive, self.tja_control))
 
     # wind brake from air resistance decel at high speed
-    wind_brake = np.interp(CS.out.vEgo, [0.0, 2.3, 35.0], [0.001, 0.002, 0.15]) * self.windfactor # not in m/s2 units
-    wind_brake_ms2 = np.interp(CS.out.vEgo, [0.0, 13.4, 22.4, 31.3, 40.2], [0.000, 0.049, 0.136, 0.267, 0.441]) # in m/s2 units
+    wind_brake = np.interp(CS.out.vEgo, [0.0, 2.3, 35.0], [0.001, 0.002, 0.15]) * self.windfactor  # not in m/s2 units
+    wind_brake_ms2 = np.interp(CS.out.vEgo, [0.0, 13.4, 22.4, 31.3, 40.2], [0.000, 0.049, 0.136, 0.267, 0.441])  # in m/s2 units
 
     # all of this is only relevant for HONDA NIDEC
     speed_control = 0
@@ -246,21 +381,21 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
           if (actuators.longControlState == LongCtrlState.pid) and (not CS.out.gasPressed):
             gas_error = self.accel - CS.out.aEgo
             if gas_error != 0.0 and gas_pedal_force > 0.0:
-              learn_speed = 150 if (self.CP.carFingerprint == CAR.HONDA_INSIGHT) else 50 # Insight gas pedal reacts too slowly
+              learn_speed = 150 if (self.CP.carFingerprint == CAR.HONDA_INSIGHT) else 50  # Insight gas pedal reacts too slowly
               self.gasfactor = np.clip(self.gasfactor + gas_error / learn_speed * gas_pedal_force, 0.1, 3.0)
             if gas_error != 0.0 and (not CS.out.brakePressed) and (CS.out.vEgo > 0.0):
               wind_adjust = 1 + wind_brake_ms2 / 1000
-              self.windfactor = np.clip(self.windfactor * (wind_adjust if (gas_error > 0) else 1.0/wind_adjust), 0.1, 3.0)
-            if gas_pedal_force <= 0.0: # don't reduce windfactor while braking, allow increases
+              self.windfactor = np.clip(self.windfactor * (wind_adjust if (gas_error > 0) else 1.0 / wind_adjust), 0.1, 3.0)
+            if gas_pedal_force <= 0.0:  # don't reduce windfactor while braking, allow increases
               self.windfactor = max(self.windfactor, self.windfactor_before_brake)
             else:
               self.windfactor_before_brake = self.windfactor
-            if gas_pedal_force >= self.params.BOSCH_ACCEL_MAX: # don't increase gasfactor nor windfactor at accel max, allow decreases
-              self.gasfactor = min(self.gasfactor, self.gasfactor_before_gasmax)
-              self.windfactor = min(self.windfactor, self.windfactor_before_gasmax)
+            if gas_pedal_force >= self.params.BOSCH_ACCEL_MAX:  # don't increase gasfactor nor windfactor at accel max, allow decreases
+              self.gasfactor = min(self.gasfactor, self.gasfactor_before_maxgas)
+              self.windfactor = min(self.windfactor, self.windfactor_before_maxgas)
             else:
-              self.gasfactor_before_gasmax = self.gasfactor
-              self.windfactor_before_gasmax = self.windfactor
+              self.gasfactor_before_maxgas = self.gasfactor
+              self.windfactor_before_maxgas = self.windfactor
           self.gas = float(np.interp(gas_pedal_force * self.gasfactor, self.params.BOSCH_GAS_LOOKUP_BP, self.params.BOSCH_GAS_LOOKUP_V))
 
           stopping = actuators.longControlState == LongCtrlState.stopping
@@ -285,8 +420,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
               self.gasfactor = np.clip(self.gasfactor + gas_error / 50 * (gas * 4.8), 0.1, 3.0)
             if gas_error != 0.0 and (not CS.out.brakePressed) and (CS.out.vEgo > 0.0):
               wind_adjust = 1 + (wind_brake * 4.8) / 1000
-              self.windfactor = np.clip(self.windfactor * (wind_adjust if (gas_error > 0) else 1.0/wind_adjust), 0.1, 5.0)
-            if gas <= 0.0: # don't reduce windfactor while braking, allow increases
+              self.windfactor = np.clip(self.windfactor * (wind_adjust if (gas_error > 0) else 1.0 / wind_adjust), 0.1, 5.0)
+            if gas <= 0.0:  # don't reduce windfactor while braking, allow increases
               self.windfactor = max(self.windfactor, self.windfactor_before_brake)
             else:
               self.windfactor_before_brake = self.windfactor
@@ -332,7 +467,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     new_actuators.accel = self.accel
     new_actuators.gas = float(self.gasfactor)
     new_actuators.brake = float(self.windfactor)
-    new_actuators.torque = self.last_torque
+    new_actuators.torque = float(self.last_torque)
     new_actuators.torqueOutputCan = apply_torque
 
     self.frame += 1
