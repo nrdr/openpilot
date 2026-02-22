@@ -99,9 +99,8 @@ class CarInterface(CarInterfaceBase):
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
     else:
-      # default longitudinal tuning for all Nidec hondas
-      ret.longitudinalTuning.kiBP = [0., 5., 35.]
-      ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
+      ret.stoppingDecelRate = 0.4
+      ret.longitudinalActuatorDelay = 0.5 # s
 
     if candidate == CAR.HONDA_CITY_7G:
       ret.vEgoStopping = 2.0
@@ -346,13 +345,13 @@ class CarInterface(CarInterfaceBase):
         # stock filter output values:     0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108
         # modified filter output values:  0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0400, 0x0480
         # note: max request allowed is 4096, but request is capped at 3840 in firmware, so modifications result in 2x max
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 2560, 8000], [0, 2560, 3840]]
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]] # Linear Modded EPS
         stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.1]]
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 2564, 8000], [0, 2564, 3840]]
-        stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.09]]  # 2.5x Modded EPS
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
+        stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.09]]  # Linear Modded EPS
 
     elif candidate == CAR.HONDA_CIVIC_2022:
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
@@ -376,15 +375,21 @@ class CarInterface(CarInterfaceBase):
       stock_cp.minEnableSpeed = -1
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
         for fw in car_fw:
-          if fw.ecu == "eps" and b"-" not in fw.fwVersion and b"," in fw.fwVersion:
-            stock_cp.lateralTuning.pid.kf = 0.00004
-            stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 5760, 15360], [0, 2560, 3840]]
-            stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.1575], [0.05175]]
-          elif fw.ecu == "eps" and b"-" in fw.fwVersion and b"," in fw.fwVersion:
-            stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 5760, 10240], [0, 2560, 3840]]
-            stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.1]]
-      else:
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 2560], [0, 2560]]
+          if fw.ecu == "eps" and b"-" not in fw.fwVersion and b"," in fw.fwVersion: # 3X
+            # stock request output values:    0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x1400
+            # modified request output values: 0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x3C00
+            stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0,  250,  800, 1700, 2800, 3840], [0,  140,  600, 1350, 1920, 3840]] # TODO: Verify this is stable
+            stock_cp.lateralTuning.pid.kf = 0.00001
+            stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.03], [0.015]]
+          elif fw.ecu == "eps" and b"-" in fw.fwVersion and b"," in fw.fwVersion: # Linear Max
+            # stock request output values:    0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x1400
+            # modified request output values: 0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x7800
+            stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0,  3840], [0, 3840]] # TODO: Verify this is stable
+            stock_cp.lateralTuning.pid.kf = 0.00001
+            stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.03], [0.015]]
+      else: # Stock
+        # stock request output values:    0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x1400
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
         stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.8], [0.24]]
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR, CAR.ACURA_RLX): # source mlocoteta
