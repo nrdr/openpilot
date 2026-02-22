@@ -42,6 +42,7 @@ class ModularAssistiveDrivingSystem:
     self.events = self.selfdrive.events
     self.events_sp = self.selfdrive.events_sp
     self.disengage_on_accelerator = Params().get_bool("DisengageOnAccelerator")
+
     if self.CP.brand == "hyundai":
       if self.CP.flags & (HyundaiFlags.HAS_LDA_BUTTON | HyundaiFlags.CANFD):
         self.allow_always = True
@@ -51,21 +52,27 @@ class ModularAssistiveDrivingSystem:
     if self.CP.brand in MADS_NO_ACC_MAIN_BUTTON:
       self.no_main_cruise = True
 
-    # read params on init
+    # Read params on init
     self.enabled_toggle = self.params.get_bool("Mads")
     self.main_enabled_toggle = self.params.get_bool("MadsMainCruiseAllowed")
     self.steering_mode_on_brake = read_steering_mode_param(self.CP, self.CP_SP, self.params)
     self.unified_engagement_mode = self.params.get_bool("MadsUnifiedEngagementMode")
+
+    # LKAS auto-enable latch:
+    # - Armed whenever MAIN is off
+    # - Requests LKAS enable when MAIN is on
+    # - Disarms only after LKAS is confirmed enabled (state machine success)
+    self.auto_lkas_armed = True
+    self.enabled_prev_mads = False
 
   def read_params(self):
     self.main_enabled_toggle = self.params.get_bool("MadsMainCruiseAllowed")
     self.unified_engagement_mode = self.params.get_bool("MadsUnifiedEngagementMode")
 
   def pedal_pressed_non_gas_pressed(self, CS: structs.CarState) -> bool:
-    # ignore `pedalPressed` events caused by gas presses
+    # Ignore `pedalPressed` events caused by gas presses.
     if self.events.has(EventName.pedalPressed) and not (CS.gasPressed and not self.selfdrive.CS_prev.gasPressed and self.disengage_on_accelerator):
       return True
-
     return False
 
   def should_silent_lkas_enable(self, CS: structs.CarState) -> bool:
@@ -154,6 +161,17 @@ class ModularAssistiveDrivingSystem:
     # wrongCarMode alert only or actively block control
     self.get_wrong_car_mode(selfdrive_enable_events or set_speed_btns_enable)
 
+    # LKAS default-on behavior:
+    # On many ports (including Honda), cruiseState.available is the MAIN-on / ready signal.
+    # cruiseState.enabled often means "cruise actively engaged", which is not suitable for boot-time defaulting.
+    main_now = bool(CS.cruiseState.available)
+
+    if not main_now:
+      self.auto_lkas_armed = True
+
+    if self.main_enabled_toggle and self.auto_lkas_armed and main_now:
+      self.events_sp.add(EventNameSP.lkasEnable)
+
     if selfdrive_enable_events:
       if self.pedal_pressed_non_gas_pressed(CS):
         self.events_sp.add(EventNameSP.pedalPressedAlertOnly)
@@ -161,15 +179,12 @@ class ModularAssistiveDrivingSystem:
       if self.block_unified_engagement_mode():
         self.events.remove(EventName.pcmEnable)
         self.events.remove(EventName.buttonEnable)
-    else:
-      if self.main_enabled_toggle:
-        if CS.cruiseState.available and not self.selfdrive.CS_prev.cruiseState.available:
-          self.events_sp.add(EventNameSP.lkasEnable)
 
     for be in CS.buttonEvents:
       if be.type == ButtonType.cancel:
         if not self.selfdrive.enabled and self.selfdrive.enabled_prev:
           self.events_sp.add(EventNameSP.manualLongitudinalRequired)
+
       if be.type == ButtonType.lkas and be.pressed and (CS.cruiseState.available or self.allow_always):
         if self.enabled:
           if self.selfdrive.enabled:
@@ -189,7 +204,7 @@ class ModularAssistiveDrivingSystem:
         if self.enabled:
           self.events_sp.add(EventNameSP.lkasDisable)
         else:
-          # block lkasEnable if being sent, then send pedalPressedAlertOnly event
+          # Block lkasEnable if being sent, then send pedalPressedAlertOnly event.
           if self.events_sp.contains(EventNameSP.lkasEnable):
             self.events_sp.remove(EventNameSP.lkasEnable)
             self.events_sp.add(EventNameSP.pedalPressedAlertOnly)
@@ -216,6 +231,11 @@ class ModularAssistiveDrivingSystem:
 
     if not self.CP.passive and self.selfdrive.initialized:
       self.enabled, self.active = self.state_machine.update()
+
+      # Disarm the auto-enable latch only after LKAS is confirmed enabled.
+      if self.enabled and not self.enabled_prev_mads:
+        self.auto_lkas_armed = False
+      self.enabled_prev_mads = self.enabled
 
     # Copy of previous SelfdriveD states for MADS events handling
     self.selfdrive.enabled_prev = self.selfdrive.enabled
