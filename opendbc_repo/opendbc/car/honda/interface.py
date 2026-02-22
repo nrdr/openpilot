@@ -343,12 +343,12 @@ class CarInterface(CarInterfaceBase):
         # stock filter output values:     0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108
         # modified filter output values:  0x009F, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0108, 0x0400, 0x0480
         # note: max request allowed is 4096, but request is capped at 3840 in firmware, so modifications result in 2x max
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 2560, 8000], [0, 2560, 3840]]
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0,  250,  800, 1700, 2800, 3840], [0,  140,  600, 1350, 1920, 3840]] # TODO: Verify this is stable
         stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.1]]
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0,  250,  800, 1700, 2800, 3840], [0,  140,  600, 1350, 1920, 3840]] # TODO: Verify this is stable
         stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.09]]  # Linear Modded EPS
 
     elif candidate == CAR.HONDA_CIVIC_2022:
