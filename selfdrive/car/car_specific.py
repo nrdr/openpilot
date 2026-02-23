@@ -105,14 +105,6 @@ class CarSpecificEvents:
     # so only use it for cancel when running openpilot longitudinal
     allow_button_cancel = self.CP.brand != 'hyundai'
 
-    if CS.doorOpen:
-      events.add(EventName.doorOpen)
-    if CS.seatbeltUnlatched:
-      events.add(EventName.seatbeltNotLatched)
-    if CS.gearShifter != GearShifter.drive and CS.gearShifter not in CI.DRIVABLE_GEARS:
-      events.add(EventName.wrongGear)
-    if CS.gearShifter == GearShifter.reverse:
-      events.add(EventName.reverseGear)
     if not CS.cruiseState.available:
       events.add(EventName.wrongCarMode)
     if CS.espDisabled:
@@ -125,14 +117,8 @@ class CarSpecificEvents:
       events.add(EventName.stockAeb)
     if CS.stockLkas:
       events.add(EventName.stockLkas)
-    if CS.vEgo > MAX_CTRL_SPEED:
-      events.add(EventName.speedTooHigh)
     if CS.cruiseState.nonAdaptive:
       events.add(EventName.wrongCruiseMode)
-    if CS.brakeHoldActive and self.CP.openpilotLongitudinalControl:
-      events.add(EventName.brakeHold)
-    if CS.parkingBrake:
-      events.add(EventName.parkBrake)
     if CS.accFaulted:
       events.add(EventName.accFaulted)
     if CS.steeringPressed:
