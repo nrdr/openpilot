@@ -26,11 +26,11 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 # Scale applied to friction input error as a function of desired lateral accel magnitude.
 FRICTION_X = [0.4, 0.6]  # m/s^2 desired lateral accel magnitude
 
-FRICTION_Y_LOW_SPEED = [1.0, 0.5]    # stronger friction comp at low speed
-FRICTION_Y_HIGH_SPEED = [1.0, 0.5]  # weaker friction comp at high speed
+FRICTION_Y_LOW_SPEED = [2.0, 1.0]    # stronger friction comp at low speed
+FRICTION_Y_HIGH_SPEED = [0.5, 0.25]  # weaker friction comp at high speed
 
-FRICTION_BLEND_START_MPH = 45.0
-FRICTION_BLEND_END_MPH = 55.0
+FRICTION_BLEND_START_MPH = 10.0
+FRICTION_BLEND_END_MPH = 20.0
 MPH_TO_MS = 0.44704
 FRICTION_BLEND_START_MS = FRICTION_BLEND_START_MPH * MPH_TO_MS
 FRICTION_BLEND_END_MS = FRICTION_BLEND_END_MPH * MPH_TO_MS
