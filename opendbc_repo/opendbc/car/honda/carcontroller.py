@@ -176,7 +176,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
           self.torque_lpf = 0.0
           self.last_torque = 0.0
         else:
-          tau = 0.20
+          tau = 0.10
           alpha = DT_CTRL / (tau + DT_CTRL)
 
           if torque_cmd * self.torque_lpf < 0.0:
@@ -191,7 +191,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         if steering_pressed:
           self.torque_lpf = torque_cmd
         else:
-          tau = 0.20
+          tau = 0.10
           alpha = DT_CTRL / (tau + DT_CTRL)
 
           if torque_cmd * self.torque_lpf < 0.0:
