@@ -95,7 +95,7 @@ ECU_FIRMWARE_DB = {
         # ECU computes CVN over 0xA0010000–0xA0400000 on every boot
         # (compute_calibration_verification_number @ 0x800735FE).
         # This exactly matches the RWD data range, so CVN = checksum(firmware_data).
-        "cvn_block_size": 0x40000,        # 256 KB — TC27x PFlash sector size
+        "cvn_block_size": 0x3F000,        # 252 KB — matches firmware's per-task scan block size
 
         # -- Boot flash checksum complement --
         # The boot-time flash checksum (calculate_flash_checksum @ 0x8004E162)
