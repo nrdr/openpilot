@@ -132,7 +132,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     #   and reset the filter state to avoid "push back" when the driver releases.
     # - This force-to-0 behavior is applied only below the configured speed threshold.
     self.driver_override_until_nanos = 0
-    self.override_hold_s = 0.35
+    self.override_hold_s = 0.1
 
   def update(self, CC, CC_SP, CS, now_nanos):
     MadsCarController.update(self, self.CP, CC, CC_SP)
@@ -163,7 +163,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
     if CC.latActive:
       steering_pressed = CS.out.steeringPressed
-      below_override_cutoff = CS.out.vEgo < (20.0 * CV.MPH_TO_MS)
+      below_override_cutoff = CS.out.vEgo < (130.0 * CV.MPH_TO_MS)
 
       if below_override_cutoff:
         if steering_pressed:
