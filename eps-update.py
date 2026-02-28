@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 from opendbc.car.structs import CarParams
 from panda.format.x5a import x5a
 from panda import Panda
-from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE
+from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, ROUTINE_CONTROL_TYPE, ROUTINE_IDENTIFIER_TYPE, DATA_IDENTIFIER_TYPE, RESET_TYPE
 from unittest import mock
 
 def auto_int(i):
@@ -49,7 +49,7 @@ def calculate_session_key(const_bytes, seed_bytes):
   if k2 == 0:
     k2 = 0x10000
 
-  key = (seed + k0) ^ (seed * k1) % k2
+  key = ((seed + k0) ^ (seed * k1) % k2) & 0xFFFF
   return struct.pack('!H', key)
 
 def decrypt(fw, ops):
@@ -60,7 +60,7 @@ def decrypt(fw, ops):
   o0 = fw.operator_lut[ops[0]]
   o1 = fw.operator_lut[ops[1]]
   o2 = fw.operator_lut[ops[2]]
-  decoder = fw._get_decoder(int(key[0]), int(key[1]), int(key[2]), o0, o1, o2)
+  decoder = fw._make_decoder(int(key[0]), int(key[1]), int(key[2]), o0, o1, o2)
   plain, _ = fw.decrypt(decoder)
   return plain
 
@@ -181,6 +181,10 @@ if __name__ == "__main__":
     data = uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)
     debug_output = debug_output + [data]
 
+    print("Resetting ECU")
+    data = uds_client.ecu_reset(RESET_TYPE.HARD)
+    debug_output = debug_output + [data]
+
   except Exception:
     print(traceback.format_exc())
 
@@ -209,6 +213,7 @@ if __name__ == "__main__":
     calls += [call.transfer_data(num_blocks & 0xFF - 1, fw.firmware_encrypted[0][((num_blocks-1)*512):])]
     calls += [call.request_transfer_exit()]
     calls += [call.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.CHECK_PROGRAMMING_DEPENDENCIES)]
+    calls += [call.ecu_reset(RESET_TYPE.HARD)]
     uds_client.assert_has_calls(calls)
 
     if args.debug:

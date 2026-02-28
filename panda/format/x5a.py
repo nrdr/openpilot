@@ -63,12 +63,21 @@ class x5a(Base):
         raise Exception("could not find encryption key header!")
 
     def _get_firmware(self, data):
-        start = struct.unpack('!I', data[0:4])[0]
-        length = struct.unpack('!I', data[4:8])[0]
+        blocks = []
+        encrypted = []
+        idx = 0
 
-        firmware = data[8:]
-        assert len(firmware) == length, "firmware length incorrect!"
-        return [{"start": start, "length": length}], [firmware]
+        while idx + 8 <= len(data):
+            start = struct.unpack('!I', data[idx:idx+4])[0]
+            length = struct.unpack('!I', data[idx+4:idx+8])[0]
+            if length == 0 or idx + 8 + length > len(data):
+                break
+            blocks.append({"start": start, "length": length})
+            encrypted.append(data[idx+8:idx+8+length])
+            idx += 8 + length
+
+        assert len(blocks) > 0, "no firmware blocks found!"
+        return blocks, encrypted
 
     def _generate_file_header(self, indicator, headers):
         """
