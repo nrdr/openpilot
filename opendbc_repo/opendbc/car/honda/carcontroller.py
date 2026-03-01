@@ -127,12 +127,17 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
     self.torque_lpf = 0.0
 
-    # Driver override behavior for steer LPF:
-    # - While the driver is steering (and for a short hold after), force OP steer torque to 0
-    #   and reset the filter state to avoid "push back" when the driver releases.
-    # - This force-to-0 behavior is applied only below the configured speed threshold.
+    # Driver interaction behavior:
+    # - Below the override cutoff speed: while the driver is steering, command 0 torque and reset internal state
+    #   to avoid "push back." When the driver releases, fade torque back in over override_hold_s.
+    # - Above the override cutoff speed: while the driver is steering, do not apply the LPF.
+    #   Keep LPF state synchronized to avoid a step when the driver releases.
+    self.override_hold_s = 0.3
+    self.steering_pressed_prev = False
+    self.override_fade_start_nanos = 0
+
+    # Kept for compatibility with existing forks/tools; not used in the updated logic.
     self.driver_override_until_nanos = 0
-    self.override_hold_s = 0.1
 
   def update(self, CC, CC_SP, CS, now_nanos):
     MadsCarController.update(self, self.CP, CC, CC_SP)
@@ -158,38 +163,60 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       accel = 0.0
       gas, brake = 0.0, 0.0
 
-    # *** rate limit steer (with low-pass filter) ***
+    # *** steer command conditioning (driver interaction + low-pass filter + rate limit) ***
     torque_cmd = actuators.torque
 
     if CC.latActive:
       steering_pressed = CS.out.steeringPressed
-      below_override_cutoff = CS.out.vEgo < (130.0 * CV.MPH_TO_MS)
+      below_override_cutoff = CS.out.vEgo < (25.0 * CV.MPH_TO_MS)
+
+      # Start fade when transitioning from "driver steering" -> "driver released" at low speeds.
+      if below_override_cutoff and self.steering_pressed_prev and not steering_pressed:
+        self.override_fade_start_nanos = now_nanos
 
       if below_override_cutoff:
         if steering_pressed:
-          self.driver_override_until_nanos = now_nanos + int(self.override_hold_s * 1e9)
-
-        bypass = now_nanos < self.driver_override_until_nanos
-
-        if bypass:
+          # Low-speed driver takeover: fully disable torque and reset state to avoid pushback.
           torque_cmd = 0.0
           self.torque_lpf = 0.0
           self.last_torque = 0.0
+          self.override_fade_start_nanos = 0
         else:
-          tau = 0.10
-          alpha = DT_CTRL / (tau + DT_CTRL)
+          # Low-speed: fade torque back in over override_hold_s after the driver releases.
+          if self.override_fade_start_nanos > 0:
+            fade_ns = int(self.override_hold_s * 1e9)
+            dt_ns = now_nanos - self.override_fade_start_nanos
 
-          if torque_cmd * self.torque_lpf < 0.0:
-            self.torque_lpf = torque_cmd
-          else:
-            self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+            if dt_ns >= fade_ns:
+              self.override_fade_start_nanos = 0
+            else:
+              scale = float(dt_ns) / float(fade_ns)
+              torque_cmd *= scale
 
-          torque_cmd = self.torque_lpf
+              # During fade-in, avoid LPF to prevent "rubber band" feel; keep state aligned.
+              self.torque_lpf = torque_cmd
+              torque_cmd = self.torque_lpf
+
+          # If not currently fading, apply normal LPF smoothing.
+          if self.override_fade_start_nanos == 0:
+            tau = 0.10
+            alpha = DT_CTRL / (tau + DT_CTRL)
+
+            if torque_cmd * self.torque_lpf < 0.0:
+              self.torque_lpf = torque_cmd
+            else:
+              self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+
+            torque_cmd = self.torque_lpf
       else:
+        # Above cutoff: disable LPF while the driver is steering to reduce perceived tension.
+        self.override_fade_start_nanos = 0
         self.driver_override_until_nanos = 0
 
         if steering_pressed:
+          # Direct torque (no LPF). Sync LPF state to avoid a step on release.
           self.torque_lpf = torque_cmd
+          # torque_cmd remains unfiltered
         else:
           tau = 0.10
           alpha = DT_CTRL / (tau + DT_CTRL)
@@ -200,10 +227,14 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
             self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
 
           torque_cmd = self.torque_lpf
+
+      self.steering_pressed_prev = steering_pressed
     else:
       self.torque_lpf = 0.0
       self.last_torque = 0.0
       self.driver_override_until_nanos = 0
+      self.override_fade_start_nanos = 0
+      self.steering_pressed_prev = False
 
     limited_torque = rate_limit(
       torque_cmd,
