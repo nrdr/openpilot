@@ -94,6 +94,20 @@ def process_hud_alert(hud_alert):
   return alert_fcw, alert_steer_required
 
 
+def _clamp01(x: float) -> float:
+  return 0.0 if x <= 0.0 else (1.0 if x >= 1.0 else x)
+
+
+def _quick_start_curve(x: float) -> float:
+  """
+  Concave easing curve for ramp-in:
+  - Returns faster early, slower later.
+  - x is expected in [0, 1].
+  """
+  x = _clamp01(x)
+  return x ** 0.5
+
+
 class CarController(CarControllerBase, MadsCarController, GasInterceptorCarController, IntelligentCruiseButtonManagementInterface):
   def __init__(self, dbc_names, CP, CP_SP):
     CarControllerBase.__init__(self, dbc_names, CP, CP_SP)
@@ -127,14 +141,18 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
     self.torque_lpf = 0.0
 
-    # Driver interaction behavior:
-    # - Below the override cutoff speed: while the driver is steering, command 0 torque and reset internal state
-    #   to avoid "push back." When the driver releases, fade torque back in over override_hold_s.
-    # - Above the override cutoff speed: while the driver is steering, do not apply the LPF.
-    #   Keep LPF state synchronized to avoid a step when the driver releases.
-    self.override_hold_s = 0.3
+    # Driver override behavior (all speeds):
+    # - On driver steering (steeringPressed rising edge): ramp torque down to 0 over override_ramp_down_s.
+    # - While driver is steering: hold torque at 0.
+    # - On release (steeringPressed falling edge): ramp torque back in over override_ramp_up_s using a
+    #   quick-start curve (first portion returns faster than the remainder).
+    # - LPF remains enabled at all speeds; during ramps we synchronize LPF state to the ramp target.
+    self.override_ramp_down_s = 0.5
+    self.override_ramp_up_s = 2.0
     self.steering_pressed_prev = False
-    self.override_fade_start_nanos = 0
+    self.override_state = "normal"  # "normal" | "ramp_down" | "holding" | "ramp_up"
+    self.override_phase_start_nanos = 0
+    self.override_start_torque = 0.0
 
     # Kept for compatibility with existing forks/tools; not used in the updated logic.
     self.driver_override_until_nanos = 0
@@ -168,56 +186,63 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
     if CC.latActive:
       steering_pressed = CS.out.steeringPressed
-      below_override_cutoff = CS.out.vEgo < (25.0 * CV.MPH_TO_MS)
 
-      # Start fade when transitioning from "driver steering" -> "driver released" at low speeds.
-      if below_override_cutoff and self.steering_pressed_prev and not steering_pressed:
-        self.override_fade_start_nanos = now_nanos
+      # Detect edges for override state transitions.
+      steering_rising = (not self.steering_pressed_prev) and steering_pressed
+      steering_falling = self.steering_pressed_prev and (not steering_pressed)
 
-      if below_override_cutoff:
-        if steering_pressed:
-          # Low-speed driver takeover: fully disable torque and reset state to avoid pushback.
-          torque_cmd = 0.0
+      if steering_rising:
+        # Begin ramp-down from the currently commanded output torque.
+        self.override_state = "ramp_down"
+        self.override_phase_start_nanos = now_nanos
+        self.override_start_torque = float(self.torque_lpf)
+
+      if steering_pressed:
+        # While the driver is steering, either ramp down or hold at zero.
+        if self.override_state == "ramp_down":
+          fade_ns = int(self.override_ramp_down_s * 1e9)
+          dt_ns = now_nanos - self.override_phase_start_nanos
+          x = 1.0 if fade_ns <= 0 else _clamp01(float(dt_ns) / float(fade_ns))
+
+          torque_target = (1.0 - x) * self.override_start_torque
+
+          # Keep LPF state synchronized to the ramp target to avoid rubber-band feel.
+          self.torque_lpf = torque_target
+          torque_cmd = self.torque_lpf
+
+          if x >= 1.0:
+            self.override_state = "holding"
+        else:
+          # Holding phase: keep torque at zero as long as the driver continues to steer.
+          self.override_state = "holding"
           self.torque_lpf = 0.0
-          self.last_torque = 0.0
-          self.override_fade_start_nanos = 0
-        else:
-          # Low-speed: fade torque back in over override_hold_s after the driver releases.
-          if self.override_fade_start_nanos > 0:
-            fade_ns = int(self.override_hold_s * 1e9)
-            dt_ns = now_nanos - self.override_fade_start_nanos
+          torque_cmd = 0.0
 
-            if dt_ns >= fade_ns:
-              self.override_fade_start_nanos = 0
-            else:
-              scale = float(dt_ns) / float(fade_ns)
-              torque_cmd *= scale
-
-              # During fade-in, avoid LPF to prevent "rubber band" feel; keep state aligned.
-              self.torque_lpf = torque_cmd
-              torque_cmd = self.torque_lpf
-
-          # If not currently fading, apply normal LPF smoothing.
-          if self.override_fade_start_nanos == 0:
-            tau = 0.10
-            alpha = DT_CTRL / (tau + DT_CTRL)
-
-            if torque_cmd * self.torque_lpf < 0.0:
-              self.torque_lpf = torque_cmd
-            else:
-              self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
-
-            torque_cmd = self.torque_lpf
       else:
-        # Above cutoff: disable LPF while the driver is steering to reduce perceived tension.
-        self.override_fade_start_nanos = 0
-        self.driver_override_until_nanos = 0
+        # Driver is not steering.
+        if steering_falling:
+          # Begin ramp-up when the driver releases the wheel.
+          self.override_state = "ramp_up"
+          self.override_phase_start_nanos = now_nanos
 
-        if steering_pressed:
-          # Direct torque (no LPF). Sync LPF state to avoid a step on release.
-          self.torque_lpf = torque_cmd
-          # torque_cmd remains unfiltered
-        else:
+        if self.override_state == "ramp_up":
+          fade_ns = int(self.override_ramp_up_s * 1e9)
+          dt_ns = now_nanos - self.override_phase_start_nanos
+          x = 1.0 if fade_ns <= 0 else _clamp01(float(dt_ns) / float(fade_ns))
+
+          # Quick-start ramp: first portion returns faster than the remainder.
+          scale = _quick_start_curve(x)
+          torque_target = float(torque_cmd) * scale
+
+          # During ramp-up, keep LPF state aligned with the ramp target to prevent a step when normal LPF resumes.
+          self.torque_lpf = torque_target
+          torque_cmd = self.torque_lpf
+
+          if x >= 1.0:
+            self.override_state = "normal"
+
+        if self.override_state == "normal":
+          # Normal operation: apply LPF smoothing at all speeds.
           tau = 0.10
           alpha = DT_CTRL / (tau + DT_CTRL)
 
@@ -233,8 +258,10 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       self.torque_lpf = 0.0
       self.last_torque = 0.0
       self.driver_override_until_nanos = 0
-      self.override_fade_start_nanos = 0
       self.steering_pressed_prev = False
+      self.override_state = "normal"
+      self.override_phase_start_nanos = 0
+      self.override_start_torque = 0.0
 
     limited_torque = rate_limit(
       torque_cmd,
@@ -347,11 +374,11 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
             else:
               self.windfactor_before_brake = self.windfactor
             if gas_pedal_force >= self.params.BOSCH_ACCEL_MAX: # don't increase gasfactor nor windfactor at accel max, allow decreases
-              self.gasfactor = min(self.gasfactor, self.gasfactor_before_gasmax)
-              self.windfactor = min(self.windfactor, self.windfactor_before_gasmax)
+              self.gasfactor = min(self.gasfactor, self.gasfactor_before_maxgas)
+              self.windfactor = min(self.windfactor, self.windfactor_before_maxgas)
             else:
-              self.gasfactor_before_gasmax = self.gasfactor
-              self.windfactor_before_gasmax = self.windfactor
+              self.gasfactor_before_maxgas = self.gasfactor
+              self.windfactor_before_maxgas = self.windfactor
           self.gas = float(np.interp(gas_pedal_force * self.gasfactor, self.params.BOSCH_GAS_LOOKUP_BP, self.params.BOSCH_GAS_LOOKUP_V))
 
           stopping = actuators.longControlState == LongCtrlState.stopping
