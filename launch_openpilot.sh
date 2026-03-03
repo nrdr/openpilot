@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export STARTED=1
 export API_HOST=https://api.konik.ai
 export ATHENA_HOST=wss://athena.konik.ai
 set -euo pipefail
