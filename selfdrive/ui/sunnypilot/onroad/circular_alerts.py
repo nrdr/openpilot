@@ -24,7 +24,12 @@ class CircularAlertsRenderer:
     self._green_light_alert = False
     self._lead_depart_alert = False
     self._standstill_elapsed_time = 0.0
+
+    # Use hysteresis so the timer doesn't reset due to a transient CAN/state blip.
     self._is_standstill = False
+    self._standstill_true_frames = 0
+    self._standstill_false_frames = 0
+
     self._alert_text = ""
     self._alert_img = None
     self._allow_e2e_alerts = False
@@ -35,10 +40,33 @@ class CircularAlertsRenderer:
     car_state = sm['carState']
     self._green_light_alert = lp_sp.e2eAlerts.greenLightAlert
     self._lead_depart_alert = lp_sp.e2eAlerts.leadDepartAlert
-    self._is_standstill = car_state.standstill
+
+    raw_standstill = car_state.standstill
+    fps = float(gui_app.target_fps)
+
+    reset_after_false_s = 1.0
+    reset_after_false_frames = int(reset_after_false_s * fps)
+
+    latch_true_after_s = 0.10
+    latch_true_after_frames = max(1, int(latch_true_after_s * fps))
+
+    if raw_standstill:
+      self._standstill_true_frames += 1
+      self._standstill_false_frames = 0
+      if self._standstill_true_frames >= latch_true_after_frames:
+        self._is_standstill = True
+    else:
+      self._standstill_false_frames += 1
+      self._standstill_true_frames = 0
+
+      if self._standstill_false_frames >= reset_after_false_frames:
+        self._is_standstill = False
 
     if not ui_state.started:
       self._standstill_elapsed_time = 0.0
+      self._is_standstill = False
+      self._standstill_true_frames = 0
+      self._standstill_false_frames = 0
 
     self._allow_e2e_alerts = sm['selfdriveState'].alertSize == log.SelfdriveState.AlertSize.none and \
                              sm.recv_frame['driverStateV2'] > ui_state.started_frame
@@ -61,7 +89,7 @@ class CircularAlertsRenderer:
 
     elif ui_state.standstill_timer and self._is_standstill:
       self._alert_img = None
-      self._standstill_elapsed_time += 1.0 / gui_app.target_fps
+      self._standstill_elapsed_time += 1.0 / fps
       minute = int(self._standstill_elapsed_time / 60)
       second = int(self._standstill_elapsed_time - (minute * 60))
       self._alert_text = f"{minute:01d}:{second:02d}"
@@ -69,7 +97,9 @@ class CircularAlertsRenderer:
 
     else:
       self._e2e_alert_frame = 0
-      if not self._is_standstill:
+
+      # Only reset elapsed time after standstill has been continuously false long enough.
+      if not self._is_standstill and self._standstill_false_frames >= reset_after_false_frames:
         self._standstill_elapsed_time = 0.0
 
   def render(self, rect: rl.Rectangle) -> None:
