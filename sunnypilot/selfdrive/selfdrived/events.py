@@ -193,9 +193,9 @@ EVENTS_SP: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventNameSP.speedLimitActive: {
     ET.WARNING: Alert(
-      "Automatically adjusting to the posted speed limit",
-      "",
-      AlertStatus.normal, AlertSize.small,
+      "Automatically Changing Max Speed",
+      "The new speed limit has been applied.",
+      AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlertSP.promptSingleHigh, 5.),
   },
 
@@ -213,9 +213,9 @@ EVENTS_SP: dict[int, dict[str, Alert | AlertCallbackType]] = {
 
   EventNameSP.speedLimitPending: {
     ET.WARNING: Alert(
-      "Automatically adjusting to the last speed limit",
-      "",
-      AlertStatus.normal, AlertSize.small,
+      "Automatically Changing Max Speed",
+      "The last known speed limit has been applied.",
+      AlertStatus.normal, AlertSize.mid,
       Priority.LOW, VisualAlert.none, AudibleAlertSP.promptSingleHigh, 5.),
   },
 
