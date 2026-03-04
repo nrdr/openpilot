@@ -21,7 +21,7 @@ Additional EPS firmware variants may be supported as they are validated.
 ## Installation
 
 ```
-installer.comma.ai/nrdr/mvl-nrdr-release-march-2026
+installer.comma.ai/nrdr/nrdr-release-march-2026
 ```
 
 ---
