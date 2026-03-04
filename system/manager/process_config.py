@@ -150,7 +150,7 @@ procs = [
   PythonProcess("hardwared", "system.hardware.hardwared", always_run),
   PythonProcess("tombstoned", "system.tombstoned", always_run, enabled=not PC),
   PythonProcess("updated", "system.updated.updated", only_offroad, enabled=not PC),
-  PythonProcess("uploader", "system.loggerd.uploader", uploader_ready),
+  #PythonProcess("uploader", "system.loggerd.uploader", uploader_ready),
   PythonProcess("statsd", "system.statsd", always_run),
   PythonProcess("feedbackd", "selfdrive.ui.feedback.feedbackd", only_onroad),
 
