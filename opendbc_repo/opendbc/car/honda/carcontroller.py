@@ -250,7 +250,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
           if self.override_state == "normal":
             # Normal operation: apply LPF smoothing at all speeds.
-            tau = 0.10
+            tau = 0.15
             alpha = DT_CTRL / (tau + DT_CTRL)
 
             if torque_cmd * self.torque_lpf < 0.0:
