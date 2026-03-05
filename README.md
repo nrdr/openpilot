@@ -21,7 +21,7 @@ Additional EPS firmware variants may be supported as they are validated.
 ## Installation
 
 ```
-installer.comma.ai/nrdr/mvl-nrdr-release-march-2026
+installer.comma.ai/nrdr/mvl-staging-03.03.2026
 ```
 
 ---
@@ -47,7 +47,7 @@ The following configuration is recommended for optimal behavior with Linear EPS 
 ### Torque Control Settings
 
 - **Version:** Default  
-  - v1.0 provides more aggressive steering response.
+  - v0.0 provides a slightly different smoother steering response at the cost of some torque.
 - **Self Tune:** OFF
 - **Less Restrict Settings (Beta):** OFF
 - **Enable Custom Tuning:** OFF
