@@ -27,7 +27,7 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 FRICTION_X = [0.4, 0.6]  # m/s^2 desired lateral accel magnitude
 
 FRICTION_Y_LOW_SPEED = [2.0, 1.5]    # stronger friction comp at low speed
-FRICTION_Y_HIGH_SPEED = [0.8, 0.8]  # weaker friction comp at high speed
+FRICTION_Y_HIGH_SPEED = [0.65, 0.35]  # weaker friction comp at high speed
 
 FRICTION_BLEND_START_MPH = 25.0
 FRICTION_BLEND_END_MPH = 30.0
