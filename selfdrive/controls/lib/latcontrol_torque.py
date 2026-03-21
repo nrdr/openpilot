@@ -17,7 +17,7 @@ KI = 0.1
 KD = 0.0
 
 INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5.0, 7.5, 10, 15, 18, 22, 30]
-KP_INTERP     = [250, 225, 100, 40, 30, 10, 5, 3.2, 2.7, 1.8, KP] # Low speed boost
+KP_INTERP     = [250, 225, 100, 40, 30, 10, 5, 3.2, 2.7, 1.8, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
@@ -27,7 +27,7 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 FRICTION_X = [0.4, 0.6]  # m/s^2 desired lateral accel magnitude
 
 FRICTION_Y_LOW_SPEED = [2.0, 1.0]    # stronger friction comp at low speed
-FRICTION_Y_HIGH_SPEED = [1.0, 0.5]  # weaker friction comp at high speed
+FRICTION_Y_HIGH_SPEED = [0.6, 0.4]  # weaker friction comp at high speed
 
 FRICTION_BLEND_START_MPH = 25.0
 FRICTION_BLEND_END_MPH = 30.0
