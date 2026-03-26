@@ -148,11 +148,11 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float) -> float:
   if torque_delta > 0.50:
     return 0.05
   elif torque_delta > 0.20:
-    return 0.1
+    return 0.10
   elif torque_delta > 0.05:
-    return 0.15
+    return 0.13
   else:
-    return 0.2
+    return 0.17
 
 
 class CarController(CarControllerBase, MadsCarController, GasInterceptorCarController, IntelligentCruiseButtonManagementInterface):
