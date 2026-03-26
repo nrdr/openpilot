@@ -92,12 +92,13 @@ class CarInterface(CarInterfaceBase):
     if candidate in HONDA_BOSCH:
       ret.longitudinalActuatorDelay = 0.5 # s
       # longitudinal gas-only tuning for Bosch hondas is in carcontroller
-      ret.stoppingDecelRate = 0.4  # drivers reporting braking was too harsh before standstill
+      ret.stoppingDecelRate = 0.2 # Adjusted on 3/26/2026. 0.4 was reported as too harsh
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
     else:
-      ret.stoppingDecelRate = 0.4
-      ret.longitudinalActuatorDelay = 0.5 # s
+      ret.stoppingDecelRate = 0.2 # Adjusted on 3/26/2026. 0.4 was reported as too harsh
+      ret.longitudinalTuning.kiBP = [0., 5., 35.]
+      ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
 
     if candidate == CAR.HONDA_CITY_7G:
       ret.vEgoStopping = 2.0
