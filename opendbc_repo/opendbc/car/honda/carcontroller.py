@@ -7,6 +7,7 @@ from opendbc.car.honda import hondacan
 from opendbc.car.honda.values import CAR, CruiseButtons, HONDA_BOSCH, HONDA_BOSCH_CANFD, HONDA_BOSCH_RADARLESS, \
                                      HONDA_BOSCH_TJA_CONTROL, HONDA_NIDEC_ALT_PCM_ACCEL, CarControllerParams
 from opendbc.car.interfaces import CarControllerBase
+from opendbc.car.common.conversions import Conversions as CV
 
 from opendbc.sunnypilot.car.honda.mads import MadsCarController
 from opendbc.sunnypilot.car.honda.gas_interceptor import GasInterceptorCarController
@@ -119,7 +120,7 @@ def _driver_override_speed_factor(v_ego: float) -> float:
 
   Returns:
     1.0 -> full driver override behavior
-    0.0 -> half driver override behavior
+    0.5 -> half driver override behavior
   """
   full_cut_mph = 20.0
   no_cut_mph = 25.0
@@ -129,21 +130,29 @@ def _driver_override_speed_factor(v_ego: float) -> float:
                          [1.0, 0.5]))
 
 
-def _torque_lpf_tau_by_speed(v_ego: float) -> float:
+def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float) -> float:
   """
-  Speed-scheduled torque LPF time constant for EPS-modified cars.
+  Rate-aware torque LPF time constant for EPS-modified cars.
 
   Behavior:
-  - More smoothing at lower speeds to reduce twitchiness and harsh step-ins.
-  - Less smoothing at higher speeds to improve tracking and reduce control lag.
+  - Faster response when the requested torque is changing quickly.
+  - More smoothing when the request is settled.
 
   Notes:
   - Lower tau = faster response.
   - Higher tau = slower / smoother response.
+  - Thresholds are in normalized actuator torque units.
   """
-  return float(np.interp(v_ego,
-                         [0.0, 10.0 * CV.MPH_TO_MS, 25.0 * CV.MPH_TO_MS, 45.0 * CV.MPH_TO_MS, 70.0 * CV.MPH_TO_MS],
-                         [0.1, 0.1, 0.1, 0.1, 0.1]))
+  torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
+
+  if torque_delta > 0.50:
+    return 0.05
+  elif torque_delta > 0.20:
+    return 0.1
+  elif torque_delta > 0.05:
+    return 0.15
+  else:
+    return 0.2
 
 
 class CarController(CarControllerBase, MadsCarController, GasInterceptorCarController, IntelligentCruiseButtonManagementInterface):
@@ -183,12 +192,12 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.pitch = 0.0
 
     self.torque_lpf = 0.0
+    self.prev_torque_cmd = 0.0
 
     # Driver override behavior (EPS modified cars only):
     # - On driver steering (steeringPressed rising edge): ramp torque toward a speed-dependent floor.
     # - While driver is steering: hold a speed-dependent torque reduction.
     # - On release (steeringPressed falling edge): ramp torque back to normal over override_ramp_up_s.
-    # - Override strength fades smoothly to zero between 20 mph and 25 mph.
     # - LPF remains enabled at all speeds; during ramps we synchronize LPF state to the ramp target.
     self.override_ramp_down_s = 0.5
     self.override_ramp_up_s = 2.0
@@ -215,7 +224,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     if CC.longActive:
       accel = actuators.accel
       if (self.CP.carFingerprint in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR)) and (accel > max(0, CS.out.aEgo) + 0.1):
-        accel = 10000.0 # help with lagged accel until pedal tuning is inserted
+        accel = 10000.0  # help with lagged accel until pedal tuning is inserted
       gas, brake = compute_gas_brake(actuators.accel + hill_brake, CS.out.vEgo, self.CP.carFingerprint)
     else:
       accel = 0.0
@@ -297,8 +306,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
               self.override_state = "normal"
 
           if self.override_state == "normal":
-            # Normal operation: apply speed-scheduled LPF smoothing.
-            tau = _torque_lpf_tau_by_speed(CS.out.vEgo)
+            # Normal operation: apply rate-aware LPF smoothing.
+            tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd)
             alpha = DT_CTRL / (tau + DT_CTRL)
 
             if torque_cmd * self.torque_lpf < 0.0:
@@ -306,6 +315,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
             else:
               self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
 
+            self.prev_torque_cmd = float(torque_cmd)
             torque_cmd = self.torque_lpf
 
         self.steering_pressed_prev = steering_pressed
@@ -314,6 +324,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         # Stock EPS path: do not apply override ramps or LPF.
         # Keep internal state synchronized to avoid discontinuities if the controller is reused.
         self.torque_lpf = float(torque_cmd)
+        self.prev_torque_cmd = float(torque_cmd)
         self.steering_pressed_prev = steering_pressed
         self.override_state = "normal"
         self.override_phase_start_nanos = 0
@@ -321,6 +332,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
     else:
       self.torque_lpf = 0.0
+      self.prev_torque_cmd = 0.0
       self.last_torque = 0.0
       self.driver_override_until_nanos = 0
       self.steering_pressed_prev = False
