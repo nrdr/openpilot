@@ -120,13 +120,23 @@ def _driver_override_speed_factor(v_ego: float) -> float:
 
 def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float) -> float:
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
+  sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
+
+  if sign_change:
+    # Unwinding from turn: prioritize fast response to reduce lag
+    if torque_delta > 0.15:
+      return 0.03
+    elif torque_delta > 0.05:
+      return 0.06
+    else:
+      return 0.10
 
   if torque_delta > 0.50:
-    return 0.05
+    return 0.07
   elif torque_delta > 0.20:
-    return 0.10
+    return 0.12
   elif torque_delta > 0.05:
-    return 0.13
+    return 0.15
   else:
     return 0.17
 
