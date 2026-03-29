@@ -137,6 +137,7 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float) -> float:
   Behavior:
   - Faster response when the requested torque is changing quickly.
   - More smoothing when the request is settled.
+  - Sign change detection for faster unwind response.
 
   Notes:
   - Lower tau = faster response.
@@ -144,6 +145,16 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float) -> float:
   - Thresholds are in normalized actuator torque units.
   """
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
+  sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
+
+  if sign_change:
+    # Unwinding from turn: prioritize fast response to reduce lag
+    if torque_delta > 0.15:
+      return 0.03
+    elif torque_delta > 0.05:
+      return 0.06
+    else:
+      return 0.10
 
   if torque_delta > 0.50:
     return 0.025
