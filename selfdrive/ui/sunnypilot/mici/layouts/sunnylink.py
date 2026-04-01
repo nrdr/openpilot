@@ -4,8 +4,6 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
-from collections.abc import Callable
-
 from cereal import custom
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigToggle
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialog, BigConfirmationDialog
@@ -20,9 +18,8 @@ from openpilot.system.version import sunnylink_consent_version, sunnylink_consen
 
 
 class SunnylinkLayoutMici(NavScroller):
-  def __init__(self, back_callback: Callable):
+  def __init__(self):
     super().__init__()
-    self.set_back_callback(back_callback)
     self._restore_in_progress = False
     self._backup_in_progress = False
     self._sunnylink_enabled = ui_state.params.get("SunnylinkEnabled")
@@ -146,7 +143,7 @@ class SunnylinkLayoutMici(NavScroller):
       elif (backup_status == custom.BackupManagerSP.Status.completed or
             (backup_status == custom.BackupManagerSP.Status.idle and backup_progress == 100.0)):
         self._backup_in_progress = False
-        gui_app.push_widget(BigDialog(title=tr("settings backed up"), description=""))
+        gui_app.push_widget(BigDialog(tr("settings backed up"), ""))
         self._backup_btn.set_enabled(not ui_state.is_onroad())
 
     elif self._restore_in_progress:
@@ -164,7 +161,7 @@ class SunnylinkLayoutMici(NavScroller):
         self._restore_btn.set_enabled(not ui_state.is_onroad())
         self._restore_btn.set_text(tr("restore"))
         self._restore_btn.set_value(tr("failed"))
-        gui_app.push_widget(BigDialog(title=tr("unable to restore"), description="try again later."))
+        gui_app.push_widget(BigDialog(tr("unable to restore"), "try again later."))
 
       elif (restore_status == custom.BackupManagerSP.Status.completed or
             (restore_status == custom.BackupManagerSP.Status.idle and restore_progress == 100.0)):
@@ -188,9 +185,6 @@ class SunnylinkPairBigButton(BigButton):
     self.sponsor_pairing = sponsor_pairing
     super().__init__("")
 
-  def _update_state(self):
-    super()._update_state()
-
   def _handle_mouse_release(self, mouse_pos: MousePos):
     super()._handle_mouse_release(mouse_pos)
 
@@ -199,7 +193,7 @@ class SunnylinkPairBigButton(BigButton):
       dlg = BigDialog(tr("sunnylink Dongle ID not found. Please reboot & try again."), "")
     elif self.sponsor_pairing:
       dlg = SunnylinkPairingDialog(sponsor_pairing=True)
-    elif not self.sponsor_pairing:
+    else:
       dlg = SunnylinkPairingDialog(sponsor_pairing=False)
     if dlg:
       gui_app.push_widget(dlg)
