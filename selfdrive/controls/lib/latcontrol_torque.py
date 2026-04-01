@@ -175,6 +175,12 @@ class LatControlTorque(LatControl):
     )
     output_torque = self.torque_from_lateral_accel(output_lataccel, self.torque_params)
 
+    # When saturated with high error, reduce output to prevent oversteer
+    # This catches torque-fight scenario where controller is maxed but car can't turn more
+    # Use output magnitude (> 80% of max) instead of saturated flag
+    if abs(output_torque) > self.steer_max * 0.80 and abs(error) > 0.03:
+      output_torque *= 0.7  # Reduce torque contribution by 30%
+
     # Extension hook (kept compatible with your earlier signature expectations).
     pid_log, output_torque = self.extension.update(
       CS, VM, self.pid, params, ff, pid_log, setpoint, measurement, calibrated_pose, roll_compensation,
