@@ -159,6 +159,7 @@ class LatControlTorque(LatControl):
     # Detect when curvature is rapidly decreasing (natural unwind happening)
     self._prev_desired_curvature.append(desired_curvature)
     self._prev_desired_lat_accel.append(future_desired_lateral_accel)
+    self._prev_angle.append(CS.steeringAngleDeg)
 
     unwind_friction_reduction = 1.0
     if len(self._prev_desired_curvature) >= 5:
@@ -175,7 +176,7 @@ class LatControlTorque(LatControl):
       # Check if steering angle is also decreasing (confirming natural unwind)
       angle_decreasing = False
       if len(self._prev_angle) >= 3:
-        angle_decreasing = abs(CS.steeringAngleDeg) < self._prev_angle[-3] * 0.95
+        angle_decreasing = abs(CS.steeringAngleDeg) < abs(self._prev_angle[-3]) * 0.95
 
       # Only reduce friction if all conditions met
       if curv_mag_decreasing and lat_accel_mag_decreasing and angle_decreasing:
@@ -213,10 +214,10 @@ class LatControlTorque(LatControl):
 
     # Get actual steering angle to confirm unwind
     angle_decreasing = False
-    if len(self._prev_angle) > 0:
+    if len(self._prev_angle) >= 3:
       current_angle = abs(CS.steeringAngleDeg)
-      prev_angle = self._prev_angle[-1]
-      angle_decreasing = current_angle < prev_angle
+      older_angle = abs(self._prev_angle[-3])
+      angle_decreasing = current_angle < older_angle * 0.97  # 3% decrease over 3 frames
 
     if is_unwinding and angle_decreasing and abs(output_torque) > self.steer_max * 0.80 and abs(error) > 0.03:
       output_torque *= 0.7  # Reduce torque contribution by 30%
