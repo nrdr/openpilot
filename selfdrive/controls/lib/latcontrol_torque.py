@@ -70,6 +70,9 @@ class LatControlTorque(LatControl):
     self.lat_accel_request_buffer = deque([0.0] * self.lat_accel_request_buffer_len,
                                           maxlen=self.lat_accel_request_buffer_len)
 
+    # Track previous angle for unwind detection
+    self._prev_angle = deque(maxlen=10)
+
     # Measurement rate filter (for error_rate / damping / stability).
     self.previous_measurement = 0.0
     self.measurement_rate_filter = FirstOrderFilter(
@@ -175,9 +178,8 @@ class LatControlTorque(LatControl):
     )
     output_torque = self.torque_from_lateral_accel(output_lataccel, self.torque_params)
 
-    # When saturated with high error AND unwinding (desired lat accel dropping), reduce output
-    # This catches torque-fight scenario where controller is maxed but car can't turn more
-    # Only applies during unwind to prevent understeer during turn entry
+    # When saturated with high error AND unwinding, reduce output
+    # Only applies during true unwind phase: both lat accel AND angle decreasing
     is_unwinding = False
     if len(self.lat_accel_request_buffer) >= 10:
       current_dla = future_desired_lateral_accel
@@ -186,7 +188,14 @@ class LatControlTorque(LatControl):
         if (current_dla > 0 and older_dla > current_dla) or (current_dla < 0 and older_dla < current_dla):
           is_unwinding = True
 
-    if is_unwinding and abs(output_torque) > self.steer_max * 0.80 and abs(error) > 0.03:
+    # Get actual steering angle to confirm unwind
+    angle_decreasing = False
+    if len(self._prev_angle) > 0:
+      current_angle = abs(CS.steeringAngleDeg)
+      prev_angle = self._prev_angle[-1]
+      angle_decreasing = current_angle < prev_angle
+
+    if is_unwinding and angle_decreasing and abs(output_torque) > self.steer_max * 0.80 and abs(error) > 0.03:
       output_torque *= 0.7  # Reduce torque contribution by 30%
 
     # Extension hook (kept compatible with your earlier signature expectations).
@@ -210,5 +219,8 @@ class LatControlTorque(LatControl):
       steer_limited_by_safety,
       curvature_limited
     ))
+
+    # Track angle for next frame
+    self._prev_angle.append(abs(CS.steeringAngleDeg))
 
     return -output_torque, 0.0, pid_log
