@@ -17,7 +17,7 @@ KI = 0.1
 KD = 0.0
 
 INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5.0, 7.5, 10, 15, 18, 22, 30]
-KP_INTERP     = [250, 225, 100, 40, 30, 10, 5, 3.2, 2.7, 1.8, KP]
+KP_INTERP = [250, 225, 100, 40, 30, 10, 5, 3.2, 2.7, 1.8, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
@@ -26,7 +26,7 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 # Scale applied to friction input error as a function of desired lateral accel magnitude.
 FRICTION_X = [0.4, 0.6]  # m/s^2 desired lateral accel magnitude
 
-FRICTION_Y_LOW_SPEED = [2.0, 1.5]    # stronger friction comp at low speed
+FRICTION_Y_LOW_SPEED = [2.0, 1.5]  # stronger friction comp at low speed
 FRICTION_Y_HIGH_SPEED = [0.65, 0.35]  # weaker friction comp at high speed
 
 FRICTION_BLEND_START_MPH = 20.0
@@ -67,8 +67,7 @@ class LatControlTorque(LatControl):
 
     # Latency compensation buffer (stores desired lateral accel history).
     self.lat_accel_request_buffer_len = max(1, int(LAT_ACCEL_REQUEST_BUFFER_SECONDS / self.dt))
-    self.lat_accel_request_buffer = deque([0.0] * self.lat_accel_request_buffer_len,
-                                          maxlen=self.lat_accel_request_buffer_len)
+    self.lat_accel_request_buffer = deque([0.0] * self.lat_accel_request_buffer_len, maxlen=self.lat_accel_request_buffer_len)
 
     # Track previous angle for unwind detection
     self._prev_angle = deque(maxlen=10)
@@ -79,11 +78,7 @@ class LatControlTorque(LatControl):
 
     # Measurement rate filter (for error_rate / damping / stability).
     self.previous_measurement = 0.0
-    self.measurement_rate_filter = FirstOrderFilter(
-      0.0,
-      1.0 / (2.0 * np.pi * LP_FILTER_CUTOFF_HZ),
-      self.dt
-    )
+    self.measurement_rate_filter = FirstOrderFilter(0.0, 1.0 / (2.0 * np.pi * LP_FILTER_CUTOFF_HZ), self.dt)
 
   def update_live_torque_params(self, latAccelFactor, latAccelOffset, friction):
     self.torque_params.latAccelFactor = latAccelFactor
@@ -97,8 +92,7 @@ class LatControlTorque(LatControl):
       self.lateral_accel_from_torque(-self.steer_max, self.torque_params),
     )
 
-  def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
-             calibrated_pose, curvature_limited, lat_delay=None):
+  def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, calibrated_pose, curvature_limited, lat_delay=None):
     # Allow extension override of torque params.
     if self.extension.update_override_torque_params(self.torque_params):
       self.update_limits()
@@ -111,16 +105,12 @@ class LatControlTorque(LatControl):
       return -0.0, 0.0, pid_log
 
     # Measurement in lateral-accel space.
-    measured_curvature = -VM.calc_curvature(
-      math.radians(CS.steeringAngleDeg - params.angleOffsetDeg),
-      CS.vEgo,
-      params.roll
-    )
-    measurement = measured_curvature * CS.vEgo ** 2
+    measured_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
+    measurement = measured_curvature * CS.vEgo**2
 
     # Deadzone conversion to lateral-accel space.
     curvature_deadzone = abs(VM.calc_curvature(math.radians(self.steering_angle_deadzone_deg), CS.vEgo, 0.0))
-    lateral_accel_deadzone = curvature_deadzone * CS.vEgo ** 2
+    lateral_accel_deadzone = curvature_deadzone * CS.vEgo**2
 
     roll_compensation = params.roll * ACCELERATION_DUE_TO_GRAVITY
 
@@ -130,7 +120,7 @@ class LatControlTorque(LatControl):
     lat_delay = float(max(lat_delay, self.dt))
 
     # Buffer expected desired lateral accel based on actuation delay.
-    future_desired_lateral_accel = desired_curvature * CS.vEgo ** 2
+    future_desired_lateral_accel = desired_curvature * CS.vEgo**2
     self.lat_accel_request_buffer.append(future_desired_lateral_accel)
 
     delay_frames = int(np.clip(lat_delay / self.dt, 1, self.lat_accel_request_buffer_len))
@@ -165,7 +155,6 @@ class LatControlTorque(LatControl):
     friction_y = (1.0 - blend) * np.array(FRICTION_Y_LOW_SPEED) + blend * np.array(FRICTION_Y_HIGH_SPEED)
 
     friction_error_scale = float(np.interp(desired_lataccel_mag, FRICTION_X, friction_y))
-
     # Natural unwind detection: reduce friction during transitions when car wants to straighten
     # Detect when curvature is rapidly decreasing (natural unwind happening)
     self._prev_desired_curvature.append(desired_curvature)
@@ -231,12 +220,30 @@ class LatControlTorque(LatControl):
 
     if is_unwinding and angle_decreasing and abs(output_torque) > self.steer_max * 0.80 and abs(error) > 0.03:
       output_torque *= 0.7  # Reduce torque contribution by 30%
+      fix_triggered = True
+    else:
+      fix_triggered = False
 
     # Extension hook (kept compatible with your earlier signature expectations).
     pid_log, output_torque = self.extension.update(
-      CS, VM, self.pid, params, ff, pid_log, setpoint, measurement, calibrated_pose, roll_compensation,
-      future_desired_lateral_accel, measurement, lateral_accel_deadzone, gravity_adjusted_future_lateral_accel,
-      desired_curvature, measured_curvature, steer_limited_by_safety, output_torque
+      CS,
+      VM,
+      self.pid,
+      params,
+      ff,
+      pid_log,
+      setpoint,
+      measurement,
+      calibrated_pose,
+      roll_compensation,
+      future_desired_lateral_accel,
+      measurement,
+      lateral_accel_deadzone,
+      gravity_adjusted_future_lateral_accel,
+      desired_curvature,
+      measured_curvature,
+      steer_limited_by_safety,
+      output_torque,
     )
 
     pid_log.active = True
@@ -247,14 +254,12 @@ class LatControlTorque(LatControl):
     pid_log.output = float(-output_torque)
     pid_log.actualLateralAccel = float(measurement)
     pid_log.desiredLateralAccel = float(setpoint)
-    pid_log.saturated = bool(self._check_saturation(
-      self.steer_max - abs(output_torque) < 1e-3,
-      CS,
-      steer_limited_by_safety,
-      curvature_limited
-    ))
+    pid_log.saturated = bool(self._check_saturation(self.steer_max - abs(output_torque) < 1e-3, CS, steer_limited_by_safety, curvature_limited))
 
-    # Track angle for next frame
-    self._prev_angle.append(abs(CS.steeringAngleDeg))
+    # Debug logging for unwind fixes
+    pid_log.isUnwinding = bool(is_unwinding)
+    pid_log.angleDecreasing = bool(angle_decreasing)
+    pid_log.fixTriggered = bool(fix_triggered)
+    pid_log.frictionReduction = float(unwind_friction_reduction)
 
     return -output_torque, 0.0, pid_log
