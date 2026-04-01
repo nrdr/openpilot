@@ -175,10 +175,18 @@ class LatControlTorque(LatControl):
     )
     output_torque = self.torque_from_lateral_accel(output_lataccel, self.torque_params)
 
-    # When saturated with high error, reduce output to prevent oversteer
+    # When saturated with high error AND unwinding (desired lat accel dropping), reduce output
     # This catches torque-fight scenario where controller is maxed but car can't turn more
-    # Use output magnitude (> 80% of max) instead of saturated flag
-    if abs(output_torque) > self.steer_max * 0.80 and abs(error) > 0.03:
+    # Only applies during unwind to prevent understeer during turn entry
+    is_unwinding = False
+    if len(self.lat_accel_request_buffer) >= 10:
+      current_dla = future_desired_lateral_accel
+      older_dla = self.lat_accel_request_buffer[-10]
+      if abs(current_dla) > 0.05 and abs(older_dla) > 0.05:
+        if (current_dla > 0 and older_dla > current_dla) or (current_dla < 0 and older_dla < current_dla):
+          is_unwinding = True
+
+    if is_unwinding and abs(output_torque) > self.steer_max * 0.80 and abs(error) > 0.03:
       output_torque *= 0.7  # Reduce torque contribution by 30%
 
     # Extension hook (kept compatible with your earlier signature expectations).
