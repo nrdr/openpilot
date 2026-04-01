@@ -29,8 +29,8 @@ FRICTION_X = [0.4, 0.6]  # m/s^2 desired lateral accel magnitude
 FRICTION_Y_LOW_SPEED = [2.0, 1.5]    # stronger friction comp at low speed
 FRICTION_Y_HIGH_SPEED = [0.65, 0.35]  # weaker friction comp at high speed
 
-FRICTION_BLEND_START_MPH = 25.0
-FRICTION_BLEND_END_MPH = 30.0
+FRICTION_BLEND_START_MPH = 20.0
+FRICTION_BLEND_END_MPH = 35.0
 MPH_TO_MS = 0.44704
 FRICTION_BLEND_START_MS = FRICTION_BLEND_START_MPH * MPH_TO_MS
 FRICTION_BLEND_END_MS = FRICTION_BLEND_END_MPH * MPH_TO_MS
@@ -72,6 +72,10 @@ class LatControlTorque(LatControl):
 
     # Track previous angle for unwind detection
     self._prev_angle = deque(maxlen=10)
+
+    # Track desired curvature for unwind detection
+    self._prev_desired_curvature = deque(maxlen=10)
+    self._prev_desired_lat_accel = deque(maxlen=10)
 
     # Measurement rate filter (for error_rate / damping / stability).
     self.previous_measurement = 0.0
@@ -161,7 +165,37 @@ class LatControlTorque(LatControl):
     friction_y = (1.0 - blend) * np.array(FRICTION_Y_LOW_SPEED) + blend * np.array(FRICTION_Y_HIGH_SPEED)
 
     friction_error_scale = float(np.interp(desired_lataccel_mag, FRICTION_X, friction_y))
-    friction_input = error * friction_error_scale
+
+    # Natural unwind detection: reduce friction during transitions when car wants to straighten
+    # Detect when curvature is rapidly decreasing (natural unwind happening)
+    self._prev_desired_curvature.append(desired_curvature)
+    self._prev_desired_lat_accel.append(future_desired_lateral_accel)
+
+    unwind_friction_reduction = 1.0
+    if len(self._prev_desired_curvature) >= 5:
+      current_curv = desired_curvature
+      older_curv = self._prev_desired_curvature[-5]
+      current_lat = future_desired_lateral_accel
+      older_lat = self._prev_desired_lat_accel[-5]
+
+      # Natural unwind: curvature magnitude decreasing while steering angle decreasing
+      # (car wants to straighten, let it)
+      curv_mag_decreasing = abs(current_curv) < abs(older_curv) * 0.9
+      lat_accel_mag_decreasing = abs(current_lat) < abs(older_lat) * 0.9
+
+      # Check if steering angle is also decreasing (confirming natural unwind)
+      angle_decreasing = False
+      if len(self._prev_angle) >= 3:
+        angle_decreasing = abs(CS.steeringAngleDeg) < self._prev_angle[-3] * 0.95
+
+      # Only reduce friction if all conditions met
+      if curv_mag_decreasing and lat_accel_mag_decreasing and angle_decreasing:
+        # Reduce friction by up to 70% during natural unwind
+        # More reduction when unwinding faster
+        decay_ratio = abs(current_lat) / max(abs(older_lat), 0.01)
+        unwind_friction_reduction = 0.3 + 0.7 * min(decay_ratio, 1.0)
+
+    friction_input = error * friction_error_scale * unwind_friction_reduction
 
     friction = get_friction(friction_input, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
     ff += friction_scale * friction
