@@ -1220,7 +1220,7 @@ struct ControlsState::LateralTorqueState {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(e774a050cbf689a4, 6, 0)
+    CAPNP_DECLARE_STRUCT_HEADER(e774a050cbf689a4, 7, 0)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -8148,6 +8148,14 @@ public:
 
   inline  ::int32_t getVersion() const;
 
+  inline bool getIsUnwinding() const;
+
+  inline bool getAngleDecreasing() const;
+
+  inline bool getFixTriggered() const;
+
+  inline float getFrictionReduction() const;
+
 private:
   ::capnp::_::StructReader _reader;
   template <typename, ::capnp::Kind>
@@ -8214,6 +8222,18 @@ public:
 
   inline  ::int32_t getVersion();
   inline void setVersion( ::int32_t value);
+
+  inline bool getIsUnwinding();
+  inline void setIsUnwinding(bool value);
+
+  inline bool getAngleDecreasing();
+  inline void setAngleDecreasing(bool value);
+
+  inline bool getFixTriggered();
+  inline void setFixTriggered(bool value);
+
+  inline float getFrictionReduction();
+  inline void setFrictionReduction(float value);
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -32295,6 +32315,62 @@ inline  ::int32_t ControlsState::LateralTorqueState::Builder::getVersion() {
 inline void ControlsState::LateralTorqueState::Builder::setVersion( ::int32_t value) {
   _builder.setDataField< ::int32_t>(
       ::capnp::bounded<11>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool ControlsState::LateralTorqueState::Reader::getIsUnwinding() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+
+inline bool ControlsState::LateralTorqueState::Builder::getIsUnwinding() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+inline void ControlsState::LateralTorqueState::Builder::setIsUnwinding(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool ControlsState::LateralTorqueState::Reader::getAngleDecreasing() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+}
+
+inline bool ControlsState::LateralTorqueState::Builder::getAngleDecreasing() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+}
+inline void ControlsState::LateralTorqueState::Builder::setAngleDecreasing(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool ControlsState::LateralTorqueState::Reader::getFixTriggered() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
+}
+
+inline bool ControlsState::LateralTorqueState::Builder::getFixTriggered() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
+}
+inline void ControlsState::LateralTorqueState::Builder::setFixTriggered(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS, value);
+}
+
+inline float ControlsState::LateralTorqueState::Reader::getFrictionReduction() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<12>() * ::capnp::ELEMENTS);
+}
+
+inline float ControlsState::LateralTorqueState::Builder::getFrictionReduction() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<12>() * ::capnp::ELEMENTS);
+}
+inline void ControlsState::LateralTorqueState::Builder::setFrictionReduction(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<12>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool ControlsState::LateralLQRState::Reader::getActive() const {
