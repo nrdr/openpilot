@@ -149,6 +149,8 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float) -> float:
     return 0.025
   elif torque_delta > 0.20:
     return 0.075
+  elif torque_delta > 0.05:
+    return 0.15
   else:
     return 0.1
 

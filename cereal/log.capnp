@@ -923,6 +923,11 @@ struct ControlsState @0x97ff69c53601abf1 {
     desiredLateralAccel @10 :Float32;
     desiredLateralJerk @11 :Float32;
     version @12 :Int32;
+    # Debug fields for unwind fix tracking
+    isUnwinding @13 :Bool;
+    angleDecreasing @14 :Bool;
+    fixTriggered @15 :Bool;
+    frictionReduction @16 :Float32;
    }
 
   struct LateralLQRState {
