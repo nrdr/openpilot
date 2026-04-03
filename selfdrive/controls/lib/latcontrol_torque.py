@@ -185,6 +185,34 @@ class LatControlTorque(LatControl):
         decay_ratio = abs(current_lat) / max(abs(older_lat), 0.01)
         unwind_friction_reduction = 0.3 + 0.7 * min(decay_ratio, 1.0)
 
+    # Natural unwind detection: BEFORE computing FF and PID output
+    # During sharp turn unwind, the model wants less curvature than driver provides.
+    # This causes huge negative error (actual >> desired) and FF from desired pushes
+    # the controller to fight the driver. Solution: reduce FF to let driver unwind.
+    is_unwinding = False
+    ff_reduction = 1.0
+    if len(self.lat_accel_request_buffer) >= 10:
+      current_dla = future_desired_lateral_accel
+      older_dla = self.lat_accel_request_buffer[-10]
+      if abs(current_dla) > 0.05 and abs(older_dla) > 0.05:
+        if (current_dla > 0 and older_dla > current_dla) or (current_dla < 0 and older_dla < current_dla):
+          is_unwinding = True
+
+    angle_decreasing = False
+    if len(self._prev_angle) >= 3:
+      current_angle = abs(CS.steeringAngleDeg)
+      older_angle = abs(self._prev_angle[-3])
+      angle_decreasing = older_angle > 10 and current_angle < older_angle - 1.0
+
+    if is_unwinding and angle_decreasing and abs(output_torque) > self.steer_max * 0.80 and abs(error) > 0.03:
+      ff_reduction = 0.3  # Reduce FF to 30% - lets driver control unwinding
+      fix_triggered = True
+    else:
+      fix_triggered = False
+
+    # Apply FF reduction before PID computation
+    ff *= ff_reduction
+
     friction_input = error * friction_error_scale * unwind_friction_reduction
 
     friction = get_friction(friction_input, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
@@ -202,28 +230,9 @@ class LatControlTorque(LatControl):
     )
     output_torque = self.torque_from_lateral_accel(output_lataccel, self.torque_params)
 
-    # When saturated with high error AND unwinding, reduce output
-    # Only applies during true unwind phase: both lat accel AND angle decreasing
-    is_unwinding = False
-    if len(self.lat_accel_request_buffer) >= 10:
-      current_dla = future_desired_lateral_accel
-      older_dla = self.lat_accel_request_buffer[-10]
-      if abs(current_dla) > 0.05 and abs(older_dla) > 0.05:
-        if (current_dla > 0 and older_dla > current_dla) or (current_dla < 0 and older_dla < current_dla):
-          is_unwinding = True
-
-    # Get actual steering angle to confirm unwind
-    angle_decreasing = False
-    if len(self._prev_angle) >= 3:
-      current_angle = abs(CS.steeringAngleDeg)
-      older_angle = abs(self._prev_angle[-3])
-      angle_decreasing = current_angle < older_angle * 0.97  # 3% decrease over 3 frames
-
-    if is_unwinding and angle_decreasing and abs(output_torque) > self.steer_max * 0.80 and abs(error) > 0.03:
-      output_torque *= 0.7  # Reduce torque contribution by 30%
-      fix_triggered = True
-    else:
-      fix_triggered = False
+    # After PID output, also reduce output torque during unwind
+    if fix_triggered:
+      output_torque *= 0.5  # Reduce output by 50% additional
 
     # Extension hook (kept compatible with your earlier signature expectations).
     pid_log, output_torque = self.extension.update(
