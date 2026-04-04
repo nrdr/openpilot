@@ -27,13 +27,18 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 FRICTION_X = [0.4, 0.6]  # m/s^2 desired lateral accel magnitude
 
 FRICTION_Y_LOW_SPEED = [2.0, 1.5]    # stronger friction comp at low speed
-FRICTION_Y_HIGH_SPEED = [0.65, 0.35]  # weaker friction comp at high speed
+FRICTION_Y_HIGH_SPEED = [0.6, 0.3]  # weaker friction comp at high speed
 
-FRICTION_BLEND_START_MPH = 25.0
+FRICTION_BLEND_START_MPH = 20.0
 FRICTION_BLEND_END_MPH = 30.0
 MPH_TO_MS = 0.44704
 FRICTION_BLEND_START_MS = FRICTION_BLEND_START_MPH * MPH_TO_MS
 FRICTION_BLEND_END_MS = FRICTION_BLEND_END_MPH * MPH_TO_MS
+
+LOW_SPEED_X = [0, 10, 20, 30] # Force low speed FSD-lite turns
+LOW_SPEED_Y = [40, 20, 10, 5]
+LOW_SPEED_CUTOFF_MPH = 15.0
+LOW_SPEED_CUTOFF_MS = LOW_SPEED_CUTOFF_MPH * MPH_TO_MS
 
 VERSION = 2
 
@@ -132,12 +137,19 @@ class LatControlTorque(LatControl):
     # Jerk term computed against expected accel (setpoint-side compensation).
     desired_lateral_jerk = (future_desired_lateral_accel - expected_lateral_accel) / lat_delay
 
+    # Restore the legacy low-speed curvature scaling only at very low speeds.
+    legacy_low_speed_factor = np.interp(CS.vEgo, LOW_SPEED_X, LOW_SPEED_Y) ** 2
+    legacy_low_speed_blend = np.interp(CS.vEgo, [0.0, LOW_SPEED_CUTOFF_MS], [1.0, 0.0])
+    low_speed_factor = float(legacy_low_speed_factor * legacy_low_speed_blend)
+
+    # Latency-compensated setpoint with low-speed curvature assist.
+    setpoint = lat_delay * desired_lateral_jerk + expected_lateral_accel + low_speed_factor * desired_curvature
+    measurement = measurement + low_speed_factor * measured_curvature
+
     # Measurement rate for optional D usage (KD currently 0.0, but behavior remains correct).
     measurement_rate = float(self.measurement_rate_filter.update((measurement - self.previous_measurement) / self.dt))
     self.previous_measurement = measurement
 
-    # Latency-compensated setpoint.
-    setpoint = lat_delay * desired_lateral_jerk + expected_lateral_accel
     error = setpoint - measurement
 
     # Feedforward in lateral-accel space (gravity-adjusted, with latAccelOffset bias correction).

@@ -118,7 +118,10 @@ def _driver_override_speed_factor(v_ego: float) -> float:
                          [1.0, 0.5]))
 
 
-def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float) -> float:
+def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> float:
+  if v_ego > 45.0 * CV.MPH_TO_MS: # Speed at which low-pass filter becomes static value listed below:
+    return 0.10
+
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
   sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
 
@@ -278,7 +281,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
               self.override_state = "normal"
 
           if self.override_state == "normal":
-            tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd)
+            tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
             alpha = DT_CTRL / (tau + DT_CTRL)
 
             if torque_cmd * self.torque_lpf < 0.0:
