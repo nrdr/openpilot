@@ -376,7 +376,7 @@ class CarInterface(CarInterfaceBase):
           if fw.ecu == "eps" and b"-" not in fw.fwVersion and b"," in fw.fwVersion: # 3X
             # stock request output values:    0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x1400
             # modified request output values: 0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x3C00
-            stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0,  250,  800, 1700, 2800, 3840], [0,  140,  600, 1350, 1920, 3840]] # TODO: Verify this is stable
+            stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0,  3840], [0, 3840]] # TODO: Verify this is stable
             stock_cp.lateralTuning.pid.kf = 0.00001
             stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.03], [0.015]]
           elif fw.ecu == "eps" and b"-" in fw.fwVersion and b"," in fw.fwVersion: # Linear Max
