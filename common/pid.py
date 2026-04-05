@@ -3,7 +3,7 @@ from numbers import Number
 
 
 class PIDController:
-  def __init__(self, k_p, k_i, k_d=0.0, k_f=1.0, pos_limit=1e308, neg_limit=-1e308, rate=100):
+  def __init__(self, k_p, k_i, k_d=0.0, pos_limit=1e308, neg_limit=-1e308, rate=100, k_f=1.0):
     self._k_p: list[list[float]] = [[0], [k_p]] if isinstance(k_p, Number) else k_p
     self._k_i: list[list[float]] = [[0], [k_i]] if isinstance(k_i, Number) else k_i
     self._k_d: list[list[float]] = [[0], [k_d]] if isinstance(k_d, Number) else k_d
