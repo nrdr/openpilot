@@ -24,10 +24,8 @@ KP_INTERP = [250, 120, 65, 35, 11.5, 5.5, 3.5, 2.0, KP]
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 
-# Different friction response on straights:
-# Downscale friction compensation as desired lateral acceleration increases.
-FRICTION_X = [0.4, 0.6]   # m/s^2 desired lateral accel magnitude
-FRICTION_Y = [1.5, 0.5]   # scale applied to friction input
+FRICTION_X = [0.1, 1.0]
+FRICTION_Y = [0.25, 0.12]
 
 
 class LatControlTorque(LatControl):

@@ -120,7 +120,7 @@ def _driver_override_speed_factor(v_ego: float) -> float:
 
 def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> float:
   if v_ego > 45.0 * CV.MPH_TO_MS: # Speed at which low-pass filter becomes static value listed below:
-    return 0.10
+    return 0.1
 
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
   sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
@@ -128,20 +128,20 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   if sign_change:
     # Unwinding from turn: prioritize fast response to reduce lag
     if torque_delta > 0.15:
-      return 0.03
+      return 0.000
     elif torque_delta > 0.05:
-      return 0.06
+      return 0.050
     else:
-      return 0.10
+      return 0.100
 
   if torque_delta > 0.50:
-    return 0.07
+    return 0.020
   elif torque_delta > 0.20:
-    return 0.12
+    return 0.050
   elif torque_delta > 0.05:
-    return 0.15
+    return 0.075
   else:
-    return 0.17
+    return 0.100
 
 
 class CarController(CarControllerBase, MadsCarController, GasInterceptorCarController, IntelligentCruiseButtonManagementInterface):
