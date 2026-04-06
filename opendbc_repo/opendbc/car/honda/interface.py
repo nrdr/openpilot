@@ -89,8 +89,8 @@ class CarInterface(CarInterfaceBase):
     ret.steerActuatorDelay = 0.1
 
     if candidate in HONDA_BOSCH:
-      ret.longitudinalActuatorDelay = 0.5 # s
-      # longitudinal gas-only tuning for Bosch hondas is in carcontroller
+      ret.longitudinalActuatorDelay = 0.5  # s
+      # longitudinal gas-only tuning for Bosch Hondas is in carcontroller
       ret.stoppingDecelRate = 0.2
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
@@ -111,46 +111,46 @@ class CarInterface(CarInterfaceBase):
 
     if candidate == CAR.HONDA_CIVIC:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 2560], [0, 2560]]
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL, CAR.ACURA_INTEGRA):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
       if candidate == CAR.HONDA_CIVIC_BOSCH:
-          CarControllerParams.BOSCH_GAS_LOOKUP_V = [0, 750]
+        CarControllerParams.BOSCH_GAS_LOOKUP_V = [0, 750]
 
     elif candidate == CAR.HONDA_CIVIC_2022:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 5120], [0, 5120]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.HONDA_ACCORD:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
       if ret.transmissionType == TransmissionType.manual:
         CarControllerParams.BOSCH_GAS_LOOKUP_BP = [-0.2, 2.0]
 
     elif candidate == CAR.HONDA_ACCORD_11G:
       ret.steerActuatorDelay = 0.22
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 12747], [0, 12747]]
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.ACURA_ILX:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 3840], [0, 3840]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate in (CAR.HONDA_CRV, CAR.HONDA_CRV_EU, CAR.HONDA_CRV_SA):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1000], [0, 1000]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
       ret.wheelSpeedFactor = 1.025
 
     elif candidate == CAR.HONDA_CRV_5G:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
       ret.wheelSpeedFactor = 1.025
 
     elif candidate == CAR.HONDA_CRV_HYBRID:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
       ret.wheelSpeedFactor = 1.025
 
     elif candidate in (CAR.HONDA_CRV_6G):
@@ -163,27 +163,27 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate == CAR.HONDA_FIT:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.HONDA_FREED:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate in (CAR.HONDA_HRV, CAR.HONDA_HRV_3G):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]
       if candidate == CAR.HONDA_HRV:
-        CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+        CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
         ret.wheelSpeedFactor = 1.025
       else:
-        CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+        CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.ACURA_RDX:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1000], [0, 1000]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.ACURA_RDX_3G:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4095], [0, 4095]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
       CarControllerParams.BOSCH_GAS_LOOKUP_V = [0, 2200]
 
     elif candidate == CAR.ACURA_RDX_3G_MMR:
@@ -193,45 +193,45 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate == CAR.HONDA_ODYSSEY:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.HONDA_ODYSSEY_TWN:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 32767], [0, 32767]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate in (CAR.HONDA_PILOT, CAR.HONDA_PILOT_4G):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]] replace w Marco tune below
+      # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]] replace with Marco tune below
       ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 10], [0.05, 0.5]]
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.HONDA_PASSPORT_4G:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4600], [0, 4600]]
-      # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]] replace w Marco tune below
+      # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]] replace with Marco tune below
       ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 10], [0.05, 0.5]]
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.ACURA_MDX_4G_MMR:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]] replace w Marco tune below
+      # ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.38], [0.11]] replace with Marco tune below
       ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0, 10], [0.05, 0.5]]
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.HONDA_RIDGELINE:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate in (CAR.HONDA_INSIGHT, CAR.HONDA_NBOX_2G):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate in (CAR.HONDA_E, CAR.HONDA_E_ADVANCE):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.HONDA_ODYSSEY_5G_MMR:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
       ret.steerActuatorDelay = 0.15
       CarControllerParams.BOSCH_GAS_LOOKUP_V = [0, 2000]
       if not ret.openpilotLongitudinalControl:
@@ -241,8 +241,8 @@ class CarInterface(CarInterfaceBase):
     elif candidate in (CAR.ACURA_TLX_2G_MMR, CAR.ACURA_MDX_4G):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]
       ret.steerActuatorDelay = 0.15
-      # try Marco tune below
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      # Apply Marco tune below
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate in CAR.HONDA_FIT_4G:
       ret.steerActuatorDelay = 0.15
@@ -270,7 +270,7 @@ class CarInterface(CarInterfaceBase):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     if candidate == CAR.ACURA_RDX_3G_MMR:
-      CarControllerParams.BOSCH_GAS_LOOKUP_V = [0, 2000] # alpha longitudinal pedal tuning
+      CarControllerParams.BOSCH_GAS_LOOKUP_V = [0, 2000]  # alpha longitudinal pedal tuning
       if not ret.openpilotLongitudinalControl:
         # When using stock ACC, the radar intercepts and filters steering commands the EPS would otherwise accept
         ret.minSteerSpeed = 70. * CV.KPH_TO_MS
@@ -294,9 +294,9 @@ class CarInterface(CarInterfaceBase):
     if candidate in HONDA_BOSCH_CANFD:
       ret.safetyConfigs[-1].safetyParam |= HondaSafetyFlags.BOSCH_CANFD.value
 
-    # min speed to enable ACC. if car can do stop and go, then set enabling speed
-    # to a negative value, so it won't matter. Otherwise, add 0.5 mph margin to not
-    # conflict with PCM acc
+    # min speed to enable ACC. If car can do stop and go, set enabling speed
+    # to a negative value so it will not matter. Otherwise, add 0.5 mph margin
+    # to avoid conflicting with PCM ACC.
     if (candidate == CAR.HONDA_FIT_4G) and (not ret.openpilotLongitudinalControl):
       ret.autoResumeSng = False
     elif (ret.transmissionType == TransmissionType.manual) and (not ret.openpilotLongitudinalControl):
@@ -370,7 +370,7 @@ class CarInterface(CarInterfaceBase):
       stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
       CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
 
-    elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR): # source mlocoteta
+    elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
       stock_cp.autoResumeSng = True
       stock_cp.minEnableSpeed = -1
       stock_cp.steerActuatorDelay = 0.3
