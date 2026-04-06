@@ -91,13 +91,11 @@ class CarInterface(CarInterfaceBase):
     if candidate in HONDA_BOSCH:
       ret.longitudinalActuatorDelay = 0.5 # s
       # longitudinal gas-only tuning for Bosch hondas is in carcontroller
-      ret.stoppingDecelRate = 0.3
-      ret.vEgoStopping = 1.0
-      ret.vEgoStarting = 1.0
+      ret.stoppingDecelRate = 0.2
       if candidate in HONDA_BOSCH_RADARLESS:
         ret.stopAccel = CarControllerParams.BOSCH_ACCEL_MIN  # stock uses -4.0 m/s^2 once stopped but limited by safety model
     else:
-      ret.stoppingDecelRate = 0.3
+      ret.stoppingDecelRate = 0.2
       ret.longitudinalTuning.kiBP = [0., 5., 35.]
       ret.longitudinalTuning.kiV = [1.2, 0.8, 0.5]
 
@@ -341,7 +339,7 @@ class CarInterface(CarInterfaceBase):
 
     if candidate == CAR.HONDA_CIVIC:
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]] # Linear Modded EPS
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
         CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
