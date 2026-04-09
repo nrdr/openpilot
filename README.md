@@ -32,8 +32,9 @@ The following configuration is recommended for optimal behavior with Linear EPS 
 
 ### Model
 
-- **Model:** GWMv9 (strongly recommended)  
-  - SC allows tighter turns but produces significantly more aggressive steering behavior.
+- **Model:** POPv1 (known simply as POP) (Good lane positioning)
+  - OPMv7 can be smoother but hugs more.
+  - GWMv9 has been tried and tested, solid legacy model.
 - **Live Learning Delay:** ON
 
 ---
@@ -46,8 +47,8 @@ The following configuration is recommended for optimal behavior with Linear EPS 
 
 ### Torque Control Settings
 
-- **Version:** Default  
-  - v0.0 provides a slightly different smoother steering response at the cost of some torque.
+- **Version:** v0.0
+  - Default provides very aggressive low speed performance but will be uncomfortable and jerky.
 - **Self Tune:** OFF
 - **Less Restrict Settings (Beta):** OFF
 - **Enable Custom Tuning:** OFF
