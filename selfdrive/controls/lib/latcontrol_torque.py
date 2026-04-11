@@ -26,8 +26,8 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 # Scale applied to friction input error as a function of desired lateral accel magnitude.
 FRICTION_X = [0.1, 1.0]  # m/s^2 desired lateral accel magnitude
 
-FRICTION_Y_LOW_SPEED =  [0.50, 0.25] # Doubled friction at very low speeds
-FRICTION_Y_HIGH_SPEED = [0.25, 0.12] # Based on Honda EPS rack.
+FRICTION_Y_LOW_SPEED =  [0.60, 0.12] # Doubled friction at very low speeds
+FRICTION_Y_HIGH_SPEED = [0.40, 0.12] # Based on Honda EPS rack.
 
 # From twilsonco:
 # "So whatever the factor is that you multiply the lat accel factor by, you divide friction by that factor instead."
@@ -40,7 +40,7 @@ FRICTION_BLEND_START_MS = FRICTION_BLEND_START_MPH * MPH_TO_MS
 FRICTION_BLEND_END_MS = FRICTION_BLEND_END_MPH * MPH_TO_MS
 
 LOW_SPEED_X = [0, 10, 20, 30] # Force low speed FSD-lite turns
-LOW_SPEED_Y = [35, 20, 10, 5]
+LOW_SPEED_Y = [20, 7, 3, 0]
 LOW_SPEED_CUTOFF_MPH = 19.0
 LOW_SPEED_CUTOFF_MS = LOW_SPEED_CUTOFF_MPH * MPH_TO_MS
 
