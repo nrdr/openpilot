@@ -153,10 +153,15 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
         self._pid_log.error = self._pid_log.error * (1.0 - error_blend_factor) + torque_from_error * error_blend_factor
 
     # compute feedforward (same as nn setpoint output)
-    friction_input = self.update_friction_input(self._setpoint, self._measurement)
+    # Position 2: use lateral_jerk_setpoint to match March 26 model training
     nn_input = (
-      [CS.vEgo, self._desired_lateral_accel, friction_input, roll] + past_lateral_accels_desired + future_planned_lateral_accels + past_rolls + future_rolls
+      [CS.vEgo, self._desired_lateral_accel, self.lateral_jerk_setpoint, roll]
+      + past_lateral_accels_desired
+      + future_planned_lateral_accels
+      + past_rolls
+      + future_rolls
     )
+    friction_input = self.update_friction_input(self._setpoint, self._measurement)
     self._ff = self.model.evaluate(nn_input)
 
     # apply friction override for cars with low NN friction response
