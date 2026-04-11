@@ -25,7 +25,7 @@ LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 
 FRICTION_X = [0.1, 1.0]
-FRICTION_Y = [0.5, 0.12]
+FRICTION_Y = [0.45, 0.14]
 
 
 class LatControlTorque(LatControl):
