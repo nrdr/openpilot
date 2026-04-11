@@ -4,7 +4,6 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
-
 from collections import deque
 import math
 import numpy as np
@@ -48,12 +47,12 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
     self.pitch_last = 0.0
 
     # setup future time offsets
-    self.future_times = [0.3, 0.6, 1.0, 1.5]  # seconds in the future
+    self.future_times = [0.3, 0.6, 1.0, 1.5] # seconds in the future
     self.nn_future_times = [i + self.desired_lat_jerk_time for i in self.future_times]
 
     # setup past time offsets
     self.past_times = [-0.3, -0.2, -0.1]
-    history_check_frames = [int(abs(i) * 100) for i in self.past_times]
+    history_check_frames = [int(abs(i)*100) for i in self.past_times]
     self.history_frame_offsets = [history_check_frames[0] - i for i in history_check_frames]
     self.lateral_accel_desired_deque = deque(maxlen=history_check_frames[0])
     self.roll_deque = deque(maxlen=history_check_frames[0])
@@ -75,23 +74,22 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
     self.nn_future_times = [t + self.desired_lat_jerk_time for t in self.future_times]
 
   def update_feedforward_torque_space(self, CS):
-    torque_from_setpoint = self.torque_from_lateral_accel_in_torque_space(
-      LatControlInputs(self._setpoint, self._roll_compensation, CS.vEgo, CS.aEgo), self.lac_torque.torque_params, gravity_adjusted=False
-    )
-    torque_from_measurement = self.torque_from_lateral_accel_in_torque_space(
-      LatControlInputs(self._measurement, self._roll_compensation, CS.vEgo, CS.aEgo), self.lac_torque.torque_params, gravity_adjusted=False
-    )
+    torque_from_setpoint = self.torque_from_lateral_accel_in_torque_space(LatControlInputs(self._setpoint, self._roll_compensation, CS.vEgo, CS.aEgo),
+                                                                          self.lac_torque.torque_params, gravity_adjusted=False)
+    torque_from_measurement = self.torque_from_lateral_accel_in_torque_space(LatControlInputs(self._measurement, self._roll_compensation, CS.vEgo, CS.aEgo),
+                                                                             self.lac_torque.torque_params, gravity_adjusted=False)
     self._pid_log.error = float(torque_from_setpoint - torque_from_measurement)
-    self._ff = self.torque_from_lateral_accel_in_torque_space(
-      LatControlInputs(self._gravity_adjusted_lateral_accel, self._roll_compensation, CS.vEgo, CS.aEgo), self.lac_torque.torque_params, gravity_adjusted=True
-    )
-    self._ff += get_friction_in_torque_space(
-      self._desired_lateral_accel - self._actual_lateral_accel, self._lateral_accel_deadzone, FRICTION_THRESHOLD, self.lac_torque.torque_params
-    )
+    self._ff = self.torque_from_lateral_accel_in_torque_space(LatControlInputs(self._gravity_adjusted_lateral_accel, self._roll_compensation,
+                                                                               CS.vEgo, CS.aEgo), self.lac_torque.torque_params, gravity_adjusted=True)
+    self._ff += get_friction_in_torque_space(self._desired_lateral_accel - self._actual_lateral_accel, self._lateral_accel_deadzone,
+                                             FRICTION_THRESHOLD, self.lac_torque.torque_params)
 
   def update_output_torque(self, CS):
     freeze_integrator = self._steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
-    self._output_torque = self._pid.update(self._pid_log.error, feedforward=self._ff, speed=CS.vEgo, freeze_integrator=freeze_integrator)
+    self._output_torque = self._pid.update(self._pid_log.error,
+                                           feedforward=self._ff,
+                                           speed=CS.vEgo,
+                                           freeze_integrator=freeze_integrator)
 
   def update_neural_network_feedforward(self, CS, params, calibrated_pose) -> None:
     if not self._nnlc_enabled:
@@ -116,22 +114,22 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
     # adjust future times to account for longitudinal acceleration
     adjusted_future_times = [t + 0.5 * CS.aEgo * (t / max(CS.vEgo, 1.0)) for t in self.nn_future_times]
     past_rolls = [self.roll_deque[min(len(self.roll_deque) - 1, i)] for i in self.history_frame_offsets]
-    future_rolls = [
-      roll_pitch_adjust(
-        np.interp(t, ModelConstants.T_IDXS, self.model_v2.orientation.x) + roll,
-        np.interp(t, ModelConstants.T_IDXS, self.model_v2.orientation.y) + self.pitch_last,
-      )
-      for t in adjusted_future_times
-    ]
-    past_lateral_accels_desired = [self.lateral_accel_desired_deque[min(len(self.lateral_accel_desired_deque) - 1, i)] for i in self.history_frame_offsets]
-    future_planned_lateral_accels = [np.interp(t, ModelConstants.T_IDXS, self.model_v2.acceleration.y) for t in adjusted_future_times]
+    future_rolls = [roll_pitch_adjust(np.interp(t, ModelConstants.T_IDXS, self.model_v2.orientation.x) + roll,
+                                      np.interp(t, ModelConstants.T_IDXS, self.model_v2.orientation.y) + self.pitch_last) for t in
+                    adjusted_future_times]
+    past_lateral_accels_desired = [self.lateral_accel_desired_deque[min(len(self.lateral_accel_desired_deque) - 1, i)]
+                                   for i in self.history_frame_offsets]
+    future_planned_lateral_accels = [np.interp(t, ModelConstants.T_IDXS, self.model_v2.acceleration.y) for t in
+                                     adjusted_future_times]
 
     # compute NNFF error response
-    nnff_setpoint_input = [CS.vEgo, self._setpoint, self.lateral_jerk_setpoint, roll] + [self._setpoint] * self.past_future_len + past_rolls + future_rolls
+    nnff_setpoint_input = [CS.vEgo, self._setpoint, self.lateral_jerk_setpoint, roll] \
+                          + [self._setpoint] * self.past_future_len \
+                          + past_rolls + future_rolls
     # past lateral accel error shouldn't count, so use past desired like the setpoint input
-    nnff_measurement_input = (
-      [CS.vEgo, self._measurement, self.lateral_jerk_measurement, roll] + [self._measurement] * self.past_future_len + past_rolls + future_rolls
-    )
+    nnff_measurement_input = [CS.vEgo, self._measurement, self.lateral_jerk_measurement, roll] \
+                             + [self._measurement] * self.past_future_len \
+                             + past_rolls + future_rolls
     torque_from_setpoint = self.model.evaluate(nnff_setpoint_input)
     torque_from_measurement = self.model.evaluate(nnff_measurement_input)
     self._pid_log.error = torque_from_setpoint - torque_from_measurement
@@ -153,11 +151,10 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
         self._pid_log.error = self._pid_log.error * (1.0 - error_blend_factor) + torque_from_error * error_blend_factor
 
     # compute feedforward (same as nn setpoint output)
-    # Position 2: use friction_input to match V6 model training and sunnypilot master
     friction_input = self.update_friction_input(self._setpoint, self._measurement)
-    nn_input = (
-      [CS.vEgo, self._desired_lateral_accel, friction_input, roll] + past_lateral_accels_desired + future_planned_lateral_accels + past_rolls + future_rolls
-    )
+    nn_input = [CS.vEgo, self._desired_lateral_accel, friction_input, roll] \
+               + past_lateral_accels_desired + future_planned_lateral_accels \
+               + past_rolls + future_rolls
     self._ff = self.model.evaluate(nn_input)
 
     # apply friction override for cars with low NN friction response
