@@ -118,4 +118,4 @@ legend = ["LAT_ACCEL_FACTOR", "MAX_LAT_ACCEL_MEASURED", "FRICTION"]
 "ACURA_TLX_1G" = [4.2, 1.8, 0.16]
 
 # Linear Torque
-"HONDA_CLARITY" = [3.37, 2.5, 1.0]
+"HONDA_CLARITY" = [3.37, 2.5, 0.19]
