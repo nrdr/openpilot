@@ -4,6 +4,7 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
+
 from json import load
 import numpy as np
 
@@ -47,6 +48,7 @@ class NNTorqueModel:
   @staticmethod
   def identity(x):
     return x
+
   # End activation functions
 
   def forward(self, x):
@@ -80,4 +82,4 @@ class NNTorqueModel:
 
   def check_for_friction_override(self):
     y = self.evaluate([10.0, 0.0, 0.2])
-    self.friction_override = (y < 0.1)
+    self.friction_override = abs(y) < 0.1
