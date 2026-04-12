@@ -17,7 +17,7 @@ KI = 0.1
 KD = 0.0
 
 INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5.0, 7.5, 10, 15, 18, 22, 30]
-KP_INTERP     = [250, 225, 100, 40, 30, 10, 5, 3.2, 2.7, 1.8, KP]
+KP_INTERP     = [250, 120,  65, 35, 11.5, 5.5, 3.5, 2.0, 1.8, 1.4, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
@@ -132,6 +132,9 @@ class LatControlTorque(LatControl):
     # Jerk term computed against expected accel (setpoint-side compensation).
     desired_lateral_jerk = (future_desired_lateral_accel - expected_lateral_accel) / lat_delay
 
+    # Latency-compensated setpoint.
+    setpoint = lat_delay * desired_lateral_jerk + expected_lateral_accel
+
     # Measurement rate for optional D usage (KD currently 0.0, but behavior remains correct).
     measurement_rate = float(self.measurement_rate_filter.update((measurement - self.previous_measurement) / self.dt))
     self.previous_measurement = measurement
@@ -165,13 +168,13 @@ class LatControlTorque(LatControl):
 
     pid_log.error = float(error)
 
-    # unwind bleed
+    # unwind bleed: decay i when car has more steering than needed (prevents slow unwind)
     if abs(setpoint) < abs(measurement):
-      self.pid.i *= 0.5
+      self.pid.i *= 0.9
 
-    # wrong-direction reset
+    # wrong-direction reset: softer than zeroing to avoid choppiness
     if error * self.pid.i < 0:
-      self.pid.i = 0.0
+      self.pid.i *= 0.5
 
     freeze_integrator = steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
     output_lataccel = self.pid.update(
