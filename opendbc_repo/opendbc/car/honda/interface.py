@@ -367,8 +367,10 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.HONDA_CLARITY:
       stock_cp.autoResumeSng = True
       stock_cp.minEnableSpeed = -1
-      stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      stock_cp.lateralParams.torqueBP = [0, 2000, 6000]
+      stock_cp.lateralParams.torqueV  = [0, 1500, 3840]
+      stock_cp.lateralTuning.pid.kf = 0.000025
+      stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.25], [0.09]]
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
       stock_cp.autoResumeSng = True
