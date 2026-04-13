@@ -10,8 +10,8 @@ MAX_CURVATURE = 0.2
 MAX_VEL_ERR = 5.0  # m/s
 
 # EU guidelines
-MAX_LATERAL_JERK = 5.0  # m/s^3
-MAX_LATERAL_ACCEL_NO_ROLL = 3.0  # m/s^2
+MAX_LATERAL_JERK = 10.0  # m/s^3
+MAX_LATERAL_ACCEL_NO_ROLL = 10.0  # m/s^2
 
 
 def clamp(val, min_val, max_val):
@@ -39,7 +39,7 @@ def clip_curvature(v_ego, prev_curvature, new_curvature, roll) -> tuple[float, b
   return float(new_curvature), limited_accel or limited_max_curv
 
 
-def get_accel_from_plan(speeds, accels, t_idxs, action_t=DT_MDL, vEgoStopping=0.1):
+def get_accel_from_plan(speeds, accels, t_idxs, action_t=DT_MDL, vEgoStopping=0.3):
   if len(speeds) == len(t_idxs):
     v_now = speeds[0]
     a_now = accels[0]
