@@ -54,6 +54,15 @@ The following configuration is recommended for optimal behavior with Linear EPS 
 - **Enable Custom Tuning:** OFF
 - **Manual Real-time Tuning:** OFF
 
+Honda Insight users (and those who want to manually tune):
+- **Version:** v0.0
+- **Self Tune:** OFF
+- **Less Restrict Settings (Beta):** OFF
+- **Enable Custom Tuning:** ON
+- **Manual Real-time Tuning:** ON
+- **LATERAL ACCELERATION FACTOR:** Start with 3.37 and work your way lower for increased response
+- **FRICTION:** Use 1.0 and lower until car feels too lazy
+
 These defaults ensure consistent behavior with linearized EPS firmware.
 
 ---
