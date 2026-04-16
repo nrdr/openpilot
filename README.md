@@ -18,7 +18,7 @@ To flash your car:
 * When you see that it aborts before peforming mutating actions, this is your key that it's ready.
 * After you are fully commited and ready to flash, run python eps-update.py REPLACE_WITH_YOUR_FIRMWARE -b 1 --skip-checksum --danger 
 
-* An example command would look like: python eps-update.py 39990-TGG-A020-2.5x.rwd --skip-checksum --danger
+* An example command would look like: python eps-update.py 39990-TXM-A040-linear-max.rwd --skip-checksum --danger
 * Wait for the flashing process to take place, you will see errors on your dash as this happens.
 * When fully completed, turn the car completely off. You are done! Then factory reset the device.
 
