@@ -17,7 +17,11 @@ KI = 0.1
 KD = 0.0
 
 INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5.0, 7.5, 10, 15, 18, 22, 30]
-KP_INTERP     = [250, 120,  65, 35, 11.5, 5.5, 3.5, 2.0, 1.8, 1.4, KP]
+# V13 tuning: reduced 3–10 m/s by ×0.65 to compensate for EPS firmware 22%→33% motor torque.
+# Data (49 min V10 routes): P-term drives 100% of overshoot; I-term ≈ 0 throughout.
+# Net effect vs V10: ×0.975 response at turning speeds (corrects existing overshoot + prevents V13 amplification).
+# Highway (15+ m/s) unchanged — route data confirmed fine there.
+KP_INTERP     = [250, 120,  65, 23,  7.5, 3.5, 2.3, 2.0, 1.8, 1.4, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
