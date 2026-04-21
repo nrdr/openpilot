@@ -115,7 +115,7 @@ def _driver_override_speed_factor(v_ego: float) -> float:
 
   return float(np.interp(v_ego,
                          [full_cut_mph * CV.MPH_TO_MS, no_cut_mph * CV.MPH_TO_MS],
-                         [1.0, 0.5]))
+                         [1.0, 0.9]))
 
 
 def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> float:
@@ -187,8 +187,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.torque_lpf = 0.0
     self.prev_torque_cmd = 0.0
 
-    self.override_ramp_down_s = 0.5
-    self.override_ramp_up_s = 2.0
+    self.override_ramp_down_s = 0.1
+    self.override_ramp_up_s = 3.0
     self.steering_pressed_prev = False
     self.override_state = "normal"
     self.override_phase_start_nanos = 0
