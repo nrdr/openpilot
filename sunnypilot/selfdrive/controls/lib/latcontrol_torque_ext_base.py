@@ -85,7 +85,7 @@ class LatControlTorqueExtBase:
     # value, which is offset by the steerActuatorDelay.
     # TODO-SP: Reevaluate lookahead v values that determines how low a desired lateral jerk signal needs to
     #          persist in order to be used.
-    self.friction_look_ahead_v = [0.5, 2.0]  # how many seconds in the future to look ahead in [0, ~2.1] in 0.1 increments
+    self.friction_look_ahead_v = [1.4, 2.0]  # how many seconds in the future to look ahead in [0, ~2.1] in 0.1 increments
     self.friction_look_ahead_bp = [9.0, 30.0]  # corresponding speeds in m/s in [0, ~40] in 1.0 increments
 
     # Scaling the lateral acceleration "friction response" could be helpful for some.
