@@ -18,12 +18,8 @@ KP = 1.0
 KI = 0.1
 KD = 0.0
 
-INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5.0, 7.5, 10, 15, 18, 22, 30]
-# V13 tuning: reduced 3–10 m/s by ×0.65 to compensate for EPS firmware 22%→33% motor torque.
-# Data (49 min V10 routes): P-term drives 100% of overshoot; I-term ≈ 0 throughout.
-# Net effect vs V10: ×0.975 response at turning speeds (corrects existing overshoot + prevents V13 amplification).
-# Highway (15+ m/s) unchanged — route data confirmed fine there.
-KP_INTERP     = [250, 120,  65, 23,  7.5, 3.5, 2.3, 2.0, 1.8, 1.4, KP]
+INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5, 7.5, 10, 15, 30]
+KP_INTERP = [250, 200, 100, 40, 20, 5.5, 3.5, 2.0, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
@@ -32,15 +28,15 @@ LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 # Scale applied to friction input error as a function of desired lateral accel magnitude.
 FRICTION_X = [0.1, 1.0]  # m/s^2 desired lateral accel magnitude
 
-FRICTION_Y_LOW_SPEED =  [0.250, 0.125] # Doubled friction at very low speeds
-FRICTION_Y_HIGH_SPEED = [0.125, 0.060] # Based on Honda EPS rack.
+FRICTION_Y_LOW_SPEED =  [1.0, 0.5] # Doubled friction at very low speeds
+FRICTION_Y_HIGH_SPEED = [1.0, 1.0] # Based on Honda EPS rack.
 
 # From twilsonco:
 # "So whatever the factor is that you multiply the lat accel factor by, you divide friction by that factor instead."
 # In that sense, we use the measured friction (0.25) in low lateral accelerations and divide by 2 in high lateral accelerations.
 
-FRICTION_BLEND_START_MPH = 1.
-FRICTION_BLEND_END_MPH = 19.
+FRICTION_BLEND_START_MPH = 15.
+FRICTION_BLEND_END_MPH = 25.
 MPH_TO_MS = 0.44704
 FRICTION_BLEND_START_MS = FRICTION_BLEND_START_MPH * MPH_TO_MS
 FRICTION_BLEND_END_MS = FRICTION_BLEND_END_MPH * MPH_TO_MS

@@ -19,13 +19,13 @@ KI = 0.1
 KD = 0.0
 
 INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5, 7.5, 10, 15, 30]
-KP_INTERP = [250, 120, 65, 35, 11.5, 5.5, 3.5, 2.0, KP]
+KP_INTERP = [250, 200, 100, 40, 20, 5.5, 3.5, 2.0, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 
 FRICTION_X = [0.1, 1.0]
-FRICTION_Y = [0.325, 0.125]
+FRICTION_Y = [1.0, 0.5]
 
 
 class LatControlTorque(LatControl):
