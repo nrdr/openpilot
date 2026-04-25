@@ -117,12 +117,12 @@ def _driver_override_speed_factor(v_ego: float) -> float:
 
   return float(np.interp(v_ego,
                          [full_cut_mph * CV.MPH_TO_MS, no_cut_mph * CV.MPH_TO_MS],
-                         [1.0, 1.0]))
+                         [1.0, 0.9]))
 
 
 def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> float:
-  if v_ego > 0.0 * CV.MPH_TO_MS: # Speed at which low-pass filter becomes static value listed below:
-    return 0.0
+  if v_ego > 45.0 * CV.MPH_TO_MS: # Speed at which low-pass filter becomes static value listed below:
+    return 0.1
 
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
   sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
@@ -190,14 +190,13 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.prev_torque_cmd = 0.0
 
     self.override_ramp_down_s = 0.1
-    self.override_hold_s = 1.0
     self.override_ramp_up_s = 3.0
     self.steering_pressed_prev = False
     self.override_state = "normal"
     self.override_phase_start_nanos = 0
     self.override_start_torque = 0.0
+
     self.driver_override_until_nanos = 0
-    self.manual_steering_override = False
 
     # Bosch extra-brake controller
     self.brake_pid = PIDController(k_p=([0,], [0,]),
@@ -243,39 +242,36 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
       if self.eps_modified:
         override_factor = _driver_override_speed_factor(CS.out.vEgo)
-        hold_ns = int(self.override_hold_s * 1e9)
 
         steering_rising = (not self.steering_pressed_prev) and steering_pressed
-
-        if steering_pressed:
-          self.driver_override_until_nanos = now_nanos + hold_ns
+        steering_falling = self.steering_pressed_prev and (not steering_pressed)
 
         if steering_rising:
           self.override_state = "ramp_down"
           self.override_phase_start_nanos = now_nanos
-          self.override_start_torque = float(self.last_torque)
+          self.override_start_torque = float(self.torque_lpf)
 
-        holding_off = now_nanos < self.driver_override_until_nanos
-        self.manual_steering_override = steering_pressed or holding_off or self.override_state in ("ramp_down", "holding", "ramp_up")
+        if steering_pressed:
+          if self.override_state == "ramp_down":
+            fade_ns = int(self.override_ramp_down_s * 1e9)
+            dt_ns = now_nanos - self.override_phase_start_nanos
+            x = 1.0 if fade_ns <= 0 else _clamp01(float(dt_ns) / float(fade_ns))
 
-        if steering_pressed or self.override_state == "ramp_down":
-          fade_ns = int(self.override_ramp_down_s * 1e9)
-          dt_ns = now_nanos - self.override_phase_start_nanos
-          x = 1.0 if fade_ns <= 0 else _clamp01(float(dt_ns) / float(fade_ns))
+            torque_target = self.override_start_torque * (1.0 - x * override_factor)
 
-          torque_cmd = self.override_start_torque * (1.0 - x * override_factor)
-          self.torque_lpf = torque_cmd
+            self.torque_lpf = torque_target
+            torque_cmd = self.torque_lpf
 
-          if x >= 1.0:
+            if x >= 1.0:
+              self.override_state = "holding"
+          else:
             self.override_state = "holding"
-
-        elif holding_off:
-          torque_cmd = 0.0
-          self.torque_lpf = 0.0
-          self.override_state = "holding"
+            torque_hold = float(torque_cmd) * (1.0 - override_factor)
+            self.torque_lpf = torque_hold
+            torque_cmd = torque_hold
 
         else:
-          if self.override_state == "holding":
+          if steering_falling:
             self.override_state = "ramp_up"
             self.override_phase_start_nanos = now_nanos
 
@@ -284,25 +280,28 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
             dt_ns = now_nanos - self.override_phase_start_nanos
             x = 1.0 if fade_ns <= 0 else _clamp01(float(dt_ns) / float(fade_ns))
 
-            torque_cmd = float(torque_cmd) * _quick_start_curve(x)
-            self.torque_lpf = torque_cmd
+            scale = _quick_start_curve(x)
+            ramp_scale = (1.0 - override_factor) + (override_factor * scale)
+            torque_target = float(torque_cmd) * ramp_scale
+
+            self.torque_lpf = torque_target
+            torque_cmd = self.torque_lpf
 
             if x >= 1.0:
               self.override_state = "normal"
 
           if self.override_state == "normal":
-            self.manual_steering_override = False
             tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
-            alpha = 1.0 if tau <= 0.0 else DT_CTRL / (tau + DT_CTRL)
+            alpha = DT_CTRL / (tau + DT_CTRL)
 
             if torque_cmd * self.torque_lpf < 0.0:
               self.torque_lpf = torque_cmd
             else:
               self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
 
+            self.prev_torque_cmd = float(torque_cmd)
             torque_cmd = self.torque_lpf
 
-        self.prev_torque_cmd = float(torque_cmd)
         self.steering_pressed_prev = steering_pressed
 
       else:
@@ -312,7 +311,6 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         self.override_state = "normal"
         self.override_phase_start_nanos = 0
         self.override_start_torque = 0.0
-        self.manual_steering_override = False
 
     else:
       self.torque_lpf = 0.0
@@ -323,17 +321,13 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       self.override_state = "normal"
       self.override_phase_start_nanos = 0
       self.override_start_torque = 0.0
-      self.manual_steering_override = False
 
-    if self.manual_steering_override:
-      limited_torque = torque_cmd
-    else:
-      limited_torque = rate_limit(
-        torque_cmd,
-        self.last_torque,
-        -self.params.STEER_DELTA_DOWN * DT_CTRL,
-        self.params.STEER_DELTA_UP * DT_CTRL
-      )
+    limited_torque = rate_limit(
+      torque_cmd,
+      self.last_torque,
+      -self.params.STEER_DELTA_DOWN * DT_CTRL,
+      self.params.STEER_DELTA_UP * DT_CTRL
+    )
 
     self.last_torque = limited_torque
 
@@ -359,8 +353,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       if self.frame % 10 == 0:
         can_sends.append(make_tester_present_msg(0x18DAB0F1, self.CAN.pt, suppress_response=True))
 
-    lkas_active = CC.latActive and not self.manual_steering_override
-    can_sends.append(hondacan.create_steering_control(self.packer, self.CAN, apply_torque, lkas_active, self.tja_control))
+    can_sends.append(hondacan.create_steering_control(self.packer, self.CAN, apply_torque, CC.latActive, self.tja_control))
 
     wind_brake = np.interp(CS.out.vEgo, [0.0, 2.3, 35.0], [0.001, 0.002, 0.15]) * self.windfactor
     wind_brake_ms2 = np.interp(CS.out.vEgo, [0.0, 13.4, 22.4, 31.3, 40.2], [0.000, 0.049, 0.136, 0.267, 0.441])
