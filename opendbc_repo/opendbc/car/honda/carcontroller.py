@@ -120,30 +120,35 @@ def _driver_override_speed_factor(v_ego: float) -> float:
                          [1.0, 0.9]))
 
 
-def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> float:
-  if v_ego > 45.0 * CV.MPH_TO_MS: # Speed at which low-pass filter becomes static value listed below:
-    return 0.1
+def _filter_2_deadband(torque_cmd: float, v_ego: float) -> float:
+  deadband = float(np.interp(v_ego,
+                             [0.0, 10.0 * CV.MPH_TO_MS, 25.0 * CV.MPH_TO_MS],
+                             [0.030, 0.020, 0.000]))
 
-  torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
-  sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
+  if abs(torque_cmd) <= deadband:
+    return 0.0
+
+  return math.copysign(abs(torque_cmd) - deadband, torque_cmd)
+
+
+def _filter_2_delta_limit(torque_cmd: float, filtered_torque: float, v_ego: float) -> float:
+  error = float(torque_cmd) - float(filtered_torque)
+  abs_error = abs(error)
+  sign_change = float(torque_cmd) * float(filtered_torque) < 0.0
+
+  low_speed_factor = float(np.interp(v_ego,
+                                     [0.0, 10.0 * CV.MPH_TO_MS, 25.0 * CV.MPH_TO_MS],
+                                     [0.45, 0.65, 1.00]))
+
+  max_delta = float(np.interp(abs_error,
+                              [0.000, 0.025, 0.100, 0.300, 1.000],
+                              [0.003, 0.006, 0.018, 0.055, 0.140]))
 
   if sign_change:
-    # Unwinding from turn: prioritize fast response to reduce lag
-    if torque_delta > 0.15:
-      return 0.000
-    elif torque_delta > 0.05:
-      return 0.050
-    else:
-      return 0.100
+    max_delta = max(max_delta, 0.080)
 
-  if torque_delta > 0.50:
-    return 0.020
-  elif torque_delta > 0.20:
-    return 0.050
-  elif torque_delta > 0.05:
-    return 0.075
-  else:
-    return 0.100
+  max_delta *= low_speed_factor
+  return float(filtered_torque) + float(np.clip(error, -max_delta, max_delta))
 
 
 class CarController(CarControllerBase, MadsCarController, GasInterceptorCarController, IntelligentCruiseButtonManagementInterface):
@@ -291,13 +296,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
               self.override_state = "normal"
 
           if self.override_state == "normal":
-            tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
-            alpha = DT_CTRL / (tau + DT_CTRL)
-
-            if torque_cmd * self.torque_lpf < 0.0:
-              self.torque_lpf = torque_cmd
-            else:
-              self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+            torque_cmd = _filter_2_deadband(float(torque_cmd), CS.out.vEgo)
+            self.torque_lpf = _filter_2_delta_limit(torque_cmd, self.torque_lpf, CS.out.vEgo)
 
             self.prev_torque_cmd = float(torque_cmd)
             torque_cmd = self.torque_lpf
