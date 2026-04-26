@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MICI · bluepilot UI mockup</title>
+<style>
+  :root {
+    --accent: #4a8cff;
+    --accent2: #7ee0ff;
+    --bg-deep: #02060f;
+    --ready: #4ade80;
+    --warn:  #fbbf24;
+    --offline:#6b7280;
+    --danger: #f87171;
+    --text: #f4f8ff;
+    --muted: rgba(244,248,255,0.55);
+    --halo: rgba(74,140,255,0.45);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    background: #0a0d14;
+    color: #cdd6e4;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  /* ===== page layout ===== */
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) 320px;
+    gap: 28px;
+    padding: 24px;
+    max-width: 1480px;
+    margin: 0 auto;
+  }
+  .stage {
+    display: flex; flex-direction: column; align-items: center; gap: 18px;
+  }
+  .breadcrumb {
+    font-size: 13px; letter-spacing: 0.04em; color: #8c97aa; text-transform: uppercase;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .breadcrumb .sep { opacity: 0.4; }
+  .breadcrumb .here { color: var(--accent2); }
+
+  /* ===== device frame ===== */
+  .frame {
+    position: relative;
+    background: linear-gradient(160deg, #1a1f2e, #06080d);
+    border-radius: 38px;
+    padding: 22px;
+    box-shadow:
+      0 30px 80px rgba(0,0,0,0.55),
+      0 0 0 1px rgba(255,255,255,0.04) inset,
+      0 0 60px rgba(74,140,255,0.05);
+    transition: transform 0.2s ease;
+  }
+  .frame::before {
+    content: ""; position: absolute; left: 50%; top: 8px; transform: translateX(-50%);
+    width: 70px; height: 5px; border-radius: 3px; background: #1f2533;
+  }
+  .device {
+    width: 536px; height: 240px;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    background: var(--bg-deep);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.06) inset;
+  }
+  .device.zoom-2 { width: 1072px; height: 480px; }
+  .device.zoom-3 { width: 1608px; height: 720px; }
+
+  /* ===== shared bg gradient on every screen ===== */
+  .screen {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(120% 140% at 0% 0%, rgba(74,140,255,0.42) 0%, rgba(20,40,90,0.28) 28%, rgba(2,6,15,0.95) 62%, #02060f 100%);
+    color: var(--text);
+    overflow: hidden;
+    transition: transform 0.32s cubic-bezier(.2,.8,.2,1), opacity 0.22s linear;
+    will-change: transform, opacity;
+  }
+  .screen.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
+  .screen.behind { transform: translateX(-22%); opacity: 0.0; pointer-events: none; }
+
+  /* ===== safe zone overlay ===== */
+  .safezone {
+    position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    transition: opacity 0.15s linear;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(255,221,0,0.0) 0px,
+      rgba(255,221,0,0.0) 38px,
+      rgba(255,221,0,0.18) 38px,
+      rgba(255,221,0,0.18) 40px
+    );
+  }
+  .safezone.on { opacity: 1; }
+
+  /* ===== HOME ===== */
+  .home {
+    position: relative;
+    display: flex; flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    padding: 22px 18px 14px 18px;
+    user-select: none;
+  }
+
+  /* aurora behind the wordmark — subtle breathing glow */
+  .home .aurora {
+    position: absolute; left: 50%; top: 44%;
+    transform: translate(-50%,-50%);
+    width: 460px; height: 220px;
+    background: radial-gradient(ellipse at center,
+      rgba(74,140,255,0.32) 0%,
+      rgba(74,140,255,0.12) 35%,
+      rgba(0,0,0,0) 70%);
+    filter: blur(6px);
+    animation: breathe 3.6s ease-in-out infinite;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+  .home.experimental .aurora {
+    background: radial-gradient(ellipse at center,
+      rgba(251,191,36,0.36) 0%,
+      rgba(251,191,36,0.12) 35%,
+      rgba(0,0,0,0) 70%);
+  }
+  .home.offline .aurora {
+    background: radial-gradient(ellipse at center,
+      rgba(120,130,150,0.18) 0%,
+      rgba(120,130,150,0.06) 35%,
+      rgba(0,0,0,0) 70%);
+    animation: none;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: translate(-50%,-50%) scale(0.96); opacity: 0.85; }
+    50%      { transform: translate(-50%,-50%) scale(1.05); opacity: 1.0; }
+  }
+
+  .wordmark {
+    position: relative;
+    font-family: "SF Pro Display","Inter",-apple-system,sans-serif;
+    font-weight: 800;
+    font-size: 96px;
+    letter-spacing: -0.045em;
+    line-height: 0.92;
+    background: linear-gradient(180deg, #ffffff 0%, #cfeaff 50%, #6bb3ff 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 28px rgba(74,140,255,0.18);
+    white-space: nowrap;
+    z-index: 1;
+  }
+  .wordmark.experimental {
+    background: linear-gradient(180deg, #fff4d6 0%, #ffd87a 55%, #f4a527 100%);
+    -webkit-background-clip: text; background-clip: text;
+  }
+  .wordmark.offline {
+    background: linear-gradient(180deg, #d0d6e0 0%, #99a3b4 50%, #6a7382 100%);
+    -webkit-background-clip: text; background-clip: text;
+    text-shadow: none;
+  }
+
+  .home .pill {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 12px;
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text);
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: 0.05em;
+    margin-top: 8px;
+    z-index: 1;
+  }
+  .home .pill .dot {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--ready);
+    box-shadow: 0 0 14px var(--ready);
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  .home.experimental .pill .dot { background: var(--warn); box-shadow: 0 0 14px var(--warn); }
+  .home.offline .pill .dot { background: var(--offline); box-shadow: none; animation: none; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.55; transform: scale(0.85); }
+  }
+
+  /* corner gear */
+  .home .gear {
+    position: absolute; top: 8px; right: 10px;
+    width: 64px; height: 64px;
+    display: grid; place-items: center;
+    border-radius: 14px;
+    cursor: pointer;
+    color: #dbe6ff;
+    z-index: 2;
+  }
+  .home .gear:active { background: rgba(255,255,255,0.06); }
+  .home .gear svg { width: 38px; height: 38px; filter: drop-shadow(0 0 8px var(--halo)); }
+
+  /* meta strip in lower-left */
+  .home .meta {
+    position: absolute; left: 18px; bottom: 10px;
+    display: flex; gap: 18px;
+    color: #8c97aa; font-size: 22px; font-weight: 500;
+    letter-spacing: 0.02em;
+    align-items: center;
+    z-index: 1;
+  }
+  .home .meta .net { display: inline-flex; gap: 8px; align-items: center; }
+  .home .meta .net svg { width: 26px; height: 26px; }
+  .home .meta .branch {
+    display: inline-flex; gap: 6px; align-items: center;
+    font-family: "SF Mono","Menlo",monospace;
+    font-size: 20px;
+  }
+
+  /* long-press progress bar across the top */
+  .home .lp-bar {
+    position: absolute; top: 0; left: 0;
+    height: 4px;
+    background: var(--accent2);
+    width: 0%;
+    box-shadow: 0 0 12px var(--accent2);
+    transition: width 0s linear;
+    z-index: 3;
+  }
+
+  /* ===== SETTINGS LANDING ===== */
+  .settings {
+    display: flex; flex-direction: column;
+    height: 100%;
+    padding: 0;
+  }
+  .topbar {
+    display: flex; align-items: center;
+    padding: 8px 14px;
+    height: 50px;
+    gap: 12px;
+    background: linear-gradient(180deg, rgba(2,6,15,0.55), rgba(2,6,15,0.0));
+    position: relative; z-index: 4;
+    flex-shrink: 0;
+  }
+  .topbar .page-meta {
+    margin-left: auto;
+    font-size: 18px; color: var(--muted);
+    letter-spacing: 0.04em; text-transform: uppercase;
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
+    font-family: "SF Mono","Menlo",monospace;
+  }
+  .topbar .back {
+    width: 56px; height: 44px;
+    display: grid; place-items: center;
+    border-radius: 10px;
+    cursor: pointer;
+    color: #dbe6ff;
+  }
+  .topbar .back:active { background: rgba(255,255,255,0.06); }
+  .topbar .back svg { width: 28px; height: 28px; filter: drop-shadow(0 0 4px var(--halo)); }
+  .topbar .title {
+    font-size: 30px; font-weight: 700; letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  .cats {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    padding: 0 10px 10px 10px;
+    flex: 1; min-height: 0;
+  }
+  .cat {
+    position: relative;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--text);
+    transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+  }
+  .cat:active { transform: scale(0.97); background: rgba(74,140,255,0.10); border-color: rgba(74,140,255,0.30); }
+  .cat svg { width: 48px; height: 48px; filter: drop-shadow(0 0 6px var(--halo)); }
+  .cat .label { font-size: 22px; font-weight: 600; letter-spacing: 0.01em; }
+
+  /* ===== SUB-PANEL ===== */
+  .panel { display: flex; flex-direction: column; height: 100%; }
+  .panel .body {
+    flex: 1; min-height: 0;
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .pager {
+    display: flex;
+    height: 100%;
+    transition: transform 0.32s cubic-bezier(.2,.8,.2,1);
+    will-change: transform;
+  }
+  .pager.dragging { transition: none; }
+  .page {
+    flex: 0 0 100%;
+    min-width: 100%;
+    padding: 4px 18px 22px 18px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+  }
+  .page.row3 { gap: 8px; }
+  .dots {
+    position: absolute;
+    bottom: 6px; left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    height: 8px;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .dots .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    transition: width 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+  }
+  .dots .dot.on {
+    width: 22px; border-radius: 4px;
+    background: var(--accent2);
+    box-shadow: 0 0 10px var(--accent2);
+  }
+
+  /* page swipe peek shadow */
+  .panel .body::before, .panel .body::after {
+    content: ""; position: absolute; top: 0; bottom: 18px;
+    width: 16px; pointer-events: none; z-index: 1;
+  }
+  .panel .body::before { left: 0; background: linear-gradient(to right, rgba(2,6,15,0.6), transparent); }
+  .panel .body::after  { right: 0; background: linear-gradient(to left,  rgba(2,6,15,0.6), transparent); }
+
+  /* one-item-per-page row (toggle) */
+  .row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 24px;
+    padding: 8px 8px;
+    flex: 1;
+  }
+  .row .name { font-size: 40px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; line-height: 1.05; }
+  .row .sub  { font-size: 24px; color: var(--muted); margin-top: 6px; line-height: 1.2; }
+
+  /* iOS switch — sized for single-item-per-page */
+  .sw {
+    width: 110px; height: 64px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.10);
+    position: relative;
+    transition: background 0.18s ease;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .sw::after {
+    content: ""; position: absolute; top: 4px; left: 4px;
+    width: 56px; height: 56px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transition: left 0.18s ease;
+  }
+  .sw.on { background: var(--accent); box-shadow: 0 0 18px rgba(74,140,255,0.45); }
+  .sw.on::after { left: 50px; }
+
+  /* network row — single item per page */
+  .net-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 18px;
+    padding: 12px 14px;
+    flex: 1;
+    border-radius: 14px;
+  }
+  .net-row.connected {
+    background: linear-gradient(90deg, rgba(74,140,255,0.18), rgba(74,140,255,0.04));
+    border: 1px solid rgba(74,140,255,0.40);
+    box-shadow: 0 0 22px rgba(74,140,255,0.18) inset;
+  }
+  .net-row .lock svg { width: 32px; height: 32px; color: var(--muted); }
+  .net-row .ssid-title { font-size: 40px; font-weight: 700; color: var(--text); letter-spacing: -0.005em; }
+  .net-row .ssid-sub   { font-size: 24px; color: var(--muted); margin-top: 4px; }
+  .net-row.connected .ssid-sub { color: var(--accent2); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;}
+  .bars { display: inline-flex; gap: 4px; align-items: flex-end; height: 48px; }
+  .bars span { width: 8px; background: rgba(255,255,255,0.25); border-radius: 2px; }
+  .bars span.lit { background: var(--text); }
+  .bars span:nth-child(1){ height: 14px; }
+  .bars span:nth-child(2){ height: 24px; }
+  .bars span:nth-child(3){ height: 36px; }
+  .bars span:nth-child(4){ height: 48px; }
+  .net-row.connected .bars span.lit { background: var(--accent2); }
+
+  /* stat card — single item per page */
+  .stat-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    padding: 18px 22px;
+    flex: 1;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .stat-card .k {
+    font-size: 24px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.10em; font-weight: 600;
+  }
+  .stat-card .v { font-size: 80px; font-weight: 800; color: var(--text); margin-top: 8px; line-height: 0.95; letter-spacing: -0.02em; }
+  .stat-card .v.small { font-size: 60px; letter-spacing: -0.015em; }
+  .stat-card .v.mono { font-family: "SF Mono","Menlo",monospace; font-size: 56px; font-weight: 700; }
+
+  /* big single-button page */
+  .btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 16px 14px;
+    font-size: 44px;
+    font-weight: 700;
+    color: var(--text);
+    cursor: pointer;
+    text-align: center;
+    letter-spacing: -0.005em;
+    display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 22px;
+    flex: 1;
+  }
+  .btn:active { background: rgba(74,140,255,0.18); }
+  .btn svg { width: 60px; height: 60px; filter: drop-shadow(0 0 8px var(--halo)); flex-shrink: 0; }
+  .btn.danger { border-color: rgba(248,113,113,0.50); color: #ffb4b4; background: rgba(248,113,113,0.08); }
+  .btn.danger:active { background: rgba(248,113,113,0.20); }
+
+  /* ===== TOOLBAR (outside frame) ===== */
+  .toolbar {
+    background: #11151f;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 14px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 12px;
+    color: #cdd6e4;
+    width: 100%;
+    max-width: 760px;
+  }
+  .toolbar h4 { font-size: 11px; letter-spacing: 0.10em; color: #8c97aa; text-transform: uppercase; margin-bottom: 6px; }
+  .tg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tg button {
+    background: #1a1f2c; border: 1px solid rgba(255,255,255,0.06); color: #cdd6e4;
+    border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  .tg button.on { background: rgba(74,140,255,0.22); border-color: rgba(74,140,255,0.55); color: #e9f1ff; }
+  .tg.zoom button { padding: 6px 14px; }
+  .slider { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  .slider input { flex: 1; }
+  .col { background: #161b27; border: 1px solid rgba(255,255,255,0.04); border-radius: 10px; padding: 10px 12px; }
+
+  /* info pane */
+  .infopane {
+    background: #11151f;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 18px;
+    color: #cdd6e4;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  .infopane h3 { color: var(--accent2); font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+  .infopane h4 { color: #e9f1ff; font-size: 13px; margin: 14px 0 4px 0; }
+  .infopane p, .infopane li { color: #aab4c5; }
+  .infopane ul { list-style: none; padding: 0; }
+  .infopane li { padding: 3px 0 3px 14px; position: relative; }
+  .infopane li::before { content: ""; position: absolute; left: 0; top: 12px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="stage">
+    <div class="breadcrumb" id="breadcrumb">
+      <span>MICI</span><span class="sep">›</span><span class="here" id="bc-here">Home</span>
+    </div>
+
+    <div class="frame" id="frame">
+      <div class="device" id="device">
+
+        <!-- HOME -->
+        <div class="screen home" id="screen-home" data-screen="home">
+          <div class="core">
+            <div class="wordmark" id="wordmark">bluepilot</div>
+            <div class="statusrow">
+              <span class="pill" id="state-pill">
+                <span class="dot"></span>
+                <span id="state-text">STANDARD · READY</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="orb" id="orb">
+            <div class="lp-ring" id="lp-ring"></div>
+          </div>
+
+          <div class="meta">
+            <span class="net" id="meta-net">
+              <!-- inserted by JS -->
+            </span>
+            <span id="meta-branch">master</span>
+          </div>
+
+          <div class="gear" id="gear" aria-label="settings">
+            <!-- gear svg inserted by JS -->
+          </div>
+        </div>
+
+        <!-- SETTINGS landing -->
+        <div class="screen settings hidden" id="screen-settings" data-screen="settings">
+          <div class="topbar">
+            <div class="back" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+            <div class="title">Settings</div>
+          </div>
+          <div class="cats" id="cats"><!-- filled by JS --></div>
+        </div>
+
+        <!-- panels inserted by JS -->
+        <div id="panels"></div>
+
+        <!-- safe zone overlay -->
+        <div class="safezone" id="safezone"></div>
+      </div>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div class="toolbar">
+      <div class="col">
+        <h4>Network</h4>
+        <div class="tg" id="net-tg">
+          <button data-net="wifi" class="on">WiFi</button>
+          <button data-net="lte">LTE</button>
+          <button data-net="5g">5G</button>
+          <button data-net="off">Offline</button>
+        </div>
+        <div class="slider" style="margin-top:10px;">
+          <span>Signal</span>
+          <input type="range" min="0" max="4" value="4" id="sig">
+          <span id="sig-v">4</span>
+        </div>
+      </div>
+      <div class="col">
+        <h4>State</h4>
+        <div class="tg">
+          <button id="t-exp">Experimental</button>
+          <button id="t-mic" class="on">Mic</button>
+          <button id="t-branch">Branch: master</button>
+        </div>
+        <h4 style="margin-top:10px;">View</h4>
+        <div class="tg">
+          <button id="t-safe">40pt Safe Zones</button>
+          <span class="tg zoom" style="display:inline-flex;">
+            <button data-zoom="1" class="on">1×</button>
+            <button data-zoom="2">2×</button>
+            <button data-zoom="3">3×</button>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INFO PANE -->
+  <div class="infopane">
+    <h3>MICI · Design Notes</h3>
+    <p><b>Canvas:</b> 536 × 240 logical px (1.9" OLED, 300 PPI). Aspect 2.23:1 — squat letterbox. At 1× the prototype renders ~3× larger than the actual device on a 96 DPI display.</p>
+
+    <h4>Information hierarchy</h4>
+    <ul>
+      <li>Wordmark anchors the home — 96 px display weight, gradient blue→cyan, kept fully visible. Recolors amber for experimental, grey for offline.</li>
+      <li>A soft aurora behind the wordmark breathes at 3.6 s, tinted by current state — life without clutter.</li>
+      <li>State pill carries the canonical state ("STANDARD · READY") with a pulsing color dot.</li>
+      <li>Meta strip is just network + branch. No date, no hash, no version — diagnostic noise lives in Settings → Developer.</li>
+    </ul>
+
+    <h4>Navigation pattern</h4>
+    <ul>
+      <li>Top-right gear → Settings landing — 5 full-height tiles, no vertical scroll-list.</li>
+      <li>Tap a category → full-screen sub-panel slides in from the right.</li>
+      <li><b>Sub-panels are horizontal pagers:</b> one setting per page. A tappable hand can't reliably scroll a 240 px-tall list, so we sidestep it entirely.</li>
+      <li>Each panel shows a counter ("3/8") in the topbar and a row of dots above the bottom edge — current page is the elongated cyan dot.</li>
+    </ul>
+
+    <h4>Interactions</h4>
+    <ul>
+      <li><b>Swipe</b> the panel body left/right to page. Edge resistance hints at the boundary. Tap-slop &lt; 8 px is treated as a tap (so a stray drag doesn't flip a toggle).</li>
+      <li><b>Long-press</b> (≥500 ms) anywhere on the home body toggles experimental mode in place; a top progress strip fills as you hold so the press is felt.</li>
+      <li>setPointerCapture is used during drag; on release we resolve the tap target via document.elementFromPoint, since pointer capture redirects e.target.</li>
+      <li>Pointer events drive everything — one path for mouse, touch, pen.</li>
+    </ul>
+
+    <h4>Aesthetic</h4>
+    <ul>
+      <li>Blue/black radial gradient on every screen for cohesion.</li>
+      <li>Monochrome white inline SVG icons with a soft blue drop shadow — no emoji, no color icons.</li>
+      <li>Status color used sparingly: green ready, amber experimental, grey offline, red destructive only.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   MICI mockup — vanilla JS
+   ========================================================================= */
+
+const ICONS = {
+  gear:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  toggles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="14" y2="7"/><line x1="20" y1="7" x2="18" y2="7"/><circle cx="16" cy="7" r="2"/><line x1="4" y1="17" x2="6" y2="17"/><line x1="12" y1="17" x2="20" y2="17"/><circle cx="9" cy="17" r="2"/></svg>',
+  network: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>',
+  device:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="2" x2="9" y2="4"/><line x1="15" y1="2" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="22"/><line x1="15" y1="20" x2="15" y2="22"/><line x1="20" y1="9" x2="22" y2="9"/><line x1="20" y1="15" x2="22" y2="15"/><line x1="2" y1="9" x2="4" y2="9"/><line x1="2" y1="15" x2="4" y2="15"/></svg>',
+  firehose:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16l-4-4-4 4"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>',
+  developer:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
+  back:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
+  wifi:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>',
+  lte:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18l4-12"/><path d="M9 18V8h4"/><path d="M16 18l3-12 3 12"/><path d="M16.5 14h5"/></svg>',
+  off:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>',
+  lock:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+  pair:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 3 18 9"/><path d="M12 3v18"/><polyline points="18 15 12 21 6 15"/></svg>',
+  cam:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  reset:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
+  reboot:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.09-6.81"/><polyline points="21 4 21 12 13 12"/></svg>',
+  shield:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  power:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>',
+  logs:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+  key:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>',
+  trash:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>',
+};
+
+function bars(strength, lit){
+  let html = '<span class="bars">';
+  for(let i=1;i<=4;i++) html += `<span class="${i<=lit?'lit':''}"></span>`;
+  return html + '</span>';
+}
+
+/* ----- state ----- */
+const state = {
+  screen: 'home',         // home | settings | panel
+  panel: null,            // toggles | network | device | firehose | developer
+  experimental: false,
+  network: 'wifi',        // wifi | lte | 5g | off
+  signal: 4,
+  mic: true,
+  branch: 'master',
+  zoom: 1,
+  safezones: false,
+};
+
+/* ----- panel definitions: each render() returns an array of HTML pages ----- */
+function row(id,name,sub,on){
+  return `
+    <div class="row" data-row="${id}">
+      <div>
+        <div class="name">${name}</div>
+        <div class="sub">${sub}</div>
+      </div>
+      <div class="sw ${on?'on':''}" data-sw="${id}"></div>
+    </div>
+  `;
+}
+function ssid(n,sec,str,connected){
+  return `
+    <div class="net-row ${connected?'connected':''}">
+      <div class="lock">${sec?ICONS.lock:''}</div>
+      <div>
+        <div class="ssid-title">${n}</div>
+        <div class="ssid-sub">${connected?'Connected':(sec?'WPA2':'Open')}</div>
+      </div>
+      ${bars(str,str)}
+    </div>
+  `;
+}
+
+const PANELS = {
+  toggles: {
+    title: 'Toggles', icon: ICONS.toggles,
+    render() {
+      const items = [
+        ['enable_bp',   'Enable bluepilot',       'Master engagement gate',   true],
+        ['personality', 'Driving Personality',    'Standard',                 false],
+        ['exp_mode',    'Experimental Mode',      'End-to-end longitudinal',  state.experimental],
+        ['rec_audio',   'Record Audio',           'Save mic feed to clips',   false],
+        ['disengage',   'Disengage on Gas',       'Pedal cancels engagement', true],
+        ['dev_ui',      'Show Dev UI',            'Onroad telemetry overlay', false],
+        ['nav_bp',      'Navigate on bluepilot',  'MapD destination routing', false],
+        ['hands',       'Hands on Wheel Monitor', 'DM torque check',          true],
+      ];
+      return items.map(([id,n,s,o]) => row(id,n,s,o));
+    }
+  },
+  network: {
+    title: 'Network', icon: ICONS.network,
+    render() {
+      const items = [
+        row('tether',  'Mobile Hotspot',     'Share connection over WiFi', false),
+        row('metered', 'Metered Connection', 'Limit background uploads',   true),
+      ];
+      const list = [
+        ['comma-pit',     true, 4, true],
+        ['Tonys-iPhone',  true, 3, false],
+        ['Garage',        true, 3, false],
+        ['Starlink_8X20', true, 2, false],
+        ['XFINITYWIFI',   false,2, false],
+        ['attwifi',       false,1, false],
+      ];
+      return items.concat(list.map(s => ssid(...s)));
+    }
+  },
+  device: {
+    title: 'Device', icon: ICONS.device,
+    render() {
+      return [
+        `<div class="stat-card"><div class="k">Paired</div><div class="v small">comma.ai</div></div>`,
+        `<div class="stat-card"><div class="k">Software</div><div class="v small">Up to date</div></div>`,
+        `<div class="stat-card"><div class="k">Calibration</div><div class="v">95%</div></div>`,
+        `<div class="btn">${ICONS.pair}<span>Pair</span></div>`,
+        `<div class="btn">${ICONS.cam}<span>Driver Cam</span></div>`,
+        `<div class="btn">${ICONS.reset}<span>Reset Cal</span></div>`,
+        `<div class="btn">${ICONS.reboot}<span>Reboot</span></div>`,
+        `<div class="btn">${ICONS.shield}<span>Regulatory</span></div>`,
+        `<div class="btn danger">${ICONS.power}<span>Power Off</span></div>`,
+      ];
+    }
+  },
+  firehose: {
+    title: 'Firehose', icon: ICONS.firehose,
+    render() {
+      return [
+        `<div class="stat-card"><div class="k">Uploaded Today</div><div class="v">1.2 GB</div></div>`,
+        `<div class="stat-card"><div class="k">Segments Banked</div><div class="v">3,421</div></div>`,
+        row('fh_enable','Enable Firehose','Upload anonymized clips', true),
+        row('fh_wifi','WiFi Only','Pause uploads on metered', true),
+        row('fh_blur','Blur Faces','Privacy filter pre-upload', true),
+        row('fh_pause','Pause Uploads','Hold all transfers', false),
+      ];
+    }
+  },
+  developer: {
+    title: 'Developer', icon: ICONS.developer,
+    render() {
+      return [
+        `<div class="stat-card"><div class="k">Dongle ID</div><div class="v mono">8c4a7f2e9b</div></div>`,
+        `<div class="stat-card"><div class="k">Serial</div><div class="v mono">c3-018af3-2a</div></div>`,
+        row('dev_adv','Show Advanced UI','Engineering overlays', false),
+        row('dev_joy','Joystick Debug','Manual actuator control', false),
+        row('dev_adb','Enable ADB','Remote shell over USB', false),
+        row('dev_logs','Log Uploads','Forward driving logs', true),
+        `<div class="btn">${ICONS.logs}<span>Live Logs</span></div>`,
+        `<div class="btn">${ICONS.key}<span>SSH Keys</span></div>`,
+        `<div class="btn danger">${ICONS.trash}<span>Uninstall</span></div>`,
+      ];
+    }
+  },
+};
+
+/* ----- DOM init ----- */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+const home = $('#screen-home');
+const settings = $('#screen-settings');
+const panelsRoot = $('#panels');
+const breadcrumb = $('#bc-here');
+const device = $('#device');
+const frame  = $('#frame');
+
+/* gear icon */
+$('#gear').innerHTML = ICONS.gear;
+
+/* meta strip */
+function renderMeta(){
+  const netIcon = (state.network === 'off') ? ICONS.off
+                : (state.network === 'wifi') ? ICONS.wifi : ICONS.lte;
+  const label =
+    state.network === 'off'  ? 'OFFLINE' :
+    state.network === 'wifi' ? `WiFi · ${state.signal}/4` :
+    state.network === 'lte'  ? `LTE · ${state.signal}/4` :
+                               `5G · ${state.signal}/4`;
+  $('#meta-net').innerHTML = `${netIcon}<span>${label}</span>`;
+  $('#meta-branch').textContent = state.branch;
+}
+
+/* state pill */
+function renderState(){
+  const p = $('#state-pill');
+  const t = $('#state-text');
+  const wm = $('#wordmark');
+  home.classList.toggle('experimental', state.experimental && state.network !== 'off');
+  home.classList.toggle('offline', state.network === 'off');
+  wm.classList.toggle('experimental', state.experimental && state.network !== 'off');
+  wm.classList.toggle('offline',      state.network === 'off');
+
+  if (state.network === 'off') {
+    t.textContent = 'OFFLINE';
+  } else if (state.experimental) {
+    t.textContent = 'EXPERIMENTAL · ARMED';
+  } else {
+    t.textContent = 'STANDARD · READY';
+  }
+}
+
+/* settings cats */
+const CAT_ORDER = ['toggles','network','device','firehose','developer'];
+function renderCats(){
+  const cats = $('#cats');
+  cats.innerHTML = CAT_ORDER.map(k => `
+    <div class="cat" data-cat="${k}">
+      ${PANELS[k].icon}
+      <div class="label">${PANELS[k].title}</div>
+    </div>
+  `).join('');
+}
+
+/* build sub-panel screens — each body is a paged carousel */
+const PAGER_STATE = {}; // panelName -> { page, count }
+function buildPanels(){
+  panelsRoot.innerHTML = CAT_ORDER.map(k => {
+    const pages = PANELS[k].render();
+    PAGER_STATE[k] = { page: 0, count: pages.length };
+    const pageHtml = pages.map(p => `<div class="page">${p}</div>`).join('');
+    const dots = pages.map((_,i) => `<div class="dot ${i===0?'on':''}"></div>`).join('');
+    return `
+      <div class="screen panel hidden" id="screen-${k}" data-screen="panel" data-panel="${k}">
+        <div class="topbar">
+          <div class="back" data-back-to="settings">${ICONS.back}</div>
+          <div class="title">${PANELS[k].title}</div>
+          <div class="page-meta" id="meta-${k}">1/${pages.length}</div>
+        </div>
+        <div class="body" id="body-${k}">
+          <div class="pager" id="pager-${k}">${pageHtml}</div>
+          <div class="dots" id="dots-${k}">${dots}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function setPage(panel, idx){
+  const s = PAGER_STATE[panel];
+  if (!s) return;
+  s.page = Math.max(0, Math.min(s.count - 1, idx));
+  const pager = document.getElementById('pager-' + panel);
+  pager.classList.remove('dragging');
+  pager.style.transform = `translateX(${-s.page * 100}%)`;
+  // dots
+  const dotsEl = document.getElementById('dots-' + panel);
+  Array.from(dotsEl.children).forEach((d,i) => d.classList.toggle('on', i === s.page));
+  // page meta
+  const meta = document.getElementById('meta-' + panel);
+  if (meta) meta.textContent = `${s.page+1}/${s.count}`;
+}
+
+/* navigation */
+function show(screen, panel){
+  // hide all
+  $$('.screen').forEach(s => {
+    s.classList.add('hidden');
+    s.classList.remove('behind');
+  });
+  if (screen === 'home') {
+    home.classList.remove('hidden');
+    state.screen = 'home'; state.panel = null;
+    breadcrumb.textContent = 'Home';
+  } else if (screen === 'settings') {
+    settings.classList.remove('hidden');
+    state.screen = 'settings'; state.panel = null;
+    breadcrumb.textContent = 'Settings';
+  } else if (screen === 'panel') {
+    const el = document.getElementById('screen-' + panel);
+    if (el) el.classList.remove('hidden');
+    state.screen = 'panel'; state.panel = panel;
+    breadcrumb.textContent = 'Settings › ' + PANELS[panel].title;
+  }
+}
+
+/* ----- pointer / long-press on home ----- */
+let lpTimer = null, lpRaf = null, lpStart = 0;
+let pointerStart = null;
+
+function startLongPress(e){
+  if (!home.contains(e.target)) return;
+  // don't long-press on the gear
+  if (e.target.closest('#gear')) return;
+  lpStart = performance.now();
+  pointerStart = { x: e.clientX, y: e.clientY };
+  home.classList.add('lp-active');
+
+  const tick = () => {
+    const dt = performance.now() - lpStart;
+    const pct = Math.min(100, (dt/500)*100);
+    $('#lp-ring').style.setProperty('--lp', pct.toFixed(1));
+    if (pct < 100) lpRaf = requestAnimationFrame(tick);
+  };
+  lpRaf = requestAnimationFrame(tick);
+  lpTimer = setTimeout(()=> {
+    state.experimental = !state.experimental;
+    renderState();
+    // sync the toggle row in toggles panel if rendered
+    const sw = document.querySelector('[data-sw="exp_mode"]');
+    if (sw) sw.classList.toggle('on', state.experimental);
+    cancelLongPress();
+  }, 500);
+}
+function cancelLongPress(){
+  if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+  if (lpRaf)   { cancelAnimationFrame(lpRaf); lpRaf = null; }
+  home.classList.remove('lp-active');
+  $('#lp-ring').style.setProperty('--lp', 0);
+  pointerStart = null;
+}
+
+home.addEventListener('pointerdown', startLongPress);
+home.addEventListener('pointermove', (e) => {
+  if (!pointerStart) return;
+  const dx = e.clientX - pointerStart.x, dy = e.clientY - pointerStart.y;
+  if (dx*dx + dy*dy > 64) cancelLongPress();
+});
+home.addEventListener('pointerup',   cancelLongPress);
+home.addEventListener('pointerleave',cancelLongPress);
+home.addEventListener('pointercancel',cancelLongPress);
+
+/* gear → settings */
+$('#gear').addEventListener('click', (e) => {
+  e.stopPropagation();
+  show('settings');
+});
+
+/* settings cat tap */
+function bindCatClicks(){
+  $$('.cat').forEach(c => {
+    c.addEventListener('click', () => {
+      const k = c.dataset.cat;
+      show('panel', k);
+    });
+  });
+}
+
+/* back buttons (delegated) */
+device.addEventListener('click', (e) => {
+  const back = e.target.closest('[data-back],[data-back-to]');
+  if (!back) return;
+  if (back.dataset.backTo === 'settings') show('settings');
+  else if (state.screen === 'settings') show('home');
+  else show('home');
+});
+
+/* swipe + tap on panel bodies (delegated) */
+const drag = {};
+panelsRoot.addEventListener('pointerdown', (e) => {
+  const body = e.target.closest('.body');
+  if (!body) return;
+  const panel = body.id.replace('body-','');
+  drag[panel] = {
+    startX: e.clientX, startY: e.clientY,
+    pid: e.pointerId,
+    captured: false,
+    body, pager: document.getElementById('pager-' + panel),
+    moved: false,
+  };
+});
+panelsRoot.addEventListener('pointermove', (e) => {
+  for (const panel in drag) {
+    const d = drag[panel];
+    if (!d || d.pid !== e.pointerId) continue;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.captured && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) d.moved = true;
+    if (!d.captured && Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy)) {
+      try { d.body.setPointerCapture(e.pointerId); } catch(_){}
+      d.captured = true;
+      d.pager.classList.add('dragging');
+    }
+    if (d.captured) {
+      const s = PAGER_STATE[panel];
+      const max = (s.count - 1) * d.body.clientWidth;
+      let base = -s.page * d.body.clientWidth;
+      let x = base + dx;
+      // resistance at edges
+      if (x > 0) x = x * 0.35;
+      if (x < -max) x = -max + (x + max) * 0.35;
+      d.pager.style.transform = `translateX(${x}px)`;
+    }
+  }
+});
+function endDrag(e, commit){
+  for (const panel in drag) {
+    const d = drag[panel];
+    if (!d || d.pid !== e.pointerId) continue;
+    if (d.captured) {
+      try { d.body.releasePointerCapture(e.pointerId); } catch(_){}
+      const s = PAGER_STATE[panel];
+      const dx = e.clientX - d.startX;
+      const w = d.body.clientWidth;
+      let target = s.page;
+      if (commit) {
+        if (dx < -w * 0.20 && s.page < s.count - 1) target = s.page + 1;
+        else if (dx > w * 0.20 && s.page > 0) target = s.page - 1;
+      }
+      setPage(panel, target);
+    } else if (commit && !d.moved) {
+      // It was a tap — resolve via document.elementFromPoint per brief
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const sw = el && el.closest('.sw');
+      if (sw) {
+        sw.classList.toggle('on');
+        if (sw.dataset.sw === 'exp_mode') {
+          state.experimental = sw.classList.contains('on');
+          renderState();
+        }
+      }
+    }
+    delete drag[panel];
+  }
+}
+panelsRoot.addEventListener('pointerup',     (e) => endDrag(e, true));
+panelsRoot.addEventListener('pointercancel', (e) => endDrag(e, false));
+panelsRoot.addEventListener('pointerleave',  (e) => endDrag(e, false));
+
+/* ===== TOOLBAR wiring ===== */
+function tg(group, fn){
+  group.forEach(b => b.addEventListener('click', () => {
+    group.forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    fn(b);
+  }));
+}
+tg($$('#net-tg button'), b => { state.network = b.dataset.net; renderMeta(); renderState(); });
+tg($$('.tg.zoom button'), b => {
+  state.zoom = +b.dataset.zoom;
+  device.classList.remove('zoom-2','zoom-3');
+  if (state.zoom === 2) device.classList.add('zoom-2');
+  if (state.zoom === 3) device.classList.add('zoom-3');
+});
+$('#sig').addEventListener('input', e => { state.signal = +e.target.value; $('#sig-v').textContent = state.signal; renderMeta(); });
+$('#t-exp').addEventListener('click', () => {
+  state.experimental = !state.experimental;
+  $('#t-exp').classList.toggle('on', state.experimental);
+  renderState();
+  const sw = document.querySelector('[data-sw="exp_mode"]'); if (sw) sw.classList.toggle('on', state.experimental);
+});
+$('#t-mic').addEventListener('click', () => {
+  state.mic = !state.mic; $('#t-mic').classList.toggle('on', state.mic);
+});
+const branches = ['master','release3','dev'];
+$('#t-branch').addEventListener('click', () => {
+  const i = (branches.indexOf(state.branch)+1) % branches.length;
+  state.branch = branches[i];
+  $('#t-branch').textContent = 'Branch: ' + state.branch;
+  renderMeta();
+});
+$('#t-safe').addEventListener('click', () => {
+  state.safezones = !state.safezones;
+  $('#t-safe').classList.toggle('on', state.safezones);
+  $('#safezone').classList.toggle('on', state.safezones);
+});
+
+/* ----- API for puppeteer/REPL ----- */
+window.mici = {
+  show, state,
+  setExperimental(v){ state.experimental = !!v; renderState(); $('#t-exp').classList.toggle('on', state.experimental); },
+  setNetwork(n){ state.network = n; $$('#net-tg button').forEach(b => b.classList.toggle('on', b.dataset.net===n)); renderMeta(); renderState(); },
+  setSignal(s){ state.signal = s; $('#sig').value = s; $('#sig-v').textContent = s; renderMeta(); },
+  setZoom(z){ state.zoom=z; device.classList.remove('zoom-2','zoom-3'); if(z===2)device.classList.add('zoom-2'); if(z===3)device.classList.add('zoom-3'); $$('.tg.zoom button').forEach(b=>b.classList.toggle('on',+b.dataset.zoom===z)); },
+  setSafezones(v){ state.safezones=!!v; $('#safezone').classList.toggle('on',state.safezones); $('#t-safe').classList.toggle('on',state.safezones); },
+  setPage(panel, idx){ setPage(panel, idx); },
+  pageNext(panel){ const s=PAGER_STATE[panel]; if(s) setPage(panel, s.page+1); },
+  pagePrev(panel){ const s=PAGER_STATE[panel]; if(s) setPage(panel, s.page-1); },
+  pages(panel){ return PAGER_STATE[panel]; },
+  triggerLongPress(){ // synthetic
+    state.experimental = !state.experimental; renderState();
+    const sw = document.querySelector('[data-sw="exp_mode"]'); if (sw) sw.classList.toggle('on', state.experimental);
+  },
+};
+
+/* boot */
+renderCats();
+buildPanels();
+bindCatClicks();
+renderMeta();
+renderState();
+show('home');
+</script>
+</body>
+</html>
