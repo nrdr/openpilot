@@ -368,10 +368,9 @@ class CarInterface(CarInterfaceBase):
         fw.ecu == "eps" and b"-" in fw.fwVersion and b"," in fw.fwVersion for fw in car_fw
       )
       if linear_max:
-        # stock request output values:    0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x1400
-        # modified request output values: 0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x7800
-        # X-axis saturates at row0=1663; CAN ceiling aligned. v2.3.3 flat speed-gain firmware.
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
+        # v2.3.5b: row0 X-axis scaled to full 0-3840 range; input clamp 0x1380E=3840.
+        # CAN ceiling aligned to firmware saturation point.
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
         stock_cp.steerActuatorDelay = 0.30
       else:
         stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
