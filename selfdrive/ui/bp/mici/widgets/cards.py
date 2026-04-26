@@ -517,11 +517,10 @@ def _draw_lock(x: float, y: float, size: int, color: rl.Color) -> None:
 # Settings landing tile
 # ------------------------------------------------------------
 class BigCategoryTile(Widget):
-  # 5 tiles visible on the 536-wide MICI screen, matching the mockup CSS
-  # (grid-template-columns: repeat(5, 1fr); 6px gap). Body height after the
-  # topbar gets us to ~180 tall, slightly less than the screen so the scroll
-  # indicator pill underneath remains visible.
-  TILE_WIDTH = 98
+  # Wider tiles — ~3 visible on the 536-wide MICI screen so each tile reads
+  # as a substantial card rather than a thin column. Extra tiles scroll
+  # horizontally; the framework's scroll-indicator pill below hints at this.
+  TILE_WIDTH = 150
   TILE_HEIGHT = 180
 
   def __init__(self, label: str, icon: Union[str, rl.Texture, None] = None,
