@@ -176,7 +176,7 @@ def main():
     (3, "14-firehose",  [(0, "segments"), (1, "status")]),
     (4, "15-developer", [(0, "dongle"), (4, "ssh-keys"), (9, "debug")]),
     (5, "16-vehicle",   [(0, "current"), (1, "clear"), (2, "select")]),
-    (6, "17-bluepilot", [(0, "first"), (5, "lower-right"), (15, "lane-pos"), (28, "uninstall-cache")]),
+    (6, "17-bluepilot", [(0, "first"), (4, "lower-right"), (15, "lane-pos"), (28, "uninstall-cache")]),
   ]
 
   # ---- Capture BP dialogs (in isolation on top of settings) ----
@@ -210,6 +210,10 @@ def main():
   _capture("23-dialog-qr", frames=30)
   if gui_app._nav_stack[-1].__class__.__name__ == "BPWebServerQRDialog":
     gui_app.pop_widget()
+
+  # Cycle the lower-right complication through each option so the multi-toggle
+  # captures show the longest text path through the auto-shrink logic.
+  ui_state.params.put("mici_complication", 4)  # "time to lead car"
 
   for tile_idx, prefix, pages in panel_specs:
     # Pop back to settings landing (in case we're inside a panel)

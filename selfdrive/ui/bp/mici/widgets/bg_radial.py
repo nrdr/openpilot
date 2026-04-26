@@ -1,8 +1,16 @@
 """Blue/black radial gradient — paints the BP screen backdrop.
 
-Approximates the mockup's `radial-gradient(120% 140% at 0% 0%, ...)` using
-raylib's 4-corner rectangle gradient. Top-left = blue glow, others = deep navy
-fading to near-black bottom-right. Cheap to draw every frame.
+Mirrors the mockup CSS:
+  radial-gradient(120% 140% at 0% 0%,
+    rgba(74,140,255,0.42) 0%,
+    rgba(20,40,90,0.28) 28%,
+    rgba(2,6,15,0.95) 62%,
+    #02060f 100%);
+
+raylib has no rectangle radial gradient, so we paint a deep-navy base then
+overlay three concentric soft circles centered at the top-left corner. The
+result is visually very close to the CSS radial when viewed on the 536x240
+canvas.
 """
 import pyray as rl
 
@@ -16,13 +24,28 @@ class BPRadialBackground(Widget):
 
   def _render(self, _):
     r = self._rect
-    # 4-corner gradient: top-left blue glow, fade to deep navy/black on the
-    # other corners. This is a close visual match for the radial used in the
-    # mockup at the size of a 536x240 panel.
-    rl.draw_rectangle_gradient_ex(
-      r,
-      P.BG_TOPLEFT,                               # top-left
-      rl.Color(0x06, 0x0E, 0x22, 0xFF),           # bottom-left
-      P.BG_DEEP,                                  # bottom-right
-      rl.Color(0x08, 0x12, 0x28, 0xFF),           # top-right
-    )
+
+    # Base: solid deep navy / near-black.
+    rl.draw_rectangle_rec(r, P.BG_DEEP)
+
+    # Concentric "light" stops centered at the top-left corner. Each call
+    # draws inner_color at center fading to fully transparent at radius.
+    # Larger radii first so the brighter inner stops paint on top.
+    cx, cy = int(r.x), int(r.y)
+    diag = (r.width ** 2 + r.height ** 2) ** 0.5
+
+    # Outer fade (62% stop) — barely-perceptible navy lift at the edges of
+    # the gradient extent.
+    rl.draw_circle_gradient(cx, cy, diag * 1.2,
+      rl.Color(0x14, 0x28, 0x5A, int(0.50 * 255)),
+      rl.Color(0, 0, 0, 0))
+
+    # Mid stop (28%) — navy tint covering most of the upper-left half.
+    rl.draw_circle_gradient(cx, cy, diag * 0.85,
+      rl.Color(0x14, 0x28, 0x5A, int(0.65 * 255)),
+      rl.Color(0, 0, 0, 0))
+
+    # Inner glow (0%) — bright blue near the corner.
+    rl.draw_circle_gradient(cx, cy, diag * 0.55,
+      rl.Color(0x4A, 0x8C, 0xFF, int(0.42 * 255)),
+      rl.Color(0, 0, 0, 0))

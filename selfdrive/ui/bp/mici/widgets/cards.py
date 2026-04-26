@@ -53,6 +53,11 @@ def _fit_single_line(label: UnifiedLabel, target_size: int, max_width: float,
 
 CARD_PADDING_X = 24
 CARD_PADDING_Y = 14
+
+# Horizontal margin between the page edge and the card frame. Vertical margin
+# stays small so cards still fill most of the page height.
+CARD_MARGIN_X = 22
+CARD_MARGIN_Y = 6
 SWITCH_W = 110
 SWITCH_H = 64
 SWITCH_KNOB = 56
@@ -61,6 +66,38 @@ SWITCH_KNOB = 56
 def _draw_panel_bg(r: rl.Rectangle, color: rl.Color = P.PANEL_BG, border: rl.Color = P.PANEL_BORDER) -> None:
   rl.draw_rectangle_rounded(r, 0.10, 16, color)
   rl.draw_rectangle_rounded_lines_ex(r, 0.10, 16, 1, border)
+
+
+def _draw_frosted_card(r, tint=None) -> None:
+  """Subtle frosted-glass card: translucent fill + soft top highlight + thin
+  border. Sits on top of the BP radial gradient so the underlying color
+  bleeds through, giving the depth the mockup has via backdrop-filter.
+
+  `tint`: when given, used as a faint accent overlay (e.g. red for danger,
+  blue for active). Otherwise the card is the neutral white-on-dark frost.
+  """
+  # Base fill — slightly more visible than P.PANEL_BG to read as glass over
+  # the radial gradient.
+  fill = rl.Color(0xFF, 0xFF, 0xFF, int(0.06 * 255))
+  rl.draw_rectangle_rounded(r, 0.14, 14, fill)
+
+  # Top-edge highlight: brighter strip at the top fading to transparent,
+  # mimicking the glass-bevel look of frosted UI cards.
+  hl_h = max(2, min(int(r.height * 0.35), 28))
+  hl = rl.Rectangle(r.x + 1, r.y + 1, r.width - 2, hl_h)
+  rl.draw_rectangle_gradient_v(int(hl.x), int(hl.y), int(hl.width), int(hl.height),
+                                rl.Color(0xFF, 0xFF, 0xFF, int(0.06 * 255)),
+                                rl.Color(0xFF, 0xFF, 0xFF, 0))
+
+  # Optional accent tint (danger / active state).
+  if tint is not None:
+    overlay = rl.Color(tint.r, tint.g, tint.b, int(0.10 * 255))
+    rl.draw_rectangle_rounded(r, 0.14, 14, overlay)
+
+  # Visible frosted-glass border — 2px @ 18% alpha reads cleanly against the
+  # radial gradient without looking heavy. Matches the mockup card outline.
+  border = rl.Color(0xFF, 0xFF, 0xFF, int(0.18 * 255))
+  rl.draw_rectangle_rounded_lines_ex(r, 0.14, 14, 2, border)
 
 
 # ------------------------------------------------------------
@@ -110,10 +147,9 @@ class BigToggleCard(Widget):
   # ---- render ----
   def _render(self, _):
     r = self._rect
-    # Card background
-    pad = 6
-    bg_rect = rl.Rectangle(r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2)
-    _draw_panel_bg(bg_rect)
+    # Mockup: toggle rows have NO card frame — just text + switch on gradient.
+    bg_rect = rl.Rectangle(r.x + CARD_MARGIN_X, r.y + CARD_MARGIN_Y,
+                           r.width - CARD_MARGIN_X * 2, r.height - CARD_MARGIN_Y * 2)
 
     # Switch on right
     sw_y = bg_rect.y + (bg_rect.height - SWITCH_H) / 2
@@ -187,9 +223,11 @@ class BigMultiToggleCard(Widget):
     self._sub_label = UnifiedLabel(sub, font_size=P.FS_SUB, font_weight=FontWeight.MEDIUM,
                                    text_color=P.MUTED, max_width=400, wrap_text=True,
                                    line_height=1.15)
-    self._value_label = UnifiedLabel("", font_size=24, font_weight=FontWeight.BOLD,
-                                     text_color=P.ACCENT2, max_width=240, wrap_text=False,
-                                     letter_spacing=0.04)
+    # Value pill text — wide max_width so we never elide; pill bounding box
+    # is computed from measured text in _render and capped to card width.
+    self._value_label = UnifiedLabel("", font_size=36, font_weight=FontWeight.BOLD,
+                                     text_color=P.ACCENT2, max_width=520, wrap_text=False,
+                                     letter_spacing=0.04, elide=False)
 
   def _read_idx(self, default: int) -> int:
     if not self._params or not self._param_key:
@@ -230,9 +268,10 @@ class BigMultiToggleCard(Widget):
 
   def _render(self, _):
     r = self._rect
-    pad = 6
-    bg_rect = rl.Rectangle(r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2)
-    _draw_panel_bg(bg_rect)
+    # Mockup: multi-toggle has NO frame around content. Only the value pill
+    # (drawn below) has accent fill.
+    bg_rect = rl.Rectangle(r.x + CARD_MARGIN_X, r.y + CARD_MARGIN_Y,
+                           r.width - CARD_MARGIN_X * 2, r.height - CARD_MARGIN_Y * 2)
 
     text_x = bg_rect.x + CARD_PADDING_X
     text_max_w = bg_rect.width - CARD_PADDING_X * 2
@@ -245,16 +284,27 @@ class BigMultiToggleCard(Widget):
     self._name_label.render()
 
     # ---- Big centered value pill (bottom half) ----
-    # Title font is the source of truth for value — no sub on multi-toggle, the
-    # pill _is_ the description. This keeps the layout legible at 1×.
+    # Pill width follows the text. We try the target font (36px) first; if
+    # the resulting pill would exceed available card width, shrink the font
+    # rather than the text.
     value_text = self._options[self._idx].upper()
-    self._value_label.set_font_size(36)
     self._value_label.set_text(value_text)
-    vw = max(self._value_label.text_width, 1)
-    pill_w = vw + 56
+
+    PILL_PAD_X = 36
+    PILL_TARGET = 36
+    PILL_MIN = 22
+    pill_max_inner_w = bg_rect.width - CARD_PADDING_X * 2 - PILL_PAD_X * 2
+
+    chosen_size = _fit_single_line(self._value_label, PILL_TARGET, pill_max_inner_w, min_size=PILL_MIN)
+
+    # Now measure at the chosen size so vw is exact for this frame.
+    font = gui_app.font(self._value_label._font_weight)
+    spacing_px = chosen_size * self._value_label._letter_spacing
+    vw = measure_text_cached(font, value_text, chosen_size, spacing_px).x
+
+    pill_w = vw + PILL_PAD_X * 2
     pill_h = 70
     px = bg_rect.x + (bg_rect.width - pill_w) / 2
-    # Center vertically in the bottom 60% of the card
     bottom_band_y = bg_rect.y + bg_rect.height * 0.45
     bottom_band_h = bg_rect.height * 0.55 - CARD_PADDING_Y
     py = bottom_band_y + (bottom_band_h - pill_h) / 2
@@ -263,7 +313,9 @@ class BigMultiToggleCard(Widget):
     rl.draw_rectangle_rounded(pill, 1.0, 16, rl.Color(P.ACCENT.r, P.ACCENT.g, P.ACCENT.b, int(0.20 * 255)))
     rl.draw_rectangle_rounded_lines_ex(pill, 1.0, 16, 1,
                                         rl.Color(P.ACCENT.r, P.ACCENT.g, P.ACCENT.b, int(0.55 * 255)))
-    self._value_label.set_position(px + (pill_w - vw) / 2, py + (pill_h - 36) / 2 - 2)
+    # Vertically center the (possibly shrunk) text in the pill.
+    self._value_label.set_position(px + (pill_w - vw) / 2,
+                                   py + (pill_h - chosen_size) / 2 - 2)
     self._value_label.render()
 
 
@@ -294,9 +346,8 @@ class StatCard(Widget):
 
   def _render(self, _):
     r = self._rect
-    pad = 6
-    bg_rect = rl.Rectangle(r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2)
-    _draw_panel_bg(bg_rect)
+    bg_rect = rl.Rectangle(r.x + CARD_MARGIN_X, r.y + CARD_MARGIN_Y, r.width - CARD_MARGIN_X * 2, r.height - CARD_MARGIN_Y * 2)
+    _draw_frosted_card(bg_rect)
 
     self._val_label.set_text(self._resolve_value())
 
@@ -342,20 +393,19 @@ class BigButtonCard(Widget):
 
   def _render(self, _):
     r = self._rect
-    pad = 6
-    bg_rect = rl.Rectangle(r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2)
+    bg_rect = rl.Rectangle(r.x + CARD_MARGIN_X, r.y + CARD_MARGIN_Y, r.width - CARD_MARGIN_X * 2, r.height - CARD_MARGIN_Y * 2)
 
+    tint = None
     if self._danger:
-      bg = rl.Color(P.DANGER.r, P.DANGER.g, P.DANGER.b, int(0.10 * 255))
-      border = rl.Color(P.DANGER.r, P.DANGER.g, P.DANGER.b, int(0.50 * 255))
+      tint = P.DANGER
     elif self.is_pressed:
-      bg = rl.Color(P.ACCENT.r, P.ACCENT.g, P.ACCENT.b, int(0.18 * 255))
-      border = P.PANEL_BORDER
-    else:
-      bg = P.PANEL_BG
-      border = P.PANEL_BORDER
-
-    _draw_panel_bg(bg_rect, bg, border)
+      tint = P.ACCENT
+    _draw_frosted_card(bg_rect, tint=tint)
+    # Add a slightly stronger danger border so destructive buttons read
+    # immediately, not only when reading the label.
+    if self._danger:
+      border = rl.Color(P.DANGER.r, P.DANGER.g, P.DANGER.b, int(0.55 * 255))
+      rl.draw_rectangle_rounded_lines_ex(bg_rect, 0.14, 14, 1, border)
 
     icon_col_w = (self.ICON_BOX + 28) if self._icon is not None else 0
     label_x = bg_rect.x + CARD_PADDING_X + icon_col_w
@@ -399,21 +449,21 @@ class SsidRowCard(Widget):
 
   def _render(self, _):
     r = self._rect
-    pad = 6
-    bg_rect = rl.Rectangle(r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2)
+    bg_rect = rl.Rectangle(r.x + CARD_MARGIN_X, r.y + CARD_MARGIN_Y, r.width - CARD_MARGIN_X * 2, r.height - CARD_MARGIN_Y * 2)
 
     if self._connected:
-      bg = rl.Color(P.ACCENT.r, P.ACCENT.g, P.ACCENT.b, int(0.18 * 255))
-      border = rl.Color(P.ACCENT.r, P.ACCENT.g, P.ACCENT.b, int(0.40 * 255))
+      tint = P.ACCENT
       sub_color = P.ACCENT2
       bar_color = P.ACCENT2
     else:
-      bg = P.PANEL_BG
-      border = P.PANEL_BORDER
+      tint = None
       sub_color = P.MUTED
       bar_color = P.TEXT
 
-    _draw_panel_bg(bg_rect, bg, border)
+    _draw_frosted_card(bg_rect, tint=tint)
+    if self._connected:
+      border = rl.Color(P.ACCENT.r, P.ACCENT.g, P.ACCENT.b, int(0.45 * 255))
+      rl.draw_rectangle_rounded_lines_ex(bg_rect, 0.14, 14, 1, border)
 
     # Lock icon (procedural — small rounded rect over a hollow shackle).
     lock_x = bg_rect.x + 18
@@ -467,8 +517,12 @@ def _draw_lock(x: float, y: float, size: int, color: rl.Color) -> None:
 # Settings landing tile
 # ------------------------------------------------------------
 class BigCategoryTile(Widget):
-  TILE_WIDTH = 100  # default, overridden by parent
-  TILE_HEIGHT = 240
+  # 5 tiles visible on the 536-wide MICI screen, matching the mockup CSS
+  # (grid-template-columns: repeat(5, 1fr); 6px gap). Body height after the
+  # topbar gets us to ~180 tall, slightly less than the screen so the scroll
+  # indicator pill underneath remains visible.
+  TILE_WIDTH = 98
+  TILE_HEIGHT = 180
 
   def __init__(self, label: str, icon: Union[str, rl.Texture, None] = None,
                on_click: Callable | None = None):
@@ -477,7 +531,7 @@ class BigCategoryTile(Widget):
       icon = gui_app.texture(icon, 64, 64)
     self._icon = icon
     self._label = UnifiedLabel(label, font_size=22, font_weight=FontWeight.BOLD,
-                               text_color=P.TEXT, max_width=140, wrap_text=False)
+                               text_color=P.TEXT, max_width=180, wrap_text=False, elide=False)
     # Default natural size; parent (Scroller) reads rect.width to lay out.
     self.set_rect(rl.Rectangle(0, 0, self.TILE_WIDTH, self.TILE_HEIGHT))
     if on_click is not None:
@@ -485,27 +539,24 @@ class BigCategoryTile(Widget):
 
   def _render(self, _):
     r = self._rect
-    pad = 4
+    # Slightly inset so the frosted-card border has room to breathe between
+    # adjacent tiles in the menu strip.
+    pad = 6
     bg_rect = rl.Rectangle(r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2)
 
-    if self.is_pressed:
-      bg = rl.Color(P.ACCENT.r, P.ACCENT.g, P.ACCENT.b, int(0.18 * 255))
-      border = rl.Color(P.ACCENT.r, P.ACCENT.g, P.ACCENT.b, int(0.45 * 255))
-    else:
-      bg = P.PANEL_BG
-      border = P.PANEL_BORDER
+    _draw_frosted_card(bg_rect, tint=P.ACCENT if self.is_pressed else None)
 
-    _draw_panel_bg(bg_rect, bg, border)
-
-    # Icon centered horizontally, slightly above center
+    # PNG icon centered slightly above middle
     if self._icon is not None:
       ix = bg_rect.x + (bg_rect.width - self._icon.width) / 2
       iy = bg_rect.y + bg_rect.height * 0.32 - self._icon.height / 2
       rl.draw_texture(self._icon, int(ix), int(iy), P.TEXT)
 
-    # Label below icon
+    # Label below icon — auto-shrink so longer labels still fit
+    label_max = bg_rect.width - 12
+    _fit_single_line(self._label, 22, label_max, min_size=14)
     lw = max(self._label.text_width, 1)
     lx = bg_rect.x + (bg_rect.width - lw) / 2
-    ly = bg_rect.y + bg_rect.height * 0.72
+    ly = bg_rect.y + bg_rect.height * 0.78
     self._label.set_position(lx, ly)
     self._label.render()
