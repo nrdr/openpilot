@@ -238,9 +238,13 @@ class CarInterface(CarInterfaceBase):
       # Apply Marco tune below
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
+    elif candidate == CAR.HONDA_CLARITY:
+      ret.steerActuatorDelay = 0.15
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 3840], [0, 3840]]
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
+
     # TODO-SP: remove when https://github.com/commaai/opendbc/pull/2687 is merged
     elif candidate in (
-        CAR.HONDA_CLARITY,
         CAR.HONDA_ACCORD_9G,
         CAR.ACURA_MDX_3G,
         CAR.ACURA_MDX_3G_MMR,
@@ -360,7 +364,17 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.HONDA_CLARITY:
       stock_cp.autoResumeSng = True
       stock_cp.minEnableSpeed = -1
-      stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
+      linear_max = ret.flags & HondaFlagsSP.EPS_MODIFIED and any(
+        fw.ecu == "eps" and b"-" in fw.fwVersion and b"," in fw.fwVersion for fw in car_fw
+      )
+      if linear_max:
+        # stock request output values:    0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x1400
+        # modified request output values: 0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x7800
+        # X-axis saturates at row0=1663; CAN ceiling aligned. v2.3.3 flat speed-gain firmware.
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
+        stock_cp.steerActuatorDelay = 0.30
+      else:
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
       CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
