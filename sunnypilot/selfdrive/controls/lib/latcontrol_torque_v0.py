@@ -4,7 +4,7 @@ from collections import deque
 import numpy as np
 
 from cereal import log
-from opendbc.car.lateral import FRICTION_THRESHOLD, get_friction
+from opendbc.car.lateral import get_friction
 from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.pid import PIDController
@@ -12,20 +12,18 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext import LatControlTorqueExt
 
-VERSION = 0
-
-KP = 1.0
+KP = 0.5
+KF = 0.5
 KI = 0.1
 KD = 0.0
 
 INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5, 7.5, 10, 15, 30]
-KP_INTERP = [250, 200, 100, 40, 20, 5.5, 3.5, 2.0, KP]
+KP_INTERP = [250, 120, 65, 30, 11.5, 5.5, 3.5, 2.0, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
-
-FRICTION_X = [0.1, 1.0]
-FRICTION_Y = [1.0, 0.5]
+FRICTION_THRESHOLD = 0.3
+VERSION = 0
 
 
 class LatControlTorque(LatControl):
@@ -44,7 +42,7 @@ class LatControlTorque(LatControl):
 
     # PIDController supports scheduled gains by passing [bp, values].
     # Avoid mutating gains after construction; the controller interpolates internally.
-    kf = float(getattr(self.torque_params, "kf", 0.5))
+    kf = float(getattr(self.torque_params, "kf", KF))
     self.pid = PIDController(
       [INTERP_SPEEDS, KP_INTERP],
       KI,
@@ -58,7 +56,7 @@ class LatControlTorque(LatControl):
 
     self.extension = LatControlTorqueExt(self, CP, CP_SP, CI)
 
-    # Blinker-based friction fade for smoother lane changes/manual lane moves.
+    # Blinker-based friction fade for smoother lane changes and manual lane moves.
     self.friction_scale = FirstOrderFilter(1.0, 0.25, self.dt)
 
     # Comma-style latency compensation buffer.
@@ -68,7 +66,7 @@ class LatControlTorque(LatControl):
       maxlen=self.lat_accel_request_buffer_len
     )
 
-    # Measurement derivative filter for stability (KD currently 0.0, but kept correct).
+    # Measurement derivative filter for stability.
     self.previous_measurement = 0.0
     self.measurement_rate_filter = FirstOrderFilter(
       0.0,
@@ -101,9 +99,7 @@ class LatControlTorque(LatControl):
       pid_log.active = False
       return -0.0, 0.0, pid_log
 
-    # -------------------------------------------------------------------------
-    # Measurements and deadzones
-    # -------------------------------------------------------------------------
+    # Measurements and deadzones.
     measured_curvature = -VM.calc_curvature(
       math.radians(CS.steeringAngleDeg - params.angleOffsetDeg),
       CS.vEgo,
@@ -116,9 +112,7 @@ class LatControlTorque(LatControl):
 
     roll_compensation = params.roll * ACCELERATION_DUE_TO_GRAVITY
 
-    # -------------------------------------------------------------------------
-    # Latency-compensated setpoint (Comma-style)
-    # -------------------------------------------------------------------------
+    # Latency-compensated setpoint.
     if lat_delay is None:
       lat_delay = float(getattr(params, "latDelay", self.dt))
     lat_delay = float(max(lat_delay, self.dt))
@@ -138,9 +132,7 @@ class LatControlTorque(LatControl):
     setpoint = lat_delay * desired_lateral_jerk + expected_lateral_accel
     error = setpoint - measurement
 
-    # -------------------------------------------------------------------------
-    # Feedforward + friction (with blinker fade and straight-line scaling)
-    # -------------------------------------------------------------------------
+    # Feedforward and friction.
     ff = gravity_adjusted_future_lateral_accel
     ff -= float(self.torque_params.latAccelOffset)
 
@@ -148,16 +140,11 @@ class LatControlTorque(LatControl):
     target_scale = 0.0 if lane_change else 1.0
     friction_scale = float(self.friction_scale.update(target_scale))
 
-    desired_lataccel_mag = abs(future_desired_lateral_accel)
-    friction_error_scale = float(np.interp(desired_lataccel_mag, FRICTION_X, FRICTION_Y))
-    friction_input = error * friction_error_scale
-
+    friction_input = error
     friction = get_friction(friction_input, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
     ff += friction_scale * friction
 
-    # -------------------------------------------------------------------------
-    # PID in lateral-accel space -> convert to torque at end
-    # -------------------------------------------------------------------------
+    # PID in lateral-accel space, converted to torque at the end.
     pid_log.error = float(error)
 
     freeze_integrator = steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
@@ -170,7 +157,7 @@ class LatControlTorque(LatControl):
     )
     output_torque = self.torque_from_lateral_accel(output_lataccel, self.torque_params)
 
-    # Extension hook (signature preserved).
+    # Extension hook.
     pid_log, output_torque = self.extension.update(
       CS, VM, self.pid, params, ff, pid_log, setpoint, measurement, calibrated_pose, roll_compensation,
       future_desired_lateral_accel, measurement, lateral_accel_deadzone, gravity_adjusted_future_lateral_accel,
