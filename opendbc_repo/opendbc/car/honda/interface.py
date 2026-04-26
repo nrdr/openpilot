@@ -370,7 +370,7 @@ class CarInterface(CarInterfaceBase):
       if linear_max:
         # stock request output values:    0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x1400
         # modified request output values: 0x0000, 0x0580, 0x0A00, 0x0D00, 0x0F00, 0x10C0, 0x11FF, 0x1300, 0x7800
-        # X-axis saturates at row0=1663; CAN ceiling aligned. v2.3.3 flat speed-gain firmware.
+        # X-axis saturates at row0=1663; CAN ceiling aligned. v2.3.4 flat speed-gain firmware.
         stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
         stock_cp.steerActuatorDelay = 0.30
       else:

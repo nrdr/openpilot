@@ -4,9 +4,7 @@ from collections import deque
 import numpy as np
 
 from cereal import log
-from opendbc.car.honda.values import CAR
 from opendbc.car.lateral import FRICTION_THRESHOLD, get_friction
-from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
@@ -20,20 +18,16 @@ KI = 0.1
 KD = 0.0
 
 INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5, 7.5, 10, 15, 30]
-KP_INTERP = [250, 120, 65, 30, 11.5, 5.5, 3.5, 2.0, KP]
+KP_INTERP = [250, 120, 65, 45, 18.0, 8.0, 4.5, 2.0, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
 LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
 
 VERSION = 2
 
-CLARITY_UNWIND_RATE_THRESHOLD = 0.05
-
-
 class LatControlTorque(LatControl):
   def __init__(self, CP, CP_SP, CI, dt):
     super().__init__(CP, CP_SP, CI, dt)
-    self.is_clarity_eps_modified = CP.carFingerprint == CAR.HONDA_CLARITY and bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
 
     self.torque_params = CP.lateralTuning.torque.as_builder()
     self.torque_from_lateral_accel = CI.torque_from_lateral_accel()
@@ -150,14 +144,6 @@ class LatControlTorque(LatControl):
 
     pid_log.error = float(error)
 
-    # Decay integrator when the car has more steering than requested.
-    if abs(setpoint) < abs(measurement):
-      self.pid.i *= 0.9
-
-    # Reduce stale integrator when it opposes the current error.
-    if error * self.pid.i < 0:
-      self.pid.i *= 0.5
-
     freeze_integrator = steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
     output_lataccel = self.pid.update(
       error,
@@ -167,13 +153,6 @@ class LatControlTorque(LatControl):
       freeze_integrator=freeze_integrator,
     )
     output_torque = self.torque_from_lateral_accel(output_lataccel, self.torque_params)
-
-    # On the modified Clarity rack, let the EPS self-center once the requested
-    # turn is relaxing and the wheel is already naturally coming off angle.
-    naturally_unwinding = measurement * measurement_rate < -CLARITY_UNWIND_RATE_THRESHOLD
-    still_holding_turn = output_torque * measurement > 0.0
-    if self.is_clarity_eps_modified and abs(setpoint) < abs(measurement) and naturally_unwinding and still_holding_turn:
-      output_torque = 0.0
 
     # Extension hook.
     pid_log, output_torque = self.extension.update(
