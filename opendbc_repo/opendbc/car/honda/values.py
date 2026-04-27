@@ -48,13 +48,6 @@ class CarControllerParams:
     assert CP.lateralParams.torqueV[0] == 0
     self.STEER_LOOKUP_BP = [v * -1 for v in CP.lateralParams.torqueBP][1:][::-1] + list(CP.lateralParams.torqueBP)
     self.STEER_LOOKUP_V = [v * -1 for v in CP.lateralParams.torqueV][1:][::-1] + list(CP.lateralParams.torqueV)
-    # Clarity w/ X_max=1663 EPS firmware: scale delta rates so the physical CAN
-    # ramp to EPS saturation matches the STEER_MAX=3840 / DELTA_UP=15 baseline.
-    #   DELTA_UP_new   = 15 × (3840 / 1663) = 34.6 → 35
-    #   DELTA_DOWN_new = 25 × (3840 / 1663) = 57.7 → 58
-    if CP.carFingerprint == CAR.HONDA_CLARITY:
-      self.STEER_DELTA_UP = 35
-      self.STEER_DELTA_DOWN = 58
 
 
 class HondaSafetyFlags(IntFlag):

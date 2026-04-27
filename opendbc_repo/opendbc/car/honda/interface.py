@@ -240,11 +240,11 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate == CAR.HONDA_CLARITY:
       # X_max=1663 EPS firmware (TaperedP / V2.3.2 lineage).
-      # STEER_MAX=1663 gives full proportional range 0–100% demand → 0–1663 CAN.
-      # CarControllerParams scales STEER_DELTA_UP/DOWN to maintain the same
-      # physical ramp rate as the STEER_MAX=3840 baseline.
+      # [0,3840] sends openpilot's full CAN range; EPS clips at X_max=1663 internally.
+      # PID gains stay tuned against this range — changing to [0,1663] halves
+      # effective torque per unit demand and requires re-tuning kp/ki/kf.
       ret.steerActuatorDelay = 0.1
-      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1663], [0, 1663]]
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 3840], [0, 3840]]
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     # TODO-SP: remove when https://github.com/commaai/opendbc/pull/2687 is merged
@@ -368,7 +368,7 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.HONDA_CLARITY:
       stock_cp.autoResumeSng = True
       stock_cp.minEnableSpeed = -1
-      stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
+      stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
       CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
