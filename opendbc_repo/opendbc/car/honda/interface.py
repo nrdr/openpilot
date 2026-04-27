@@ -239,8 +239,12 @@ class CarInterface(CarInterfaceBase):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.HONDA_CLARITY:
-      ret.steerActuatorDelay = 0.15
-      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 3840], [0, 3840]]
+      # X_max=1663 EPS firmware (TaperedP / V2.3.2 lineage).
+      # STEER_MAX=1663 gives full proportional range 0–100% demand → 0–1663 CAN.
+      # CarControllerParams scales STEER_DELTA_UP/DOWN to maintain the same
+      # physical ramp rate as the STEER_MAX=3840 baseline.
+      ret.steerActuatorDelay = 0.1
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1663], [0, 1663]]
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     # TODO-SP: remove when https://github.com/commaai/opendbc/pull/2687 is merged
@@ -364,16 +368,7 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.HONDA_CLARITY:
       stock_cp.autoResumeSng = True
       stock_cp.minEnableSpeed = -1
-      linear_max = ret.flags & HondaFlagsSP.EPS_MODIFIED and any(
-        fw.ecu == "eps" and b"-" in fw.fwVersion and b"," in fw.fwVersion for fw in car_fw
-      )
-      if linear_max:
-        # v2.3.5b: row0 X-axis scaled to full 0-3840 range; input clamp 0x1380E=3840.
-        # CAN ceiling aligned to firmware saturation point.
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
-        stock_cp.steerActuatorDelay = 0.30
-      else:
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
+      stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
       CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
