@@ -239,12 +239,12 @@ class CarInterface(CarInterfaceBase):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     elif candidate == CAR.HONDA_CLARITY:
-      # X_max=1663 EPS firmware (TaperedP / V2.3.2 lineage).
-      # [0,3840] sends openpilot's full CAN range; EPS clips at X_max=1663 internally.
-      # PID gains stay tuned against this range — changing to [0,1663] halves
-      # effective torque per unit demand and requires re-tuning kp/ki/kf.
+      # X_max=1663 EPS firmware (TaperedP_FullClamp / V2.3.2 lineage).
+      # [0,1663] aligns openpilot CAN range with EPS X_max — proportional demand.
+      # latAccelFactor and friction in override.toml scaled by (1663/3840) to match
+      # the same physical CAN output as [0,3840] had at every demand level.
       ret.steerActuatorDelay = 0.1
-      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 3840], [0, 3840]]
+      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1663], [0, 1663]]
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     # TODO-SP: remove when https://github.com/commaai/opendbc/pull/2687 is merged
