@@ -559,3 +559,92 @@ class BigCategoryTile(Widget):
     ly = bg_rect.y + bg_rect.height * 0.78
     self._label.set_position(lx, ly)
     self._label.render()
+
+
+# ------------------------------------------------------------
+# Select-list tile (horizontal scroller item: vehicle make/model, saved networks, ...)
+#
+# Horizontal scroll matches the rest of the BP UI (settings landing, sub-panels)
+# and avoids the swipe-down vs. scroll-back-to-top conflict that vertical
+# NavWidget children hit (see NavScroller._back_enabled).
+# ------------------------------------------------------------
+class BPSelectTile(Widget):
+  """Frosted tile used by BPSelectPanel.
+
+  Layout: icon top-center, label bottom (auto-shrunk to fit). `selected=True`
+  paints an accent tint + accent border for the currently-chosen entry.
+  """
+  TILE_WIDTH = 170
+  TILE_HEIGHT = 180
+  ICON_BOX = 64
+  LABEL_FS = 22
+
+  def __init__(self, label: str, icon: Union[str, rl.Texture, None] = None,
+               selected: bool = False, on_click: Callable | None = None,
+               width: int | None = None, height: int | None = None,
+               wrap_label: bool = False):
+    super().__init__()
+    self._selected = selected
+    self._wrap_label = wrap_label
+    if isinstance(icon, str):
+      icon = gui_app.texture(icon, self.ICON_BOX, self.ICON_BOX)
+    self._icon = icon
+    self._label = UnifiedLabel(label, font_size=self.LABEL_FS, font_weight=FontWeight.BOLD,
+                               text_color=P.TEXT, max_width=240,
+                               wrap_text=wrap_label, line_height=1.10, elide=False)
+    w = width if width is not None else self.TILE_WIDTH
+    h = height if height is not None else self.TILE_HEIGHT
+    self.set_rect(rl.Rectangle(0, 0, w, h))
+    if on_click is not None:
+      self.set_click_callback(on_click)
+
+  def _render(self, _):
+    r = self._rect
+    pad = 6
+    bg_rect = rl.Rectangle(r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2)
+
+    if self._selected:
+      tint = P.ACCENT
+    elif self.is_pressed:
+      tint = P.ACCENT
+    else:
+      tint = None
+    _draw_frosted_card(bg_rect, tint=tint)
+    if self._selected:
+      border = rl.Color(P.ACCENT.r, P.ACCENT.g, P.ACCENT.b, int(0.55 * 255))
+      rl.draw_rectangle_rounded_lines_ex(bg_rect, 0.14, 14, 2, border)
+
+    # Icon centered slightly above middle.
+    if self._icon is not None:
+      ix = bg_rect.x + (bg_rect.width - self._icon.width) / 2
+      iy = bg_rect.y + bg_rect.height * 0.30 - self._icon.height / 2
+      tint_color = P.ACCENT2 if self._selected else P.TEXT
+      rl.draw_texture(self._icon, int(ix), int(iy), tint_color)
+
+    # Label below icon
+    label_max = int(bg_rect.width - 12)
+    if self._wrap_label:
+      # Multi-line: try font sizes 22 → 18 → 16 until 3 wrapped lines fit
+      # in the lower 65% of the tile.
+      max_lbl_h = bg_rect.height * 0.62
+      chosen = self.LABEL_FS
+      for sz in (self.LABEL_FS, 20, 18, 16):
+        self._label.set_font_size(sz)
+        self._label.set_max_width(label_max)
+        h = self._label.get_content_height(label_max)
+        chosen = sz
+        if h <= max_lbl_h:
+          break
+      h = self._label.get_content_height(label_max) + chosen * 0.5
+      lbl_y = bg_rect.y + bg_rect.height * 0.55
+      self._label.set_rect(rl.Rectangle(bg_rect.x + 6, lbl_y,
+                                         label_max, h))
+      self._label.render()
+    else:
+      # Single-line: auto-shrink horizontally to fit.
+      chosen = _fit_single_line(self._label, self.LABEL_FS, label_max, min_size=14)
+      lw = max(self._label.text_width, 1)
+      lx = bg_rect.x + (bg_rect.width - lw) / 2
+      ly = bg_rect.y + bg_rect.height * 0.74
+      self._label.set_position(lx, ly)
+      self._label.render()
