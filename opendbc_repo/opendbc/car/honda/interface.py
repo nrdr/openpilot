@@ -243,7 +243,6 @@ class CarInterface(CarInterfaceBase):
       # [0,1663] aligns openpilot CAN range with EPS X_max — proportional demand.
       # latAccelFactor and friction in override.toml scaled by (1663/3840) to match
       # the same physical CAN output as [0,3840] had at every demand level.
-      ret.steerActuatorDelay = 0.1
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1663], [0, 1663]]
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
