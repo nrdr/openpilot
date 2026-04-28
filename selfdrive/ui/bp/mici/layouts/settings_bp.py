@@ -71,13 +71,14 @@ class SettingsLayoutBP(NavWidget):
       tile.set_click_callback(lambda n=key: gui_app.push_widget(_ensure(n)))
       tiles.append(tile)
 
-    # Horizontal scroller below the topbar — restore the framework's scroll
-    # indicator + edge shadows so the user sees there's more to scroll into
-    # (Vehicle / BluePilot tiles past the visible 5).
+    # Horizontal scroller below the topbar. Scroll indicator stays on so the
+    # user knows there's more to scroll into; edge shadows are off because the
+    # frosted-tile borders already define the row visually and the dark
+    # vignette they draw reads as a "black section" next to the tiles.
     self._scroller = self._child(_Scroller(
       tiles, horizontal=True, snap_items=False,
       spacing=6, pad=10,
-      scroll_indicator=True, edge_shadows=True,
+      scroll_indicator=True, edge_shadows=False,
     ))
 
   def _on_back(self):
