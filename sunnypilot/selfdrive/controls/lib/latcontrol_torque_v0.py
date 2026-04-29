@@ -13,7 +13,7 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext import LatControlTorqueExt
 
 KP = 0.5
-KF = 0.5
+KF = 1.0
 KI = 0.1
 KD = 0.0
 
