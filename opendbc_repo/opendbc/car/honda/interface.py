@@ -344,10 +344,7 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
-        stock_cp.lateralTuning.pid.kf = 0.00006
-        stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0, 10, 20], [0.3, 0.3, 0.3]]
-        stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0, 10, 20], [0.1, 0.1, 0.1]]
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
 
     elif candidate == CAR.HONDA_CIVIC_2022:
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
