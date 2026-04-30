@@ -49,9 +49,13 @@ class CarControllerParams:
     self.STEER_LOOKUP_BP = [v * -1 for v in CP.lateralParams.torqueBP][1:][::-1] + list(CP.lateralParams.torqueBP)
     self.STEER_LOOKUP_V = [v * -1 for v in CP.lateralParams.torqueV][1:][::-1] + list(CP.lateralParams.torqueV)
 
-    # Clarity [0,1663] alignment: STEER_DELTA in absolute CAN units/frame.
-    # Default 15/25 gives correct ramp rate with STEER_MAX=1663.
-    # (The 35/58 values were compensation for [0,3840] operation — no longer needed.)
+    # Clarity [0,1663] alignment: STEER_DELTA operates on normalized [-1,1] space.
+    # Default DELTA_UP=15 reaches normalized 1.0 (CAN=1663) in 7 frames (70ms).
+    # With [0,3840], EPS saturation at normalized 0.433 was reached in 3 frames (30ms).
+    # Scale by 3840/1663 to restore the same physical ramp rate to EPS saturation.
+    if CP.carFingerprint == CAR.HONDA_CLARITY:
+      self.STEER_DELTA_UP = 35    # 15 × (3840/1663) ≈ 35
+      self.STEER_DELTA_DOWN = 58  # 25 × (3840/1663) ≈ 58
 
 
 class HondaSafetyFlags(IntFlag):
