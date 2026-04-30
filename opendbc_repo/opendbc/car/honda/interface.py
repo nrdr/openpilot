@@ -240,6 +240,7 @@ class CarInterface(CarInterfaceBase):
 
     # TODO-SP: remove when https://github.com/commaai/opendbc/pull/2687 is merged
     elif candidate in (
+        CAR.HONDA_CLARITY,
         CAR.HONDA_ACCORD_9G,
         CAR.ACURA_MDX_3G,
         CAR.ACURA_MDX_3G_MMR,
@@ -361,12 +362,12 @@ class CarInterface(CarInterfaceBase):
         CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
 
     elif candidate == CAR.HONDA_CLARITY:
-       stock_cp.autoResumeSng = True
-       stock_cp.minEnableSpeed = -1
-       stock_cp.steerActuatorDelay = 0.6
-       stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]] # TODO: Verify this is stable
-       stock_cp.lateralTuning.pid.kf = 0.00006
-       stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.1]]
+      stock_cp.autoResumeSng = True
+      stock_cp.minEnableSpeed = -1
+      stock_cp.steerActuatorDelay = 0.6
+      stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
+      stock_cp.lateralTuning.pid.kf = 0.00006
+      stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.1]]
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
       stock_cp.autoResumeSng = True
