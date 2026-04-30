@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-
 set -e
+
+cd /data/openpilot
 
 BRANCH=$(git branch --show-current)
 
-echo "Fetching..."
-git fetch origin
+if [ -z "$BRANCH" ]; then
+  echo "Not on a branch. Refusing to pull."
+  exit 1
+fi
 
-echo "Pulling branch: $BRANCH"
-git pull origin "$BRANCH"
+echo "Pulling only current branch: $BRANCH"
+git pull origin "$BRANCH" --no-tags
 
 echo "Starting openpilot..."
 op start
