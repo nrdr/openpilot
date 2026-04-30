@@ -1,3 +1,4 @@
+import inspect
 import math
 from typing import NamedTuple
 
@@ -66,6 +67,11 @@ class LatControlTorque(LatControl):
 
     # Use the classic torque-space callback so PID and feedforward stay in steering torque space.
     self.torque_from_lateral_accel = CI.torque_from_lateral_accel_in_torque_space()
+
+    try:
+      self.torque_callback_arg_count = len(inspect.signature(self.torque_from_lateral_accel).parameters)
+    except (TypeError, ValueError):
+      self.torque_callback_arg_count = 3
 
     self.pid = PIDController(
       KP,
@@ -147,9 +153,18 @@ class LatControlTorque(LatControl):
       [-friction, friction],
     )) * lat_accel_factor
 
-  def _torque_from_lateral_accel(self, lateral_accel, roll_compensation, v_ego, a_ego):
+  def _torque_from_lateral_accel(self, lateral_accel, roll_compensation, v_ego, a_ego, gravity_adjusted=False):
+    lat_control_inputs = LatControlInputs(lateral_accel, roll_compensation, v_ego, a_ego)
+
+    if self.torque_callback_arg_count >= 3:
+      return self.torque_from_lateral_accel(
+        lat_control_inputs,
+        self.torque_params,
+        gravity_adjusted,
+      )
+
     return self.torque_from_lateral_accel(
-      LatControlInputs(lateral_accel, roll_compensation, v_ego, a_ego),
+      lat_control_inputs,
       self.torque_params,
     )
 
@@ -208,6 +223,7 @@ class LatControlTorque(LatControl):
       roll_compensation,
       v_ego,
       a_ego,
+      gravity_adjusted=False,
     )
 
     torque_from_measurement = self._torque_from_lateral_accel(
@@ -215,6 +231,7 @@ class LatControlTorque(LatControl):
       roll_compensation,
       v_ego,
       a_ego,
+      gravity_adjusted=False,
     )
 
     pid_error = torque_from_setpoint - torque_from_measurement
@@ -228,6 +245,7 @@ class LatControlTorque(LatControl):
       roll_compensation,
       v_ego,
       a_ego,
+      gravity_adjusted=True,
     )
     ff += self._classic_friction(friction_input, lateral_accel_deadzone)
 
