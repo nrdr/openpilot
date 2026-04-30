@@ -165,12 +165,58 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.prev_torque_cmd = 0.0
     self.driver_override_lkas_inactive = False
 
+    # EPS-modified steering override filter. Raw Honda steeringPressed can false-trigger
+    # during high-assist/high-angle turns because the EPS torque sensor sees a short
+    # load spike. Keep real driver override behavior, but require persistence before
+    # cutting OP torque. Opposing driver torque triggers faster than same-direction
+    # assist because same-direction spikes are the common false-positive shape.
+    self.steering_pressed_filter_s = 0.0
+    self.steering_pressed_robust_prev = False
+
+    # Bosch extra-brake controller
     self.brake_pid = PIDController(k_p=([0,], [0,]),
                                    k_i=([0.], [0.5]),
                                    pos_limit=0.0,
                                    neg_limit=-2.0,
                                    rate=50)
     self.brake_pid.reset()
+
+  def _filtered_steering_pressed(self, CS, torque_cmd: float) -> bool:
+    raw_pressed = bool(CS.out.steeringPressed)
+
+    # Signed driver torque from CarState. If unavailable, fall back to stock behavior.
+    steering_torque = float(getattr(CS.out, "steeringTorque", 0.0))
+    torque_cmd = float(torque_cmd)
+
+    # Direction classification:
+    #   opposite = driver fighting OP -> fast trigger
+    #   same     = driver helping OP OR EPS load spike -> slower trigger
+    torque_product = steering_torque * torque_cmd
+    torque_cmd_abs = abs(torque_cmd)
+
+    if raw_pressed:
+      if self.steering_pressed_robust_prev:
+        trigger_s = 0.05
+      elif torque_cmd_abs < 0.10:
+        # OP is not meaningfully steering; assume manual input.
+        trigger_s = 0.12
+      elif torque_product < 0.0:
+        # Driver opposing OP should win quickly.
+        trigger_s = 0.12
+      else:
+        # Same-direction torque needs persistence; this rejects short EPS-load spikes
+        # but still allows the driver to help OP if they hold torque.
+        trigger_s = 0.32
+
+      self.steering_pressed_filter_s = min(1.0, self.steering_pressed_filter_s + DT_CTRL)
+      steering_pressed = self.steering_pressed_filter_s >= trigger_s
+    else:
+      # Quick release so OP can resume once the driver/load spike is gone.
+      self.steering_pressed_filter_s = max(0.0, self.steering_pressed_filter_s - 4.0 * DT_CTRL)
+      steering_pressed = self.steering_pressed_filter_s > 0.08 and self.steering_pressed_robust_prev
+
+    self.steering_pressed_robust_prev = steering_pressed
+    return steering_pressed
 
   def update(self, CC, CC_SP, CS, now_nanos):
     MadsCarController.update(self, self.CP, CC, CC_SP)
@@ -203,9 +249,11 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     torque_cmd = actuators.torque
 
     if CC.latActive:
-      steering_pressed = CS.out.steeringPressed
-
       if self.eps_modified:
+        steering_pressed = self._filtered_steering_pressed(CS, torque_cmd)
+
+        # Use filtered/robust steeringPressed for actual LKAS disable behavior.
+        # Raw steeringPressed may false-trigger on EPS-modified high-torque setups.
         self.driver_override_lkas_inactive = steering_pressed
 
         if steering_pressed:
@@ -223,16 +271,18 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
           self.prev_torque_cmd = float(torque_cmd)
           torque_cmd = self.torque_lpf
-
       else:
         self.torque_lpf = float(torque_cmd)
         self.prev_torque_cmd = float(torque_cmd)
+        self.steering_pressed_filter_s = 0.0
+        self.steering_pressed_robust_prev = False
         self.driver_override_lkas_inactive = False
-
     else:
       self.torque_lpf = 0.0
       self.prev_torque_cmd = 0.0
       self.last_torque = 0.0
+      self.steering_pressed_filter_s = 0.0
+      self.steering_pressed_robust_prev = False
       self.driver_override_lkas_inactive = False
 
     limited_torque = rate_limit(
