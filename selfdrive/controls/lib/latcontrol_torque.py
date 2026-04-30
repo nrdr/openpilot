@@ -32,6 +32,18 @@ class LatControlInputs(NamedTuple):
   v_ego: float
   a_ego: float
 
+
+class ClassicTorqueExtension:
+  def update_model_v2(self, model_v2):
+    pass
+
+  def update_lateral_lag(self, lag):
+    pass
+
+  def update_override_torque_params(self, torque_params):
+    return False
+
+
 class LatControlTorque(LatControl):
   def __init__(self, CP, CP_SP, CI, dt=0.01):
     try:
@@ -64,6 +76,10 @@ class LatControlTorque(LatControl):
     )
 
     self.steering_angle_deadzone_deg = self.torque_params.steeringAngleDeadzoneDeg
+
+    # controlsd expects torque controllers to expose an extension object.
+    # This shim preserves that interface without enabling NNLC/NNFF/jerk extension behavior.
+    self.extension = ClassicTorqueExtension()
 
     self.params = Params()
     self.frame = -1
