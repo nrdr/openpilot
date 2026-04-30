@@ -14,4 +14,4 @@ echo "Pulling only current branch: $BRANCH"
 git pull origin "$BRANCH" --no-tags
 
 echo "Starting openpilot..."
-op start
+/data/openpilot/tools/op.sh start
