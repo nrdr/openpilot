@@ -1,4 +1,5 @@
 import math
+from typing import NamedTuple
 
 import numpy as np
 
@@ -12,11 +13,6 @@ try:
 except ImportError:
   from openpilot.selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 
-try:
-  from opendbc.car.interfaces import LatControlInputs
-except ImportError:
-  from openpilot.selfdrive.car.interfaces import LatControlInputs
-
 
 KP = 1.0
 KF = 1.0
@@ -29,6 +25,12 @@ LOW_SPEED_Y = [15.0, 13.0, 10.0, 5.0]
 VERSION = 2
 PARAM_UPDATE_FRAMES = 30
 
+
+class LatControlInputs(NamedTuple):
+  lateral_acceleration: float
+  roll_compensation: float
+  v_ego: float
+  a_ego: float
 
 class LatControlTorque(LatControl):
   def __init__(self, CP, CP_SP, CI, dt=0.01):
