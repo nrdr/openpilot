@@ -182,8 +182,8 @@ class LatControlTorque(LatControl):
       self.torque_params,
       0.0,
       lateral_accel_deadzone,
-      friction_compensation=False,
-      gravity_adjusted=False,
+      False,
+      False,
     )
 
     torque_from_measurement = self.torque_from_lateral_accel(
@@ -191,8 +191,8 @@ class LatControlTorque(LatControl):
       self.torque_params,
       0.0,
       lateral_accel_deadzone,
-      friction_compensation=False,
-      gravity_adjusted=False,
+      False,
+      False,
     )
 
     pid_error = torque_from_setpoint - torque_from_measurement
@@ -206,8 +206,8 @@ class LatControlTorque(LatControl):
       self.torque_params,
       friction_input,
       lateral_accel_deadzone,
-      friction_compensation=True,
-      gravity_adjusted=True,
+      True,
+      True,
     )
 
     freeze_integrator = steer_limited_by_safety or CS.steeringPressed or v_ego < 5.0
