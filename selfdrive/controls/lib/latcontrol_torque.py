@@ -22,6 +22,8 @@ KD = 0.0
 LOW_SPEED_X = [0.0, 10.0, 20.0, 30.0]
 LOW_SPEED_Y = [15.0, 13.0, 10.0, 5.0]
 
+FRICTION_THRESHOLD = 0.3
+
 VERSION = 2
 PARAM_UPDATE_FRAMES = 30
 
@@ -62,7 +64,7 @@ class LatControlTorque(LatControl):
     if not hasattr(CI, "torque_from_lateral_accel_in_torque_space"):
       raise RuntimeError("Classic torque controller requires CI.torque_from_lateral_accel_in_torque_space()")
 
-    # Use the classic torque-space callback so PID, feedforward, and friction stay in steering torque space.
+    # Use the classic torque-space callback so PID and feedforward stay in steering torque space.
     self.torque_from_lateral_accel = CI.torque_from_lateral_accel_in_torque_space()
 
     self.pid = PIDController(
@@ -127,6 +129,30 @@ class LatControlTorque(LatControl):
       self.torque_params.friction,
     )
 
+  @staticmethod
+  def _apply_deadzone(error, deadzone):
+    if error > deadzone:
+      return error - deadzone
+    if error < -deadzone:
+      return error + deadzone
+    return 0.0
+
+  def _classic_friction(self, friction_input, lateral_accel_deadzone):
+    friction = float(getattr(self.torque_params, "friction", 0.0))
+    lat_accel_factor = float(getattr(self.torque_params, "latAccelFactor", 1.0))
+
+    return float(np.interp(
+      self._apply_deadzone(friction_input, lateral_accel_deadzone),
+      [-FRICTION_THRESHOLD, FRICTION_THRESHOLD],
+      [-friction, friction],
+    )) * lat_accel_factor
+
+  def _torque_from_lateral_accel(self, lateral_accel, roll_compensation, v_ego, a_ego):
+    return self.torque_from_lateral_accel(
+      LatControlInputs(lateral_accel, roll_compensation, v_ego, a_ego),
+      self.torque_params,
+    )
+
   def _check_saturation_compat(self, saturated, CS, steer_limited_by_safety, curvature_limited):
     try:
       return self._check_saturation(saturated, CS, steer_limited_by_safety, curvature_limited)
@@ -177,38 +203,33 @@ class LatControlTorque(LatControl):
     measurement = actual_lateral_accel + low_speed_factor * actual_curvature
 
     # PID error is intentionally computed in torque space.
-    torque_from_setpoint = self.torque_from_lateral_accel(
-      LatControlInputs(setpoint, roll_compensation, v_ego, a_ego),
-      self.torque_params,
-      0.0,
-      lateral_accel_deadzone,
-      False,
-      False,
+    torque_from_setpoint = self._torque_from_lateral_accel(
+      setpoint,
+      roll_compensation,
+      v_ego,
+      a_ego,
     )
 
-    torque_from_measurement = self.torque_from_lateral_accel(
-      LatControlInputs(measurement, roll_compensation, v_ego, a_ego),
-      self.torque_params,
-      0.0,
-      lateral_accel_deadzone,
-      False,
-      False,
+    torque_from_measurement = self._torque_from_lateral_accel(
+      measurement,
+      roll_compensation,
+      v_ego,
+      a_ego,
     )
 
     pid_error = torque_from_setpoint - torque_from_measurement
 
-    # Classic friction behavior: friction is applied inside the torque feedforward path.
+    # Classic friction behavior: base torque feedforward plus direct torque-space friction.
     friction_input = desired_lateral_accel - actual_lateral_accel
     gravity_adjusted_lateral_accel = desired_lateral_accel - roll_compensation
 
-    ff = self.torque_from_lateral_accel(
-      LatControlInputs(gravity_adjusted_lateral_accel, roll_compensation, v_ego, a_ego),
-      self.torque_params,
-      friction_input,
-      lateral_accel_deadzone,
-      True,
-      True,
+    ff = self._torque_from_lateral_accel(
+      gravity_adjusted_lateral_accel,
+      roll_compensation,
+      v_ego,
+      a_ego,
     )
+    ff += self._classic_friction(friction_input, lateral_accel_deadzone)
 
     freeze_integrator = steer_limited_by_safety or CS.steeringPressed or v_ego < 5.0
 
