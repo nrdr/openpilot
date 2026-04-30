@@ -238,14 +238,6 @@ class CarInterface(CarInterfaceBase):
       # Apply Marco tune below
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
-    elif candidate == CAR.HONDA_CLARITY:
-      # X_max=1663 EPS firmware (TaperedP_FullClamp / V2.3.2 lineage).
-      # [0,1663] aligns openpilot CAN range with EPS X_max — proportional demand.
-      # latAccelFactor and friction in override.toml scaled by (1663/3840) to match
-      # the same physical CAN output as [0,3840] had at every demand level.
-      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1663], [0, 1663]]
-      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
-
     # TODO-SP: remove when https://github.com/commaai/opendbc/pull/2687 is merged
     elif candidate in (
         CAR.HONDA_ACCORD_9G,
