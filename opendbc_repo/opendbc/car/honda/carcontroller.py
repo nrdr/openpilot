@@ -106,25 +106,17 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
 
   if highway:
     if sign_change and torque_delta > 0.15:
-      return 0.25
-    return 0.5
-
-  if sign_change:
-    if torque_delta > 0.15:
-      return 0.4
-    elif torque_delta > 0.05:
-      return 0.45
-    else:
-      return 0.7
+      return 0.08
+    return 0.1
 
   if torque_delta > 0.50:
-    return 0.4
+    return 0.08
   elif torque_delta > 0.20:
-    return 0.5
+    return 0.12
   elif torque_delta > 0.05:
-    return 0.6
+    return 0.2
   else:
-    return 0.7
+    return 0.3
 
 class CarController(CarControllerBase, MadsCarController, GasInterceptorCarController, IntelligentCruiseButtonManagementInterface):
   def __init__(self, dbc_names, CP, CP_SP):
@@ -248,34 +240,19 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     torque_cmd = actuators.torque
 
     if CC.latActive:
-      if self.eps_modified:
-        steering_pressed = self._filtered_steering_pressed(CS, torque_cmd)
+      # Always low-pass filter lateral torque while openpilot lateral control is active.
+      # This intentionally ignores EPS_MODIFIED and does not bypass filtering on sign changes.
+      tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
+      alpha = DT_CTRL / (tau + DT_CTRL)
 
-        # Use filtered/robust steeringPressed for actual LKAS disable behavior.
-        # Raw steeringPressed may false-trigger on EPS-modified high-torque setups.
-        self.driver_override_lkas_inactive = steering_pressed
+      self.torque_lpf = alpha * float(torque_cmd) + (1.0 - alpha) * self.torque_lpf
+      self.prev_torque_cmd = float(torque_cmd)
+      torque_cmd = self.torque_lpf
 
-        if steering_pressed:
-          self.torque_lpf = 0.0
-          self.prev_torque_cmd = 0.0
-          torque_cmd = 0.0
-        else:
-          tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
-          alpha = DT_CTRL / (tau + DT_CTRL)
-
-          if torque_cmd * self.torque_lpf < 0.0:
-            self.torque_lpf = torque_cmd
-          else:
-            self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
-
-          self.prev_torque_cmd = float(torque_cmd)
-          torque_cmd = self.torque_lpf
-      else:
-        self.torque_lpf = float(torque_cmd)
-        self.prev_torque_cmd = float(torque_cmd)
-        self.steering_pressed_filter_s = 0.0
-        self.steering_pressed_robust_prev = False
-        self.driver_override_lkas_inactive = False
+      # Disable the custom EPS-modified steeringPressed override path for this diagnostic test.
+      self.driver_override_lkas_inactive = False
+      self.steering_pressed_filter_s = 0.0
+      self.steering_pressed_robust_prev = False
     else:
       self.torque_lpf = 0.0
       self.prev_torque_cmd = 0.0
