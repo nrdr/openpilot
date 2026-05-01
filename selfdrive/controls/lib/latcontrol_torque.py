@@ -15,9 +15,9 @@ except ImportError:
   from openpilot.selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 
 # Speed based KP
-KP = 0.5
-KF = 0.5
-KI = 0.05
+KP = 1.0
+KF = 1.0
+KI = 0.1
 KD = 0.0
 
 LOW_SPEED_X = [0.0, 10.0, 20.0, 30.0]
