@@ -5,6 +5,7 @@ from typing import NamedTuple
 import numpy as np
 
 from cereal import log
+from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
@@ -14,8 +15,10 @@ try:
 except ImportError:
   from openpilot.selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 
-# Speed based KP
-KP = 1.0
+
+# PID speed breakpoints use m/s.
+# Hold kp at 1.0 below 20 mph, then step down to 0.5 above 20 mph.
+KP = 0.8
 KF = 1.0
 KI = 0.1
 KD = 0.0
@@ -24,6 +27,7 @@ LOW_SPEED_X = [0.0, 10.0, 20.0, 30.0]
 LOW_SPEED_Y = [15.0, 13.0, 10.0, 5.0]
 
 FRICTION_THRESHOLD = 0.3
+FRICTION_FADE_TAU = 0.25
 
 VERSION = 2
 PARAM_UPDATE_FRAMES = 30
@@ -88,6 +92,9 @@ class LatControlTorque(LatControl):
     # controlsd expects torque controllers to expose an extension object.
     # This shim preserves that interface without enabling NNLC/NNFF/jerk extension behavior.
     self.extension = ClassicTorqueExtension()
+
+    # Fade only the friction term during lane changes while keeping base feedforward intact.
+    self.friction_scale = FirstOrderFilter(1.0, FRICTION_FADE_TAU, self.dt)
 
     self.params = Params()
     self.frame = -1
@@ -247,7 +254,10 @@ class LatControlTorque(LatControl):
       a_ego,
       gravity_adjusted=True,
     )
-    ff += self._classic_friction(friction_input, lateral_accel_deadzone)
+
+    lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))
+    friction_scale = float(self.friction_scale.update(0.0 if lane_change else 1.0))
+    ff += friction_scale * self._classic_friction(friction_input, lateral_accel_deadzone)
 
     freeze_integrator = steer_limited_by_safety or CS.steeringPressed or v_ego < 5.0
 
