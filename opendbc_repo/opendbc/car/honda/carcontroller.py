@@ -240,19 +240,23 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     torque_cmd = actuators.torque
 
     if CC.latActive:
-      # Always low-pass filter lateral torque while openpilot lateral control is active.
-      # This intentionally ignores EPS_MODIFIED and does not bypass filtering on sign changes.
-      tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
-      alpha = DT_CTRL / (tau + DT_CTRL)
+      # Keep driver override behavior separate from the torque LPF.
+      # The LPF is forced on during normal lateral control, but driver override
+      # still disables LKAS torque instead of making the EPS fight the driver.
+      steering_pressed = self._filtered_steering_pressed(CS, torque_cmd) if self.eps_modified else bool(CS.out.steeringPressed)
+      self.driver_override_lkas_inactive = steering_pressed
 
-      self.torque_lpf = alpha * float(torque_cmd) + (1.0 - alpha) * self.torque_lpf
-      self.prev_torque_cmd = float(torque_cmd)
-      torque_cmd = self.torque_lpf
+      if steering_pressed:
+        self.torque_lpf = 0.0
+        self.prev_torque_cmd = 0.0
+        torque_cmd = 0.0
+      else:
+        tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
+        alpha = DT_CTRL / (tau + DT_CTRL)
 
-      # Disable the custom EPS-modified steeringPressed override path for this diagnostic test.
-      self.driver_override_lkas_inactive = False
-      self.steering_pressed_filter_s = 0.0
-      self.steering_pressed_robust_prev = False
+        self.torque_lpf = alpha * float(torque_cmd) + (1.0 - alpha) * self.torque_lpf
+        self.prev_torque_cmd = float(torque_cmd)
+        torque_cmd = self.torque_lpf
     else:
       self.torque_lpf = 0.0
       self.prev_torque_cmd = 0.0
