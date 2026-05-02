@@ -13,7 +13,7 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext import LatControlTorqueExt
 
 KP = 0.4
-KF = 0.75  # 0.85 caused highway near-center oscillation; 0.75 reduces FF weave
+KF = 0.5
 KI = 0.07  # 0.1 caused integrator windup in sustained highway turns
 KD = 0.0
 
