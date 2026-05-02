@@ -54,8 +54,8 @@ class CarControllerParams:
     # With [0,3840], EPS saturation at normalized 0.433 was reached in 3 frames (30ms).
     # Scale by 3840/1663 to restore the same physical ramp rate to EPS saturation.
     if CP.carFingerprint == CAR.HONDA_CLARITY:
-      self.STEER_DELTA_UP = 35    # 15 × (3840/1663) ≈ 35
-      self.STEER_DELTA_DOWN = 58  # 25 × (3840/1663) ≈ 58
+      self.STEER_DELTA_UP = 15    # 15 × (3840/1663) ≈ 35
+      self.STEER_DELTA_DOWN = 25  # 25 × (3840/1663) ≈ 58
 
 
 class HondaSafetyFlags(IntFlag):
