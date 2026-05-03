@@ -241,11 +241,9 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.HONDA_CLARITY:
       # X_max=1663 EPS firmware (TaperedP_FullClamp / V2.3.2 lineage).
       # [0,1663] aligns openpilot CAN range with EPS X_max — proportional demand.
-      # latAccelFactor and friction in override.toml scaled by (1663/3840) to match
-      # the same physical CAN output as [0,3840] had at every demand level.
       ret.steerActuatorDelay = 0.1
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1663], [0, 1663]]
-      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.8], [0.24]]
 
     # TODO-SP: remove when https://github.com/commaai/opendbc/pull/2687 is merged
     elif candidate in (
@@ -369,7 +367,10 @@ class CarInterface(CarInterfaceBase):
       stock_cp.autoResumeSng = True
       stock_cp.minEnableSpeed = -1
       stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
-      CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
+      if ret.flags & HondaFlagsSP.EPS_MODIFIED:
+        stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.1]]
+      else:
+        stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.8], [0.24]]
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
       stock_cp.autoResumeSng = True
