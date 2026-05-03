@@ -98,7 +98,7 @@ class SteeringLayout(Widget):
     )
     self._clarity_angle_pid_toggle = toggle_item_sp(
       param="ClarityAnglePIDControl",
-      title=lambda: tr("Clarity: Angle PID Lateral Control"),
+      title=lambda: tr("Angle PID Lateral Control"),
       description=lambda: tr("Use the experimental angle-space PID controller for Honda Clarity EPS_MODIFIED. "
                              "OFF (default) uses the torque controller with carcontroller LPF. "
                              "Requires restart to take effect."),
