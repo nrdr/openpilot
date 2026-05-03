@@ -2,6 +2,7 @@
 import numpy as np
 from opendbc.car import get_safety_config, structs, uds
 from openpilot.common.params import Params
+from openpilot.common.params_pyx import UnknownKeyName
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.disable_ecu import disable_ecu
 from opendbc.car.honda.hondacan import CanBus
