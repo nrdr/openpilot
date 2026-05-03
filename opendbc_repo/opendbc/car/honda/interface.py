@@ -369,7 +369,9 @@ class CarInterface(CarInterfaceBase):
       stock_cp.minEnableSpeed = -1
       stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
       if (ret.flags & HondaFlagsSP.EPS_MODIFIED) and Params().get_bool("ClarityAnglePIDControl"):
-        stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.1]]
+        stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0.], [0.3]]
+        stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0.], [0.1]]
+        stock_cp.lateralTuning.pid.kf = 0.00006
       else:
         CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
 

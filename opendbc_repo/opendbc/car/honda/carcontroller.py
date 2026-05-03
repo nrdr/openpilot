@@ -186,14 +186,10 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     # All other Nidec platforms fall back to the legacy longitudinal behavior.
     self.use_new_long_logic = (CP.carFingerprint in HONDA_BOSCH) or (CP.carFingerprint == CAR.HONDA_CLARITY)
 
-    # Enable steering override behavior only when the modified EPS firmware is detected AND
-    # the car is using the torque controller.  PID-tuned cars handle all EPS_MODIFIED logic
-    # at the latcontrol layer; applying the carcontroller ramp/LPF on top would double-filter
-    # and fight the angle-space PID.
-    self.eps_modified = (
-      bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value) and
-      CP.lateralTuning.which() != 'pid'
-    )
+    eps_mod = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
+    # Bypass carcontroller ramp/LPF only for Clarity running the angle-PID controller.
+    # All other EPS_MODIFIED cars and Clarity in torque mode retain the full LPF path.
+    self.eps_modified = eps_mod and not (CP.carFingerprint == CAR.HONDA_CLARITY and CP.lateralTuning.which() == 'pid')
 
     self.braking = False
     self.brake_steady = 0.
