@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 import pyray as rl
 from openpilot.common.params import Params
+from openpilot.common.params_pyx import UnknownKeyName
 from openpilot.system.ui.lib.application import MousePos
 from openpilot.system.ui.widgets.toggle import Toggle
 from openpilot.system.ui.sunnypilot.lib.styles import style
@@ -21,7 +22,10 @@ class ToggleSP(Toggle):
     self.param_key = param
     self.params = Params()
     if self.param_key:
-      initial_state = self.params.get_bool(self.param_key)
+      try:
+        initial_state = self.params.get_bool(self.param_key)
+      except UnknownKeyName:
+        self.param_key = None
     Toggle.__init__(self, initial_state, callback)
 
   def set_rect(self, rect: rl.Rectangle):
