@@ -24,6 +24,16 @@ class CarInterface(CarInterfaceBase):
 
   DRIVABLE_GEARS = (structs.CarState.GearShifter.sport,)
 
+  def update(self, can_packets):
+    ret, ret_sp = super().update(can_packets)
+    # For EPS_MODIFIED Clarity: apply the filtered steerPressed computed in latcontrol_pid
+    # (one frame behind is fine at 100Hz). Without this, MADS sees the raw Honda threshold
+    # which fires from EPS column-load artifacts and causes spurious torque drops.
+    eps_sp = getattr(self, 'eps_modified_steer_pressed', None)
+    if eps_sp is not None:
+      ret.steeringPressed = eps_sp
+    return ret, ret_sp
+
   @staticmethod
   def get_pid_accel_limits(CP, CP_SP, current_speed, cruise_speed):
     if CP.carFingerprint in HONDA_BOSCH:

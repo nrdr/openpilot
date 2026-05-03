@@ -82,6 +82,9 @@ class LatControlPID(LatControl):
           self.eps_modified_steering_pressed_prev,
         )
         self.eps_modified_steering_pressed_prev = steering_pressed
+        # Feed filtered result back through CI so CarInterface.update() can override
+        # carState.steeringPressed before it reaches MADS/selfdrived (one frame lag, ~10ms)
+        self.CI.eps_modified_steer_pressed = steering_pressed
 
       freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < 5
 
@@ -92,6 +95,10 @@ class LatControlPID(LatControl):
 
       if self.is_clarity_eps_modified:
         desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
+        # Ramp output to zero below 3 m/s: path model desired angles are unreliable at
+        # near-zero speed and produce absurd commands (observed ±159° desired angle)
+        low_speed_scale = max(min((CS.vEgo - 1.5) / 3.5, 1.0), 0.0)
+        output_torque *= low_speed_scale
         output_torque *= _clarity_pid_output_scale(angle_steers_des_no_offset, desired_angle_delta, CS.vEgo)
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
 
