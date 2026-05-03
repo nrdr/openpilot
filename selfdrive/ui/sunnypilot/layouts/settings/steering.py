@@ -96,6 +96,13 @@ class SteeringLayout(Widget):
       title=lambda: tr("Neural Network Lateral Control (NNLC)"),
       description=""
     )
+    self._clarity_angle_pid_toggle = toggle_item_sp(
+      param="ClarityAnglePIDControl",
+      title=lambda: tr("Clarity: Angle PID Lateral Control"),
+      description=lambda: tr("Use the experimental angle-space PID controller for Honda Clarity EPS_MODIFIED. "
+                             "OFF (default) uses the torque controller with carcontroller LPF. "
+                             "Requires restart to take effect."),
+    )
 
     items = [
       self._mads_toggle,
@@ -111,6 +118,8 @@ class SteeringLayout(Widget):
       self._torque_customization_button,
       LineSeparatorSP(40),
       self._nnlc_toggle,
+      LineSeparatorSP(40),
+      self._clarity_angle_pid_toggle,
     ]
     return items
 
@@ -145,6 +154,10 @@ class SteeringLayout(Widget):
     self._nnlc_toggle.action_item.set_enabled(ui_state.is_offroad() and torque_allowed and not enforce_torque_enabled)
     self._torque_control_toggle.action_item.set_enabled(ui_state.is_offroad() and torque_allowed and not nnlc_enabled)
     self._torque_customization_button.action_item.set_enabled(self._torque_control_toggle.action_item.get_state())
+
+    is_clarity = ui_state.CP is not None and ui_state.CP.carFingerprint == "HONDA_CLARITY"
+    self._clarity_angle_pid_toggle.set_visible(is_clarity)
+    self._clarity_angle_pid_toggle.action_item.set_enabled(ui_state.is_offroad() and is_clarity)
 
   def _render(self, rect):
     if self._current_panel == PanelType.LANE_CHANGE:

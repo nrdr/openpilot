@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
 from opendbc.car import get_safety_config, structs, uds
+from openpilot.common.params import Params
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.disable_ecu import disable_ecu
 from opendbc.car.honda.hondacan import CanBus
@@ -243,7 +244,7 @@ class CarInterface(CarInterfaceBase):
       # [0,1663] aligns openpilot CAN range with EPS X_max — proportional demand.
       ret.steerActuatorDelay = 0.1
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1663], [0, 1663]]
-      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.8], [0.24]]
+      CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     # TODO-SP: remove when https://github.com/commaai/opendbc/pull/2687 is merged
     elif candidate in (
@@ -367,10 +368,10 @@ class CarInterface(CarInterfaceBase):
       stock_cp.autoResumeSng = True
       stock_cp.minEnableSpeed = -1
       stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
-      if ret.flags & HondaFlagsSP.EPS_MODIFIED:
+      if (ret.flags & HondaFlagsSP.EPS_MODIFIED) and Params().get_bool("ClarityAnglePIDControl"):
         stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.1]]
       else:
-        stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.8], [0.24]]
+        CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
       stock_cp.autoResumeSng = True

@@ -8,7 +8,7 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.common.pid import PIDController
 
 
-def _eps_modified_pid_output_scale(desired_angle_deg: float, desired_angle_delta_deg: float, v_ego: float) -> float:
+def _clarity_pid_output_scale(desired_angle_deg: float, desired_angle_delta_deg: float, v_ego: float) -> float:
   abs_angle = abs(desired_angle_deg)
   speed_weight = min(max((v_ego - 4.0) / 10.0, 0.0), 1.0)
   center_speed_weight = 0.65 + (0.35 * speed_weight)
@@ -92,7 +92,7 @@ class LatControlPID(LatControl):
 
       if self.is_clarity_eps_modified:
         desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
-        output_torque *= _eps_modified_pid_output_scale(angle_steers_des_no_offset, desired_angle_delta, CS.vEgo)
+        output_torque *= _clarity_pid_output_scale(angle_steers_des_no_offset, desired_angle_delta, CS.vEgo)
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
 
       pid_log.active = True
