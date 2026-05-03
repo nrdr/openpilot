@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from opendbc.can import CANPacker, CANParser
-from opendbc.car import Bus, ButtonType, gen_empty_fingerprint
+from opendbc.car import Bus, ButtonType, gen_empty_fingerprint, structs
 from opendbc.car.structs import CarControl, CarParams
 from opendbc.car.fw_versions import build_fw_dict, match_fw_to_car
 from opendbc.car.hyundai.carcontroller import Ioniq6LongitudinalTuningState, GenesisG90LongitudinalTuningState, \
@@ -365,6 +365,17 @@ class TestHyundaiFingerprint:
     state = update_ioniq_6_longitudinal_tuning(state, accel_cmd=1.0, v_ego=0.0, a_ego=0.0,
                                                long_control_state=LongCtrlState.starting, long_active=True)
     assert state.actual_accel == pytest.approx(0.312)
+
+  def test_ioniq_6_longitudinal_tuning_helper_softens_final_stop_hold(self):
+    state = Ioniq6LongitudinalTuningState(actual_accel=-0.12, accel_last=-0.12,
+                                          stopping=True, stopping_count=25,
+                                          long_control_state_last=LongCtrlState.stopping)
+
+    state = update_ioniq_6_longitudinal_tuning(state, accel_cmd=-1.8, v_ego=0.0, a_ego=0.0,
+                                               long_control_state=LongCtrlState.stopping, long_active=True)
+    assert state.desired_accel == pytest.approx(-0.09)
+    assert state.jerk_upper == pytest.approx(0.42)
+    assert state.actual_accel == pytest.approx(-0.099)
 
   def test_genesis_g90_longitudinal_tuning_softens_final_stop_hold(self):
     state = GenesisG90LongitudinalTuningState()

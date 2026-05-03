@@ -571,9 +571,9 @@ class CarInterface(CarInterfaceBase):
       ret.openpilotLongitudinalControl = not disable_openpilot_long
 
     volt_test_tune_active = (
+      testing_ground.use_2 and
       ret.openpilotLongitudinalControl and
-      candidate in VOLT_LONG_TEST_TUNE_CARS and
-      (testing_ground.use_2 or not ret.enableGasInterceptorDEPRECATED)
+      candidate in VOLT_LONG_TEST_TUNE_CARS
     )
     if volt_test_tune_active:
       # Volt long can still fall back to an all-I tune on both the interceptor and

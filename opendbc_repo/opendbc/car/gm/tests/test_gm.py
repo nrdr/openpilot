@@ -60,41 +60,38 @@ class TestGMInterface:
 
     assert car_params.minSteerSpeed == pytest.approx(7 * CV.MPH_TO_MS)
 
-  def test_volt_testing_ground_tune_sets_nonzero_p_and_starting_state(self, monkeypatch):
+  @parameterized.expand([
+    ("interceptor", True),
+    ("ascm_int", False),
+  ])
+  def test_volt_testing_ground_tune_sets_nonzero_p_and_starting_state(self, _name, pedal_present):
     CarInterface = interfaces[CAR.CHEVROLET_VOLT_ASCM]
     fingerprint = _empty_fingerprint()
-    fingerprint[0][0x201] = 8  # pedal detected
+    if pedal_present:
+      fingerprint[0][0x201] = 8  # pedal detected
     fingerprint[0][0x2FF] = 8  # SASCM detected
 
-    monkeypatch.setattr(gm_interface, "testing_ground", SimpleNamespace(use_2=True), raising=False)
+    old_testing_ground = gm_interface.testing_ground
+    gm_interface.testing_ground = SimpleNamespace(use_2=True)
 
-    car_params = CarInterface.get_params(CAR.CHEVROLET_VOLT_ASCM, fingerprint, [], alpha_long=False, is_release=False, docs=False,
-                                         starpilot_toggles=_test_starpilot_toggles())
+    try:
+      car_params = CarInterface.get_params(CAR.CHEVROLET_VOLT_ASCM, fingerprint, [], alpha_long=False, is_release=False, docs=False,
+                                           starpilot_toggles=_test_starpilot_toggles())
+    finally:
+      gm_interface.testing_ground = old_testing_ground
 
-    assert list(car_params.longitudinalTuning.kpV) == pytest.approx([0.10, 0.072, 0.05, 0.04])
-    assert list(car_params.longitudinalTuning.kiV) == pytest.approx([0.025, 0.03, 0.04, 0.055])
-    assert car_params.startingState
-    assert car_params.startAccel == pytest.approx(1.15)
-
-  @parameterized.expand([
-    ("volt_2019", CAR.CHEVROLET_VOLT_2019, True),
-    ("volt_ascm", CAR.CHEVROLET_VOLT_ASCM, True),
-  ])
-  def test_non_pedal_volt_alpha_long_uses_volt_tune_by_default(self, _name, car_model, needs_sascm):
-    CarInterface = interfaces[car_model]
-    fingerprint = _empty_fingerprint()
-    if needs_sascm:
-      fingerprint[0][0x2FF] = 8  # SASCM detected
-
-    car_params = CarInterface.get_params(car_model, fingerprint, [], alpha_long=True, is_release=False, docs=False,
-                                         starpilot_toggles=_test_starpilot_toggles())
-
-    assert car_params.openpilotLongitudinalControl
-    assert not car_params.enableGasInterceptorDEPRECATED
-    assert list(car_params.longitudinalTuning.kpV) == pytest.approx([0.10, 0.072, 0.05, 0.04])
-    assert list(car_params.longitudinalTuning.kiV) == pytest.approx([0.025, 0.03, 0.04, 0.055])
-    assert car_params.startingState
-    assert car_params.startAccel == pytest.approx(1.15)
+    if pedal_present:
+      assert list(car_params.longitudinalTuning.kpV) == pytest.approx([0.10, 0.072, 0.05, 0.04])
+      assert list(car_params.longitudinalTuning.kiV) == pytest.approx([0.025, 0.03, 0.04, 0.055])
+      assert car_params.startingState
+      assert car_params.startAccel == pytest.approx(1.15)
+    else:
+      assert not car_params.openpilotLongitudinalControl
+      assert not car_params.enableGasInterceptorDEPRECATED
+      assert list(car_params.longitudinalTuning.kpV) == [0.0]
+      assert list(car_params.longitudinalTuning.kiV) == [0.5, 0.5]
+      assert not car_params.startingState
+      assert car_params.startAccel == pytest.approx(0.0)
 
   def test_volt_cc_sparse_fingerprint_without_camera_sets_no_camera(self):
     CarInterface = interfaces[CAR.CHEVROLET_VOLT_CC]

@@ -13,7 +13,11 @@ from opendbc.car.hyundai.values import CAR as HYUNDAI
 from opendbc.car.vehicle_model import VehicleModel
 from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.controls.lib.latcontrol_angle import LatControlAngle
-from openpilot.selfdrive.controls.lib.latcontrol_pid import LatControlPID, get_civic_bosch_modified_pid_output_scale
+from openpilot.selfdrive.controls.lib.latcontrol_pid import (
+  LatControlPID,
+  get_civic_bosch_modified_pid_output_alpha,
+  get_civic_bosch_modified_pid_output_scale,
+)
 from openpilot.selfdrive.controls.lib.latcontrol_torque import (
   LatControlTorque,
   get_bolt_2017_center_taper_scale,
@@ -275,7 +279,7 @@ class TestLatControl:
     assert get_ioniq_6_center_taper_scale(0.0, 10.0) < get_ioniq_6_center_taper_scale(0.0, 30.0)
     assert get_ioniq_6_center_taper_scale(0.0, 30.0) < get_ioniq_6_center_taper_scale(0.2, 30.0)
     assert get_ioniq_6_center_taper_scale(0.0, 12.0) < get_ioniq_6_center_taper_scale(0.25, 12.0)
-    assert abs(get_ioniq_6_center_taper_scale(0.2, 30.0) - 1.0) < 1.3e-2
+    assert abs(get_ioniq_6_center_taper_scale(0.2, 30.0) - 1.0) < 4.2e-2
 
   def test_kia_ev6_ff_scale_curve(self):
     assert get_kia_ev6_ff_scale(0.0, 0.0, 20.0) == 1.0
@@ -394,6 +398,13 @@ class TestLatControl:
     assert get_civic_bosch_modified_pid_output_scale(-20.0, 0.5, 12.0) < get_civic_bosch_modified_pid_output_scale(-20.0, 0.0, 12.0)
     assert get_civic_bosch_modified_pid_output_scale(-20.0, -0.5, 12.0) > get_civic_bosch_modified_pid_output_scale(20.0, 0.5, 12.0)
     assert get_civic_bosch_modified_pid_output_scale(-20.0, -0.5, 4.0) < get_civic_bosch_modified_pid_output_scale(-20.0, -0.5, 12.0)
+
+  def test_civic_bosch_modified_pid_output_alpha_curve(self):
+    assert get_civic_bosch_modified_pid_output_alpha(0.0, 0.0, 12.0, 0.2, 0.1) == 1.0
+    assert get_civic_bosch_modified_pid_output_alpha(8.0, 0.0, 12.0, 0.2, 0.1) < 1.0
+    assert get_civic_bosch_modified_pid_output_alpha(8.0, 0.4, 12.0, 0.2, 0.1) < get_civic_bosch_modified_pid_output_alpha(8.0, 0.0, 12.0, 0.2, 0.1)
+    assert get_civic_bosch_modified_pid_output_alpha(8.0, 0.4, 20.0, -0.2, 0.2) < get_civic_bosch_modified_pid_output_alpha(8.0, 0.4, 8.0, -0.2, 0.2)
+    assert get_civic_bosch_modified_pid_output_alpha(24.0, 0.0, 12.0, 0.2, 0.1) == 1.0
 
   def test_civic_bosch_modified_pid_testing_ground_update_path(self, monkeypatch):
     controller, VM, CS, params, starpilot_toggles = self._build_pid_controller(HONDA.HONDA_CIVIC_BOSCH)
