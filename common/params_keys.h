@@ -142,7 +142,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
 
     // StarPilot variables
     {"AccelerationPath", {PERSISTENT, BOOL, "1", "0", 2}},
-    {"AccelerationProfile", {PERSISTENT, INT, "2", "0", 0}},
+    {"AccelerationProfile", {PERSISTENT, INT, "0", "0", 0}},
     {"AdjacentLeadsUI", {PERSISTENT, BOOL, "1", "0", 3}},
     {"AdjacentPath", {PERSISTENT, BOOL, "0", "0", 3}},
     {"AdjacentPathMetrics", {PERSISTENT, BOOL, "0", "0", 3}},

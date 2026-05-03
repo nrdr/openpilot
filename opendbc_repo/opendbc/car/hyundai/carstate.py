@@ -130,6 +130,19 @@ class CarState(CarStateBase):
 
     return events
 
+  def update_button_enable(self, buttonEvents: list[structs.CarState.ButtonEvent]):
+    if super().update_button_enable(buttonEvents):
+      return True
+
+    if not self.CP.pcmCruise and hyundai_cancel_button_enables_cruise(self.CP.carFingerprint):
+      for b in buttonEvents:
+        # Some Palisade 2023 routes still surface the pause/resume interaction as a
+        # plain cancel event even though stock ACC engages on the release edge.
+        if b.type == ButtonType.cancel and not b.pressed and not self.out.cruiseState.enabled:
+          return True
+
+    return False
+
   def update(self, can_parsers, starpilot_toggles) -> structs.CarState:
     cp = can_parsers[Bus.pt]
     cp_cam = can_parsers[Bus.cam]

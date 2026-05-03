@@ -384,8 +384,10 @@ class TestLatControl:
     assert get_civic_bosch_modified_pid_output_scale(8.0, 0.0, 12.0) < 1.0
     assert get_civic_bosch_modified_pid_output_scale(10.0, 0.0, 12.0) < 1.0
     assert get_civic_bosch_modified_pid_output_scale(12.0, 0.0, 12.0) < 1.0
+    assert get_civic_bosch_modified_pid_output_scale(14.0, 0.0, 12.0) < 1.0
+    assert get_civic_bosch_modified_pid_output_scale(16.0, 0.0, 12.0) < 1.0
     assert get_civic_bosch_modified_pid_output_scale(0.0, 0.0, 6.0) < 0.9
-    assert get_civic_bosch_modified_pid_output_scale(14.0, 0.0, 12.0) > get_civic_bosch_modified_pid_output_scale(8.0, 0.0, 12.0)
+    assert get_civic_bosch_modified_pid_output_scale(18.0, 0.0, 12.0) > get_civic_bosch_modified_pid_output_scale(8.0, 0.0, 12.0)
     assert get_civic_bosch_modified_pid_output_scale(20.0, 0.5, 12.0) > get_civic_bosch_modified_pid_output_scale(20.0, 0.0, 12.0)
     assert get_civic_bosch_modified_pid_output_scale(-20.0, -0.5, 12.0) > get_civic_bosch_modified_pid_output_scale(-20.0, 0.0, 12.0)
     assert get_civic_bosch_modified_pid_output_scale(20.0, -0.5, 12.0) < get_civic_bosch_modified_pid_output_scale(20.0, 0.0, 12.0)

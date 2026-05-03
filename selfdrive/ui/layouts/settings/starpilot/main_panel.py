@@ -14,8 +14,7 @@ from openpilot.selfdrive.ui.layouts.settings.starpilot.longitudinal import StarP
 from openpilot.selfdrive.ui.layouts.settings.starpilot.lateral import StarPilotLateralLayout
 from openpilot.selfdrive.ui.layouts.settings.starpilot.maps import StarPilotMapsLayout
 from openpilot.selfdrive.ui.layouts.settings.starpilot.system_settings import StarPilotSystemLayout
-from openpilot.selfdrive.ui.layouts.settings.starpilot.visuals import StarPilotVisualsLayout
-from openpilot.selfdrive.ui.layouts.settings.starpilot.themes import StarPilotThemesLayout
+from openpilot.selfdrive.ui.layouts.settings.starpilot.appearance import StarPilotAppearanceLayout
 from openpilot.selfdrive.ui.layouts.settings.starpilot.vehicle import StarPilotVehicleSettingsLayout
 
 from openpilot.selfdrive.ui.layouts.settings.starpilot.aethergrid import TileGrid, HubTile, RadioTileGroup, SPACING
@@ -27,37 +26,37 @@ class StarPilotLayout(Widget):
     {
       "title": "Alerts & Sounds",
       "icon": "icon_sound.png",
-      "buttons": [("MANAGE", "SOUNDS", 0)],
+      "panel": "SOUNDS",
       "color": "#E63956",
     },
     {
       "title": "Driving Controls",
       "icon": "icon_steering.png",
-      "buttons": [("DRIVING MODEL", "DRIVING_MODEL", 0), ("GAS / BRAKE", "LONGITUDINAL", 0), ("STEERING", "LATERAL", 0)],
+      "buttons": [("DRIVING MODEL", "DRIVING_MODEL"), ("GAS / BRAKE", "LONGITUDINAL"), ("STEERING", "LATERAL")],
       "color": "#3B82F6",
     },
     {
       "title": "Map Data",
       "icon": "icon_navigate.png",
-      "buttons": [("MAP DATA", "MAPS", 0)],
+      "panel": "MAPS",
       "color": "#10B981",
     },
     {
       "title": "System",
       "icon": "icon_system.png",
-      "buttons": [("MANAGE", "SYSTEM", 0)],
+      "panel": "SYSTEM",
       "color": "#D946EF",
     },
     {
       "title": "Appearance",
       "icon": "icon_display.png",
-      "buttons": [("APPEARANCE", "VISUALS", 0), ("THEME", "THEMES", 0)],
+      "panel": "VISUALS",
       "color": "#8B5CF6",
     },
     {
       "title": "Vehicle Settings",
       "icon": "icon_vehicle.png",
-      "buttons": [("VEHICLE SETTINGS", "VEHICLE", 0)],
+      "panel": "VEHICLE",
       "color": "#64748B",
     },
   ]
@@ -82,8 +81,7 @@ class StarPilotLayout(Widget):
       StarPilotPanelType.LONGITUDINAL: StarPilotPanelInfo(tr_noop("Gas / Brake"), StarPilotLongitudinalLayout()),
       StarPilotPanelType.LATERAL: StarPilotPanelInfo(tr_noop("Steering"), StarPilotLateralLayout()),
       StarPilotPanelType.MAPS: StarPilotPanelInfo(tr_noop("Map Data"), StarPilotMapsLayout()),
-      StarPilotPanelType.VISUALS: StarPilotPanelInfo(tr_noop("Appearance"), StarPilotVisualsLayout()),
-      StarPilotPanelType.THEMES: StarPilotPanelInfo(tr_noop("Themes"), StarPilotThemesLayout()),
+      StarPilotPanelType.VISUALS: StarPilotPanelInfo(tr_noop("Appearance"), StarPilotAppearanceLayout()),
       StarPilotPanelType.VEHICLE: StarPilotPanelInfo(tr_noop("Vehicle Settings"), StarPilotVehicleSettingsLayout()),
     }
 
@@ -94,7 +92,6 @@ class StarPilotLayout(Widget):
       StarPilotPanelType.LATERAL,
       StarPilotPanelType.MAPS,
       StarPilotPanelType.VISUALS,
-      StarPilotPanelType.THEMES,
       StarPilotPanelType.VEHICLE,
     )
 
@@ -115,8 +112,7 @@ class StarPilotLayout(Widget):
     elif self._current_panel != StarPilotPanelType.MAIN:
       if self._current_category_idx is not None:
         cat_info = self.CATEGORIES[self._current_category_idx]
-        vis_btns = cat_info["buttons"]
-        if len(vis_btns) > 1:
+        if "buttons" in cat_info:
           self._set_current_panel(StarPilotPanelType.MAIN)
         else:
           self._current_category_idx = None
@@ -134,8 +130,7 @@ class StarPilotLayout(Widget):
     if self._current_panel != StarPilotPanelType.MAIN:
       if self._current_category_idx is not None:
         cat_info = self.CATEGORIES[self._current_category_idx]
-        vis_btns = cat_info["buttons"]
-        depth = 2 if len(vis_btns) > 1 else 1
+        depth = 2 if "buttons" in cat_info else 1
       else:
         depth = 1
       # Deep nesting check
@@ -184,25 +179,19 @@ class StarPilotLayout(Widget):
       "LATERAL": StarPilotPanelType.LATERAL,
       "MAPS": StarPilotPanelType.MAPS,
       "VISUALS": StarPilotPanelType.VISUALS,
-      "THEMES": StarPilotPanelType.THEMES,
       "VEHICLE": StarPilotPanelType.VEHICLE,
     }
 
     if self._current_category_idx is None:
       # Main Categories Grid
       for i, cat in enumerate(self.CATEGORIES):
-        visible_buttons = cat["buttons"]
-        if not visible_buttons:
-          continue
-          
         def on_click(idx=i):
           cat_info = self.CATEGORIES[idx]
-          vis_btns = cat_info["buttons"]
-          if len(vis_btns) == 1:
-            self._current_category_idx = idx
-            self._set_current_panel(panel_type_map[vis_btns[0][1]])
+          self._current_category_idx = idx
+          panel_key = cat_info.get("panel")
+          if panel_key is not None:
+            self._set_current_panel(panel_type_map[panel_key])
           else:
-            self._current_category_idx = idx
             self._rebuild_grid()
             if self._depth_callback:
               self._depth_callback(1)
@@ -221,7 +210,7 @@ class StarPilotLayout(Widget):
       cat = self.CATEGORIES[self._current_category_idx]
       visible_buttons = cat["buttons"]
       
-      for label, panel_key, _ in visible_buttons:
+      for label, panel_key in visible_buttons:
         p_type = panel_type_map[panel_key]
         def on_btn_click(p=p_type):
           self._set_current_panel(p)
@@ -229,7 +218,7 @@ class StarPilotLayout(Widget):
         tile = HubTile(
           title=tr(label),
           desc="",
-          icon_path=f"{STARPILOT_ICONS_DIR}/{cat['icon']}", # Reuse category icon for sub-tiles
+          icon_path=f"{STARPILOT_ICONS_DIR}/{cat['icon']}",
           on_click=on_btn_click,
           starpilot_icon=True,
           bg_color=cat.get("color")

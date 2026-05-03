@@ -102,8 +102,11 @@ class AetherSettingsView(Widget):
 
   def __init__(self, controller: StarPilotPanel, sections: list[SettingSection],
                *, header_title: str = "", header_subtitle: str = "",
-               tab_defs: list[dict] | None = None):
+               tab_defs: list[dict] | None = None,
+               panel_style=None, fade_height: float = AETHER_LIST_METRICS.fade_height):
     super().__init__()
+    self._panel_style = panel_style or PANEL_STYLE
+    self._fade_height = fade_height
     self._controller = controller
     self._sections = sections
     self._header_title = header_title
@@ -186,7 +189,7 @@ class AetherSettingsView(Widget):
     self.set_rect(rect)
     self._interactive_rects.clear()
 
-    frame, scroll_rect, content_width = init_list_panel(rect, PANEL_STYLE)
+    frame, scroll_rect, content_width = init_list_panel(rect, self._panel_style)
     self._scroll_rect = scroll_rect
 
     if self._has_header:
@@ -206,7 +209,7 @@ class AetherSettingsView(Widget):
       self._scrollbar.render(self._scroll_rect, self._content_height, self._scroll_offset)
 
     draw_list_scroll_fades(self._scroll_rect, self._content_height, self._scroll_offset,
-                            AetherListColors.PANEL_BG, fade_height=FADE_HEIGHT)
+                            AetherListColors.PANEL_BG, fade_height=self._fade_height)
 
   def _draw_header(self, rect: rl.Rectangle):
     title = tr(self._header_title) if self._header_title else ""
@@ -242,7 +245,7 @@ class AetherSettingsView(Widget):
         i += 2
       else:
         i += 1
-      total += SECTION_HEADER_HEIGHT + SECTION_HEADER_GAP
+      total += SECTION_HEADER_HEIGHT + SECTION_HEADER_GAP if section.title else 0.0
       total += row_h
       total += SECTION_GAP
     return max(0.0, total - SECTION_GAP) if total > 0 else 0.0
@@ -250,9 +253,8 @@ class AetherSettingsView(Widget):
   def _draw_tabs(self, y: float, x: float, width: float) -> float:
     if not self._tab_defs:
       return y
-    content_w = width - AETHER_LIST_METRICS.content_right_gutter
     n = len(self._tab_defs)
-    tab_w = (content_w - self.TAB_GAP * max(0, n - 1)) / max(1, n)
+    tab_w = (width - self.TAB_GAP * max(0, n - 1)) / max(1, n)
     for i, tab in enumerate(self._tab_defs):
       tab_rect = rl.Rectangle(x + i * (tab_w + self.TAB_GAP), y, tab_w, self.TAB_HEIGHT)
       target_id = f"tab:{tab['id']}"
@@ -267,15 +269,20 @@ class AetherSettingsView(Widget):
         title_size=24,
         subtitle_size=17,
         show_underline=True,
-        style=PANEL_STYLE,
+        style=self._panel_style,
       )
     return y + self.TAB_HEIGHT + self.TAB_BOTTOM_GAP
+
+  def _has_subsequent_visible(self, start_idx: int, sections: list[SettingSection]) -> bool:
+    for j in range(start_idx, len(sections)):
+      if self._visible_rows(sections[j]):
+        return True
+    return False
 
   def _draw_scroll_content(self, rect: rl.Rectangle, width: float):
     y = rect.y + self._scroll_offset
     if self._tab_defs:
       y = self._draw_tabs(y, rect.x, width)
-    content_w = width - AETHER_LIST_METRICS.content_right_gutter
     active = self._active_sections()
     i = 0
     while i < len(active):
@@ -287,55 +294,59 @@ class AetherSettingsView(Widget):
       if section.column_pair and i + 1 < len(active) and active[i + 1].column_pair == section.column_pair:
         right_section = active[i + 1]
         right_rows = self._visible_rows(right_section)
-        col_w = (content_w - self.COLUMN_GAP) / 2
+        col_w = (width - self.COLUMN_GAP) / 2
         section_h = len(visible_rows) * section.row_height
         right_h = len(right_rows) * right_section.row_height
         group_h = max(section_h, right_h)
 
         draw_section_header(
           rl.Rectangle(rect.x, y, col_w, SECTION_HEADER_HEIGHT),
-          tr(section.title), style=PANEL_STYLE,
+          tr(section.title), style=self._panel_style,
         )
         draw_section_header(
           rl.Rectangle(rect.x + col_w + self.COLUMN_GAP, y, col_w, SECTION_HEADER_HEIGHT),
-          tr(right_section.title), style=PANEL_STYLE,
+          tr(right_section.title), style=self._panel_style,
         )
         y += SECTION_HEADER_HEIGHT + SECTION_HEADER_GAP
 
         left_group = rl.Rectangle(rect.x, y, col_w, section_h)
         right_group = rl.Rectangle(rect.x + col_w + self.COLUMN_GAP, y, col_w, right_h)
-        draw_list_group_shell(left_group, style=PANEL_STYLE)
-        draw_list_group_shell(right_group, style=PANEL_STYLE)
+        draw_list_group_shell(left_group, style=self._panel_style)
+        draw_list_group_shell(right_group, style=self._panel_style)
 
         for j, row in enumerate(visible_rows):
           self._draw_row(rl.Rectangle(rect.x, y + j * section.row_height, col_w, section.row_height), row, is_last=(j == len(visible_rows) - 1))
         for j, row in enumerate(right_rows):
           self._draw_row(rl.Rectangle(rect.x + col_w + self.COLUMN_GAP, y + j * right_section.row_height, col_w, right_section.row_height), row, is_last=(j == len(right_rows) - 1))
 
-        y += group_h + SECTION_GAP
+        y += group_h
+        if self._has_subsequent_visible(i + 2, active):
+          y += SECTION_GAP
         i += 2
       else:
         y = self._draw_section(y, rect.x, width, section, visible_rows)
+        if self._has_subsequent_visible(i + 1, active):
+          y += SECTION_GAP
         i += 1
 
   def _draw_section(self, y: float, x: float, width: float,
                     section: SettingSection, rows: list[SettingRow]) -> float:
-    content_w = width - AETHER_LIST_METRICS.content_right_gutter
-    draw_section_header(
-      rl.Rectangle(x, y, content_w, SECTION_HEADER_HEIGHT),
-      tr(section.title),
-      style=PANEL_STYLE,
-    )
-    y += SECTION_HEADER_HEIGHT + SECTION_HEADER_GAP
+    if section.title:
+      draw_section_header(
+        rl.Rectangle(x, y, width, SECTION_HEADER_HEIGHT),
+        tr(section.title),
+        style=self._panel_style,
+      )
+      y += SECTION_HEADER_HEIGHT + SECTION_HEADER_GAP
 
-    group_rect = rl.Rectangle(x, y, content_w, len(rows) * section.row_height)
-    draw_list_group_shell(group_rect, style=PANEL_STYLE)
+    group_rect = rl.Rectangle(x, y, width, len(rows) * section.row_height)
+    draw_list_group_shell(group_rect, style=self._panel_style)
 
     for i, row in enumerate(rows):
-      row_rect = rl.Rectangle(x, y + i * section.row_height, content_w, section.row_height)
+      row_rect = rl.Rectangle(x, y + i * section.row_height, width, section.row_height)
       self._draw_row(row_rect, row, is_last=(i == len(rows) - 1))
 
-    return y + group_rect.height + SECTION_GAP
+    return y + group_rect.height
 
   def _draw_row(self, rect: rl.Rectangle, row: SettingRow, is_last: bool):
     target_id = f"{row.type}:{row.id}"
@@ -356,7 +367,7 @@ class AetherSettingsView(Widget):
         pressed=pressed,
         is_last=is_last,
         show_chevron=False,
-        style=PANEL_STYLE,
+        style=self._panel_style,
       )
     elif row.type == "value":
       value_text = row.get_value() if row.get_value else ""
@@ -370,13 +381,13 @@ class AetherSettingsView(Widget):
         pressed=pressed,
         is_last=is_last,
         show_chevron=row.on_click is not None,
-        style=PANEL_STYLE,
+        style=self._panel_style,
       )
     elif row.type == "action":
-      action_fill = AetherListColors.DANGER_SOFT if row.action_danger else PANEL_STYLE.current_fill
+      action_fill = AetherListColors.DANGER_SOFT if row.action_danger else self._panel_style.current_fill
       action_border = (rl.Color(AetherListColors.DANGER.r, AetherListColors.DANGER.g,
                                 AetherListColors.DANGER.b, 70)
-                       if row.action_danger else PANEL_STYLE.current_border)
+                       if row.action_danger else self._panel_style.current_border)
       action_text_color = AetherListColors.DANGER if row.action_danger else AetherListColors.HEADER
       draw_selection_list_row(
         rect,
@@ -390,7 +401,7 @@ class AetherSettingsView(Widget):
         action_text_color=action_text_color,
         action_fill=action_fill,
         action_border=action_border,
-        row_separator=PANEL_STYLE.divider_color,
+        row_separator=self._panel_style.divider_color,
       )
 
 

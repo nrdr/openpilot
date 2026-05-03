@@ -16,6 +16,8 @@ QT_STEER_KP_PLACEHOLDER = 1.0
 
 LAUNCH_PARAM_MIGRATION_MARKER = ".starpilot_launch_param_migrations_v2"
 BRANCH_DEFAULTS_MIGRATION_MARKER = ".starpilot_branch_defaults_migrations_v1"
+ACCELERATION_PROFILE_MIGRATION_MARKER = ".starpilot_acceleration_profile_default_v1"
+STANDARD_ACCELERATION_PROFILE = 0
 
 BRANCH_BOOL_DEFAULTS = {
   "ConditionalExperimental": True,
@@ -53,8 +55,10 @@ BRANCH_FLOAT_DEFAULTS = {
 class ParamsLike(Protocol):
   def get_param_path(self, key: str = "") -> str: ...
   def get_bool(self, key: str) -> bool: ...
+  def get_int(self, key: str) -> int: ...
   def get_float(self, key: str) -> float: ...
   def put_bool(self, key: str, value: bool) -> None: ...
+  def put_int(self, key: str, value: int) -> None: ...
   def put_float(self, key: str, value: float) -> None: ...
 
 
@@ -68,6 +72,10 @@ def _default_marker_path(params: ParamsLike) -> Path:
 
 def _branch_defaults_marker_path(params: ParamsLike) -> Path:
   return Path(params.get_param_path()) / BRANCH_DEFAULTS_MIGRATION_MARKER
+
+
+def _acceleration_profile_marker_path(params: ParamsLike) -> Path:
+  return Path(params.get_param_path()) / ACCELERATION_PROFILE_MIGRATION_MARKER
 
 
 def _apply_legacy_launch_param_migrations(params: ParamsLike, marker: Path) -> None:
@@ -112,12 +120,25 @@ def _apply_branch_default_migration(params: ParamsLike, marker: Path) -> None:
   marker.touch()
 
 
+def _apply_acceleration_profile_default_migration(params: ParamsLike, marker: Path) -> None:
+  if marker.exists():
+    return
+
+  marker.parent.mkdir(parents=True, exist_ok=True)
+  params.put_int("AccelerationProfile", STANDARD_ACCELERATION_PROFILE)
+  marker.touch()
+
+
 def apply_launch_param_migrations(params: ParamsLike, marker_path: Path | None = None,
-                                  branch_defaults_marker_path: Path | None = None) -> None:
+                                  branch_defaults_marker_path: Path | None = None,
+                                  acceleration_profile_marker_path: Path | None = None) -> None:
   _apply_legacy_launch_param_migrations(params, marker_path or _default_marker_path(params))
   # Keep branch-default rollout on its own marker so older installs that already
   # have the legacy marker still receive this one-time param reset.
   _apply_branch_default_migration(params, branch_defaults_marker_path or _branch_defaults_marker_path(params))
+  _apply_acceleration_profile_default_migration(
+    params, acceleration_profile_marker_path or _acceleration_profile_marker_path(params)
+  )
 
 
 def main() -> int:

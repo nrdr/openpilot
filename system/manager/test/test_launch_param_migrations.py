@@ -1,9 +1,11 @@
 from pathlib import Path
 
 from openpilot.system.manager.launch_param_migrations import (
+  ACCELERATION_PROFILE_MIGRATION_MARKER,
   BRANCH_DEFAULTS_MIGRATION_MARKER,
   DEFAULT_STEER_KP,
   LAUNCH_PARAM_MIGRATION_MARKER,
+  STANDARD_ACCELERATION_PROFILE,
   apply_launch_param_migrations,
 )
 
@@ -32,8 +34,15 @@ class FileBackedFakeParams:
     value = self.get(key)
     return float(value) if value is not None else 0.0
 
+  def get_int(self, key):
+    value = self.get(key)
+    return int(float(value)) if value is not None else 0
+
   def put_bool(self, key, value):
     Path(self.get_param_path(key)).write_text("1" if value else "0", encoding="utf-8")
+
+  def put_int(self, key, value):
+    Path(self.get_param_path(key)).write_text(str(int(value)), encoding="utf-8")
 
   def put_float(self, key, value):
     Path(self.get_param_path(key)).write_text(str(float(value)), encoding="utf-8")
@@ -141,3 +150,28 @@ def test_apply_launch_param_migrations_does_not_reapply_branch_defaults_after_ma
   assert params.get_float("AggressiveFollowHigh") == 2.0
   assert params.get_float("StandardJerkAcceleration") == 25.0
   assert params.get_float("RelaxedFollow") == 2.0
+
+
+def test_apply_launch_param_migrations_updates_acceleration_profile_for_existing_installs(tmp_path):
+  params = FileBackedFakeParams(tmp_path / "params")
+
+  params.put_int("AccelerationProfile", 2)
+  (tmp_path / "params" / LAUNCH_PARAM_MIGRATION_MARKER).touch()
+  (tmp_path / "params" / BRANCH_DEFAULTS_MIGRATION_MARKER).touch()
+
+  apply_launch_param_migrations(params)
+
+  assert params.get_int("AccelerationProfile") == STANDARD_ACCELERATION_PROFILE
+  assert (tmp_path / "params" / ACCELERATION_PROFILE_MIGRATION_MARKER).is_file()
+
+
+def test_apply_launch_param_migrations_does_not_reapply_acceleration_profile_after_marker(tmp_path):
+  params = FileBackedFakeParams(tmp_path / "params")
+  acceleration_profile_marker = tmp_path / "params" / ACCELERATION_PROFILE_MIGRATION_MARKER
+
+  params.put_int("AccelerationProfile", 3)
+  acceleration_profile_marker.touch()
+
+  apply_launch_param_migrations(params)
+
+  assert params.get_int("AccelerationProfile") == 3

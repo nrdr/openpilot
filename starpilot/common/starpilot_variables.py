@@ -925,7 +925,7 @@ class StarPilotVariables:
     custom_accel_profile_tuning = advanced_longitudinal_tuning and self.get_value("CustomAccelProfile")
     acceleration_profile_tuning = longitudinal_tuning or custom_accel_profile_tuning
     toggle.acceleration_profile = normalize_acceleration_profile(
-      self.get_value("AccelerationProfile", cast=None, condition=acceleration_profile_tuning, default=ACCELERATION_PROFILES["SPORT"])
+      self.get_value("AccelerationProfile", cast=None, condition=acceleration_profile_tuning, default=ACCELERATION_PROFILES["STANDARD"])
     )
     toggle.deceleration_profile = normalize_deceleration_profile(
       self.get_value("DecelerationProfile", cast=None, condition=longitudinal_tuning, default=DECELERATION_PROFILES["ECO"])

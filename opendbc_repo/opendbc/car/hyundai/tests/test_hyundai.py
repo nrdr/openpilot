@@ -120,6 +120,19 @@ class TestHyundaiFingerprint:
     events = car_state.create_cruise_button_events(Buttons.CANCEL, Buttons.NONE)
     assert [(be.type, be.pressed) for be in events] == [(ButtonType.cancel, True)]
 
+  def test_palisade_2023_cancel_release_enables_from_standby(self):
+    toggles = get_test_toggles()
+    CP = CarInterface.get_params(CAR.HYUNDAI_PALISADE_2023, gen_empty_fingerprint(), [], True, False, False, toggles)
+    FPCP = CarInterface.get_starpilot_params(CAR.HYUNDAI_PALISADE_2023, gen_empty_fingerprint(), [], CP, toggles)
+    car_state = CarState(CP, FPCP)
+
+    car_state.out.cruiseState.enabled = False
+    assert not car_state.update_button_enable([structs.CarState.ButtonEvent(pressed=True, type=ButtonType.cancel)])
+    assert car_state.update_button_enable([structs.CarState.ButtonEvent(pressed=False, type=ButtonType.cancel)])
+
+    car_state.out.cruiseState.enabled = True
+    assert not car_state.update_button_enable([structs.CarState.ButtonEvent(pressed=False, type=ButtonType.cancel)])
+
   def test_palisade_2023_disable_failure_falls_back_to_stock_acc(self, monkeypatch):
     toggles = get_test_toggles()
     CP = CarInterface.get_params(CAR.HYUNDAI_PALISADE_2023, gen_empty_fingerprint(), [], True, False, False, toggles)
