@@ -148,27 +148,42 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
 
 def get_eps_modified_steering_pressed(raw_pressed: bool, steering_torque: float, torque_cmd: float,
                                       filter_s: float, was_pressed: bool) -> tuple[float, bool]:
+  # steering_torque is raw Honda STEER_TORQUE_SENSOR (CAN units, can be 1200-5000+).
+  # torque_cmd is normalized PID output [-1.0, 1.0].
+  # With EPS_MODIFIED firmware the column sensor reads high during normal OP turns because
+  # the EPS applies more assist torque than stock — this is NOT driver input.
+  #
+  # torque_product sign classifies the scenario:
+  #   negative  → driver fighting OP's command        → genuine override, fast trigger
+  #   cmd ≈ 0   → OP not steering; driver torque is intentional
+  #   positive  → driver same-dir OR EPS column-load artifact
+  #               For EPS_MODIFIED the positive case is almost always the artifact on
+  #               sustained turns, so we DRAIN the accumulator instead of filling it.
+  #               This prevents false triggers on curves lasting more than ~1.6 s.
+
+  if not raw_pressed:
+    filter_s = max(0.0, filter_s - 8.0 * DT_CTRL)
+    return filter_s, filter_s > 0.04 and was_pressed
+
   torque_product = steering_torque * torque_cmd
   torque_cmd_abs = abs(torque_cmd)
 
-  if raw_pressed:
-    if torque_product < 0.0:
-      trigger_s = 0.08 if was_pressed else 0.10
-      rise_rate = 1.0
-    elif torque_cmd_abs < 0.10:
-      trigger_s = 0.20 if was_pressed else 0.24
-      rise_rate = 0.75
-    else:
-      trigger_s = 0.70 if was_pressed else 0.80
-      rise_rate = 0.50
+  if torque_product < 0.0:
+    # Driver explicitly opposing OP: fast trigger.
+    trigger_s = 0.08 if was_pressed else 0.10
+    filter_s = min(1.0, filter_s + DT_CTRL)
+    return filter_s, filter_s >= trigger_s
 
-    filter_s = min(1.0, filter_s + (rise_rate * DT_CTRL))
-    steering_pressed = filter_s >= trigger_s
-  else:
-    filter_s = max(0.0, filter_s - 8.0 * DT_CTRL)
-    steering_pressed = filter_s > 0.04 and was_pressed
+  if torque_cmd_abs < 0.05:
+    # OP near-idle: driver applying torque unprompted — treat as intentional.
+    trigger_s = 0.25 if was_pressed else 0.30
+    filter_s = min(1.0, filter_s + 0.75 * DT_CTRL)
+    return filter_s, filter_s >= trigger_s
 
-  return filter_s, steering_pressed
+  # Same-direction torque while OP is actively steering → EPS column-load artifact.
+  # Drain the accumulator so a long curve never trips the filter.
+  filter_s = max(0.0, filter_s - 3.0 * DT_CTRL)
+  return filter_s, False
 
 
 class CarController(CarControllerBase, MadsCarController, GasInterceptorCarController, IntelligentCruiseButtonManagementInterface):
