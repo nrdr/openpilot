@@ -26,12 +26,13 @@ class CarInterface(CarInterfaceBase):
 
   def update(self, can_packets):
     ret, ret_sp = super().update(can_packets)
-    # For EPS_MODIFIED Clarity: apply the filtered steerPressed computed in latcontrol_pid
-    # (one frame behind is fine at 100Hz). Without this, MADS sees the raw Honda threshold
-    # which fires from EPS column-load artifacts and causes spurious torque drops.
-    eps_sp = getattr(self, 'eps_modified_steer_pressed', None)
-    if eps_sp is not None:
-      ret.steeringPressed = eps_sp
+    # For EPS_MODIFIED Clarity: publish filtered steeringPressed so selfdrived/MADS see the
+    # debounced value rather than raw Honda threshold (which spikes on EPS column-load).
+    # CarController.eps_filtered_steer_pressed is set each apply() cycle (one frame behind
+    # update(), ~10ms lag at 100Hz). Both live in card.py so no cross-process issue.
+    cc = getattr(self, 'CC', None)
+    if cc is not None and getattr(cc, 'eps_mod_flag', False):
+      ret.steeringPressed = cc.eps_filtered_steer_pressed
     return ret, ret_sp
 
   @staticmethod

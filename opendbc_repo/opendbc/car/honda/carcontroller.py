@@ -202,8 +202,9 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.use_new_long_logic = (CP.carFingerprint in HONDA_BOSCH) or (CP.carFingerprint == CAR.HONDA_CLARITY)
 
     eps_mod = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
-    # Bypass carcontroller ramp/LPF only for Clarity running the angle-PID controller.
-    # All other EPS_MODIFIED cars and Clarity in torque mode retain the full LPF path.
+    # Bypass carcontroller ramp/LPF for Clarity running the angle-PID controller;
+    # latcontrol_pid handles output scaling there. Other EPS_MODIFIED cars retain the full path.
+    self.eps_mod_flag = eps_mod
     self.eps_modified = eps_mod and not (CP.carFingerprint == CAR.HONDA_CLARITY and CP.lateralTuning.which() == 'pid')
 
     self.braking = False
@@ -245,6 +246,9 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     # assist because same-direction spikes are the common false-positive shape.
     self.steering_pressed_filter_s = 0.0
     self.steering_pressed_robust_prev = False
+    # Filtered result exposed to CarInterface.update() one frame later (same card.py process).
+    # Used so selfdrived reads filtered steeringPressed from carState pubsub instead of raw.
+    self.eps_filtered_steer_pressed = False
 
     # Bosch extra-brake controller
     self.brake_pid = PIDController(k_p=([0,], [0,]),
@@ -328,6 +332,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
       if self.eps_modified:
         steering_pressed = self._filtered_steering_pressed(CS, torque_cmd)
+        self.eps_filtered_steer_pressed = steering_pressed
         override_factor = _driver_override_speed_factor(CS.out.vEgo)
 
         steering_rising = (not self.steering_pressed_prev) and steering_pressed
@@ -391,7 +396,21 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
         self.steering_pressed_prev = steering_pressed
 
+      elif self.eps_mod_flag:
+        # Angle-PID mode: filter steerPressed for CarInterface without ramp/LPF.
+        # latcontrol_pid owns output scaling; carcontroller just provides filtered state
+        # so card.py's carState pubsub carries accurate steeringPressed for selfdrived/MADS.
+        steering_pressed = self._filtered_steering_pressed(CS, torque_cmd)
+        self.eps_filtered_steer_pressed = steering_pressed
+        self.torque_lpf = float(torque_cmd)
+        self.prev_torque_cmd = float(torque_cmd)
+        self.steering_pressed_prev = steering_pressed
+        self.override_state = "normal"
+        self.override_phase_start_nanos = 0
+        self.override_start_torque = 0.0
+
       else:
+        self.eps_filtered_steer_pressed = False
         self.torque_lpf = float(torque_cmd)
         self.prev_torque_cmd = float(torque_cmd)
         self.steering_pressed_prev = steering_pressed
@@ -402,6 +421,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         self.override_start_torque = 0.0
 
     else:
+      self.eps_filtered_steer_pressed = False
       self.torque_lpf = 0.0
       self.prev_torque_cmd = 0.0
       self.last_torque = 0.0

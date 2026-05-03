@@ -83,9 +83,6 @@ class LatControlPID(LatControl):
           self.eps_modified_steering_pressed_prev,
         )
         self.eps_modified_steering_pressed_prev = steering_pressed
-        # Feed filtered result back through CI so CarInterface.update() can override
-        # carState.steeringPressed before it reaches MADS/selfdrived (one frame lag, ~10ms)
-        self.CI.eps_modified_steer_pressed = steering_pressed
 
       freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < 5
 
