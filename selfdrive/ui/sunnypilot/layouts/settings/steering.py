@@ -156,7 +156,6 @@ class SteeringLayout(Widget):
     self._torque_customization_button.action_item.set_enabled(self._torque_control_toggle.action_item.get_state())
 
     is_clarity = ui_state.CP is not None and ui_state.CP.carFingerprint == "HONDA_CLARITY"
-    self._clarity_angle_pid_toggle.set_visible(is_clarity)
     self._clarity_angle_pid_toggle.action_item.set_enabled(ui_state.is_offroad() and is_clarity)
 
   def _render(self, rect):
