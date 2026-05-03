@@ -39,6 +39,7 @@ class LatControlPID(LatControl):
                              (CP.lateralTuning.pid.kiBP, CP.lateralTuning.pid.kiV),
                              pos_limit=self.steer_max, neg_limit=-self.steer_max)
     self.ff_factor = CP.lateralTuning.pid.kf
+    self.CI = CI
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
     self.is_clarity_eps_modified = (
       CP.carFingerprint == HONDA.HONDA_CLARITY and
