@@ -585,7 +585,6 @@ _fast_update_state = {
 
 _FACTORY_RESET_WIPE_PATHS = [
   "/data/params",
-  "/persist/params",
   "/cache/params",
   "/data/media/0/realdata",
   "/data/media/0/realdata_HD",

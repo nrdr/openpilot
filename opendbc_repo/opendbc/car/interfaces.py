@@ -18,7 +18,7 @@ from opendbc.car.common.basedir import BASEDIR
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.common.simple_kalman import KF1D, get_kalman_gain
 from opendbc.car.gm.values import CAR as GM
-from opendbc.car.honda.values import CAR as HONDA, HONDA_BOSCH, HONDA_CAMERA_MESSAGE_CARS, HondaSafetyFlags, HondaStarPilotFlags
+from opendbc.car.honda.values import CAR as HONDA, HONDA_BOSCH, HONDA_CAMERA_MESSAGE_CARS, HondaFlags, HondaSafetyFlags, HondaStarPilotFlags
 from opendbc.car.hyundai.hyundaicanfd import CanBus
 from opendbc.car.hyundai.values import CAR as HYUNDAI, CANFD_CAR, HyundaiFlags, HyundaiStarPilotFlags, HyundaiStarPilotSafetyFlags
 from opendbc.car.mock.values import CAR as MOCK
@@ -26,6 +26,7 @@ from opendbc.car.toyota.values import CAR as TOYOTA, NO_DSU_CAR, TSS2_CAR, UNSUP
 from opendbc.car.values import PLATFORMS
 from opendbc.can import CANParser
 from openpilot.common.params import Params
+from openpilot.starpilot.common.testing_grounds import testing_ground
 
 GearShifter = structs.CarState.GearShifter
 ButtonType = structs.CarState.ButtonEvent.Type
@@ -182,7 +183,15 @@ class CarInterfaceBase(ABC):
     ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront, ret.tireStiffnessFactor)
 
     toggles_to_check = ("force_torque_controller", "nnff", "nnff_lite")
-    if ret.steerControlType != structs.CarParams.SteerControlType.angle and any(getattr(starpilot_toggles, toggle, False) for toggle in toggles_to_check):
+    modified_civic_b_force_torque = (
+      candidate == HONDA.HONDA_CIVIC_BOSCH and
+      bool(ret.flags & HondaFlags.EPS_MODIFIED) and
+      testing_ground.use("8", "B")
+    )
+    if ret.steerControlType != structs.CarParams.SteerControlType.angle and (
+      any(getattr(starpilot_toggles, toggle, False) for toggle in toggles_to_check) or
+      modified_civic_b_force_torque
+    ):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     return ret

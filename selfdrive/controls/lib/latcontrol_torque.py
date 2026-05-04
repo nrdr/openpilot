@@ -4,6 +4,7 @@ from collections import deque
 
 from cereal import log
 from opendbc.car.gm.values import CAR as GM_CAR
+from opendbc.car.honda.values import CAR as HONDA_CAR, HondaFlags
 from opendbc.car.hyundai.values import CAR as HYUNDAI_CAR
 from opendbc.car.lateral import get_friction
 from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY, CV
@@ -45,6 +46,23 @@ DEADZONE_BOOST_LAT_ACCEL = 0.15
 UNWIND_D_DES_THRESHOLD = -1.0
 UNWIND_LAT_ACCEL_NEAR_ZERO = 0.3
 MIN_LATERAL_CONTROL_SPEED = 0.3
+CIVIC_BOSCH_MODIFIED_B_FIXED_FRICTION_THRESHOLD = 0.30
+CIVIC_BOSCH_MODIFIED_B_TRANSITION_SPEED = 12.0
+CIVIC_BOSCH_MODIFIED_B_PHASE_SCALE = 0.10
+CIVIC_BOSCH_MODIFIED_B_FF_ONSET = 0.18
+CIVIC_BOSCH_MODIFIED_B_FF_ONSET_WIDTH = 0.07
+CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF = 1.00
+CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF_WIDTH = 0.30
+CIVIC_BOSCH_MODIFIED_B_FF_REDUCTION_LEFT = 0.11
+CIVIC_BOSCH_MODIFIED_B_FF_REDUCTION_RIGHT = 0.08
+CIVIC_BOSCH_MODIFIED_B_TURN_IN_BOOST_LEFT = 0.08
+CIVIC_BOSCH_MODIFIED_B_TURN_IN_BOOST_RIGHT = 0.10
+CIVIC_BOSCH_MODIFIED_B_UNWIND_TAPER_LEFT = 0.22
+CIVIC_BOSCH_MODIFIED_B_UNWIND_TAPER_RIGHT = 0.24
+CIVIC_BOSCH_MODIFIED_B_TURN_IN_FRICTION_BOOST_LEFT = 0.04
+CIVIC_BOSCH_MODIFIED_B_TURN_IN_FRICTION_BOOST_RIGHT = 0.05
+CIVIC_BOSCH_MODIFIED_B_UNWIND_FRICTION_REDUCTION_LEFT = 0.15
+CIVIC_BOSCH_MODIFIED_B_UNWIND_FRICTION_REDUCTION_RIGHT = 0.18
 
 BOLT_2022_2023_CARS = (
   GM_CAR.CHEVROLET_BOLT_ACC_2022_2023,
@@ -203,6 +221,8 @@ GENESIS_G90_UNWIND_FRICTION_REDUCTION_RIGHT = 0.22
 
 IONIQ_6_FF_GAIN_LEFT = 0.040
 IONIQ_6_FF_GAIN_RIGHT = 0.000
+IONIQ_6_BASE_LAT_ACCEL_FACTOR_MULT = 1.15
+IONIQ_6_BASE_FRICTION_THRESHOLD = 0.30
 IONIQ_6_FF_ONSET = 0.10
 IONIQ_6_FF_ONSET_WIDTH = 0.04
 IONIQ_6_FF_CUTOFF = 0.48
@@ -315,6 +335,73 @@ def _sigmoid(x: float) -> float:
 def get_friction_threshold(v_ego: float) -> float:
   # Keep the speed-scaled friction threshold behavior.
   return float(np.interp(v_ego, [1 * CV.MPH_TO_MS, 20 * CV.MPH_TO_MS, 75 * CV.MPH_TO_MS], [0.16, 0.19, 0.27]))
+
+
+def civic_bosch_modified_lateral_testing_ground_active() -> bool:
+  return testing_ground.use("8", "B")
+
+
+def _civic_bosch_modified_b_low_speed_factor(v_ego: float) -> float:
+  return 1.0 / (1.0 + (max(v_ego, 0.0) / CIVIC_BOSCH_MODIFIED_B_TRANSITION_SPEED) ** 2)
+
+
+def _civic_bosch_modified_b_transition_phase(desired_lateral_accel: float, desired_lateral_jerk: float) -> float:
+  return math.tanh((desired_lateral_accel * desired_lateral_jerk) / CIVIC_BOSCH_MODIFIED_B_PHASE_SCALE)
+
+
+def _civic_bosch_modified_b_side_value(desired_lateral_accel: float, left_value: float, right_value: float) -> float:
+  return left_value if desired_lateral_accel >= 0.0 else right_value
+
+
+def get_civic_bosch_modified_b_ff_scale(desired_lateral_accel: float, desired_lateral_jerk: float, v_ego: float) -> float:
+  if desired_lateral_accel == 0.0:
+    return 1.0
+
+  abs_lateral_accel = abs(desired_lateral_accel)
+  onset = _sigmoid((abs_lateral_accel - CIVIC_BOSCH_MODIFIED_B_FF_ONSET) / CIVIC_BOSCH_MODIFIED_B_FF_ONSET_WIDTH)
+  cutoff = _sigmoid((CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF - abs_lateral_accel) / CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF_WIDTH)
+  base_reduction = _civic_bosch_modified_b_side_value(desired_lateral_accel,
+                                                       CIVIC_BOSCH_MODIFIED_B_FF_REDUCTION_LEFT,
+                                                       CIVIC_BOSCH_MODIFIED_B_FF_REDUCTION_RIGHT) * onset * cutoff
+
+  phase = _civic_bosch_modified_b_transition_phase(desired_lateral_accel, desired_lateral_jerk)
+  turn_in_weight = max(phase, 0.0)
+  unwind_weight = max(-phase, 0.0)
+  low_speed_factor = _civic_bosch_modified_b_low_speed_factor(v_ego)
+
+  turn_in_boost = 1.0 + (_civic_bosch_modified_b_side_value(desired_lateral_accel,
+                                                             CIVIC_BOSCH_MODIFIED_B_TURN_IN_BOOST_LEFT,
+                                                             CIVIC_BOSCH_MODIFIED_B_TURN_IN_BOOST_RIGHT) *
+                          turn_in_weight * (0.40 + 0.60 * low_speed_factor))
+  unwind_taper = 1.0 - (_civic_bosch_modified_b_side_value(desired_lateral_accel,
+                                                            CIVIC_BOSCH_MODIFIED_B_UNWIND_TAPER_LEFT,
+                                                            CIVIC_BOSCH_MODIFIED_B_UNWIND_TAPER_RIGHT) *
+                         unwind_weight * (0.35 + 0.65 * low_speed_factor))
+  return (1.0 - base_reduction) * turn_in_boost * max(unwind_taper, 0.0)
+
+
+def get_civic_bosch_modified_b_friction_scale(v_ego: float, desired_lateral_accel: float, desired_lateral_jerk: float) -> float:
+  if desired_lateral_accel == 0.0 or desired_lateral_jerk == 0.0:
+    return 1.0
+
+  abs_lateral_accel = abs(desired_lateral_accel)
+  onset = _sigmoid((abs_lateral_accel - CIVIC_BOSCH_MODIFIED_B_FF_ONSET) / CIVIC_BOSCH_MODIFIED_B_FF_ONSET_WIDTH)
+  cutoff = _sigmoid((CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF - abs_lateral_accel) / CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF_WIDTH)
+  envelope = onset * cutoff * _civic_bosch_modified_b_low_speed_factor(v_ego)
+  phase = _civic_bosch_modified_b_transition_phase(desired_lateral_accel, desired_lateral_jerk)
+  turn_in_weight = max(phase, 0.0)
+  unwind_weight = max(-phase, 0.0)
+
+  friction_scale = 1.0
+  friction_scale += (_civic_bosch_modified_b_side_value(desired_lateral_accel,
+                                                         CIVIC_BOSCH_MODIFIED_B_TURN_IN_FRICTION_BOOST_LEFT,
+                                                         CIVIC_BOSCH_MODIFIED_B_TURN_IN_FRICTION_BOOST_RIGHT) *
+                     envelope * turn_in_weight)
+  friction_scale -= (_civic_bosch_modified_b_side_value(desired_lateral_accel,
+                                                         CIVIC_BOSCH_MODIFIED_B_UNWIND_FRICTION_REDUCTION_LEFT,
+                                                         CIVIC_BOSCH_MODIFIED_B_UNWIND_FRICTION_REDUCTION_RIGHT) *
+                     envelope * unwind_weight)
+  return min(max(friction_scale, 0.82), 1.06)
 
 
 def bolt_2017_lateral_testing_ground_active() -> bool:
@@ -725,7 +812,7 @@ def get_ioniq_6_ff_scale(desired_lateral_accel: float, desired_lateral_jerk: flo
 
 
 def get_ioniq_6_friction_threshold(v_ego: float, desired_lateral_accel: float = 0.0, desired_lateral_jerk: float = 0.0) -> float:
-  base_threshold = get_friction_threshold(v_ego)
+  base_threshold = max(get_friction_threshold(v_ego), IONIQ_6_BASE_FRICTION_THRESHOLD)
   transition_envelope = _ioniq_6_transition_envelope(v_ego, desired_lateral_accel, desired_lateral_jerk)
   phase = _ioniq_6_transition_phase(desired_lateral_accel, desired_lateral_jerk)
   turn_in_weight = max(phase, 0.0)
@@ -965,6 +1052,7 @@ class LatControlTorque(LatControl):
     self.is_genesis_g90 = CP.carFingerprint in GENESIS_G90_CARS
     self.is_ioniq_6 = CP.carFingerprint in IONIQ_6_CARS
     self.is_kia_ev6 = CP.carFingerprint in KIA_EV6_CARS
+    self.is_civic_bosch_modified = CP.carFingerprint == HONDA_CAR.HONDA_CIVIC_BOSCH and bool(CP.flags & HondaFlags.EPS_MODIFIED)
     self.is_volt_cc = CP.carFingerprint == GM_CAR.CHEVROLET_VOLT_CC
     self.is_silverado = CP.carFingerprint == GM_CAR.CHEVROLET_SILVERADO
     self.use_bolt_ff_scaling = self.is_bolt_2022_2023 or self.is_bolt_2018_2021 or self.is_bolt_2017
@@ -973,6 +1061,8 @@ class LatControlTorque(LatControl):
     self.torque_ff_scale_neg = 1.0
     self.torque_deadzone_boost = float(getattr(self.torque_params, "kfDEPRECATED", 0.0))
     self.torque_ki_mult = 1.0
+    if self.is_ioniq_6:
+      self.torque_params.latAccelFactor *= IONIQ_6_BASE_LAT_ACCEL_FACTOR_MULT
     if self.is_bolt:
       kp_scale = getattr(self.torque_params, "kp", getattr(self.torque_params, "kpDEPRECATED", 1.0))
       ki_scale = getattr(self.torque_params, "ki", getattr(self.torque_params, "kiDEPRECATED", 1.0))
@@ -984,6 +1074,8 @@ class LatControlTorque(LatControl):
         self.pid._k_i = [self.pid._k_i[0], [k * self.torque_ki_mult for k in self.pid._k_i[1]]]
 
   def update_live_torque_params(self, latAccelFactor, latAccelOffset, friction):
+    if self.is_ioniq_6:
+      latAccelFactor *= IONIQ_6_BASE_LAT_ACCEL_FACTOR_MULT
     self.torque_params.latAccelFactor = latAccelFactor
     self.torque_params.latAccelOffset = latAccelOffset
     self.torque_params.friction = friction
@@ -1051,11 +1143,11 @@ class LatControlTorque(LatControl):
       bolt_2018_2021_tuned_path_active = self.is_bolt_2018_2021
       volt_standard_test_active = self.is_volt_standard and volt_standard_lateral_testing_ground_active()
       genesis_g90_test_active = self.is_genesis_g90 and genesis_g90_lateral_testing_ground_active()
-      ioniq_6_test_active = self.is_ioniq_6
+      ioniq_6_active = self.is_ioniq_6
       kia_ev6_test_active = self.is_kia_ev6 and kia_ev6_lateral_testing_ground_active()
       volt_plexy_test_active = self.is_volt_cc and volt_plexy_lateral_testing_ground_active()
       volt_standard_center_taper = get_volt_standard_center_taper_scale(setpoint, CS.vEgo) if volt_standard_test_active else 1.0
-      ioniq_6_center_taper = get_ioniq_6_center_taper_scale(setpoint, CS.vEgo) if ioniq_6_test_active else 1.0
+      ioniq_6_center_taper = get_ioniq_6_center_taper_scale(setpoint, CS.vEgo) if ioniq_6_active else 1.0
       friction_threshold = get_friction_threshold(CS.vEgo)
       friction_scale = 1.0
       if bolt_2022_2023_tuned_path_active:
@@ -1074,7 +1166,7 @@ class LatControlTorque(LatControl):
         ff *= get_genesis_g90_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo)
         friction_threshold = get_genesis_g90_friction_threshold(CS.vEgo, setpoint, desired_lateral_jerk)
         friction_scale = get_genesis_g90_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
-      elif ioniq_6_test_active:
+      elif ioniq_6_active:
         ff *= get_ioniq_6_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo) * ioniq_6_center_taper
         friction_threshold = get_ioniq_6_friction_threshold(CS.vEgo, setpoint, desired_lateral_jerk) / max(ioniq_6_center_taper, 1e-3)
         friction_scale = get_ioniq_6_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
@@ -1087,6 +1179,10 @@ class LatControlTorque(LatControl):
         ff *= get_volt_plexy_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo)
         friction_threshold = get_volt_plexy_friction_threshold(CS.vEgo, setpoint, desired_lateral_jerk)
         friction_scale = get_volt_plexy_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
+      elif self.is_civic_bosch_modified and civic_bosch_modified_lateral_testing_ground_active():
+        ff *= get_civic_bosch_modified_b_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo)
+        friction_threshold = CIVIC_BOSCH_MODIFIED_B_FIXED_FRICTION_THRESHOLD
+        friction_scale = get_civic_bosch_modified_b_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
       ff += friction_scale * get_friction(error_with_lsf + JERK_GAIN * desired_lateral_jerk, lateral_accel_deadzone, friction_threshold, self.torque_params)
       deadzone_boost_active = False
       if self.torque_deadzone_boost > 0.0 and abs(gravity_adjusted_future_lateral_accel) < DEADZONE_BOOST_LAT_ACCEL:
@@ -1106,9 +1202,6 @@ class LatControlTorque(LatControl):
         output_torque *= get_bolt_2018_2021_dynamic_torque_scale(setpoint, desired_lateral_jerk, CS.vEgo)
       elif volt_standard_test_active:
         output_torque *= volt_standard_center_taper
-      elif ioniq_6_test_active:
-        output_torque *= get_ioniq_6_output_taper_scale(setpoint, desired_lateral_jerk, CS.vEgo)
-
       pid_log.active = True
       pid_log.p = float(self.pid.p)
       pid_log.i = float(self.pid.i)

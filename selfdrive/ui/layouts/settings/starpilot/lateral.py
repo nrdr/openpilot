@@ -19,7 +19,6 @@ from openpilot.selfdrive.ui.layouts.settings.starpilot.aethergrid import (
 
 
 PANEL_STYLE = DEFAULT_PANEL_STYLE
-UTILITY_ROW_HEIGHT = AETHER_LIST_METRICS.utility_row_height
 
 
 def _confirm_reboot_toggle(params, key, state):
@@ -112,7 +111,7 @@ class StarPilotAdvancedLateralLayout(_SettingsPage):
                    get_state=lambda: self._params.get_bool("ForceTorqueController"),
                    set_state=lambda s: _confirm_reboot_toggle(self._params, "ForceTorqueController", s),
                    visible=lambda: adv() and not starpilot_state.car_state.isAngleCar and not starpilot_state.car_state.isTorqueCar),
-      ], row_height=UTILITY_ROW_HEIGHT),
+      ]),
     ]
     self._manager_view = AetherSettingsView(
       self, sections,
@@ -169,7 +168,7 @@ class StarPilotLateralLayout(_SettingsPage):
                    get_value=lambda: f"{self._params.get_int('PauseLateralSpeed')} mph",
                    on_click=lambda: self._show_slider("PauseLateralSpeed", 0, 100, unit=" mph"),
                    visible=lambda: self._params.get_bool("QOLLateral")),
-      ], tab_key="steering", row_height=UTILITY_ROW_HEIGHT),
+      ], tab_key="steering"),
 
       # ── Lane tab ──
       SettingSection("", [
@@ -207,7 +206,7 @@ class StarPilotLateralLayout(_SettingsPage):
                    get_value=lambda: f"{self._params.get_int('LaneChangeSmoothing')}",
                    on_click=self._show_modal_pace_selector,
                    visible=lambda: self._params.get_bool("LaneChanges")),
-      ], tab_key="lane", row_height=UTILITY_ROW_HEIGHT),
+      ], tab_key="lane"),
 
       # ── Tune tab ──
       SettingSection(tr_noop("Advanced Lateral Tuning"), [
@@ -221,7 +220,7 @@ class StarPilotLateralLayout(_SettingsPage):
                    navigate_to="advanced_lateral",
                    enabled=lambda: self._params.get_bool("AdvancedLateralTune"),
                    disabled_label=tr_noop("Enable First")),
-      ], tab_key="tune", row_height=UTILITY_ROW_HEIGHT),
+      ], tab_key="tune"),
       SettingSection(tr_noop("Lateral Tuning"), [
         SettingRow("LateralTune", "toggle", tr_noop("Lateral Tuning"),
                    subtitle=tr_noop("Miscellaneous steering control changes such as turn desires and NNFF modes."),
@@ -242,7 +241,7 @@ class StarPilotLateralLayout(_SettingsPage):
                    get_state=lambda: self._params.get_bool("NNFFLite"),
                    set_state=lambda s: _confirm_reboot_toggle(self._params, "NNFFLite", s),
                    visible=lambda: self._params.get_bool("LateralTune") and not self._params.get_bool("NNFF") and not starpilot_state.car_state.isAngleCar),
-      ], tab_key="tune", row_height=UTILITY_ROW_HEIGHT),
+      ], tab_key="tune"),
     ]
 
     self._manager_view = AetherSettingsView(
