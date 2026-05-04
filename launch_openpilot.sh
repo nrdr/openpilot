@@ -11,6 +11,11 @@ is_device_runtime() {
 }
 
 if is_device_runtime; then
+  # Recreate local developer helpers after branch switches, reinstalls, or factory resets.
+  if [[ -f "${DIR}/scripts/setup_dev_helpers.sh" ]]; then
+    bash "${DIR}/scripts/setup_dev_helpers.sh" || true
+  fi
+
   exec ./launch_chffrplus.sh "$@"
 fi
 
