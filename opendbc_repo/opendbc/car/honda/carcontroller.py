@@ -225,6 +225,7 @@ class CarController(CarControllerBase):
     self.prev_torque_cmd = 0.0
     self.steering_pressed_filter_s = 0.0
     self.steering_pressed_robust_prev = False
+    self.is_clarity_eps_modified = CP.carFingerprint == CAR.HONDA_CLARITY and bool(CP.flags & HondaFlags.EPS_MODIFIED)
     self.bosch_gas_factor = 1.0
     self.bosch_wind_factor = 1.0
     self.bosch_wind_factor_before_brake = 0.0
@@ -275,6 +276,21 @@ class CarController(CarControllerBase):
           self.torque_lpf = alpha * torque_cmd + ((1.0 - alpha) * self.torque_lpf)
           self.prev_torque_cmd = torque_cmd
           torque_cmd = self.torque_lpf
+      else:
+        self.torque_lpf = 0.0
+        self.prev_torque_cmd = 0.0
+        self.steering_pressed_filter_s = 0.0
+        self.steering_pressed_robust_prev = False
+    elif self.is_clarity_eps_modified:
+      if CC.latActive:
+        filtered_steering_pressed = self._filtered_steering_pressed(CS, torque_cmd)
+        if filtered_steering_pressed:
+          self.torque_lpf = 0.0
+          self.prev_torque_cmd = 0.0
+          torque_cmd = 0.0
+        else:
+          self.torque_lpf = float(torque_cmd)
+          self.prev_torque_cmd = float(torque_cmd)
       else:
         self.torque_lpf = 0.0
         self.prev_torque_cmd = 0.0
