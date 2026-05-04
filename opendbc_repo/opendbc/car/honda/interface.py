@@ -116,6 +116,8 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.HONDA_CLARITY:
       ret.autoResumeSng = True
       ret.minEnableSpeed = -1.
+      ret.minSteerSpeed = -1.
+      ret.steerAtStandstill = True
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1663], [0, 1663]]
       ret.lateralTuning.init('pid')
       ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0.], [0.04]]
