@@ -143,7 +143,7 @@ class TestHondaFingerprint:
   def test_modified_civic_b_testing_ground_forces_torque(self, monkeypatch):
     toggles = SimpleNamespace(force_torque_controller=False, nnff=False, nnff_lite=False)
     car_fw = [CarParams.CarFw(ecu=CarParams.Ecu.eps, fwVersion=b'39990-TGG,A020\x00\x00', address=0x18DA30F1, subAddress=0)]
-    monkeypatch.setattr("openpilot.starpilot.common.testing_grounds.testing_ground.use", lambda slot_id, variant="B": slot_id == "8" and variant == "B")
+    monkeypatch.setattr("openpilot.starpilot.common.testing_grounds.is_testing_ground_active", lambda slot_id, variant="B", refresh_interval_s=0.5: slot_id == "8" and variant == "B")
 
     CP = CarInterface.get_params(CAR.HONDA_CIVIC_BOSCH, gen_empty_fingerprint(), car_fw, False, False, False, toggles)
 

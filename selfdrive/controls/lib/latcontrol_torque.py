@@ -205,6 +205,8 @@ GENESIS_G90_UNWIND_FRICTION_REDUCTION_RIGHT = 0.22
 
 IONIQ_6_FF_GAIN_LEFT = 0.040
 IONIQ_6_FF_GAIN_RIGHT = 0.000
+IONIQ_6_BASE_LAT_ACCEL_FACTOR_MULT = 1.15
+IONIQ_6_BASE_FRICTION_THRESHOLD = 0.30
 IONIQ_6_FF_ONSET = 0.10
 IONIQ_6_FF_ONSET_WIDTH = 0.04
 IONIQ_6_FF_CUTOFF = 0.48
@@ -731,7 +733,7 @@ def get_ioniq_6_ff_scale(desired_lateral_accel: float, desired_lateral_jerk: flo
 
 
 def get_ioniq_6_friction_threshold(v_ego: float, desired_lateral_accel: float = 0.0, desired_lateral_jerk: float = 0.0) -> float:
-  base_threshold = get_friction_threshold(v_ego)
+  base_threshold = max(get_friction_threshold(v_ego), IONIQ_6_BASE_FRICTION_THRESHOLD)
   transition_envelope = _ioniq_6_transition_envelope(v_ego, desired_lateral_accel, desired_lateral_jerk)
   phase = _ioniq_6_transition_phase(desired_lateral_accel, desired_lateral_jerk)
   turn_in_weight = max(phase, 0.0)
@@ -980,6 +982,8 @@ class LatControlTorque(LatControl):
     self.torque_ff_scale_neg = 1.0
     self.torque_deadzone_boost = float(getattr(self.torque_params, "kfDEPRECATED", 0.0))
     self.torque_ki_mult = 1.0
+    if self.is_ioniq_6:
+      self.torque_params.latAccelFactor *= IONIQ_6_BASE_LAT_ACCEL_FACTOR_MULT
     if self.is_bolt:
       kp_scale = getattr(self.torque_params, "kp", getattr(self.torque_params, "kpDEPRECATED", 1.0))
       ki_scale = getattr(self.torque_params, "ki", getattr(self.torque_params, "kiDEPRECATED", 1.0))
@@ -991,6 +995,8 @@ class LatControlTorque(LatControl):
         self.pid._k_i = [self.pid._k_i[0], [k * self.torque_ki_mult for k in self.pid._k_i[1]]]
 
   def update_live_torque_params(self, latAccelFactor, latAccelOffset, friction):
+    if self.is_ioniq_6:
+      latAccelFactor *= IONIQ_6_BASE_LAT_ACCEL_FACTOR_MULT
     self.torque_params.latAccelFactor = latAccelFactor
     self.torque_params.latAccelOffset = latAccelOffset
     self.torque_params.friction = friction
