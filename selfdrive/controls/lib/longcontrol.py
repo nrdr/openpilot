@@ -251,7 +251,10 @@ class LongControl:
         output_accel = clip(a_target, 0.0, starpilot_toggles.startAccel)
       else:
         output_accel = starpilot_toggles.startAccel
-      self.reset()
+      self.pid.reset()
+      self.pid.i = a_target
+      self.last_a_target = 0.0
+      self.integrator_hold_frames = 0
 
     else:  # LongCtrlState.pid
       error = a_target - CS.aEgo

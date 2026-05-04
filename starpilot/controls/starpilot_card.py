@@ -86,6 +86,8 @@ class StarPilotCard:
       for be in carState.buttonEvents:
         if be.type == ButtonType.lkas and be.pressed and starpilot_toggles.always_on_lateral_lkas:
           self.always_on_lateral_allowed = not self.always_on_lateral_allowed
+          if carState.cruiseState.enabled or self.pause_lateral:
+            self.pause_lateral = not self.always_on_lateral_allowed
         elif be.type == ButtonType.mainCruise and be.pressed:
           if starpilot_toggles.always_on_lateral_main:
             self.always_on_lateral_allowed = not self.always_on_lateral_allowed

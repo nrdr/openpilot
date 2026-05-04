@@ -586,6 +586,54 @@ class TestHyundaiFingerprint:
     assert parser.vl["LFA"]["STEER_REQ"] == 1
     assert parser.vl["LFA"]["LKA_ICON"] == 2
 
+  def test_ioniq_6_lkas_alt_helper_preserves_stock_camera_fields(self):
+    CP = CarParams.new_message()
+    CP.carFingerprint = CAR.HYUNDAI_IONIQ_6
+    CP.flags = int(HyundaiFlags.CANFD | HyundaiFlags.CANFD_LKA_STEERING | HyundaiFlags.CANFD_LKA_STEERING_ALT)
+
+    packer = CANPacker(DBC[CP.carFingerprint][Bus.pt])
+    can_bus = CanBus(CP)
+    parser = CANParser(DBC[CP.carFingerprint][Bus.pt], [("LKAS_ALT", 0)], can_bus.ACAN)
+
+    stock_lkas = {
+      "CHECKSUM": 1234,
+      "COUNTER": 42,
+      "LKA_MODE": 6,
+      "LKA_AVAILABLE": 3,
+      "LKA_WARNING": 1,
+      "LKA_ICON": 1,
+      "FCA_SYSWARN": 1,
+      "TORQUE_REQUEST": 17,
+      "STEER_REQ": 0,
+      "LFA_BUTTON": 1,
+      "LKA_ASSIST": 1,
+      "STEER_MODE": 5,
+      "NEW_SIGNAL_2": 2,
+      "LKAS_ANGLE_ACTIVE": 1,
+      "HAS_LANE_SAFETY": 1,
+      "ADAS_StrAnglReqVal": 12.3,
+      "ADAS_ACIAnglTqRedcGainVal": 0.42,
+      "DAMP_FACTOR": 0x70,
+    }
+
+    msgs = hyundaicanfd.create_steering_messages(packer, CP, can_bus, True, True, 123, 0.0,
+                                                 lkas_base_values=stock_lkas)
+    lkas_msgs = [msg for msg in msgs if msg[0] == 0x110]
+    assert len(lkas_msgs) == 1
+
+    parser.update([(1, lkas_msgs)])
+
+    assert parser.can_valid
+    assert parser.vl["LKAS_ALT"]["LKA_AVAILABLE"] == 3
+    assert parser.vl["LKAS_ALT"]["LKA_WARNING"] == 1
+    assert parser.vl["LKAS_ALT"]["FCA_SYSWARN"] == 1
+    assert parser.vl["LKAS_ALT"]["LFA_BUTTON"] == 1
+    assert parser.vl["LKAS_ALT"]["HAS_LANE_SAFETY"] == 1
+    assert parser.vl["LKAS_ALT"]["DAMP_FACTOR"] == 0x70
+    assert parser.vl["LKAS_ALT"]["TORQUE_REQUEST"] == 123
+    assert parser.vl["LKAS_ALT"]["STEER_REQ"] == 1
+    assert parser.vl["LKAS_ALT"]["LKA_ICON"] == 2
+
   def test_ioniq_6_blindspot_status_helper_regenerates_counter_checksum(self):
     CP = CarParams.new_message()
     CP.carFingerprint = CAR.HYUNDAI_IONIQ_6

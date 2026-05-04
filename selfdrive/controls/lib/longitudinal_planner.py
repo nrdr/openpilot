@@ -54,8 +54,14 @@ VISION_UNTRACKED_SLOW_LEAD_FULL_TTC = 8.0
 VISION_UNTRACKED_SLOW_LEAD_MAX_DISTANCE_TIME = 4.4
 VISION_UNTRACKED_SLOW_LEAD_MIN_DISTANCE = 80.0
 VISION_UNTRACKED_SLOW_LEAD_MAX_DISTANCE = 120.0
+VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_DISTANCE_TIME = 5.7
 VISION_UNTRACKED_SLOW_LEAD_MAX_DECEL = 0.85
 VISION_UNTRACKED_SLOW_LEAD_MIN_DECEL = 0.1
+VISION_UNTRACKED_SLOW_LEAD_RELAXED_MODEL_PROB = 0.68
+VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_LEAD_SPEED = 8.0
+VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_TTC = 10.0
+VISION_UNTRACKED_SLOW_LEAD_RELAXED_MIN_CLOSING_SPEED = 10.0
+VISION_UNTRACKED_SLOW_LEAD_RELAXED_FULL_CLOSING_SPEED = 16.0
 VISION_SLOW_LEAD_MAX_SPEED = 5.0
 VISION_SLOW_LEAD_MIN_CLOSING_SPEED = 1.5
 VISION_SLOW_LEAD_TRIGGER_TTC = 4.5
@@ -99,8 +105,8 @@ UNCERT_SLOPE_TRIG = 0.12  # per second
 UNCERT_MAG_TRIG = 0.50
 
 # Lookup table for turns
-_A_TOTAL_MAX_V = [1.7, 3.2]
-_A_TOTAL_MAX_BP = [20., 40.]
+_A_TOTAL_MAX_V = [3.5, 3.5, 3.2]
+_A_TOTAL_MAX_BP = [0., 20., 40.]
 
 
 def get_longitudinal_personality(sm):
@@ -363,8 +369,6 @@ class LongitudinalPlanner:
       return None
 
     lead_prob = float(getattr(lead, "modelProb", 0.0))
-    if lead_prob < VISION_UNTRACKED_SLOW_LEAD_MIN_MODEL_PROB:
-      return None
 
     lead_brake = max(0.0, -float(lead.aLeadK))
     reaction_t = max(self.CP.longitudinalActuatorDelay, self.dt)
@@ -377,21 +381,42 @@ class LongitudinalPlanner:
     if closing_ratio < VISION_UNTRACKED_SLOW_LEAD_MIN_CLOSING_RATIO:
       return None
 
-    max_distance = float(np.clip(VISION_UNTRACKED_SLOW_LEAD_MAX_DISTANCE_TIME * v_ego,
+    projected_ttc = float(lead.dRel) / max(projected_closing_speed, 0.1)
+    if projected_ttc > VISION_UNTRACKED_SLOW_LEAD_TRIGGER_TTC:
+      return None
+
+    min_model_prob = VISION_UNTRACKED_SLOW_LEAD_MIN_MODEL_PROB
+    max_distance_time = VISION_UNTRACKED_SLOW_LEAD_MAX_DISTANCE_TIME
+    if float(lead.vLead) <= VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_LEAD_SPEED and \
+        projected_ttc <= VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_TTC:
+      closing_relax = float(np.clip((projected_closing_speed - VISION_UNTRACKED_SLOW_LEAD_RELAXED_MIN_CLOSING_SPEED) /
+                                    (VISION_UNTRACKED_SLOW_LEAD_RELAXED_FULL_CLOSING_SPEED -
+                                     VISION_UNTRACKED_SLOW_LEAD_RELAXED_MIN_CLOSING_SPEED), 0.0, 1.0))
+      ttc_relax = float(np.clip((VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_TTC - projected_ttc) /
+                                (VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_TTC -
+                                 VISION_UNTRACKED_SLOW_LEAD_FULL_TTC), 0.0, 1.0))
+      relax_factor = closing_relax * ttc_relax
+      min_model_prob = float(np.interp(relax_factor, [0.0, 1.0],
+                                       [VISION_UNTRACKED_SLOW_LEAD_MIN_MODEL_PROB,
+                                        VISION_UNTRACKED_SLOW_LEAD_RELAXED_MODEL_PROB]))
+      max_distance_time = float(np.interp(relax_factor, [0.0, 1.0],
+                                          [VISION_UNTRACKED_SLOW_LEAD_MAX_DISTANCE_TIME,
+                                           VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_DISTANCE_TIME]))
+
+    max_distance = float(np.clip(max_distance_time * v_ego,
                                  VISION_UNTRACKED_SLOW_LEAD_MIN_DISTANCE,
                                  VISION_UNTRACKED_SLOW_LEAD_MAX_DISTANCE))
     if float(lead.dRel) > max_distance:
       return None
 
-    projected_ttc = float(lead.dRel) / max(projected_closing_speed, 0.1)
-    if projected_ttc > VISION_UNTRACKED_SLOW_LEAD_TRIGGER_TTC:
+    if lead_prob < min_model_prob:
       return None
 
     time_factor = float(np.clip((VISION_UNTRACKED_SLOW_LEAD_TRIGGER_TTC - projected_ttc) /
                                 (VISION_UNTRACKED_SLOW_LEAD_TRIGGER_TTC - VISION_UNTRACKED_SLOW_LEAD_FULL_TTC),
                                 0.0, 1.0))
-    prob_factor = float(np.clip((lead_prob - VISION_UNTRACKED_SLOW_LEAD_MIN_MODEL_PROB) /
-                                (VISION_UNTRACKED_SLOW_LEAD_FULL_MODEL_PROB - VISION_UNTRACKED_SLOW_LEAD_MIN_MODEL_PROB),
+    prob_factor = float(np.clip((lead_prob - min_model_prob) /
+                                (VISION_UNTRACKED_SLOW_LEAD_FULL_MODEL_PROB - min_model_prob),
                                 0.0, 1.0))
     closing_factor = float(np.clip((closing_ratio - VISION_UNTRACKED_SLOW_LEAD_MIN_CLOSING_RATIO) /
                                    (VISION_UNTRACKED_SLOW_LEAD_FULL_CLOSING_RATIO - VISION_UNTRACKED_SLOW_LEAD_MIN_CLOSING_RATIO),

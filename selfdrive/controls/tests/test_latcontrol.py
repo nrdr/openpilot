@@ -245,22 +245,25 @@ class TestLatControl:
     assert get_ioniq_6_ff_scale(0.4, 0.0, 20.0) > get_ioniq_6_ff_scale(-0.4, 0.0, 20.0)
     assert get_ioniq_6_ff_scale(0.4, 0.7, 8.0) > get_ioniq_6_ff_scale(0.4, 0.0, 8.0) > get_ioniq_6_ff_scale(0.4, -0.7, 8.0)
     assert get_ioniq_6_ff_scale(-0.4, -0.7, 8.0) >= get_ioniq_6_ff_scale(-0.4, 0.0, 8.0) >= get_ioniq_6_ff_scale(-0.4, 0.7, 8.0)
-    assert abs(get_ioniq_6_ff_scale(1.2, 0.0, 20.0) - 1.0) < 0.02
+    assert get_ioniq_6_ff_scale(-1.2, 0.0, 20.0) < get_ioniq_6_ff_scale(1.2, 0.0, 20.0) < 1.0
+    assert get_ioniq_6_ff_scale(-1.2, 0.7, 20.0) <= get_ioniq_6_ff_scale(-1.2, 0.0, 20.0)
 
   def test_ioniq_6_directional_taper_curve(self):
     assert get_ioniq_6_directional_taper_scale(0.0, 0.0) == 1.0
     assert get_ioniq_6_directional_taper_scale(-0.5, 0.0) < get_ioniq_6_directional_taper_scale(0.5, 0.0) < 1.0
     assert get_ioniq_6_directional_taper_scale(-0.5, 0.7) <= get_ioniq_6_directional_taper_scale(-0.5, 0.0)
-    assert get_ioniq_6_directional_taper_scale(1.2, 0.0) > 0.96
+    assert get_ioniq_6_directional_taper_scale(-1.2, 0.0) < get_ioniq_6_directional_taper_scale(1.2, 0.0) < 1.0
+    assert get_ioniq_6_directional_taper_scale(-1.2, 0.7) <= get_ioniq_6_directional_taper_scale(-1.2, 0.0)
 
   def test_ioniq_6_output_taper_curve(self):
     assert get_ioniq_6_output_taper_scale(0.0, 0.0, 25.0) < get_ioniq_6_output_taper_scale(0.0, 0.0, 8.0) <= 1.0
     assert get_ioniq_6_output_taper_scale(-0.5, 0.0, 25.0) < get_ioniq_6_output_taper_scale(0.5, 0.0, 25.0) < 1.0
     assert get_ioniq_6_output_taper_scale(-0.5, 0.7, 25.0) <= get_ioniq_6_output_taper_scale(-0.5, 0.0, 25.0)
-    assert get_ioniq_6_output_taper_scale(1.2, 0.0, 25.0) > 0.94
+    assert get_ioniq_6_output_taper_scale(-1.2, 0.0, 25.0) < get_ioniq_6_output_taper_scale(1.2, 0.0, 25.0) < 1.0
+    assert get_ioniq_6_output_taper_scale(-1.2, 0.7, 25.0) <= get_ioniq_6_output_taper_scale(-1.2, 0.0, 25.0)
 
   def test_ioniq_6_friction_threshold_curve(self):
-    base = max(get_friction_threshold(6.0), 0.30)
+    base = max(get_friction_threshold(6.0), 0.36)
     left_turn_in = get_ioniq_6_friction_threshold(6.0, 0.5, 0.8)
     right_turn_in = get_ioniq_6_friction_threshold(6.0, -0.5, -0.8)
     left_unwind = get_ioniq_6_friction_threshold(6.0, 0.5, -0.8)
@@ -268,7 +271,7 @@ class TestLatControl:
     assert max(left_turn_in, right_turn_in) < base
     assert left_unwind >= base
     assert right_unwind >= base
-    assert get_ioniq_6_friction_threshold(25.0, 0.0, 0.0) >= 0.30
+    assert get_ioniq_6_friction_threshold(25.0, 0.0, 0.0) >= 0.36
 
   def test_ioniq_6_friction_scale_curve(self):
     base = get_ioniq_6_friction_scale(25.0, 0.5, 0.8)
@@ -369,7 +372,7 @@ class TestLatControl:
     _, _, lac_log = controller.update(True, CS, VM, params, False, 0.0025, False, 0.2, None, None, starpilot_toggles)
 
     assert lac_log.active
-    assert controller.torque_params.latAccelFactor == pytest.approx(3.0 * 1.15)
+    assert controller.torque_params.latAccelFactor == pytest.approx(3.0 * 1.23)
 
   def test_ioniq_6_update_path_does_not_post_taper_output(self, monkeypatch):
     base_controller, VM, CS, params, starpilot_toggles = self._build_torque_controller(HYUNDAI.HYUNDAI_IONIQ_6)
@@ -414,6 +417,20 @@ class TestLatControl:
 
     assert captured["threshold"] == pytest.approx(0.3)
 
+  def test_modified_civic_b_torque_path_scales_lat_accel_factor(self, monkeypatch):
+    CarInterface = interfaces[HONDA.HONDA_CIVIC_BOSCH]
+    CP = CarInterface.get_non_essential_params(HONDA.HONDA_CIVIC_BOSCH)
+    CP.flags |= int(HondaFlags.EPS_MODIFIED)
+    CP.lateralTuning.init("torque")
+    CP.lateralTuning.torque.latAccelFactor = 3.0
+    CP.lateralTuning.torque.friction = 0.1
+
+    monkeypatch.setattr(latcontrol_torque, "civic_bosch_modified_lateral_testing_ground_active", lambda: True)
+    CI = CarInterface(CP, custom.StarPilotCarParams.new_message())
+    controller = LatControlTorque(CP.as_reader(), CI, DT_CTRL)
+
+    assert controller.torque_params.latAccelFactor == pytest.approx(3.0 * 1.20)
+
   def test_modified_civic_b_torque_ff_scale_curve(self):
     steady_left = get_civic_bosch_modified_b_ff_scale(0.5, 0.0, 12.0)
     steady_right = get_civic_bosch_modified_b_ff_scale(-0.5, 0.0, 12.0)
@@ -424,7 +441,7 @@ class TestLatControl:
 
     assert steady_left < 1.0
     assert steady_right < 1.0
-    assert steady_left < steady_right
+    assert steady_right < steady_left
     assert turn_in_left > steady_left
     assert turn_in_right > steady_right
     assert unwind_left < steady_left

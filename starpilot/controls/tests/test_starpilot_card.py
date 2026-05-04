@@ -88,6 +88,35 @@ def test_honda_lkas_button_can_toggle_always_on_lateral(monkeypatch, tmp_path):
   ret = card.update(car_state, starpilot_car_state, sm, toggles)
 
   assert ret.alwaysOnLateralAllowed is True
+  assert ret.pauseLateral is False
+
+
+def test_honda_lkas_button_pauses_lateral_when_cruise_is_active(monkeypatch, tmp_path):
+  monkeypatch.setattr(spc, "Params", FakeParams)
+  monkeypatch.setattr(spc, "is_FrogsGoMoo", lambda: False)
+  monkeypatch.setattr(spc, "ERROR_LOGS_PATH", tmp_path)
+
+  card = spc.StarPilotCard(
+    SimpleNamespace(brand="honda"),
+    SimpleNamespace(alternativeExperience=spc.ALTERNATIVE_EXPERIENCE.ALWAYS_ON_LATERAL),
+  )
+  card.always_on_lateral_allowed = True
+
+  car_state = make_car_state(available=True, enabled=True, button_events=[SimpleNamespace(type=spc.ButtonType.lkas, pressed=True)])
+  starpilot_car_state = SimpleNamespace(distancePressed=False)
+  sm = make_sm()
+  sm["selfdriveState"].active = True
+  toggles = make_toggles(always_on_lateral_lkas=True, lkas_allowed_for_aol=True)
+
+  ret = card.update(car_state, starpilot_car_state, sm, toggles)
+
+  assert ret.alwaysOnLateralAllowed is False
+  assert ret.pauseLateral is True
+
+  ret = card.update(car_state, starpilot_car_state, sm, toggles)
+
+  assert ret.alwaysOnLateralAllowed is True
+  assert ret.pauseLateral is False
 
 
 def test_main_aol_still_follows_cruise_main_for_other_platforms(monkeypatch, tmp_path):

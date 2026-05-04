@@ -91,7 +91,8 @@ def _create_angle_adas_cmd_msg(packer, CAN, apply_angle: float, lat_active: bool
   return packer.make_can_msg("ADAS_CMD_35_10ms", CAN.ECAN, values)
 
 
-def create_steering_messages(packer, CP, CAN, enabled, lat_active, apply_torque, apply_angle, lfa_base_values=None):
+def create_steering_messages(packer, CP, CAN, enabled, lat_active, apply_torque, apply_angle,
+                             lfa_base_values=None, lkas_base_values=None):
   control_values = {
     "LKA_MODE": 2,
     "LKA_ICON": 2 if enabled else 1,
@@ -101,8 +102,12 @@ def create_steering_messages(packer, CP, CAN, enabled, lat_active, apply_torque,
     "STEER_MODE": 0,
   }
 
-  lkas_values = copy.copy(control_values)
-  lkas_values["LKA_AVAILABLE"] = 0
+  if lkas_base_values:
+    lkas_values = {k: v for k, v in lkas_base_values.items() if k not in ("CHECKSUM", "COUNTER")}
+    lkas_values.update(control_values)
+  else:
+    lkas_values = copy.copy(control_values)
+    lkas_values["LKA_AVAILABLE"] = 0
 
   if lfa_base_values:
     # Preserve stock UI/status fields and only override the actuation-relevant signals.

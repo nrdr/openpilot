@@ -438,9 +438,11 @@ class CarController(CarControllerBase):
     use_ioniq_6_smoothed_accel = use_ioniq_6_dynamic_long_tuning and CC.actuators.accel >= self._ioniq_6_long_tuning.actual_accel
 
     # steering control
+    preserve_stock_lkas = self.CP.carFingerprint == CAR.HYUNDAI_IONIQ_6 and not self.long_active_ecu
     can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, self.CAN, CC.enabled,
                                                            apply_steer_req, apply_torque, apply_angle,
-                                                           CS.stock_lfa_msg))
+                                                           CS.stock_lfa_msg,
+                                                           CS.stock_lkas_msg if preserve_stock_lkas else None))
 
     # prevent LFA from activating on LKA steering cars by sending "no lane lines detected" to ADAS ECU
     if self.frame % 5 == 0 and lka_steering:

@@ -11,6 +11,7 @@ from opendbc.car.honda.carcontroller import (
   get_honda_bosch_wind_brake_mps2,
   update_honda_bosch_live_learning,
 )
+from opendbc.car.honda.hondacan import create_lkas_hud
 from opendbc.car.honda.fingerprints import FW_VERSIONS
 from opendbc.car.honda.values import CAR, HONDA_BOSCH, HONDA_BOSCH_TJA_CONTROL, HondaFlags
 
@@ -18,6 +19,19 @@ HONDA_FW_VERSION_RE = rb"[A-Z0-9]{5}-[A-Z0-9]{3}(-|,)[A-Z0-9]{4}(\x00){2}$"
 
 
 class TestHondaFingerprint:
+  def test_honda_lkas_hud_shows_lane_lines_when_lateral_only_is_active(self):
+    class FakePacker:
+      @staticmethod
+      def make_can_msg(name, bus, values):
+        return name, bus, values
+
+    CP = CarInterface.get_non_essential_params(CAR.HONDA_CIVIC_BOSCH)
+    hud_control = SimpleNamespace(lanesVisible=False)
+
+    cmds = create_lkas_hud(FakePacker(), 0, CP, hud_control, True, True, False, False, {})
+
+    assert cmds[0][2]["SOLID_LANES"] is True
+
   def test_fw_version_format(self):
     # Asserts all FW versions follow an expected format
     for fw_by_ecu in FW_VERSIONS.values():

@@ -89,6 +89,7 @@ class CarState(CarStateBase):
 
     self.cruise_info = {}
     self.msg_364 = {}
+    self.stock_lkas_msg = {}
     self.stock_lfa_msg = {}
     self.stock_lfahda_cluster_msg = {}
     self.stock_blinker_stalks_ts = 0
@@ -400,8 +401,11 @@ class CarState(CarStateBase):
     ret.accFaulted = cp.vl["TCS"]["ACCEnable"] != 0  # 0 ACC CONTROL ENABLED, 1-3 ACC CONTROL DISABLED
 
     if self.CP.flags & HyundaiFlags.CANFD_LKA_STEERING:
+      lkas_msg = "LKAS_ALT" if self.CP.flags & HyundaiFlags.CANFD_LKA_STEERING_ALT else "LKAS"
       self.lfa_block_msg = copy.copy(cp_cam.vl["CAM_0x362"] if self.CP.flags & HyundaiFlags.CANFD_LKA_STEERING_ALT
                                           else cp_cam.vl["CAM_0x2a4"])
+      if cp_cam.ts_nanos[lkas_msg]["CHECKSUM"] > 0:
+        self.stock_lkas_msg = copy.copy(cp_cam.vl[lkas_msg])
     if cp.ts_nanos["LFA"]["CHECKSUM"] > 0:
       self.stock_lfa_msg = copy.copy(cp.vl["LFA"])
     if cp.ts_nanos["LFAHDA_CLUSTER"]["CHECKSUM"] > 0:
@@ -446,6 +450,7 @@ class CarState(CarStateBase):
       ]
     if CP.flags & HyundaiFlags.CANFD_LKA_STEERING:
       msgs.append(("FR_CMR_02_100ms", 10))
+      cam_msgs.append(("LKAS_ALT" if CP.flags & HyundaiFlags.CANFD_LKA_STEERING_ALT else "LKAS", 0))
     else:
       cam_msgs.append(("FR_CMR_02_100ms", 0))  # optional: not all non-LKA CANFD cars have this on CAM bus
     msgs += [
