@@ -115,7 +115,7 @@ class LatControlPID(LatControl):
         )
         self.eps_modified_steering_pressed_prev = steering_pressed
 
-      freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < 5
+      freeze_integrator = steer_limited_by_safety or steering_pressed
 
       output_torque = self.pid.update(error,
                                 feedforward=ff,
@@ -124,8 +124,6 @@ class LatControlPID(LatControl):
 
       if self.is_clarity_eps_modified:
         desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
-        low_speed_scale = max(min((CS.vEgo - 1.5) / 3.5, 1.0), 0.0)
-        output_torque *= low_speed_scale
         output_torque *= _clarity_pid_output_scale(angle_steers_des_no_offset, desired_angle_delta, CS.vEgo)
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
 
