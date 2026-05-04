@@ -264,7 +264,7 @@ class Controls:
       hud_set_speed = get_gm_hud_set_speed(hud_set_speed, self.starpilot_toggles)
     hudControl.setSpeed = hud_set_speed
     hudControl.speedVisible = CC.enabled
-    hudControl.lanesVisible = CC.enabled
+    hudControl.lanesVisible = CC.enabled or CC.latActive
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
     hudControl.leadDistanceBars = self.sm['selfdriveState'].personality.raw + 1
     hudControl.visualAlert = self.sm['selfdriveState'].alertHudVisual
