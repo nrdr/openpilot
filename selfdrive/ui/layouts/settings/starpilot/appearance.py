@@ -12,7 +12,6 @@ from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 from openpilot.selfdrive.ui.lib.starpilot_state import starpilot_state
 from openpilot.selfdrive.ui.layouts.settings.starpilot.panel import _SettingsPage
 from openpilot.selfdrive.ui.layouts.settings.starpilot.aethergrid import (
-    AETHER_LIST_METRICS,
     AetherSliderDialog,
     DEFAULT_PANEL_STYLE,
 )
@@ -23,8 +22,6 @@ from openpilot.selfdrive.ui.layouts.settings.starpilot.longitudinal import (
 )
 
 PANEL_STYLE = DEFAULT_PANEL_STYLE
-UTILITY_ROW_HEIGHT = AETHER_LIST_METRICS.utility_row_height
-ROW_HEIGHT = AETHER_LIST_METRICS.row_height
 
 # ── Theme paths & config (preserved from themes.py) ──
 
@@ -170,7 +167,7 @@ class StarPilotAppearancePersonalizeLayout(_SettingsPage):
                            subtitle="",
                            get_value=lambda: self._get_theme_value("WheelIcon"),
                            on_click=lambda: self._show_theme_selector("WheelIcon")),
-            ], row_height=UTILITY_ROW_HEIGHT),
+            ]),
         ]
         self._manager_view = AetherSettingsView(
             self, sections,
@@ -277,7 +274,7 @@ class StarPilotAppearanceLayout(_SettingsPage):
                            subtitle="",
                            get_state=lambda: self._params.get_bool("HideAlerts"),
                            set_state=lambda s: self._params.put_bool("HideAlerts", s)),
-            ], tab_key="display", column_pair="display", row_height=UTILITY_ROW_HEIGHT),
+            ], tab_key="display", column_pair="display"),
 
             SettingSection(tr_noop("Speed Info"), [
                 SettingRow("HideSpeedLimit", "toggle", tr_noop("Hide Speed Limit"),
@@ -293,7 +290,7 @@ class StarPilotAppearanceLayout(_SettingsPage):
                            subtitle="",
                            get_state=lambda: self._params.get_bool("WheelSpeed"),
                            set_state=lambda s: self._params.put_bool("WheelSpeed", s)),
-            ], tab_key="display", column_pair="display", row_height=UTILITY_ROW_HEIGHT),
+            ], tab_key="display", column_pair="display"),
 
             # ═══ Tab 2: Widgets — driving screen widget toggles ═══
             SettingSection(tr_noop("Path Overlays"), [
@@ -319,7 +316,7 @@ class StarPilotAppearanceLayout(_SettingsPage):
                            get_state=lambda: self._params.get_bool("BlindSpotPath"),
                            set_state=lambda s: self._params.put_bool("BlindSpotPath", s),
                            visible=bsm),
-            ], tab_key="widgets", column_pair="widgets", row_height=UTILITY_ROW_HEIGHT),
+            ], tab_key="widgets", column_pair="widgets"),
 
             SettingSection(tr_noop("Dashboard Controls"), [
                 SettingRow("Compass", "toggle", tr_noop("Compass"),
@@ -349,7 +346,7 @@ class StarPilotAppearanceLayout(_SettingsPage):
                            subtitle="",
                            get_state=lambda: self._params.get_bool("RotatingWheel"),
                            set_state=lambda s: self._params.put_bool("RotatingWheel", s)),
-            ], tab_key="widgets", column_pair="widgets", row_height=UTILITY_ROW_HEIGHT),
+            ], tab_key="widgets", column_pair="widgets"),
 
             # ═══ Tab 3: Convenience — QOL + Navigation ═══
             SettingSection(tr_noop("Quality of Life"), [
@@ -369,7 +366,7 @@ class StarPilotAppearanceLayout(_SettingsPage):
                            subtitle="",
                            get_state=lambda: self._params.get_bool("StoppedTimer"),
                            set_state=lambda s: self._params.put_bool("StoppedTimer", s)),
-            ], tab_key="convenience", column_pair="convenience", row_height=UTILITY_ROW_HEIGHT),
+            ], tab_key="convenience", column_pair="convenience"),
 
             SettingSection(tr_noop("Navigation"), [
                 SettingRow("NavigationUI", "toggle", tr_noop("Navigation Widgets"),
@@ -388,7 +385,7 @@ class StarPilotAppearanceLayout(_SettingsPage):
                            subtitle="",
                            get_state=lambda: self._params.get_bool("UseVienna"),
                            set_state=lambda s: self._params.put_bool("UseVienna", s)),
-            ], tab_key="convenience", column_pair="convenience", row_height=UTILITY_ROW_HEIGHT),
+            ], tab_key="convenience", column_pair="convenience"),
 
             # ═══ Tab 4: Model — path/lane visualization ═══
             SettingSection(tr_noop("Path & Lanes"), [
@@ -412,7 +409,7 @@ class StarPilotAppearanceLayout(_SettingsPage):
                            subtitle="",
                            get_value=lambda: self._get_path_width_display(),
                            on_click=self._show_path_width_selector),
-            ], tab_key="model", column_pair="model", row_height=UTILITY_ROW_HEIGHT),
+            ], tab_key="model", column_pair="model"),
 
             SettingSection(tr_noop("Edges & Colors"), [
                 SettingRow("PathEdgeWidth", "value", tr_noop("Path Edge Width"),
@@ -435,7 +432,7 @@ class StarPilotAppearanceLayout(_SettingsPage):
                            subtitle="",
                            get_value=lambda: f"{int(round(self._params.get_float('BorderWidth')))}%",
                            on_click=lambda: self._show_float_selector("BorderWidth", 25, 250, 5, "%")),
-            ], tab_key="model", column_pair="model", row_height=UTILITY_ROW_HEIGHT),
+            ], tab_key="model", column_pair="model"),
 
             # ═══ Tab 5: Theme — customization ═══
             SettingSection(tr_noop("Customization"), [
@@ -455,7 +452,7 @@ class StarPilotAppearanceLayout(_SettingsPage):
                            subtitle="",
                            get_state=lambda: self._params.get_bool("RainbowPath"),
                            set_state=lambda s: self._params.put_bool("RainbowPath", s)),
-            ], tab_key="theme", column_pair="theme", row_height=UTILITY_ROW_HEIGHT),
+            ], tab_key="theme", column_pair="theme"),
 
             SettingSection(tr_noop("Options"), [
                 SettingRow("RandomEvents", "toggle", tr_noop("Random Events"),
@@ -470,7 +467,7 @@ class StarPilotAppearanceLayout(_SettingsPage):
                            subtitle="",
                            get_value=self._get_startup_alert_display,
                            on_click=self._show_startup_alert_selector),
-            ], tab_key="theme", column_pair="theme", row_height=UTILITY_ROW_HEIGHT),
+            ], tab_key="theme", column_pair="theme"),
         ]
 
         self._manager_view = AetherSettingsView(

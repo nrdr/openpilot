@@ -12,7 +12,6 @@ from openpilot.system.ui.widgets.label import gui_label
 from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 from openpilot.selfdrive.ui.layouts.settings.starpilot.panel import StarPilotPanel
 from openpilot.selfdrive.ui.layouts.settings.starpilot.aethergrid import (
-  AETHER_COMPACT_ROW_HEIGHT,
   AETHER_LIST_METRICS,
   AetherListColors,
   AetherScrollbar,
@@ -65,17 +64,16 @@ class VehicleSettingsManagerView(Widget):
   HEADER_SUBTITLE_HEIGHT = 24
   HEADER_SUMMARY_GAP = 12
   HEADER_CARD_HEIGHT = 108
-  TAB_HEIGHT = 52
+  TAB_HEIGHT = 56
   TAB_GAP = 10
   TAB_BOTTOM_GAP = 18
   SECTION_GAP = AETHER_LIST_METRICS.section_gap
   SECTION_HEADER_HEIGHT = AETHER_LIST_METRICS.section_header_height
   SECTION_HEADER_GAP = AETHER_LIST_METRICS.section_header_gap
-  ROW_HEIGHT = AETHER_COMPACT_ROW_HEIGHT
+  ROW_HEIGHT = AETHER_LIST_METRICS.row_height
   FADE_HEIGHT = AETHER_LIST_METRICS.fade_height
   COLUMN_GAP = 22
   TWO_COLUMN_BREAKPOINT = 1180
-  ACTION_PILL_WIDTH = 108
 
   PANEL_STYLE = DEFAULT_PANEL_STYLE
 
@@ -332,8 +330,8 @@ class VehicleSettingsManagerView(Widget):
         current=self._active_tab_key == tab["id"],
         hovered=hovered,
         pressed=pressed,
-        title_size=19,
-        subtitle_size=14,
+        title_size=26,
+        subtitle_size=17,
         show_underline=True,
         style=self.PANEL_STYLE,
       )
@@ -399,16 +397,16 @@ class VehicleSettingsManagerView(Widget):
       draw_settings_list_row(
         rect, title=row["title"], subtitle=row.get("subtitle", ""),
         toggle_value=row["get_state"](), hovered=hovered, pressed=pressed,
-        is_last=is_last, show_chevron=False, title_size=26, subtitle_size=17,
+        is_last=is_last, show_chevron=False, title_size=34, subtitle_size=22,
         style=self.PANEL_STYLE,
       )
     elif row_type == "select":
       draw_selection_list_row(
         rect, title=row["title"], subtitle=row.get("subtitle", ""),
         action_text=row["get_value"](), hovered=hovered, pressed=pressed,
-        is_last=is_last, action_width=154, action_pill=True,
-        action_pill_width=row.get("pill_width", 108), action_pill_height=40,
-        title_size=26, subtitle_size=17, action_text_size=15,
+        is_last=is_last, action_width=188, action_pill=True,
+        action_pill_width=row.get("pill_width", 108), action_pill_height=44,
+        title_size=34, subtitle_size=22, action_text_size=18,
         row_separator=self.PANEL_STYLE.divider_color,
         action_fill=self.PANEL_STYLE.current_fill,
         action_border=self.PANEL_STYLE.current_border,
@@ -418,7 +416,7 @@ class VehicleSettingsManagerView(Widget):
       draw_settings_list_row(
         rect, title=row["title"], value=row["get_value"](),
         hovered=False, pressed=False, is_last=is_last,
-        show_chevron=False, title_size=26, subtitle_size=17,
+        show_chevron=False, title_size=34, subtitle_size=22,
         style=self.PANEL_STYLE,
       )
 

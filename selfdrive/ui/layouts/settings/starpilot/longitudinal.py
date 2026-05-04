@@ -47,8 +47,6 @@ SECTION_GAP = AETHER_LIST_METRICS.section_gap
 SECTION_HEADER_HEIGHT = AETHER_LIST_METRICS.section_header_height
 SECTION_HEADER_GAP = AETHER_LIST_METRICS.section_header_gap
 ROW_HEIGHT = AETHER_LIST_METRICS.row_height
-UTILITY_ROW_HEIGHT = AETHER_LIST_METRICS.utility_row_height
-FADE_HEIGHT = AETHER_LIST_METRICS.fade_height
 
 ACCELERATION_PROFILE_OPTIONS = [
   (ACCELERATION_PROFILES["STANDARD"], "Standard"),
@@ -266,7 +264,7 @@ class AetherSettingsView(Widget):
         current=self._active_tab_key == tab["id"],
         hovered=hovered,
         pressed=pressed,
-        title_size=24,
+        title_size=26,
         subtitle_size=17,
         show_underline=True,
         style=self._panel_style,
@@ -367,6 +365,7 @@ class AetherSettingsView(Widget):
         pressed=pressed,
         is_last=is_last,
         show_chevron=False,
+        title_size=34, subtitle_size=22,
         style=self._panel_style,
       )
     elif row.type == "value":
@@ -381,6 +380,7 @@ class AetherSettingsView(Widget):
         pressed=pressed,
         is_last=is_last,
         show_chevron=row.on_click is not None,
+        title_size=34, subtitle_size=22, value_size=28,
         style=self._panel_style,
       )
     elif row.type == "action":
@@ -398,6 +398,7 @@ class AetherSettingsView(Widget):
         pressed=pressed,
         is_last=is_last,
         action_pill=True,
+        title_size=34, subtitle_size=22,
         action_text_color=action_text_color,
         action_fill=action_fill,
         action_border=action_border,
@@ -477,7 +478,7 @@ class StarPilotLongitudinalLayout(_SettingsPage):
                    navigate_to="tuning",
                    enabled=lambda: self._params.get_bool("LongitudinalTune"),
                    disabled_label=tr_noop("Enable First")),
-      ], tab_key="tune", row_height=UTILITY_ROW_HEIGHT),
+      ], tab_key="tune"),
       SettingSection(tr_noop("Advanced"), [
         SettingRow("AdvancedTune", "toggle", tr_noop("Advanced Longitudinal Tuning"),
                    subtitle=tr_noop("Advanced acceleration and braking changes for refining launch, stopping, and actuator response."),
@@ -489,13 +490,13 @@ class StarPilotLongitudinalLayout(_SettingsPage):
                    navigate_to="advanced",
                    enabled=lambda: self._params.get_bool("AdvancedLongitudinalTune"),
                    disabled_label=tr_noop("Enable First")),
-      ], tab_key="tune", row_height=UTILITY_ROW_HEIGHT),
+      ], tab_key="tune"),
       SettingSection(tr_noop("Driving Personalities"), [
         SettingRow("PersonalitiesConfigure", "value", tr_noop("Configure"),
                    subtitle=tr_noop("Customize the Traffic, Aggressive, Standard, and Relaxed profiles to match your driving style."),
                    get_value=lambda: tr_noop("Manage"),
                    navigate_to="personalities"),
-      ], tab_key="tune", row_height=UTILITY_ROW_HEIGHT),
+      ], tab_key="tune"),
 
       # ── Adaptive tab ──
       SettingSection(tr_noop("Adaptive"), [
@@ -531,7 +532,7 @@ class StarPilotLongitudinalLayout(_SettingsPage):
                    subtitle=tr_noop("Display options for the speed limit controller."),
                    get_value=lambda: tr_noop("Configure"),
                    navigate_to="slc_visuals"),
-      ], tab_key="limits", column_pair="limits", row_height=UTILITY_ROW_HEIGHT),
+      ], tab_key="limits", column_pair="limits"),
       SettingSection(tr_noop("Override & Fallback"), [
         SettingRow("SLCFallback", "value", tr_noop("Fallback Speed"),
                    subtitle="",
@@ -545,7 +546,7 @@ class StarPilotLongitudinalLayout(_SettingsPage):
                    subtitle="",
                    get_value=self._get_priority_value,
                    on_click=self._on_priority_clicked),
-      ], tab_key="limits", column_pair="limits", row_height=UTILITY_ROW_HEIGHT),
+      ], tab_key="limits", column_pair="limits"),
 
       # ── Daily tab ──
       SettingSection(tr_noop("Cruise & Stops"), [
@@ -580,7 +581,7 @@ class StarPilotLongitudinalLayout(_SettingsPage):
                    get_value=lambda: f"{self._params.get_int('ForceStopDistanceOffset'):+d} ft",
                    on_click=lambda: self._show_slider("ForceStopDistanceOffset", -20, 20, unit=" ft"),
                    visible=lambda: self._params.get_bool("QOLLongitudinal") and self._params.get_bool("ForceStops")),
-      ], tab_key="daily", column_pair="daily", row_height=UTILITY_ROW_HEIGHT),
+      ], tab_key="daily", column_pair="daily"),
       SettingSection(tr_noop("Standstill & Gears"), [
         SettingRow("ForceStandstill", "toggle", tr_noop("Force Standstill"),
                    subtitle="",
@@ -612,7 +613,7 @@ class StarPilotLongitudinalLayout(_SettingsPage):
                    get_state=lambda: self._params.get_bool("MapDeceleration"),
                    set_state=lambda s: self._params.put_bool("MapDeceleration", s),
                    visible=lambda: self._params.get_bool("QOLLongitudinal") and self._params.get_bool("MapGears")),
-       ], tab_key="daily", column_pair="daily", row_height=UTILITY_ROW_HEIGHT),
+       ], tab_key="daily", column_pair="daily"),
     ]
 
     self._manager_view = AetherSettingsView(
@@ -684,7 +685,7 @@ class StarPilotLongitudinalTuneLayout(_SettingsPage):
                    get_value=self._get_deceleration_profile_label,
                    on_click=self._show_deceleration_profile_selector,
                    visible=self._longitudinal_enabled),
-      ], row_height=UTILITY_ROW_HEIGHT),
+      ]),
       SettingSection(tr_noop("Human-Like Driving"), [
         SettingRow("HumanAcceleration", "toggle", tr_noop("Human-Like Acceleration"),
                    subtitle=tr_noop("Smooth throttle at low speed with stronger takeoff from a stop."),
@@ -696,28 +697,28 @@ class StarPilotLongitudinalTuneLayout(_SettingsPage):
                    get_state=lambda: self._params.get_bool("CoastUpToLeads"),
                    set_state=lambda s: self._params.put_bool("CoastUpToLeads", s),
                    visible=self._longitudinal_enabled),
-      ], column_pair="human_driving", row_height=UTILITY_ROW_HEIGHT),
+      ], column_pair="human_driving"),
       SettingSection(tr_noop("Lane Changes"), [
         SettingRow("HumanLaneChanges", "toggle", tr_noop("Human-Like Lane Changes"),
                    subtitle=tr_noop("Radar-informed behavior during lane changes."),
                    get_state=lambda: self._params.get_bool("HumanLaneChanges"),
                    set_state=lambda s: self._params.put_bool("HumanLaneChanges", s),
                    visible=lambda: self._longitudinal_enabled() and starpilot_state.car_state.hasRadar),
-      ], column_pair="human_driving", row_height=UTILITY_ROW_HEIGHT),
+      ], column_pair="human_driving"),
       SettingSection(tr_noop("Detection"), [
         SettingRow("LeadDetection", "value", tr_noop("Lead Detection Sensitivity"),
                    subtitle=tr_noop("Control how aggressively openpilot detects and reacts to vehicles ahead."),
                    get_value=lambda: f"{self._params.get_int('LeadDetectionThreshold')}%",
                    on_click=lambda: self._show_slider("LeadDetectionThreshold", 25, 50, unit="%"),
                    visible=self._longitudinal_enabled),
-      ], column_pair="detection_tune", row_height=UTILITY_ROW_HEIGHT),
+      ], column_pair="detection_tune"),
       SettingSection(tr_noop("Tuning"), [
         SettingRow("TacoTune", "toggle", tr_noop("Taco Bell Run Turn Speed Hack"),
                    subtitle=tr_noop("Slow down more assertively for turns."),
                    get_state=lambda: self._params.get_bool("TacoTune"),
                    set_state=lambda s: self._params.put_bool("TacoTune", s),
                    visible=self._longitudinal_enabled),
-      ], column_pair="detection_tune", row_height=UTILITY_ROW_HEIGHT),
+      ], column_pair="detection_tune"),
     ]
     self._manager_view = AetherSettingsView(
       self, sections,
@@ -799,7 +800,7 @@ class StarPilotAdvancedLongitudinalLayout(_SettingsPage):
                    get_value=lambda: f"{self._params.get_float('StartAccel'):.2f}m/s",
                    on_click=lambda: self._show_slider("StartAccel", 0.0, 4.0, step=0.01, unit="m/s", value_type="float"),
                    visible=lambda: adv() and not self._using_human_acceleration()),
-      ], row_height=UTILITY_ROW_HEIGHT),
+      ]),
       SettingSection(tr_noop("Braking"), [
         SettingRow("StopAccel", "value", tr_noop("Stop Acceleration"),
                    subtitle=tr_noop("Brake force to hold the vehicle at a complete stop."),
@@ -811,7 +812,7 @@ class StarPilotAdvancedLongitudinalLayout(_SettingsPage):
                    get_value=lambda: f"{self._params.get_float('StoppingDecelRate'):.3f}m/s",
                    on_click=lambda: self._show_slider("StoppingDecelRate", 0.001, 1.0, step=0.001, unit="m/s", value_type="float"),
                    visible=self._show_stop_tuning_values),
-      ], column_pair="adv_brake_speed", row_height=UTILITY_ROW_HEIGHT),
+      ], column_pair="adv_brake_speed"),
       SettingSection(tr_noop("Speed"), [
         SettingRow("StartSpeed", "value", tr_noop("Start Speed"),
                    subtitle=tr_noop("Speed where openpilot exits the stopped state."),
@@ -823,7 +824,7 @@ class StarPilotAdvancedLongitudinalLayout(_SettingsPage):
                    get_value=lambda: f"{self._params.get_float('VEgoStopping'):.2f}m/s",
                    on_click=lambda: self._show_slider("VEgoStopping", 0.01, 1.0, step=0.01, unit="m/s", value_type="float"),
                    visible=self._show_stop_tuning_values),
-      ], column_pair="adv_brake_speed", row_height=UTILITY_ROW_HEIGHT),
+      ], column_pair="adv_brake_speed"),
     ]
     self._manager_view = AetherSettingsView(
       self, sections,
@@ -890,7 +891,7 @@ class StarPilotConditionalExperimentalLayout(_SettingsPage):
                    get_state=lambda: self._params.get_bool("CELead"),
                    set_state=lambda s: self._params.put_bool("CELead", s),
                    visible=ce_on),
-      ], column_pair="ce", row_height=UTILITY_ROW_HEIGHT),
+      ], column_pair="ce"),
       SettingSection(tr_noop("Conditions"), [
         SettingRow("CESlowerLead", "toggle", tr_noop("Slower Lead"),
                    subtitle="",
@@ -927,7 +928,7 @@ class StarPilotConditionalExperimentalLayout(_SettingsPage):
                    get_state=lambda: self._params.get_bool("ShowCEMStatus"),
                    set_state=lambda s: self._params.put_bool("ShowCEMStatus", s),
                    visible=ce_on),
-      ], column_pair="ce", row_height=UTILITY_ROW_HEIGHT),
+      ], column_pair="ce"),
     ]
     self._manager_view = AetherSettingsView(
       self, sections,
@@ -1079,7 +1080,7 @@ class StarPilotPersonalityProfileLayout(_SettingsPage):
                    subtitle="",
                    get_value=lambda: f"{self._params.get_int(p + 'JerkDeceleration')}%",
                    on_click=lambda: self._show_slider(p + "JerkDeceleration", 25, 200, step=5, unit="%")),
-      ], column_pair=p, row_height=UTILITY_ROW_HEIGHT),
+      ], column_pair=p),
       SettingSection(tr_noop(f"{p} — Behavior"), [
         SettingRow(f"{p}JerkDanger", "value", tr_noop("Safety Gap Bias"),
                    subtitle="",
@@ -1098,7 +1099,7 @@ class StarPilotPersonalityProfileLayout(_SettingsPage):
                    action_text=tr_noop("Reset"),
                    action_danger=True,
                    on_click=lambda: self._reset_profile()),
-      ], column_pair=p, row_height=UTILITY_ROW_HEIGHT),
+      ], column_pair=p),
     ]
     self._manager_view = AetherSettingsView(
       self, sections,
@@ -1145,7 +1146,7 @@ class StarPilotSLCOffsetsLayout(_SettingsPage):
       ))
 
     sections: list[SettingSection] = [
-      SettingSection(tr_noop("SLC Offsets"), rows, row_height=UTILITY_ROW_HEIGHT),
+      SettingSection(tr_noop("SLC Offsets"), rows),
     ]
     self._manager_view = AetherSettingsView(
       self, sections,
@@ -1197,7 +1198,7 @@ class StarPilotSLCQOLLayout(_SettingsPage):
                    subtitle="",
                    get_state=lambda: self._params.get_bool("SLCMapboxFiller"),
                     set_state=lambda s: self._params.put_bool("SLCMapboxFiller", s)),
-      ], row_height=UTILITY_ROW_HEIGHT),
+      ]),
     ]
     self._manager_view = AetherSettingsView(
       self, sections,
