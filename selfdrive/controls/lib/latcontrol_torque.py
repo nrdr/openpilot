@@ -1106,9 +1106,6 @@ class LatControlTorque(LatControl):
         output_torque *= get_bolt_2018_2021_dynamic_torque_scale(setpoint, desired_lateral_jerk, CS.vEgo)
       elif volt_standard_test_active:
         output_torque *= volt_standard_center_taper
-      elif ioniq_6_test_active:
-        output_torque *= get_ioniq_6_output_taper_scale(setpoint, desired_lateral_jerk, CS.vEgo)
-
       pid_log.active = True
       pid_log.p = float(self.pid.p)
       pid_log.i = float(self.pid.i)

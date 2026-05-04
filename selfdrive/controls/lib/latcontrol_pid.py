@@ -53,15 +53,15 @@ def get_civic_bosch_modified_pid_output_alpha(desired_angle_deg: float, desired_
   onset = min(max((abs_angle - 0.75) / 5.25, 0.0), 1.0)
   cutoff = min(max((22.0 - abs_angle) / 8.0, 0.0), 1.0)
   band_weight = onset * cutoff
-  small_curve_weight = min(max((10.0 - abs_angle) / 4.0, 0.0), 1.0)
+  small_curve_weight = min(max((12.0 - abs_angle) / 6.0, 0.0), 1.0)
   large_turn_weight = min(max((abs_angle - 16.0) / 6.0, 0.0), 1.0)
   transition_weight = min(abs(desired_angle_delta_deg) / 0.35, 1.0)
   sign_change_weight = 1.0 if (output_torque * prev_output_torque) < 0.0 else 0.0
 
   smoothing = band_weight * (0.36 + (0.22 * speed_weight) + (0.12 * transition_weight) + (0.12 * sign_change_weight))
-  smoothing *= 1.0 + (0.25 * small_curve_weight)
+  smoothing *= 1.0 + (0.35 * small_curve_weight)
   smoothing *= 1.0 - (0.50 * large_turn_weight)
-  return min(max(1.0 - smoothing, 0.16), 1.0)
+  return min(max(1.0 - smoothing, 0.14), 1.0)
 
 
 class LatControlPID(LatControl):
