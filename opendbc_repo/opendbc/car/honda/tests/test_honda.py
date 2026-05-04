@@ -127,6 +127,18 @@ class TestHondaFingerprint:
     assert list(crv_cp.lateralTuning.pid.kpV) == pytest.approx([0.21])
     assert list(crv_cp.lateralTuning.pid.kiV) == pytest.approx([0.07])
 
+    clarity_fw = [CarParams.CarFw(ecu=CarParams.Ecu.eps, fwVersion=b'39990-TRW,A020\x00\x00', address=0x18DA30F1, subAddress=0)]
+    clarity_cp = CarInterface.get_params(CAR.HONDA_CLARITY, gen_empty_fingerprint(), clarity_fw, False, False, False, toggles)
+    assert not clarity_cp.dashcamOnly
+    assert clarity_cp.flags & HondaFlags.EPS_MODIFIED
+    assert clarity_cp.autoResumeSng
+    assert clarity_cp.minEnableSpeed == pytest.approx(-1.0)
+    assert list(clarity_cp.lateralParams.torqueBP) == [0, 1663]
+    assert list(clarity_cp.lateralParams.torqueV) == [0, 1663]
+    assert list(clarity_cp.lateralTuning.pid.kpV) == pytest.approx([0.04])
+    assert list(clarity_cp.lateralTuning.pid.kiV) == pytest.approx([0.05])
+    assert clarity_cp.lateralTuning.pid.kf == pytest.approx(0.000075)
+
   def test_modified_civic_bosch_keeps_official_support(self):
     toggles = SimpleNamespace(force_torque_controller=False, nnff=False, nnff_lite=False)
     car_fw = [CarParams.CarFw(ecu=CarParams.Ecu.eps, fwVersion=b'39990-TGG,A020\x00\x00', address=0x18DA30F1, subAddress=0)]

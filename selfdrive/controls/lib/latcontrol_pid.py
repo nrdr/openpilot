@@ -1,24 +1,18 @@
 import math
 
 from cereal import log
-from opendbc.car.honda.carcontroller import get_civic_bosch_modified_steering_pressed
+from opendbc.car.honda.carcontroller import get_civic_bosch_modified_steering_pressed as get_eps_modified_steering_pressed
 from opendbc.car.honda.values import CAR as HONDA, HondaFlags
-from openpilot.starpilot.common.testing_grounds import testing_ground
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.common.pid import PIDController
 
 
-def civic_bosch_modified_lateral_testing_ground_active() -> bool:
-  return testing_ground.use("8", "B")
-
-
-def get_civic_bosch_modified_pid_output_scale(desired_angle_deg: float, desired_angle_delta_deg: float, v_ego: float) -> float:
+def _clarity_pid_output_scale(desired_angle_deg: float, desired_angle_delta_deg: float, v_ego: float) -> float:
   abs_angle = abs(desired_angle_deg)
   speed_weight = min(max((v_ego - 4.0) / 10.0, 0.0), 1.0)
-  center_speed_weight = 0.70 + (0.30 * speed_weight)
-  center_weight = min(max((18.0 - abs_angle) / 18.0, 0.0), 1.0)
-  mid_turn_weight = min(max((abs_angle - 10.0) / 10.0, 0.0), 1.0)
-  angle_weight = min(max((abs_angle - 18.0) / 10.0, 0.0), 1.0)
+  center_speed_weight = 0.65 + (0.35 * speed_weight)
+  center_weight = min(max((16.0 - abs_angle) / 16.0, 0.0), 1.0)
+  angle_weight = min(max((abs_angle - 16.0) / 12.0, 0.0), 1.0)
   phase = desired_angle_deg * desired_angle_delta_deg
 
   is_left = desired_angle_deg > 0.0
@@ -72,11 +66,13 @@ class LatControlPID(LatControl):
                              pos_limit=self.steer_max, neg_limit=-self.steer_max)
     self.ff_factor = CP.lateralTuning.pid.kf
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
-    self.is_civic_bosch_modified = CP.carFingerprint == HONDA.HONDA_CIVIC_BOSCH and bool(CP.flags & HondaFlags.EPS_MODIFIED)
-    self.prev_angle_steers_des_no_offset = 0.0
-    self.modified_civic_steering_pressed_filter_s = 0.0
-    self.modified_civic_steering_pressed_prev = False
+    self.is_clarity_eps_modified = CP.carFingerprint == HONDA.HONDA_CLARITY and bool(CP.flags & HondaFlags.EPS_MODIFIED)
+    self.eps_modified_steering_pressed_filter_s = 0.0
+    self.eps_modified_steering_pressed_prev = False
     self.prev_output_torque = 0.0
+    self.prev_angle_steers_des_no_offset = 0.0
+    self._dt = dt
+    self._des_angle_rate_lim = 0.0
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, curvature_limited, lat_delay, calibrated_pose, model_data, starpilot_toggles):
     pid_log = log.ControlsState.LateralPIDState.new_message()
@@ -84,6 +80,12 @@ class LatControlPID(LatControl):
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
 
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+    if self.is_clarity_eps_modified:
+      max_delta = 200.0 * self._dt
+      angle_steers_des_no_offset = max(
+        min(angle_steers_des_no_offset, self._des_angle_rate_lim + max_delta),
+        self._des_angle_rate_lim - max_delta
+      )
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
     error = angle_steers_des - CS.steeringAngleDeg
 
@@ -93,23 +95,24 @@ class LatControlPID(LatControl):
       output_torque = 0.0
       pid_log.active = False
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
-      self.modified_civic_steering_pressed_filter_s = 0.0
-      self.modified_civic_steering_pressed_prev = False
+      self.eps_modified_steering_pressed_filter_s = 0.0
+      self.eps_modified_steering_pressed_prev = False
       self.prev_output_torque = 0.0
+      self._des_angle_rate_lim = angle_steers_des_no_offset
 
     else:
       # offset does not contribute to resistive torque
       ff = self.ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
       steering_pressed = CS.steeringPressed
-      if self.is_civic_bosch_modified:
-        self.modified_civic_steering_pressed_filter_s, steering_pressed = get_civic_bosch_modified_steering_pressed(
+      if self.is_clarity_eps_modified:
+        self.eps_modified_steering_pressed_filter_s, steering_pressed = get_eps_modified_steering_pressed(
           bool(CS.steeringPressed),
           float(getattr(CS, "steeringTorque", 0.0)),
           float(self.prev_output_torque),
-          self.modified_civic_steering_pressed_filter_s,
-          self.modified_civic_steering_pressed_prev,
+          self.eps_modified_steering_pressed_filter_s,
+          self.eps_modified_steering_pressed_prev,
         )
-        self.modified_civic_steering_pressed_prev = steering_pressed
+        self.eps_modified_steering_pressed_prev = steering_pressed
 
       freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < 5
 
@@ -118,12 +121,11 @@ class LatControlPID(LatControl):
                                 speed=CS.vEgo,
                                 freeze_integrator=freeze_integrator)
 
-      if self.is_civic_bosch_modified and civic_bosch_modified_lateral_testing_ground_active():
+      if self.is_clarity_eps_modified:
         desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
-        output_torque *= get_civic_bosch_modified_pid_output_scale(angle_steers_des_no_offset, desired_angle_delta, CS.vEgo)
-        output_alpha = get_civic_bosch_modified_pid_output_alpha(angle_steers_des_no_offset, desired_angle_delta, CS.vEgo,
-                                                                 output_torque, self.prev_output_torque)
-        output_torque = self.prev_output_torque + (output_alpha * (output_torque - self.prev_output_torque))
+        low_speed_scale = max(min((CS.vEgo - 1.5) / 3.5, 1.0), 0.0)
+        output_torque *= low_speed_scale
+        output_torque *= _clarity_pid_output_scale(angle_steers_des_no_offset, desired_angle_delta, CS.vEgo)
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
 
       pid_log.active = True
@@ -134,5 +136,6 @@ class LatControlPID(LatControl):
       pid_log.saturated = bool(self._check_saturation(self.steer_max - abs(output_torque) < 1e-3, CS, steer_limited_by_safety, curvature_limited))
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
       self.prev_output_torque = float(output_torque)
+      self._des_angle_rate_lim = angle_steers_des_no_offset
 
     return output_torque, angle_steers_des, pid_log
