@@ -38,7 +38,7 @@ class CarControllerParams:
   STEER_STEP = 1  # 100 Hz
   STEER_DELTA_UP = 3  # min/max in 0.33s for all Honda
   STEER_DELTA_DOWN = 3
-  STEER_GLOBAL_MIN_SPEED = 3 * CV.MPH_TO_MS
+  STEER_GLOBAL_MIN_SPEED = 0 * CV.MPH_TO_MS
 
   def __init__(self, CP):
     self.STEER_MAX = CP.lateralParams.torqueBP[-1]
@@ -182,7 +182,7 @@ class CAR(Platforms):
     CarSpecs(mass=3477 * CV.LB_TO_KG, wheelbase=2.83, steerRatio=16.0, centerToFrontRatio=0.39),
   )
   HONDA_CLARITY = HondaNidecPlatformConfig(
-    [HondaCarDocs("Honda Clarity 2018-21", min_steer_speed=12. * CV.MPH_TO_MS)],
+    [HondaCarDocs("Honda Clarity 2018-21", min_steer_speed=0. * CV.MPH_TO_MS)],
     CarSpecs(mass=1834, wheelbase=2.75, centerToFrontRatio=0.4, steerRatio=16.5),
     radar_dbc_dict('honda_clarity_hybrid_2018_can_generated'),
     flags=HondaFlags.HAS_ALL_DOOR_STATES,
