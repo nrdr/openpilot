@@ -21,6 +21,8 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
 )
 from openpilot.selfdrive.controls.lib.latcontrol_torque import (
   LatControlTorque,
+  get_civic_bosch_modified_b_ff_scale,
+  get_civic_bosch_modified_b_friction_scale,
   get_bolt_2017_center_taper_scale,
   get_friction_threshold,
   get_bolt_2017_base_torque_scale,
@@ -411,6 +413,33 @@ class TestLatControl:
     controller.update(True, CS, VM, params, False, 0.0025, False, 0.2, None, None, SimpleNamespace())
 
     assert captured["threshold"] == pytest.approx(0.3)
+
+  def test_modified_civic_b_torque_ff_scale_curve(self):
+    steady_left = get_civic_bosch_modified_b_ff_scale(0.5, 0.0, 12.0)
+    steady_right = get_civic_bosch_modified_b_ff_scale(-0.5, 0.0, 12.0)
+    turn_in_left = get_civic_bosch_modified_b_ff_scale(0.5, 0.8, 12.0)
+    turn_in_right = get_civic_bosch_modified_b_ff_scale(-0.5, -0.8, 12.0)
+    unwind_left = get_civic_bosch_modified_b_ff_scale(0.5, -0.8, 12.0)
+    unwind_right = get_civic_bosch_modified_b_ff_scale(-0.5, 0.8, 12.0)
+
+    assert steady_left < 1.0
+    assert steady_right < 1.0
+    assert steady_left < steady_right
+    assert turn_in_left > steady_left
+    assert turn_in_right > steady_right
+    assert unwind_left < steady_left
+    assert unwind_right < steady_right
+
+  def test_modified_civic_b_torque_friction_scale_curve(self):
+    turn_in_left = get_civic_bosch_modified_b_friction_scale(12.0, 0.5, 0.8)
+    turn_in_right = get_civic_bosch_modified_b_friction_scale(12.0, -0.5, -0.8)
+    unwind_left = get_civic_bosch_modified_b_friction_scale(12.0, 0.5, -0.8)
+    unwind_right = get_civic_bosch_modified_b_friction_scale(12.0, -0.5, 0.8)
+
+    assert turn_in_left > 1.0
+    assert turn_in_right > turn_in_left
+    assert unwind_left < 1.0
+    assert unwind_right < unwind_left
 
   def test_kia_ev6_testing_ground_update_path(self, monkeypatch):
     controller, VM, CS, params, starpilot_toggles = self._build_torque_controller(HYUNDAI.KIA_EV6)

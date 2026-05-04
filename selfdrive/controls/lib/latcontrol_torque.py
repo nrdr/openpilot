@@ -47,6 +47,22 @@ UNWIND_D_DES_THRESHOLD = -1.0
 UNWIND_LAT_ACCEL_NEAR_ZERO = 0.3
 MIN_LATERAL_CONTROL_SPEED = 0.3
 CIVIC_BOSCH_MODIFIED_B_FIXED_FRICTION_THRESHOLD = 0.30
+CIVIC_BOSCH_MODIFIED_B_TRANSITION_SPEED = 12.0
+CIVIC_BOSCH_MODIFIED_B_PHASE_SCALE = 0.10
+CIVIC_BOSCH_MODIFIED_B_FF_ONSET = 0.18
+CIVIC_BOSCH_MODIFIED_B_FF_ONSET_WIDTH = 0.07
+CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF = 1.00
+CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF_WIDTH = 0.30
+CIVIC_BOSCH_MODIFIED_B_FF_REDUCTION_LEFT = 0.11
+CIVIC_BOSCH_MODIFIED_B_FF_REDUCTION_RIGHT = 0.08
+CIVIC_BOSCH_MODIFIED_B_TURN_IN_BOOST_LEFT = 0.08
+CIVIC_BOSCH_MODIFIED_B_TURN_IN_BOOST_RIGHT = 0.10
+CIVIC_BOSCH_MODIFIED_B_UNWIND_TAPER_LEFT = 0.22
+CIVIC_BOSCH_MODIFIED_B_UNWIND_TAPER_RIGHT = 0.24
+CIVIC_BOSCH_MODIFIED_B_TURN_IN_FRICTION_BOOST_LEFT = 0.04
+CIVIC_BOSCH_MODIFIED_B_TURN_IN_FRICTION_BOOST_RIGHT = 0.05
+CIVIC_BOSCH_MODIFIED_B_UNWIND_FRICTION_REDUCTION_LEFT = 0.15
+CIVIC_BOSCH_MODIFIED_B_UNWIND_FRICTION_REDUCTION_RIGHT = 0.18
 
 BOLT_2022_2023_CARS = (
   GM_CAR.CHEVROLET_BOLT_ACC_2022_2023,
@@ -323,6 +339,69 @@ def get_friction_threshold(v_ego: float) -> float:
 
 def civic_bosch_modified_lateral_testing_ground_active() -> bool:
   return testing_ground.use("8", "B")
+
+
+def _civic_bosch_modified_b_low_speed_factor(v_ego: float) -> float:
+  return 1.0 / (1.0 + (max(v_ego, 0.0) / CIVIC_BOSCH_MODIFIED_B_TRANSITION_SPEED) ** 2)
+
+
+def _civic_bosch_modified_b_transition_phase(desired_lateral_accel: float, desired_lateral_jerk: float) -> float:
+  return math.tanh((desired_lateral_accel * desired_lateral_jerk) / CIVIC_BOSCH_MODIFIED_B_PHASE_SCALE)
+
+
+def _civic_bosch_modified_b_side_value(desired_lateral_accel: float, left_value: float, right_value: float) -> float:
+  return left_value if desired_lateral_accel >= 0.0 else right_value
+
+
+def get_civic_bosch_modified_b_ff_scale(desired_lateral_accel: float, desired_lateral_jerk: float, v_ego: float) -> float:
+  if desired_lateral_accel == 0.0:
+    return 1.0
+
+  abs_lateral_accel = abs(desired_lateral_accel)
+  onset = _sigmoid((abs_lateral_accel - CIVIC_BOSCH_MODIFIED_B_FF_ONSET) / CIVIC_BOSCH_MODIFIED_B_FF_ONSET_WIDTH)
+  cutoff = _sigmoid((CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF - abs_lateral_accel) / CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF_WIDTH)
+  base_reduction = _civic_bosch_modified_b_side_value(desired_lateral_accel,
+                                                       CIVIC_BOSCH_MODIFIED_B_FF_REDUCTION_LEFT,
+                                                       CIVIC_BOSCH_MODIFIED_B_FF_REDUCTION_RIGHT) * onset * cutoff
+
+  phase = _civic_bosch_modified_b_transition_phase(desired_lateral_accel, desired_lateral_jerk)
+  turn_in_weight = max(phase, 0.0)
+  unwind_weight = max(-phase, 0.0)
+  low_speed_factor = _civic_bosch_modified_b_low_speed_factor(v_ego)
+
+  turn_in_boost = 1.0 + (_civic_bosch_modified_b_side_value(desired_lateral_accel,
+                                                             CIVIC_BOSCH_MODIFIED_B_TURN_IN_BOOST_LEFT,
+                                                             CIVIC_BOSCH_MODIFIED_B_TURN_IN_BOOST_RIGHT) *
+                          turn_in_weight * (0.40 + 0.60 * low_speed_factor))
+  unwind_taper = 1.0 - (_civic_bosch_modified_b_side_value(desired_lateral_accel,
+                                                            CIVIC_BOSCH_MODIFIED_B_UNWIND_TAPER_LEFT,
+                                                            CIVIC_BOSCH_MODIFIED_B_UNWIND_TAPER_RIGHT) *
+                         unwind_weight * (0.35 + 0.65 * low_speed_factor))
+  return (1.0 - base_reduction) * turn_in_boost * max(unwind_taper, 0.0)
+
+
+def get_civic_bosch_modified_b_friction_scale(v_ego: float, desired_lateral_accel: float, desired_lateral_jerk: float) -> float:
+  if desired_lateral_accel == 0.0 or desired_lateral_jerk == 0.0:
+    return 1.0
+
+  abs_lateral_accel = abs(desired_lateral_accel)
+  onset = _sigmoid((abs_lateral_accel - CIVIC_BOSCH_MODIFIED_B_FF_ONSET) / CIVIC_BOSCH_MODIFIED_B_FF_ONSET_WIDTH)
+  cutoff = _sigmoid((CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF - abs_lateral_accel) / CIVIC_BOSCH_MODIFIED_B_FF_CUTOFF_WIDTH)
+  envelope = onset * cutoff * _civic_bosch_modified_b_low_speed_factor(v_ego)
+  phase = _civic_bosch_modified_b_transition_phase(desired_lateral_accel, desired_lateral_jerk)
+  turn_in_weight = max(phase, 0.0)
+  unwind_weight = max(-phase, 0.0)
+
+  friction_scale = 1.0
+  friction_scale += (_civic_bosch_modified_b_side_value(desired_lateral_accel,
+                                                         CIVIC_BOSCH_MODIFIED_B_TURN_IN_FRICTION_BOOST_LEFT,
+                                                         CIVIC_BOSCH_MODIFIED_B_TURN_IN_FRICTION_BOOST_RIGHT) *
+                     envelope * turn_in_weight)
+  friction_scale -= (_civic_bosch_modified_b_side_value(desired_lateral_accel,
+                                                         CIVIC_BOSCH_MODIFIED_B_UNWIND_FRICTION_REDUCTION_LEFT,
+                                                         CIVIC_BOSCH_MODIFIED_B_UNWIND_FRICTION_REDUCTION_RIGHT) *
+                     envelope * unwind_weight)
+  return min(max(friction_scale, 0.82), 1.06)
 
 
 def bolt_2017_lateral_testing_ground_active() -> bool:
@@ -1101,7 +1180,9 @@ class LatControlTorque(LatControl):
         friction_threshold = get_volt_plexy_friction_threshold(CS.vEgo, setpoint, desired_lateral_jerk)
         friction_scale = get_volt_plexy_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
       elif self.is_civic_bosch_modified and civic_bosch_modified_lateral_testing_ground_active():
+        ff *= get_civic_bosch_modified_b_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo)
         friction_threshold = CIVIC_BOSCH_MODIFIED_B_FIXED_FRICTION_THRESHOLD
+        friction_scale = get_civic_bosch_modified_b_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
       ff += friction_scale * get_friction(error_with_lsf + JERK_GAIN * desired_lateral_jerk, lateral_accel_deadzone, friction_threshold, self.torque_params)
       deadzone_boost_active = False
       if self.torque_deadzone_boost > 0.0 and abs(gravity_adjusted_future_lateral_accel) < DEADZONE_BOOST_LAT_ACCEL:
