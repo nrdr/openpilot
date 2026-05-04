@@ -329,12 +329,6 @@ class CAR(Platforms):
     radar_dbc_dict('acura_ilx_2016_can_generated'),
     flags=HondaFlags.NIDEC_ALT_SCM_MESSAGES,
   )
-  HONDA_CLARITY = HondaNidecPlatformConfig(
-    [HondaCarDocs("Honda Clarity 2018-21", "All", min_steer_speed=3. * CV.MPH_TO_MS)],
-    CarSpecs(mass=1838, wheelbase=2.75, centerToFrontRatio=0.4, steerRatio=16.5),
-    radar_dbc_dict('honda_clarity_hybrid_2018_can_generated'),
-    flags=HondaFlags.HAS_ALL_DOOR_STATES,
-  )
   HONDA_ODYSSEY = HondaNidecPlatformConfig(
     [HondaCarDocs("Honda Odyssey 2018-20")],
     CarSpecs(mass=1900, wheelbase=3.0, steerRatio=14.35, centerToFrontRatio=0.41, tireStiffnessFactor=0.82),
