@@ -4,6 +4,7 @@ from collections import deque
 
 from cereal import log
 from opendbc.car.gm.values import CAR as GM_CAR
+from opendbc.car.honda.values import CAR as HONDA_CAR, HondaFlags
 from opendbc.car.hyundai.values import CAR as HYUNDAI_CAR
 from opendbc.car.lateral import get_friction
 from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY, CV
@@ -45,6 +46,7 @@ DEADZONE_BOOST_LAT_ACCEL = 0.15
 UNWIND_D_DES_THRESHOLD = -1.0
 UNWIND_LAT_ACCEL_NEAR_ZERO = 0.3
 MIN_LATERAL_CONTROL_SPEED = 0.3
+CIVIC_BOSCH_MODIFIED_B_FIXED_FRICTION_THRESHOLD = 0.30
 
 BOLT_2022_2023_CARS = (
   GM_CAR.CHEVROLET_BOLT_ACC_2022_2023,
@@ -315,6 +317,10 @@ def _sigmoid(x: float) -> float:
 def get_friction_threshold(v_ego: float) -> float:
   # Keep the speed-scaled friction threshold behavior.
   return float(np.interp(v_ego, [1 * CV.MPH_TO_MS, 20 * CV.MPH_TO_MS, 75 * CV.MPH_TO_MS], [0.16, 0.19, 0.27]))
+
+
+def civic_bosch_modified_lateral_testing_ground_active() -> bool:
+  return testing_ground.use("8", "B")
 
 
 def bolt_2017_lateral_testing_ground_active() -> bool:
@@ -965,6 +971,7 @@ class LatControlTorque(LatControl):
     self.is_genesis_g90 = CP.carFingerprint in GENESIS_G90_CARS
     self.is_ioniq_6 = CP.carFingerprint in IONIQ_6_CARS
     self.is_kia_ev6 = CP.carFingerprint in KIA_EV6_CARS
+    self.is_civic_bosch_modified = CP.carFingerprint == HONDA_CAR.HONDA_CIVIC_BOSCH and bool(CP.flags & HondaFlags.EPS_MODIFIED)
     self.is_volt_cc = CP.carFingerprint == GM_CAR.CHEVROLET_VOLT_CC
     self.is_silverado = CP.carFingerprint == GM_CAR.CHEVROLET_SILVERADO
     self.use_bolt_ff_scaling = self.is_bolt_2022_2023 or self.is_bolt_2018_2021 or self.is_bolt_2017
@@ -1087,6 +1094,8 @@ class LatControlTorque(LatControl):
         ff *= get_volt_plexy_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo)
         friction_threshold = get_volt_plexy_friction_threshold(CS.vEgo, setpoint, desired_lateral_jerk)
         friction_scale = get_volt_plexy_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
+      elif self.is_civic_bosch_modified and civic_bosch_modified_lateral_testing_ground_active():
+        friction_threshold = CIVIC_BOSCH_MODIFIED_B_FIXED_FRICTION_THRESHOLD
       ff += friction_scale * get_friction(error_with_lsf + JERK_GAIN * desired_lateral_jerk, lateral_accel_deadzone, friction_threshold, self.torque_params)
       deadzone_boost_active = False
       if self.torque_deadzone_boost > 0.0 and abs(gravity_adjusted_future_lateral_accel) < DEADZONE_BOOST_LAT_ACCEL:

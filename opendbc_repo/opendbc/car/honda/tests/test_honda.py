@@ -140,6 +140,16 @@ class TestHondaFingerprint:
     assert list(CP.lateralTuning.pid.kpV) == pytest.approx([0.8])
     assert list(CP.lateralTuning.pid.kiV) == pytest.approx([0.24])
 
+  def test_modified_civic_b_testing_ground_forces_torque(self, monkeypatch):
+    toggles = SimpleNamespace(force_torque_controller=False, nnff=False, nnff_lite=False)
+    car_fw = [CarParams.CarFw(ecu=CarParams.Ecu.eps, fwVersion=b'39990-TGG,A020\x00\x00', address=0x18DA30F1, subAddress=0)]
+    monkeypatch.setattr("openpilot.starpilot.common.testing_grounds.testing_ground.use", lambda slot_id, variant="B": slot_id == "8" and variant == "B")
+
+    CP = CarInterface.get_params(CAR.HONDA_CIVIC_BOSCH, gen_empty_fingerprint(), car_fw, False, False, False, toggles)
+
+    assert CP.flags & HondaFlags.EPS_MODIFIED
+    assert CP.lateralTuning.which() == "torque"
+
   def test_honda_clarity_supports_pid_and_torque_paths(self):
     pid_toggles = SimpleNamespace(force_torque_controller=False, nnff=False, nnff_lite=False)
     car_fw = [CarParams.CarFw(ecu=CarParams.Ecu.eps, fwVersion=b'39990-TRW,A020\x00\x00', address=0x18DA30F1, subAddress=0)]

@@ -6,7 +6,7 @@ from cereal import car, custom, log
 import openpilot.selfdrive.controls.lib.latcontrol_torque as latcontrol_torque
 import openpilot.selfdrive.controls.lib.latcontrol_pid as latcontrol_pid
 from opendbc.car.car_helpers import interfaces
-from opendbc.car.honda.values import CAR as HONDA
+from opendbc.car.honda.values import CAR as HONDA, HondaFlags
 from opendbc.car.toyota.values import CAR as TOYOTA
 from opendbc.car.nissan.values import CAR as NISSAN
 from opendbc.car.gm.values import CAR as GM
@@ -376,6 +376,37 @@ class TestLatControl:
     tapered_output, _, _ = tapered_controller.update(True, CS, VM, params, False, 0.0025, False, 0.2, None, None, starpilot_toggles)
 
     assert tapered_output == pytest.approx(base_output)
+
+  def test_modified_civic_b_torque_path_uses_fixed_friction_threshold(self, monkeypatch):
+    CarInterface = interfaces[HONDA.HONDA_CIVIC_BOSCH]
+    CP = CarInterface.get_non_essential_params(HONDA.HONDA_CIVIC_BOSCH)
+    CP.flags |= int(HondaFlags.EPS_MODIFIED)
+    CP.lateralTuning.init("torque")
+    CI = CarInterface(CP, custom.StarPilotCarParams.new_message())
+    controller = LatControlTorque(CP.as_reader(), CI, DT_CTRL)
+    VM = VehicleModel(CP)
+
+    CS = car.CarState.new_message()
+    CS.vEgo = 12
+    CS.steeringPressed = False
+    CS.steeringAngleDeg = 1.0
+
+    params = log.LiveParametersData.new_message()
+    params.steerRatio = CP.steerRatio
+    params.stiffnessFactor = 1.0
+    params.roll = 0.0
+    params.angleOffsetDeg = 0.0
+
+    captured = {}
+    def fake_get_friction(_error, _deadzone, friction_threshold, _torque_params):
+      captured["threshold"] = friction_threshold
+      return 0.0
+
+    monkeypatch.setattr(latcontrol_torque, "civic_bosch_modified_lateral_testing_ground_active", lambda: True)
+    monkeypatch.setattr(latcontrol_torque, "get_friction", fake_get_friction)
+    controller.update(True, CS, VM, params, False, 0.0025, False, 0.2, None, None, SimpleNamespace())
+
+    assert captured["threshold"] == pytest.approx(0.3)
 
   def test_kia_ev6_testing_ground_update_path(self, monkeypatch):
     controller, VM, CS, params, starpilot_toggles = self._build_torque_controller(HYUNDAI.KIA_EV6)
