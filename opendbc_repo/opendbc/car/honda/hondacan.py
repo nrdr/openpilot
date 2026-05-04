@@ -168,15 +168,11 @@ def create_acc_hud(packer, bus, CP, enabled, pcm_speed, pcm_accel, hud_control, 
 def create_lkas_hud(packer, bus, CP, hud_control, lat_active, steering_available, reduced_steering, alert_steer_required, lkas_hud):
   commands = []
 
-  dashed_lanes = bool(hud_control.lanesVisible) and bool(steering_available)
-  solid_lanes = bool(lat_active)
-
   lkas_hud_values = {
     'LKAS_READY': 1,
     'LKAS_STATE_CHANGE': 1,
     'STEERING_REQUIRED': alert_steer_required,
-    'SOLID_LANES': solid_lanes,
-    'DASHED_LANES': dashed_lanes,
+    'SOLID_LANES': hud_control.lanesVisible,
     'BEEP': 0,
   }
 

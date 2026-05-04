@@ -132,8 +132,7 @@ class Controls:
     CC.enabled = self.sm['selfdriveState'].enabled
 
     # Check which actuators can be enabled
-    min_steer_speed = max(self.CP.minSteerSpeed, 0.0)
-    standstill = CS.standstill or (min_steer_speed > 0.0 and abs(CS.vEgo) <= min_steer_speed)
+    standstill = abs(CS.vEgo) <= max(self.CP.minSteerSpeed, 0.3) or CS.standstill
     CC.latActive = get_lateral_active(CC.enabled, self.sm['selfdriveState'].active,
                                       self.sm['starpilotCarState'].alwaysOnLateralEnabled,
                                       CS.steerFaultTemporary, CS.steerFaultPermanent,
@@ -265,7 +264,7 @@ class Controls:
       hud_set_speed = get_gm_hud_set_speed(hud_set_speed, self.starpilot_toggles)
     hudControl.setSpeed = hud_set_speed
     hudControl.speedVisible = CC.enabled
-    hudControl.lanesVisible = CC.latActive
+    hudControl.lanesVisible = CC.enabled
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
     hudControl.leadDistanceBars = self.sm['selfdriveState'].personality.raw + 1
     hudControl.visualAlert = self.sm['selfdriveState'].alertHudVisual
