@@ -1051,11 +1051,11 @@ class LatControlTorque(LatControl):
       bolt_2018_2021_tuned_path_active = self.is_bolt_2018_2021
       volt_standard_test_active = self.is_volt_standard and volt_standard_lateral_testing_ground_active()
       genesis_g90_test_active = self.is_genesis_g90 and genesis_g90_lateral_testing_ground_active()
-      ioniq_6_test_active = self.is_ioniq_6
+      ioniq_6_active = self.is_ioniq_6
       kia_ev6_test_active = self.is_kia_ev6 and kia_ev6_lateral_testing_ground_active()
       volt_plexy_test_active = self.is_volt_cc and volt_plexy_lateral_testing_ground_active()
       volt_standard_center_taper = get_volt_standard_center_taper_scale(setpoint, CS.vEgo) if volt_standard_test_active else 1.0
-      ioniq_6_center_taper = get_ioniq_6_center_taper_scale(setpoint, CS.vEgo) if ioniq_6_test_active else 1.0
+      ioniq_6_center_taper = get_ioniq_6_center_taper_scale(setpoint, CS.vEgo) if ioniq_6_active else 1.0
       friction_threshold = get_friction_threshold(CS.vEgo)
       friction_scale = 1.0
       if bolt_2022_2023_tuned_path_active:
@@ -1074,7 +1074,7 @@ class LatControlTorque(LatControl):
         ff *= get_genesis_g90_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo)
         friction_threshold = get_genesis_g90_friction_threshold(CS.vEgo, setpoint, desired_lateral_jerk)
         friction_scale = get_genesis_g90_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
-      elif ioniq_6_test_active:
+      elif ioniq_6_active:
         ff *= get_ioniq_6_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo) * ioniq_6_center_taper
         friction_threshold = get_ioniq_6_friction_threshold(CS.vEgo, setpoint, desired_lateral_jerk) / max(ioniq_6_center_taper, 1e-3)
         friction_scale = get_ioniq_6_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
