@@ -12,6 +12,7 @@ def _clarity_pid_output_scale(desired_angle_deg: float, desired_angle_delta_deg:
   speed_weight = min(max((v_ego - 4.0) / 10.0, 0.0), 1.0)
   center_speed_weight = 0.65 + (0.35 * speed_weight)
   center_weight = min(max((16.0 - abs_angle) / 16.0, 0.0), 1.0)
+  mid_turn_weight = min(max((abs_angle - 10.0) / 10.0, 0.0), 1.0)
   angle_weight = min(max((abs_angle - 16.0) / 12.0, 0.0), 1.0)
   phase = desired_angle_deg * desired_angle_delta_deg
 
