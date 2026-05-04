@@ -22,9 +22,9 @@ def get_civic_bosch_modified_pid_output_scale(desired_angle_deg: float, desired_
 
   is_left = desired_angle_deg > 0.0
   center_taper = 0.32
-  base_scale = 0.10 if is_left else 0.12
-  turn_in_scale = 0.10 if is_left else 0.14
-  unwind_scale = 0.14 if is_left else 0.20
+  base_scale = 0.12 if is_left else 0.10
+  turn_in_scale = 0.12 if is_left else 0.12
+  unwind_scale = 0.14 if is_left else 0.18
 
   scale = 1.0 - (center_speed_weight * center_weight * center_taper)
   scale += speed_weight * angle_weight * base_scale

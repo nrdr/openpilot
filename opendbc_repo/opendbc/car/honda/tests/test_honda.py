@@ -139,3 +139,25 @@ class TestHondaFingerprint:
     assert list(CP.lateralParams.torqueV) == [0, 4096]
     assert list(CP.lateralTuning.pid.kpV) == pytest.approx([0.8])
     assert list(CP.lateralTuning.pid.kiV) == pytest.approx([0.24])
+
+  def test_honda_clarity_supports_pid_and_torque_paths(self):
+    pid_toggles = SimpleNamespace(force_torque_controller=False, nnff=False, nnff_lite=False)
+    car_fw = [CarParams.CarFw(ecu=CarParams.Ecu.eps, fwVersion=b'39990-TRW,A020\x00\x00', address=0x18DA30F1, subAddress=0)]
+
+    pid_cp = CarInterface.get_params(CAR.HONDA_CLARITY, gen_empty_fingerprint(), car_fw, False, False, False, pid_toggles)
+
+    assert not pid_cp.dashcamOnly
+    assert pid_cp.flags & HondaFlags.EPS_MODIFIED
+    assert pid_cp.lateralTuning.which() == "pid"
+    assert list(pid_cp.lateralParams.torqueBP) == [0, 2560]
+    assert list(pid_cp.lateralParams.torqueV) == [0, 2560]
+    assert list(pid_cp.lateralTuning.pid.kpV) == pytest.approx([0.8])
+    assert list(pid_cp.lateralTuning.pid.kiV) == pytest.approx([0.24])
+    assert pid_cp.autoResumeSng
+    assert pid_cp.minEnableSpeed == pytest.approx(-1.0)
+    assert pid_cp.stopAccel == pytest.approx(0.0)
+
+    torque_toggles = SimpleNamespace(force_torque_controller=True, nnff=False, nnff_lite=False)
+    torque_cp = CarInterface.get_params(CAR.HONDA_CLARITY, gen_empty_fingerprint(), car_fw, False, False, False, torque_toggles)
+
+    assert torque_cp.lateralTuning.which() == "torque"

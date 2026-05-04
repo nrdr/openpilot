@@ -359,9 +359,8 @@ class TestLatControl:
 
     assert lac_log.active
 
-  def test_ioniq_6_testing_ground_update_path(self, monkeypatch):
+  def test_ioniq_6_default_update_path(self):
     controller, VM, CS, params, starpilot_toggles = self._build_torque_controller(HYUNDAI.HYUNDAI_IONIQ_6)
-    monkeypatch.setattr(latcontrol_torque, "ioniq_6_lateral_testing_ground_active", lambda: True)
 
     _, _, lac_log = controller.update(True, CS, VM, params, False, 0.0025, False, 0.2, None, None, starpilot_toggles)
 
@@ -396,7 +395,7 @@ class TestLatControl:
     assert get_civic_bosch_modified_pid_output_scale(-20.0, -0.5, 12.0) > get_civic_bosch_modified_pid_output_scale(-20.0, 0.0, 12.0)
     assert get_civic_bosch_modified_pid_output_scale(20.0, -0.5, 12.0) < get_civic_bosch_modified_pid_output_scale(20.0, 0.0, 12.0)
     assert get_civic_bosch_modified_pid_output_scale(-20.0, 0.5, 12.0) < get_civic_bosch_modified_pid_output_scale(-20.0, 0.0, 12.0)
-    assert get_civic_bosch_modified_pid_output_scale(-20.0, -0.5, 12.0) > get_civic_bosch_modified_pid_output_scale(20.0, 0.5, 12.0)
+    assert abs(get_civic_bosch_modified_pid_output_scale(-20.0, -0.5, 12.0) - get_civic_bosch_modified_pid_output_scale(20.0, 0.5, 12.0)) < 5e-3
     assert get_civic_bosch_modified_pid_output_scale(-20.0, -0.5, 4.0) < get_civic_bosch_modified_pid_output_scale(-20.0, -0.5, 12.0)
 
   def test_civic_bosch_modified_pid_output_alpha_curve(self):

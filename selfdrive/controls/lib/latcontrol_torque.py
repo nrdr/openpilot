@@ -201,8 +201,6 @@ GENESIS_G90_TURN_IN_FRICTION_BOOST_RIGHT = 0.12
 GENESIS_G90_UNWIND_FRICTION_REDUCTION_LEFT = 0.14
 GENESIS_G90_UNWIND_FRICTION_REDUCTION_RIGHT = 0.22
 
-IONIQ_6_LATERAL_TESTING_GROUND_ID = testing_ground.id_5
-IONIQ_6_LATERAL_TESTING_GROUND_VARIANT = "C"
 IONIQ_6_FF_GAIN_LEFT = 0.040
 IONIQ_6_FF_GAIN_RIGHT = 0.000
 IONIQ_6_FF_ONSET = 0.10
@@ -240,10 +238,14 @@ IONIQ_6_LOW_MID_CENTER_TAPER_SPEED_WIDTH = 1.5
 IONIQ_6_DIRECTIONAL_TAPER_LAT_START = 0.15
 IONIQ_6_DIRECTIONAL_TAPER_LAT_END = 0.90
 IONIQ_6_DIRECTIONAL_TAPER_LAT_WIDTH = 0.08
-IONIQ_6_DIRECTIONAL_TAPER_BASE_LEFT = 0.05
-IONIQ_6_DIRECTIONAL_TAPER_BASE_RIGHT = 0.47
-IONIQ_6_DIRECTIONAL_TAPER_UNWIND_LEFT = 1.00
-IONIQ_6_DIRECTIONAL_TAPER_UNWIND_RIGHT = 2.65
+IONIQ_6_DIRECTIONAL_TAPER_BASE_LEFT = 0.10
+IONIQ_6_DIRECTIONAL_TAPER_BASE_RIGHT = 0.40
+IONIQ_6_DIRECTIONAL_TAPER_UNWIND_LEFT = 1.20
+IONIQ_6_DIRECTIONAL_TAPER_UNWIND_RIGHT = 2.30
+IONIQ_6_DIRECTIONAL_TAPER_FLOOR_LEFT = 0.54
+IONIQ_6_DIRECTIONAL_TAPER_FLOOR_RIGHT = 0.60
+IONIQ_6_DIRECTIONAL_TAPER_UNWIND_FLOOR_LEFT = 0.10
+IONIQ_6_DIRECTIONAL_TAPER_UNWIND_FLOOR_RIGHT = 0.04
 IONIQ_6_OUTPUT_TAPER_SPEED = 8.5
 IONIQ_6_OUTPUT_TAPER_SPEED_WIDTH = 2.5
 IONIQ_6_OUTPUT_CENTER_TAPER_BLEND = 0.90
@@ -680,10 +682,6 @@ def get_genesis_g90_friction_scale(v_ego: float, desired_lateral_accel: float, d
   return min(max(friction_scale, 0.92), 1.12)
 
 
-def ioniq_6_lateral_testing_ground_active() -> bool:
-  return testing_ground.use(IONIQ_6_LATERAL_TESTING_GROUND_ID, IONIQ_6_LATERAL_TESTING_GROUND_VARIANT)
-
-
 def _ioniq_6_sigmoid(x: float) -> float:
   return _sigmoid(x)
 
@@ -780,7 +778,8 @@ def get_ioniq_6_directional_taper_scale(desired_lateral_accel: float, desired_la
   base_reduction = _ioniq_6_side_value(desired_lateral_accel, IONIQ_6_DIRECTIONAL_TAPER_BASE_LEFT, IONIQ_6_DIRECTIONAL_TAPER_BASE_RIGHT)
   unwind_reduction = _ioniq_6_side_value(desired_lateral_accel, IONIQ_6_DIRECTIONAL_TAPER_UNWIND_LEFT, IONIQ_6_DIRECTIONAL_TAPER_UNWIND_RIGHT)
   reduction = band_weight * (base_reduction + unwind_reduction * unwind_weight)
-  floor = 0.56 - (0.06 * unwind_weight)
+  floor = _ioniq_6_side_value(desired_lateral_accel, IONIQ_6_DIRECTIONAL_TAPER_FLOOR_LEFT, IONIQ_6_DIRECTIONAL_TAPER_FLOOR_RIGHT)
+  floor -= _ioniq_6_side_value(desired_lateral_accel, IONIQ_6_DIRECTIONAL_TAPER_UNWIND_FLOOR_LEFT, IONIQ_6_DIRECTIONAL_TAPER_UNWIND_FLOOR_RIGHT) * unwind_weight
   return max(1.0 - reduction, floor)
 
 
@@ -1052,7 +1051,7 @@ class LatControlTorque(LatControl):
       bolt_2018_2021_tuned_path_active = self.is_bolt_2018_2021
       volt_standard_test_active = self.is_volt_standard and volt_standard_lateral_testing_ground_active()
       genesis_g90_test_active = self.is_genesis_g90 and genesis_g90_lateral_testing_ground_active()
-      ioniq_6_test_active = self.is_ioniq_6 and ioniq_6_lateral_testing_ground_active()
+      ioniq_6_test_active = self.is_ioniq_6
       kia_ev6_test_active = self.is_kia_ev6 and kia_ev6_lateral_testing_ground_active()
       volt_plexy_test_active = self.is_volt_cc and volt_plexy_lateral_testing_ground_active()
       volt_standard_center_taper = get_volt_standard_center_taper_scale(setpoint, CS.vEgo) if volt_standard_test_active else 1.0
