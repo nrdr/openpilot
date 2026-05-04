@@ -24,7 +24,6 @@ from openpilot.system.ui.widgets.label import gui_label
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.layouts.settings.starpilot.panel import _SettingsPage
 from openpilot.selfdrive.ui.layouts.settings.starpilot.aethergrid import (
-  AETHER_COMPACT_ROW_HEIGHT,
   AETHER_LIST_METRICS,
   AetherAdjustorRow,
   AetherScrollbar,
@@ -32,8 +31,6 @@ from openpilot.selfdrive.ui.layouts.settings.starpilot.aethergrid import (
   AetherListColors,
   DEFAULT_PANEL_STYLE,
   _point_hits,
-  build_list_panel_frame,
-  draw_list_panel_shell,
   init_list_panel,
   draw_list_group_shell,
   draw_list_scroll_fades,
@@ -624,7 +621,7 @@ class SystemSettingsManagerView(Widget):
         current=self._active_tab_key == tab["id"],
         hovered=hovered,
         pressed=pressed,
-        title_size=24,
+        title_size=26,
         subtitle_size=17,
         show_underline=True,
         style=self.PANEL_STYLE,
@@ -713,7 +710,7 @@ class SystemSettingsManagerView(Widget):
       pressed=pressed,
       is_last=is_last,
       show_chevron=False,
-      title_size=30,
+      title_size=34,
       subtitle_size=22,
       style=self.PANEL_STYLE,
     )

@@ -399,6 +399,7 @@ class AetherSettingsView(Widget):
         is_last=is_last,
         action_pill=True,
         title_size=34, subtitle_size=22,
+        action_pill_height=44, action_text_size=18,
         action_text_color=action_text_color,
         action_fill=action_fill,
         action_border=action_border,
