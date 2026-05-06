@@ -70,8 +70,7 @@ CLARITY_OVERRIDE_RELEASE_GRACE_S = 0.20
 CLARITY_OVERRIDE_HOLD_S = 0.8
 CLARITY_OVERRIDE_STAGE_2_S = 1.5
 CLARITY_OVERRIDE_FULL_DROP_S = 2.0
-CLARITY_OVERRIDE_HUD_BLINK_S = 1.0
-CLARITY_OVERRIDE_HUD_BLINK_PERIOD_FRAMES = 2
+CLARITY_OVERRIDE_HUD_BLINK_HALF_PERIOD_S = 0.50
 
 
 def get_clarity_override_fade_from_timer(override_timer_s: float) -> float:
@@ -153,15 +152,15 @@ def get_clarity_override_hud_lanes(
   if not clarity_active:
     return solid_lanes, dashed_lanes
 
-  blink_lanes = ((frame // CLARITY_OVERRIDE_HUD_BLINK_PERIOD_FRAMES) % 2) == 0
+  ramping_down = override_latched and not override_zeroed
   ramping_back_in = 0.0 < override_fade < 1.0 and not override_latched
-  early_override_blink = override_latched and override_timer_s < CLARITY_OVERRIDE_HUD_BLINK_S
+
+  if ramping_down or ramping_back_in:
+    blink_lanes = (int((frame * DT_CTRL) / CLARITY_OVERRIDE_HUD_BLINK_HALF_PERIOD_S) % 2) == 0
+    return blink_lanes, not blink_lanes
 
   if override_zeroed:
     return False, True
-
-  if early_override_blink or ramping_back_in:
-    return blink_lanes, not blink_lanes
 
   return solid_lanes, dashed_lanes
 
