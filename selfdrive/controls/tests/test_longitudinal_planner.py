@@ -501,6 +501,78 @@ def test_acc_mode_pretracking_vision_far_slower_lead_starts_braking_before_track
 
 
 @pytest.mark.parametrize("model_version", ["v11", "v12", "v13", "v14"])
+def test_acc_mode_pretracking_vision_far_slower_lead_can_still_brake_immediately(model_version):
+  v_ego = 21.48
+
+  CP = CarInterface.get_non_essential_params(CAR.HONDA_CIVIC)
+  planner = LongitudinalPlanner(CP, init_v=v_ego)
+  sm = make_sm(
+    v_ego,
+    desired_accel=0.2,
+    min_accel=-1.0,
+    experimental_mode=False,
+    tracking_lead=False,
+    lead_one=make_lead(status=True, d_rel=93.0, v_lead=12.84, a_lead=0.0, radar=False, model_prob=0.935),
+  )
+  sm["starpilotPlan"].vCruise = v_ego + 6.0
+
+  planner.update(sm, make_toggles(model_version))
+
+  assert planner.mode == "acc"
+  assert planner.output_a_target < -0.45
+
+
+@pytest.mark.parametrize("model_version", ["v11", "v12", "v13", "v14"])
+def test_acc_mode_pretracking_flappy_far_lead_requires_persistence(model_version):
+  v_ego = 26.09
+
+  CP = CarInterface.get_non_essential_params(CAR.HONDA_CIVIC)
+  planner_no_lead = LongitudinalPlanner(CP, init_v=v_ego)
+  planner_flappy = LongitudinalPlanner(CP, init_v=v_ego)
+  sm_no_lead = make_sm(
+    v_ego,
+    desired_accel=0.2,
+    min_accel=-1.0,
+    experimental_mode=False,
+    tracking_lead=False,
+  )
+  sm_flappy = make_sm(
+    v_ego,
+    desired_accel=0.2,
+    min_accel=-1.0,
+    experimental_mode=False,
+    tracking_lead=False,
+    lead_one=make_lead(status=True, d_rel=74.75, v_lead=26.63, a_lead=0.01, radar=False, model_prob=0.989),
+  )
+  sm_no_lead["starpilotPlan"].vCruise = v_ego + 6.0
+  sm_flappy["starpilotPlan"].vCruise = v_ego + 6.0
+
+  flappy_sequence = [
+    (74.75, 26.63, 0.01, 0.989),
+    (68.17, 20.81, 0.094, 0.971),
+    (69.73, 24.12, 0.057, 0.981),
+    (62.15, 21.38, 0.064, 0.983),
+    (66.29, 23.19, 0.069, 0.985),
+    (70.58, 27.51, 0.036, 0.988),
+  ]
+
+  no_lead_outputs = []
+  flappy_outputs = []
+  for d_rel, v_lead, a_lead, model_prob in flappy_sequence:
+    planner_no_lead.update(sm_no_lead, make_toggles(model_version))
+    sm_flappy["radarState"].leadOne = make_lead(
+      status=True, d_rel=d_rel, v_lead=v_lead, a_lead=a_lead, radar=False, model_prob=model_prob,
+    )
+    planner_flappy.update(sm_flappy, make_toggles(model_version))
+    no_lead_outputs.append(planner_no_lead.output_a_target)
+    flappy_outputs.append(planner_flappy.output_a_target)
+
+  assert planner_flappy.mode == "acc"
+  assert min(flappy_outputs) > -0.05
+  assert min(flappy_outputs) > min(no_lead_outputs) - 0.12
+
+
+@pytest.mark.parametrize("model_version", ["v11", "v12", "v13", "v14"])
 def test_acc_mode_pretracking_near_stopped_vision_lead_does_not_relax_when_confidence_is_midrange(model_version):
   v_ego = 20.35
 

@@ -62,6 +62,8 @@ VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_LEAD_SPEED = 8.0
 VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_TTC = 10.0
 VISION_UNTRACKED_SLOW_LEAD_RELAXED_MIN_CLOSING_SPEED = 10.0
 VISION_UNTRACKED_SLOW_LEAD_RELAXED_FULL_CLOSING_SPEED = 16.0
+VISION_UNTRACKED_SLOW_LEAD_CONFIRM_TIME = 0.30
+VISION_UNTRACKED_SLOW_LEAD_IMMEDIATE_DECEL = 0.55
 VISION_SLOW_LEAD_MAX_SPEED = 5.0
 VISION_SLOW_LEAD_MIN_CLOSING_SPEED = 1.5
 VISION_SLOW_LEAD_TRIGGER_TTC = 4.5
@@ -273,6 +275,7 @@ class LongitudinalPlanner:
     self._uncert_last_t = None
     self.effective_t_follow = None
     self.vision_low_speed_stop_hold_until = 0.0
+    self.untracked_slow_lead_confirm_t = 0.0
 
     if self.is_preap:
       try:
@@ -909,8 +912,21 @@ class LongitudinalPlanner:
 
       if pretracking_vision_caps:
         pretracking_vision_cap = min(pretracking_vision_caps)
-        self.a_desired = min(self.a_desired, pretracking_vision_cap)
-        output_a_target = min(output_a_target, pretracking_vision_cap)
+        if pretracking_vision_cap <= -VISION_UNTRACKED_SLOW_LEAD_IMMEDIATE_DECEL:
+          self.untracked_slow_lead_confirm_t = VISION_UNTRACKED_SLOW_LEAD_CONFIRM_TIME
+        else:
+          self.untracked_slow_lead_confirm_t = min(
+            self.untracked_slow_lead_confirm_t + self.dt,
+            VISION_UNTRACKED_SLOW_LEAD_CONFIRM_TIME,
+          )
+
+        if self.untracked_slow_lead_confirm_t >= VISION_UNTRACKED_SLOW_LEAD_CONFIRM_TIME:
+          self.a_desired = min(self.a_desired, pretracking_vision_cap)
+          output_a_target = min(output_a_target, pretracking_vision_cap)
+      else:
+        self.untracked_slow_lead_confirm_t = 0.0
+    else:
+      self.untracked_slow_lead_confirm_t = 0.0
 
     close_lead_caps = []
     vision_low_speed_stop_active = False
