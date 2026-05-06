@@ -64,18 +64,43 @@ def get_civic_bosch_modified_torque_lpf_tau(torque_cmd: float, prev_torque_cmd: 
 
 
 CLARITY_OVERRIDE_FADE_SPEED = 50.0 * 0.44704
-CLARITY_OVERRIDE_FADE_DOWN_S = 2.0
 CLARITY_OVERRIDE_FADE_UP_S = 2.0
 CLARITY_OVERRIDE_LPF_KILL_S = 0.2
+CLARITY_OVERRIDE_HOLD_S = 0.8
+CLARITY_OVERRIDE_STAGE_2_S = 1.5
+CLARITY_OVERRIDE_FULL_DROP_S = 2.0
 
 
-def update_clarity_override_fade(driver_override: bool, v_ego: float, fade: float) -> float:
+def get_clarity_override_fade_from_timer(override_timer_s: float) -> float:
+  if override_timer_s <= CLARITY_OVERRIDE_HOLD_S:
+    return 1.0
+
+  if override_timer_s <= CLARITY_OVERRIDE_STAGE_2_S:
+    progress = (
+      (override_timer_s - CLARITY_OVERRIDE_HOLD_S) /
+      (CLARITY_OVERRIDE_STAGE_2_S - CLARITY_OVERRIDE_HOLD_S)
+    )
+    return 1.0 - (0.40 * progress)
+
+  if override_timer_s <= CLARITY_OVERRIDE_FULL_DROP_S:
+    progress = (
+      (override_timer_s - CLARITY_OVERRIDE_STAGE_2_S) /
+      (CLARITY_OVERRIDE_FULL_DROP_S - CLARITY_OVERRIDE_STAGE_2_S)
+    )
+    return 0.60 * (1.0 - progress)
+
+  return 0.0
+
+
+def update_clarity_override_fade(driver_override: bool, v_ego: float, fade: float, override_timer_s: float) -> tuple[float, float]:
   if driver_override:
-    if v_ego < CLARITY_OVERRIDE_FADE_SPEED:
-      return max(0.0, fade - DT_CTRL / CLARITY_OVERRIDE_FADE_DOWN_S)
-    return 0.0
+    if v_ego >= CLARITY_OVERRIDE_FADE_SPEED:
+      return 0.0, CLARITY_OVERRIDE_FULL_DROP_S
 
-  return min(1.0, fade + DT_CTRL / CLARITY_OVERRIDE_FADE_UP_S)
+    override_timer_s = min(CLARITY_OVERRIDE_FULL_DROP_S, override_timer_s + DT_CTRL)
+    return get_clarity_override_fade_from_timer(override_timer_s), override_timer_s
+
+  return min(1.0, fade + DT_CTRL / CLARITY_OVERRIDE_FADE_UP_S), 0.0
 
 
 def get_clarity_override_lpf_kill(driver_override: bool, lpf_kill: float) -> float:
@@ -257,6 +282,7 @@ class CarController(CarControllerBase):
     self.steering_pressed_robust_prev = False
     self.is_clarity_eps_modified = CP.carFingerprint == CAR.HONDA_CLARITY and bool(CP.flags & HondaFlags.EPS_MODIFIED)
     self.clarity_driver_override_fade = 1.0
+    self.clarity_driver_override_timer = 0.0
     self.clarity_driver_override_lpf_kill = 0.0
     self.clarity_driver_override_zeroed = False
     self.bosch_gas_factor = 1.0
@@ -317,8 +343,8 @@ class CarController(CarControllerBase):
     elif self.is_clarity_eps_modified:
       if CC.latActive:
         filtered_steering_pressed = self._filtered_steering_pressed(CS, torque_cmd)
-        self.clarity_driver_override_fade = update_clarity_override_fade(
-          filtered_steering_pressed, CS.out.vEgo, self.clarity_driver_override_fade
+        self.clarity_driver_override_fade, self.clarity_driver_override_timer = update_clarity_override_fade(
+          filtered_steering_pressed, CS.out.vEgo, self.clarity_driver_override_fade, self.clarity_driver_override_timer
         )
         self.clarity_driver_override_lpf_kill = get_clarity_override_lpf_kill(
           filtered_steering_pressed, self.clarity_driver_override_lpf_kill
@@ -336,6 +362,7 @@ class CarController(CarControllerBase):
         self.steering_pressed_filter_s = 0.0
         self.steering_pressed_robust_prev = False
         self.clarity_driver_override_fade = 1.0
+        self.clarity_driver_override_timer = 0.0
         self.clarity_driver_override_lpf_kill = 0.0
         self.clarity_driver_override_zeroed = False
 
