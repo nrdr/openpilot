@@ -64,6 +64,7 @@ class DummyCarInterface(CarInterfaceBase):
 
 def get_test_starpilot_toggles() -> SimpleNamespace:
   return SimpleNamespace(
+    always_ipedal=False,
     always_on_lateral_lkas=False,
     car_model="",
     cluster_offset=1.0,
@@ -213,6 +214,31 @@ class TestCarInterfaces:
       toggles,
     )
     assert fp_car_params.safetyConfigs[-1].safetyParam & HyundaiStarPilotSafetyFlags.AOL_LKAS_ON_ENGAGE.value
+
+  def test_hyundai_always_ipedal_flag_is_set_for_ioniq_6(self):
+    toggles = get_test_starpilot_toggles()
+    toggles.always_ipedal = True
+    fingerprint = {bus: {} for bus in range(8)}
+    fingerprint[2][0x50] = 16
+
+    car_params = HyundaiCarInterface.get_params(
+      HYUNDAI_CAR.HYUNDAI_IONIQ_6,
+      fingerprint,
+      [],
+      alpha_long=False,
+      is_release=False,
+      docs=False,
+      starpilot_toggles=toggles,
+    )
+
+    fp_car_params = HyundaiCarInterface.get_starpilot_params(
+      HYUNDAI_CAR.HYUNDAI_IONIQ_6,
+      fingerprint,
+      [],
+      car_params,
+      toggles,
+    )
+    assert fp_car_params.safetyConfigs[-1].safetyParam & HyundaiStarPilotSafetyFlags.ALLOW_IPEDAL_PADDLE.value
 
   def test_toyota_disable_openpilot_long_sets_stock_long_safety_flag(self):
     CarInterface = interfaces[TOYOTA_CAR.TOYOTA_PRIUS_TSS2]

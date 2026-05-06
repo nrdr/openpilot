@@ -220,13 +220,23 @@ class Car:
     if can_rcv_valid and REPLAY:
       self.can_log_mono_time = messaging.log_from_bytes(can_strs[0]).logMonoTime
 
-    self.v_cruise_helper.update_v_cruise(
-      CS,
-      self.sm['carControl'].enabled,
-      self.is_metric,
-      self.sm['starpilotPlan'].speedLimitChanged,
-      self.starpilot_toggles,
+    preap_software_cruise = (
+      self.CP.brand == "tesla" and self.CP.carFingerprint == "TESLA_MODEL_S_PREAP" and
+      self.CP.openpilotLongitudinalControl and not self.CP.pcmCruise
     )
+    if not preap_software_cruise:
+      self.v_cruise_helper.update_v_cruise(
+        CS,
+        self.sm['carControl'].enabled,
+        self.is_metric,
+        self.sm['starpilotPlan'].speedLimitChanged,
+        self.starpilot_toggles,
+      )
+    else:
+      preap_v_cruise_kph = float(CS.cruiseState.speed * CV.MS_TO_KPH)
+      self.v_cruise_helper.v_cruise_kph_last = self.v_cruise_helper.v_cruise_kph
+      self.v_cruise_helper.v_cruise_kph = preap_v_cruise_kph
+      self.v_cruise_helper.v_cruise_cluster_kph = preap_v_cruise_kph
     slc_force_speed = self.params_memory.get_float("SLCForceCruiseSpeed")
     if slc_force_speed > 0:
       if self.is_metric:
@@ -237,7 +247,7 @@ class Car:
       self.v_cruise_helper.v_cruise_cluster_kph = self.v_cruise_helper.v_cruise_kph
       self.params_memory.remove("SLCForceCruiseSpeed")
 
-    if self.sm['carControl'].enabled and not self.CC_prev.enabled:
+    if self.sm['carControl'].enabled and not self.CC_prev.enabled and not preap_software_cruise:
       # Use CarState w/ buttons from the step selfdrived enables on
       desired_speed_limit = self.sm['starpilotPlan'].slcSpeedLimit + self.sm['starpilotPlan'].slcSpeedLimitOffset
       self.v_cruise_helper.initialize_v_cruise(

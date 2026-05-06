@@ -223,6 +223,34 @@ class LongControl:
       bleed = interp(v_ego, [0.0, 4.0, 12.0, 25.0], [0.82, 0.86, 0.90, 0.94])
       self.pid.i *= bleed
 
+  def _trim_positive_overshoot_integrator(self, a_target, error, CS):
+    if self.pid.i <= 0.0:
+      return
+    if a_target >= -0.05 or error >= -0.25:
+      return
+    if CS.vEgo <= 8.0 or CS.aEgo <= 0.15:
+      return
+
+    # If the planner has already crossed into decel but the car is still
+    # accelerating, bleed stale positive I aggressively so the command can
+    # cross back through zero instead of carrying throttle for several seconds.
+    bleed = interp(abs(error), [0.25, 0.75, 1.5], [0.55, 0.25, 0.0])
+    self.pid.i *= bleed
+
+  @staticmethod
+  def _cap_positive_output_on_negative_target(output_accel, a_target, error, CS):
+    if output_accel <= 0.0:
+      return output_accel
+    if a_target >= -0.10 or error >= -0.35:
+      return output_accel
+    if CS.vEgo <= 8.0 or CS.aEgo <= 0.15:
+      return output_accel
+
+    # Once the planner is asking for real decel, don't keep feeding positive
+    # drive torque while we're still accelerating away from the target.
+    positive_cap = interp(a_target, [-0.6, -0.1], [0.0, 0.05])
+    return min(output_accel, float(positive_cap))
+
   def update(self, active, CS, a_target, should_stop, accel_limits, starpilot_toggles):
     """Update longitudinal control. This updates the state machine and runs a PID loop"""
     self.pid.neg_limit = accel_limits[0]
@@ -251,19 +279,18 @@ class LongControl:
         output_accel = clip(a_target, 0.0, starpilot_toggles.startAccel)
       else:
         output_accel = starpilot_toggles.startAccel
-      self.pid.reset()
-      self.pid.i = a_target
-      self.last_a_target = 0.0
-      self.integrator_hold_frames = 0
+      self.reset()
 
     else:  # LongCtrlState.pid
       error = a_target - CS.aEgo
       self.update_mpc_mode(self.experimental_mode)
       self._shape_volt_test_tune_integrator(error, CS.vEgo)
+      self._trim_positive_overshoot_integrator(a_target, error, CS)
       feedforward = a_target * self.feedforward_gain
       freeze_integrator = self._get_pedal_long_freeze(a_target, error, CS.vEgo, accel_limits)
       raw_output_accel = self.pid.update(error, speed=CS.vEgo, feedforward=feedforward,
                                          freeze_integrator=freeze_integrator)
+      raw_output_accel = self._cap_positive_output_on_negative_target(raw_output_accel, a_target, error, CS)
 
 
       if self.transitioning and self.prev_mode == 'acc' and self.current_mode == 'blended':

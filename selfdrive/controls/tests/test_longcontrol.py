@@ -262,3 +262,30 @@ def test_non_interceptor_volt_testing_ground_handoff_freezes_integrator(monkeypa
 
   assert freeze
   assert lc.integrator_hold_frames > 0
+
+
+def test_negative_target_unwinds_positive_accel_command_after_sign_flip():
+  CP = car.CarParams.new_message(startingState=True, vEgoStarting=0.5)
+  CP.longitudinalTuning.kpBP = [0.0]
+  CP.longitudinalTuning.kpV = [0.1]
+  CP.longitudinalTuning.kiBP = [0.0]
+  CP.longitudinalTuning.kiV = [0.03]
+
+  lc = LongControl(CP)
+  lc.long_control_state = LongCtrlState.pid
+  lc.last_output_accel = 1.2
+  lc.pid.i = 1.2
+  CS = car.CarState.new_message(vEgo=30.0, aEgo=0.9, brakePressed=False, gasPressed=False)
+  CS.cruiseState.standstill = False
+
+  output_accel = lc.update(
+    active=True,
+    CS=CS,
+    a_target=-0.5,
+    should_stop=False,
+    accel_limits=(-3.0, 2.0),
+    starpilot_toggles=make_toggles(),
+  )
+
+  assert lc.long_control_state == LongCtrlState.pid
+  assert output_accel <= 0.01

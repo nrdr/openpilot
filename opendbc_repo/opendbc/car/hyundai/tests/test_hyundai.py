@@ -7,9 +7,11 @@ from opendbc.can import CANPacker, CANParser
 from opendbc.car import Bus, ButtonType, gen_empty_fingerprint, structs
 from opendbc.car.structs import CarControl, CarParams
 from opendbc.car.fw_versions import build_fw_dict, match_fw_to_car
-from opendbc.car.hyundai.carcontroller import Ioniq6LongitudinalTuningState, GenesisG90LongitudinalTuningState, \
-                                              update_ioniq_6_longitudinal_tuning, update_genesis_g90_longitudinal_tuning
-from opendbc.car.hyundai.carstate import CarState, decode_ioniq_6_blindspot_radar_state
+from opendbc.car.hyundai.carcontroller import CarController, Ioniq6LongitudinalTuningState, GenesisG90LongitudinalTuningState, \
+                                              IONIQ_6_IPEDAL_PADDLE_BURST_COUNT, update_ioniq_6_longitudinal_tuning, \
+                                              update_genesis_g90_longitudinal_tuning
+from opendbc.car.hyundai.carstate import CarState, decode_ioniq_6_blindspot_radar_state, decode_ioniq_6_ipedal_intermediate_state, \
+                                        decode_ioniq_6_ipedal_state, decode_ioniq_6_max_regen_state
 from opendbc.car.hyundai.interface import CarInterface
 from opendbc.car.hyundai import hyundaican, hyundaicanfd
 from opendbc.car.hyundai.hyundaicanfd import CanBus
@@ -53,7 +55,7 @@ CANFD_EXPECTED_ECUS = {Ecu.fwdCamera, Ecu.fwdRadar}
 
 
 def get_test_toggles() -> SimpleNamespace:
-  return SimpleNamespace(always_on_lateral_lkas=False, force_torque_controller=False, nnff=False, nnff_lite=False)
+  return SimpleNamespace(always_ipedal=False, always_on_lateral_lkas=False, force_torque_controller=False, nnff=False, nnff_lite=False)
 
 
 class TestHyundaiFingerprint:
@@ -293,6 +295,254 @@ class TestHyundaiFingerprint:
 
     ret = update(0, 3)
     assert any(be.type == ButtonType.altButton2 and not be.pressed for be in ret.buttonEvents)
+
+  def test_ioniq_6_ipedal_state_decode(self):
+    assert decode_ioniq_6_max_regen_state(0x3C, 0x01)
+    assert not decode_ioniq_6_ipedal_state(0x3C, 0x01)
+    assert not decode_ioniq_6_ipedal_state(0x50, 0x01)
+    assert decode_ioniq_6_ipedal_intermediate_state(0x50, 0x01)
+    assert decode_ioniq_6_ipedal_state(0x50, 0x03)
+
+  def test_ioniq_6_msla_regen_signals_decode(self):
+    CP = CarParams.new_message()
+    CP.carFingerprint = CAR.HYUNDAI_IONIQ_6
+    CP.flags = int(HyundaiFlags.CANFD | HyundaiFlags.CANFD_LKA_STEERING)
+
+    packer = CANPacker(DBC[CP.carFingerprint][Bus.pt])
+    can_bus = CanBus(CP)
+    parser = CANParser(DBC[CP.carFingerprint][Bus.pt], [("MANUAL_SPEED_LIMIT_ASSIST", 0)], can_bus.ECAN)
+
+    msg = packer.make_can_msg("MANUAL_SPEED_LIMIT_ASSIST", can_bus.ECAN, {
+      "MSLA_STATUS": 0,
+      "MSLA_ENABLED": 0,
+      "MAX_SPEED": 0,
+      "MAX_SPEED_COPY": 0,
+      "EV_REGEN_STATE": 0x50,
+      "EV_REGEN_STATE_2": 0x03,
+    })
+    parser.update([(1, [msg])])
+
+    assert parser.can_valid
+    assert parser.vl["MANUAL_SPEED_LIMIT_ASSIST"]["EV_REGEN_STATE"] == 0x50
+    assert parser.vl["MANUAL_SPEED_LIMIT_ASSIST"]["EV_REGEN_STATE_2"] == 0x03
+
+  @pytest.mark.parametrize(("counter", "expected_hex"), [
+    (0, "2100002800000000"),
+    (7, "2970002800000000"),
+    (14, "31e0002800000000"),
+  ])
+  def test_ioniq_6_left_paddle_message_matches_stock(self, counter, expected_hex):
+    CP = CarParams.new_message()
+    CP.carFingerprint = CAR.HYUNDAI_IONIQ_6
+    CP.flags = int(HyundaiFlags.CANFD | HyundaiFlags.CANFD_LKA_STEERING)
+
+    msg = hyundaicanfd.create_ioniq_6_paddle_buttons(CANPacker(DBC[CP.carFingerprint][Bus.pt]), CP, CanBus(CP),
+                                                     counter, left_paddle=True)
+    assert msg[1].hex() == expected_hex
+
+  def test_ioniq_6_buttons_counter_wraps_like_stock(self):
+    assert hyundaicanfd.get_ioniq_6_cruise_buttons_next_counter(13) == 14
+    assert hyundaicanfd.get_ioniq_6_cruise_buttons_next_counter(14) == 0
+
+  @pytest.mark.parametrize(("stock_hex", "expected_tail"), [
+    ("45421440801f000000000000a865170000a000000080c071a80c120e00000000", bytes.fromhex("c00c1200")),
+    ("47745840801f0000000005006e5e0e0000a000000080c071a80e070e00000000", bytes.fromhex("850e070c")),
+    ("7aea8140801f000000000000b965140000a000000080c0711810070200000000", bytes.fromhex("b5100700")),
+    ("32438340801f000000000000b965140000a000000080c071a810070e00000000", bytes.fromhex("b5100700")),
+  ])
+  def test_ioniq_6_regen_control_message_preserves_stock_frame_and_flips_only_ipedal_request_bytes(self, stock_hex, expected_tail):
+    CP = CarParams.new_message()
+    CP.carFingerprint = CAR.HYUNDAI_IONIQ_6
+    CP.flags = int(HyundaiFlags.CANFD | HyundaiFlags.CANFD_LKA_STEERING)
+
+    packer = CANPacker(DBC[CP.carFingerprint][Bus.pt])
+    can_bus = CanBus(CP)
+    parser = CANParser(DBC[CP.carFingerprint][Bus.pt], [("IONIQ_6_REGEN_CONTROL", 0)], can_bus.ECAN)
+    stock_dat = bytes.fromhex(stock_hex)
+    parser.update([(1, [(0x25A, stock_dat, can_bus.ECAN)])])
+
+    msg = hyundaicanfd.create_ioniq_6_regen_control(packer, CP, can_bus, parser.vl["IONIQ_6_REGEN_CONTROL"])
+    assert msg[1][2:24] == stock_dat[2:24]
+    assert msg[1][24:28] == expected_tail
+    assert msg[1][28:] == stock_dat[28:]
+    checksum = hyundaicanfd.hkg_can_fd_checksum(msg[0], None, bytearray(msg[1]))
+    assert msg[1][0] | (msg[1][1] << 8) == checksum
+
+  def test_ioniq_6_always_ipedal_spoofs_left_paddle_in_startup_park_and_drive_until_latched(self):
+    toggles = get_test_toggles()
+    toggles.always_ipedal = True
+    CP = CarInterface.get_params(CAR.HYUNDAI_IONIQ_6, gen_empty_fingerprint(), [], True, False, False, toggles)
+
+    controller = CarController(DBC[CP.carFingerprint], CP)
+    can_bus = CanBus(CP)
+    parser_bus = can_bus.ECAN if CP.flags & HyundaiFlags.CANFD_LKA_STEERING else can_bus.CAM
+    parser = CANParser(DBC[CP.carFingerprint][Bus.pt], [("CRUISE_BUTTONS", 0)], parser_bus)
+
+    cs = SimpleNamespace(
+      out=SimpleNamespace(gearShifter=structs.CarState.GearShifter.park),
+      ipedal_active=False,
+      buttons_counter=5,
+      cruise_buttons_msg={
+        "_CHECKSUM": 0,
+        "COUNTER": 5,
+        "CRUISE_BUTTONS": 0,
+        "ADAPTIVE_CRUISE_MAIN_BTN": 0,
+        "NORMAL_CRUISE_MAIN_BTN": 0,
+        "LDA_BTN": 0,
+        "RIGHT_PADDLE": 0,
+        "LEFT_PADDLE": 0,
+        "SET_ME_1": 1,
+      },
+      ioniq_6_regen_control_msg={},
+      ioniq_6_regen_control_ts=0,
+    )
+    cc = SimpleNamespace(enabled=False)
+
+    sends = controller._update_ioniq_6_always_ipedal(cc, cs, toggles)
+    parser.update([(1, sends)])
+
+    assert sends
+    assert len([msg for msg in sends if msg[0] == 0x1CF]) == IONIQ_6_IPEDAL_PADDLE_BURST_COUNT
+    assert sends[0][1].hex() == "4650002800000000"
+    assert parser.vl["CRUISE_BUTTONS"]["LEFT_PADDLE"] == 1
+    assert parser.vl["CRUISE_BUTTONS"]["COUNTER"] == 5
+    assert controller._ioniq_6_always_ipedal_pending
+    assert not controller._ioniq_6_always_ipedal_startup_park_done
+
+    controller.frame = 1
+    sends = controller._update_ioniq_6_always_ipedal(cc, cs, toggles)
+
+    assert sends == []
+
+    controller.frame = 2
+    cs.out.gearShifter = structs.CarState.GearShifter.drive
+    cs.buttons_counter = 6
+    sends = controller._update_ioniq_6_always_ipedal(cc, cs, toggles)
+
+    assert sends
+    assert len([msg for msg in sends if msg[0] == 0x1CF]) == IONIQ_6_IPEDAL_PADDLE_BURST_COUNT
+    assert sends[0][1].hex() == "9060002800000000"
+    assert controller._ioniq_6_always_ipedal_pending
+    assert controller._ioniq_6_always_ipedal_startup_park_done
+
+    controller.frame = 4
+    cs.ipedal_active = True
+    sends = controller._update_ioniq_6_always_ipedal(cc, cs, toggles)
+
+    assert sends == []
+    assert not controller._ioniq_6_always_ipedal_pending
+    assert controller._ioniq_6_always_ipedal_press_remaining == 0
+
+  def test_ioniq_6_always_ipedal_uses_stronger_followup_pull_for_intermediate_latch_state(self):
+    toggles = get_test_toggles()
+    toggles.always_ipedal = True
+    CP = CarInterface.get_params(CAR.HYUNDAI_IONIQ_6, gen_empty_fingerprint(), [], True, False, False, toggles)
+
+    controller = CarController(DBC[CP.carFingerprint], CP)
+    cs = SimpleNamespace(
+      out=SimpleNamespace(gearShifter=structs.CarState.GearShifter.drive),
+      ipedal_active=False,
+      ipedal_regen_state=0x50,
+      ipedal_regen_state_2=0x01,
+      buttons_counter=5,
+      cruise_buttons_msg={
+        "_CHECKSUM": 0,
+        "COUNTER": 5,
+        "CRUISE_BUTTONS": 0,
+        "ADAPTIVE_CRUISE_MAIN_BTN": 0,
+        "NORMAL_CRUISE_MAIN_BTN": 0,
+        "LDA_BTN": 0,
+        "RIGHT_PADDLE": 0,
+        "LEFT_PADDLE": 0,
+        "SET_ME_1": 1,
+      },
+      ioniq_6_regen_control_msg={},
+      ioniq_6_regen_control_ts=0,
+    )
+    cc = SimpleNamespace(enabled=False)
+
+    controller._ioniq_6_last_gear = structs.CarState.GearShifter.reverse
+    sends = controller._update_ioniq_6_always_ipedal(cc, cs, toggles)
+
+    assert sends
+    assert controller._ioniq_6_always_ipedal_press_remaining == 9
+
+  def test_ioniq_6_always_ipedal_sends_regen_control_companion_once_max_regen_is_shown(self):
+    toggles = get_test_toggles()
+    toggles.always_ipedal = True
+    CP = CarInterface.get_params(CAR.HYUNDAI_IONIQ_6, gen_empty_fingerprint(), [], True, False, False, toggles)
+
+    controller = CarController(DBC[CP.carFingerprint], CP)
+    cs = SimpleNamespace(
+      out=SimpleNamespace(gearShifter=structs.CarState.GearShifter.drive),
+      ipedal_active=False,
+      ipedal_regen_state=0x3C,
+      ipedal_regen_state_2=0x01,
+      buttons_counter=5,
+      cruise_buttons_msg={
+        "_CHECKSUM": 0,
+        "COUNTER": 5,
+        "CRUISE_BUTTONS": 0,
+        "ADAPTIVE_CRUISE_MAIN_BTN": 0,
+        "NORMAL_CRUISE_MAIN_BTN": 0,
+        "LDA_BTN": 0,
+        "RIGHT_PADDLE": 0,
+        "LEFT_PADDLE": 0,
+        "SET_ME_1": 1,
+      },
+      ioniq_6_regen_control_msg={
+        "COUNTER": 0x14,
+        "BYTE3": 0x40,
+        "BYTE4": 0x80,
+        "BYTE5": 0x1F,
+        "BYTE6": 0x00,
+        "BYTE7": 0x00,
+        "BYTE8": 0x00,
+        "BYTE9": 0x00,
+        "BYTE10": 0x00,
+        "BYTE11": 0x00,
+        "BYTE12": 0xA8,
+        "BYTE13": 0x65,
+        "BYTE14": 0x17,
+        "BYTE15": 0x00,
+        "BYTE16": 0x00,
+        "BYTE17": 0xA0,
+        "BYTE18": 0x00,
+        "BYTE19": 0x00,
+        "BYTE20": 0x00,
+        "BYTE21": 0x80,
+        "BYTE22": 0xC0,
+        "BYTE23": 0x71,
+        "BYTE24": 0xA8,
+        "BYTE25": 0x0C,
+        "BYTE26": 0x12,
+        "BYTE27": 0x0E,
+        "BYTE28": 0x00,
+        "BYTE29": 0x00,
+        "BYTE30": 0x00,
+        "BYTE31": 0x00,
+      },
+      ioniq_6_regen_control_ts=1,
+    )
+    cc = SimpleNamespace(enabled=False)
+
+    controller._ioniq_6_last_gear = structs.CarState.GearShifter.reverse
+    controller._ioniq_6_last_regen_control_counter = 0x13
+    sends = controller._update_ioniq_6_always_ipedal(cc, cs, toggles)
+
+    assert len([msg for msg in sends if msg[0] == 0x1CF]) == IONIQ_6_IPEDAL_PADDLE_BURST_COUNT
+    regen_cmd = next(msg for msg in sends if msg[0] == 0x25A)
+    assert regen_cmd[1][24:28] == bytes.fromhex("c00c1200")
+    checksum = hyundaicanfd.hkg_can_fd_checksum(regen_cmd[0], None, bytearray(regen_cmd[1]))
+    assert regen_cmd[1][0] | (regen_cmd[1][1] << 8) == checksum
+
+    controller.frame = 1
+    cs.buttons_counter = 6
+    cs.ioniq_6_regen_control_msg = dict(cs.ioniq_6_regen_control_msg, COUNTER=0x15)
+    sends = controller._update_ioniq_6_always_ipedal(cc, cs, toggles)
+
+    assert len([msg for msg in sends if msg[0] == 0x1CF]) == IONIQ_6_IPEDAL_PADDLE_BURST_COUNT
+    assert not any(msg[0] == 0x25A for msg in sends)
 
   def test_ioniq_6_longitudinal_params_match_canfd_tune(self):
     toggles = get_test_toggles()

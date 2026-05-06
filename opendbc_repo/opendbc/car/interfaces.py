@@ -183,14 +183,13 @@ class CarInterfaceBase(ABC):
     ret.tireStiffnessFront, ret.tireStiffnessRear = scale_tire_stiffness(ret.mass, ret.wheelbase, ret.centerToFront, ret.tireStiffnessFactor)
 
     toggles_to_check = ("force_torque_controller", "nnff", "nnff_lite")
-    modified_civic_b_force_torque = (
+    modified_civic_force_torque = (
       candidate == HONDA.HONDA_CIVIC_BOSCH and
-      bool(ret.flags & HondaFlags.EPS_MODIFIED) and
-      testing_ground.use("8", "B")
+      bool(ret.flags & HondaFlags.EPS_MODIFIED)
     )
     if ret.steerControlType != structs.CarParams.SteerControlType.angle and (
       any(getattr(starpilot_toggles, toggle, False) for toggle in toggles_to_check) or
-      modified_civic_b_force_torque
+      modified_civic_force_torque
     ):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
@@ -233,6 +232,8 @@ class CarInterfaceBase(ABC):
           fp_ret.safetyConfigs[-1].safetyParam |= HyundaiStarPilotSafetyFlags.HAS_LDA_BUTTON.value
         if starpilot_toggles.always_on_lateral_lkas:
           fp_ret.safetyConfigs[-1].safetyParam |= HyundaiStarPilotSafetyFlags.AOL_LKAS_ON_ENGAGE.value
+        if candidate == HYUNDAI.HYUNDAI_IONIQ_6 and getattr(starpilot_toggles, "always_ipedal", False):
+          fp_ret.safetyConfigs[-1].safetyParam |= HyundaiStarPilotSafetyFlags.ALLOW_IPEDAL_PADDLE.value
 
       elif platform in TOYOTA:
         fp_ret.canUsePedal = not CP.autoResumeSng
@@ -247,6 +248,9 @@ class CarInterfaceBase(ABC):
         if candidate == TOYOTA.TOYOTA_PRIUS:
           if 0x23 in fingerprint[0]:
             fp_ret.flags |= ToyotaStarPilotFlags.ZSS.value
+
+      elif platform.config.platform_str == "TESLA_MODEL_S_PREAP":
+        fp_ret.canUsePedal = True
 
     return fp_ret
 

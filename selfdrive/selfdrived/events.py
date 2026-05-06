@@ -402,6 +402,8 @@ def personality_changed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging
 
 def invalid_lkas_setting_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality, starpilot_toggles: SimpleNamespace) -> Alert:
   text = "Toggle stock LKAS on or off to engage"
+  if CP.brand == "tesla" and CP.carFingerprint == "TESLA_MODEL_S_PREAP":
+    return NormalPermanentAlert("EPAS Firmware Required", "Flash Pre-AP EPAS firmware to enable steering")
   if CP.brand == "tesla":
     text = "Switch to Traffic-Aware Cruise Control to engage"
   elif CP.brand == "mazda":

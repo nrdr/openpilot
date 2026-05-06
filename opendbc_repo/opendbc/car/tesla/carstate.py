@@ -5,6 +5,10 @@ from opendbc.car import Bus, structs
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarStateBase
 from opendbc.car.tesla.values import DBC, CANBUS, GEAR_MAP, STEER_THRESHOLD, CAR
+from opendbc.car.tesla.preap.carstate import get_preap_can_parsers, update_preap
+from opendbc.car.tesla.preap.engagement import PreAPEngagement
+from opendbc.car.tesla.preap.nap_conf import nap_conf
+from opendbc.car.tesla.preap.pedal_feedback import PedalFeedback
 
 ButtonType = structs.CarState.ButtonEvent.Type
 
@@ -13,7 +17,8 @@ class CarState(CarStateBase):
   def __init__(self, CP, FPCP):
     super().__init__(CP, FPCP)
     self.can_define = CANDefine(DBC[CP.carFingerprint][Bus.party])
-    self.shifter_values = self.can_define.dv["DI_systemStatus"]["DI_gear"]
+    self.shifter_values = self.can_define.dv["DI_systemStatus"]["DI_gear"] if CP.carFingerprint != CAR.TESLA_MODEL_S_PREAP else \
+                          self.can_define.dv["DI_torque2"]["DI_gear"]
 
     self.autopark = False
     self.autopark_prev = False
@@ -21,6 +26,23 @@ class CarState(CarStateBase):
 
     self.hands_on_level = 0
     self.das_control = None
+    self.cruise_buttons = 0
+    self.prev_cruise_buttons = 0
+    self.msg_stw_actn_req = None
+    self.speed_units = "MPH"
+
+    if CP.carFingerprint == CAR.TESLA_MODEL_S_PREAP:
+      self.engagement = PreAPEngagement(nap_conf.double_pull_enabled, nap_conf.double_pull_window_ms)
+      self.cruiseEnabled = False
+      self.enableLongControl = False
+      self.enableJustCC = False
+      self.pedal_speed_kph = 0.0
+      self.preap_cc_cancel_needed = False
+      self.preap_cc_engage_needed = False
+      self.di_cruise_state = "OFF"
+      self.pedal = PedalFeedback()
+      self.pedal_interceptor_value = 0.0
+      self.pedal_timeout = True
 
   def update_autopark_state(self, autopark_state: str, cruise_enabled: bool):
     autopark_now = autopark_state in ("ACTIVE", "COMPLETE", "SELFPARK_STARTED")
@@ -32,6 +54,9 @@ class CarState(CarStateBase):
     self.cruise_enabled_prev = cruise_enabled
 
   def update(self, can_parsers, starpilot_toggles) -> structs.CarState:
+    if self.CP.carFingerprint == CAR.TESLA_MODEL_S_PREAP:
+      return update_preap(self, can_parsers)
+
     cp_party = can_parsers[Bus.party]
     cp_ap_party = can_parsers[Bus.ap_party]
     ret = structs.CarState()
@@ -124,6 +149,8 @@ class CarState(CarStateBase):
 
   @staticmethod
   def get_can_parsers(CP):
+    if CP.carFingerprint == CAR.TESLA_MODEL_S_PREAP:
+      return get_preap_can_parsers(CP)
     return {
       Bus.party: CANParser(DBC[CP.carFingerprint][Bus.party], [], CANBUS.party),
       Bus.ap_party: CANParser(DBC[CP.carFingerprint][Bus.party], [], CANBUS.autopilot_party)

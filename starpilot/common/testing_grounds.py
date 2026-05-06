@@ -63,9 +63,10 @@ TESTING_GROUNDS_SLOT_DEFINITIONS = (
   },
   {
     "id": TESTING_GROUND_5,
-    "name": "Unused",
-    "description": "Unused slot.",
+    "name": "Honda Clarity Lateral",
+    "description": "Honda Clarity lateral sandbox.",
     "aLabel": "A - Installed tune",
+    "bLabel": "B - Firestar Tune",
   },
   {
     "id": TESTING_GROUND_6,
