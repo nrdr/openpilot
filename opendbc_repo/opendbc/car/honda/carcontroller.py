@@ -70,6 +70,8 @@ CLARITY_OVERRIDE_RELEASE_GRACE_S = 0.20
 CLARITY_OVERRIDE_HOLD_S = 0.8
 CLARITY_OVERRIDE_STAGE_2_S = 1.5
 CLARITY_OVERRIDE_FULL_DROP_S = 2.0
+CLARITY_OVERRIDE_HUD_BLINK_S = 1.0
+CLARITY_OVERRIDE_HUD_BLINK_PERIOD_FRAMES = 2
 
 
 def get_clarity_override_fade_from_timer(override_timer_s: float) -> float:
@@ -125,6 +127,36 @@ def get_clarity_override_lpf_kill(driver_override: bool, lpf_kill: float) -> flo
     return min(1.0, lpf_kill + DT_CTRL / CLARITY_OVERRIDE_LPF_KILL_S)
 
   return 0.0
+
+
+def get_clarity_override_hud_lanes(
+  clarity_active: bool,
+  lat_active: bool,
+  lanes_visible: bool,
+  steering_available: bool,
+  override_latched: bool,
+  override_zeroed: bool,
+  override_timer_s: float,
+  override_fade: float,
+  frame: int,
+) -> tuple[bool, bool]:
+  solid_lanes = bool(lat_active)
+  dashed_lanes = bool(lanes_visible) and bool(steering_available) and not bool(lat_active)
+
+  if not clarity_active:
+    return solid_lanes, dashed_lanes
+
+  blink_lanes = ((frame // CLARITY_OVERRIDE_HUD_BLINK_PERIOD_FRAMES) % 2) == 0
+  ramping_back_in = 0.0 < override_fade < 1.0 and not override_latched
+  early_override_blink = override_latched and override_timer_s < CLARITY_OVERRIDE_HUD_BLINK_S
+
+  if override_zeroed:
+    return False, bool(lanes_visible) and bool(steering_available)
+
+  if early_override_blink or ramping_back_in:
+    return blink_lanes, not blink_lanes and bool(lanes_visible) and bool(steering_available)
+
+  return solid_lanes, dashed_lanes
 
 
 def apply_torque_lpf(torque_cmd: float, prev_torque_cmd: float, torque_lpf: float, v_ego: float, tau_kill: float = 0.0) -> tuple[float, float]:
@@ -303,6 +335,7 @@ class CarController(CarControllerBase):
     self.clarity_driver_override_release_grace_s = CLARITY_OVERRIDE_RELEASE_GRACE_S
     self.clarity_driver_override_lpf_kill = 0.0
     self.clarity_driver_override_zeroed = False
+    self.clarity_driver_override_latched = False
     self.bosch_gas_factor = 1.0
     self.bosch_wind_factor = 1.0
     self.bosch_wind_factor_before_brake = 0.0
@@ -361,7 +394,7 @@ class CarController(CarControllerBase):
     elif self.is_clarity_eps_modified:
       if CC.latActive:
         filtered_steering_pressed = self._filtered_steering_pressed(CS, torque_cmd)
-        self.clarity_driver_override_fade, self.clarity_driver_override_timer, self.clarity_driver_override_release_grace_s, clarity_override_latched = update_clarity_override_fade(
+        self.clarity_driver_override_fade, self.clarity_driver_override_timer, self.clarity_driver_override_release_grace_s, self.clarity_driver_override_latched = update_clarity_override_fade(
           filtered_steering_pressed,
           CS.out.vEgo,
           self.clarity_driver_override_fade,
@@ -369,7 +402,7 @@ class CarController(CarControllerBase):
           self.clarity_driver_override_release_grace_s,
         )
         self.clarity_driver_override_lpf_kill = get_clarity_override_lpf_kill(
-          clarity_override_latched, self.clarity_driver_override_lpf_kill
+          self.clarity_driver_override_latched, self.clarity_driver_override_lpf_kill
         )
 
         torque_cmd *= self.clarity_driver_override_fade
@@ -377,7 +410,7 @@ class CarController(CarControllerBase):
           torque_cmd, self.prev_torque_cmd, self.torque_lpf, CS.out.vEgo, self.clarity_driver_override_lpf_kill
         )
         torque_cmd = self.torque_lpf
-        self.clarity_driver_override_zeroed = clarity_override_latched and self.clarity_driver_override_fade <= 0.001
+        self.clarity_driver_override_zeroed = self.clarity_driver_override_latched and self.clarity_driver_override_fade <= 0.001
       else:
         self.torque_lpf = 0.0
         self.prev_torque_cmd = 0.0
@@ -388,6 +421,7 @@ class CarController(CarControllerBase):
         self.clarity_driver_override_release_grace_s = CLARITY_OVERRIDE_RELEASE_GRACE_S
         self.clarity_driver_override_lpf_kill = 0.0
         self.clarity_driver_override_zeroed = False
+        self.clarity_driver_override_latched = False
 
     # *** rate limit steer ***
     limited_torque = rate_limit(torque_cmd, self.last_torque, -self.params.STEER_DELTA_DOWN * DT_CTRL, self.params.STEER_DELTA_UP * DT_CTRL)
@@ -508,10 +542,20 @@ class CarController(CarControllerBase):
 
       steering_available = CS.out.cruiseState.available and CS.out.vEgo > self.CP.minSteerSpeed
       reduced_steering = filtered_steering_pressed
-      dashed_lanes = bool(hud_control.lanesVisible) and bool(steering_available) and not bool(CC.latActive)
+      solid_lanes, dashed_lanes = get_clarity_override_hud_lanes(
+        self.is_clarity_eps_modified,
+        CC.latActive,
+        bool(hud_control.lanesVisible),
+        bool(steering_available),
+        self.clarity_driver_override_latched,
+        self.clarity_driver_override_zeroed,
+        self.clarity_driver_override_timer,
+        self.clarity_driver_override_fade,
+        self.frame,
+      )
       can_sends.extend(
         hondacan.create_lkas_hud(
-          self.packer, self.CAN.lkas, self.CP, hud_control, CC.latActive, steering_available,
+          self.packer, self.CAN.lkas, self.CP, hud_control, solid_lanes, steering_available,
           reduced_steering, alert_steer_required, CS.lkas_hud, dashed_lanes=dashed_lanes
         )
       )
