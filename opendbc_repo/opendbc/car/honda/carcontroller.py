@@ -131,7 +131,7 @@ def get_clarity_override_lpf_kill(driver_override: bool, lpf_kill: float) -> flo
 
 def get_clarity_override_hud_lanes(
   clarity_active: bool,
-  lat_active: bool,
+  torque_applied: bool,
   lanes_visible: bool,
   steering_available: bool,
   override_latched: bool,
@@ -140,8 +140,15 @@ def get_clarity_override_hud_lanes(
   override_fade: float,
   frame: int,
 ) -> tuple[bool, bool]:
-  solid_lanes = bool(lat_active)
-  dashed_lanes = bool(lanes_visible) and bool(steering_available) and not bool(lat_active)
+  # Three-state LKAS HUD model:
+  # 1. No lines: lateral control was intentionally disabled by the user/system.
+  # 2. Dashed lines: lateral control exists, but no steering torque is currently being applied.
+  # 3. Solid lines: steering torque is actively being applied.
+  if not lanes_visible:
+    return False, False
+
+  solid_lanes = bool(torque_applied)
+  dashed_lanes = not solid_lanes
 
   if not clarity_active:
     return solid_lanes, dashed_lanes
@@ -151,10 +158,10 @@ def get_clarity_override_hud_lanes(
   early_override_blink = override_latched and override_timer_s < CLARITY_OVERRIDE_HUD_BLINK_S
 
   if override_zeroed:
-    return False, bool(lanes_visible) and bool(steering_available)
+    return False, True
 
   if early_override_blink or ramping_back_in:
-    return blink_lanes, not blink_lanes and bool(lanes_visible) and bool(steering_available)
+    return blink_lanes, not blink_lanes
 
   return solid_lanes, dashed_lanes
 
@@ -542,9 +549,10 @@ class CarController(CarControllerBase):
 
       steering_available = CS.out.cruiseState.available and CS.out.vEgo > self.CP.minSteerSpeed
       reduced_steering = filtered_steering_pressed
+      torque_applied = bool(lkas_active) and abs(apply_torque) > 0
       solid_lanes, dashed_lanes = get_clarity_override_hud_lanes(
         self.is_clarity_eps_modified,
-        CC.latActive,
+        torque_applied,
         bool(hud_control.lanesVisible),
         bool(steering_available),
         self.clarity_driver_override_latched,
