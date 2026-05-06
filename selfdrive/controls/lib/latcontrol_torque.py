@@ -87,6 +87,50 @@ CIVIC_BOSCH_MODIFIED_B_VARIANT_TURN_IN_FRICTION_BOOST_RIGHT = 0.03
 CIVIC_BOSCH_MODIFIED_B_VARIANT_UNWIND_FRICTION_REDUCTION_LEFT = 0.46
 CIVIC_BOSCH_MODIFIED_B_VARIANT_UNWIND_FRICTION_REDUCTION_RIGHT = 0.70
 
+CLARITY_NIDEC_LATERAL_TESTING_GROUND_ID = testing_ground.id_5
+CLARITY_NIDEC_FIXED_FRICTION_THRESHOLD = 0.130
+CLARITY_NIDEC_LAT_ACCEL_FACTOR_MULT = 1.087
+CLARITY_NIDEC_A_VARIANT_LAT_ACCEL_FACTOR_MULT = 1.000
+CLARITY_NIDEC_B_VARIANT_LAT_ACCEL_FACTOR_MULT = 1.069
+CLARITY_NIDEC_TRANSITION_SPEED = 12.0
+CLARITY_NIDEC_PHASE_SCALE = 0.10
+CLARITY_NIDEC_FF_ONSET = 0.18
+CLARITY_NIDEC_FF_ONSET_WIDTH = 0.07
+CLARITY_NIDEC_FF_CUTOFF = 1.00
+CLARITY_NIDEC_FF_CUTOFF_WIDTH = 0.30
+CLARITY_NIDEC_FF_REDUCTION_LEFT = 0.061
+CLARITY_NIDEC_FF_REDUCTION_RIGHT = 0.104
+CLARITY_NIDEC_TURN_IN_BOOST_LEFT = 0.017
+CLARITY_NIDEC_TURN_IN_BOOST_RIGHT = 0.000
+CLARITY_NIDEC_UNWIND_TAPER_LEFT = 0.173
+CLARITY_NIDEC_UNWIND_TAPER_RIGHT = 0.260
+CLARITY_NIDEC_TURN_IN_FRICTION_BOOST_LEFT = 0.009
+CLARITY_NIDEC_TURN_IN_FRICTION_BOOST_RIGHT = 0.000
+CLARITY_NIDEC_UNWIND_FRICTION_REDUCTION_LEFT = 0.113
+CLARITY_NIDEC_UNWIND_FRICTION_REDUCTION_RIGHT = 0.173
+CLARITY_NIDEC_A_VARIANT_FF_RESTORE_LEFT = 0.000
+CLARITY_NIDEC_A_VARIANT_FF_RESTORE_RIGHT = 0.000
+CLARITY_NIDEC_A_VARIANT_TURN_IN_BOOST_LEFT = 0.000
+CLARITY_NIDEC_A_VARIANT_TURN_IN_BOOST_RIGHT = 0.000
+CLARITY_NIDEC_A_VARIANT_UNWIND_TAPER_LEFT = 0.026
+CLARITY_NIDEC_A_VARIANT_UNWIND_TAPER_RIGHT = 0.061
+CLARITY_NIDEC_A_VARIANT_TURN_IN_FRICTION_BOOST_LEFT = 0.000
+CLARITY_NIDEC_A_VARIANT_TURN_IN_FRICTION_BOOST_RIGHT = 0.000
+CLARITY_NIDEC_A_VARIANT_UNWIND_FRICTION_REDUCTION_LEFT = 0.017
+CLARITY_NIDEC_A_VARIANT_UNWIND_FRICTION_REDUCTION_RIGHT = 0.043
+CLARITY_NIDEC_B_VARIANT_FF_REDUCTION_LEFT = 0.074
+CLARITY_NIDEC_B_VARIANT_FF_REDUCTION_RIGHT = 0.108
+CLARITY_NIDEC_B_VARIANT_TURN_IN_BOOST_LEFT = 0.026
+CLARITY_NIDEC_B_VARIANT_TURN_IN_BOOST_RIGHT = 0.022
+CLARITY_NIDEC_B_VARIANT_UNWIND_TAPER_LEFT = 0.294
+CLARITY_NIDEC_B_VARIANT_UNWIND_TAPER_RIGHT = 0.372
+CLARITY_NIDEC_B_VARIANT_TURN_IN_FRICTION_BOOST_LEFT = 0.013
+CLARITY_NIDEC_B_VARIANT_TURN_IN_FRICTION_BOOST_RIGHT = 0.013
+CLARITY_NIDEC_B_VARIANT_UNWIND_FRICTION_REDUCTION_LEFT = 0.199
+CLARITY_NIDEC_B_VARIANT_UNWIND_FRICTION_REDUCTION_RIGHT = 0.303
+CLARITY_NIDEC_FRICTION_SCALE_MIN = 0.922
+CLARITY_NIDEC_FRICTION_SCALE_MAX = 1.026
+
 BOLT_2022_2023_CARS = (
   GM_CAR.CHEVROLET_BOLT_ACC_2022_2023,
   GM_CAR.CHEVROLET_BOLT_ACC_2022_2023_PEDAL,
@@ -372,6 +416,129 @@ def civic_bosch_modified_lateral_testing_ground_active() -> bool:
 
 def civic_bosch_modified_a_lateral_testing_ground_active() -> bool:
   return testing_ground.use("8", "A")
+
+
+def clarity_nidec_lateral_testing_ground_active() -> bool:
+  return testing_ground.use(CLARITY_NIDEC_LATERAL_TESTING_GROUND_ID, "B")
+
+
+def clarity_nidec_lateral_testing_ground_a_active() -> bool:
+  return testing_ground.use(CLARITY_NIDEC_LATERAL_TESTING_GROUND_ID, "A")
+
+
+def _clarity_nidec_low_speed_factor(v_ego: float) -> float:
+  return 1.0 / (1.0 + (max(v_ego, 0.0) / CLARITY_NIDEC_TRANSITION_SPEED) ** 2)
+
+
+def _clarity_nidec_transition_phase(desired_lateral_accel: float, desired_lateral_jerk: float) -> float:
+  return math.tanh((desired_lateral_accel * desired_lateral_jerk) / CLARITY_NIDEC_PHASE_SCALE)
+
+
+def _clarity_nidec_side_value(desired_lateral_accel: float, left_value: float, right_value: float) -> float:
+  return left_value if desired_lateral_accel >= 0.0 else right_value
+
+
+def get_clarity_nidec_ff_scale(desired_lateral_accel: float, desired_lateral_jerk: float, v_ego: float) -> float:
+  if desired_lateral_accel == 0.0:
+    return 1.0
+
+  abs_lateral_accel = abs(desired_lateral_accel)
+  onset = _sigmoid((abs_lateral_accel - CLARITY_NIDEC_FF_ONSET) / CLARITY_NIDEC_FF_ONSET_WIDTH)
+  cutoff = _sigmoid((CLARITY_NIDEC_FF_CUTOFF - abs_lateral_accel) / CLARITY_NIDEC_FF_CUTOFF_WIDTH)
+  base_reduction = _clarity_nidec_side_value(desired_lateral_accel,
+                                                CLARITY_NIDEC_FF_REDUCTION_LEFT,
+                                                CLARITY_NIDEC_FF_REDUCTION_RIGHT) * onset * cutoff
+
+  phase = _clarity_nidec_transition_phase(desired_lateral_accel, desired_lateral_jerk)
+  turn_in_weight = max(phase, 0.0)
+  unwind_weight = max(-phase, 0.0)
+  low_speed_factor = _clarity_nidec_low_speed_factor(v_ego)
+  a_variant_active = clarity_nidec_lateral_testing_ground_a_active()
+  variant_active = clarity_nidec_lateral_testing_ground_active()
+  if a_variant_active:
+    base_reduction -= (_clarity_nidec_side_value(desired_lateral_accel,
+                                                    CLARITY_NIDEC_A_VARIANT_FF_RESTORE_LEFT,
+                                                    CLARITY_NIDEC_A_VARIANT_FF_RESTORE_RIGHT) * onset * cutoff)
+  if variant_active:
+    base_reduction += (_clarity_nidec_side_value(desired_lateral_accel,
+                                                    CLARITY_NIDEC_B_VARIANT_FF_REDUCTION_LEFT,
+                                                    CLARITY_NIDEC_B_VARIANT_FF_REDUCTION_RIGHT) * onset * cutoff)
+
+  turn_in_boost = 1.0 + (_clarity_nidec_side_value(desired_lateral_accel,
+                                                      CLARITY_NIDEC_TURN_IN_BOOST_LEFT,
+                                                      CLARITY_NIDEC_TURN_IN_BOOST_RIGHT) *
+                           turn_in_weight * (0.40 + 0.60 * low_speed_factor))
+  if a_variant_active:
+    turn_in_boost *= 1.0 + (_clarity_nidec_side_value(desired_lateral_accel,
+                                                         CLARITY_NIDEC_A_VARIANT_TURN_IN_BOOST_LEFT,
+                                                         CLARITY_NIDEC_A_VARIANT_TURN_IN_BOOST_RIGHT) *
+                              turn_in_weight * (0.40 + 0.60 * low_speed_factor))
+  if variant_active:
+    turn_in_boost *= 1.0 + (_clarity_nidec_side_value(desired_lateral_accel,
+                                                         CLARITY_NIDEC_B_VARIANT_TURN_IN_BOOST_LEFT,
+                                                         CLARITY_NIDEC_B_VARIANT_TURN_IN_BOOST_RIGHT) *
+                              turn_in_weight * (0.40 + 0.60 * low_speed_factor))
+  unwind_taper = 1.0 - (_clarity_nidec_side_value(desired_lateral_accel,
+                                                     CLARITY_NIDEC_UNWIND_TAPER_LEFT,
+                                                     CLARITY_NIDEC_UNWIND_TAPER_RIGHT) *
+                          unwind_weight * (0.35 + 0.65 * low_speed_factor))
+  if a_variant_active:
+    unwind_taper *= 1.0 - (_clarity_nidec_side_value(desired_lateral_accel,
+                                                        CLARITY_NIDEC_A_VARIANT_UNWIND_TAPER_LEFT,
+                                                        CLARITY_NIDEC_A_VARIANT_UNWIND_TAPER_RIGHT) *
+                             unwind_weight * (0.35 + 0.65 * low_speed_factor))
+  if variant_active:
+    unwind_taper *= 1.0 - (_clarity_nidec_side_value(desired_lateral_accel,
+                                                        CLARITY_NIDEC_B_VARIANT_UNWIND_TAPER_LEFT,
+                                                        CLARITY_NIDEC_B_VARIANT_UNWIND_TAPER_RIGHT) *
+                             unwind_weight * (0.35 + 0.65 * low_speed_factor))
+  return (1.0 - base_reduction) * turn_in_boost * max(unwind_taper, 0.0)
+
+
+def get_clarity_nidec_friction_scale(v_ego: float, desired_lateral_accel: float, desired_lateral_jerk: float) -> float:
+  if desired_lateral_accel == 0.0 or desired_lateral_jerk == 0.0:
+    return 1.0
+
+  abs_lateral_accel = abs(desired_lateral_accel)
+  onset = _sigmoid((abs_lateral_accel - CLARITY_NIDEC_FF_ONSET) / CLARITY_NIDEC_FF_ONSET_WIDTH)
+  cutoff = _sigmoid((CLARITY_NIDEC_FF_CUTOFF - abs_lateral_accel) / CLARITY_NIDEC_FF_CUTOFF_WIDTH)
+  envelope = onset * cutoff * _clarity_nidec_low_speed_factor(v_ego)
+  phase = _clarity_nidec_transition_phase(desired_lateral_accel, desired_lateral_jerk)
+  turn_in_weight = max(phase, 0.0)
+  unwind_weight = max(-phase, 0.0)
+  a_variant_active = clarity_nidec_lateral_testing_ground_a_active()
+  variant_active = clarity_nidec_lateral_testing_ground_active()
+
+  friction_scale = 1.0
+  friction_scale += (_clarity_nidec_side_value(desired_lateral_accel,
+                                                  CLARITY_NIDEC_TURN_IN_FRICTION_BOOST_LEFT,
+                                                  CLARITY_NIDEC_TURN_IN_FRICTION_BOOST_RIGHT) *
+                     envelope * turn_in_weight)
+  if a_variant_active:
+    friction_scale += (_clarity_nidec_side_value(desired_lateral_accel,
+                                                    CLARITY_NIDEC_A_VARIANT_TURN_IN_FRICTION_BOOST_LEFT,
+                                                    CLARITY_NIDEC_A_VARIANT_TURN_IN_FRICTION_BOOST_RIGHT) *
+                       envelope * turn_in_weight)
+  if variant_active:
+    friction_scale += (_clarity_nidec_side_value(desired_lateral_accel,
+                                                    CLARITY_NIDEC_B_VARIANT_TURN_IN_FRICTION_BOOST_LEFT,
+                                                    CLARITY_NIDEC_B_VARIANT_TURN_IN_FRICTION_BOOST_RIGHT) *
+                       envelope * turn_in_weight)
+  friction_scale -= (_clarity_nidec_side_value(desired_lateral_accel,
+                                                  CLARITY_NIDEC_UNWIND_FRICTION_REDUCTION_LEFT,
+                                                  CLARITY_NIDEC_UNWIND_FRICTION_REDUCTION_RIGHT) *
+                     envelope * unwind_weight)
+  if a_variant_active:
+    friction_scale -= (_clarity_nidec_side_value(desired_lateral_accel,
+                                                    CLARITY_NIDEC_A_VARIANT_UNWIND_FRICTION_REDUCTION_LEFT,
+                                                    CLARITY_NIDEC_A_VARIANT_UNWIND_FRICTION_REDUCTION_RIGHT) *
+                       envelope * unwind_weight)
+  if variant_active:
+    friction_scale -= (_clarity_nidec_side_value(desired_lateral_accel,
+                                                    CLARITY_NIDEC_B_VARIANT_UNWIND_FRICTION_REDUCTION_LEFT,
+                                                    CLARITY_NIDEC_B_VARIANT_UNWIND_FRICTION_REDUCTION_RIGHT) *
+                       envelope * unwind_weight)
+  return min(max(friction_scale, CLARITY_NIDEC_FRICTION_SCALE_MIN), CLARITY_NIDEC_FRICTION_SCALE_MAX)
 
 
 def _civic_bosch_modified_b_low_speed_factor(v_ego: float) -> float:
@@ -1142,6 +1309,7 @@ class LatControlTorque(LatControl):
     self.is_ioniq_6 = CP.carFingerprint in IONIQ_6_CARS
     self.is_kia_ev6 = CP.carFingerprint in KIA_EV6_CARS
     self.is_civic_bosch_modified = CP.carFingerprint == HONDA_CAR.HONDA_CIVIC_BOSCH and bool(CP.flags & HondaFlags.EPS_MODIFIED)
+    self.is_clarity_nidec = CP.carFingerprint == HONDA_CAR.HONDA_CLARITY
     self.is_volt_cc = CP.carFingerprint == GM_CAR.CHEVROLET_VOLT_CC
     self.is_silverado = CP.carFingerprint == GM_CAR.CHEVROLET_SILVERADO
     self.use_bolt_ff_scaling = self.is_bolt_2022_2023 or self.is_bolt_2018_2021 or self.is_bolt_2017
@@ -1158,6 +1326,12 @@ class LatControlTorque(LatControl):
         self.torque_params.latAccelFactor *= CIVIC_BOSCH_MODIFIED_A_VARIANT_LAT_ACCEL_FACTOR_MULT
       if civic_bosch_modified_lateral_testing_ground_active():
         self.torque_params.latAccelFactor *= CIVIC_BOSCH_MODIFIED_B_VARIANT_LAT_ACCEL_FACTOR_MULT
+    if self.is_clarity_nidec:
+      self.torque_params.latAccelFactor *= CLARITY_NIDEC_LAT_ACCEL_FACTOR_MULT
+      if clarity_nidec_lateral_testing_ground_a_active():
+        self.torque_params.latAccelFactor *= CLARITY_NIDEC_A_VARIANT_LAT_ACCEL_FACTOR_MULT
+      if clarity_nidec_lateral_testing_ground_active():
+        self.torque_params.latAccelFactor *= CLARITY_NIDEC_B_VARIANT_LAT_ACCEL_FACTOR_MULT
     if self.is_bolt:
       kp_scale = getattr(self.torque_params, "kp", getattr(self.torque_params, "kpDEPRECATED", 1.0))
       ki_scale = getattr(self.torque_params, "ki", getattr(self.torque_params, "kiDEPRECATED", 1.0))
@@ -1177,6 +1351,12 @@ class LatControlTorque(LatControl):
         latAccelFactor *= CIVIC_BOSCH_MODIFIED_A_VARIANT_LAT_ACCEL_FACTOR_MULT
       if civic_bosch_modified_lateral_testing_ground_active():
         latAccelFactor *= CIVIC_BOSCH_MODIFIED_B_VARIANT_LAT_ACCEL_FACTOR_MULT
+    if self.is_clarity_nidec:
+      latAccelFactor *= CLARITY_NIDEC_LAT_ACCEL_FACTOR_MULT
+      if clarity_nidec_lateral_testing_ground_a_active():
+        latAccelFactor *= CLARITY_NIDEC_A_VARIANT_LAT_ACCEL_FACTOR_MULT
+      if clarity_nidec_lateral_testing_ground_active():
+        latAccelFactor *= CLARITY_NIDEC_B_VARIANT_LAT_ACCEL_FACTOR_MULT
     self.torque_params.latAccelFactor = latAccelFactor
     self.torque_params.latAccelOffset = latAccelOffset
     self.torque_params.friction = friction
@@ -1247,6 +1427,7 @@ class LatControlTorque(LatControl):
       ioniq_6_active = self.is_ioniq_6
       kia_ev6_test_active = self.is_kia_ev6 and kia_ev6_lateral_testing_ground_active()
       volt_plexy_test_active = self.is_volt_cc and volt_plexy_lateral_testing_ground_active()
+      clarity_nidec_active = self.is_clarity_nidec
       volt_standard_center_taper = get_volt_standard_center_taper_scale(setpoint, CS.vEgo) if volt_standard_test_active else 1.0
       ioniq_6_center_taper = get_ioniq_6_center_taper_scale(setpoint, CS.vEgo) if ioniq_6_active else 1.0
       friction_threshold = get_friction_threshold(CS.vEgo)
@@ -1280,6 +1461,10 @@ class LatControlTorque(LatControl):
         ff *= get_volt_plexy_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo)
         friction_threshold = get_volt_plexy_friction_threshold(CS.vEgo, setpoint, desired_lateral_jerk)
         friction_scale = get_volt_plexy_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
+      elif clarity_nidec_active:
+        ff *= get_clarity_nidec_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo)
+        friction_threshold = CLARITY_NIDEC_FIXED_FRICTION_THRESHOLD
+        friction_scale = get_clarity_nidec_friction_scale(CS.vEgo, setpoint, desired_lateral_jerk)
       elif self.is_civic_bosch_modified:
         ff *= get_civic_bosch_modified_b_ff_scale(setpoint, desired_lateral_jerk, CS.vEgo)
         friction_threshold = CIVIC_BOSCH_MODIFIED_B_FIXED_FRICTION_THRESHOLD
