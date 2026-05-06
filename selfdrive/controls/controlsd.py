@@ -264,7 +264,9 @@ class Controls:
       hud_set_speed = get_gm_hud_set_speed(hud_set_speed, self.starpilot_toggles)
     hudControl.setSpeed = hud_set_speed
     hudControl.speedVisible = CC.enabled
-    hudControl.lanesVisible = CC.enabled or CC.latActive
+    # Show lane-line HUD whenever the user has allowed AOL/LKAS to exist.
+    # The brand-specific carcontroller decides whether those lines are solid or dashed.
+    hudControl.lanesVisible = bool(self.sm['starpilotCarState'].alwaysOnLateralAllowed)
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
     hudControl.leadDistanceBars = self.sm['selfdriveState'].personality.raw + 1
     hudControl.visualAlert = self.sm['selfdriveState'].alertHudVisual
