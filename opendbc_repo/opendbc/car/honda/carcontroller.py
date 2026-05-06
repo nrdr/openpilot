@@ -63,6 +63,36 @@ def get_civic_bosch_modified_torque_lpf_tau(torque_cmd: float, prev_torque_cmd: 
     return 0.18
 
 
+CLARITY_OVERRIDE_FADE_SPEED = 50.0 * 0.44704
+CLARITY_OVERRIDE_FADE_DOWN_S = 2.0
+CLARITY_OVERRIDE_FADE_UP_S = 2.0
+CLARITY_OVERRIDE_LPF_KILL_S = 0.2
+
+
+def update_clarity_override_fade(driver_override: bool, v_ego: float, fade: float) -> float:
+  if driver_override:
+    if v_ego < CLARITY_OVERRIDE_FADE_SPEED:
+      return max(0.0, fade - DT_CTRL / CLARITY_OVERRIDE_FADE_DOWN_S)
+    return 0.0
+
+  return min(1.0, fade + DT_CTRL / CLARITY_OVERRIDE_FADE_UP_S)
+
+
+def get_clarity_override_lpf_kill(driver_override: bool, lpf_kill: float) -> float:
+  if driver_override:
+    return min(1.0, lpf_kill + DT_CTRL / CLARITY_OVERRIDE_LPF_KILL_S)
+
+  return 0.0
+
+
+def apply_torque_lpf(torque_cmd: float, prev_torque_cmd: float, torque_lpf: float, v_ego: float, tau_kill: float = 0.0) -> tuple[float, float]:
+  tau = get_civic_bosch_modified_torque_lpf_tau(torque_cmd, prev_torque_cmd, v_ego)
+  tau *= max(0.0, 1.0 - tau_kill)
+  alpha = DT_CTRL / (tau + DT_CTRL)
+  torque_lpf = alpha * torque_cmd + ((1.0 - alpha) * torque_lpf)
+  return torque_lpf, torque_cmd
+
+
 def get_civic_bosch_modified_steering_pressed(
   raw_pressed: bool, steering_torque: float, torque_cmd: float, filter_s: float, was_pressed: bool
 ) -> tuple[float, bool]:
@@ -226,6 +256,9 @@ class CarController(CarControllerBase):
     self.steering_pressed_filter_s = 0.0
     self.steering_pressed_robust_prev = False
     self.is_clarity_eps_modified = CP.carFingerprint == CAR.HONDA_CLARITY and bool(CP.flags & HondaFlags.EPS_MODIFIED)
+    self.clarity_driver_override_fade = 1.0
+    self.clarity_driver_override_lpf_kill = 0.0
+    self.clarity_driver_override_zeroed = False
     self.bosch_gas_factor = 1.0
     self.bosch_wind_factor = 1.0
     self.bosch_wind_factor_before_brake = 0.0
@@ -284,18 +317,27 @@ class CarController(CarControllerBase):
     elif self.is_clarity_eps_modified:
       if CC.latActive:
         filtered_steering_pressed = self._filtered_steering_pressed(CS, torque_cmd)
-        if filtered_steering_pressed:
-          self.torque_lpf = 0.0
-          self.prev_torque_cmd = 0.0
-          torque_cmd = 0.0
-        else:
-          self.torque_lpf = float(torque_cmd)
-          self.prev_torque_cmd = float(torque_cmd)
+        self.clarity_driver_override_fade = update_clarity_override_fade(
+          filtered_steering_pressed, CS.out.vEgo, self.clarity_driver_override_fade
+        )
+        self.clarity_driver_override_lpf_kill = get_clarity_override_lpf_kill(
+          filtered_steering_pressed, self.clarity_driver_override_lpf_kill
+        )
+
+        torque_cmd *= self.clarity_driver_override_fade
+        self.torque_lpf, self.prev_torque_cmd = apply_torque_lpf(
+          torque_cmd, self.prev_torque_cmd, self.torque_lpf, CS.out.vEgo, self.clarity_driver_override_lpf_kill
+        )
+        torque_cmd = self.torque_lpf
+        self.clarity_driver_override_zeroed = filtered_steering_pressed and self.clarity_driver_override_fade <= 0.001
       else:
         self.torque_lpf = 0.0
         self.prev_torque_cmd = 0.0
         self.steering_pressed_filter_s = 0.0
         self.steering_pressed_robust_prev = False
+        self.clarity_driver_override_fade = 1.0
+        self.clarity_driver_override_lpf_kill = 0.0
+        self.clarity_driver_override_zeroed = False
 
     # *** rate limit steer ***
     limited_torque = rate_limit(torque_cmd, self.last_torque, -self.params.STEER_DELTA_DOWN * DT_CTRL, self.params.STEER_DELTA_UP * DT_CTRL)
@@ -324,7 +366,7 @@ class CarController(CarControllerBase):
         can_sends.append(make_tester_present_msg(0x18DAB0F1, 1, suppress_response=True))
 
     # Send steering command.
-    lkas_active = CC.latActive and CS.out.cruiseState.available
+    lkas_active = CC.latActive and CS.out.cruiseState.available and not self.clarity_driver_override_zeroed
 
     can_sends.append(hondacan.create_steering_control(
       self.packer, self.CAN, apply_torque, lkas_active, self.tja_control
