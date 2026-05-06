@@ -427,6 +427,124 @@ class TestHyundaiCanfdLKASteeringEV(TestHyundaiCanfdBase):
     self.safety.set_safety_hooks(CarParams.SafetyModel.hyundaiCanfd, HyundaiSafetyFlags.CANFD_LKA_STEERING | HyundaiSafetyFlags.EV_GAS)
     self.safety.init_tests()
 
+  def _paddle_msg(self, left_paddle=0, right_paddle=0, buttons=0, main_button=0, lka_button=0, bus=None):
+    if bus is None:
+      bus = self.BUTTONS_TX_BUS
+    values = {
+      "CRUISE_BUTTONS": buttons,
+      "ADAPTIVE_CRUISE_MAIN_BTN": main_button,
+      "LDA_BTN": lka_button,
+      "RIGHT_PADDLE": right_paddle,
+      "LEFT_PADDLE": left_paddle,
+      "SET_ME_1": 1,
+    }
+    return self.packer.make_can_msg_safety("CRUISE_BUTTONS", bus, values)
+
+  def _regen_control_msg(self, byte24=0xA8, byte25=0x0C, byte26=0x12, byte27=0x0E, counter=0x14, bus=None):
+    if bus is None:
+      bus = self.PT_BUS
+    values = {
+      "COUNTER": counter,
+      "BYTE3": 0x40,
+      "BYTE4": 0x80,
+      "BYTE5": 0x1F,
+      "BYTE6": 0x00,
+      "BYTE7": 0x00,
+      "BYTE8": 0x00,
+      "BYTE9": 0x00,
+      "BYTE10": 0x00,
+      "BYTE11": 0x00,
+      "BYTE12": 0xA8,
+      "BYTE13": 0x65,
+      "BYTE14": 0x17,
+      "BYTE15": 0x00,
+      "BYTE16": 0x00,
+      "BYTE17": 0xA0,
+      "BYTE18": 0x00,
+      "BYTE19": 0x00,
+      "BYTE20": 0x00,
+      "BYTE21": 0x80,
+      "BYTE22": 0xC0,
+      "BYTE23": 0x71,
+      "BYTE24": byte24,
+      "BYTE25": byte25,
+      "BYTE26": byte26,
+      "BYTE27": byte27,
+      "BYTE28": 0x00,
+      "BYTE29": 0x00,
+      "BYTE30": 0x00,
+      "BYTE31": 0x00,
+    }
+
+    def fix_checksum(msg):
+      addr, dat, msg_bus = msg
+      dat = bytearray(dat)
+      checksum = hyundaicanfd.hkg_can_fd_checksum(addr, None, dat)
+      dat[0] = checksum & 0xFF
+      dat[1] = (checksum >> 8) & 0xFF
+      return addr, bytes(dat), msg_bus
+
+    return self.packer.make_can_msg_safety("IONIQ_6_REGEN_CONTROL", bus, values, fix_checksum=fix_checksum)
+
+  def test_left_paddle_send(self):
+    for controls_allowed in (True, False):
+      self.safety.set_controls_allowed(controls_allowed)
+      self.assertFalse(self._tx(self._paddle_msg(left_paddle=1)))
+
+
+class TestHyundaiCanfdLKASteeringEVAlwaysIPedal(TestHyundaiCanfdLKASteeringEV):
+
+  TX_MSGS = TestHyundaiCanfdLKASteeringEV.TX_MSGS + [[0x25A, 1]]
+
+  def setUp(self):
+    self.packer = CANPackerSafety("hyundai_canfd_generated")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.hyundaiCanfd,
+                                 HyundaiSafetyFlags.CANFD_LKA_STEERING |
+                                 HyundaiSafetyFlags.EV_GAS |
+                                 HyundaiStarPilotSafetyFlags.ALLOW_IPEDAL_PADDLE)
+    self.safety.init_tests()
+
+  def test_left_paddle_send(self):
+    self.safety.set_controls_allowed(False)
+    self.assertTrue(self._tx(self._paddle_msg(left_paddle=1)))
+    self.assertFalse(self._tx(self._paddle_msg(right_paddle=1)))
+    self.assertFalse(self._tx(self._paddle_msg(left_paddle=1, buttons=1)))
+    self.assertFalse(self._tx(self._paddle_msg(left_paddle=1, main_button=1)))
+    self.assertFalse(self._tx(self._paddle_msg(left_paddle=1, lka_button=1)))
+
+    self.safety.set_controls_allowed(True)
+    self.assertFalse(self._tx(self._paddle_msg(left_paddle=1)))
+
+  def test_regen_control_send(self):
+    stock_msg = self._regen_control_msg(byte24=0xA8, byte27=0x0E, counter=0x14)
+    self._rx(stock_msg)
+
+    self.safety.set_controls_allowed(False)
+    self.assertTrue(self._tx(self._regen_control_msg(byte24=0xC0, byte27=0x00, counter=0x14)))
+    self.assertFalse(self._tx(self._regen_control_msg(byte24=0x85, byte25=0x0E, byte26=0x07, byte27=0x0C, counter=0x14)))
+    self.assertFalse(self._tx(self._regen_control_msg(byte24=0xA8, byte27=0x00, counter=0x14)))
+    self.assertFalse(self._tx(self._regen_control_msg(byte24=0xC0, byte27=0x0E, counter=0x14)))
+    self.assertFalse(self._tx(self._regen_control_msg(byte24=0xC0, byte27=0x00, counter=0x15)))
+
+    stock_msg = self._regen_control_msg(byte24=0xA8, byte25=0x0E, byte26=0x07, byte27=0x0E, counter=0x58)
+    self._rx(stock_msg)
+    self.assertTrue(self._tx(self._regen_control_msg(byte24=0x85, byte25=0x0E, byte26=0x07, byte27=0x0C, counter=0x58)))
+    self.assertFalse(self._tx(self._regen_control_msg(byte24=0xC0, byte25=0x0E, byte26=0x07, byte27=0x00, counter=0x58)))
+
+    stock_msg = self._regen_control_msg(byte24=0x18, byte25=0x10, byte26=0x07, byte27=0x02, counter=0x81)
+    self._rx(stock_msg)
+    self.assertTrue(self._tx(self._regen_control_msg(byte24=0xB5, byte25=0x10, byte26=0x07, byte27=0x00, counter=0x81)))
+    self.assertFalse(self._tx(self._regen_control_msg(byte24=0xA8, byte25=0x10, byte26=0x07, byte27=0x00, counter=0x81)))
+
+    stock_msg = self._regen_control_msg(byte24=0xA8, byte25=0x10, byte26=0x07, byte27=0x0E, counter=0x82)
+    self._rx(stock_msg)
+    self.assertTrue(self._tx(self._regen_control_msg(byte24=0xB5, byte25=0x10, byte26=0x07, byte27=0x00, counter=0x82)))
+    self.assertFalse(self._tx(self._regen_control_msg(byte24=0xA8, byte25=0x02, byte26=0x07, byte27=0x0E, counter=0x82)))
+
+    self.safety.set_controls_allowed(True)
+    self.assertFalse(self._tx(self._regen_control_msg(byte24=0xC0, byte27=0x00, counter=0x14)))
+
 
 # TODO: Handle ICE and HEV configurations once we see cars that use the new messages
 class TestHyundaiCanfdLKASteeringAltEV(TestHyundaiCanfdBase):
@@ -476,6 +594,26 @@ class TestHyundaiCanfdLKASteeringLongEV(HyundaiLongitudinalBase, TestHyundaiCanf
       "aReqValue": accel,
     }
     return self.packer.make_can_msg_safety("SCC_CONTROL", 1, values)
+
+
+class TestHyundaiCanfdLKASteeringLongEVAlwaysIPedal(TestHyundaiCanfdLKASteeringLongEV):
+
+  TX_MSGS = TestHyundaiCanfdLKASteeringLongEV.TX_MSGS + [[0x25A, 1]]
+
+  def setUp(self):
+    self.packer = CANPackerSafety("hyundai_canfd_generated")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.hyundaiCanfd, HyundaiSafetyFlags.CANFD_LKA_STEERING |
+                                 HyundaiSafetyFlags.LONG | HyundaiSafetyFlags.EV_GAS |
+                                 HyundaiStarPilotSafetyFlags.ALLOW_IPEDAL_PADDLE)
+    self.safety.init_tests()
+
+  def test_regen_control_send(self):
+    stock_msg = self._regen_control_msg(byte24=0xA8, byte27=0x0E, counter=0x14)
+    self._rx(stock_msg)
+
+    self.safety.set_controls_allowed(False)
+    self.assertTrue(self._tx(self._regen_control_msg(byte24=0xC0, byte27=0x00, counter=0x14)))
 
 
 # Tests longitudinal for ICE, hybrid, EV cars with LFA steering

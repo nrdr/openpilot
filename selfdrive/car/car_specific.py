@@ -184,6 +184,9 @@ class CarSpecificEvents:
   def create_common_events(self, CS: structs.CarState, CS_prev: car.CarState, extra_gears: list | None = None, pcm_enable=True,
                            allow_button_cancel=True, suppress_low_speed_alert=False):
     events = Events()
+    preap_software_cruise = (self.CP.brand == "tesla" and self.CP.carFingerprint == "TESLA_MODEL_S_PREAP" and
+                             self.CP.openpilotLongitudinalControl and not self.CP.pcmCruise)
+    pcm_enable = pcm_enable or preap_software_cruise
 
     if CS.gearShifter == GearShifter.reverse:
       events.add(EventName.reverseGear)

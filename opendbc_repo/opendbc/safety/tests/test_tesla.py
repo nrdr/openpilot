@@ -39,9 +39,9 @@ class TestTeslaSafetyBase(common.CarSafetyTest, common.AngleSteeringSafetyTest, 
 
   # Tesla uses get_max_angle_delta_vm and get_max_angle_vm for real lateral accel and jerk limits
   # TODO: integrate this into AngleSteeringSafetyTest
-  ANGLE_RATE_BP = None
-  ANGLE_RATE_UP = None
-  ANGLE_RATE_DOWN = None
+  ANGLE_RATE_BP = [0.]
+  ANGLE_RATE_UP = [CarControllerParams.ANGLE_LIMITS.MAX_ANGLE_RATE]
+  ANGLE_RATE_DOWN = [CarControllerParams.ANGLE_LIMITS.MAX_ANGLE_RATE]
 
   # Real time limits
   LATERAL_FREQUENCY = 50  # Hz
@@ -69,7 +69,9 @@ class TestTeslaSafetyBase(common.CarSafetyTest, common.AngleSteeringSafetyTest, 
 
     self.steer_control_types = {d: v for v, d in self.define.dv["DAS_steeringControl"]["DAS_steeringControlType"].items()}
 
-  def _angle_cmd_msg(self, angle: float, state: bool | int, increment_timer: bool = True, bus: int = 0):
+  def _angle_cmd_msg(self, angle: float, state: bool | int = True, increment_timer: bool = True, bus: int = 0, enabled: bool | None = None):
+    if enabled is not None:
+      state = enabled
     values = {"DAS_steeringAngleRequest": angle, "DAS_steeringControlType": state}
     if increment_timer:
       self.safety.set_timer(self.cnt_angle_cmd * int(1e6 / self.LATERAL_FREQUENCY))

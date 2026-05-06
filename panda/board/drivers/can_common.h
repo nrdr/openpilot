@@ -216,6 +216,22 @@ void ignition_can_hook(CANPacket_t *msg) {
       prev_counter_tesla = counter;
     }
 
+    // Tesla Model S pre-AP exception
+    if ((msg->addr == 0x101U) && (len == 3)) {
+      // Validate Tesla checksum/counter to avoid false positives on overlapping frames.
+      int counter = msg->data[1] & 0xFU;
+      int checksum = (((msg->addr & 0xFFU) + ((msg->addr >> 8U) & 0xFFU) + msg->data[0] + msg->data[1]) & 0xFFU);
+
+      static int prev_counter_tesla_preap = -1;
+      if ((msg->data[2] == checksum) && (counter == ((prev_counter_tesla_preap + 1) % 16)) && (prev_counter_tesla_preap != -1)) {
+        // GTW_epasPowerMode=1 is DRIVE_ON, which is the only ignition source on pre-AP cars.
+        int power_mode = (msg->data[0] >> 3U) & 0xFU;
+        ignition_can = power_mode == 0x1U;
+        ignition_can_cnt = 0U;
+      }
+      prev_counter_tesla_preap = counter;
+    }
+
     // Mazda exception
     if ((msg->addr == 0x9EU) && (len == 8)) {
       ignition_can = (msg->data[0] >> 5) == 0x6U;

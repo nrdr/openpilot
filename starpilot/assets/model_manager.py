@@ -18,7 +18,7 @@ from openpilot.starpilot.common.starpilot_utilities import delete_file
 from openpilot.starpilot.common.starpilot_variables import MODELS_PATH
 
 MANIFEST_CANDIDATES = ("v21",)
-TINYGRAD_VERSIONS = {"v8", "v9", "v10", "v11", "v12", "v13"}
+TINYGRAD_VERSIONS = {"v8", "v9", "v10", "v11", "v12", "v13", "v14"}
 DEFAULT_MODEL_KEY = "sc2"
 MODEL_KEY_CANONICAL_MAP = {
   "sc": DEFAULT_MODEL_KEY,
@@ -192,7 +192,7 @@ class ModelManager:
       f"{model_key}_driving_vision_metadata.pkl",
     ]
 
-    if model_version in {"v12", "v13"}:
+    if model_version in {"v12", "v13", "v14"}:
       filenames += [
         f"{model_key}_driving_off_policy_tinygrad.pkl",
         f"{model_key}_driving_off_policy_metadata.pkl",

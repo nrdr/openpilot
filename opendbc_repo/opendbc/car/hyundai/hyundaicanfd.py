@@ -156,12 +156,86 @@ def create_suppress_lfa(packer, CAN, lfa_block_msg, lka_steering_alt):
   return packer.make_can_msg(suppress_msg, CAN.ACAN, values)
 
 
-def create_buttons(packer, CP, CAN, cnt, btn):
+IONIQ_6_CRUISE_BUTTONS_COUNTER_MAX = 15
+IONIQ_6_CRUISE_BUTTONS_BASE_CHECKSUMS = (
+  0x56, 0xEF, 0x39, 0x80, 0x88,
+  0x31, 0xE7, 0x5E, 0xF7, 0x4E,
+  0x98, 0x21, 0x29, 0x90, 0x46,
+)
+IONIQ_6_CRUISE_BUTTONS_LEFT_PADDLE_CHECKSUM_XOR = 0x77
+IONIQ_6_CRUISE_BUTTONS_RIGHT_PADDLE_CHECKSUM_XOR = 0xD4
+IONIQ_6_REGEN_CONTROL_REQUEST_TAILS = {
+  (0xA8, 0x0C, 0x12, 0x0E): (0xC0, 0x0C, 0x12, 0x00),
+  (0xA8, 0x0E, 0x07, 0x0E): (0x85, 0x0E, 0x07, 0x0C),
+  (0x18, 0x10, 0x07, 0x02): (0xB5, 0x10, 0x07, 0x00),
+  (0xA8, 0x10, 0x07, 0x0E): (0xB5, 0x10, 0x07, 0x00),
+}
+
+
+def get_ioniq_6_cruise_buttons_next_counter(counter: int) -> int:
+  return (int(counter) + 1) % IONIQ_6_CRUISE_BUTTONS_COUNTER_MAX
+
+
+def create_ioniq_6_paddle_buttons(packer, CP, CAN, cnt, left_paddle=False, right_paddle=False):
+  if left_paddle and right_paddle:
+    raise ValueError("Ioniq 6 paddle spoof only supports one paddle at a time")
+  if cnt < 0 or cnt >= IONIQ_6_CRUISE_BUTTONS_COUNTER_MAX:
+    raise ValueError(f"Invalid Ioniq 6 cruise buttons counter: {cnt}")
+
   values = {
     "COUNTER": cnt,
     "SET_ME_1": 1,
-    "CRUISE_BUTTONS": btn,
+    "CRUISE_BUTTONS": 0,
+    "ADAPTIVE_CRUISE_MAIN_BTN": 0,
+    "NORMAL_CRUISE_MAIN_BTN": 0,
+    "LDA_BTN": 0,
+    "LEFT_PADDLE": int(left_paddle),
+    "RIGHT_PADDLE": int(right_paddle),
   }
+
+  address = packer.dbc.name_to_msg["CRUISE_BUTTONS"].address
+  dat = packer.pack(address, values)
+  checksum = IONIQ_6_CRUISE_BUTTONS_BASE_CHECKSUMS[cnt]
+  if left_paddle:
+    checksum ^= IONIQ_6_CRUISE_BUTTONS_LEFT_PADDLE_CHECKSUM_XOR
+  if right_paddle:
+    checksum ^= IONIQ_6_CRUISE_BUTTONS_RIGHT_PADDLE_CHECKSUM_XOR
+  dat[0] = checksum
+
+  bus = CAN.ECAN if CP.flags & HyundaiFlags.CANFD_LKA_STEERING else CAN.CAM
+  return address, bytes(dat), bus
+
+
+def get_ioniq_6_regen_control_request_tail(base_values):
+  base_tail = tuple(int(base_values.get(f"BYTE{i}", 0)) for i in range(24, 28))
+  return IONIQ_6_REGEN_CONTROL_REQUEST_TAILS.get(base_tail)
+
+
+def create_ioniq_6_regen_control(packer, CP, CAN, base_values):
+  request_tail = get_ioniq_6_regen_control_request_tail(base_values)
+  if request_tail is None:
+    raise ValueError(f"Unsupported Ioniq 6 regen control tail: {tuple(int(base_values.get(f'BYTE{i}', 0)) for i in range(24, 28))}")
+
+  values = {k: v for k, v in base_values.items() if k != "CHECKSUM"}
+  address = packer.dbc.name_to_msg["IONIQ_6_REGEN_CONTROL"].address
+  dat = bytearray(packer.pack(address, values))
+  dat[24:28] = bytes(request_tail)
+
+  checksum = hkg_can_fd_checksum(address, None, dat)
+  dat[0] = checksum & 0xFF
+  dat[1] = (checksum >> 8) & 0xFF
+  return address, bytes(dat), CAN.ECAN
+
+
+def create_buttons(packer, CP, CAN, cnt, btn=0, base_values=None, left_paddle=False, right_paddle=False):
+  values = {k: v for k, v in base_values.items() if k not in ("_CHECKSUM", "COUNTER")} if base_values else {}
+  values.update({
+    "COUNTER": cnt,
+    "SET_ME_1": 1,
+    "CRUISE_BUTTONS": btn,
+    "LEFT_PADDLE": int(left_paddle),
+    "RIGHT_PADDLE": int(right_paddle),
+  })
 
   bus = CAN.ECAN if CP.flags & HyundaiFlags.CANFD_LKA_STEERING else CAN.CAM
   return packer.make_can_msg("CRUISE_BUTTONS", bus, values)

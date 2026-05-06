@@ -51,6 +51,7 @@ class ConditionalExperimentalMode:
   SLOW_LEAD_CONTINUITY_MIN_MODEL_PROB = 0.85
   SLOW_LEAD_CONTINUITY_MAX_DISTANCE_TIME = 4.0
   SLOW_LEAD_CONTINUITY_MIN_EGO = 2.5
+  SLOW_LEAD_CONTINUITY_HOLD_TIME = 1.25
   SLOW_LEAD_MIN_CLOSING_SPEED = 0.75
   SLOW_LEAD_CLEAR_FASTER_FACTOR = 0.5
 
@@ -85,6 +86,8 @@ class ConditionalExperimentalMode:
 
     self.curve_detected = False
     self.slow_lead_detected = False
+    self.prev_tracking_lead = bool(getattr(self.starpilot_planner, "tracking_lead", False))
+    self.slow_lead_continuity_until = 0.0
     self.experimental_mode = False
     self.stop_light_detected = False
     self.stop_light_model_detected = False
@@ -208,7 +211,9 @@ class ConditionalExperimentalMode:
     self.curve_detected = bool(self.curvature_filter.x >= THRESHOLD and v_ego > CRUISING_SPEED)
 
   def slow_lead(self, starpilot_toggles, v_ego):
+    now = time.monotonic()
     lead = self.starpilot_planner.lead_one
+    tracking_lead = bool(getattr(self.starpilot_planner, "tracking_lead", False))
     lead_status = bool(getattr(lead, "status", False))
     lead_distance = float(getattr(lead, "dRel", float("inf")))
     lead_speed = float(getattr(lead, "vLead", float("inf")))
@@ -219,14 +224,13 @@ class ConditionalExperimentalMode:
     if not starpilot_toggles.conditional_stopped_lead and v_ego < self.SLOW_LEAD_CONTINUITY_MIN_EGO:
       self.slow_lead_filter.update(False)
       self.slow_lead_detected = False
+      self.slow_lead_continuity_until = 0.0
+      self.prev_tracking_lead = tracking_lead
       return
 
     slower_lead = starpilot_toggles.conditional_slower_lead and self.starpilot_planner.starpilot_following.slower_lead
     stopped_lead = starpilot_toggles.conditional_stopped_lead and lead_speed < 1
-    allow_raw_vision_slow_lead = not self.starpilot_planner.tracking_lead
-    raw_vision_slow_lead = bool(
-      starpilot_toggles.conditional_slower_lead and
-      allow_raw_vision_slow_lead and
+    vision_slow_lead_candidate = bool(
       lead_status and
       lead_prob >= self.SLOW_LEAD_CONTINUITY_MIN_MODEL_PROB and
       lead_distance < max(40.0, v_ego * self.SLOW_LEAD_CONTINUITY_MAX_DISTANCE_TIME) and
@@ -240,14 +244,30 @@ class ConditionalExperimentalMode:
     if lead_status and not slower_lead and not stopped_lead and closing_speed < (min_closing_speed * self.SLOW_LEAD_CLEAR_FASTER_FACTOR):
       self.slow_lead_filter.update(False)
       self.slow_lead_detected = False
+      self.slow_lead_continuity_until = 0.0
+      self.prev_tracking_lead = tracking_lead
       return
 
-    if self.starpilot_planner.tracking_lead or raw_vision_slow_lead or stopped_lead:
+    if tracking_lead and (slower_lead or stopped_lead or vision_slow_lead_candidate):
+      self.slow_lead_continuity_until = now + self.SLOW_LEAD_CONTINUITY_HOLD_TIME
+    elif self.prev_tracking_lead and not tracking_lead and self.slow_lead_detected and vision_slow_lead_candidate:
+      self.slow_lead_continuity_until = now + self.SLOW_LEAD_CONTINUITY_HOLD_TIME
+
+    raw_vision_slow_lead = bool(
+      starpilot_toggles.conditional_slower_lead and
+      not tracking_lead and
+      now < self.slow_lead_continuity_until and
+      vision_slow_lead_candidate
+    )
+
+    if tracking_lead or raw_vision_slow_lead or stopped_lead:
       self.slow_lead_filter.update(slower_lead or raw_vision_slow_lead or stopped_lead)
       self.slow_lead_detected = bool(self.slow_lead_filter.x >= adjusted_threshold)
     else:
       self.slow_lead_filter.update(False)
       self.slow_lead_detected = False
+
+    self.prev_tracking_lead = tracking_lead
 
   def stop_sign_and_light(self, v_ego, sm, model_time):
     now = time.monotonic()

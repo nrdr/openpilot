@@ -2144,6 +2144,100 @@
         "ui_type": "toggle"
       },
       {
+        "key": "NAPRadarEnabled",
+        "label": "Tesla Pre-AP Bosch Radar",
+        "description": "Use the stock Bosch radar path on pre-Autopilot Teslas.",
+        "data_type": "bool",
+        "ui_type": "toggle",
+        "is_parent_toggle": true
+      },
+      {
+        "key": "NAPRadarBehindNosecone",
+        "label": "Radar Behind Nosecone",
+        "description": "Enable this if the Bosch radar is mounted behind the nosecone instead of being exposed.",
+        "data_type": "bool",
+        "ui_type": "toggle",
+        "parent_key": "NAPRadarEnabled"
+      },
+      {
+        "key": "NAPRadarOffset",
+        "label": "Radar Offset",
+        "description": "Adjust the radar position offset in meters if the radar alignment needs a small correction.",
+        "data_type": "float",
+        "ui_type": "numeric",
+        "min": -2.0,
+        "max": 2.0,
+        "step": 0.01,
+        "precision": 2,
+        "parent_key": "NAPRadarEnabled"
+      },
+      {
+        "key": "NAPPedalEnabled",
+        "label": "Tesla Pre-AP comma Pedal Longitudinal",
+        "description": "Use a comma pedal interceptor for acceleration and regenerative braking on pre-Autopilot Teslas.",
+        "data_type": "bool",
+        "ui_type": "toggle",
+        "is_parent_toggle": true
+      },
+      {
+        "key": "NAPPedalCanBus",
+        "label": "Pedal CAN Bus",
+        "description": "Select the CAN bus used by the Tesla pedal interceptor.",
+        "data_type": "int",
+        "ui_type": "dropdown",
+        "parent_key": "NAPPedalEnabled",
+        "options": [
+          {
+            "value": 0,
+            "label": "CAN 0"
+          },
+          {
+            "value": 2,
+            "label": "CAN 2"
+          }
+        ]
+      },
+      {
+        "key": "NAPAdaptiveAccel",
+        "label": "Adaptive Acceleration Limit",
+        "description": "Reduce maximum acceleration as you close in on a lead vehicle when Tesla pedal-long is active.",
+        "data_type": "bool",
+        "ui_type": "toggle",
+        "parent_key": "NAPPedalEnabled"
+      },
+      {
+        "key": "NAPPedalCalibDone",
+        "label": "Pedal Calibration Complete",
+        "description": "Enable only after entering valid Tesla pedal calibration values. Pedal-long stays inactive until this is on.",
+        "data_type": "bool",
+        "ui_type": "toggle",
+        "parent_key": "NAPPedalEnabled"
+      },
+      {
+        "key": "NAPPedalCalibFactor",
+        "label": "Pedal Calibration Factor",
+        "description": "Scaling factor used to convert Tesla pedal interceptor output into the internal DI range.",
+        "data_type": "float",
+        "ui_type": "numeric",
+        "min": 0.01,
+        "max": 10.0,
+        "step": 0.01,
+        "precision": 2,
+        "parent_key": "NAPPedalEnabled"
+      },
+      {
+        "key": "NAPPedalCalibZero",
+        "label": "Pedal Calibration Zero",
+        "description": "Zero point used to convert Tesla pedal interceptor output into the internal DI range.",
+        "data_type": "float",
+        "ui_type": "numeric",
+        "min": -50.0,
+        "max": 50.0,
+        "step": 0.01,
+        "precision": 2,
+        "parent_key": "NAPPedalEnabled"
+      },
+      {
         "key": "GMPedalLongitudinal",
         "label": "Use Pedal For Longitudinal",
         "description": "Use the pedal interceptor for full longitudinal control on supported GM vehicles.",
@@ -2226,6 +2320,13 @@
         "key": "RemapCancelToDistance",
         "label": "Remap Cancel To Distance",
         "description": "On pedal-interceptor Bolts, remap the steering-wheel CANCEL button to distance/personality input.",
+        "data_type": "bool",
+        "ui_type": "toggle"
+      },
+      {
+        "key": "AlwaysIPedal",
+        "label": "Always I-Pedal",
+        "description": "Automatically spoof the left paddle when shifting into Drive until i-Pedal latches on supported Hyundai CAN-FD cars.",
         "data_type": "bool",
         "ui_type": "toggle"
       },

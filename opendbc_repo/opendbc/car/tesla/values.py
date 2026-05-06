@@ -60,6 +60,16 @@ class CAR(Platforms):
     [TeslaCarDocsHW4("Tesla Model X (with HW4) 2024")],
     CarSpecs(mass=2495., wheelbase=2.960, steerRatio=12.0),
   )
+  TESLA_MODEL_S_PREAP = TeslaPlatformConfig(
+    [CarDocs("Tesla Model S (Pre-AP) 2012-14", "All")],
+    CarSpecs(mass=2100., wheelbase=2.960, steerRatio=15.0),
+    {
+      Bus.party: 'tesla_can',
+      Bus.pt: 'tesla_can',
+      Bus.chassis: 'tesla_can',
+      Bus.radar: 'tesla_radar_bosch_generated',
+    },
+  )
 
 
 FW_QUERY_CONFIG = FwQueryConfig(
@@ -75,7 +85,8 @@ FW_QUERY_CONFIG = FwQueryConfig(
 
 class CANBUS:
   party = 0
-  vehicle = 1
+  radar = 1
+  vehicle = radar
   autopilot_party = 2
 
 
@@ -123,6 +134,25 @@ class TeslaSafetyFlags(IntFlag):
 
 class TeslaFlags(IntFlag):
   LONG_CONTROL = 1
+
+
+class CruiseButtons:
+  IDLE = 0
+  CANCEL = 1
+  MAIN = 2
+  RES_ACCEL_2ND = 4
+  DECEL_2ND = 8
+  SET_ACCEL = 16
+  RES_ACCEL = 16
+  DECEL_SET = 32
+
+  @classmethod
+  def is_accel(cls, btn: int) -> bool:
+    return btn in (cls.RES_ACCEL, cls.RES_ACCEL_2ND)
+
+  @classmethod
+  def is_decel(cls, btn: int) -> bool:
+    return btn in (cls.DECEL_SET, cls.DECEL_2ND)
 
 
 DBC = CAR.create_dbc_map()

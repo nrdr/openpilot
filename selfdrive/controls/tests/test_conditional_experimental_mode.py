@@ -332,6 +332,56 @@ def test_slow_lead_holds_through_tracking_flap_for_high_confidence_vision_lead()
   assert cem.slow_lead_detected
 
 
+def test_untracked_raw_slow_lead_does_not_self_trigger_without_recent_tracking(monkeypatch):
+  v_ego = 35 * CV.MPH_TO_MS
+  cem = make_cem(
+    model_length=v_ego * 5.0,
+    tracking_lead=False,
+    lead_status=True,
+    lead_d_rel=v_ego * 3.0,
+    lead_v_lead=8.0 * CV.MPH_TO_MS,
+    lead_model_prob=0.95,
+  )
+  toggles = SimpleNamespace(conditional_slower_lead=True, conditional_stopped_lead=False)
+
+  monotonic_values = iter([20.0 + 0.1 * i for i in range(24)])
+  monkeypatch.setattr(conditional_experimental_mode_module.time, "monotonic", lambda: next(monotonic_values))
+
+  for _ in range(12):
+    cem.slow_lead(toggles, v_ego)
+
+  assert not cem.slow_lead_detected
+
+
+def test_untracked_raw_slow_lead_continuity_expires_after_tracking_flap(monkeypatch):
+  v_ego = 35 * CV.MPH_TO_MS
+  cem = make_cem(
+    model_length=v_ego * 5.0,
+    tracking_lead=True,
+    lead_status=True,
+    lead_d_rel=v_ego * 3.0,
+    lead_v_lead=8.0 * CV.MPH_TO_MS,
+    lead_model_prob=0.95,
+  )
+  toggles = SimpleNamespace(conditional_slower_lead=True, conditional_stopped_lead=False)
+
+  cem.slow_lead_filter.x = 1.0
+  cem.slow_lead_detected = True
+  monotonic_values = iter([30.0, 30.1, 31.6])
+  monkeypatch.setattr(conditional_experimental_mode_module.time, "monotonic", lambda: next(monotonic_values))
+
+  cem.slow_lead(toggles, v_ego)
+  assert cem.slow_lead_detected
+
+  cem.starpilot_planner.tracking_lead = False
+  cem.starpilot_planner.starpilot_following.slower_lead = False
+  cem.slow_lead(toggles, v_ego)
+  assert cem.slow_lead_detected
+
+  cem.slow_lead(toggles, v_ego)
+  assert not cem.slow_lead_detected
+
+
 def test_tracked_highway_mild_closing_lead_does_not_trigger_raw_slow_lead():
   v_ego = 65 * CV.MPH_TO_MS
   cem = make_cem(

@@ -6,6 +6,9 @@
 #define HYUNDAI_CANFD_CRUISE_BUTTON_TX_MSGS(bus) \
   {0x1CF, bus, 8, .check_relay = false},  /* CRUISE_BUTTON */   \
 
+#define HYUNDAI_CANFD_IPEDAL_REGEN_TX_MSGS(bus) \
+  {0x25A, bus, 32, .check_relay = false},  /* IONIQ_6_REGEN_CONTROL */ \
+
 #define HYUNDAI_CANFD_LKA_STEERING_COMMON_TX_MSGS(a_can, e_can) \
   HYUNDAI_CANFD_CRUISE_BUTTON_TX_MSGS(e_can)                        \
   {0x50,  a_can, 16, .check_relay = (a_can) == 0},  /* LKAS */      \
@@ -56,6 +59,9 @@
 static bool hyundai_canfd_alt_buttons = false;
 static bool hyundai_canfd_lka_steering_alt = false;
 static bool hyundai_canfd_angle_steering = false;
+static bool hyundai_canfd_allow_ipedal_paddle = false;
+static bool hyundai_canfd_last_regen_control_seen = false;
+static uint8_t hyundai_canfd_last_regen_control[32] = {0U};
 
 static unsigned int hyundai_canfd_get_lka_addr(void) {
   return hyundai_canfd_lka_steering_alt ? 0x110U : 0x50U;
@@ -74,6 +80,46 @@ static uint8_t hyundai_canfd_get_counter(const CANPacket_t *msg) {
 static uint32_t hyundai_canfd_get_checksum(const CANPacket_t *msg) {
   uint32_t chksum = msg->data[0] | (msg->data[1] << 8);
   return chksum;
+}
+
+static bool hyundai_canfd_ioniq_6_regen_tail_allowed(const CANPacket_t *msg) {
+  const uint8_t stock24 = hyundai_canfd_last_regen_control[24];
+  const uint8_t stock25 = hyundai_canfd_last_regen_control[25];
+  const uint8_t stock26 = hyundai_canfd_last_regen_control[26];
+  const uint8_t stock27 = hyundai_canfd_last_regen_control[27];
+
+  if ((stock24 == 0xA8U) && (stock25 == 0x0CU) && (stock26 == 0x12U) && (stock27 == 0x0EU)) {
+    return (msg->data[24] == 0xC0U) && (msg->data[25] == 0x0CU) &&
+           (msg->data[26] == 0x12U) && (msg->data[27] == 0x00U);
+  }
+
+  if ((stock24 == 0xA8U) && (stock25 == 0x0EU) && (stock26 == 0x07U) && (stock27 == 0x0EU)) {
+    return (msg->data[24] == 0x85U) && (msg->data[25] == 0x0EU) &&
+           (msg->data[26] == 0x07U) && (msg->data[27] == 0x0CU);
+  }
+
+  if ((stock24 == 0x18U) && (stock25 == 0x10U) && (stock26 == 0x07U) && (stock27 == 0x02U)) {
+    return (msg->data[24] == 0xB5U) && (msg->data[25] == 0x10U) &&
+           (msg->data[26] == 0x07U) && (msg->data[27] == 0x00U);
+  }
+
+  if ((stock24 == 0xA8U) && (stock25 == 0x10U) && (stock26 == 0x07U) && (stock27 == 0x0EU)) {
+    return (msg->data[24] == 0xB5U) && (msg->data[25] == 0x10U) &&
+           (msg->data[26] == 0x07U) && (msg->data[27] == 0x00U);
+  }
+
+  return false;
+}
+
+static void hyundai_canfd_rx_all_hook(const CANPacket_t *msg) {
+  const unsigned pt_bus = hyundai_canfd_lka_steering ? 1U : 0U;
+
+  if (hyundai_canfd_allow_ipedal_paddle && (msg->bus == pt_bus) && (msg->addr == 0x25AU) && (GET_LEN(msg) == 32U)) {
+    for (int i = 0; i < 32; i++) {
+      hyundai_canfd_last_regen_control[i] = msg->data[i];
+    }
+    hyundai_canfd_last_regen_control_seen = true;
+  }
 }
 
 static void hyundai_canfd_rx_hook(const CANPacket_t *msg) {
@@ -228,10 +274,47 @@ static bool hyundai_canfd_tx_hook(const CANPacket_t *msg) {
   // cruise buttons check
   if (msg->addr == 0x1cfU) {
     int button = msg->data[2] & 0x7U;
+    bool main_button = GET_BIT(msg, 19U) || GET_BIT(msg, 21U);
+    bool lkas_button = GET_BIT(msg, 23U);
+    bool right_paddle = GET_BIT(msg, 25U);
+    bool left_paddle = GET_BIT(msg, 27U);
     bool is_cancel = (button == HYUNDAI_BTN_CANCEL);
     bool is_resume = (button == HYUNDAI_BTN_RESUME);
+    bool is_left_paddle_only = hyundai_canfd_allow_ipedal_paddle &&
+                               !controls_allowed &&
+                               (button == HYUNDAI_BTN_NONE) &&
+                               !main_button &&
+                               !lkas_button &&
+                               !right_paddle &&
+                               left_paddle;
 
-    bool allowed = (is_cancel && cruise_engaged_prev) || (is_resume && controls_allowed);
+    bool allowed = (is_cancel && cruise_engaged_prev) || (is_resume && controls_allowed) || is_left_paddle_only;
+    if (!allowed) {
+      tx = false;
+    }
+  }
+
+  if (msg->addr == 0x25AU) {
+    const unsigned pt_bus = hyundai_canfd_lka_steering ? 1U : 0U;
+    bool allowed = hyundai_canfd_allow_ipedal_paddle &&
+                   !controls_allowed &&
+                   (msg->bus == pt_bus) &&
+                   (GET_LEN(msg) == 32U) &&
+                   hyundai_canfd_last_regen_control_seen &&
+                   (hyundai_canfd_get_checksum(msg) == hyundai_common_canfd_compute_checksum(msg)) &&
+                   hyundai_canfd_ioniq_6_regen_tail_allowed(msg);
+
+    if (allowed) {
+      for (int i = 2; i < 32; i++) {
+        if ((i < 24) || (i > 27)) {
+          if (msg->data[i] != hyundai_canfd_last_regen_control[i]) {
+            allowed = false;
+            break;
+          }
+        }
+      }
+    }
+
     if (!allowed) {
       tx = false;
     }
@@ -278,13 +361,24 @@ static safety_config hyundai_canfd_init(uint16_t param) {
   const uint16_t HYUNDAI_PARAM_CANFD_LKA_STEERING_ALT = 128;
   const uint16_t HYUNDAI_PARAM_CANFD_ALT_BUTTONS = 32;
   const uint16_t HYUNDAI_PARAM_CANFD_ANGLE_STEERING = 1024;
+  const uint16_t HYUNDAI_PARAM_ALLOW_IPEDAL_PADDLE = 32768;
 
   static const CanMsg HYUNDAI_CANFD_LKA_STEERING_TX_MSGS[] = {
     HYUNDAI_CANFD_LKA_STEERING_COMMON_TX_MSGS(0, 1)
   };
 
+  static const CanMsg HYUNDAI_CANFD_LKA_STEERING_IPEDAL_TX_MSGS[] = {
+    HYUNDAI_CANFD_LKA_STEERING_COMMON_TX_MSGS(0, 1)
+    HYUNDAI_CANFD_IPEDAL_REGEN_TX_MSGS(1)
+  };
+
   static const CanMsg HYUNDAI_CANFD_LKA_STEERING_ALT_TX_MSGS[] = {
     HYUNDAI_CANFD_LKA_STEERING_ALT_COMMON_TX_MSGS(0, 1)
+  };
+
+  static const CanMsg HYUNDAI_CANFD_LKA_STEERING_ALT_IPEDAL_TX_MSGS[] = {
+    HYUNDAI_CANFD_LKA_STEERING_ALT_COMMON_TX_MSGS(0, 1)
+    HYUNDAI_CANFD_IPEDAL_REGEN_TX_MSGS(1)
   };
 
   static const CanMsg HYUNDAI_CANFD_LKA_STEERING_LONG_TX_MSGS[] = {
@@ -292,6 +386,21 @@ static safety_config hyundai_canfd_init(uint16_t param) {
     HYUNDAI_CANFD_LFA_STEERING_COMMON_TX_MSGS(1)
     HYUNDAI_CANFD_SCC_CONTROL_COMMON_TX_MSGS(1, true)
     HYUNDAI_CANFD_BLINDSPOT_DASH_TX_MSGS(1)
+    {0x51,  0, 32, .check_relay = false},  // ADRV_0x51
+    {0x730, 1,  8, .check_relay = false},  // tester present for ADAS ECU disable
+    {0x160, 1, 16, .check_relay = false},  // ADRV_0x160
+    {0x1EA, 1, 32, .check_relay = false},  // ADRV_0x1ea
+    {0x200, 1,  8, .check_relay = false},  // ADRV_0x200
+    {0x345, 1,  8, .check_relay = false},  // ADRV_0x345
+    {0x1DA, 1, 32, .check_relay = false},  // ADRV_0x1da
+  };
+
+  static const CanMsg HYUNDAI_CANFD_LKA_STEERING_LONG_IPEDAL_TX_MSGS[] = {
+    HYUNDAI_CANFD_LKA_STEERING_COMMON_TX_MSGS(0, 1)
+    HYUNDAI_CANFD_LFA_STEERING_COMMON_TX_MSGS(1)
+    HYUNDAI_CANFD_SCC_CONTROL_COMMON_TX_MSGS(1, true)
+    HYUNDAI_CANFD_BLINDSPOT_DASH_TX_MSGS(1)
+    HYUNDAI_CANFD_IPEDAL_REGEN_TX_MSGS(1)
     {0x51,  0, 32, .check_relay = false},  // ADRV_0x51
     {0x730, 1,  8, .check_relay = false},  // tester present for ADAS ECU disable
     {0x160, 1, 16, .check_relay = false},  // ADRV_0x160
@@ -330,6 +439,8 @@ static safety_config hyundai_canfd_init(uint16_t param) {
   hyundai_canfd_alt_buttons = GET_FLAG(param, HYUNDAI_PARAM_CANFD_ALT_BUTTONS);
   hyundai_canfd_lka_steering_alt = GET_FLAG(param, HYUNDAI_PARAM_CANFD_LKA_STEERING_ALT);
   hyundai_canfd_angle_steering = GET_FLAG(param, HYUNDAI_PARAM_CANFD_ANGLE_STEERING);
+  hyundai_canfd_allow_ipedal_paddle = GET_FLAG(param, HYUNDAI_PARAM_ALLOW_IPEDAL_PADDLE);
+  hyundai_canfd_last_regen_control_seen = false;
 
   safety_config ret;
   if (hyundai_longitudinal) {
@@ -338,7 +449,12 @@ static safety_config hyundai_canfd_init(uint16_t param) {
         HYUNDAI_CANFD_STD_BUTTONS_RX_CHECKS(1)
       };
 
-      ret = BUILD_SAFETY_CFG(hyundai_canfd_lka_steering_long_rx_checks, HYUNDAI_CANFD_LKA_STEERING_LONG_TX_MSGS);
+      SET_RX_CHECKS(hyundai_canfd_lka_steering_long_rx_checks, ret);
+      if (hyundai_canfd_allow_ipedal_paddle) {
+        SET_TX_MSGS(HYUNDAI_CANFD_LKA_STEERING_LONG_IPEDAL_TX_MSGS, ret);
+      } else {
+        SET_TX_MSGS(HYUNDAI_CANFD_LKA_STEERING_LONG_TX_MSGS, ret);
+      }
 
     } else {
       // Longitudinal checks for LFA steering
@@ -380,9 +496,17 @@ static safety_config hyundai_canfd_init(uint16_t param) {
 
       SET_RX_CHECKS(hyundai_canfd_lka_steering_rx_checks, ret);
       if (hyundai_canfd_lka_steering_alt) {
-        SET_TX_MSGS(HYUNDAI_CANFD_LKA_STEERING_ALT_TX_MSGS, ret);
+        if (hyundai_canfd_allow_ipedal_paddle) {
+          SET_TX_MSGS(HYUNDAI_CANFD_LKA_STEERING_ALT_IPEDAL_TX_MSGS, ret);
+        } else {
+          SET_TX_MSGS(HYUNDAI_CANFD_LKA_STEERING_ALT_TX_MSGS, ret);
+        }
       } else {
-        SET_TX_MSGS(HYUNDAI_CANFD_LKA_STEERING_TX_MSGS, ret);
+        if (hyundai_canfd_allow_ipedal_paddle) {
+          SET_TX_MSGS(HYUNDAI_CANFD_LKA_STEERING_IPEDAL_TX_MSGS, ret);
+        } else {
+          SET_TX_MSGS(HYUNDAI_CANFD_LKA_STEERING_TX_MSGS, ret);
+        }
       }
 
     } else if (!hyundai_camera_scc) {
@@ -438,6 +562,7 @@ static safety_config hyundai_canfd_init(uint16_t param) {
 
 const safety_hooks hyundai_canfd_hooks = {
   .init = hyundai_canfd_init,
+  .rx_all = hyundai_canfd_rx_all_hook,
   .rx = hyundai_canfd_rx_hook,
   .tx = hyundai_canfd_tx_hook,
   .get_counter = hyundai_canfd_get_counter,

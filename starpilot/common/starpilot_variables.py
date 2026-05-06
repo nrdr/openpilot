@@ -77,6 +77,13 @@ LEGACY_STARPILOT_STATS_KEY_RENAMES = {
   "FrogPilotSeconds": "StarPilotSeconds",
 }
 
+LEGACY_VOLT_STOCK_ACC_CARS = {
+  GM_CAR.CHEVROLET_VOLT,
+  GM_CAR.CHEVROLET_VOLT_2019,
+  GM_CAR.CHEVROLET_VOLT_ASCM,
+  GM_CAR.CHEVROLET_VOLT_CAMERA,
+}
+
 RESOURCES_REPO = os.getenv("STARPILOT_RESOURCES_REPO", "firestar5683/StarPilot-Resources")
 
 ACTIVE_THEME_PATH = Path(BASEDIR) / "starpilot/assets/active_theme"
@@ -762,6 +769,7 @@ class StarPilotVariables:
     toggle.no_uploads = self.get_value("NoUploads", condition=device_management and not self.vetting_branch)
     toggle.no_onroad_uploads = self.get_value("DisableOnroadUploads", condition=toggle.no_uploads)
 
+    toggle.always_ipedal = self.get_value("AlwaysIPedal", condition=toggle.car_model == HYUNDAI_CAR.HYUNDAI_IONIQ_6)
     toggle.nostalgia_mode = self.get_value("NostalgiaMode", condition=toggle.openpilot_longitudinal and toggle.car_model == HYUNDAI_CAR.HYUNDAI_IONIQ_6)
 
     distance_button_control = self.get_value("DistanceButtonControl", cast=float)
@@ -975,7 +983,7 @@ class StarPilotVariables:
     if isinstance(toggle.model_version, bytes):
       toggle.model_version = toggle.model_version.decode("utf-8", "ignore")
     toggle.classic_model = toggle.model_version in {"v1", "v2", "v3", "v4"}
-    toggle.tinygrad_model = toggle.model_version in {"v8", "v9", "v10", "v11", "v12", "v13"}
+    toggle.tinygrad_model = toggle.model_version in {"v8", "v9", "v10", "v11", "v12", "v13", "v14"}
     toggle.tomb_raider = toggle.model == "space-lab"
 
     toggle.model_ui = self.get_value("ModelUI")
@@ -1193,15 +1201,10 @@ class StarPilotVariables:
       condition=toggle.car_make == "gm" and toggle.has_pedal and "BOLT" in toggle.car_model,
     )
 
-    gm_auto_hold_supported = toggle.car_model in {
-      GM_CAR.CHEVROLET_VOLT,
-      GM_CAR.CHEVROLET_VOLT_2019,
-      GM_CAR.CHEVROLET_VOLT_ASCM,
-      GM_CAR.CHEVROLET_VOLT_CAMERA,
-    }
+    gm_auto_hold_supported = toggle.car_model in LEGACY_VOLT_STOCK_ACC_CARS
     toggle.gm_auto_hold = self.get_value("GMAutoHold", condition=gm_auto_hold_supported)
 
-    toggle.volt_sng = self.get_value("VoltSNG", condition=toggle.car_model == "CHEVROLET_VOLT")
+    toggle.volt_sng = self.get_value("VoltSNG", condition=toggle.car_model in LEGACY_VOLT_STOCK_ACC_CARS)
 
     process_starpilot_toggles.cache_clear()
     self.params_memory.remove("StarPilotTogglesUpdated")
