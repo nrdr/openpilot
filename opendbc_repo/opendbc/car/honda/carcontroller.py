@@ -66,6 +66,7 @@ def get_civic_bosch_modified_torque_lpf_tau(torque_cmd: float, prev_torque_cmd: 
 CLARITY_OVERRIDE_FADE_SPEED = 50.0 * 0.44704
 CLARITY_OVERRIDE_FADE_UP_S = 2.0
 CLARITY_OVERRIDE_LPF_KILL_S = 0.2
+CLARITY_OVERRIDE_RELEASE_GRACE_S = 0.20
 CLARITY_OVERRIDE_HOLD_S = 0.8
 CLARITY_OVERRIDE_STAGE_2_S = 1.5
 CLARITY_OVERRIDE_FULL_DROP_S = 2.0
@@ -92,15 +93,31 @@ def get_clarity_override_fade_from_timer(override_timer_s: float) -> float:
   return 0.0
 
 
-def update_clarity_override_fade(driver_override: bool, v_ego: float, fade: float, override_timer_s: float) -> tuple[float, float]:
+def update_clarity_override_fade(
+  driver_override: bool,
+  v_ego: float,
+  fade: float,
+  override_timer_s: float,
+  release_grace_s: float,
+) -> tuple[float, float, float, bool]:
+  latched_override = driver_override
+
   if driver_override:
+    release_grace_s = 0.0
+  elif override_timer_s > 0.0 and release_grace_s < CLARITY_OVERRIDE_RELEASE_GRACE_S:
+    release_grace_s = min(CLARITY_OVERRIDE_RELEASE_GRACE_S, release_grace_s + DT_CTRL)
+    latched_override = True
+  else:
+    release_grace_s = CLARITY_OVERRIDE_RELEASE_GRACE_S
+
+  if latched_override:
     if v_ego >= CLARITY_OVERRIDE_FADE_SPEED:
-      return 0.0, CLARITY_OVERRIDE_FULL_DROP_S
+      return 0.0, CLARITY_OVERRIDE_FULL_DROP_S, release_grace_s, True
 
     override_timer_s = min(CLARITY_OVERRIDE_FULL_DROP_S, override_timer_s + DT_CTRL)
-    return get_clarity_override_fade_from_timer(override_timer_s), override_timer_s
+    return get_clarity_override_fade_from_timer(override_timer_s), override_timer_s, release_grace_s, True
 
-  return min(1.0, fade + DT_CTRL / CLARITY_OVERRIDE_FADE_UP_S), 0.0
+  return min(1.0, fade + DT_CTRL / CLARITY_OVERRIDE_FADE_UP_S), 0.0, release_grace_s, False
 
 
 def get_clarity_override_lpf_kill(driver_override: bool, lpf_kill: float) -> float:
@@ -206,7 +223,7 @@ def actuator_hysteresis(brake, braking, brake_steady, v_ego, car_fingerprint):
   # hyst params
   brake_hyst_on = 0.02  # to activate brakes exceed this value
   brake_hyst_off = 0.005  # to deactivate brakes below this value
-  brake_hyst_gap = 0.01  # don't change brake command for small oscillations within this value
+  brake_hyst_gap = 0.01  # don't change the brake command for small oscillations within this value
 
   # *** hysteresis logic to avoid brake blinking. go above 0.1 to trigger
   if (brake < brake_hyst_on and not braking) or brake < brake_hyst_off:
@@ -283,6 +300,7 @@ class CarController(CarControllerBase):
     self.is_clarity_eps_modified = CP.carFingerprint == CAR.HONDA_CLARITY and bool(CP.flags & HondaFlags.EPS_MODIFIED)
     self.clarity_driver_override_fade = 1.0
     self.clarity_driver_override_timer = 0.0
+    self.clarity_driver_override_release_grace_s = CLARITY_OVERRIDE_RELEASE_GRACE_S
     self.clarity_driver_override_lpf_kill = 0.0
     self.clarity_driver_override_zeroed = False
     self.bosch_gas_factor = 1.0
@@ -343,11 +361,15 @@ class CarController(CarControllerBase):
     elif self.is_clarity_eps_modified:
       if CC.latActive:
         filtered_steering_pressed = self._filtered_steering_pressed(CS, torque_cmd)
-        self.clarity_driver_override_fade, self.clarity_driver_override_timer = update_clarity_override_fade(
-          filtered_steering_pressed, CS.out.vEgo, self.clarity_driver_override_fade, self.clarity_driver_override_timer
+        self.clarity_driver_override_fade, self.clarity_driver_override_timer, self.clarity_driver_override_release_grace_s, clarity_override_latched = update_clarity_override_fade(
+          filtered_steering_pressed,
+          CS.out.vEgo,
+          self.clarity_driver_override_fade,
+          self.clarity_driver_override_timer,
+          self.clarity_driver_override_release_grace_s,
         )
         self.clarity_driver_override_lpf_kill = get_clarity_override_lpf_kill(
-          filtered_steering_pressed, self.clarity_driver_override_lpf_kill
+          clarity_override_latched, self.clarity_driver_override_lpf_kill
         )
 
         torque_cmd *= self.clarity_driver_override_fade
@@ -355,7 +377,7 @@ class CarController(CarControllerBase):
           torque_cmd, self.prev_torque_cmd, self.torque_lpf, CS.out.vEgo, self.clarity_driver_override_lpf_kill
         )
         torque_cmd = self.torque_lpf
-        self.clarity_driver_override_zeroed = filtered_steering_pressed and self.clarity_driver_override_fade <= 0.001
+        self.clarity_driver_override_zeroed = clarity_override_latched and self.clarity_driver_override_fade <= 0.001
       else:
         self.torque_lpf = 0.0
         self.prev_torque_cmd = 0.0
@@ -363,6 +385,7 @@ class CarController(CarControllerBase):
         self.steering_pressed_robust_prev = False
         self.clarity_driver_override_fade = 1.0
         self.clarity_driver_override_timer = 0.0
+        self.clarity_driver_override_release_grace_s = CLARITY_OVERRIDE_RELEASE_GRACE_S
         self.clarity_driver_override_lpf_kill = 0.0
         self.clarity_driver_override_zeroed = False
 
