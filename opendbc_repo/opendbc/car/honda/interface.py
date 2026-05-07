@@ -115,6 +115,7 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate == CAR.HONDA_CLARITY:
       ret.autoResumeSng = True
+      ret.stopAccel = 0.0
       ret.minEnableSpeed = -1.
       ret.minSteerSpeed = -1.
       ret.steerAtStandstill = True
@@ -189,11 +190,6 @@ class CarInterface(CarInterfaceBase):
         ret.wheelSpeedFactor = 1.025
       else:
         ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.8], [0.24]]  # TODO: can probably use some tuning
-
-    elif candidate == CAR.HONDA_CLARITY:
-      ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 2560], [0, 2560]]
-      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.8], [0.24]]
-      ret.stopAccel = 0.0
 
     elif candidate == CAR.ACURA_RDX:
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1000], [0, 1000]]  # TODO: determine if there is a dead zone at the top end
