@@ -42,6 +42,7 @@ private:
   QColor rightBorderColor;
 
   QRect rect;
+  QLinearGradient steeringGradient;
 
   QRegion marginRegion;
 

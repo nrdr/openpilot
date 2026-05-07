@@ -318,7 +318,9 @@ class SpeedLimitController:
     had_override = self.override_active(v_ego, sm["carState"].gasPressed)
 
     long_active = sm["carControl"].longActive
-    speed_limit_accepted = (sm["starpilotCarState"].accelPressed and long_active) or self.starpilot_planner.params_memory.get_bool("SpeedLimitAccepted")
+    speed_limit_accepted = sm["starpilotCarState"].accelPressed and long_active
+    if not speed_limit_accepted and self._slc_adopt_counter % 4 == 0:
+      speed_limit_accepted = self.starpilot_planner.params_memory.get_bool("SpeedLimitAccepted")
     speed_limit_denied = sm["starpilotCarState"].decelPressed or (self.speed_limit_changed_timer >= 30 and long_active)
 
     if not long_active and not sm["selfdriveState"].enabled:

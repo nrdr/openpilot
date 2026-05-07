@@ -49,10 +49,6 @@ def update_preap(cs, can_parsers):
   ))
   cs.engagement.handle_steering_disengage(ret.steeringDisengage)
 
-  gtw_epas = cp_chassis.vl["GTW_epasControl"]
-  # Pre-AP steering requires the EPAS firmware patch to advertise angle control and LDW enabled.
-  ret.invalidLkasSetting = (gtw_epas["GTW_epasControlType"] != 1) or (gtw_epas["GTW_epasLDWEnabled"] != 1)
-
   cruise_state = cs.can_define.dv["DI_state"]["DI_cruiseState"].get(int(cp_chassis.vl["DI_state"]["DI_cruiseState"]), None)
   cs.di_cruise_state = cruise_state or "OFF"
   speed_units = cs.can_define.dv["DI_state"]["DI_speedUnits"].get(int(cp_chassis.vl["DI_state"]["DI_speedUnits"]), None)

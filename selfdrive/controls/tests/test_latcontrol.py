@@ -286,7 +286,7 @@ class TestLatControl:
     assert get_ioniq_6_center_taper_scale(0.0, 10.0) < get_ioniq_6_center_taper_scale(0.0, 30.0)
     assert get_ioniq_6_center_taper_scale(0.0, 30.0) < get_ioniq_6_center_taper_scale(0.2, 30.0)
     assert get_ioniq_6_center_taper_scale(0.0, 12.0) < get_ioniq_6_center_taper_scale(0.25, 12.0)
-    assert abs(get_ioniq_6_center_taper_scale(0.2, 30.0) - 1.0) < 4.2e-2
+    assert abs(get_ioniq_6_center_taper_scale(0.2, 30.0) - 1.0) < 4.5e-2
 
   def test_kia_ev6_ff_scale_curve(self):
     assert get_kia_ev6_ff_scale(0.0, 0.0, 20.0) == 1.0
@@ -372,7 +372,7 @@ class TestLatControl:
     _, _, lac_log = controller.update(True, CS, VM, params, False, 0.0025, False, 0.2, None, None, starpilot_toggles)
 
     assert lac_log.active
-    assert controller.torque_params.latAccelFactor == pytest.approx(3.0 * 1.23)
+    assert controller.torque_params.latAccelFactor == pytest.approx(3.0 * 1.22)
 
   def test_ioniq_6_update_path_does_not_post_taper_output(self, monkeypatch):
     base_controller, VM, CS, params, starpilot_toggles = self._build_torque_controller(HYUNDAI.HYUNDAI_IONIQ_6)

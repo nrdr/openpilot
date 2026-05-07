@@ -9,6 +9,27 @@ from opendbc.car.tesla.preap.stock_cc_spoofer import StockCCSpoofer
 from opendbc.car.tesla.values import CANBUS, CAR, CarControllerParams
 from opendbc.car.vehicle_model import VehicleModel
 
+_PREAP_RATE_LIMIT_BP = [0., 5., 15.]
+_PREAP_RATE_LIMIT_UP = [5., 0.8, 0.15]
+_PREAP_RATE_LIMIT_DOWN = [5., 3.5, 0.4]
+_PREAP_EPS_ANGLE_ERROR_MAX = 20.0
+
+
+def _apply_preap_steer_angle_limits(desired_angle: float, last_angle: float, v_ego: float,
+                                    steering_angle: float, lat_active: bool) -> float:
+  if not lat_active:
+    return steering_angle
+
+  steer_up = (last_angle * desired_angle > 0.) and (abs(desired_angle) > abs(last_angle))
+  rate_limit = _PREAP_RATE_LIMIT_UP if steer_up else _PREAP_RATE_LIMIT_DOWN
+  max_angle_diff = float(np.interp(v_ego, _PREAP_RATE_LIMIT_BP, rate_limit))
+
+  apply_angle = float(np.clip(desired_angle, last_angle - max_angle_diff, last_angle + max_angle_diff))
+  # Match the older Tesla unity controller and stay close to measured EPAS angle to avoid rejection.
+  return float(np.clip(apply_angle,
+                       steering_angle - _PREAP_EPS_ANGLE_ERROR_MAX,
+                       steering_angle + _PREAP_EPS_ANGLE_ERROR_MAX))
+
 
 def get_safety_CP():
   from opendbc.car.tesla.interface import CarInterface
@@ -96,9 +117,8 @@ class CarController(CarControllerBase):
         CS.engagement.pedal_speed_kph = 0.0
 
     if self.frame % 2 == 0:
-      self.apply_angle_last = apply_steer_angle_limits_vm(
-        actuators.steeringAngleDeg, self.apply_angle_last, CS.out.vEgoRaw, CS.out.steeringAngleDeg,
-        lat_active, CarControllerParams, self.VM,
+      self.apply_angle_last = _apply_preap_steer_angle_limits(
+        actuators.steeringAngleDeg, self.apply_angle_last, CS.out.vEgo, CS.out.steeringAngleDeg, lat_active,
       )
       cntr = (self.frame // 2) % 16
       can_sends.append(self.tesla_can.create_steering_control(cntr, self.apply_angle_last, lat_active))

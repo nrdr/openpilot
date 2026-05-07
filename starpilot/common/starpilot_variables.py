@@ -561,6 +561,10 @@ class StarPilotVariables:
 
     advanced_custom_ui = self.get_value("AdvancedCustomUI")
     toggle.hide_alerts = self.get_value("HideAlerts", condition=advanced_custom_ui and not toggle.debug_mode)
+    toggle.hide_changing_lanes_banner = self.get_value("HideChangingLanesBanner", condition=advanced_custom_ui and not toggle.debug_mode)
+    toggle.hide_distance_profile_banner = self.get_value("HideDistanceProfileBanner", condition=advanced_custom_ui and not toggle.debug_mode)
+    toggle.hide_turning_banner = self.get_value("HideTurningBanner", condition=advanced_custom_ui and not toggle.debug_mode)
+    toggle.hide_dm_icon = self.get_value("HideDMIcon", condition=advanced_custom_ui) and not toggle.debug_mode
     toggle.hide_lead_marker = self.get_value("HideLeadMarker", condition=advanced_custom_ui and toggle.openpilot_longitudinal and not toggle.debug_mode)
     toggle.hide_max_speed = self.get_value("HideMaxSpeed", condition=advanced_custom_ui and not toggle.debug_mode)
     toggle.hide_speed = self.get_value("HideSpeed", condition=advanced_custom_ui and not toggle.debug_mode)
@@ -1104,6 +1108,10 @@ class StarPilotVariables:
       toggle.wheel_image = "stock"
 
       toggle.hide_alerts = False
+      toggle.hide_changing_lanes_banner = False
+      toggle.hide_distance_profile_banner = False
+      toggle.hide_turning_banner = False
+      toggle.hide_dm_icon = False
       toggle.hide_lead_marker = False
       toggle.hide_max_speed = False
       toggle.hide_speed = False

@@ -72,6 +72,7 @@ private:
   void paintSpeedLimit(QPainter &p);
   void paintSpeedLimitSources(QPainter &p);
   void paintStandstillTimer(QPainter &p);
+  void paintForceStop(QPainter &p);
   void paintStoppingPoint(QPainter &p);
   void paintTurnSignals(QPainter &p);
   void paintWeather(QPainter &p);
@@ -83,6 +84,8 @@ private:
   bool blinkerRight;
   bool brakeLights;
   bool cscControllingSpeed;
+  bool forcingStop;
+  bool stopSignConfirmed;
   bool cscTraining;
   bool experimentalMode;
   bool forceCoast;
@@ -91,6 +94,33 @@ private:
   bool redLight;
   bool speedLimitChanged;
   bool weatherDaytime;
+
+  // Cached toggle values — refreshed once per updateState(), used in paint code
+  bool cachedAdjacentPathMetrics = false;
+  bool cachedBlindSpotPath = false;
+  bool cachedCemStatus = false;
+  bool cachedCompass = false;
+  bool cachedCscStatus = false;
+  bool cachedDynamicPedalsOnUi = false;
+  bool cachedHideSpeedLimit = false;
+  bool cachedOpenpilotLongitudinal = false;
+  bool cachedPedalsOnUi = false;
+  bool cachedRadarTracks = false;
+  bool cachedRoadNameUi = false;
+  bool cachedShowSpeedLimitOffset = false;
+  bool cachedShowSpeedLimits = false;
+  bool cachedShowStoppingPoint = false;
+  bool cachedShowStoppingPointMetrics = false;
+  bool cachedSimpleMode = false;
+  bool cachedSpeedLimitController = false;
+  bool cachedSpeedLimitSources = false;
+  bool cachedSpeedLimitVienna = false;
+  bool cachedStaticPedalsOnUi = false;
+  bool cachedStoppedTimer = false;
+  double cachedLaneDetectionWidth = 3.7;
+  QString cachedColorScheme;
+  QString cachedPathEdgesColor;
+  QString cachedSignalIcons;
 
   int animationFrameIndex;
   int desiredFollowDistance;
@@ -104,6 +134,7 @@ private:
 
   float accelerationEgo;
   float cscSpeed;
+  float forcingStopLength;
   float dashboardSpeedLimit;
   float distanceConversion;
   float laneWidthLeft;
@@ -143,6 +174,8 @@ private:
   QPixmap nextMapsIcon;
   QPixmap pausedIcon;
   QPixmap speedIcon;
+  QPixmap forceStopDashImg;
+  QPixmap forceStopImg;
   QPixmap stopSignImg;
   QPixmap turnIcon;
   QPixmap visionIcon;

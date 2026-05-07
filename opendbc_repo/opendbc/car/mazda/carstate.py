@@ -118,11 +118,13 @@ class CarState(CarStateBase):
 
     fp_ret = custom.StarPilotCarState.new_message()
 
+    fp_ret.dashboardStopSign = 1 if cp_cam.vl["CAM_TRAFFIC_SIGNS"]["STOP_SIGN"] == 9 else 0
+
     return ret, fp_ret
 
   @staticmethod
   def get_can_parsers(CP):
     return {
       Bus.pt: CANParser(DBC[CP.carFingerprint][Bus.pt], [], 0),
-      Bus.cam: CANParser(DBC[CP.carFingerprint][Bus.pt], [], 2),
+      Bus.cam: CANParser(DBC[CP.carFingerprint][Bus.pt], [("CAM_TRAFFIC_SIGNS", 0)], 2),
     }

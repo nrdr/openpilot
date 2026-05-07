@@ -64,6 +64,8 @@ VISION_UNTRACKED_SLOW_LEAD_RELAXED_MIN_CLOSING_SPEED = 10.0
 VISION_UNTRACKED_SLOW_LEAD_RELAXED_FULL_CLOSING_SPEED = 16.0
 VISION_UNTRACKED_SLOW_LEAD_CONFIRM_TIME = 0.30
 VISION_UNTRACKED_SLOW_LEAD_IMMEDIATE_DECEL = 0.55
+VISION_UNTRACKED_SLOW_LEAD_IMMEDIATE_DISTANCE = 45.0
+VISION_UNTRACKED_SLOW_LEAD_IMMEDIATE_LEAD_BRAKE = 0.10
 VISION_SLOW_LEAD_MAX_SPEED = 5.0
 VISION_SLOW_LEAD_MIN_CLOSING_SPEED = 1.5
 VISION_SLOW_LEAD_TRIGGER_TTC = 4.5
@@ -908,11 +910,19 @@ class LongitudinalPlanner:
         if lead.status and not bool(getattr(lead, "radar", False)):
           pretracking_cap = self.get_vision_untracked_slow_lead_cap(lead, v_ego, vision_cap_accel_min)
           if pretracking_cap is not None:
-            pretracking_vision_caps.append(pretracking_cap)
+            pretracking_vision_caps.append((pretracking_cap, lead))
 
       if pretracking_vision_caps:
-        pretracking_vision_cap = min(pretracking_vision_caps)
-        if pretracking_vision_cap <= -VISION_UNTRACKED_SLOW_LEAD_IMMEDIATE_DECEL:
+        pretracking_vision_cap, pretracking_vision_lead = min(pretracking_vision_caps, key=lambda cap_and_lead: cap_and_lead[0])
+        lead_brake = max(0.0, -float(getattr(pretracking_vision_lead, "aLeadK", 0.0)))
+        immediate_pretracking_cap = (
+          pretracking_vision_cap <= -VISION_UNTRACKED_SLOW_LEAD_IMMEDIATE_DECEL or
+          float(getattr(pretracking_vision_lead, "dRel", float("inf"))) <= VISION_UNTRACKED_SLOW_LEAD_IMMEDIATE_DISTANCE or
+          lead_brake >= VISION_UNTRACKED_SLOW_LEAD_IMMEDIATE_LEAD_BRAKE or
+          float(getattr(pretracking_vision_lead, "vLead", float("inf"))) <= VISION_UNTRACKED_SLOW_LEAD_RELAXED_MAX_LEAD_SPEED
+        )
+
+        if immediate_pretracking_cap:
           self.untracked_slow_lead_confirm_t = VISION_UNTRACKED_SLOW_LEAD_CONFIRM_TIME
         else:
           self.untracked_slow_lead_confirm_t = min(

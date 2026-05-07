@@ -45,10 +45,10 @@ IONIQ_6_DYNAMIC_LOWER_JERK_BP = [-2.0, -1.5, -1.0, -0.25, -0.1, -0.025, -0.01, -
 IONIQ_6_DYNAMIC_LOWER_JERK_V = [3.3, 1.5, 1.0, 0.8, 0.7, 0.65, 0.55, 0.5]
 IONIQ_6_LAUNCH_HOLD_SPEED_BP = [0.0, 0.6, 1.25, 2.5]
 IONIQ_6_LAUNCH_HOLD_SPEED_V = [0.75, 0.6, 0.4, 0.0]
-IONIQ_6_STOP_HOLD_SPEED_BP = [0.0, 0.08, 0.25, 0.6, 1.2]
-IONIQ_6_STOP_HOLD_SPEED_V = [-0.09, -0.095, -0.10, -0.05, 0.0]
-IONIQ_6_STOP_HOLD_JERK_BP = [0.0, 0.15, 0.6, 1.2]
-IONIQ_6_STOP_HOLD_JERK_V = [0.35, 0.40, 0.52, 0.65]
+IONIQ_6_STOP_BRAKE_CAP_SPEED_BP = [0.0, 0.08, 0.25, 0.6, 1.2, 2.0, 3.0]
+IONIQ_6_STOP_BRAKE_CAP_ACCEL_V = [-0.09, -0.095, -0.10, -0.18, -0.40, -0.80, -1.30]
+IONIQ_6_STOP_HOLD_JERK_BP = [0.0, 0.15, 0.6, 1.2, 2.0, 3.0]
+IONIQ_6_STOP_HOLD_JERK_V = [0.35, 0.40, 0.48, 0.65, 0.85, 1.10]
 IONIQ_6_STOP_RELEASE_JERK_BP = [0.0, 0.15, 0.5]
 IONIQ_6_STOP_RELEASE_JERK_V = [3.6 * IONIQ_6_RESPONSE_MULTIPLIER,
                                4.2 * IONIQ_6_RESPONSE_MULTIPLIER,
@@ -56,6 +56,7 @@ IONIQ_6_STOP_RELEASE_JERK_V = [3.6 * IONIQ_6_RESPONSE_MULTIPLIER,
 IONIQ_6_IPEDAL_PRESS_SEND_COUNT = 6
 IONIQ_6_IPEDAL_LATCH_PRESS_SEND_COUNT = 10
 IONIQ_6_IPEDAL_PADDLE_BURST_COUNT = 3
+IONIQ_6_IPEDAL_NEXT_COUNTER_BURST_COUNT = 1
 IONIQ_6_MAX_REGEN_STATE = 0x3C
 IONIQ_6_MAX_REGEN_STATE_2 = 0x01
 IONIQ_6_IPEDAL_REGEN_STATE = 0x50
@@ -103,15 +104,8 @@ def update_ioniq_6_longitudinal_tuning(state: Ioniq6LongitudinalTuningState, acc
   restart_from_stop = state.long_control_state_last in (LongCtrlState.stopping, LongCtrlState.starting) and \
                       long_control_state in (LongCtrlState.starting, LongCtrlState.pid) and accel_cmd > 0.0 and v_ego < 0.5
 
-  if not long_active or not stopping:
-    state.stopping = False
-    state.stopping_count = 0
-  elif state.long_control_state_last == LongCtrlState.off:
-    state.stopping = True
-  else:
-    if state.stopping_count > 1 / (DT_CTRL * 5):
-      state.stopping = True
-    state.stopping_count += 1
+  state.stopping = long_active and stopping
+  state.stopping_count = state.stopping_count + 1 if state.stopping else 0
 
   if not long_active:
     state.desired_accel = 0.0
@@ -146,7 +140,8 @@ def update_ioniq_6_longitudinal_tuning(state: Ioniq6LongitudinalTuningState, acc
   state.jerk_lower = min(dynamic_lower_jerk, lower_speed_limit)
 
   if state.stopping:
-    state.desired_accel = float(np.interp(v_ego, IONIQ_6_STOP_HOLD_SPEED_BP, IONIQ_6_STOP_HOLD_SPEED_V))
+    stop_brake_cap = float(np.interp(v_ego, IONIQ_6_STOP_BRAKE_CAP_SPEED_BP, IONIQ_6_STOP_BRAKE_CAP_ACCEL_V))
+    state.desired_accel = min(0.0, max(accel_cmd, stop_brake_cap))
     state.jerk_upper = min(state.jerk_upper, float(np.interp(v_ego, IONIQ_6_STOP_HOLD_JERK_BP, IONIQ_6_STOP_HOLD_JERK_V)) * IONIQ_6_RESPONSE_MULTIPLIER)
   else:
     state.desired_accel = float(np.clip(accel_cmd, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
@@ -327,6 +322,11 @@ class CarController(CarControllerBase):
         paddle_msg = hyundaicanfd.create_ioniq_6_paddle_buttons(self.packer, self.CP, self.CAN,
                                                                 buttons_counter, left_paddle=True)
         can_sends.extend([paddle_msg] * IONIQ_6_IPEDAL_PADDLE_BURST_COUNT)
+        if max_regen_state or ipedal_latch_pending:
+          next_counter = hyundaicanfd.get_ioniq_6_cruise_buttons_next_counter(buttons_counter)
+          next_paddle_msg = hyundaicanfd.create_ioniq_6_paddle_buttons(self.packer, self.CP, self.CAN,
+                                                                       next_counter, left_paddle=True)
+          can_sends.extend([next_paddle_msg] * IONIQ_6_IPEDAL_NEXT_COUNTER_BURST_COUNT)
         self._ioniq_6_always_ipedal_press_remaining -= 1
         if self._ioniq_6_always_ipedal_press_remaining == 0:
           retry_wait_frames = IONIQ_6_IPEDAL_PROGRESS_RETRY_WAIT_FRAMES if regen_state_changed else IONIQ_6_IPEDAL_RETRY_WAIT_FRAMES

@@ -65,12 +65,25 @@ class StarPilotVCruise:
     long_control_active = sm["carControl"].longActive
 
     # ----- Activation paths -----
-    # CEM/model path: model predicted stop within ACTIVATION_M
+    # Raw lead check: block Force Stop as soon as a relevant lead is present, without
+    # waiting for the tracking_lead filter (~1s ramp). Without this, Force Stop can latch
+    # during the filter's settling window and stay committed for the whole stop.
+    lead = self.starpilot_planner.lead_one
+    lead_present = (bool(getattr(lead, "status", False))
+                    and float(getattr(lead, "dRel", float("inf"))) < ACTIVATION_M
+                    and float(getattr(lead, "vLead", float("inf"))) < v_ego + 2.0)
+
+    # CEM/model path: model predicted stop within ACTIVATION_M.
+    # Exclude when a lead is present (raw or filtered) — the handoff_to_stopped_lead path
+    # in CEM can set stop_light_detected even with a lead present, which would incorrectly
+    # activate Force Stop and stop the car far behind the lead instead of letting ACC handle it.
     cem_path = (self.starpilot_planner.starpilot_cem.stop_light_detected
                 and controls_enabled and starpilot_toggles.force_stops
                 and self.starpilot_planner.model_length < ACTIVATION_M
                 and self.override_force_stop_timer <= 0
-                and not self.starpilot_planner.driving_in_curve)
+                and not self.starpilot_planner.driving_in_curve
+                and not self.starpilot_planner.tracking_lead
+                and not lead_present)
 
     # Dashboard path: ADAS camera confirms a stop sign on our road. Field is 0 on
     # platforms that don't publish ADAS_0x380, so dash_path is naturally inert there.
@@ -80,7 +93,8 @@ class StarPilotVCruise:
                  and v_ego < ADAS_MAX_MS
                  and self.override_force_stop_timer <= 0
                  and not self.starpilot_planner.driving_in_curve
-                 and not self.starpilot_planner.tracking_lead)
+                 and not self.starpilot_planner.tracking_lead
+                 and not lead_present)
 
     force_stop_active = cem_path or dash_path
 

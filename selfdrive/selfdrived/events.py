@@ -395,15 +395,29 @@ def longitudinal_maneuver_alert(CP: car.CarParams, CS: car.CarState, sm: messagi
                Priority.LOW, VisualAlert.none, audible_alert, 0.2)
 
 
+def turning_alert(direction: str):
+  def func(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality, starpilot_toggles: SimpleNamespace) -> Alert:
+    if starpilot_toggles.hide_turning_banner:
+      return EmptyAlert
+    return Alert(f"Turning {direction}", "", AlertStatus.normal, AlertSize.small, Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .1)
+  return func
+
+
+def changing_lanes_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality, starpilot_toggles: SimpleNamespace) -> Alert:
+  if starpilot_toggles.hide_changing_lanes_banner:
+    return EmptyAlert
+  return Alert("Changing Lanes", "", AlertStatus.normal, AlertSize.small, Priority.LOW, VisualAlert.none, AudibleAlert.none, .1)
+
+
 def personality_changed_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality, starpilot_toggles: SimpleNamespace) -> Alert:
+  if starpilot_toggles.hide_distance_profile_banner:
+    return EmptyAlert
   personality = str(personality).title()
   return NormalPermanentAlert(f"Driving Personality: {personality}", duration=1.5)
 
 
 def invalid_lkas_setting_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality, starpilot_toggles: SimpleNamespace) -> Alert:
   text = "Toggle stock LKAS on or off to engage"
-  if CP.brand == "tesla" and CP.carFingerprint == "TESLA_MODEL_S_PREAP":
-    return NormalPermanentAlert("EPAS Firmware Required", "Flash Pre-AP EPAS firmware to enable steering")
   if CP.brand == "tesla":
     text = "Switch to Traffic-Aware Cruise Control to engage"
   elif CP.brand == "mazda":
@@ -422,17 +436,13 @@ def forcing_stop_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMas
     return Alert(
       "Holding the car at a stop",
       "Press the gas pedal or 'Resume' button to override",
-      StarPilotAlertStatus.starpilot, AlertSize.mid,
+      StarPilotAlertStatus.starpilot, AlertSize.small,
       Priority.MID, VisualAlert.none, AudibleAlert.prompt, 1.)
 
-  model_length = sm["starpilotPlan"].forcingStopLength
-  model_length_msg = f"{model_length:.1f} meters" if metric else f"{model_length * CV.METER_TO_FOOT:.1f} feet"
-
   return Alert(
-    f"Forcing the car to stop in {model_length_msg}",
-    "Press the gas pedal or 'Resume' button to override",
-    StarPilotAlertStatus.starpilot, AlertSize.mid,
-    Priority.MID, VisualAlert.none, AudibleAlert.prompt, 1.)
+    "", "",
+    StarPilotAlertStatus.starpilot, AlertSize.none,
+    Priority.MID, VisualAlert.none, AudibleAlert.none, .1)
 
 
 def holiday_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality, starpilot_toggles: SimpleNamespace) -> Alert:
@@ -1172,19 +1182,11 @@ STARPILOT_EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   StarPilotEventName.turningLeft: {
-    ET.WARNING: Alert(
-      "Turning Left",
-      "",
-      AlertStatus.normal, AlertSize.small,
-      Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .1),
+    ET.WARNING: turning_alert("Left"),
   },
 
   StarPilotEventName.turningRight: {
-    ET.WARNING: Alert(
-      "Turning Right",
-      "",
-      AlertStatus.normal, AlertSize.small,
-      Priority.LOWEST, VisualAlert.none, AudibleAlert.none, .1),
+    ET.WARNING: turning_alert("Right"),
   },
 
   # Random Events

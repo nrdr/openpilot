@@ -45,6 +45,7 @@ class ConditionalExperimentalMode:
   STOP_LIGHT_OFF_MARGIN = 4.0
   STOP_LIGHT_LEAD_BLOCK_MARGIN = 15.0
   STOP_LIGHT_HANDOFF_MAX_LEAD_SPEED = 2.0
+  STOP_LIGHT_DETECTED_HOLD_TIME = 1.75
   STOP_APPROACH_LATCH_TIME = 1.0
   STOP_APPROACH_MAX_LEAD_SPEED = 4.5
   STOP_APPROACH_MIN_MODEL_PROB = 0.9
@@ -52,6 +53,7 @@ class ConditionalExperimentalMode:
   SLOW_LEAD_CONTINUITY_MAX_DISTANCE_TIME = 4.0
   SLOW_LEAD_CONTINUITY_MIN_EGO = 2.5
   SLOW_LEAD_CONTINUITY_HOLD_TIME = 1.25
+  SLOW_LEAD_FORCE_CLEAR_TIME = 0.75
   SLOW_LEAD_MIN_CLOSING_SPEED = 0.75
   SLOW_LEAD_CLEAR_FASTER_FACTOR = 0.5
 
@@ -87,15 +89,18 @@ class ConditionalExperimentalMode:
     self.curve_detected = False
     self.slow_lead_detected = False
     self.prev_tracking_lead = bool(getattr(self.starpilot_planner, "tracking_lead", False))
+    self.slow_lead_clear_since = 0.0
     self.slow_lead_continuity_until = 0.0
     self.experimental_mode = False
     self.stop_light_detected = False
     self.stop_light_model_detected = False
+    self.stop_light_detected_hold_until = 0.0
     self.stop_approach_hold_until = 0.0
     self.standstill_stop_reason = None
     self.prev_experimental_mode = False  # For hysteresis
     self.mode_hold_until = 0.0
     self.mode_false_since = 0.0
+    self._prev_ce_status = None
 
   def update(self, v_ego, sm, starpilot_toggles):
     now = time.monotonic()
@@ -121,7 +126,10 @@ class ConditionalExperimentalMode:
 
       self.experimental_mode = triggered or hold_active or transition_buffer_active
       self.prev_experimental_mode = self.experimental_mode
-      self.params_memory.put_int("CEStatus", self.status_value if self.experimental_mode else CEStatus["OFF"])
+      ce_write_value = self.status_value if self.experimental_mode else CEStatus["OFF"]
+      if ce_write_value != self._prev_ce_status:
+        self.params_memory.put_int("CEStatus", ce_write_value)
+        self._prev_ce_status = ce_write_value
     elif not is_manual_ce_status(self.status_value):
       self.mode_hold_until = 0.0
       self.mode_false_since = 0.0
@@ -135,10 +143,14 @@ class ConditionalExperimentalMode:
       self.experimental_mode = standstill_stop_hold
       self.prev_experimental_mode = self.experimental_mode
       self.status_value = CEStatus["STOP_LIGHT"] if self.experimental_mode else CEStatus["OFF"]
-      self.params_memory.put_int("CEStatus", self.status_value if self.experimental_mode else CEStatus["OFF"])
+      ce_write_value = self.status_value
+      if ce_write_value != self._prev_ce_status:
+        self.params_memory.put_int("CEStatus", ce_write_value)
+        self._prev_ce_status = ce_write_value
     else:
       self.mode_hold_until = 0.0
       self.mode_false_since = 0.0
+      self._prev_ce_status = None
       self.experimental_mode = self.status_value == CEStatus["USER_OVERRIDDEN"]
       self.prev_experimental_mode = self.experimental_mode
       self.stop_light_detected &= not is_manual_ce_status(self.status_value)
@@ -222,10 +234,7 @@ class ConditionalExperimentalMode:
     min_closing_speed = max(self.SLOW_LEAD_MIN_CLOSING_SPEED, 0.04 * v_ego)
 
     if not starpilot_toggles.conditional_stopped_lead and v_ego < self.SLOW_LEAD_CONTINUITY_MIN_EGO:
-      self.slow_lead_filter.update(False)
-      self.slow_lead_detected = False
-      self.slow_lead_continuity_until = 0.0
-      self.prev_tracking_lead = tracking_lead
+      self.clear_slow_lead_state(tracking_lead)
       return
 
     slower_lead = starpilot_toggles.conditional_slower_lead and self.starpilot_planner.starpilot_following.slower_lead
@@ -242,10 +251,7 @@ class ConditionalExperimentalMode:
     adjusted_threshold = lead_threshold * (1.0 + 0.2 * (1.0 - lead_prob))  # Higher threshold for lower confidence
 
     if lead_status and not slower_lead and not stopped_lead and closing_speed < (min_closing_speed * self.SLOW_LEAD_CLEAR_FASTER_FACTOR):
-      self.slow_lead_filter.update(False)
-      self.slow_lead_detected = False
-      self.slow_lead_continuity_until = 0.0
-      self.prev_tracking_lead = tracking_lead
+      self.clear_slow_lead_state(tracking_lead)
       return
 
     if tracking_lead and (slower_lead or stopped_lead or vision_slow_lead_candidate):
@@ -260,13 +266,30 @@ class ConditionalExperimentalMode:
       vision_slow_lead_candidate
     )
 
-    if tracking_lead or raw_vision_slow_lead or stopped_lead:
-      self.slow_lead_filter.update(slower_lead or raw_vision_slow_lead or stopped_lead)
+    slow_lead_active = bool(slower_lead or raw_vision_slow_lead or stopped_lead)
+    if slow_lead_active:
+      self.slow_lead_clear_since = 0.0
+      self.slow_lead_filter.update(True)
       self.slow_lead_detected = bool(self.slow_lead_filter.x >= adjusted_threshold)
-    else:
-      self.slow_lead_filter.update(False)
-      self.slow_lead_detected = False
+    elif tracking_lead:
+      if self.slow_lead_clear_since == 0.0:
+        self.slow_lead_clear_since = now
 
+      if (now - self.slow_lead_clear_since) >= self.SLOW_LEAD_FORCE_CLEAR_TIME:
+        self.clear_slow_lead_state(tracking_lead)
+      else:
+        self.slow_lead_filter.update(False)
+        self.slow_lead_detected = bool(self.slow_lead_filter.x >= adjusted_threshold)
+    else:
+      self.clear_slow_lead_state(tracking_lead)
+
+    self.prev_tracking_lead = tracking_lead
+
+  def clear_slow_lead_state(self, tracking_lead):
+    self.slow_lead_filter.update(False)
+    self.slow_lead_detected = False
+    self.slow_lead_clear_since = 0.0
+    self.slow_lead_continuity_until = 0.0
     self.prev_tracking_lead = tracking_lead
 
   def stop_sign_and_light(self, v_ego, sm, model_time):
@@ -303,9 +326,9 @@ class ConditionalExperimentalMode:
       cap_factor = interp(speed_mph, bp, [low_cap_factor, low_cap_factor, tuned_cap_factor])
 
       # Update filter times with interp
-      self.curvature_filter = FirstOrderFilter(self.curvature_filter.x, filter_time_curves, DT_MDL)
-      self.slow_lead_filter = FirstOrderFilter(self.slow_lead_filter.x, filter_time_leads, DT_MDL)
-      self.stop_light_filter = FirstOrderFilter(self.stop_light_filter.x, filter_time_lights, DT_MDL)
+      self.curvature_filter.update_alpha(filter_time_curves)
+      self.slow_lead_filter.update_alpha(filter_time_leads)
+      self.stop_light_filter.update_alpha(filter_time_lights)
       self.lead_clear_filter.update_alpha(lead_clear_filter_time)
 
       # Disable stoplight detection at very high speeds to prevent false positives
@@ -313,6 +336,7 @@ class ConditionalExperimentalMode:
         self.stop_light_filter.x = 0
         self.stop_light_detected = False
         self.stop_light_model_detected = False
+        self.stop_light_detected_hold_until = 0.0
         self.lead_clear_filter.x = 0
         return
 
@@ -348,7 +372,8 @@ class ConditionalExperimentalMode:
         lead_prob >= self.STOP_APPROACH_MIN_MODEL_PROB and
         lead_speed < self.STOP_APPROACH_MAX_LEAD_SPEED
       )
-      if (self.stop_light_detected or self.stop_light_model_detected) and vision_stop_approach:
+      stop_approach_hold_active = now < self.stop_approach_hold_until
+      if (self.stop_light_detected or self.stop_light_model_detected or stop_approach_hold_active) and vision_stop_approach:
         self.stop_approach_hold_until = now + self.STOP_APPROACH_LATCH_TIME
       stop_approach_latched = now < self.stop_approach_hold_until and vision_stop_approach
       handoff_to_stopped_lead = (
@@ -365,12 +390,21 @@ class ConditionalExperimentalMode:
         self.lead_clear_filter.update(not lead_relevant)
         lead_cleared = self.lead_clear_filter.x >= THRESHOLD
       self.stop_light_filter.update(model_stopping and lead_cleared)
+      detector_active = bool(
+        (self.stop_light_filter.x >= THRESHOLD**2 and lead_cleared) or handoff_to_stopped_lead or stop_approach_latched
+      )
+      if detector_active:
+        self.stop_light_detected_hold_until = now + self.STOP_LIGHT_DETECTED_HOLD_TIME
+
+      hold_context_ok = bool(not lead_relevant or vision_stop_approach)
       self.stop_light_detected = bool(
-        (self.stop_light_filter.x >= THRESHOLD**2 and lead_cleared) or handoff_to_stopped_lead
+        detector_active or
+        (hold_context_ok and now < self.stop_light_detected_hold_until)
       )
     else:
       self.stop_light_filter.x = 0
       self.stop_light_detected = False
       self.stop_light_model_detected = False
+      self.stop_light_detected_hold_until = 0.0
       self.lead_clear_filter.x = 0
       self.stop_approach_hold_until = 0.0

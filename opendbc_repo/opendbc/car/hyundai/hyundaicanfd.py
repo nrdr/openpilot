@@ -2,7 +2,7 @@ import copy
 import numpy as np
 from opendbc.car import CanBusBase, CanData
 from opendbc.car.crc import CRC16_XMODEM
-from opendbc.car.hyundai.values import HyundaiFlags
+from opendbc.car.hyundai.values import CAR, HyundaiFlags
 
 
 def _set_value(msg: bytearray, sig, ival: int) -> None:
@@ -134,7 +134,15 @@ def create_steering_messages(packer, CP, CAN, enabled, lat_active, apply_torque,
   else:
     if CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING:
       if CP.flags & HyundaiFlags.SEND_LFA:
-        ret.append(_create_angle_adas_cmd_msg(packer, CAN, apply_angle, lat_active, apply_torque))
+        # Sportage HEV 2026 tracks more reliably and stays fault-free on the stock-style
+        # LFA angle request path. Other SEND_LFA angle cars still use ADAS_CMD.
+        if CP.carFingerprint == CAR.KIA_SPORTAGE_HEV_2026:
+          ret.append(_create_angle_lfa_msg(packer, CAN, lfa_values, apply_angle, lat_active, apply_torque))
+        else:
+          # Some CAN-FD angle-steering trims still expect the stock-style LFA status/UI
+          # message to remain present even though angle actuation comes through ADAS_CMD.
+          ret.append(packer.make_can_msg("LFA", CAN.ECAN, lfa_values))
+          ret.append(_create_angle_adas_cmd_msg(packer, CAN, apply_angle, lat_active, apply_torque))
       else:
         ret.append(_create_angle_lfa_msg(packer, CAN, lfa_values, apply_angle, lat_active, apply_torque))
     else:

@@ -45,10 +45,13 @@ void HudRenderer::updateState(const UIState &s) {
 void HudRenderer::draw(QPainter &p, const QRect &surface_rect) {
   p.save();
 
-  // Draw header gradient
-  QLinearGradient bg(0, UI_HEADER_HEIGHT - (UI_HEADER_HEIGHT / 2.5), 0, UI_HEADER_HEIGHT);
-  bg.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.45));
-  bg.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
+  // Draw header gradient — constant stops, build once
+  static const QLinearGradient bg = []() {
+    QLinearGradient g(0, UI_HEADER_HEIGHT - (UI_HEADER_HEIGHT / 2.5), 0, UI_HEADER_HEIGHT);
+    g.setColorAt(0, QColor::fromRgbF(0, 0, 0, 0.45));
+    g.setColorAt(1, QColor::fromRgbF(0, 0, 0, 0));
+    return g;
+  }();
   p.fillRect(0, 0, surface_rect.width(), UI_HEADER_HEIGHT, bg);
 
 

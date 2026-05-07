@@ -8,7 +8,8 @@ from opendbc.car import Bus, ButtonType, gen_empty_fingerprint, structs
 from opendbc.car.structs import CarControl, CarParams
 from opendbc.car.fw_versions import build_fw_dict, match_fw_to_car
 from opendbc.car.hyundai.carcontroller import CarController, Ioniq6LongitudinalTuningState, GenesisG90LongitudinalTuningState, \
-                                              IONIQ_6_IPEDAL_PADDLE_BURST_COUNT, update_ioniq_6_longitudinal_tuning, \
+                                              IONIQ_6_IPEDAL_PADDLE_BURST_COUNT, IONIQ_6_IPEDAL_NEXT_COUNTER_BURST_COUNT, \
+                                              update_ioniq_6_longitudinal_tuning, \
                                               update_genesis_g90_longitudinal_tuning
 from opendbc.car.hyundai.carstate import CarState, decode_ioniq_6_blindspot_radar_state, decode_ioniq_6_ipedal_intermediate_state, \
                                         decode_ioniq_6_ipedal_state, decode_ioniq_6_max_regen_state
@@ -168,6 +169,22 @@ class TestHyundaiFingerprint:
     CP = CarInterface.get_params(CAR.GENESIS_G90, gen_empty_fingerprint(), [], True, False, False, toggles)
 
     assert CP.vEgoStopping == pytest.approx(0.8)
+    assert CP.stoppingDecelRate == pytest.approx(0.55)
+
+  def test_palisade_2023_longitudinal_params_soften_final_stop_hold(self):
+    toggles = get_test_toggles()
+    CP = CarInterface.get_params(CAR.HYUNDAI_PALISADE_2023, gen_empty_fingerprint(), [], True, False, False, toggles)
+
+    assert CP.stopAccel == pytest.approx(-1.5)
+    assert CP.vEgoStopping == pytest.approx(0.7)
+    assert CP.stoppingDecelRate == pytest.approx(0.55)
+
+  def test_kia_niro_phev_2022_longitudinal_params_soften_final_stop_hold(self):
+    toggles = get_test_toggles()
+    CP = CarInterface.get_params(CAR.KIA_NIRO_PHEV_2022, gen_empty_fingerprint(), [], True, False, False, toggles)
+
+    assert CP.stopAccel == pytest.approx(-1.5)
+    assert CP.vEgoStopping == pytest.approx(0.7)
     assert CP.stoppingDecelRate == pytest.approx(0.55)
 
   def test_kia_forte_no_scc_fw_match(self):
@@ -530,7 +547,10 @@ class TestHyundaiFingerprint:
     controller._ioniq_6_last_regen_control_counter = 0x13
     sends = controller._update_ioniq_6_always_ipedal(cc, cs, toggles)
 
-    assert len([msg for msg in sends if msg[0] == 0x1CF]) == IONIQ_6_IPEDAL_PADDLE_BURST_COUNT
+    paddle_msgs = [msg for msg in sends if msg[0] == 0x1CF]
+    assert len(paddle_msgs) == IONIQ_6_IPEDAL_PADDLE_BURST_COUNT + IONIQ_6_IPEDAL_NEXT_COUNTER_BURST_COUNT
+    assert [msg[1].hex() for msg in paddle_msgs[:IONIQ_6_IPEDAL_PADDLE_BURST_COUNT]] == ["4650002800000000"] * IONIQ_6_IPEDAL_PADDLE_BURST_COUNT
+    assert [msg[1].hex() for msg in paddle_msgs[IONIQ_6_IPEDAL_PADDLE_BURST_COUNT:]] == ["9060002800000000"] * IONIQ_6_IPEDAL_NEXT_COUNTER_BURST_COUNT
     regen_cmd = next(msg for msg in sends if msg[0] == 0x25A)
     assert regen_cmd[1][24:28] == bytes.fromhex("c00c1200")
     checksum = hyundaicanfd.hkg_can_fd_checksum(regen_cmd[0], None, bytearray(regen_cmd[1]))
@@ -541,7 +561,10 @@ class TestHyundaiFingerprint:
     cs.ioniq_6_regen_control_msg = dict(cs.ioniq_6_regen_control_msg, COUNTER=0x15)
     sends = controller._update_ioniq_6_always_ipedal(cc, cs, toggles)
 
-    assert len([msg for msg in sends if msg[0] == 0x1CF]) == IONIQ_6_IPEDAL_PADDLE_BURST_COUNT
+    paddle_msgs = [msg for msg in sends if msg[0] == 0x1CF]
+    assert len(paddle_msgs) == IONIQ_6_IPEDAL_PADDLE_BURST_COUNT + IONIQ_6_IPEDAL_NEXT_COUNTER_BURST_COUNT
+    assert [msg[1].hex() for msg in paddle_msgs[:IONIQ_6_IPEDAL_PADDLE_BURST_COUNT]] == ["9060002800000000"] * IONIQ_6_IPEDAL_PADDLE_BURST_COUNT
+    assert [msg[1].hex() for msg in paddle_msgs[IONIQ_6_IPEDAL_PADDLE_BURST_COUNT:]] == ["2970002800000000"] * IONIQ_6_IPEDAL_NEXT_COUNTER_BURST_COUNT
     assert not any(msg[0] == 0x25A for msg in sends)
 
   def test_ioniq_6_longitudinal_params_match_canfd_tune(self):
@@ -566,12 +589,6 @@ class TestHyundaiFingerprint:
 
     state = update_ioniq_6_longitudinal_tuning(state, accel_cmd=1.0, v_ego=10.0, a_ego=0.0,
                                                long_control_state=LongCtrlState.stopping, long_active=True)
-    assert not state.stopping
-    assert state.desired_accel == pytest.approx(1.0)
-
-    for _ in range(25):
-      state = update_ioniq_6_longitudinal_tuning(state, accel_cmd=1.0, v_ego=10.0, a_ego=0.0,
-                                                 long_control_state=LongCtrlState.stopping, long_active=True)
     assert state.stopping
     assert state.desired_accel == pytest.approx(0.0)
     actual_accel_after_stop = state.actual_accel
@@ -626,6 +643,20 @@ class TestHyundaiFingerprint:
     assert state.desired_accel == pytest.approx(-0.09)
     assert state.jerk_upper == pytest.approx(0.42)
     assert state.actual_accel == pytest.approx(-0.099)
+
+  def test_ioniq_6_longitudinal_tuning_helper_caps_late_low_speed_stop_brake(self):
+    state = Ioniq6LongitudinalTuningState(actual_accel=-2.82, accel_last=-2.82,
+                                          long_control_state_last=LongCtrlState.pid)
+
+    state = update_ioniq_6_longitudinal_tuning(state, accel_cmd=-2.82, v_ego=2.5, a_ego=-2.4,
+                                               long_control_state=LongCtrlState.stopping, long_active=True)
+    assert state.stopping
+    assert state.desired_accel == pytest.approx(-1.05)
+
+    for _ in range(10):
+      state = update_ioniq_6_longitudinal_tuning(state, accel_cmd=-2.82, v_ego=2.5, a_ego=-2.4,
+                                                 long_control_state=LongCtrlState.stopping, long_active=True)
+    assert state.actual_accel == pytest.approx(-2.49)
 
   def test_genesis_g90_longitudinal_tuning_softens_final_stop_hold(self):
     state = GenesisG90LongitudinalTuningState()
@@ -780,7 +811,7 @@ class TestHyundaiFingerprint:
     assert parser.vl["FCA12"]["FCA_DrvSetState"] == 2
     assert parser.vl["FCA12"]["FCA_USM"] == 2
 
-  def test_sportage_angle_steering_uses_adas_cmd_with_send_lfa(self):
+  def test_sportage_angle_steering_uses_lfa_only_with_send_lfa(self):
     fingerprint = gen_empty_fingerprint()
     cam_can = CanBus(None, fingerprint).CAM
     fingerprint[cam_can][0xCB] = 24
@@ -790,8 +821,11 @@ class TestHyundaiFingerprint:
     assert CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING
 
     packer = CANPacker(DBC[CP.carFingerprint][Bus.pt])
-    msgs = hyundaicanfd.create_steering_messages(packer, CP, CanBus(CP), True, True, 1.0, 12.3)
-    assert [(addr, bus) for addr, _, bus in msgs] == [(0xCB, CanBus(CP).ECAN)]
+    can_bus = CanBus(CP)
+    msgs = hyundaicanfd.create_steering_messages(packer, CP, can_bus, True, True, 1.0, 12.3)
+    assert [(packer.dbc.addr_to_msg[addr].name, bus) for addr, _, bus in msgs] == [
+      ("LFA", can_bus.ECAN),
+    ]
 
   def test_ioniq_6_lfa_helper_preserves_stock_ui_fields(self):
     CP = CarParams.new_message()
@@ -1033,6 +1067,9 @@ class TestHyundaiFingerprint:
     assert sportage_high_speed_params.ANGLE_LIMITS.MAX_LATERAL_JERK == sportage_params.ANGLE_LIMITS.MAX_LATERAL_JERK
     assert sportage_low_speed_params.ANGLE_LIMITS.MAX_LATERAL_JERK > sportage_high_speed_params.ANGLE_LIMITS.MAX_LATERAL_JERK
     assert sportage_low_speed_params.ANGLE_LIMITS.MAX_LATERAL_JERK < comparison_params.ANGLE_LIMITS.MAX_LATERAL_JERK
+    assert sportage_params.ANGLE_LIMITS.STEER_ANGLE_MAX > comparison_params.ANGLE_LIMITS.STEER_ANGLE_MAX
+    assert sportage_params.ANGLE_LIMITS.MAX_LATERAL_ACCEL > comparison_params.ANGLE_LIMITS.MAX_LATERAL_ACCEL
+    assert sportage_params.ANGLE_LIMITS.MAX_ANGLE_RATE > comparison_params.ANGLE_LIMITS.MAX_ANGLE_RATE
     assert comparison_params.ANGLE_LIMITS.MAX_LATERAL_JERK == ioniq6_params.ANGLE_LIMITS.MAX_LATERAL_JERK
 
   def test_ioniq_5_canfd_aux_messages_are_optional(self):

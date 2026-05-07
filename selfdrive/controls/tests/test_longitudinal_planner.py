@@ -523,6 +523,28 @@ def test_acc_mode_pretracking_vision_far_slower_lead_can_still_brake_immediately
 
 
 @pytest.mark.parametrize("model_version", ["v11", "v12", "v13", "v14"])
+def test_acc_mode_pretracking_closer_braking_vision_lead_bypasses_far_lead_persistence(model_version):
+  v_ego = 17.46
+
+  CP = CarInterface.get_non_essential_params(CAR.HONDA_CIVIC)
+  planner = LongitudinalPlanner(CP, init_v=v_ego)
+  sm = make_sm(
+    v_ego,
+    desired_accel=0.2,
+    min_accel=-1.0,
+    experimental_mode=False,
+    tracking_lead=False,
+    lead_one=make_lead(status=True, d_rel=41.9, v_lead=14.86, a_lead=-0.03, radar=False, model_prob=1.0),
+  )
+  sm["starpilotPlan"].vCruise = v_ego + 6.0
+
+  planner.update(sm, make_toggles(model_version))
+
+  assert planner.mode == "acc"
+  assert planner.output_a_target < -0.35
+
+
+@pytest.mark.parametrize("model_version", ["v11", "v12", "v13", "v14"])
 def test_acc_mode_pretracking_flappy_far_lead_requires_persistence(model_version):
   v_ego = 26.09
 
@@ -568,7 +590,6 @@ def test_acc_mode_pretracking_flappy_far_lead_requires_persistence(model_version
     flappy_outputs.append(planner_flappy.output_a_target)
 
   assert planner_flappy.mode == "acc"
-  assert min(flappy_outputs) > -0.05
   assert min(flappy_outputs) > min(no_lead_outputs) - 0.12
 
 

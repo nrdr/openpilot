@@ -66,12 +66,9 @@ void DriverMonitorRenderer::updateState(const UIState &s) {
 void DriverMonitorRenderer::draw(QPainter &painter, const QRect &surface_rect) {
   if (!is_visible) return;
 
-  painter.save();
-
   int offset = UI_BORDER_SIZE + btn_size / 2;
   float x = is_rhd ? surface_rect.width() - offset : offset;
   float y = surface_rect.height() - offset;
-  float opacity = is_active ? 0.65f : 0.2f;
 
   if (onroad_distance_btn_enabled) {
     if (is_rhd) {
@@ -84,6 +81,18 @@ void DriverMonitorRenderer::draw(QPainter &painter, const QRect &surface_rect) {
   if (starpilot_toggles.value("road_name_ui").toBool()) {
     y -= UI_BORDER_SIZE;
   }
+
+  if (starpilot_nvg) {
+    starpilot_nvg->dmIconPosition.setX(x);
+    starpilot_nvg->dmIconPosition.setY(y);
+    starpilot_nvg->rightHandDM = is_rhd;
+  }
+
+  if (starpilot_toggles.value("hide_dm_icon").toBool()) return;
+
+  painter.save();
+
+  float opacity = is_active ? 0.65f : 0.2f;
 
   drawIcon(painter, QPoint(x, y), dm_img, QColor(0, 0, 0, 70), opacity);
 
@@ -116,10 +125,4 @@ void DriverMonitorRenderer::draw(QPainter &painter, const QRect &surface_rect) {
   painter.drawArc(QRectF(x - arc_l / 2, std::min(y + delta_y, y), arc_l, std::abs(delta_y)), (driver_pose_sins[0] > 0 ? 0 : 180) * 16, 180 * 16);
 
   painter.restore();
-
-  if (starpilot_nvg) {
-    starpilot_nvg->dmIconPosition.setX(x);
-    starpilot_nvg->dmIconPosition.setY(y);
-    starpilot_nvg->rightHandDM = is_rhd;
-  }
 }

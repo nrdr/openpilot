@@ -175,6 +175,66 @@ def test_stop_light_latch_holds_slow_high_confidence_vision_lead_during_model_fl
   assert cem.stop_light_detected
 
 
+def test_stop_light_hold_bridges_short_no_lead_model_flicker(monkeypatch):
+  v_ego = 40 * CV.MPH_TO_MS
+  cem = make_cem(model_length=v_ego * 3.8)
+
+  run_stop_light_detector(cem, v_ego, steps=20)
+  assert cem.stop_light_detected
+
+  monotonic_values = iter([10.0, 11.0, 14.5, 16.5, 18.5])
+  monkeypatch.setattr(conditional_experimental_mode_module.time, "monotonic", lambda: next(monotonic_values))
+
+  cem.starpilot_planner.model_length = v_ego * 9.0
+  cem.stop_sign_and_light(v_ego, make_sm(), model_time=7.0)
+  assert cem.stop_light_detected
+
+  cem.stop_sign_and_light(v_ego, make_sm(), model_time=7.0)
+  assert cem.stop_light_detected
+
+  cem.stop_sign_and_light(v_ego, make_sm(), model_time=7.0)
+  assert cem.stop_light_detected
+
+  cem.stop_sign_and_light(v_ego, make_sm(), model_time=7.0)
+  assert cem.stop_light_detected
+
+  cem.stop_sign_and_light(v_ego, make_sm(), model_time=7.0)
+  assert not cem.stop_light_detected
+
+
+def test_stop_light_hold_refreshes_through_stopped_approach_lead(monkeypatch):
+  v_ego = 20 * CV.MPH_TO_MS
+  model_length = v_ego * 4.0
+  cem = make_cem(
+    model_length=model_length,
+    lead_status=True,
+    lead_d_rel=model_length - 5.0,
+    lead_v_lead=0.5,
+    lead_model_prob=0.98,
+  )
+
+  run_stop_light_detector(cem, v_ego, steps=20)
+  assert cem.stop_light_detected
+
+  monotonic_values = iter([20.0, 21.2, 22.4])
+  monkeypatch.setattr(conditional_experimental_mode_module.time, "monotonic", lambda: next(monotonic_values))
+
+  cem.starpilot_planner.model_length = v_ego * 9.0
+  cem.stop_light_detected = False
+  cem.stop_light_model_detected = False
+  cem.stop_light_filter.x = 0.0
+
+  cem.stop_sign_and_light(v_ego, make_sm(), model_time=7.0)
+  assert cem.stop_light_detected
+
+  cem.stop_sign_and_light(v_ego, make_sm(), model_time=7.0)
+  assert cem.stop_light_detected
+
+  cem.starpilot_planner.lead_one.vLead = 6.0
+  cem.stop_sign_and_light(v_ego, make_sm(), model_time=7.0)
+  assert not cem.stop_light_detected
+
+
 def test_standstill_red_light_keeps_exp_on_even_when_model_stopped_clears(monkeypatch):
   cem = make_cem(model_length=80.0, model_stopped=False)
   toggles = make_update_toggles()
@@ -481,6 +541,35 @@ def test_pace_matched_lead_clears_slow_lead_quickly():
   cem.starpilot_planner.starpilot_following.slower_lead = False
   cem.slow_lead(toggles, v_ego)
 
+  assert not cem.slow_lead_detected
+
+
+def test_tracked_stale_slow_lead_clears_after_short_timeout(monkeypatch):
+  v_ego = 65 * CV.MPH_TO_MS
+  cem = make_cem(
+    model_length=v_ego * 5.0,
+    tracking_lead=True,
+    lead_status=True,
+    lead_d_rel=55.0,
+    lead_v_lead=v_ego - 0.8,
+    lead_model_prob=0.98,
+  )
+  toggles = SimpleNamespace(conditional_slower_lead=True, conditional_stopped_lead=False)
+
+  cem.slow_lead_filter.x = 1.0
+  cem.slow_lead_detected = True
+  cem.starpilot_planner.starpilot_following.slower_lead = False
+
+  monotonic_values = iter([50.0, 50.3, 50.9])
+  monkeypatch.setattr(conditional_experimental_mode_module.time, "monotonic", lambda: next(monotonic_values))
+
+  cem.slow_lead(toggles, v_ego)
+  assert cem.slow_lead_detected
+
+  cem.slow_lead(toggles, v_ego)
+  assert cem.slow_lead_detected
+
+  cem.slow_lead(toggles, v_ego)
   assert not cem.slow_lead_detected
 
 

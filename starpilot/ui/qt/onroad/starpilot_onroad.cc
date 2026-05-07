@@ -10,6 +10,15 @@ StarPilotOnroadWindow::StarPilotOnroadWindow(QWidget *parent) : QWidget(parent) 
 void StarPilotOnroadWindow::resizeEvent(QResizeEvent *event) {
   rect = QWidget::rect();
   marginRegion = QRegion(rect) - QRegion(rect.marginsRemoved(QMargins(UI_BORDER_SIZE, UI_BORDER_SIZE, UI_BORDER_SIZE, UI_BORDER_SIZE)));
+
+  steeringGradient = QLinearGradient(rect.topLeft(), rect.bottomLeft());
+  QColor bottomGreen = bg_colors[STATUS_ENGAGED].lighter(120);
+  bottomGreen.setAlpha(bg_colors[STATUS_ENGAGED].alpha());
+  steeringGradient.setColorAt(0.0, bg_colors[STATUS_TRAFFIC_MODE_ENABLED]);
+  steeringGradient.setColorAt(0.25, bg_colors[STATUS_EXPERIMENTAL_MODE_ENABLED]);
+  steeringGradient.setColorAt(0.5, bg_colors[STATUS_CEM_DISABLED]);
+  steeringGradient.setColorAt(0.75, bg_colors[STATUS_ENGAGED]);
+  steeringGradient.setColorAt(1.0, bottomGreen);
 }
 
 void StarPilotOnroadWindow::updateState(const UIState &s, const StarPilotUIState &fs) {
@@ -86,7 +95,9 @@ void StarPilotOnroadWindow::updateState(const UIState &s, const StarPilotUIState
                           .arg(qRound(avgFPS));
   }
 
-  update();
+  if (showBlindspot || showSignal || showSteering || showFPS) {
+    update();
+  }
 }
 
 void StarPilotOnroadWindow::paintEvent(QPaintEvent *event) {
@@ -125,20 +136,11 @@ void StarPilotOnroadWindow::paintFPS(QPainter &p) {
 void StarPilotOnroadWindow::paintSteeringTorqueBorder(QPainter &p) {
   p.save();
 
-  QLinearGradient gradient(rect.topLeft(), rect.bottomLeft());
-  QColor bottomGreen = bg_colors[STATUS_ENGAGED].lighter(120);
-  bottomGreen.setAlpha(bg_colors[STATUS_ENGAGED].alpha());
-  gradient.setColorAt(0.0, bg_colors[STATUS_TRAFFIC_MODE_ENABLED]);
-  gradient.setColorAt(0.25, bg_colors[STATUS_EXPERIMENTAL_MODE_ENABLED]);
-  gradient.setColorAt(0.5, bg_colors[STATUS_CEM_DISABLED]);
-  gradient.setColorAt(0.75, bg_colors[STATUS_ENGAGED]);
-  gradient.setColorAt(1.0, bottomGreen);
-
   int visibleHeight = rect.height() * smoothedSteer;
   int xPos = (torque < 0) ? rect.x() : (rect.x() + rect.width() - UI_BORDER_SIZE);
   int yPos = rect.y() + rect.height() - visibleHeight;
 
-  p.fillRect(QRect(xPos, yPos, UI_BORDER_SIZE, visibleHeight), gradient);
+  p.fillRect(QRect(xPos, yPos, UI_BORDER_SIZE, visibleHeight), steeringGradient);
 
   p.restore();
 }

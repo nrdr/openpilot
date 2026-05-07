@@ -23,7 +23,7 @@ private:
 
   std::map<QString, AbstractControl*> toggles;
 
-  QSet<QString> advancedCustomOnroadUIKeys = {"HideAlerts", "HideLeadMarker", "HideMaxSpeed", "HideSpeed", "HideSpeedLimit", "HideSteeringWheel", "WheelSpeed"};
+  QSet<QString> advancedCustomOnroadUIKeys = {"HideAlerts", "HideChangingLanesBanner", "HideDistanceProfileBanner", "HideDMIcon", "HideLeadMarker", "HideMaxSpeed", "HideSpeed", "HideSpeedLimit", "HideSteeringWheel", "HideTurningBanner", "WheelSpeed"};
   QSet<QString> customOnroadUIKeys = {"AccelerationPath", "AdjacentPath", "BlindSpotPath", "Compass", "OnroadDistanceButton", "PedalsOnUI", "RotatingWheel"};
   QSet<QString> modelUIKeys = {"DynamicPathWidth", "LaneLinesWidth", "PathEdgeWidth", "PathWidth", "RoadEdgesWidth"};
   QSet<QString> navigationUIKeys = {"RoadNameUI", "ShowSpeedLimits", "SLCMapboxFiller", "UseVienna"};

@@ -194,6 +194,7 @@ struct StarPilotPlan @0xf98d843bfd7004a3 {
   weatherId @34 :Int16;
   disableThrottle @35 :Bool;
   trackingLead @36 :Bool;
+  stopSignConfirmed @37 :Bool;
 }
 
 struct StarPilotRadarState @0xb86e6369214c01c8 {

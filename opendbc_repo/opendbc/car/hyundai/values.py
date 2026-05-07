@@ -11,6 +11,13 @@ from opendbc.car.fw_query_definitions import FwQueryConfig, Request, p16
 
 Ecu = CarParams.Ecu
 AVERAGE_ROAD_ROLL = 0.06  # conservative roll margin used by Hyundai CAN-FD angle steering safety
+SPORTAGE_HEV_2026_MAX_LATERAL_ACCEL = 3.6
+SPORTAGE_HEV_2026_BASE_LATERAL_JERK = 3.25
+SPORTAGE_HEV_2026_LOW_SPEED_JERK_BOOST = 0.55
+SPORTAGE_HEV_2026_LOW_SPEED_JERK_SPEED = 11.0
+SPORTAGE_HEV_2026_LOW_SPEED_JERK_WIDTH = 5.0
+SPORTAGE_HEV_2026_MAX_ANGLE_RATE = 6.5
+SPORTAGE_HEV_2026_STEER_ANGLE_MAX = 220.0
 
 
 class CarControllerParams:
@@ -53,15 +60,20 @@ class CarControllerParams:
     if CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING:
       self.STEER_THRESHOLD = 175
 
-      # The Sportage angle port gets rough if it keeps the branch-wide higher jerk
-      # limit everywhere, but the fully calmed 3.0 m/s^3 cap lags too much in tight
-      # low-speed turns. Give it extra low-speed authority, then fade back to the
-      # calmer ceiling by normal road speeds.
+      # The Sportage angle port still needs more authority in real turns than the
+      # fully calmed branch-wide ceiling allows, but the old low-speed jerk boost
+      # made the 3-20 degree band angry and ping-pongy as the car slowed down.
+      # Split the difference:
+      # - keep a calmer low-speed boost that fades out earlier
+      # - give the car a little more true turn headroom through accel/rate limits
       if CP.carFingerprint == CAR.KIA_SPORTAGE_HEV_2026:
-        sportage_low_speed_weight = min(max((15.0 - vEgoRaw) / 7.0, 0.0), 1.0)
-        sportage_lateral_jerk = 3.0 + (1.2 * sportage_low_speed_weight)
+        sportage_low_speed_weight = min(max((SPORTAGE_HEV_2026_LOW_SPEED_JERK_SPEED - vEgoRaw) / SPORTAGE_HEV_2026_LOW_SPEED_JERK_WIDTH, 0.0), 1.0)
+        sportage_lateral_jerk = SPORTAGE_HEV_2026_BASE_LATERAL_JERK + (SPORTAGE_HEV_2026_LOW_SPEED_JERK_BOOST * sportage_low_speed_weight)
         self.ANGLE_LIMITS = replace(self.ANGLE_LIMITS,
-                                    MAX_LATERAL_JERK=sportage_lateral_jerk + (ACCELERATION_DUE_TO_GRAVITY * AVERAGE_ROAD_ROLL))
+                                    STEER_ANGLE_MAX=SPORTAGE_HEV_2026_STEER_ANGLE_MAX,
+                                    MAX_LATERAL_ACCEL=SPORTAGE_HEV_2026_MAX_LATERAL_ACCEL + (ACCELERATION_DUE_TO_GRAVITY * AVERAGE_ROAD_ROLL),
+                                    MAX_LATERAL_JERK=sportage_lateral_jerk + (ACCELERATION_DUE_TO_GRAVITY * AVERAGE_ROAD_ROLL),
+                                    MAX_ANGLE_RATE=SPORTAGE_HEV_2026_MAX_ANGLE_RATE)
 
     # To determine the limit for your car, find the maximum value that the stock LKAS will request.
     # If the max stock LKAS request is <384, add your car to this list.

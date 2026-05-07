@@ -235,6 +235,9 @@ class CarState(CarStateBase):
     fp_ret = custom.StarPilotCarState.new_message()
 
     fp_ret.dashboardSpeedLimit = calculate_speed_limit(self.CP, self.FPCP, cp, cp_cam)
+    if self.FPCP.flags & HondaStarPilotFlags.HAS_CAMERA_MESSAGES:
+      sign_bus = cp if (self.CP.carFingerprint in (HONDA_BOSCH - HONDA_BOSCH_RADARLESS - HONDA_BOSCH_CANFD)) else cp_cam
+      fp_ret.dashboardStopSign = 1 if sign_bus.vl["CAMERA_MESSAGES"]["ROAD_SIGN"] == 89 else 0
 
     return ret, fp_ret
 

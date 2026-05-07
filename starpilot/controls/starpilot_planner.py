@@ -55,9 +55,11 @@ class StarPilotPlanner:
     self.model_stopped = False
     self.road_curvature_detected = False
     self.tracking_lead = False
+    self._prev_gps_bearing = 0
 
     self.lane_width_left = 0
     self.lane_width_right = 0
+    self._lane_width_counter = 0
     self.lateral_acceleration = 0
     self.model_length = 0
     self.road_curvature = 0
@@ -98,12 +100,18 @@ class StarPilotPlanner:
       "bearing": gps_location.bearingDeg,
     }
     self.gps_valid = self.gps_position["latitude"] != 0 or self.gps_position["longitude"] != 0
-    self.params_memory.put("LastGPSPosition", json.dumps(self.gps_position))
+    bearing = self.gps_position["bearing"]
+    if starpilot_toggles.compass and abs(bearing - self._prev_gps_bearing) > 0.5:
+      self.params_memory.put("LastGPSPosition", json.dumps(self.gps_position))
+      self._prev_gps_bearing = bearing
 
     if v_ego >= starpilot_toggles.minimum_lane_change_speed:
-      self.lane_width_left = calculate_lane_width(sm["modelV2"].laneLines[0], sm["modelV2"].laneLines[1], sm["modelV2"].roadEdges[0])
-      self.lane_width_right = calculate_lane_width(sm["modelV2"].laneLines[3], sm["modelV2"].laneLines[2], sm["modelV2"].roadEdges[1])
+      self._lane_width_counter += 1
+      if self._lane_width_counter % 4 == 0:
+        self.lane_width_left = calculate_lane_width(sm["modelV2"].laneLines[0], sm["modelV2"].laneLines[1], sm["modelV2"].roadEdges[0])
+        self.lane_width_right = calculate_lane_width(sm["modelV2"].laneLines[3], sm["modelV2"].laneLines[2], sm["modelV2"].roadEdges[1])
     else:
+      self._lane_width_counter = 0
       self.lane_width_left = 0
       self.lane_width_right = 0
 
@@ -182,6 +190,7 @@ class StarPilotPlanner:
 
     starpilotPlan.forcingStop = self.starpilot_vcruise.forcing_stop
     starpilotPlan.forcingStopLength = self.starpilot_vcruise.tracked_model_length
+    starpilotPlan.stopSignConfirmed = self.starpilot_vcruise.stop_sign_confirmed
 
     starpilotPlan.starpilotEvents = self.starpilot_events.events.to_msg()
 
