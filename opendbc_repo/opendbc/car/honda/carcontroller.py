@@ -527,6 +527,22 @@ class CarController(CarControllerBase):
         else:
           apply_brake = np.clip(self.brake_last - wind_brake, 0.0, 1.0)
           apply_brake = int(np.clip(apply_brake * self.params.NIDEC_BRAKE_MAX, 0, self.params.NIDEC_BRAKE_MAX - 1))
+
+          if self.frame % 20 == 0:
+            print(
+              "HONDA_LONG_DEBUG",
+              "enabled=", CC.enabled,
+              "longActive=", CC.longActive,
+              "act_state=", actuators.longControlState,
+              "accel=", float(accel),
+              "gas=", float(gas),
+              "brake=", float(brake),
+              "brake_last=", float(self.brake_last),
+              "wind_brake=", float(wind_brake),
+              "apply_brake=", int(apply_brake),
+              "pedal_enabled=", self.CP.enableGasInterceptorDEPRECATED,
+            )
+
           pump_on, self.last_pump_ts = brake_pump_hysteresis(apply_brake, self.apply_brake_last, self.last_pump_ts, ts)
 
           pcm_override = True
@@ -549,6 +565,15 @@ class CarController(CarControllerBase):
               self.gas = float(np.clip(gas_mult * (gas - brake + wind_brake * 3 / 4), 0.0, 1.0))
             else:
               self.gas = 0.0
+
+            if self.frame % 20 == 0:
+              print(
+                "HONDA_PEDAL_DEBUG",
+                "self.gas=", float(self.gas),
+                "frame=", self.frame,
+                "idx=", self.frame // 2,
+              )
+
             can_sends.append(create_gas_interceptor_command(self.packer, self.gas, self.frame // 2))
 
     # Send dashboard UI commands.
