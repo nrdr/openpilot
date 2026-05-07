@@ -624,5 +624,8 @@ class CarController(CarControllerBase):
     new_actuators.torque = self.last_torque
     new_actuators.torqueOutputCan = apply_torque
 
+    if self.frame % 20 == 0:
+      print("HONDA_CAN_SENDS", [(hex(msg[0]), msg[2]) for msg in can_sends])
+
     self.frame += 1
     return new_actuators, can_sends
