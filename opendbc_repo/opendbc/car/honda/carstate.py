@@ -159,7 +159,12 @@ class CarState(CarStateBase):
       gear_position = self.shifter_values.get(cp.vl[self.gearbox_msg]["GEAR_SHIFTER"], None)
       ret.gearShifter = self.parse_gear_shifter(gear_position)
 
-    ret.gasPressed = cp.vl["POWERTRAIN_DATA"]["PEDAL_GAS"] > 1e-5
+    if self.CP.enableGasInterceptorDEPRECATED:
+      # Same threshold as panda, equivalent to 1e-5 with previous DBC scaling.
+      gas = (cp.vl["GAS_SENSOR"]["INTERCEPTOR_GAS"] + cp.vl["GAS_SENSOR"]["INTERCEPTOR_GAS2"]) // 2
+      ret.gasPressed = gas > 492
+    else:
+      ret.gasPressed = cp.vl["POWERTRAIN_DATA"]["PEDAL_GAS"] > 1e-5
 
     ret.steeringTorque = cp.vl["STEER_STATUS"]["STEER_TORQUE_SENSOR"]
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD.get(self.CP.carFingerprint, 1200)
@@ -242,8 +247,12 @@ class CarState(CarStateBase):
     return ret, fp_ret
 
   def get_can_parsers(self, CP):
+    pt_messages = []
+    if CP.enableGasInterceptorDEPRECATED:
+      pt_messages.append(("GAS_SENSOR", 50))
+
     parsers = {
-      Bus.pt: CANParser(DBC[CP.carFingerprint][Bus.pt], [], CanBus(CP).pt),
+      Bus.pt: CANParser(DBC[CP.carFingerprint][Bus.pt], pt_messages, CanBus(CP).pt),
       Bus.cam: CANParser(DBC[CP.carFingerprint][Bus.pt], [], CanBus(CP).camera),
     }
     if CP.enableBsm:

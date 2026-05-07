@@ -2,7 +2,7 @@ import math
 import numpy as np
 
 from opendbc.can import CANPacker
-from opendbc.car import ACCELERATION_DUE_TO_GRAVITY, Bus, DT_CTRL, rate_limit, make_tester_present_msg, structs
+from opendbc.car import ACCELERATION_DUE_TO_GRAVITY, Bus, DT_CTRL, rate_limit, make_tester_present_msg, create_gas_interceptor_command, structs
 from opendbc.car.honda import hondacan
 from opendbc.car.honda.values import (
   CAR,
@@ -482,6 +482,9 @@ class CarController(CarControllerBase):
       pcm_speed = float(np.interp(gas - brake, pcm_speed_BP, pcm_speed_V))
       pcm_accel = int(np.clip((accel / 1.44) / max_accel, 0.0, 1.0) * self.params.NIDEC_GAS_MAX)
 
+    if self.CP.enableGasInterceptorDEPRECATED:
+      pcm_accel = int(0.0)
+
     if not self.CP.openpilotLongitudinalControl:
       if self.frame % 2 == 0 and self.CP.carFingerprint not in HONDA_BOSCH_RADARLESS | HONDA_BOSCH_CANFD:
         can_sends.append(hondacan.create_bosch_supplemental_1(self.packer, self.CAN))
@@ -538,6 +541,19 @@ class CarController(CarControllerBase):
           self.apply_brake_last = apply_brake
           self.brake = apply_brake / self.params.NIDEC_BRAKE_MAX
 
+          if self.CP.enableGasInterceptorDEPRECATED:
+            # Way too aggressive at low speed without this.
+            gas_mult = np.interp(CS.out.vEgo, [0.0, 10.0], [0.4, 1.0])
+            # Send exactly zero if apply_gas is zero. Interceptor will send the max between read value and apply_gas.
+            # This prevents unexpected pedal range rescaling.
+            # Sending non-zero gas when OP is not enabled will cause the PCM not to respond to throttle as expected
+            # when you do enable.
+            if CC.longActive:
+              self.gas = float(np.clip(gas_mult * (gas - brake + wind_brake * 3 / 4), 0.0, 1.0))
+            else:
+              self.gas = 0.0
+            can_sends.append(create_gas_interceptor_command(self.packer, self.gas, self.frame // 2))
+
     # Send dashboard UI commands.
     if self.frame % 10 == 0:
       if self.CP.openpilotLongitudinalControl:
@@ -575,7 +591,8 @@ class CarController(CarControllerBase):
           can_sends.append(hondacan.create_legacy_brake_command(self.packer, self.CAN.pt))
         if self.CP.carFingerprint not in HONDA_BOSCH:
           self.speed = pcm_speed
-          self.gas = pcm_accel / self.params.NIDEC_GAS_MAX
+          if not self.CP.enableGasInterceptorDEPRECATED:
+            self.gas = pcm_accel / self.params.NIDEC_GAS_MAX
 
     new_actuators = actuators.as_builder()
     new_actuators.speed = self.speed
