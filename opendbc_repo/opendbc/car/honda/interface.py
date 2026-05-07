@@ -121,8 +121,8 @@ class CarInterface(CarInterfaceBase):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 1663], [0, 1663]]
       ret.lateralTuning.init('pid')
       ret.lateralTuning.pid.kpBP, ret.lateralTuning.pid.kpV = [[0.], [0.03]]
-      ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0.], [0.05]]
-      ret.lateralTuning.pid.kf = 0.000090
+      ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kiV = [[0.], [0.01]]
+      ret.lateralTuning.pid.kf = 0.000015
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
       ret.lateralParams.torqueBP, ret.lateralParams.torqueV = [[0, 4096], [0, 4096]]  # TODO: determine if there is a dead zone at the top end
