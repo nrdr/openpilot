@@ -248,13 +248,18 @@ class CarState(CarStateBase):
 
   def get_can_parsers(self, CP):
     pt_messages = []
+
     if CP.enableGasInterceptorDEPRECATED:
-      pt_messages.append(("GAS_SENSOR", 50))
+      pt_messages += [
+        ("POWERTRAIN_DATA", 100),
+        ("GAS_SENSOR", 50),
+      ]
 
     parsers = {
       Bus.pt: CANParser(DBC[CP.carFingerprint][Bus.pt], pt_messages, CanBus(CP).pt),
       Bus.cam: CANParser(DBC[CP.carFingerprint][Bus.pt], [], CanBus(CP).camera),
     }
+
     if CP.enableBsm:
       parsers[Bus.body] = CANParser(DBC[CP.carFingerprint][Bus.body], [], CanBus(CP).radar)
 
