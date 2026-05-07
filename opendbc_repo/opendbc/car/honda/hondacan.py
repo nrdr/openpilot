@@ -1,7 +1,14 @@
 from opendbc.car import CanBusBase
 from opendbc.car.common.conversions import Conversions as CV
-from opendbc.car.honda.values import (HondaFlags, HONDA_BOSCH, HONDA_BOSCH_ALT_RADAR, HONDA_BOSCH_RADARLESS,
-                                      HONDA_BOSCH_CANFD, CarControllerParams)
+from opendbc.car.honda.values import (
+  CAR,
+  HondaFlags,
+  HONDA_BOSCH,
+  HONDA_BOSCH_ALT_RADAR,
+  HONDA_BOSCH_RADARLESS,
+  HONDA_BOSCH_CANFD,
+  CarControllerParams,
+)
 
 # CAN bus layout with relay
 # 0 = ACC-CAN - radar side
@@ -51,6 +58,16 @@ def create_brake_command(packer, CAN, apply_brake, pump_on, pcm_override, pcm_ca
   brakelights = apply_brake > 0
   brake_rq = apply_brake > 0
   pcm_fault_cmd = False
+  use_hybrid_brake = bool((CP.flags & HondaFlags.HYBRID) or car_fingerprint == CAR.HONDA_CLARITY)
+
+  if apply_brake > 0:
+    print(
+      "HONDA_BRAKE_PATH",
+      "hybrid=", use_hybrid_brake,
+      "flags=", int(CP.flags),
+      "fingerprint=", car_fingerprint,
+      "apply_brake=", apply_brake,
+    )
 
   values = {
     "CRUISE_OVERRIDE": pcm_override,
@@ -66,9 +83,9 @@ def create_brake_command(packer, CAN, apply_brake, pump_on, pcm_override, pcm_ca
     "AEB_STATUS": 0,
   }
 
-  if CP.flags & HondaFlags.HYBRID:
+  if use_hybrid_brake:
     values["COMPUTER_BRAKE_HYBRID"] = apply_brake
-    values["BRAKE_PUMP_REQUEST_HYBRID"] = apply_brake > 0
+    values["BRAKE_PUMP_REQUEST_HYBRID"] = pump_on
   else:
     values["COMPUTER_BRAKE"] = apply_brake
     values["BRAKE_PUMP_REQUEST"] = pump_on
@@ -212,6 +229,7 @@ def create_lkas_hud(packer, bus, CP, hud_control, lat_active, steering_available
     commands.append(packer.make_can_msg('LKAS_HUD', bus, lkas_hud_values))
 
   return commands
+
 
 def create_radar_hud(packer, bus):
   radar_hud_values = {
