@@ -104,20 +104,31 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
   sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
   highway = v_ego > 50.0 * CV.MPH_TO_MS
+  low_speed = v_ego < 30.0 * CV.MPH_TO_MS
 
   if highway:
     if sign_change and torque_delta > 0.20:
-      return 0.07
-    return 0.1
+      return 0.10
+    return 0.12
+
+  if low_speed:
+    if torque_delta > 0.50:
+      return 0.14
+    elif torque_delta > 0.20:
+      return 0.16
+    elif torque_delta > 0.05:
+      return 0.18
+    else:
+      return 0.22
 
   if torque_delta > 0.50:
-    return 0.1
-  elif torque_delta > 0.20:
-    return 0.11
-  elif torque_delta > 0.05:
     return 0.12
-  else:
+  elif torque_delta > 0.20:
+    return 0.13
+  elif torque_delta > 0.05:
     return 0.15
+  else:
+    return 0.18
 
 class CarController(CarControllerBase, MadsCarController, GasInterceptorCarController, IntelligentCruiseButtonManagementInterface):
   def __init__(self, dbc_names, CP, CP_SP):
