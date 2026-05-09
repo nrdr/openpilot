@@ -113,22 +113,22 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
 
   if low_speed:
     if torque_delta > 0.50:
-      return 0.14
+      return 0.05
     elif torque_delta > 0.20:
-      return 0.16
+      return 0.06
     elif torque_delta > 0.05:
-      return 0.18
+      return 0.07
     else:
-      return 0.22
+      return 0.1
 
   if torque_delta > 0.50:
-    return 0.12
+    return 0.05
   elif torque_delta > 0.20:
-    return 0.13
+    return 0.07
   elif torque_delta > 0.05:
-    return 0.15
+    return 0.09
   else:
-    return 0.18
+    return 0.1
 
 def get_eps_modified_steering_pressed(raw_pressed: bool, steering_torque: float, torque_cmd: float,
                                       filter_s: float, was_pressed: bool) -> tuple[float, bool]:
