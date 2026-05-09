@@ -176,8 +176,11 @@ EVENTS_SP: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventNameSP.controlsMismatchLateral: {
-    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("Controls Mismatch: Lateral"),
-    ET.NO_ENTRY: NoEntryAlert("Controls Mismatch: Lateral"),
+    ET.WARNING: Alert(
+      "Possible Controls Mismatch",
+      "Openpilot may not have fully disengaged.",
+      AlertStatus.normal, AlertSize.mid,
+      Priority.LOW, VisualAlert.none, AudibleAlert.none, 1.),
   },
 
   EventNameSP.experimentalModeSwitched: {
@@ -193,19 +196,9 @@ EVENTS_SP: dict[int, dict[str, Alert | AlertCallbackType]] = {
   },
 
   EventNameSP.laneTurnLeft: {
-    ET.WARNING: Alert(
-      "Turning Left",
-      "",
-      AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, 1.),
   },
 
   EventNameSP.laneTurnRight: {
-    ET.WARNING: Alert(
-      "Turning Right",
-      "",
-      AlertStatus.normal, AlertSize.small,
-      Priority.LOW, VisualAlert.none, AudibleAlert.none, 1.),
   },
 
   EventNameSP.speedLimitActive: {
