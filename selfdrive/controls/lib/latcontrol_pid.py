@@ -17,7 +17,7 @@ def _clarity_pid_output_scale(desired_angle_deg: float, desired_angle_delta_deg:
   angle_weight = min(max((abs_angle - 16.0) / 12.0, 0.0), 1.0)
   phase = desired_angle_deg * desired_angle_delta_deg
   is_left = desired_angle_deg > 0.0
-  center_taper = 0.01
+  center_taper = 0.4
   mid_turn_scale = 0.1200 if is_left else 0.0150
   mid_turn_turn_in_scale = -0.5500 if is_left else -0.0524
   mid_turn_unwind_scale = -0.0743 if is_left else -0.0842
@@ -25,7 +25,7 @@ def _clarity_pid_output_scale(desired_angle_deg: float, desired_angle_delta_deg:
   turn_in_scale = -0.0799 if is_left else 0.0888
   unwind_scale = 0.1600 if is_left else 0.2000
 
-  scale = 1.0 - (center_speed_weight * center_weight * center_taper)
+  scale = 1.0 + (center_speed_weight * center_weight * center_taper)
   scale += speed_weight * mid_turn_weight * mid_turn_scale
   scale += speed_weight * angle_weight * base_scale
   if phase > 0.2:
