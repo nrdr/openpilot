@@ -352,8 +352,17 @@ class CarInterface(CarInterfaceBase):
 
         stock_cp.lateralTuning.pid.kpV = [ # Controls how strongly the car reacts RIGHT NOW.
           #
-          # Higher values: More immediate steering response, Can become twitchy or oscillate if too high.
-          # Lower values:  Smoother and calmer steering, Less nervous on rough roads, can feel lazy or wander on highways.
+          # Higher values:
+          #   More immediate steering response.
+          #   Can become twitchy or oscillate if too high.
+          #
+          # Lower values:
+          #   Smoother and calmer steering.
+          #   Less nervous on rough roads.
+          #   Can feel lazy or wander on highways.
+          #
+          # 50+ mph values reduced by 15% to reduce inside curve hugging
+          # and make highway tracking feel more natural and relaxed.
           #
           0.048,  # 0 mph
           0.057,  # 5 mph
@@ -365,19 +374,29 @@ class CarInterface(CarInterfaceBase):
           0.114,  # 35 mph
           0.124,  # 40 mph
           0.133,  # 45 mph
-          0.143,  # 50 mph
-          0.143,  # 55 mph
-          0.143,  # 60 mph
-          0.143,  # 65 mph
-          0.143,  # 70 mph
-          0.143,  # 75 mph
-          0.143,  # 80 mph
+          0.122,  # 50 mph
+          0.122,  # 55 mph
+          0.122,  # 60 mph
+          0.122,  # 65 mph
+          0.122,  # 70 mph
+          0.122,  # 75 mph
+          0.122,  # 80 mph
         ]
 
         stock_cp.lateralTuning.pid.kiV = [ # Controls how strongly the car fights permanent errors over time. (Do you have an alignment problem?)
           #
-          # Higher values: Better at staying perfectly centered, helps correct slow drifting, can create "sticky windup" if too high.
-          # Lower values:  More natural steering feel, less correction buildup, Can slowly drift off-center.
+          # Higher values:
+          #   Better at staying perfectly centered.
+          #   Helps correct slow drifting.
+          #   Can create sticky windup if too high.
+          #
+          # Lower values:
+          #   More natural steering feel.
+          #   Less correction buildup.
+          #   Can slowly drift off-center.
+          #
+          # 50+ mph values reduced by 15% to reduce curve bias
+          # and prevent excessive steering buildup on long sweepers.
           #
           0.000,  # 0 mph
           0.004,  # 5 mph
@@ -389,13 +408,13 @@ class CarInterface(CarInterfaceBase):
           0.038,  # 35 mph
           0.041,  # 40 mph
           0.045,  # 45 mph
-          0.048,  # 50 mph
-          0.048,  # 55 mph
-          0.048,  # 60 mph
-          0.048,  # 65 mph
-          0.048,  # 70 mph
-          0.048,  # 75 mph
-          0.048,  # 80 mph
+          0.041,  # 50 mph
+          0.041,  # 55 mph
+          0.041,  # 60 mph
+          0.041,  # 65 mph
+          0.041,  # 70 mph
+          0.041,  # 75 mph
+          0.041,  # 80 mph
         ]
 
         stock_cp.lateralTuning.pid.kf = 0.0000285 # Predicts what steering will be needed ahead of time.
