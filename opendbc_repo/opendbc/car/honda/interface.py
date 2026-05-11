@@ -355,22 +355,22 @@ class CarInterface(CarInterfaceBase):
           # Higher values: More immediate steering response, Can become twitchy or oscillate if too high.
           # Lower values:  Smoother and calmer steering, Less nervous on rough roads, can feel lazy or wander on highways.
           #
-          0.060,  # 0 mph
-          0.063,  # 5 mph
-          0.065,  # 10 mph
-          0.068,  # 15 mph
-          0.070,  # 20 mph
-          0.073,  # 25 mph
-          0.075,  # 30 mph
-          0.078,  # 35 mph
-          0.080,  # 40 mph
-          0.083,  # 45 mph
-          0.085,  # 50 mph
-          0.088,  # 55 mph
-          0.090,  # 60 mph
-          0.093,  # 65 mph
-          0.095,  # 70 mph
-          0.098,  # 75 mph
+          0.045,  # 0 mph
+          0.050,  # 5 mph
+          0.055,  # 10 mph
+          0.065,  # 15 mph
+          0.075,  # 20 mph
+          0.085,  # 25 mph
+          0.095,  # 30 mph
+          0.105,  # 35 mph
+          0.110,  # 40 mph
+          0.115,  # 45 mph
+          0.120,  # 50 mph
+          0.120,  # 55 mph
+          0.120,  # 60 mph
+          0.115,  # 65 mph
+          0.110,  # 70 mph
+          0.105,  # 75 mph
           0.100,  # 80 mph
         ]
 
@@ -379,26 +379,26 @@ class CarInterface(CarInterfaceBase):
           # Higher values: Better at staying perfectly centered, helps correct slow drifting, can create "sticky windup" if too high.
           # Lower values:  More natural steering feel, less correction buildup, Can slowly drift off-center.
           #
-          0.020,  # 0 mph
-          0.021,  # 5 mph
-          0.022,  # 10 mph
-          0.023,  # 15 mph
-          0.023,  # 20 mph
-          0.024,  # 25 mph
-          0.025,  # 30 mph
-          0.026,  # 35 mph
-          0.027,  # 40 mph
-          0.028,  # 45 mph
-          0.028,  # 50 mph
-          0.029,  # 55 mph
-          0.030,  # 60 mph
-          0.031,  # 65 mph
-          0.032,  # 70 mph
-          0.033,  # 75 mph
+          0.015,  # 0 mph
+          0.017,  # 5 mph
+          0.018,  # 10 mph
+          0.022,  # 15 mph
+          0.025,  # 20 mph
+          0.028,  # 25 mph
+          0.032,  # 30 mph
+          0.035,  # 35 mph
+          0.037,  # 40 mph
+          0.038,  # 45 mph
+          0.040,  # 50 mph
+          0.040,  # 55 mph
+          0.040,  # 60 mph
+          0.038,  # 65 mph
+          0.037,  # 70 mph
+          0.035,  # 75 mph
           0.033,  # 80 mph
         ]
 
-        stock_cp.lateralTuning.pid.kf = 0.00002 # Predicts what steering will be needed ahead of time.
+        stock_cp.lateralTuning.pid.kf = 0.000024 # Predicts what steering will be needed ahead of time.
 
     elif candidate == CAR.HONDA_CIVIC_2022:
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
