@@ -355,10 +355,10 @@ class CarInterface(CarInterfaceBase):
           # Higher values: More immediate steering response, Can become twitchy or oscillate if too high.
           # Lower values:  Smoother and calmer steering, Less nervous on rough roads, can feel lazy or wander on highways.
           #
-          0.024,  # 0 mph
-          0.036,  # 5 mph
-          0.048,  # 10 mph
-          0.072,  # 15 mph
+          0.048,  # 0 mph
+          0.057,  # 5 mph
+          0.067,  # 10 mph
+          0.076,  # 15 mph
           0.086,  # 20 mph
           0.095,  # 25 mph
           0.105,  # 30 mph
@@ -380,8 +380,8 @@ class CarInterface(CarInterfaceBase):
           # Lower values:  More natural steering feel, less correction buildup, Can slowly drift off-center.
           #
           0.000,  # 0 mph
-          0.000,  # 5 mph
-          0.005,  # 10 mph
+          0.004,  # 5 mph
+          0.012,  # 10 mph
           0.026,  # 15 mph
           0.029,  # 20 mph
           0.031,  # 25 mph
