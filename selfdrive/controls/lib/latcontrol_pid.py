@@ -29,7 +29,7 @@ def _pid_output_scale(
   # Center taper is intentionally negative at very low speeds to reduce
   # center twitchiness, then ramps back to the normal positive taper by 50 mph.
   center_taper_low = -0.1764
-  center_taper_high = 0.4
+  center_taper_high = 2.0
   center_taper_speed_weight = min(max(v_ego / (50.0 * 0.44704), 0.0), 1.0)
   center_taper = (center_taper_low + ((center_taper_high - center_taper_low) * center_taper_speed_weight)) * center_taper_scale
 
