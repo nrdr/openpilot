@@ -355,23 +355,23 @@ class CarInterface(CarInterfaceBase):
           # Higher values: More immediate steering response, Can become twitchy or oscillate if too high.
           # Lower values:  Smoother and calmer steering, Less nervous on rough roads, can feel lazy or wander on highways.
           #
-          0.045,  # 0 mph
-          0.043,  # 5 mph
-          0.040,  # 10 mph
-          0.038,  # 15 mph
-          0.035,  # 20 mph
-          0.034,  # 25 mph
-          0.033,  # 30 mph
-          0.032,  # 35 mph
-          0.031,  # 40 mph
-          0.031,  # 45 mph
-          0.030,  # 50 mph
-          0.030,  # 55 mph
-          0.030,  # 60 mph
-          0.030,  # 65 mph
-          0.030,  # 70 mph
-          0.030,  # 75 mph
-          0.030,  # 80 mph
+          0.090,  # 0 mph
+          0.086,  # 5 mph
+          0.080,  # 10 mph
+          0.076,  # 15 mph
+          0.070,  # 20 mph
+          0.068,  # 25 mph
+          0.066,  # 30 mph
+          0.064,  # 35 mph
+          0.062,  # 40 mph
+          0.062,  # 45 mph
+          0.060,  # 50 mph
+          0.060,  # 55 mph
+          0.060,  # 60 mph
+          0.060,  # 65 mph
+          0.060,  # 70 mph
+          0.060,  # 75 mph
+          0.060,  # 80 mph
         ]
 
         stock_cp.lateralTuning.pid.kiV = [ # Controls how strongly the car fights permanent errors over time. (Do you have an alignment problem?)
@@ -380,25 +380,25 @@ class CarInterface(CarInterfaceBase):
           # Lower values:  More natural steering feel, less correction buildup, Can slowly drift off-center
           #
           0.000,  # 0 mph
-          0.003,  # 5 mph
-          0.005,  # 10 mph
-          0.008,  # 15 mph
-          0.010,  # 20 mph
-          0.013,  # 25 mph
-          0.015,  # 30 mph
-          0.017,  # 35 mph
-          0.018,  # 40 mph
-          0.019,  # 45 mph
-          0.020,  # 50 mph
-          0.020,  # 55 mph
-          0.020,  # 60 mph
-          0.020,  # 65 mph
-          0.020,  # 70 mph
-          0.020,  # 75 mph
-          0.020,  # 80 mph
+          0.006,  # 5 mph
+          0.010,  # 10 mph
+          0.016,  # 15 mph
+          0.020,  # 20 mph
+          0.026,  # 25 mph
+          0.030,  # 30 mph
+          0.034,  # 35 mph
+          0.036,  # 40 mph
+          0.038,  # 45 mph
+          0.040,  # 50 mph
+          0.040,  # 55 mph
+          0.040,  # 60 mph
+          0.040,  # 65 mph
+          0.040,  # 70 mph
+          0.040,  # 75 mph
+          0.040,  # 80 mph
         ]
 
-        stock_cp.lateralTuning.pid.kf = 0.000014 # Predicts what steering will be needed ahead of time.
+        stock_cp.lateralTuning.pid.kf = 0.000028 # Predicts what steering will be needed ahead of time.
         # Too much kf can create: sudden steering snaps, overconfident turn-in, oscillation on aggressive tunes.
         # Too little kf can create: lazy steering, delayed turn response, excessive dependence on kp/ki.
 
