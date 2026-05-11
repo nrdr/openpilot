@@ -26,7 +26,13 @@ def _pid_output_scale(
   phase = desired_angle_deg * desired_angle_delta_deg
   is_left = desired_angle_deg > 0.0
 
-  center_taper = 0.4 * center_taper_scale
+  # Center taper is intentionally negative at very low speeds to reduce
+  # center twitchiness, then ramps back to the normal positive taper by 50 mph.
+  center_taper_low = -0.1764
+  center_taper_high = 0.4
+  center_taper_speed_weight = min(max(v_ego / (50.0 * 0.44704), 0.0), 1.0)
+  center_taper = (center_taper_low + ((center_taper_high - center_taper_low) * center_taper_speed_weight)) * center_taper_scale
+
   mid_turn_scale = 0.1200 if is_left else 0.0150
   mid_turn_turn_in_scale = -0.5500 if is_left else -0.0524
   mid_turn_unwind_scale = -0.0743 if is_left else -0.0842
