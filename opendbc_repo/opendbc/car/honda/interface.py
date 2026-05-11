@@ -355,52 +355,50 @@ class CarInterface(CarInterfaceBase):
           # Higher values: More immediate steering response, Can become twitchy or oscillate if too high.
           # Lower values:  Smoother and calmer steering, Less nervous on rough roads, can feel lazy or wander on highways.
           #
-          0.090,  # 0 mph
-          0.086,  # 5 mph
-          0.080,  # 10 mph
-          0.076,  # 15 mph
+          0.060,  # 0 mph
+          0.063,  # 5 mph
+          0.065,  # 10 mph
+          0.068,  # 15 mph
           0.070,  # 20 mph
-          0.068,  # 25 mph
-          0.066,  # 30 mph
-          0.064,  # 35 mph
-          0.062,  # 40 mph
-          0.062,  # 45 mph
-          0.060,  # 50 mph
-          0.060,  # 55 mph
-          0.060,  # 60 mph
-          0.060,  # 65 mph
-          0.060,  # 70 mph
-          0.060,  # 75 mph
-          0.060,  # 80 mph
+          0.073,  # 25 mph
+          0.075,  # 30 mph
+          0.078,  # 35 mph
+          0.080,  # 40 mph
+          0.083,  # 45 mph
+          0.085,  # 50 mph
+          0.088,  # 55 mph
+          0.090,  # 60 mph
+          0.093,  # 65 mph
+          0.095,  # 70 mph
+          0.098,  # 75 mph
+          0.100,  # 80 mph
         ]
 
         stock_cp.lateralTuning.pid.kiV = [ # Controls how strongly the car fights permanent errors over time. (Do you have an alignment problem?)
           #
           # Higher values: Better at staying perfectly centered, helps correct slow drifting, can create "sticky windup" if too high.
-          # Lower values:  More natural steering feel, less correction buildup, Can slowly drift off-center
+          # Lower values:  More natural steering feel, less correction buildup, Can slowly drift off-center.
           #
-          0.000,  # 0 mph
-          0.006,  # 5 mph
-          0.010,  # 10 mph
-          0.016,  # 15 mph
-          0.020,  # 20 mph
-          0.026,  # 25 mph
-          0.030,  # 30 mph
-          0.034,  # 35 mph
-          0.036,  # 40 mph
-          0.038,  # 45 mph
-          0.040,  # 50 mph
-          0.040,  # 55 mph
-          0.040,  # 60 mph
-          0.040,  # 65 mph
-          0.040,  # 70 mph
-          0.040,  # 75 mph
-          0.040,  # 80 mph
+          0.020,  # 0 mph
+          0.021,  # 5 mph
+          0.022,  # 10 mph
+          0.023,  # 15 mph
+          0.023,  # 20 mph
+          0.024,  # 25 mph
+          0.025,  # 30 mph
+          0.026,  # 35 mph
+          0.027,  # 40 mph
+          0.028,  # 45 mph
+          0.028,  # 50 mph
+          0.029,  # 55 mph
+          0.030,  # 60 mph
+          0.031,  # 65 mph
+          0.032,  # 70 mph
+          0.033,  # 75 mph
+          0.033,  # 80 mph
         ]
 
-        stock_cp.lateralTuning.pid.kf = 0.000028 # Predicts what steering will be needed ahead of time.
-        # Too much kf can create: sudden steering snaps, overconfident turn-in, oscillation on aggressive tunes.
-        # Too little kf can create: lazy steering, delayed turn response, excessive dependence on kp/ki.
+        stock_cp.lateralTuning.pid.kf = 0.00002 # Predicts what steering will be needed ahead of time.
 
     elif candidate == CAR.HONDA_CIVIC_2022:
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
