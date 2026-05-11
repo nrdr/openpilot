@@ -104,7 +104,7 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
   sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
   highway = v_ego > 50.0 * CV.MPH_TO_MS
-  low_speed = v_ego < 30.0 * CV.MPH_TO_MS
+  low_speed = v_ego < 20.0 * CV.MPH_TO_MS
 
   if highway:
     if sign_change and torque_delta > 0.20:
@@ -113,13 +113,13 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
 
   if low_speed:
     if torque_delta > 0.50:
-      return 0.05
-    elif torque_delta > 0.20:
-      return 0.06
-    elif torque_delta > 0.05:
-      return 0.07
-    else:
       return 0.1
+    elif torque_delta > 0.20:
+      return 0.12
+    elif torque_delta > 0.05:
+      return 0.14
+    else:
+      return 0.15
 
   if torque_delta > 0.50:
     return 0.05
