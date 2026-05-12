@@ -100,6 +100,10 @@ class LatControlPID(LatControl):
       # Offset does not contribute to resistive torque.
       ff = self.ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
 
+      # Does feedforward negatively impact our low speed output?
+      ff_scale = min(max((CS.vEgo - 12.0 * 0.44704) / (6.0 * 0.44704), 0.0), 1.0)
+      ff *= ff_scale
+
       steering_pressed = CS.steeringPressed
       if self.is_eps_modified:
         self.eps_modified_steering_pressed_filter_s, steering_pressed = get_eps_modified_steering_pressed(
@@ -128,6 +132,11 @@ class LatControlPID(LatControl):
           center_taper_scale = float(self.center_taper_scale.update(1.0))
 
         desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
+
+        # Add back low speed scale
+        low_speed_scale = min(max((CS.vEgo - 0.9) / 4.5, 0.35), 1.0)
+        output_torque *= low_speed_scale
+
         output_torque *= _pid_output_scale(
           angle_steers_des_no_offset,
           desired_angle_delta,

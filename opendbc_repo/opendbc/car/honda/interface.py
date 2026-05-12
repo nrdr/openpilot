@@ -364,23 +364,23 @@ class CarInterface(CarInterfaceBase):
           # 50+ mph values reduced by 15% to reduce inside curve hugging
           # and make highway tracking feel more natural and relaxed.
           #
-          0.048,  # 0 mph
-          0.057,  # 5 mph
-          0.067,  # 10 mph
-          0.076,  # 15 mph
-          0.086,  # 20 mph
-          0.095,  # 25 mph
-          0.105,  # 30 mph
-          0.114,  # 35 mph
-          0.124,  # 40 mph
-          0.133,  # 45 mph
-          0.122,  # 50 mph
-          0.122,  # 55 mph
-          0.122,  # 60 mph
-          0.122,  # 65 mph
-          0.122,  # 70 mph
-          0.122,  # 75 mph
-          0.122,  # 80 mph
+          0.1,  # 0 mph
+          0.1,  # 5 mph
+          0.1,  # 10 mph
+          0.1,  # 15 mph
+          0.1,  # 20 mph
+          0.1,  # 25 mph
+          0.1,  # 30 mph
+          0.1,  # 35 mph
+          0.1,  # 40 mph
+          0.1,  # 45 mph
+          0.1,  # 50 mph
+          0.1,  # 55 mph
+          0.1,  # 60 mph
+          0.1,  # 65 mph
+          0.1,  # 70 mph
+          0.1,  # 75 mph
+          0.1,  # 80 mph
         ]
 
         stock_cp.lateralTuning.pid.kiV = [ # Controls how strongly the car fights permanent errors over time. (Do you have an alignment problem?)
@@ -399,22 +399,22 @@ class CarInterface(CarInterfaceBase):
           # and prevent excessive steering buildup on long sweepers.
           #
           0.000,  # 0 mph
-          0.004,  # 5 mph
-          0.012,  # 10 mph
-          0.026,  # 15 mph
-          0.029,  # 20 mph
-          0.031,  # 25 mph
-          0.035,  # 30 mph
-          0.038,  # 35 mph
-          0.041,  # 40 mph
-          0.045,  # 45 mph
-          0.041,  # 50 mph
-          0.041,  # 55 mph
-          0.041,  # 60 mph
-          0.041,  # 65 mph
-          0.041,  # 70 mph
-          0.041,  # 75 mph
-          0.041,  # 80 mph
+          0.000,  # 5 mph
+          0.000,  # 10 mph
+          0.000,  # 15 mph
+          0.000,  # 20 mph
+          0.005,  # 25 mph
+          0.010,  # 30 mph
+          0.015,  # 35 mph
+          0.020,  # 40 mph
+          0.025,  # 45 mph
+          0.030,  # 50 mph
+          0.035,  # 55 mph
+          0.040,  # 60 mph
+          0.040,  # 65 mph
+          0.040,  # 70 mph
+          0.040,  # 75 mph
+          0.040,  # 80 mph
         ]
 
         stock_cp.lateralTuning.pid.kf = 0.0000285 # Predicts what steering will be needed ahead of time.
