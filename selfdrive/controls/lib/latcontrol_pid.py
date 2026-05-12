@@ -119,7 +119,7 @@ class LatControlPID(LatControl):
       # Offset does not contribute to resistive torque.
       ff = self.ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
 
-      ff_scale = min(max((CS.vEgo - 20.0 * 0.44704) / (10.0 * 0.44704), 0.5), 1.0)
+      ff_scale = min(max((CS.vEgo - 20.0 * 0.44704) / (10.0 * 0.44704), 4.0), 1.0)
       ff *= ff_scale
 
       steering_pressed = CS.steeringPressed
