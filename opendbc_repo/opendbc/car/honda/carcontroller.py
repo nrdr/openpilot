@@ -112,13 +112,13 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
 
   if low_speed:
     if torque_delta > 0.50:
-      return 0.02
+      return 0.12
     elif torque_delta > 0.20:
-      return 0.04
+      return 0.14
     elif torque_delta > 0.05:
-      return 0.06
+      return 0.16
     else:
-      return 0.1
+      return 0.18
 
   if torque_delta > 0.50:
     return 0.05
