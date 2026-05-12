@@ -143,9 +143,6 @@ class LatControlPID(LatControl):
 
         desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
 
-        low_speed_scale = min(max((CS.vEgo - 0.9) / 4.5, 0.35), 1.0)
-        output_torque *= low_speed_scale
-
         output_torque *= _pid_output_scale(
           angle_steers_des_no_offset,
           desired_angle_delta,
