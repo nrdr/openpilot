@@ -116,11 +116,22 @@ class LatControlPID(LatControl):
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
 
     else:
+      desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
+      phase = angle_steers_des_no_offset * desired_angle_delta
+
       # Offset does not contribute to resistive torque.
       ff = self.ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
 
-      ff_scale = min(max((CS.vEgo - 20.0 * 0.44704) / (10.0 * 0.44704), 4.0), 1.0)
-      ff *= ff_scale
+      if CS.vEgo < 15.0 * 0.44704:
+        if phase > 0.2:
+          ff *= 0.25
+        elif phase < -0.2:
+          ff *= 4.0
+        else:
+          ff *= 0.25
+      else:
+        ff_scale = min(max((CS.vEgo - 20.0 * 0.44704) / (10.0 * 0.44704), 0.25), 1.0)
+        ff *= ff_scale
 
       steering_pressed = CS.steeringPressed
       if self.is_eps_modified:
@@ -148,8 +159,6 @@ class LatControlPID(LatControl):
           center_taper_scale = 0.0
         else:
           center_taper_scale = float(self.center_taper_scale.update(1.0))
-
-        desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
 
         output_torque *= _pid_output_scale(
           angle_steers_des_no_offset,
