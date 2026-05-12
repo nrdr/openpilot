@@ -1,6 +1,7 @@
 import math
 
 from cereal import log
+from opendbc.car.honda.values import CAR
 from opendbc.car.honda.carcontroller import get_eps_modified_steering_pressed
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
@@ -11,11 +12,21 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 CENTER_TAPER_FADE_TAU = 0.25
 
 
+def _center_taper_high(car_fingerprint) -> float:
+  if car_fingerprint in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
+    return 0.6
+  if car_fingerprint == CAR.HONDA_CLARITY:
+    return 1.2
+
+  return 0.5
+
+
 def _pid_output_scale(
   desired_angle_deg: float,
   desired_angle_delta_deg: float,
   v_ego: float,
   center_taper_scale: float = 1.0,
+  center_taper_high: float = 2.0,
 ) -> float:
   abs_angle = abs(desired_angle_deg)
   speed_weight = min(max((v_ego - 4.0) / 10.0, 0.0), 1.0)
@@ -27,9 +38,8 @@ def _pid_output_scale(
   is_left = desired_angle_deg > 0.0
 
   # Center taper is intentionally negative at very low speeds to reduce
-  # center twitchiness, then ramps back to the normal positive taper by 50 mph.
+  # center twitchiness, then ramps back to the vehicle-specific positive taper by 50 mph.
   center_taper_low = -0.1764
-  center_taper_high = 2.0
   center_taper_speed_weight = min(max(v_ego / (50.0 * 0.44704), 0.0), 1.0)
   center_taper = (center_taper_low + ((center_taper_high - center_taper_low) * center_taper_speed_weight)) * center_taper_scale
 
@@ -67,6 +77,7 @@ class LatControlPID(LatControl):
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
 
     self.is_eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
+    self.center_taper_high = _center_taper_high(CP.carFingerprint)
 
     self.eps_modified_steering_pressed_filter_s = 0.0
     self.eps_modified_steering_pressed_prev = False
@@ -100,7 +111,6 @@ class LatControlPID(LatControl):
       # Offset does not contribute to resistive torque.
       ff = self.ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
 
-      # Does feedforward negatively impact our low speed output?
       ff_scale = min(max((CS.vEgo - 12.0 * 0.44704) / (6.0 * 0.44704), 0.0), 1.0)
       ff *= ff_scale
 
@@ -133,7 +143,6 @@ class LatControlPID(LatControl):
 
         desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
 
-        # Add back low speed scale
         low_speed_scale = min(max((CS.vEgo - 0.9) / 4.5, 0.35), 1.0)
         output_torque *= low_speed_scale
 
@@ -142,6 +151,7 @@ class LatControlPID(LatControl):
           desired_angle_delta,
           CS.vEgo,
           center_taper_scale,
+          self.center_taper_high,
         )
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
 
