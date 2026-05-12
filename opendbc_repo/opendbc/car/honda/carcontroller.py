@@ -20,9 +20,6 @@ LongCtrlState = structs.CarControl.Actuators.LongControlState
 
 _BRAKE_MODIFIER = 0.0
 
-DRIVER_OVERRIDE_HOLD_S = 0.4
-DRIVER_OVERRIDE_BLINKER_HOLD_S = 1.2
-
 
 def compute_gb_honda_bosch(accel, speed):
   return 0.0, 0.0
@@ -132,7 +129,6 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   else:
     return 0.1
 
-
 def get_eps_modified_steering_pressed(raw_pressed: bool, steering_torque: float, torque_cmd: float,
                                       filter_s: float, was_pressed: bool) -> tuple[float, bool]:
   torque_product = steering_torque * torque_cmd
@@ -196,7 +192,6 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.torque_lpf = 0.0
     self.prev_torque_cmd = 0.0
     self.driver_override_lkas_inactive = False
-    self.driver_override_lkas_inactive_until = 0.0
 
     # EPS-modified steering override filter. Raw Honda steeringPressed can false-trigger
     # during high-assist/high-angle turns because the EPS torque sensor sees a short
@@ -286,20 +281,9 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       # The LPF is forced on during normal lateral control, but driver override
       # still disables LKAS torque instead of making the EPS fight the driver.
       steering_pressed = self._filtered_steering_pressed(CS, torque_cmd) if self.eps_modified else bool(CS.out.steeringPressed)
-
-      now_s = now_nanos * 1e-9
-      blinker_on = bool(CS.out.leftBlinker or CS.out.rightBlinker)
-      override_hold_s = DRIVER_OVERRIDE_BLINKER_HOLD_S if blinker_on else DRIVER_OVERRIDE_HOLD_S
+      self.driver_override_lkas_inactive = steering_pressed
 
       if steering_pressed:
-        self.driver_override_lkas_inactive_until = max(
-          self.driver_override_lkas_inactive_until,
-          now_s + override_hold_s,
-        )
-
-      self.driver_override_lkas_inactive = steering_pressed or now_s < self.driver_override_lkas_inactive_until
-
-      if self.driver_override_lkas_inactive:
         self.torque_lpf = 0.0
         self.prev_torque_cmd = 0.0
         torque_cmd = 0.0
@@ -317,7 +301,6 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       self.steering_pressed_filter_s = 0.0
       self.steering_pressed_robust_prev = False
       self.driver_override_lkas_inactive = False
-      self.driver_override_lkas_inactive_until = 0.0
 
     limited_torque = rate_limit(
       torque_cmd,
