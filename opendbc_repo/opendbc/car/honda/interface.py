@@ -446,43 +446,43 @@ class CarInterface(CarInterfaceBase):
       stock_cp.lateralTuning.pid.kiBP = stock_cp.lateralTuning.pid.kpBP
 
       stock_cp.lateralTuning.pid.kpV = [
-        0.050,  # 0 mph
-        0.050,  # 5 mph
-        0.050,  # 10 mph
-        0.050,  # 15 mph
-        0.050,  # 20 mph
-        0.050,  # 25 mph
-        0.050,  # 30 mph
-        0.050,  # 35 mph
-        0.050,  # 40 mph
-        0.050,  # 45 mph
-        0.050,  # 50 mph
-        0.050,  # 55 mph
-        0.050,  # 60 mph
-        0.050,  # 65 mph
-        0.050,  # 70 mph
-        0.050,  # 75 mph
-        0.050,  # 80 mph
+        0.024,   # 0 mph
+        0.0285,  # 5 mph
+        0.0335,  # 10 mph
+        0.038,   # 15 mph
+        0.043,   # 20 mph
+        0.0475,  # 25 mph
+        0.0525,  # 30 mph
+        0.057,   # 35 mph
+        0.062,   # 40 mph
+        0.0665,  # 45 mph
+        0.061,   # 50 mph
+        0.061,   # 55 mph
+        0.061,   # 60 mph
+        0.061,   # 65 mph
+        0.061,   # 70 mph
+        0.061,   # 75 mph
+        0.061,   # 80 mph
       ]
 
       stock_cp.lateralTuning.pid.kiV = [
         0.0000,  # 0 mph
-        0.0000,  # 5 mph
-        0.0000,  # 10 mph
-        0.0000,  # 15 mph
-        0.0000,  # 20 mph
-        0.0025,  # 25 mph
-        0.0050,  # 30 mph
-        0.0075,  # 35 mph
-        0.0100,  # 40 mph
-        0.0125,  # 45 mph
-        0.0150,  # 50 mph
-        0.0175,  # 55 mph
-        0.0200,  # 60 mph
-        0.0200,  # 65 mph
-        0.0200,  # 70 mph
-        0.0200,  # 75 mph
-        0.0200,  # 80 mph
+        0.0040,  # 5 mph
+        0.0060,  # 10 mph
+        0.0130,  # 15 mph
+        0.0145,  # 20 mph
+        0.0155,  # 25 mph
+        0.0175,  # 30 mph
+        0.0190,  # 35 mph
+        0.0205,  # 40 mph
+        0.0225,  # 45 mph
+        0.0205,  # 50 mph
+        0.0205,  # 55 mph
+        0.0205,  # 60 mph
+        0.0205,  # 65 mph
+        0.0205,  # 70 mph
+        0.0205,  # 75 mph
+        0.0205,  # 80 mph
       ]
 
       stock_cp.lateralTuning.pid.kf = 0.00001425
