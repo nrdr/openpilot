@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from openpilot.common.params import Params
 
 from opendbc.can import CANPacker
 from opendbc.car import ACCELERATION_DUE_TO_GRAVITY, Bus, DT_CTRL, rate_limit, make_tester_present_msg, structs
@@ -182,11 +183,10 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.last_torque = 0.0
     self.bosch_last_gas = 0
 
-    self.gasfactor = 1.0
-    self.gasfactor_before_maxgas = 1.0
-    self.windfactor = 1.0
-    self.windfactor_before_maxgas = 1.0
-    self.windfactor_before_brake = 0.0
+    self.gasfactor = 1.0 if (Params().get("HondaGasFactorParams") is None) else Params().get("HondaGasFactorParams")
+    self.gasfactor_before_maxgas = self.gasfactor
+    self.windfactor = 1.0 if (Params().get("HondaWindFactorParams") is None) else Params().get("HondaWindFactorParams")
+    self.windfactor_before_maxgas = self.windfactor_before_brake = self.windfactor
     self.pitch = 0.0
 
     self.torque_lpf = 0.0
@@ -523,6 +523,10 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
     new_actuators.torque = float(self.last_torque)
     new_actuators.torqueOutputCan = apply_torque
+
+    if self.frame % 6000 == 0:
+      Params().put_nonblocking("HondaGasFactorParams", float(self.gasfactor))
+      Params().put_nonblocking("HondaWindFactorParams", float(self.windfactor))
 
     self.frame += 1
     return new_actuators, can_sends
