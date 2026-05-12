@@ -37,6 +37,11 @@ def _pid_output_scale(
   phase = desired_angle_deg * desired_angle_delta_deg
   is_left = desired_angle_deg > 0.0
 
+  # At very low speeds, steering angle changes more slowly during unwind,
+  # which can delay phase detection and cause late steering release.
+  low_speed_unwind_weight = min(max(1.0 - (v_ego / (15.0 * 0.44704)), 0.0), 1.0)
+  unwind_phase_threshold = -0.2 + (0.17 * low_speed_unwind_weight)
+
   # Center taper is intentionally negative at very low speeds to reduce
   # center twitchiness, then ramps back to the vehicle-specific positive taper by 50 mph.
   center_taper_low = -0.1764
@@ -57,7 +62,7 @@ def _pid_output_scale(
   if phase > 0.2:
     scale += speed_weight * mid_turn_weight * mid_turn_turn_in_scale
     scale += speed_weight * angle_weight * turn_in_scale
-  elif phase < -0.2:
+  elif phase < unwind_phase_threshold:
     scale += speed_weight * mid_turn_weight * mid_turn_unwind_scale
     scale -= speed_weight * angle_weight * unwind_scale
 
