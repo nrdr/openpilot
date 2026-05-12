@@ -365,12 +365,12 @@ class CarInterface(CarInterfaceBase):
           # 50+ mph values reduced by 15% to reduce inside curve hugging
           # and make highway tracking feel more natural and relaxed.
           #
-          0.048,  # 0 mph
-          0.057,  # 5 mph
-          0.067,  # 10 mph
-          0.076,  # 15 mph
-          0.086,  # 20 mph
-          0.095,  # 25 mph
+          0.011,  # 0 mph
+          0.022,  # 5 mph
+          0.033,  # 10 mph
+          0.044,  # 15 mph
+          0.055,  # 20 mph
+          0.075,  # 25 mph
           0.105,  # 30 mph
           0.114,  # 35 mph
           0.124,  # 40 mph
@@ -396,19 +396,16 @@ class CarInterface(CarInterfaceBase):
           #   Less correction buildup.
           #   Can slowly drift off-center.
           #
-          # 50+ mph values reduced by 15% to reduce curve bias
-          # and prevent excessive steering buildup on long sweepers.
-          #
-          0.000,  # 0 mph
-          0.008,  # 5 mph
-          0.012,  # 10 mph
-          0.026,  # 15 mph
-          0.029,  # 20 mph
-          0.031,  # 25 mph
+          0.000,  # 0 mph - intentionally reduced to avoid intersection windup
+          0.007,  # 5 mph - intentionally reduced to avoid intersection windup
+          0.011,  # 10 mph
+          0.015,  # 15 mph
+          0.018,  # 20 mph
+          0.025,  # 25 mph
           0.035,  # 30 mph
           0.038,  # 35 mph
           0.041,  # 40 mph
-          0.045,  # 45 mph
+          0.044,  # 45 mph
           0.041,  # 50 mph
           0.041,  # 55 mph
           0.041,  # 60 mph
@@ -418,7 +415,7 @@ class CarInterface(CarInterfaceBase):
           0.041,  # 80 mph
         ]
 
-        stock_cp.lateralTuning.pid.kf = 0.0000285 # Predicts what steering will be needed ahead of time.
+        stock_cp.lateralTuning.pid.kf = 0.0000244 # Predicts what steering will be needed ahead of time.
 
     elif candidate == CAR.HONDA_CIVIC_2022:
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
