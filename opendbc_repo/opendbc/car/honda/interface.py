@@ -443,14 +443,14 @@ class CarInterface(CarInterfaceBase):
       stock_cp.lateralTuning.pid.kiBP = stock_cp.lateralTuning.pid.kpBP
 
       stock_cp.lateralTuning.pid.kpV = [
-        0.06,   # 0 mph
-        0.06,   # 5 mph
-        0.06,   # 10 mph
-        0.06,   # 15 mph
-        0.06,   # 20 mph
-        0.06,   # 25 mph
-        0.06,   # 30 mph
-        0.06,   # 35 mph
+        0.04,   # 0 mph
+        0.04,   # 5 mph
+        0.04,   # 10 mph
+        0.04,   # 15 mph
+        0.04,   # 20 mph
+        0.04,   # 25 mph
+        0.04,   # 30 mph
+        0.05,   # 35 mph
         0.06,   # 40 mph
         0.06,   # 45 mph
         0.06,   # 50 mph
