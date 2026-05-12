@@ -365,23 +365,23 @@ class CarInterface(CarInterfaceBase):
           # 50+ mph values reduced by 15% to reduce inside curve hugging
           # and make highway tracking feel more natural and relaxed.
           #
-          0.011,  # 0 mph
-          0.022,  # 5 mph
-          0.033,  # 10 mph
-          0.044,  # 15 mph
-          0.055,  # 20 mph
-          0.075,  # 25 mph
-          0.105,  # 30 mph
-          0.114,  # 35 mph
-          0.124,  # 40 mph
-          0.133,  # 45 mph
-          0.122,  # 50 mph
-          0.122,  # 55 mph
-          0.122,  # 60 mph
-          0.122,  # 65 mph
-          0.122,  # 70 mph
-          0.122,  # 75 mph
-          0.122,  # 80 mph
+          0.06,  # 0 mph
+          0.06,  # 5 mph
+          0.06,  # 10 mph
+          0.06,  # 15 mph
+          0.06,  # 20 mph
+          0.06,  # 25 mph
+          0.06,  # 30 mph
+          0.06,  # 35 mph
+          0.12,  # 40 mph
+          0.12,  # 45 mph
+          0.12,  # 50 mph
+          0.12,  # 55 mph
+          0.12,  # 60 mph
+          0.12,  # 65 mph
+          0.12,  # 70 mph
+          0.12,  # 75 mph
+          0.12,  # 80 mph
         ]
 
         stock_cp.lateralTuning.pid.kiV = [ # Controls how strongly the car fights permanent errors over time. (Do you have an alignment problem?)
@@ -396,26 +396,26 @@ class CarInterface(CarInterfaceBase):
           #   Less correction buildup.
           #   Can slowly drift off-center.
           #
-          0.000,  # 0 mph - intentionally reduced to avoid intersection windup
-          0.007,  # 5 mph - intentionally reduced to avoid intersection windup
-          0.011,  # 10 mph
-          0.015,  # 15 mph
-          0.018,  # 20 mph
-          0.025,  # 25 mph
-          0.035,  # 30 mph
-          0.038,  # 35 mph
-          0.041,  # 40 mph
-          0.044,  # 45 mph
-          0.041,  # 50 mph
-          0.041,  # 55 mph
-          0.041,  # 60 mph
-          0.041,  # 65 mph
-          0.041,  # 70 mph
-          0.041,  # 75 mph
-          0.041,  # 80 mph
+          0.00,  # 0 mph
+          0.00,  # 5 mph
+          0.00,  # 10 mph
+          0.02,  # 15 mph
+          0.02,  # 20 mph
+          0.02,  # 25 mph
+          0.02,  # 30 mph
+          0.02,  # 35 mph
+          0.04,  # 40 mph
+          0.04,  # 45 mph
+          0.04,  # 50 mph
+          0.04,  # 55 mph
+          0.04,  # 60 mph
+          0.04,  # 65 mph
+          0.04,  # 70 mph
+          0.04,  # 75 mph
+          0.04,  # 80 mph
         ]
 
-        stock_cp.lateralTuning.pid.kf = 0.0000244 # Predicts what steering will be needed ahead of time.
+        stock_cp.lateralTuning.pid.kf = 0.000024 # Predicts what steering will be needed ahead of time.
 
     elif candidate == CAR.HONDA_CIVIC_2022:
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
@@ -443,46 +443,46 @@ class CarInterface(CarInterfaceBase):
       stock_cp.lateralTuning.pid.kiBP = stock_cp.lateralTuning.pid.kpBP
 
       stock_cp.lateralTuning.pid.kpV = [
-        0.024,   # 0 mph
-        0.0285,  # 5 mph
-        0.0335,  # 10 mph
-        0.038,   # 15 mph
-        0.043,   # 20 mph
-        0.0475,  # 25 mph
-        0.0525,  # 30 mph
-        0.057,   # 35 mph
-        0.062,   # 40 mph
-        0.0665,  # 45 mph
-        0.061,   # 50 mph
-        0.061,   # 55 mph
-        0.061,   # 60 mph
-        0.061,   # 65 mph
-        0.061,   # 70 mph
-        0.061,   # 75 mph
-        0.061,   # 80 mph
+        0.03,   # 0 mph
+        0.03,   # 5 mph
+        0.03,   # 10 mph
+        0.03,   # 15 mph
+        0.03,   # 20 mph
+        0.03,   # 25 mph
+        0.03,   # 30 mph
+        0.06,   # 35 mph
+        0.06,   # 40 mph
+        0.06,   # 45 mph
+        0.06,   # 50 mph
+        0.06,   # 55 mph
+        0.06,   # 60 mph
+        0.06,   # 65 mph
+        0.06,   # 70 mph
+        0.06,   # 75 mph
+        0.06,   # 80 mph
       ]
 
       stock_cp.lateralTuning.pid.kiV = [
-        0.0000,  # 0 mph
-        0.0040,  # 5 mph
-        0.0060,  # 10 mph
-        0.0130,  # 15 mph
-        0.0145,  # 20 mph
-        0.0155,  # 25 mph
-        0.0175,  # 30 mph
-        0.0190,  # 35 mph
-        0.0205,  # 40 mph
-        0.0225,  # 45 mph
-        0.0205,  # 50 mph
-        0.0205,  # 55 mph
-        0.0205,  # 60 mph
-        0.0205,  # 65 mph
-        0.0205,  # 70 mph
-        0.0205,  # 75 mph
-        0.0205,  # 80 mph
+        0.00,  # 0 mph
+        0.00,  # 5 mph
+        0.00,  # 10 mph
+        0.01,  # 15 mph
+        0.01,  # 20 mph
+        0.01,  # 25 mph
+        0.01,  # 30 mph
+        0.01,  # 35 mph
+        0.02,  # 40 mph
+        0.02,  # 45 mph
+        0.02,  # 50 mph
+        0.02,  # 55 mph
+        0.02,  # 60 mph
+        0.02,  # 65 mph
+        0.02,  # 70 mph
+        0.02,  # 75 mph
+        0.02,  # 80 mph
       ]
 
-      stock_cp.lateralTuning.pid.kf = 0.00001425
+      stock_cp.lateralTuning.pid.kf = 0.000012
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
       stock_cp.autoResumeSng = True
