@@ -196,9 +196,9 @@ class CAR(Platforms):
   HONDA_CIVIC_BOSCH = HondaBoschPlatformConfig(
     [
       HondaCarDocs("Honda Civic 2019-21", "All", video="https://www.youtube.com/watch?v=4Iz1Mz5LGF8",
-                   footnotes=[Footnote.CIVIC_DIESEL], min_steer_speed=2. * CV.MPH_TO_MS),
-      HondaCarDocs("Honda Civic Hatchback 2017-18", min_steer_speed=12. * CV.MPH_TO_MS),
-      HondaCarDocs("Honda Civic Hatchback 2019-21", "All", min_steer_speed=12. * CV.MPH_TO_MS),
+                   footnotes=[Footnote.CIVIC_DIESEL], min_steer_speed=0. * CV.MPH_TO_MS),
+      HondaCarDocs("Honda Civic Hatchback 2017-18", min_steer_speed=0. * CV.MPH_TO_MS),
+      HondaCarDocs("Honda Civic Hatchback 2019-21", "All", min_steer_speed=0. * CV.MPH_TO_MS),
     ],
     CarSpecs(mass=1326, wheelbase=2.7, steerRatio=15.38, centerToFrontRatio=0.4),  # steerRatio: 10.93 is end-to-end spec
     {Bus.pt: 'honda_civic_hatchback_ex_2017_can_generated'},
@@ -437,7 +437,7 @@ class CAR(Platforms):
     flags=HondaFlags.NIDEC_ALT_SCM_MESSAGES | HondaFlags.HAS_ALL_DOOR_STATES,
   )
   HONDA_CLARITY = HondaNidecPlatformConfig(
-    [HondaCarDocs("Honda Clarity 2018-21", min_steer_speed=12. * CV.MPH_TO_MS)],
+    [HondaCarDocs("Honda Clarity 2018-21", min_steer_speed=0. * CV.MPH_TO_MS)],
     CarSpecs(mass=4052, wheelbase=2.75, centerToFrontRatio=0.41, steerRatio=16.50, tireStiffnessFactor=1.),
     radar_dbc_dict('honda_clarity_hybrid_2018_can_generated'),
     flags=HondaFlags.HAS_ALL_DOOR_STATES,

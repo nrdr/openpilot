@@ -343,6 +343,7 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
+        stock_cp.minSteerSpeed = -1.
         stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 4096], [0, 4096]] # TODO: Verify this is stable
 
         # Modified EPS tuning playground. Watch this video to tune: https://youtu.be/4Y7zG48uHRo
@@ -439,10 +440,52 @@ class CarInterface(CarInterfaceBase):
     elif candidate == CAR.HONDA_CLARITY:
       stock_cp.autoResumeSng = True
       stock_cp.minEnableSpeed = -1
+      stock_cp.minSteerSpeed = -1.
       stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
-      stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0., 8.940, 22.352], [0.045, 0.035, 0.030]] # 0/20/50mph
-      stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0., 8.940, 22.352], [0.000, 0.010, 0.020]] # 0/20/50mph
-      stock_cp.lateralTuning.pid.kf = 0.000014
+      stock_cp.lateralTuning.pid.kpBP = [0.000, 2.235, 4.470, 6.706, 8.941, 11.176, 13.411, 15.646, 17.882, 20.117, 22.352, 24.587, 26.822, 29.058, 31.293, 33.528, 35.763]
+      stock_cp.lateralTuning.pid.kiBP = stock_cp.lateralTuning.pid.kpBP
+
+      stock_cp.lateralTuning.pid.kpV = [
+        0.050,  # 0 mph
+        0.050,  # 5 mph
+        0.050,  # 10 mph
+        0.050,  # 15 mph
+        0.050,  # 20 mph
+        0.050,  # 25 mph
+        0.050,  # 30 mph
+        0.050,  # 35 mph
+        0.050,  # 40 mph
+        0.050,  # 45 mph
+        0.050,  # 50 mph
+        0.050,  # 55 mph
+        0.050,  # 60 mph
+        0.050,  # 65 mph
+        0.050,  # 70 mph
+        0.050,  # 75 mph
+        0.050,  # 80 mph
+      ]
+
+      stock_cp.lateralTuning.pid.kiV = [
+        0.0000,  # 0 mph
+        0.0000,  # 5 mph
+        0.0000,  # 10 mph
+        0.0000,  # 15 mph
+        0.0000,  # 20 mph
+        0.0025,  # 25 mph
+        0.0050,  # 30 mph
+        0.0075,  # 35 mph
+        0.0100,  # 40 mph
+        0.0125,  # 45 mph
+        0.0150,  # 50 mph
+        0.0175,  # 55 mph
+        0.0200,  # 60 mph
+        0.0200,  # 65 mph
+        0.0200,  # 70 mph
+        0.0200,  # 75 mph
+        0.0200,  # 80 mph
+      ]
+
+      stock_cp.lateralTuning.pid.kf = 0.00001425
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
       stock_cp.autoResumeSng = True
