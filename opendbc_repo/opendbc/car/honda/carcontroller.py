@@ -100,25 +100,6 @@ def process_hud_alert(hud_alert):
   return alert_fcw, alert_steer_required
 
 
-
-def _smooth_low_speed_micro_torque(torque_cmd: float, prev_torque_cmd: float) -> float:
-  torque_delta = float(torque_cmd) - float(prev_torque_cmd)
-  sign_change = float(torque_cmd) * float(prev_torque_cmd) < 0.0
-  unwinding = abs(float(torque_cmd)) < abs(float(prev_torque_cmd))
-
-  # Preserve fast unwind and direction changes while damping tiny same-direction
-  # low-speed EPS chatter. This replaces the low-speed LPF path only.
-  if sign_change or unwinding:
-    return float(torque_cmd)
-
-  if abs(torque_delta) < 0.015:
-    return float(prev_torque_cmd) + torque_delta * 0.25
-
-  if abs(torque_delta) < 0.035:
-    return float(prev_torque_cmd) + torque_delta * 0.60
-
-  return float(torque_cmd)
-
 def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> float:
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
   sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
@@ -307,17 +288,12 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         self.prev_torque_cmd = 0.0
         torque_cmd = 0.0
       else:
-        if CS.out.vEgo < 20.0 * CV.MPH_TO_MS:
-          torque_cmd = _smooth_low_speed_micro_torque(torque_cmd, self.prev_torque_cmd)
-          self.torque_lpf = float(torque_cmd)
-          self.prev_torque_cmd = float(torque_cmd)
-        else:
-          tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
-          alpha = DT_CTRL / (tau + DT_CTRL)
+        tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
+        alpha = DT_CTRL / (tau + DT_CTRL)
 
-          self.torque_lpf = alpha * float(torque_cmd) + (1.0 - alpha) * self.torque_lpf
-          self.prev_torque_cmd = float(torque_cmd)
-          torque_cmd = self.torque_lpf
+        self.torque_lpf = alpha * float(torque_cmd) + (1.0 - alpha) * self.torque_lpf
+        self.prev_torque_cmd = float(torque_cmd)
+        torque_cmd = self.torque_lpf
     else:
       self.torque_lpf = 0.0
       self.prev_torque_cmd = 0.0
