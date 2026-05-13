@@ -118,6 +118,31 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   else:
     return 0.15
 
+def get_eps_modified_steering_pressed(raw_pressed: bool, steering_torque: float, torque_cmd: float,
+                                      filter_s: float, was_pressed: bool) -> tuple[float, bool]:
+  torque_product = steering_torque * torque_cmd
+  torque_cmd_abs = abs(torque_cmd)
+
+  if raw_pressed:
+    if torque_product < 0.0:
+      trigger_s = 0.08 if was_pressed else 0.10
+      rise_rate = 1.0
+    elif torque_cmd_abs < 0.10:
+      trigger_s = 0.20 if was_pressed else 0.24
+      rise_rate = 0.75
+    else:
+      trigger_s = 0.70 if was_pressed else 0.80
+      rise_rate = 0.50
+
+    filter_s = min(1.0, filter_s + (rise_rate * DT_CTRL))
+    steering_pressed = filter_s >= trigger_s
+  else:
+    filter_s = max(0.0, filter_s - 8.0 * DT_CTRL)
+    steering_pressed = filter_s > 0.04 and was_pressed
+
+  return filter_s, steering_pressed
+
+
 class CarController(CarControllerBase, MadsCarController, GasInterceptorCarController, IntelligentCruiseButtonManagementInterface):
   def __init__(self, dbc_names, CP, CP_SP):
     CarControllerBase.__init__(self, dbc_names, CP, CP_SP)
