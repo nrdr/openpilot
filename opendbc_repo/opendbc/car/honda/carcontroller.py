@@ -242,22 +242,31 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.steering_pressed_robust_prev = steering_pressed
     return steering_pressed
 
-  def _low_speed_cooperative_override(self, CS, torque_cmd: float) -> float:
-    driver_torque = float(getattr(CS.out, "steeringTorque", 0.0))
+def _low_speed_cooperative_override(self, CS, torque_cmd: float) -> float:
+  driver_torque = float(getattr(CS.out, "steeringTorque", 0.0))
 
-    if abs(driver_torque) < LOW_SPEED_COOP_DRIVER_DEADZONE:
-      self.driver_steer_dir = 0.0
-      return 0.0
+  # Deadzone
+  if abs(driver_torque) < LOW_SPEED_COOP_DRIVER_DEADZONE:
+    self.driver_steer_dir = 0.0
+    return 0.0
 
-    self.driver_steer_dir = float(np.sign(driver_torque))
+  driver_dir = float(np.sign(driver_torque))
+  self.driver_steer_dir = driver_dir
 
-    driver_assist = float(np.clip(driver_torque * LOW_SPEED_COOP_ASSIST_GAIN,
-                                  -LOW_SPEED_COOP_ASSIST_CAP,
-                                  LOW_SPEED_COOP_ASSIST_CAP))
+  if driver_torque * torque_cmd < 0.0:
+    op_component = 0.0
+  else:
+    # If same direction → KEEP some OP torque
+    op_component = torque_cmd * 0.5
 
-    # Once the driver is making a meaningful low-speed input, fully remove OP
-    # path-following torque. Only the capped same-direction cooperative assist remains.
-    return driver_assist
+  # Stronger assist
+  driver_assist = float(np.clip(
+    driver_torque * LOW_SPEED_COOP_ASSIST_GAIN,
+    -LOW_SPEED_COOP_ASSIST_CAP,
+    LOW_SPEED_COOP_ASSIST_CAP
+  ))
+
+  return op_component + driver_assist
 
   def update(self, CC, CC_SP, CS, now_nanos):
     MadsCarController.update(self, self.CP, CC, CC_SP)
