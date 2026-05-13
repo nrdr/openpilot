@@ -269,15 +269,6 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
     return op_component + driver_assist
 
-  # Stronger assist
-  driver_assist = float(np.clip(
-    driver_torque * LOW_SPEED_COOP_ASSIST_GAIN,
-    -LOW_SPEED_COOP_ASSIST_CAP,
-    LOW_SPEED_COOP_ASSIST_CAP
-  ))
-
-  return op_component + driver_assist
-
   def update(self, CC, CC_SP, CS, now_nanos):
     MadsCarController.update(self, self.CP, CC, CC_SP)
     gas_pedal_force = 0.0
