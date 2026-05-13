@@ -21,9 +21,9 @@ LongCtrlState = structs.CarControl.Actuators.LongControlState
 _BRAKE_MODIFIER = 0.0
 
 LOW_SPEED_COOP_MAX = 25.0 * CV.MPH_TO_MS
-LOW_SPEED_COOP_ASSIST_CAP = 0.06
-LOW_SPEED_COOP_ASSIST_GAIN = 0.002
-LOW_SPEED_COOP_OP_FADE = 0.10
+LOW_SPEED_COOP_DRIVER_DEADZONE = 0.05
+LOW_SPEED_COOP_ASSIST_CAP = 0.12
+LOW_SPEED_COOP_ASSIST_GAIN = 0.004
 
 
 def compute_gb_honda_bosch(accel, speed):
@@ -245,18 +245,19 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
   def _low_speed_cooperative_override(self, CS, torque_cmd: float) -> float:
     driver_torque = float(getattr(CS.out, "steeringTorque", 0.0))
 
-    if abs(driver_torque) > 0.05:
-      self.driver_steer_dir = float(np.sign(driver_torque))
-    else:
+    if abs(driver_torque) < LOW_SPEED_COOP_DRIVER_DEADZONE:
       self.driver_steer_dir = 0.0
+      return 0.0
+
+    self.driver_steer_dir = float(np.sign(driver_torque))
 
     driver_assist = float(np.clip(driver_torque * LOW_SPEED_COOP_ASSIST_GAIN,
                                   -LOW_SPEED_COOP_ASSIST_CAP,
                                   LOW_SPEED_COOP_ASSIST_CAP))
 
-    # Keep a small amount of OP torque for continuity, but mostly unload the rack
-    # so the EPS does not fight the driver's low-speed steering input.
-    return float(torque_cmd) * LOW_SPEED_COOP_OP_FADE + driver_assist
+    # Once the driver is making a meaningful low-speed input, fully remove OP
+    # path-following torque. Only the capped same-direction cooperative assist remains.
+    return driver_assist
 
   def update(self, CC, CC_SP, CS, now_nanos):
     MadsCarController.update(self, self.CP, CC, CC_SP)
@@ -290,8 +291,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
     if CC.latActive:
       # Keep driver override behavior separate from the torque LPF.
-      # The LPF is forced on during normal lateral control, but driver override
-      # still disables LKAS torque at higher speeds instead of making the EPS fight the driver.
+      # At low speed on EPS-modified cars, meaningful driver input fully unloads
+      # OP path-following torque and leaves only a capped same-direction assist.
       steering_pressed = self._filtered_steering_pressed(CS, torque_cmd) if self.eps_modified else bool(CS.out.steeringPressed)
 
       if steering_pressed:
@@ -300,12 +301,11 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
           self.driver_override_lkas_inactive = False
 
           torque_cmd = self._low_speed_cooperative_override(CS, torque_cmd)
-          tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
-          alpha = DT_CTRL / (tau + DT_CTRL)
 
-          self.torque_lpf = alpha * float(torque_cmd) + (1.0 - alpha) * self.torque_lpf
+          # Do not blend against prior OP torque during cooperative override.
+          # This prevents lingering path-following torque from fighting the driver.
+          self.torque_lpf = float(torque_cmd)
           self.prev_torque_cmd = float(torque_cmd)
-          torque_cmd = self.torque_lpf
         else:
           self.driver_coop_override_active = False
           self.driver_override_lkas_inactive = True
