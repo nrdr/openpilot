@@ -20,6 +20,11 @@ LongCtrlState = structs.CarControl.Actuators.LongControlState
 
 _BRAKE_MODIFIER = 0.0
 
+LOW_SPEED_COOP_MAX = 25.0 * CV.MPH_TO_MS
+LOW_SPEED_COOP_ASSIST_CAP = 0.06
+LOW_SPEED_COOP_ASSIST_GAIN = 0.002
+LOW_SPEED_COOP_OP_FADE = 0.10
+
 
 def compute_gb_honda_bosch(accel, speed):
   return 0.0, 0.0
@@ -118,6 +123,7 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   else:
     return 0.15
 
+
 def get_eps_modified_steering_pressed(raw_pressed: bool, steering_torque: float, torque_cmd: float,
                                       filter_s: float, was_pressed: bool) -> tuple[float, bool]:
   torque_product = steering_torque * torque_cmd
@@ -180,6 +186,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.torque_lpf = 0.0
     self.prev_torque_cmd = 0.0
     self.driver_override_lkas_inactive = False
+    self.driver_coop_override_active = False
+    self.driver_steer_dir = 0.0
 
     # EPS-modified steering override filter. Raw Honda steeringPressed can false-trigger
     # during high-assist/high-angle turns because the EPS torque sensor sees a short
@@ -234,6 +242,22 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.steering_pressed_robust_prev = steering_pressed
     return steering_pressed
 
+  def _low_speed_cooperative_override(self, CS, torque_cmd: float) -> float:
+    driver_torque = float(getattr(CS.out, "steeringTorque", 0.0))
+
+    if abs(driver_torque) > 0.05:
+      self.driver_steer_dir = float(np.sign(driver_torque))
+    else:
+      self.driver_steer_dir = 0.0
+
+    driver_assist = float(np.clip(driver_torque * LOW_SPEED_COOP_ASSIST_GAIN,
+                                  -LOW_SPEED_COOP_ASSIST_CAP,
+                                  LOW_SPEED_COOP_ASSIST_CAP))
+
+    # Keep a small amount of OP torque for continuity, but mostly unload the rack
+    # so the EPS does not fight the driver's low-speed steering input.
+    return float(torque_cmd) * LOW_SPEED_COOP_OP_FADE + driver_assist
+
   def update(self, CC, CC_SP, CS, now_nanos):
     MadsCarController.update(self, self.CP, CC, CC_SP)
     gas_pedal_force = 0.0
@@ -267,15 +291,33 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     if CC.latActive:
       # Keep driver override behavior separate from the torque LPF.
       # The LPF is forced on during normal lateral control, but driver override
-      # still disables LKAS torque instead of making the EPS fight the driver.
+      # still disables LKAS torque at higher speeds instead of making the EPS fight the driver.
       steering_pressed = self._filtered_steering_pressed(CS, torque_cmd) if self.eps_modified else bool(CS.out.steeringPressed)
-      self.driver_override_lkas_inactive = steering_pressed
 
       if steering_pressed:
-        self.torque_lpf = 0.0
-        self.prev_torque_cmd = 0.0
-        torque_cmd = 0.0
+        if self.eps_modified and CS.out.vEgo < LOW_SPEED_COOP_MAX:
+          self.driver_coop_override_active = True
+          self.driver_override_lkas_inactive = False
+
+          torque_cmd = self._low_speed_cooperative_override(CS, torque_cmd)
+          tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
+          alpha = DT_CTRL / (tau + DT_CTRL)
+
+          self.torque_lpf = alpha * float(torque_cmd) + (1.0 - alpha) * self.torque_lpf
+          self.prev_torque_cmd = float(torque_cmd)
+          torque_cmd = self.torque_lpf
+        else:
+          self.driver_coop_override_active = False
+          self.driver_override_lkas_inactive = True
+          self.torque_lpf = 0.0
+          self.prev_torque_cmd = 0.0
+          self.driver_steer_dir = 0.0
+          torque_cmd = 0.0
       else:
+        self.driver_coop_override_active = False
+        self.driver_override_lkas_inactive = False
+        self.driver_steer_dir = 0.0
+
         tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
         alpha = DT_CTRL / (tau + DT_CTRL)
 
@@ -289,6 +331,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       self.steering_pressed_filter_s = 0.0
       self.steering_pressed_robust_prev = False
       self.driver_override_lkas_inactive = False
+      self.driver_coop_override_active = False
+      self.driver_steer_dir = 0.0
 
     limited_torque = rate_limit(
       torque_cmd,
