@@ -118,6 +118,7 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   else:
     return 0.15
 
+
 def get_eps_modified_steering_pressed(raw_pressed: bool, steering_torque: float, torque_cmd: float,
                                       filter_s: float, was_pressed: bool) -> tuple[float, bool]:
   torque_product = steering_torque * torque_cmd
@@ -181,19 +182,9 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.prev_torque_cmd = 0.0
     self.driver_override_lkas_inactive = False
 
-    # EPS-modified steering override filter. The goal here is intentionally different
-    # from the normal openpilot ramp behavior:
-    #   - real driver override drops LKAS active on the same frame
-    #   - LKAS remains inactive while the driver continues holding torque
-    #   - when released, LKAS returns immediately with full requested torque
-    #
-    # Same-direction driver torque can also be an EPS load spike, so only that shape is
-    # debounced. Opposing torque, already-active override, or manual torque while OP is
-    # near zero all trigger immediately.
     self.steering_pressed_filter_s = 0.0
     self.steering_pressed_robust_prev = False
 
-    # Bosch extra-brake controller
     self.brake_pid = PIDController(k_p=([0,], [0,]),
                                    k_i=([0.], [0.5]),
                                    pos_limit=0.0,
@@ -214,14 +205,11 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     torque_product = steering_torque * torque_cmd
     torque_cmd_abs = abs(torque_cmd)
 
-    # Fast paths: these are treated as a real driver override immediately.
     if self.steering_pressed_robust_prev or torque_cmd_abs < 0.10 or torque_product < 0.0:
       self.steering_pressed_filter_s = 1.0
       self.steering_pressed_robust_prev = True
       return True
 
-    # Same-direction torque is the shape most likely to be an EPS load spike while OP
-    # is already steering the car. Require persistence before declaring override.
     self.steering_pressed_filter_s = min(1.0, self.steering_pressed_filter_s + DT_CTRL)
     steering_pressed = self.steering_pressed_filter_s >= 0.28
 
@@ -268,14 +256,14 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         self.torque_lpf = 0.0
         self.prev_torque_cmd = 0.0
         self.last_torque = 0.0
-      elif self.eps_modified:
-        # EPS-modified test path: no Comma-side LPF or torque slew on resume.
-        # This lets the EPS/car handle the transition instead of slowly blending it.
-        limited_torque = torque_cmd
-        self.torque_lpf = torque_cmd
-        self.prev_torque_cmd = torque_cmd
-        self.last_torque = limited_torque
       else:
+        tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
+        alpha = DT_CTRL / (tau + DT_CTRL)
+
+        self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+        self.prev_torque_cmd = torque_cmd
+        torque_cmd = self.torque_lpf
+
         limited_torque = rate_limit(
           torque_cmd,
           self.last_torque,
