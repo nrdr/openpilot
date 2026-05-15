@@ -181,11 +181,15 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.prev_torque_cmd = 0.0
     self.driver_override_lkas_inactive = False
 
-    # EPS-modified steering override filter. Raw Honda steeringPressed can false-trigger
-    # during high-assist/high-angle turns because the EPS torque sensor sees a short
-    # load spike. Keep real driver override behavior, but require persistence before
-    # cutting OP torque. Opposing driver torque triggers faster than same-direction
-    # assist because same-direction spikes are the common false-positive shape.
+    # EPS-modified steering override filter. The goal here is intentionally different
+    # from the normal openpilot ramp behavior:
+    #   - real driver override drops LKAS active on the same frame
+    #   - LKAS remains inactive while the driver continues holding torque
+    #   - when released, LKAS returns immediately with full requested torque
+    #
+    # Same-direction driver torque can also be an EPS load spike, so only that shape is
+    # debounced. Opposing torque, already-active override, or manual torque while OP is
+    # near zero all trigger immediately.
     self.steering_pressed_filter_s = 0.0
     self.steering_pressed_robust_prev = False
 
@@ -199,37 +203,27 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
   def _filtered_steering_pressed(self, CS, torque_cmd: float) -> bool:
     raw_pressed = bool(CS.out.steeringPressed)
-
-    # Signed driver torque from CarState. If unavailable, fall back to stock behavior.
     steering_torque = float(getattr(CS.out, "steeringTorque", 0.0))
     torque_cmd = float(torque_cmd)
 
-    # Direction classification:
-    #   opposite = driver fighting OP -> fast trigger
-    #   same     = driver helping OP OR EPS load spike -> slower trigger
+    if not raw_pressed:
+      self.steering_pressed_filter_s = 0.0
+      self.steering_pressed_robust_prev = False
+      return False
+
     torque_product = steering_torque * torque_cmd
     torque_cmd_abs = abs(torque_cmd)
 
-    if raw_pressed:
-      if self.steering_pressed_robust_prev:
-        trigger_s = 0.05
-      elif torque_cmd_abs < 0.10:
-        # OP is not meaningfully steering; assume manual input.
-        trigger_s = 0.12
-      elif torque_product < 0.0:
-        # Driver opposing OP should win quickly.
-        trigger_s = 0.12
-      else:
-        # Same-direction torque needs persistence; this rejects short EPS-load spikes
-        # but still allows the driver to help OP if they hold torque.
-        trigger_s = 0.32
+    # Fast paths: these are treated as a real driver override immediately.
+    if self.steering_pressed_robust_prev or torque_cmd_abs < 0.10 or torque_product < 0.0:
+      self.steering_pressed_filter_s = 1.0
+      self.steering_pressed_robust_prev = True
+      return True
 
-      self.steering_pressed_filter_s = min(1.0, self.steering_pressed_filter_s + DT_CTRL)
-      steering_pressed = self.steering_pressed_filter_s >= trigger_s
-    else:
-      # Quick release so OP can resume once the driver/load spike is gone.
-      self.steering_pressed_filter_s = max(0.0, self.steering_pressed_filter_s - 4.0 * DT_CTRL)
-      steering_pressed = self.steering_pressed_filter_s > 0.08 and self.steering_pressed_robust_prev
+    # Same-direction torque is the shape most likely to be an EPS load spike while OP
+    # is already steering the car. Require persistence before declaring override.
+    self.steering_pressed_filter_s = min(1.0, self.steering_pressed_filter_s + DT_CTRL)
+    steering_pressed = self.steering_pressed_filter_s >= 0.28
 
     self.steering_pressed_robust_prev = steering_pressed
     return steering_pressed
@@ -262,42 +256,42 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       accel = 0.0
       gas, brake = 0.0, 0.0
 
-    torque_cmd = actuators.torque
+    torque_cmd = float(actuators.torque)
 
     if CC.latActive:
-      # Keep driver override behavior separate from the torque LPF.
-      # The LPF is forced on during normal lateral control, but driver override
-      # still disables LKAS torque instead of making the EPS fight the driver.
       steering_pressed = self._filtered_steering_pressed(CS, torque_cmd) if self.eps_modified else bool(CS.out.steeringPressed)
       self.driver_override_lkas_inactive = steering_pressed
 
       if steering_pressed:
+        torque_cmd = 0.0
+        limited_torque = 0.0
         self.torque_lpf = 0.0
         self.prev_torque_cmd = 0.0
-        torque_cmd = 0.0
+        self.last_torque = 0.0
+      elif self.eps_modified:
+        # EPS-modified test path: no Comma-side LPF or torque slew on resume.
+        # This lets the EPS/car handle the transition instead of slowly blending it.
+        limited_torque = torque_cmd
+        self.torque_lpf = torque_cmd
+        self.prev_torque_cmd = torque_cmd
+        self.last_torque = limited_torque
       else:
-        tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
-        alpha = DT_CTRL / (tau + DT_CTRL)
-
-        self.torque_lpf = alpha * float(torque_cmd) + (1.0 - alpha) * self.torque_lpf
-        self.prev_torque_cmd = float(torque_cmd)
-        torque_cmd = self.torque_lpf
+        limited_torque = rate_limit(
+          torque_cmd,
+          self.last_torque,
+          -self.params.STEER_DELTA_DOWN * DT_CTRL,
+          self.params.STEER_DELTA_UP * DT_CTRL
+        )
+        self.last_torque = limited_torque
     else:
+      torque_cmd = 0.0
+      limited_torque = 0.0
       self.torque_lpf = 0.0
       self.prev_torque_cmd = 0.0
       self.last_torque = 0.0
       self.steering_pressed_filter_s = 0.0
       self.steering_pressed_robust_prev = False
       self.driver_override_lkas_inactive = False
-
-    limited_torque = rate_limit(
-      torque_cmd,
-      self.last_torque,
-      -self.params.STEER_DELTA_DOWN * DT_CTRL,
-      self.params.STEER_DELTA_UP * DT_CTRL
-    )
-
-    self.last_torque = limited_torque
 
     pre_limit_brake, self.braking, self.brake_steady = actuator_hysteresis(
       brake, self.braking, self.brake_steady, CS.out.vEgo, self.CP.carFingerprint
