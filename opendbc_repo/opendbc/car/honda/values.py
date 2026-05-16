@@ -37,7 +37,7 @@ class CarControllerParams:
 
   STEER_STEP = 1  # 100 Hz
   STEER_DELTA_UP = 1.5
-  STEER_DELTA_DOWN = 1.5
+  STEER_DELTA_DOWN = 100
   STEER_GLOBAL_MIN_SPEED = 0 * CV.MPH_TO_MS
 
   def __init__(self, CP):
