@@ -107,7 +107,7 @@ def process_hud_alert(hud_alert):
 def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> float:
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
   sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
-  highway = v_ego > 20.0 * CV.MPH_TO_MS
+  highway = v_ego > 50.0 * CV.MPH_TO_MS
 
   if highway:
     if sign_change and torque_delta > 0.20:
@@ -115,13 +115,13 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
     return 0.1
 
   if torque_delta > 0.50:
-    return 0.5
+    return 0.1
   elif torque_delta > 0.20:
-    return 0.5
+    return 0.11
   elif torque_delta > 0.05:
-    return 0.5
+    return 0.12
   else:
-    return 0.5
+    return 0.15
 
 
 def get_eps_modified_steering_pressed(raw_pressed: bool, steering_torque: float, torque_cmd: float,
