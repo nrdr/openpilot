@@ -20,6 +20,20 @@ LongCtrlState = structs.CarControl.Actuators.LongControlState
 
 _BRAKE_MODIFIER = 0.0
 
+RATCHET_RECOVERY_MAX_SPEED = 20.0 * CV.MPH_TO_MS
+RATCHET_MIN_TORQUE = 0.15
+RATCHET_MIN_STEERING_ANGLE_DEG = 120.0
+RATCHET_STALL_RATE_DEG_S = 2.0
+RATCHET_JOLT_ACCEL_DEG_S2 = 800.0
+RATCHET_SCORE_ON_RATE = 4.0
+RATCHET_SCORE_OFF_RATE = 2.0
+RATCHET_SCORE_TRIGGER = 0.5
+DYNAMIC_DELTA_UP_START = 0.5
+DYNAMIC_DELTA_UP_MAX = 1.5
+DYNAMIC_DELTA_UP_RAMP_RATE = 1.2
+LOW_SPEED_BLEED_MAX_SPEED = 10.0 * CV.MPH_TO_MS
+LOW_SPEED_BLEED_FACTOR = 0.92
+
 
 def compute_gb_honda_bosch(accel, speed):
   return 0.0, 0.0
@@ -188,6 +202,11 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.lat_active_prev = False
     self.steering_pressed_prev = False
     self.rejoin_ramp = 1.0
+    self.delta_up_dynamic = DYNAMIC_DELTA_UP_START
+
+    self.prev_steering_angle_deg = 0.0
+    self.prev_steering_angle_rate = 0.0
+    self.ratchet_score = 0.0
 
     self.brake_pid = PIDController(k_p=([0,], [0,]),
                                    k_i=([0.], [0.5]),
@@ -259,6 +278,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
       if lat_rejoined or driver_released:
         self.rejoin_ramp = 0.0
+        self.delta_up_dynamic = DYNAMIC_DELTA_UP_START
 
       if steering_pressed:
         torque_cmd = 0.0
@@ -266,7 +286,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
           torque_cmd,
           self.last_torque,
           -self.params.STEER_DELTA_DOWN * DT_CTRL,
-          self.params.STEER_DELTA_UP * DT_CTRL
+          self.delta_up_dynamic * DT_CTRL
         )
         self.last_torque = limited_torque
       else:
@@ -279,12 +299,41 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         self.prev_torque_cmd = torque_cmd
         torque_cmd = self.torque_lpf * self.rejoin_ramp
 
+        steering_angle_deg = float(CS.out.steeringAngleDeg)
+        steering_angle_rate = (steering_angle_deg - self.prev_steering_angle_deg) / DT_CTRL
+        steering_angle_accel = (steering_angle_rate - self.prev_steering_angle_rate) / DT_CTRL
+
+        ratchet_recovery_allowed = CS.out.vEgo < RATCHET_RECOVERY_MAX_SPEED
+        commanding_torque = abs(torque_cmd) > RATCHET_MIN_TORQUE
+        near_lock = abs(steering_angle_deg) > RATCHET_MIN_STEERING_ANGLE_DEG
+        angle_stalling = abs(steering_angle_rate) < RATCHET_STALL_RATE_DEG_S
+        angle_jolting = abs(steering_angle_accel) > RATCHET_JOLT_ACCEL_DEG_S2
+
+        if ratchet_recovery_allowed and commanding_torque and near_lock and (angle_stalling or angle_jolting):
+          self.ratchet_score = min(1.0, self.ratchet_score + DT_CTRL * RATCHET_SCORE_ON_RATE)
+        else:
+          self.ratchet_score = max(0.0, self.ratchet_score - DT_CTRL * RATCHET_SCORE_OFF_RATE)
+
+        if ratchet_recovery_allowed and self.ratchet_score > RATCHET_SCORE_TRIGGER:
+          torque_cmd = 0.0
+          self.rejoin_ramp = 0.0
+          self.delta_up_dynamic = DYNAMIC_DELTA_UP_START
+
+        self.prev_steering_angle_deg = steering_angle_deg
+        self.prev_steering_angle_rate = steering_angle_rate
+
+        self.delta_up_dynamic = min(DYNAMIC_DELTA_UP_MAX, self.delta_up_dynamic + DT_CTRL * DYNAMIC_DELTA_UP_RAMP_RATE)
+
         limited_torque = rate_limit(
           torque_cmd,
           self.last_torque,
           -self.params.STEER_DELTA_DOWN * DT_CTRL,
-          self.params.STEER_DELTA_UP * DT_CTRL
+          self.delta_up_dynamic * DT_CTRL
         )
+
+        if CS.out.vEgo < LOW_SPEED_BLEED_MAX_SPEED and abs(torque_cmd) < abs(limited_torque):
+          limited_torque *= LOW_SPEED_BLEED_FACTOR
+
         self.last_torque = limited_torque
 
       self.lat_active_prev = CC.latActive
@@ -295,10 +344,14 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         torque_cmd,
         self.last_torque,
         -self.params.STEER_DELTA_DOWN * DT_CTRL,
-        self.params.STEER_DELTA_UP * DT_CTRL
+        self.delta_up_dynamic * DT_CTRL
       )
       self.last_torque = limited_torque
       self.rejoin_ramp = 0.0
+      self.delta_up_dynamic = DYNAMIC_DELTA_UP_START
+      self.ratchet_score = 0.0
+      self.prev_steering_angle_deg = float(CS.out.steeringAngleDeg)
+      self.prev_steering_angle_rate = 0.0
       self.steering_pressed_filter_s = 0.0
       self.steering_pressed_robust_prev = False
       self.driver_override_lkas_inactive = False
