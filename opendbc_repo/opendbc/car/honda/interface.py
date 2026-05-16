@@ -341,7 +341,9 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
+        stock_cp.minEnableSpeed = -1.0
         stock_cp.minSteerSpeed = -1.0
+        stock_cp.steerAtStandstill = True
         stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 4096], [0, 4096]]
 
         # mph:                                  0      5      10     15     20     25     30     45     50     80
@@ -375,6 +377,7 @@ class CarInterface(CarInterfaceBase):
       stock_cp.autoResumeSng = True
       stock_cp.minEnableSpeed = -1.0
       stock_cp.minSteerSpeed = -1.0
+      stock_cp.steerAtStandstill = True
       stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
 
       # mph:                                  0      30     35     40     80
