@@ -499,6 +499,9 @@ STEER_THRESHOLD = {
   CAR.HONDA_NBOX_2G: 600,
   CAR.HONDA_ODYSSEY_5G_MMR: 600,
   # port extensions
+  CAR.HONDA_CLARITY: 2400, # linear torque modded Clarity only
+  CAR.HONDA_CIVIC: 2400, # linear torque modded Civic only
+  CAR.HONDA_CIVIC_BOSCH: 2400, # linear torque modded Civic only
   CAR.HONDA_ACCORD_9G: 30,
   CAR.ACURA_MDX_3G: 30,
   CAR.ACURA_MDX_3G_MMR: 30,
