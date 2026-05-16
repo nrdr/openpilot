@@ -339,83 +339,20 @@ class CarInterface(CarInterfaceBase):
         stock_cp.lateralTuning.pid.kf = 0.00006
         stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.3], [0.1]]
 
-    # Bosch Civic Testing Grounds
-
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
-        stock_cp.minSteerSpeed = -1.
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 4096], [0, 4096]] # TODO: Verify this is stable
+        stock_cp.minSteerSpeed = -1.0
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 4096], [0, 4096]]
 
-        # Modified EPS tuning playground. Watch this video to tune: https://youtu.be/4Y7zG48uHRo
-        # Speed breakpoints are fixed 5 mph steps from 0-80 mph. Do not tune the BP arrays directly.
-        stock_cp.lateralTuning.pid.kpBP = [0.000, 2.235, 4.470, 6.706, 8.941, 11.176, 13.411, 15.646, 17.882, 20.117, 22.352, 24.587, 26.822, 29.058, 31.293, 33.528, 35.763]
-        stock_cp.lateralTuning.pid.kiBP = stock_cp.lateralTuning.pid.kpBP
+        # mph:                                  0      5      10     15     20     25     30     45     50     80
+        stock_cp.lateralTuning.pid.kpBP = [0.000, 2.235, 4.470, 6.706, 8.941, 11.176, 13.411, 20.117, 22.352, 35.763]
+        stock_cp.lateralTuning.pid.kpV  = [0.045, 0.050, 0.055, 0.060, 0.080, 0.090, 0.120, 0.120, 0.130, 0.130]
 
-        stock_cp.lateralTuning.pid.kpV = [ # Controls how strongly the car reacts RIGHT NOW.
-          #
-          # Higher values:
-          #   More immediate steering response.
-          #   Can become twitchy or oscillate if too high.
-          #
-          # Lower values:
-          #   Smoother and calmer steering.
-          #   Less nervous on rough roads.
-          #   Can feel lazy or wander on highways.
-          #
-          # 50+ mph values reduced by 15% to reduce inside curve hugging
-          # and make highway tracking feel more natural and relaxed.
-          #
-          0.045,  # 0 mph
-          0.050,  # 5 mph
-          0.055,  # 10 mph
-          0.060,  # 15 mph
-          0.080,  # 20 mph
-          0.090,  # 25 mph
-          0.120,  # 30 mph
-          0.120,  # 35 mph
-          0.120,  # 40 mph
-          0.120,  # 45 mph
-          0.130,  # 50 mph
-          0.130,  # 55 mph
-          0.130,  # 60 mph
-          0.130,  # 65 mph
-          0.130,  # 70 mph
-          0.130,  # 75 mph
-          0.130,  # 80 mph
-        ]
+        # mph:                                  0      5      10     15     20     25     30     35     40     45     50     80
+        stock_cp.lateralTuning.pid.kiBP = [0.000, 2.235, 4.470, 6.706, 8.941, 11.176, 13.411, 15.646, 17.882, 20.117, 22.352, 35.763]
+        stock_cp.lateralTuning.pid.kiV  = [0.000, 0.005, 0.012, 0.020, 0.025, 0.031, 0.035, 0.038, 0.041, 0.045, 0.047, 0.047]
 
-        stock_cp.lateralTuning.pid.kiV = [ # Controls how strongly the car fights permanent errors over time. (Do you have an alignment problem?)
-          #
-          # Higher values:
-          #   Better at staying perfectly centered.
-          #   Helps correct slow drifting.
-          #   Can create sticky windup if too high.
-          #
-          # Lower values:
-          #   More natural steering feel.
-          #   Less correction buildup.
-          #   Can slowly drift off-center.
-          #
-          0.000,  # 0 mph
-          0.005,  # 5 mph
-          0.012,  # 10 mph
-          0.020,  # 15 mph
-          0.025,  # 20 mph
-          0.031,  # 25 mph
-          0.035,  # 30 mph
-          0.038,  # 35 mph
-          0.041,  # 40 mph
-          0.045,  # 45 mph
-          0.047,  # 50 mph
-          0.047,  # 55 mph
-          0.047,  # 60 mph
-          0.047,  # 65 mph
-          0.047,  # 70 mph
-          0.047,  # 75 mph
-          0.047,  # 80 mph
-        ]
-
-        stock_cp.lateralTuning.pid.kf = 0.000024 # Predicts what steering will be needed ahead of time.
+        stock_cp.lateralTuning.pid.kf = 0.000024
 
     elif candidate == CAR.HONDA_CIVIC_2022:
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
@@ -436,51 +373,17 @@ class CarInterface(CarInterfaceBase):
 
     elif candidate == CAR.HONDA_CLARITY:
       stock_cp.autoResumeSng = True
-      stock_cp.minEnableSpeed = -1
-      stock_cp.minSteerSpeed = -1.
+      stock_cp.minEnableSpeed = -1.0
+      stock_cp.minSteerSpeed = -1.0
       stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
-      stock_cp.lateralTuning.pid.kpBP = [0.000, 2.235, 4.470, 6.706, 8.941, 11.176, 13.411, 15.646, 17.882, 20.117, 22.352, 24.587, 26.822, 29.058, 31.293, 33.528, 35.763]
-      stock_cp.lateralTuning.pid.kiBP = stock_cp.lateralTuning.pid.kpBP
 
-      stock_cp.lateralTuning.pid.kpV = [
-        0.04,   # 0 mph
-        0.04,   # 5 mph
-        0.04,   # 10 mph
-        0.04,   # 15 mph
-        0.04,   # 20 mph
-        0.04,   # 25 mph
-        0.04,   # 30 mph
-        0.05,   # 35 mph
-        0.06,   # 40 mph
-        0.06,   # 45 mph
-        0.06,   # 50 mph
-        0.06,   # 55 mph
-        0.06,   # 60 mph
-        0.06,   # 65 mph
-        0.06,   # 70 mph
-        0.06,   # 75 mph
-        0.06,   # 80 mph
-      ]
+      # mph:                                  0      30     35     40     80
+      stock_cp.lateralTuning.pid.kpBP = [0.000, 13.411, 15.646, 17.882, 35.763]
+      stock_cp.lateralTuning.pid.kpV  = [0.04,  0.04,   0.05,   0.06,   0.06]
 
-      stock_cp.lateralTuning.pid.kiV = [
-        0.00,  # 0 mph
-        0.00,  # 5 mph
-        0.00,  # 10 mph
-        0.01,  # 15 mph
-        0.01,  # 20 mph
-        0.01,  # 25 mph
-        0.01,  # 30 mph
-        0.01,  # 35 mph
-        0.02,  # 40 mph
-        0.02,  # 45 mph
-        0.02,  # 50 mph
-        0.02,  # 55 mph
-        0.02,  # 60 mph
-        0.02,  # 65 mph
-        0.02,  # 70 mph
-        0.02,  # 75 mph
-        0.02,  # 80 mph
-      ]
+      # mph:                                  0      10     15     35     40     80
+      stock_cp.lateralTuning.pid.kiBP = [0.000, 4.470,  6.706,  15.646, 17.882, 35.763]
+      stock_cp.lateralTuning.pid.kiV  = [0.00,  0.00,   0.01,   0.01,   0.02,   0.02]
 
       stock_cp.lateralTuning.pid.kf = 0.000012
 
