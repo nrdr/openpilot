@@ -188,7 +188,6 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.lat_active_prev = False
     self.steering_pressed_prev = False
     self.rejoin_ramp = 1.0
-    self.delta_up_dynamic = 0.5
 
     self.brake_pid = PIDController(k_p=([0,], [0,]),
                                    k_i=([0.], [0.5]),
@@ -260,7 +259,6 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
       if lat_rejoined or driver_released:
         self.rejoin_ramp = 0.0
-        self.delta_up_dynamic = 0.5
 
       if steering_pressed:
         torque_cmd = 0.0
@@ -280,18 +278,13 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
         self.prev_torque_cmd = torque_cmd
         torque_cmd = self.torque_lpf * self.rejoin_ramp
-        self.delta_up_dynamic = min(self.params.STEER_DELTA_UP, self.delta_up_dynamic + DT_CTRL * 1.2)
 
         limited_torque = rate_limit(
           torque_cmd,
           self.last_torque,
           -self.params.STEER_DELTA_DOWN * DT_CTRL,
-          self.delta_up_dynamic * DT_CTRL
+          self.params.STEER_DELTA_UP * DT_CTRL
         )
-
-        if CS.out.vEgo < 20.0 * CV.MPH_TO_MS and abs(torque_cmd) < abs(limited_torque):
-          limited_torque *= 0.92
-
         self.last_torque = limited_torque
 
       self.lat_active_prev = CC.latActive
@@ -306,7 +299,6 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       )
       self.last_torque = limited_torque
       self.rejoin_ramp = 0.0
-      self.delta_up_dynamic = 0.5
       self.steering_pressed_filter_s = 0.0
       self.steering_pressed_robust_prev = False
       self.driver_override_lkas_inactive = False
