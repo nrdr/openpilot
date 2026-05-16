@@ -247,30 +247,22 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     torque_cmd = float(actuators.torque)
 
     if CC.latActive:
-      steering_pressed = self._filtered_steering_pressed(CS, torque_cmd) if self.eps_modified else bool(CS.out.steeringPressed)
-      self.driver_override_lkas_inactive = steering_pressed
+      self.driver_override_lkas_inactive = False
 
-      if steering_pressed:
-        torque_cmd = 0.0
-        limited_torque = 0.0
-        self.torque_lpf = 0.0
-        self.prev_torque_cmd = 0.0
-        self.last_torque = 0.0
-      else:
-        tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
-        alpha = DT_CTRL / (tau + DT_CTRL)
+      tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
+      alpha = DT_CTRL / (tau + DT_CTRL)
 
-        self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
-        self.prev_torque_cmd = torque_cmd
-        torque_cmd = self.torque_lpf
+      self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+      self.prev_torque_cmd = torque_cmd
+      torque_cmd = self.torque_lpf
 
-        limited_torque = rate_limit(
-          torque_cmd,
-          self.last_torque,
-          -self.params.STEER_DELTA_DOWN * DT_CTRL,
-          self.params.STEER_DELTA_UP * DT_CTRL
-        )
-        self.last_torque = limited_torque
+      limited_torque = rate_limit(
+        torque_cmd,
+        self.last_torque,
+        -self.params.STEER_DELTA_DOWN * DT_CTRL,
+        self.params.STEER_DELTA_UP * DT_CTRL
+      )
+      self.last_torque = limited_torque
     else:
       torque_cmd = 0.0
       limited_torque = 0.0
