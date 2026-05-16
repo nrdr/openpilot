@@ -185,6 +185,10 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.steering_pressed_filter_s = 0.0
     self.steering_pressed_robust_prev = False
 
+    self.lat_active_prev = False
+    self.steering_pressed_prev = False
+    self.rejoin_ramp = 1.0
+
     self.brake_pid = PIDController(k_p=([0,], [0,]),
                                    k_i=([0.], [0.5]),
                                    pos_limit=0.0,
@@ -250,19 +254,30 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       steering_pressed = self._filtered_steering_pressed(CS, torque_cmd) if self.eps_modified else bool(CS.out.steeringPressed)
       self.driver_override_lkas_inactive = steering_pressed
 
+      lat_rejoined = CC.latActive and not self.lat_active_prev
+      driver_released = self.steering_pressed_prev and not steering_pressed
+
+      if lat_rejoined or driver_released:
+        self.rejoin_ramp = 0.0
+
       if steering_pressed:
         torque_cmd = 0.0
-        limited_torque = 0.0
-        self.torque_lpf = 0.0
-        self.prev_torque_cmd = 0.0
-        self.last_torque = 0.0
+        limited_torque = rate_limit(
+          torque_cmd,
+          self.last_torque,
+          -self.params.STEER_DELTA_DOWN * DT_CTRL,
+          self.params.STEER_DELTA_UP * DT_CTRL
+        )
+        self.last_torque = limited_torque
       else:
+        self.rejoin_ramp = min(1.0, self.rejoin_ramp + DT_CTRL / 3.0)
+
         tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
         alpha = DT_CTRL / (tau + DT_CTRL)
 
         self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
         self.prev_torque_cmd = torque_cmd
-        torque_cmd = self.torque_lpf
+        torque_cmd = self.torque_lpf * self.rejoin_ramp
 
         limited_torque = rate_limit(
           torque_cmd,
@@ -271,15 +286,24 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
           self.params.STEER_DELTA_UP * DT_CTRL
         )
         self.last_torque = limited_torque
+
+      self.lat_active_prev = CC.latActive
+      self.steering_pressed_prev = steering_pressed
     else:
       torque_cmd = 0.0
-      limited_torque = 0.0
-      self.torque_lpf = 0.0
-      self.prev_torque_cmd = 0.0
-      self.last_torque = 0.0
+      limited_torque = rate_limit(
+        torque_cmd,
+        self.last_torque,
+        -self.params.STEER_DELTA_DOWN * DT_CTRL,
+        self.params.STEER_DELTA_UP * DT_CTRL
+      )
+      self.last_torque = limited_torque
+      self.rejoin_ramp = 0.0
       self.steering_pressed_filter_s = 0.0
       self.steering_pressed_robust_prev = False
       self.driver_override_lkas_inactive = False
+      self.lat_active_prev = False
+      self.steering_pressed_prev = False
 
     pre_limit_brake, self.braking, self.brake_steady = actuator_hysteresis(
       brake, self.braking, self.brake_steady, CS.out.vEgo, self.CP.carFingerprint
