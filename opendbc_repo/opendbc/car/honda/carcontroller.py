@@ -20,6 +20,11 @@ LongCtrlState = structs.CarControl.Actuators.LongControlState
 
 _BRAKE_MODIFIER = 0.0
 
+LOW_TORQUE_OVERRIDE_ON_S = 0.15
+OPPOSING_OVERRIDE_ON_S = 0.25
+SAME_DIRECTION_OVERRIDE_ON_S = 0.40
+OVERRIDE_OFF_S = 0.30
+
 
 def compute_gb_honda_bosch(accel, speed):
   return 0.0, 0.0
@@ -182,7 +187,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     self.prev_torque_cmd = 0.0
     self.driver_override_lkas_inactive = False
 
-    self.steering_pressed_filter_s = 0.0
+    self.steering_pressed_on_s = 0.0
+    self.steering_pressed_off_s = 0.0
     self.steering_pressed_robust_prev = False
 
     self.brake_pid = PIDController(k_p=([0,], [0,]),
@@ -197,24 +203,38 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     steering_torque = float(getattr(CS.out, "steeringTorque", 0.0))
     torque_cmd = float(torque_cmd)
 
-    if not raw_pressed:
-      self.steering_pressed_filter_s = 0.0
-      self.steering_pressed_robust_prev = False
-      return False
-
     torque_product = steering_torque * torque_cmd
     torque_cmd_abs = abs(torque_cmd)
 
-    if self.steering_pressed_robust_prev or torque_cmd_abs < 0.10 or torque_product < 0.0:
-      self.steering_pressed_filter_s = 1.0
-      self.steering_pressed_robust_prev = True
-      return True
+    if raw_pressed:
+      self.steering_pressed_off_s = 0.0
 
-    self.steering_pressed_filter_s = min(1.0, self.steering_pressed_filter_s + DT_CTRL)
-    steering_pressed = self.steering_pressed_filter_s >= 0.28
+      if torque_cmd_abs < 0.10:
+        trigger_s = LOW_TORQUE_OVERRIDE_ON_S
+      elif torque_product < 0.0:
+        trigger_s = OPPOSING_OVERRIDE_ON_S
+      else:
+        trigger_s = SAME_DIRECTION_OVERRIDE_ON_S
 
-    self.steering_pressed_robust_prev = steering_pressed
-    return steering_pressed
+      self.steering_pressed_on_s = min(1.0, self.steering_pressed_on_s + DT_CTRL)
+
+      if self.steering_pressed_robust_prev or self.steering_pressed_on_s >= trigger_s:
+        self.steering_pressed_robust_prev = True
+        return True
+
+      return False
+
+    self.steering_pressed_on_s = 0.0
+
+    if self.steering_pressed_robust_prev:
+      self.steering_pressed_off_s = min(1.0, self.steering_pressed_off_s + DT_CTRL)
+
+      if self.steering_pressed_off_s < OVERRIDE_OFF_S:
+        return True
+
+    self.steering_pressed_off_s = 0.0
+    self.steering_pressed_robust_prev = False
+    return False
 
   def update(self, CC, CC_SP, CS, now_nanos):
     MadsCarController.update(self, self.CP, CC, CC_SP)
@@ -250,20 +270,17 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       steering_pressed = self._filtered_steering_pressed(CS, torque_cmd) if self.eps_modified else bool(CS.out.steeringPressed)
       self.driver_override_lkas_inactive = steering_pressed
 
+      tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
+      alpha = DT_CTRL / (tau + DT_CTRL)
+
+      self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
+      self.prev_torque_cmd = torque_cmd
+      torque_cmd = self.torque_lpf
+
       if steering_pressed:
-        torque_cmd = 0.0
         limited_torque = 0.0
-        self.torque_lpf = 0.0
-        self.prev_torque_cmd = 0.0
         self.last_torque = 0.0
       else:
-        tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
-        alpha = DT_CTRL / (tau + DT_CTRL)
-
-        self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
-        self.prev_torque_cmd = torque_cmd
-        torque_cmd = self.torque_lpf
-
         limited_torque = rate_limit(
           torque_cmd,
           self.last_torque,
@@ -277,7 +294,8 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       self.torque_lpf = 0.0
       self.prev_torque_cmd = 0.0
       self.last_torque = 0.0
-      self.steering_pressed_filter_s = 0.0
+      self.steering_pressed_on_s = 0.0
+      self.steering_pressed_off_s = 0.0
       self.steering_pressed_robust_prev = False
       self.driver_override_lkas_inactive = False
 
