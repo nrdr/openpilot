@@ -333,7 +333,6 @@ class CarInterface(CarInterfaceBase):
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
         stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]] # TODO: Verify this is stable
         stock_cp.steerAtStandstill = True
-        stock_cp.autoResumeSng = True
         stock_cp.minEnableSpeed = -1.0
         stock_cp.minSteerSpeed = -1.0
 
@@ -351,7 +350,6 @@ class CarInterface(CarInterfaceBase):
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
         stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 4096], [0, 4096]]
         stock_cp.steerAtStandstill = True
-        stock_cp.autoResumeSng = True
         stock_cp.minEnableSpeed = -1.0
         stock_cp.minSteerSpeed = -1.0
 
