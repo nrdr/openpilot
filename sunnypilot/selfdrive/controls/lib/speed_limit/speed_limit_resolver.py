@@ -20,6 +20,8 @@ SpeedLimitSource = custom.LongitudinalPlanSP.SpeedLimit.Source
 
 ALL_SOURCES = tuple(SpeedLimitSource.schema.enumerants.values())
 
+LIMIT_AHEAD_PREEMPTIVE_DISTANCE = 1000.  # m
+
 
 class SpeedLimitResolver:
   limit_solutions: dict[custom.LongitudinalPlanSP.SpeedLimit.Source, float]
@@ -38,8 +40,8 @@ class SpeedLimitResolver:
     self.frame = -1
 
     self._gps_location_service = get_gps_location_service(self.params)
-    self.limit_solutions = {}  # Store for speed limit solutions from different sources
-    self.distance_solutions = {}  # Store for distance to current speed limit start for different sources
+    self.limit_solutions = {}
+    self.distance_solutions = {}
 
     self.policy = self.params.get("SpeedLimitPolicy", return_default=True)
     self.policy = get_sanitize_int_param(
@@ -142,20 +144,17 @@ class SpeedLimitResolver:
     self.limit_solutions[SpeedLimitSource.map] = speed_limit
     self.distance_solutions[SpeedLimitSource.map] = 0.
 
-    # FIXME-SP: this is not working as expected
-    if 0. < next_speed_limit < self.v_ego:
-      adapt_time = (next_speed_limit - self.v_ego) / LIMIT_ADAPT_ACC
-      adapt_distance = self.v_ego * adapt_time + 0.5 * LIMIT_ADAPT_ACC * adapt_time ** 2
-
-      if distance_to_speed_limit_ahead <= adapt_distance:
-        self.limit_solutions[SpeedLimitSource.map] = next_speed_limit
-        self.distance_solutions[SpeedLimitSource.map] = distance_to_speed_limit_ahead
+    # Preemptively resolve lower upcoming map limits before the sign so speed
+    # limit assist can begin adapting early when map markers are slightly late
+    # or when the vehicle needs distance to settle near the new limit.
+    if 0. < next_speed_limit < speed_limit and distance_to_speed_limit_ahead <= LIMIT_AHEAD_PREEMPTIVE_DISTANCE:
+      self.limit_solutions[SpeedLimitSource.map] = next_speed_limit
+      self.distance_solutions[SpeedLimitSource.map] = distance_to_speed_limit_ahead
 
   def _get_source_solution_according_to_policy(self) -> custom.LongitudinalPlanSP.SpeedLimit.Source:
     sources_for_policy = self._policy_to_sources_map[self.policy]
 
     if self.policy != Policy.combined:
-      # They are ordered in the order of preference, so we pick the first that's non-zero
       for source in sources_for_policy:
         if self.limit_solutions[source] > 0.:
           return source
