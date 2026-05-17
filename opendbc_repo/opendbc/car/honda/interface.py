@@ -386,7 +386,7 @@ class CarInterface(CarInterfaceBase):
 
       # mph:                                  0      10     15     35     40     80
       stock_cp.lateralTuning.pid.kiBP = [0.000, 4.470,  6.706,  15.646, 17.882, 35.763]
-      stock_cp.lateralTuning.pid.kiV  = [0.00,  0.00,   0.01,   0.01,   0.02,   0.02]
+      stock_cp.lateralTuning.pid.kiV  = [0.01,  0.01,   0.01,   0.01,   0.02,   0.02]
 
       stock_cp.lateralTuning.pid.kf = 0.000012
 
