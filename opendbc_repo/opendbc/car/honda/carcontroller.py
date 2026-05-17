@@ -105,6 +105,11 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   highway = v_ego > 50.0 * CV.MPH_TO_MS
   low_speed = v_ego > 25.0 * CV.MPH_TO_MS
 
+  if low_speed:
+    if sign_change and torque_delta > 0.20:
+      return 0.01
+    return 0.05
+    
   if highway:
     if sign_change and torque_delta > 0.20:
       return 0.07
@@ -118,14 +123,6 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
     return 0.12
   else:
     return 0.15
-
-  if low_speed:
-    if sign_change and torque_delta > 0.20:
-      return 0.01
-    return 0.05
-  
-
-
 
 def _low_speed_torque_bleed(limited_torque: float, torque_cmd: float, v_ego: float) -> float:
   # Prevent low-speed stale torque from lingering after the controller has already
