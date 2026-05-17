@@ -119,6 +119,15 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
     return 0.15
 
 
+
+def _low_speed_torque_bleed(limited_torque: float, torque_cmd: float, v_ego: float) -> float:
+  # Prevent low-speed stale torque from lingering after the controller has already
+  # requested less steering. This helps the wheel unwind cleanly through tight turns
+  # without changing normal turn-in behavior.
+  if v_ego < 25.0 * CV.MPH_TO_MS and abs(torque_cmd) < abs(limited_torque):
+    return limited_torque * 0.92
+  return limited_torque
+
 def get_eps_modified_steering_pressed(raw_pressed: bool, steering_torque: float, torque_cmd: float,
                                       filter_s: float, was_pressed: bool) -> tuple[float, bool]:
   torque_product = steering_torque * torque_cmd
@@ -285,6 +294,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
           -self.params.STEER_DELTA_DOWN * DT_CTRL,
           self.params.STEER_DELTA_UP * DT_CTRL
         )
+        limited_torque = _low_speed_torque_bleed(limited_torque, torque_cmd, CS.out.vEgo)
         self.last_torque = limited_torque
 
       self.lat_active_prev = CC.latActive
