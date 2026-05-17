@@ -105,16 +105,13 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   highway = v_ego > 50.0 * CV.MPH_TO_MS
   low_speed = v_ego < 25.0 * CV.MPH_TO_MS
 
-  if low_speed:
-    if sign_change and torque_delta > 0.20:
-      return 0.01
-    return 0.05
-    
-  if highway:
+  # Low speed needs less lag, highway doesn't have as much oscillations to begin with. They are similar:
+  if highway or low_speed:
     if sign_change and torque_delta > 0.20:
       return 0.07
     return 0.1
 
+  # Mid Speed Filtering:
   if torque_delta > 0.50:
     return 0.1
   elif torque_delta > 0.20:
@@ -128,7 +125,7 @@ def _low_speed_torque_bleed(limited_torque: float, torque_cmd: float, v_ego: flo
   # Prevent low-speed stale torque from lingering after the controller has already
   # requested less steering. This helps the wheel unwind cleanly through tight turns
   # without changing normal turn-in behavior.
-  if v_ego < 25.0 * CV.MPH_TO_MS and abs(torque_cmd) < abs(limited_torque):
+  if v_ego < 20.0 * CV.MPH_TO_MS and abs(torque_cmd) < abs(limited_torque):
     return limited_torque * 0.92
   return limited_torque
 
