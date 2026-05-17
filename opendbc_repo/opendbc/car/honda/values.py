@@ -36,9 +36,9 @@ class CarControllerParams:
   BOSCH_GAS_LOOKUP_V = [0, 1600]
 
   STEER_STEP = 1  # 100 Hz
-  STEER_DELTA_UP = 3  # min/max in 0.33s for all Honda
-  STEER_DELTA_DOWN = 3
-  STEER_GLOBAL_MIN_SPEED = 3 * CV.MPH_TO_MS
+  STEER_DELTA_UP = 9999999999
+  STEER_DELTA_DOWN = 9999999999
+  STEER_GLOBAL_MIN_SPEED = 0 * CV.MPH_TO_MS
 
   def __init__(self, CP):
     self.STEER_MAX = CP.lateralParams.torqueBP[-1]
@@ -48,6 +48,16 @@ class CarControllerParams:
     assert CP.lateralParams.torqueV[0] == 0
     self.STEER_LOOKUP_BP = [v * -1 for v in CP.lateralParams.torqueBP][1:][::-1] + list(CP.lateralParams.torqueBP)
     self.STEER_LOOKUP_V = [v * -1 for v in CP.lateralParams.torqueV][1:][::-1] + list(CP.lateralParams.torqueV)
+
+    # Unclear if this is needed or just Claude making stuff up:
+    # ---------------------------------------------------------
+    # Clarity [0,1663] alignment: STEER_DELTA operates on normalized [-1,1] space.
+    # Default DELTA_UP=15 reaches normalized 1.0 (CAN=1663) in 7 frames (70ms).
+    # With [0,3840], EPS saturation at normalized 0.433 was reached in 3 frames (30ms).
+    # Scale by 3840/1663 to restore the same physical ramp rate to EPS saturation.
+    #if CP.carFingerprint == CAR.HONDA_CLARITY:
+      #self.STEER_DELTA_UP = 15    # 15 × (3840/1663) ≈ 35
+      #self.STEER_DELTA_DOWN = 25  # 25 × (3840/1663) ≈ 58
 
 
 class HondaSafetyFlags(IntFlag):
@@ -188,9 +198,9 @@ class CAR(Platforms):
   HONDA_CIVIC_BOSCH = HondaBoschPlatformConfig(
     [
       HondaCarDocs("Honda Civic 2019-21", "All", video="https://www.youtube.com/watch?v=4Iz1Mz5LGF8",
-                   footnotes=[Footnote.CIVIC_DIESEL], min_steer_speed=2. * CV.MPH_TO_MS),
-      HondaCarDocs("Honda Civic Hatchback 2017-18", min_steer_speed=12. * CV.MPH_TO_MS),
-      HondaCarDocs("Honda Civic Hatchback 2019-21", "All", min_steer_speed=12. * CV.MPH_TO_MS),
+                   footnotes=[Footnote.CIVIC_DIESEL], min_steer_speed=0. * CV.MPH_TO_MS),
+      HondaCarDocs("Honda Civic Hatchback 2017-18", min_steer_speed=0. * CV.MPH_TO_MS),
+      HondaCarDocs("Honda Civic Hatchback 2019-21", "All", min_steer_speed=0. * CV.MPH_TO_MS),
     ],
     CarSpecs(mass=1326, wheelbase=2.7, steerRatio=15.38, centerToFrontRatio=0.4),  # steerRatio: 10.93 is end-to-end spec
     {Bus.pt: 'honda_civic_hatchback_ex_2017_can_generated'},
@@ -429,8 +439,8 @@ class CAR(Platforms):
     flags=HondaFlags.NIDEC_ALT_SCM_MESSAGES | HondaFlags.HAS_ALL_DOOR_STATES,
   )
   HONDA_CLARITY = HondaNidecPlatformConfig(
-    [HondaCarDocs("Honda Clarity 2018-21", min_steer_speed=12. * CV.MPH_TO_MS)],
-    CarSpecs(mass=1834, wheelbase=2.75, centerToFrontRatio=0.4, steerRatio=16.5),
+    [HondaCarDocs("Honda Clarity 2018-21", min_steer_speed=0. * CV.MPH_TO_MS)],
+    CarSpecs(mass=4052, wheelbase=2.75, centerToFrontRatio=0.41, steerRatio=16.50, tireStiffnessFactor=1.),
     radar_dbc_dict('honda_clarity_hybrid_2018_can_generated'),
     flags=HondaFlags.HAS_ALL_DOOR_STATES,
   )
@@ -491,6 +501,9 @@ STEER_THRESHOLD = {
   CAR.HONDA_NBOX_2G: 600,
   CAR.HONDA_ODYSSEY_5G_MMR: 600,
   # port extensions
+  CAR.HONDA_CLARITY: 2400, # linear torque modded Clarity only
+  CAR.HONDA_CIVIC: 2400, # linear torque modded Civic only
+  CAR.HONDA_CIVIC_BOSCH: 2400, # linear torque modded Civic only
   CAR.HONDA_ACCORD_9G: 30,
   CAR.ACURA_MDX_3G: 30,
   CAR.ACURA_MDX_3G_MMR: 30,
