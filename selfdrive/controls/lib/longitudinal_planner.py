@@ -23,15 +23,36 @@ CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 ALLOW_THROTTLE_THRESHOLD = 0.4
 MIN_ALLOW_THROTTLE_SPEED = 2.5
 
+# Smooth throttle gating. The model gas-press probability can move around frame-to-frame,
+# so do not use it as a hard accel/no-accel switch.
+THROTTLE_SCALE_PROB_MIN = 0.20
+THROTTLE_SCALE_PROB_MAX = 0.55
+THROTTLE_SCALE_FILTER_TAU = 0.35
+MIN_THROTTLE_ACCEL_SCALE = 0.15
+
+# Accel limit smoothing. These values are intentionally asymmetric: allow accel authority
+# to recover reasonably quickly, but pull it down a bit more gently to avoid snap changes.
+ACCEL_CLIP_UP_STEP = 0.20
+ACCEL_CLIP_DOWN_STEP = 0.12
+
+# Final output smoothing. Keeps the published target from jumping hard when MPC, E2E,
+# speed-limit logic, or throttle gating disagree briefly.
+OUTPUT_ACCEL_FILTER_TAU = 0.25
+OUTPUT_ACCEL_RISE_STEP = 0.18
+OUTPUT_ACCEL_FALL_STEP = 0.35
+
 # Lookup table for turns
 _A_TOTAL_MAX_V = [1.7, 3.2]
 _A_TOTAL_MAX_BP = [20., 40.]
 
+
 def get_max_accel(v_ego):
   return np.interp(v_ego, A_CRUISE_MAX_BP, A_CRUISE_MAX_VALS)
 
+
 def get_coast_accel(pitch):
   return np.sin(pitch) * -5.65 - 0.3  # fitted from data using xx/projects/allow_throttle/compute_coast_accel.py
+
 
 def limit_accel_in_turns(v_ego, angle_steers, a_target, CP):
   """
@@ -47,6 +68,10 @@ def limit_accel_in_turns(v_ego, angle_steers, a_target, CP):
   return [a_target[0], min(a_target[1], a_x_allowed)]
 
 
+def rate_limit_asym(value, last_value, down_step, up_step):
+  return float(np.clip(value, last_value - down_step, last_value + up_step))
+
+
 class LongitudinalPlanner(LongitudinalPlannerSP):
   def __init__(self, CP, CP_SP, init_v=0.0, init_a=0.0, dt=DT_MDL):
     self.CP = CP
@@ -55,11 +80,13 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.fcw = False
     self.dt = dt
     self.allow_throttle = True
+    self.throttle_scale_filter = FirstOrderFilter(1.0, THROTTLE_SCALE_FILTER_TAU, self.dt)
 
     self.a_desired = init_a
     self.v_desired_filter = FirstOrderFilter(init_v, 2.0, self.dt)
     self.prev_accel_clip = [ACCEL_MIN, ACCEL_MAX]
     self.output_a_target = 0.0
+    self.output_a_target_filter = FirstOrderFilter(init_a, OUTPUT_ACCEL_FILTER_TAU, self.dt)
     self.output_should_stop = False
 
     self.v_desired_trajectory = np.zeros(CONTROL_N)
@@ -85,6 +112,25 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     else:
       throttle_prob = 1.0
     return x, v, a, j, throttle_prob
+
+  def get_throttle_scale(self, throttle_prob, v_ego):
+    if v_ego <= MIN_ALLOW_THROTTLE_SPEED:
+      throttle_scale = 1.0
+    else:
+      throttle_scale = np.interp(throttle_prob,
+                                 [THROTTLE_SCALE_PROB_MIN, THROTTLE_SCALE_PROB_MAX],
+                                 [MIN_THROTTLE_ACCEL_SCALE, 1.0])
+
+    return float(np.clip(self.throttle_scale_filter.update(throttle_scale), MIN_THROTTLE_ACCEL_SCALE, 1.0))
+
+  def smooth_accel_clip(self, accel_clip):
+    accel_clip[0] = rate_limit_asym(accel_clip[0], self.prev_accel_clip[0], ACCEL_CLIP_DOWN_STEP, ACCEL_CLIP_UP_STEP)
+    accel_clip[1] = rate_limit_asym(accel_clip[1], self.prev_accel_clip[1], ACCEL_CLIP_DOWN_STEP, ACCEL_CLIP_UP_STEP)
+    return accel_clip
+
+  def smooth_output_accel(self, output_a_target):
+    output_a_target = rate_limit_asym(output_a_target, self.output_a_target, OUTPUT_ACCEL_FALL_STEP, OUTPUT_ACCEL_RISE_STEP)
+    return float(self.output_a_target_filter.update(output_a_target))
 
   def update(self, sm):
     LongitudinalPlannerSP.update(self, sm)
@@ -118,17 +164,25 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       self.v_desired_filter.x = v_ego
       # Clip aEgo to cruise limits to prevent large accelerations when becoming active
       self.a_desired = np.clip(sm['carState'].aEgo, accel_clip[0], accel_clip[1])
+      self.output_a_target = self.a_desired
+      self.output_a_target_filter.x = self.a_desired
+      self.throttle_scale_filter.x = 1.0
 
     # Prevent divergence, smooth in current v_ego
     self.v_desired_filter.x = max(0.0, self.v_desired_filter.update(v_ego))
     _, _, _, _, throttle_prob = self.parse_model(sm['modelV2'])
-    # Don't clip at low speeds since throttle_prob doesn't account for creep
-    self.allow_throttle = throttle_prob > ALLOW_THROTTLE_THRESHOLD or v_ego <= MIN_ALLOW_THROTTLE_SPEED
 
-    if not self.allow_throttle:
+    throttle_scale = self.get_throttle_scale(throttle_prob, v_ego)
+    self.allow_throttle = throttle_scale > MIN_THROTTLE_ACCEL_SCALE or v_ego <= MIN_ALLOW_THROTTLE_SPEED
+
+    # Gradually reduce positive accel authority when the model predicts the driver/model
+    # is unlikely to want throttle. This replaces the previous hard on/off throttle gate.
+    if v_ego > MIN_ALLOW_THROTTLE_SPEED:
       clipped_accel_coast = max(accel_coast, accel_clip[0])
-      clipped_accel_coast_interp = np.interp(v_ego, [MIN_ALLOW_THROTTLE_SPEED, MIN_ALLOW_THROTTLE_SPEED*2], [accel_clip[1], clipped_accel_coast])
-      accel_clip[1] = min(accel_clip[1], clipped_accel_coast_interp)
+      coast_limited_max_accel = max(clipped_accel_coast, accel_clip[1] * throttle_scale)
+      accel_clip[1] = min(accel_clip[1], coast_limited_max_accel)
+
+    accel_clip = self.smooth_accel_clip(accel_clip)
 
     # Get new v_cruise and a_desired from Smart Cruise Control and Speed Limit Assist
     v_cruise, self.a_desired = LongitudinalPlannerSP.update_targets(self, sm, self.v_desired_filter.x, self.a_desired, v_cruise)
@@ -154,9 +208,9 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.a_desired = float(np.interp(self.dt, CONTROL_N_T_IDX, self.a_desired_trajectory))
     self.v_desired_filter.x = self.v_desired_filter.x + self.dt * (self.a_desired + a_prev) / 2.0
 
-    action_t =  self.CP.longitudinalActuatorDelay + DT_MDL
+    action_t = self.CP.longitudinalActuatorDelay + DT_MDL
     output_a_target_mpc, output_should_stop_mpc = get_accel_from_plan(self.v_desired_trajectory, self.a_desired_trajectory, CONTROL_N_T_IDX,
-                                                                        action_t=action_t, vEgoStopping=self.CP.vEgoStopping)
+                                                                       action_t=action_t, vEgoStopping=self.CP.vEgoStopping)
     output_a_target_e2e = sm['modelV2'].action.desiredAcceleration
     output_should_stop_e2e = sm['modelV2'].action.shouldStop
 
@@ -169,9 +223,8 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       output_a_target = output_a_target_mpc
       self.output_should_stop = output_should_stop_mpc
 
-    for idx in range(2):
-      accel_clip[idx] = np.clip(accel_clip[idx], self.prev_accel_clip[idx] - 0.05, self.prev_accel_clip[idx] + 0.05)
-    self.output_a_target = np.clip(output_a_target, accel_clip[0], accel_clip[1])
+    output_a_target = np.clip(output_a_target, accel_clip[0], accel_clip[1])
+    self.output_a_target = np.clip(self.smooth_output_accel(output_a_target), accel_clip[0], accel_clip[1])
     self.prev_accel_clip = accel_clip
 
   def publish(self, sm, pm):
