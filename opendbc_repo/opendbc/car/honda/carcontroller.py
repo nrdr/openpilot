@@ -99,7 +99,10 @@ def process_hud_alert(hud_alert):
   return alert_fcw, alert_steer_required
 
 
-def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> float:
+def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float, steering_angle_deg: float) -> float:
+  if abs(float(steering_angle_deg)) > 70.0:
+    return 0.02
+
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
   sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
   highway = v_ego > 50.0 * CV.MPH_TO_MS
@@ -275,7 +278,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       else:
         self.rejoin_ramp = min(1.0, self.rejoin_ramp + DT_CTRL / 3.0)
 
-        tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo)
+        tau = _torque_lpf_tau(torque_cmd, self.prev_torque_cmd, CS.out.vEgo, CS.out.steeringAngleDeg)
         alpha = DT_CTRL / (tau + DT_CTRL)
 
         self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
