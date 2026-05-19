@@ -14,7 +14,7 @@ To flash your car:
 * Make sure your Comma Power is connected to the OBD2 port.
 * Run pfkill -f openpilot over SSH with the car OFF.
 * Turn the car into full accessory mode (ON) but keep the engine off. Turn off the A/C to avoid wasting battery.
-* Run python eps-update.py REPLACE_WITH_YOUR_FIRMWARE --skip-checksum -b 1
+* Run python eps-update.py REPLACE_WITH_YOUR_FIRMWARE -b 1
 * When you see that it aborts before peforming mutating actions, this is your key that it's ready.
 * After you are fully commited and ready to flash, run python eps-update.py REPLACE_WITH_YOUR_FIRMWARE -b 1 --skip-checksum --danger 
 
