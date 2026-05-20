@@ -16,6 +16,18 @@ from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP, HondaSafetyFla
 
 TransmissionType = structs.CarParams.TransmissionType
 
+FORCE_EPS_MODIFIED_TUNE_CANDIDATES = {
+  CAR.HONDA_CIVIC,
+  CAR.HONDA_CIVIC_BOSCH,
+  CAR.HONDA_CIVIC_BOSCH_DIESEL,
+  CAR.HONDA_CIVIC_2022,
+  CAR.HONDA_ACCORD,
+  CAR.HONDA_CRV_5G,
+  CAR.HONDA_INSIGHT,
+  CAR.HONDA_NBOX_2G,
+  CAR.HONDA_CLARITY,
+}
+
 
 class CarInterface(CarInterfaceBase):
   CarState = CarState
@@ -313,6 +325,13 @@ class CarInterface(CarInterfaceBase):
   def _get_params_sp(stock_cp: structs.CarParams, ret: structs.CarParamsSP, candidate, fingerprint: dict[int, dict[int, int]],
                      car_fw: list[structs.CarParams.CarFw], alpha_long: bool, is_release_sp: bool, docs: bool) -> structs.CarParamsSP:
     CAN = CanBus(stock_cp, fingerprint)
+
+    # Force known EPS-modified tune targets even if firmware fingerprinting misses
+    # the comma-marked EPS firmware version. This keeps the modded steering tune
+    # deterministic for developer/test builds.
+    if candidate in FORCE_EPS_MODIFIED_TUNE_CANDIDATES:
+      ret.flags |= HondaFlagsSP.EPS_MODIFIED.value
+      stock_cp.dashcamOnly = False
 
     for fw in car_fw:
       if fw.ecu == "eps" and b"," in fw.fwVersion:
