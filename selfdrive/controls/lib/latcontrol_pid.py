@@ -14,7 +14,7 @@ CENTER_TAPER_FADE_TAU = 0.25
 
 def _center_taper_high(car_fingerprint) -> float:
   if car_fingerprint in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
-    return 0.45
+    return 0.00 # Turn this off temporarily for testing
   if car_fingerprint == CAR.HONDA_CLARITY:
     return 1.24
 
