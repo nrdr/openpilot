@@ -126,7 +126,7 @@ class LatControlPID(LatControl):
         if phase > 0.2:
           ff *= 0.25
         elif phase < -0.2:
-          ff *= 5.0
+          ff *= 3.0
         else:
           ff *= 1.0
       else:
