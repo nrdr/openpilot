@@ -126,9 +126,9 @@ class LatControlPID(LatControl):
         if phase > 0.2:
           ff *= 0.25
         elif phase < -0.2:
-          ff *= 4.0
+          ff *= 5.0
         else:
-          ff *= 0.25
+          ff *= 1.0
       else:
         ff_scale = min(max((CS.vEgo - 20.0 * 0.44704) / (10.0 * 0.44704), 0.25), 1.0)
         ff *= ff_scale
