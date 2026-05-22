@@ -350,11 +350,12 @@ class CarInterface(CarInterfaceBase):
 
     if candidate == CAR.HONDA_CIVIC:
       if ret.flags & HondaFlagsSP.EPS_MODIFIED:
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]] # TODO: Verify this is stable
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
         stock_cp.steerAtStandstill = True
         stock_cp.minEnableSpeed = -1.0
         stock_cp.minSteerSpeed = -1.0
-        stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.12], [0.04]]
+        stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0, 10], [0.012, 0.12]]
+        stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0, 10], [0.004, 0.04]]
         stock_cp.lateralTuning.pid.kf = 0.000024
 
     elif candidate in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
@@ -363,7 +364,28 @@ class CarInterface(CarInterfaceBase):
         stock_cp.steerAtStandstill = True
         stock_cp.minEnableSpeed = -1.0
         stock_cp.minSteerSpeed = -1.0
-        stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.12], [0.04]]
+        stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0, 10], [0.012, 0.12]]
+        stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0, 10], [0.004, 0.04]]
+        stock_cp.lateralTuning.pid.kf = 0.000024
+
+    elif candidate == CAR.HONDA_CLARITY:
+      stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
+      stock_cp.steerAtStandstill = True
+      stock_cp.autoResumeSng = True
+      stock_cp.minEnableSpeed = -1.0
+      stock_cp.minSteerSpeed = -1.0
+      stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0, 10], [0.006, 0.06]]
+      stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0, 10], [0.002, 0.02]]
+      stock_cp.lateralTuning.pid.kf = 0.000012
+
+    elif candidate in (CAR.HONDA_INSIGHT, CAR.HONDA_NBOX_2G):
+      if ret.flags & HondaFlagsSP.EPS_MODIFIED:
+        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
+        stock_cp.steerAtStandstill = True
+        stock_cp.minEnableSpeed = -1.0
+        stock_cp.minSteerSpeed = -1.0
+        stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0, 10], [0.012, 0.12]]
+        stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0, 10], [0.004, 0.04]]
         stock_cp.lateralTuning.pid.kf = 0.000024
 
     elif candidate == CAR.HONDA_CIVIC_2022:
@@ -382,25 +404,6 @@ class CarInterface(CarInterfaceBase):
         # modified request output values: 0x0000, 0x0500, 0x0A15, 0x0E6D, 0x1100, 0x1200, 0x1ACD, 0x239A, 0x2800
         stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 2560, 10000], [0, 2560, 3840]]
         CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
-
-    elif candidate == CAR.HONDA_CLARITY:
-      stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 1663], [0, 1663]]
-      stock_cp.steerAtStandstill = True
-      stock_cp.autoResumeSng = True
-      stock_cp.minEnableSpeed = -1.0
-      stock_cp.minSteerSpeed = -1.0
-      stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.06], [0.02]]
-      stock_cp.lateralTuning.pid.kf = 0.000012
-
-    elif candidate in (CAR.HONDA_INSIGHT, CAR.HONDA_NBOX_2G):
-      if ret.flags & HondaFlagsSP.EPS_MODIFIED:
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
-        stock_cp.steerAtStandstill = True
-        stock_cp.autoResumeSng = True
-        stock_cp.minEnableSpeed = -1.0
-        stock_cp.minSteerSpeed = -1.0
-        stock_cp.lateralTuning.pid.kpV, stock_cp.lateralTuning.pid.kiV = [[0.12], [0.04]]
-        stock_cp.lateralTuning.pid.kf = 0.000024
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
       stock_cp.autoResumeSng = True
