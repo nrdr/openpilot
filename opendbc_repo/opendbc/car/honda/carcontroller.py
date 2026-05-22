@@ -108,8 +108,8 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   # Low speed needs less lag, highway doesn't have as much oscillations to begin with. They are similar:
   if highway or low_speed:
     if sign_change and torque_delta > 0.20:
-      return 0.07
-    return 0.1
+      return 0.1
+    return 0.12
 
   # Mid Speed Filtering:
   if torque_delta > 0.50:
