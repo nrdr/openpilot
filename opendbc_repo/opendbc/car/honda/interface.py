@@ -398,14 +398,13 @@ class CarInterface(CarInterfaceBase):
         CarInterfaceBase.configure_torque_tune(candidate, stock_cp.lateralTuning)
 
     elif candidate == CAR.HONDA_CRV_5G:
-      if ret.flags & HondaFlagsSP.EPS_MODIFIED:
-        stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
-        stock_cp.steerAtStandstill = True
-        stock_cp.minEnableSpeed = -1.0
-        stock_cp.minSteerSpeed = -1.0
-        stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0, 10], [0.012, 0.12]]
-        stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0, 10], [0.004, 0.04]]
-        stock_cp.lateralTuning.pid.kf = 0.000024
+      stock_cp.lateralParams.torqueBP, stock_cp.lateralParams.torqueV = [[0, 3840], [0, 3840]]
+      stock_cp.steerAtStandstill = True
+      stock_cp.minEnableSpeed = -1.0
+      stock_cp.minSteerSpeed = -1.0
+      stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0, 10], [0.012, 0.12]]
+      stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0, 10], [0.004, 0.04]]
+      stock_cp.lateralTuning.pid.kf = 0.000024
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
       stock_cp.autoResumeSng = True
