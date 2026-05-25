@@ -168,7 +168,7 @@ class CAR(Platforms):
     CarSpecs(mass=3334, wheelbase=3.99, steerRatio=17.0),
   )
   FORD_F_150_LIGHTNING_MK1 = FordF150LightningPlatform(
-    [FordCarDocs("Ford F-150 Lightning 2022-23", "Co-Pilot360 Assist 2.0")],
+    [FordCarDocs("Ford F-150 Lightning 2022-25", "Co-Pilot360 Assist 2.0")],
     CarSpecs(mass=2948, wheelbase=3.70, steerRatio=16.9),
   )
   FORD_FOCUS_MK4 = FordPlatformConfig(
@@ -320,6 +320,13 @@ FW_QUERY_CONFIG = FwQueryConfig(
     (Ecu.debug, 0x7d0, None),         # Accessory Protocol Interface Module
     (Ecu.hud, 0x720, None),           # Instrument Cluster Module
   ],
+  # 2025 F-150 Lightning Flash EPS at 0x730 responds to Mazda's UDS query but not
+  # to Ford's auxiliary (bus 0) query, so all Ford-tagged EPS responses arrive
+  # with logging=True and are filtered out of the matching dict. Mark EPS
+  # non-essential for MK1 so the missing Ford-tagged matching-eligible EPS
+  # response doesn't block matching. The unique TL38-2D053-AD (ABS) +
+  # RB5T-14D049-AB (radar) FWs still identify MK1 cleanly.
+  non_essential_ecus={Ecu.eps: [CAR.FORD_F_150_LIGHTNING_MK1]},
   # Custom fuzzy fingerprinting function using platform and model year hints
   match_fw_to_car_fuzzy=match_fw_to_car_fuzzy,
 )
