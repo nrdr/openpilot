@@ -103,15 +103,15 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   torque_delta = abs(float(torque_cmd) - float(prev_torque_cmd))
   sign_change = (float(torque_cmd) * float(prev_torque_cmd)) < 0.0
   highway = v_ego > 50.0 * CV.MPH_TO_MS
-  low_speed = v_ego < 25.0 * CV.MPH_TO_MS
 
-  # Low speed needs less lag, highway doesn't have as much oscillations to begin with. They are similar:
-  if highway or low_speed:
+  if v_ego < 10.0:
+    return float(np.interp(v_ego, [0.0, 10.0], [0.02, 0.10]))
+
+  if highway:
     if sign_change and torque_delta > 0.20:
       return 0.1
     return 0.12
 
-  # Mid Speed Filtering:
   if torque_delta > 0.50:
     return 0.1
   elif torque_delta > 0.20:
