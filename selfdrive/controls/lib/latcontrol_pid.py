@@ -124,7 +124,7 @@ class LatControlPID(LatControl):
       ff = self.ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
 
       # Smooth feedforward scaling: matches PID ramp (0–10 m/s → 0.1–1.0).
-      ff_scale = float(np.interp(CS.vEgo, [0.0, 10.0, 35.0], [0.5, 0.75, 1.0]))
+      ff_scale = float(np.interp(CS.vEgo, [0.0, 10.0, 35.0], [2.0, 1.5, 1.0]))
 
       # Low-speed unwind needs extra feedforward to overcome EPS/tire stiction,
       # but the boost fades out as speed increases to avoid twitchiness.
