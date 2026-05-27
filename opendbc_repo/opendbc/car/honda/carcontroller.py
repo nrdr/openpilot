@@ -281,13 +281,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
         self.torque_lpf = alpha * torque_cmd + (1.0 - alpha) * self.torque_lpf
         self.prev_torque_cmd = torque_cmd
         torque_cmd = self.torque_lpf * self.rejoin_ramp
-
-        limited_torque = rate_limit(
-          torque_cmd,
-          self.last_torque,
-          -self.params.STEER_DELTA_DOWN * DT_CTRL,
-          self.params.STEER_DELTA_UP * DT_CTRL
-        )
+        limited_torque = torque_cmd
         self.last_torque = limited_torque
 
       self.lat_active_prev = CC.latActive
