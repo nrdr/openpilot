@@ -105,7 +105,7 @@ def _torque_lpf_tau(torque_cmd: float, prev_torque_cmd: float, v_ego: float) -> 
   highway = v_ego > 50.0 * CV.MPH_TO_MS
 
   if v_ego < 10.0:
-    return float(np.interp(v_ego, [0.0, 10.0], [0.02, 0.10]))
+    return float(np.interp(v_ego, [0.0, 10.0], [0.01, 0.05]))
 
   if highway:
     if sign_change and torque_delta > 0.20:
