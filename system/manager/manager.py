@@ -62,23 +62,23 @@ NRDR_DEFAULT_BOOL_PARAMS = {
 
 NRDR_DEFAULT_VALUE_PARAMS = {
   # Models
-  "LaneTurnValue": "20",
+  "LaneTurnValue": 20.0,
 
   # Steering
-  "AutoLaneChangeTimer": "1",
+  "AutoLaneChangeTimer": 1,
 
   # Cruise
-  "SpeedLimitMode": "3",
-  "SpeedLimitOffsetType": "1",
-  "SpeedLimitValueOffset": "5",
+  "SpeedLimitMode": 3,
+  "SpeedLimitOffsetType": 1,
+  "SpeedLimitValueOffset": 5.0,
 
   # Visuals
-  "ChevronInfo": "3",
-  "DevUIInfo": "3",
+  "ChevronInfo": 3,
+  "DevUIInfo": 3,
 
   # Display
-  "OnroadScreenOffBrightness": "1",
-  "InteractivityTimeout": "120",
+  "OnroadScreenOffBrightness": 1,
+  "InteractivityTimeout": 120,
 }
 
 
