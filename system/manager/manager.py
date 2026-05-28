@@ -24,8 +24,61 @@ from openpilot.system.hardware import PC
 
 from openpilot.sunnypilot.system.params_migration import run_migration
 
+# nrdr fork defaults are applied only when a param is missing, so user-selected
+# values are preserved after first boot.
 NRDR_DEFAULT_BOOL_PARAMS = {
+  # Device
   "QuietMode": True,
+
+  # Toggles
+  "ExperimentalMode": True,
+  "RecordFront": True,
+  "RecordAudio": True,
+
+  # Models
+  "LaneTurnDesire": True,
+
+  # Cruise
+  "DynamicExperimentalControl": True,
+  "SmartCruiseControlVision": True,
+
+  # Visuals
+  "BlindSpot": True,
+  "TorqueBar": True,
+  "RainbowMode": False,
+  "StandstillTimer": True,
+  "RoadNameToggle": True,
+  "GreenLightAlert": True,
+  "LeadDepartAlert": True,
+  "TrueVEgoUI": False,
+  "HideVEgoUI": False,
+  "ShowTurnSignals": True,
+
+  # Developer
+  "SshEnabled": True,
+  "ShowAdvancedControls": True,
+  "LagdToggle": True,
+}
+
+NRDR_DEFAULT_VALUE_PARAMS = {
+  # Models
+  "LaneTurnValue": "20",
+
+  # Steering
+  "AutoLaneChangeTimer": "1",
+
+  # Cruise
+  "SpeedLimitMode": "3",
+  "SpeedLimitOffsetType": "1",
+  "SpeedLimitValueOffset": "5",
+
+  # Visuals
+  "ChevronInfo": "3",
+  "DevUIInfo": "3",
+
+  # Display
+  "OnroadScreenOffBrightness": "1",
+  "InteractivityTimeout": "120",
 }
 
 
@@ -34,6 +87,10 @@ def apply_nrdr_default_params(params: Params) -> None:
   for key, value in NRDR_DEFAULT_BOOL_PARAMS.items():
     if params.get(key) is None:
       params.put_bool(key, value)
+
+  for key, value in NRDR_DEFAULT_VALUE_PARAMS.items():
+    if params.get(key) is None:
+      params.put(key, value)
 
 
 def manager_init() -> None:
