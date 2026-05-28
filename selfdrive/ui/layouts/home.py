@@ -57,16 +57,40 @@ class NrdrForkWidget(Widget):
     button_font = gui_app.font(FontWeight.MEDIUM)
 
     x = rect.x + 55
-    y = rect.y + 55
+    y = rect.y + 75
     w = rect.width - 110
 
     title = "nrdr"
     subtitle = "Making Toyota and HKG users jealous, one day at a time."
-    body = "Access your drives from stable.konik.ai."
+    body = "stable.konik.ai"
 
     rl.draw_text_ex(title_font, title, rl.Vector2(x, y), 74, 0, rl.WHITE)
 
-    rl.draw_text_ex(body_font, subtitle, rl.Vector2(x, y + 110), 32, 0, rl.Color(225, 225, 225, 255))
+    subtitle_words = subtitle.split()
+    subtitle_lines = []
+    subtitle_line = ""
+
+    for word in subtitle_words:
+      test_line = f"{subtitle_line} {word}".strip()
+
+      if measure_text_cached(body_font, test_line, 42).x > w and subtitle_line:
+        subtitle_lines.append(subtitle_line)
+        subtitle_line = word
+      else:
+        subtitle_line = test_line
+
+    if subtitle_line:
+      subtitle_lines.append(subtitle_line)
+
+    for idx, line_text in enumerate(subtitle_lines[:2]):
+      rl.draw_text_ex(
+        body_font,
+        line_text,
+        rl.Vector2(x, y + 110 + idx * 46),
+        42,
+        0,
+        rl.Color(225, 225, 225, 255),
+      )
 
     max_line_width = int(w)
     words = body.split()
@@ -84,22 +108,25 @@ class NrdrForkWidget(Widget):
     if line:
       lines.append(line)
 
-    body_y = y + 190
+    body_y = y + 230
 
     for idx, line_text in enumerate(lines[:4]):
       rl.draw_text_ex(
         body_font,
         line_text,
         rl.Vector2(x, body_y + idx * 47),
-        34,
+        28,
         0,
         rl.Color(175, 175, 175, 255),
       )
 
+    button_width = min(455, w)
+    button_x = rect.x + (rect.width - button_width) / 2
+
     self._button_rect = rl.Rectangle(
-      x,
+      button_x,
       rect.y + rect.height - 205,
-      min(455, w),
+      button_width,
       76,
     )
 
@@ -126,17 +153,17 @@ class NrdrForkWidget(Widget):
     )
 
     self._update_button_rect = rl.Rectangle(
-      x,
-      rect.y + rect.height - 110,
-      min(455, w),
-      62,
+      button_x,
+      rect.y + rect.height - 105,
+      button_width,
+      54,
     )
 
     rl.draw_rectangle_rounded(
       self._update_button_rect,
       0.32,
       18,
-      rl.Color(44, 44, 44, 255),
+      rl.Color(36, 36, 36, 255),
     )
 
     update_text = "FORCE UPDATE"
