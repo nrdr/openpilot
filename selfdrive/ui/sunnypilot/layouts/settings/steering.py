@@ -8,6 +8,7 @@ from cereal import car
 from enum import IntEnum
 
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.system.hardware import HARDWARE
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, simple_button_item_sp, option_item_sp, LineSeparatorSP
 from openpilot.system.ui.widgets.scroller_tici import Scroller
@@ -32,6 +33,7 @@ class SteeringLayout(Widget):
     self._lane_change_settings_layout = LaneChangeSettingsLayout(lambda: self._set_current_panel(PanelType.STEERING))
     self._mads_settings_layout = MadsSettingsLayout(lambda: self._set_current_panel(PanelType.STEERING))
     self._torque_control_layout = TorqueSettingsLayout(lambda: self._set_current_panel(PanelType.STEERING))
+    self._increase_override_tolerance = None
 
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
@@ -96,11 +98,6 @@ class SteeringLayout(Widget):
       title=lambda: tr("Neural Network Lateral Control (NNLC)"),
       description=""
     )
-    self._increase_override_tolerance = toggle_item_sp(
-      param="NrdrIncreaseOverrideTolerance",
-      title=lambda: tr("Increase Driver Override Tolerance"),
-      description=lambda: tr("Reduces the likelihood of false driver override detections on sensitive Honda EPS platforms."),
-    )
 
     items = [
       self._mads_toggle,
@@ -116,10 +113,25 @@ class SteeringLayout(Widget):
       self._torque_customization_button,
       LineSeparatorSP(40),
       self._nnlc_toggle,
-      LineSeparatorSP(40),
-      self._increase_override_tolerance,
     ]
+
+    if self._is_comma_four():
+      self._increase_override_tolerance = toggle_item_sp(
+        param="NrdrIncreaseOverrideTolerance",
+        title=lambda: tr("Increase Driver Override Tolerance"),
+        description=lambda: tr("Reduces the likelihood of false driver override detections on sensitive Honda EPS platforms."),
+      )
+
+      items.extend([
+        LineSeparatorSP(40),
+        self._increase_override_tolerance,
+      ])
+
     return items
+
+  @staticmethod
+  def _is_comma_four() -> bool:
+    return HARDWARE.get_device_type() == "mici"
 
   def _set_current_panel(self, panel: PanelType):
     self._current_panel = panel
@@ -144,7 +156,9 @@ class SteeringLayout(Widget):
     self._nnlc_toggle.action_item.set_enabled(ui_state.is_offroad() and torque_allowed and not enforce_torque_enabled)
     self._torque_control_toggle.action_item.set_enabled(ui_state.is_offroad() and torque_allowed and not nnlc_enabled)
     self._torque_customization_button.action_item.set_enabled(self._torque_control_toggle.action_item.get_state())
-    self._increase_override_tolerance.action_item.set_enabled(ui_state.is_offroad())
+
+    if self._increase_override_tolerance is not None:
+      self._increase_override_tolerance.action_item.set_enabled(ui_state.is_offroad())
 
   def _render(self, rect):
     if self._current_panel == PanelType.LANE_CHANGE:
