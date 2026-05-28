@@ -256,8 +256,8 @@ sections:
       op: '>'
       value: 0
 - id: nrdr
-  title: nrdr
-  description: Experimental steering behavior controls
+  title: nrdr Settings
+  description: Customize settings related to the nrdr fork
   items:
   - key: NrdrIncreaseOverrideTolerance
     widget: toggle
