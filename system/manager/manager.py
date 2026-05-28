@@ -24,6 +24,17 @@ from openpilot.system.hardware import PC
 
 from openpilot.sunnypilot.system.params_migration import run_migration
 
+NRDR_DEFAULT_BOOL_PARAMS = {
+  "QuietMode": True,
+}
+
+
+def apply_nrdr_default_params(params: Params) -> None:
+  """Apply nrdr fork defaults without overriding user-selected values."""
+  for key, value in NRDR_DEFAULT_BOOL_PARAMS.items():
+    if params.get(key) is None:
+      params.put_bool(key, value)
+
 
 def manager_init() -> None:
   save_bootlog()
@@ -53,6 +64,8 @@ def manager_init() -> None:
 
   if not PC:
     run_migration(params)
+
+  apply_nrdr_default_params(params)
 
   # set unset params to their default value
   for k in params.all_keys():
