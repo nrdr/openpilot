@@ -100,6 +100,14 @@ sections:
     field: torque_allowed
     equals: true
   items:
+
+  - key: NrdrIncreaseOverrideTolerance
+    widget: toggle
+    title: Increase Driver Override Tolerance
+    description: Reduces the likelihood of false driver override detections on sensitive Honda EPS platforms.
+    enablement:
+    - $ref: '#/macros/offroad'
+
   - key: EnforceTorqueControl
     widget: toggle
     title: Enforce Torque Lateral Control
