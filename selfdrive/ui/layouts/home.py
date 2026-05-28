@@ -37,6 +37,7 @@ class NrdrForkWidget(Widget):
     self._force_update_flash_until = 0.0
     self._force_update_status_text = "FORCE UPDATE"
     self._force_update_status_color = rl.Color(70, 135, 255, 255)
+    self._tune_button_flash_until = 0.0
 
   def set_click_callback(self, callback: Callable[[], None]):
     self._tune_click_callback = callback
@@ -50,6 +51,7 @@ class NrdrForkWidget(Widget):
       return
 
     if self._tune_click_callback is not None and rl.check_collision_point_rec(mouse_pos, self._button_rect):
+      self._tune_button_flash_until = time.monotonic() + 0.35
       self._tune_click_callback()
       return
 
@@ -167,11 +169,14 @@ class NrdrForkWidget(Widget):
       tune_button_height,
     )
 
+    tune_button_active = time.monotonic() < self._tune_button_flash_until
+    tune_color = rl.Color(70, 135, 255, 255) if tune_button_active else rl.Color(58, 58, 58, 255)
+
     rl.draw_rectangle_rounded(
       self._button_rect,
       0.32,
       18,
-      rl.Color(58, 58, 58, 255),
+      tune_color,
     )
 
     button_text = "TUNE YOUR CAR"
