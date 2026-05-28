@@ -255,3 +255,13 @@ sections:
       key: AutoLaneChangeTimer
       op: '>'
       value: 0
+- id: nrdr
+  title: nrdr
+  description: Experimental steering behavior controls
+  items:
+  - key: NrdrIncreaseOverrideTolerance
+    widget: toggle
+    title: Increase Driver Override Tolerance
+    description: Reduces the likelihood of false driver override detections on sensitive Honda EPS platforms.
+    enablement:
+    - $ref: '#/macros/offroad'
