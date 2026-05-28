@@ -23,7 +23,7 @@ from openpilot.system.statsd import statlog
 from openpilot.common.swaglog import cloudlog
 from openpilot.system.hardware.power_monitoring import PowerMonitoring
 from openpilot.system.hardware.fan_controller import FanController
-from openpilot.system.version import terms_version, training_version, get_build_metadata, terms_version_sp
+from openpilot.system.version import terms_version, training_version, get_build_metadata, terms_version_sp, sunnylink_consent_version
 
 ThermalStatus = log.DeviceState.ThermalStatus
 NetworkType = log.DeviceState.NetworkType
@@ -207,6 +207,8 @@ def hardware_thread(end_event, hw_queue) -> None:
   params.put("HasAcceptedTerms", terms_version)
   params.put("HasAcceptedTermsSP", terms_version_sp)
   params.put("CompletedTrainingVersion", training_version)
+  params.put("CompletedSunnylinkConsentVersion", sunnylink_consent_version)
+  params.put_bool("SunnylinkEnabled", True)
 
   uptime_offroad: float = params.get("UptimeOffroad", return_default=True)
   uptime_onroad: float = params.get("UptimeOnroad", return_default=True)
