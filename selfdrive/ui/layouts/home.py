@@ -125,14 +125,26 @@ class NrdrForkWidget(Widget):
         rl.Color(175, 175, 175, 255),
       )
 
-    button_width = min(455, w)
+    button_width = min(590, w)
     button_x = rect.x + (rect.width - button_width) / 2
+
+    tune_button_height = 99
+    update_button_height = 70
+    button_gap = 28
+    bottom_margin = 51
+
+    self._update_button_rect = rl.Rectangle(
+      button_x,
+      rect.y + rect.height - bottom_margin - update_button_height,
+      button_width,
+      update_button_height,
+    )
 
     self._button_rect = rl.Rectangle(
       button_x,
-      rect.y + rect.height - 205,
+      self._update_button_rect.y - button_gap - tune_button_height,
       button_width,
-      76,
+      tune_button_height,
     )
 
     rl.draw_rectangle_rounded(
@@ -143,7 +155,7 @@ class NrdrForkWidget(Widget):
     )
 
     button_text = "TUNE YOUR CAR"
-    button_size = measure_text_cached(button_font, button_text, 36)
+    button_size = measure_text_cached(button_font, button_text, 47)
 
     rl.draw_text_ex(
       button_font,
@@ -152,27 +164,20 @@ class NrdrForkWidget(Widget):
         self._button_rect.x + (self._button_rect.width - button_size.x) / 2,
         self._button_rect.y + (self._button_rect.height - button_size.y) / 2,
       ),
-      36,
+      47,
       0,
       rl.WHITE,
-    )
-
-    self._update_button_rect = rl.Rectangle(
-      button_x,
-      rect.y + rect.height - 105,
-      button_width,
-      54,
     )
 
     rl.draw_rectangle_rounded(
       self._update_button_rect,
       0.32,
       18,
-      rl.Color(36, 36, 36, 255),
+      rl.Color(58, 58, 58, 255),
     )
 
     update_text = "FORCE UPDATE"
-    update_size = measure_text_cached(button_font, update_text, 30)
+    update_size = measure_text_cached(button_font, update_text, 39)
 
     rl.draw_text_ex(
       button_font,
@@ -181,9 +186,9 @@ class NrdrForkWidget(Widget):
         self._update_button_rect.x + (self._update_button_rect.width - update_size.x) / 2,
         self._update_button_rect.y + (self._update_button_rect.height - update_size.y) / 2,
       ),
-      30,
+      39,
       0,
-      rl.Color(210, 210, 210, 255),
+      rl.WHITE,
     )
 
 
