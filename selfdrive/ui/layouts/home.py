@@ -64,7 +64,7 @@ class NrdrForkWidget(Widget):
     subtitle = "Your drives will upload to stable.konik.ai."
     body = "Making Toyota and HKG users jealous, one day at a time."
 
-    rl.draw_text_ex(title_font, title, rl.Vector2(x, y), 107, 0, rl.WHITE)
+    rl.draw_text_ex(title_font, title, rl.Vector2(x, y), 97, 0, rl.WHITE)
 
     subtitle_words = subtitle.split()
     subtitle_lines = []
@@ -73,7 +73,7 @@ class NrdrForkWidget(Widget):
     for word in subtitle_words:
       test_line = f"{subtitle_line} {word}".strip()
 
-      if measure_text_cached(body_font, test_line, 60).x > w and subtitle_line:
+      if measure_text_cached(body_font, test_line, 54).x > w and subtitle_line:
         subtitle_lines.append(subtitle_line)
         subtitle_line = word
       else:
@@ -87,7 +87,7 @@ class NrdrForkWidget(Widget):
         body_font,
         line_text,
         rl.Vector2(x, y + 110 + idx * 46),
-        60,
+        54,
         0,
         rl.Color(225, 225, 225, 255),
       )
@@ -99,7 +99,7 @@ class NrdrForkWidget(Widget):
 
     for word in words:
       test_line = f"{line} {word}".strip()
-      if measure_text_cached(body_font, test_line, 49).x > max_line_width and line:
+      if measure_text_cached(body_font, test_line, 44).x > max_line_width and line:
         lines.append(line)
         line = word
       else:
@@ -108,14 +108,14 @@ class NrdrForkWidget(Widget):
     if line:
       lines.append(line)
 
-    body_y = y + 300
+    body_y = y + 275
 
     for idx, line_text in enumerate(lines[:4]):
       rl.draw_text_ex(
         body_font,
         line_text,
         rl.Vector2(x, body_y + idx * 47),
-        41,
+        37,
         0,
         rl.Color(175, 175, 175, 255),
       )
