@@ -202,6 +202,12 @@ def hardware_thread(end_event, hw_queue) -> None:
   params = Params()
   power_monitor = PowerMonitoring()
 
+  # Keep onboarding satisfied for this fork so factory resets, branch changes,
+  # and fresh installs do not repeatedly block startup on already-reviewed content.
+  params.put("HasAcceptedTerms", terms_version)
+  params.put("HasAcceptedTermsSP", terms_version_sp)
+  params.put("CompletedTrainingVersion", training_version)
+
   uptime_offroad: float = params.get("UptimeOffroad", return_default=True)
   uptime_onroad: float = params.get("UptimeOnroad", return_default=True)
   last_uptime_ts: float = time.monotonic()
@@ -302,12 +308,6 @@ def hardware_thread(end_event, hw_queue) -> None:
     startup_conditions["up_to_date"] = params.get("Offroad_ConnectivityNeeded") is None or params.get_bool("DisableUpdates") or params.get_bool("SnoozeUpdate")
     startup_conditions["no_excessive_actuation"] = params.get("Offroad_ExcessiveActuation") is None
     startup_conditions["not_uninstalling"] = not params.get_bool("DoUninstall")
-    # Keep onboarding satisfied for this fork so factory resets, branch changes, and
-    # fresh installs do not repeatedly block startup on already-reviewed content.
-    params.put("HasAcceptedTerms", terms_version)
-    params.put("HasAcceptedTermsSP", terms_version_sp)
-    params.put("CompletedTrainingVersion", training_version)
-
     startup_conditions["accepted_terms"] = True
     startup_conditions["accepted_terms_sp"] = True
 
