@@ -37,7 +37,8 @@ class NrdrForkWidget(Widget):
     self._force_update_flash_until = 0.0
     self._force_update_status_text = "FORCE UPDATE"
     self._force_update_status_color = rl.Color(70, 135, 255, 255)
-    self._tune_button_flash_until = 0.0
+    self._tune_flash_until = 0.0
+    self._pending_tune_callback = False
 
   def set_click_callback(self, callback: Callable[[], None]):
     self._tune_click_callback = callback
@@ -51,8 +52,8 @@ class NrdrForkWidget(Widget):
       return
 
     if self._tune_click_callback is not None and rl.check_collision_point_rec(mouse_pos, self._button_rect):
-      self._tune_button_flash_until = time.monotonic() + 0.35
-      self._tune_click_callback()
+      self._tune_flash_until = time.monotonic() + 0.18
+      self._pending_tune_callback = True
       return
 
     super()._handle_mouse_release(mouse_pos)
@@ -77,6 +78,11 @@ class NrdrForkWidget(Widget):
     )
 
   def _render(self, rect: rl.Rectangle):
+    if self._pending_tune_callback and time.monotonic() >= self._tune_flash_until:
+      self._pending_tune_callback = False
+      if self._tune_click_callback is not None:
+        self._tune_click_callback()
+
     rl.draw_rectangle_rounded(rect, 0.04, 16, rl.Color(30, 30, 30, 255))
 
     title_font = gui_app.font(FontWeight.BOLD)
@@ -169,7 +175,7 @@ class NrdrForkWidget(Widget):
       tune_button_height,
     )
 
-    tune_button_active = time.monotonic() < self._tune_button_flash_until
+    tune_button_active = time.monotonic() < self._tune_flash_until
     tune_color = rl.Color(70, 135, 255, 255) if tune_button_active else rl.Color(58, 58, 58, 255)
 
     rl.draw_rectangle_rounded(
