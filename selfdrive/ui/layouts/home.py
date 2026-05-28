@@ -30,14 +30,15 @@ class NrdrForkWidget(Widget):
     super().__init__()
     self._button_rect = rl.Rectangle(0, 0, 0, 0)
     self._update_button_rect = rl.Rectangle(0, 0, 0, 0)
-    self._click_callback: Callable[[], None] | None = None
+    self._tune_click_callback: Callable[[], None] | None = None
 
   def set_click_callback(self, callback: Callable[[], None]):
-    self._click_callback = callback
+    self._tune_click_callback = callback
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
-    super()._handle_mouse_release(mouse_pos)
-
+    # Handle the inner buttons before calling the base Widget handler. The base
+    # handler may treat this whole card as clickable, so FORCE UPDATE must be
+    # consumed here before the Tune Your Car callback can fire.
     if rl.check_collision_point_rec(mouse_pos, self._update_button_rect):
       if os.path.exists(self.OPSYNC_PATH):
         subprocess.Popen(
@@ -45,9 +46,13 @@ class NrdrForkWidget(Widget):
           stdout=subprocess.DEVNULL,
           stderr=subprocess.DEVNULL,
         )
+      return
 
-    elif self._click_callback is not None and rl.check_collision_point_rec(mouse_pos, self._button_rect):
-      self._click_callback()
+    if self._tune_click_callback is not None and rl.check_collision_point_rec(mouse_pos, self._button_rect):
+      self._tune_click_callback()
+      return
+
+    super()._handle_mouse_release(mouse_pos)
 
   def _render(self, rect: rl.Rectangle):
     rl.draw_rectangle_rounded(rect, 0.04, 16, rl.Color(30, 30, 30, 255))
