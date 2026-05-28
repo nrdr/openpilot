@@ -38,16 +38,16 @@ class NrdrForkWidget(Widget):
   def _handle_mouse_release(self, mouse_pos: MousePos):
     super()._handle_mouse_release(mouse_pos)
 
-    if self._click_callback is not None and rl.check_collision_point_rec(mouse_pos, self._button_rect):
-      self._click_callback()
-
-    elif rl.check_collision_point_rec(mouse_pos, self._update_button_rect):
+    if rl.check_collision_point_rec(mouse_pos, self._update_button_rect):
       if os.path.exists(self.OPSYNC_PATH):
         subprocess.Popen(
           [self.OPSYNC_PATH],
           stdout=subprocess.DEVNULL,
           stderr=subprocess.DEVNULL,
         )
+
+    elif self._click_callback is not None and rl.check_collision_point_rec(mouse_pos, self._button_rect):
+      self._click_callback()
 
   def _render(self, rect: rl.Rectangle):
     rl.draw_rectangle_rounded(rect, 0.04, 16, rl.Color(30, 30, 30, 255))
