@@ -403,9 +403,9 @@ class CarInterface(CarInterfaceBase):
       stock_cp.steerAtStandstill = True
       stock_cp.minEnableSpeed = -1.0
       stock_cp.minSteerSpeed = -1.0
-      stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0, 10, 35], [0.006, 0.03, 0.06]]
-      stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0, 10, 35], [0.002, 0.01, 0.02]]
-      stock_cp.lateralTuning.pid.kf = 0.000012
+      stock_cp.lateralTuning.pid.kpBP, stock_cp.lateralTuning.pid.kpV = [[0, 10, 35], [0.0096, 0.048, 0.096]]
+      stock_cp.lateralTuning.pid.kiBP, stock_cp.lateralTuning.pid.kiV = [[0, 10, 35], [0.0032, 0.016, 0.032]]
+      stock_cp.lateralTuning.pid.kf = 0.0000192
 
     elif candidate in (CAR.ACURA_MDX_3G, CAR.ACURA_MDX_3G_MMR):  # source mlocoteta
       stock_cp.autoResumeSng = True
