@@ -61,8 +61,8 @@ class NrdrForkWidget(Widget):
     w = rect.width - 110
 
     title = "nrdr"
-    subtitle = "Making Toyota and HKG users jealous, one day at a time."
-    body = "stable.konik.ai"
+    subtitle = "Your drives will upload to stable.konik.ai."
+    body = "Making Toyota and HKG users jealous, one day at a time."
 
     rl.draw_text_ex(title_font, title, rl.Vector2(x, y), 74, 0, rl.WHITE)
 
