@@ -1,17 +1,18 @@
 import time
+import os
+import subprocess
 import pyray as rl
 from collections.abc import Callable
 from enum import IntEnum
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.widgets.offroad_alerts import UpdateAlert, OffroadAlert
 from openpilot.selfdrive.ui.widgets.exp_mode_button import ExperimentalModeButton
-from openpilot.selfdrive.ui.widgets.prime import PrimeWidget
-from openpilot.selfdrive.ui.widgets.setup import SetupWidget
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
 from openpilot.system.ui.lib.multilang import tr, trn
 from openpilot.system.ui.widgets.label import gui_label
 from openpilot.system.ui.widgets import Widget
+from openpilot.selfdrive.ui.sunnypilot.layouts.settings.trips import TripsLayout
 
 HEADER_HEIGHT = 80
 HEAD_BUTTON_FONT_SIZE = 40
@@ -19,6 +20,139 @@ CONTENT_MARGIN = 40
 SPACING = 25
 RIGHT_COLUMN_WIDTH = 750
 REFRESH_INTERVAL = 10.0
+
+
+
+class NrdrForkWidget(Widget):
+  OPSYNC_PATH = "/data/openpilot/scripts/bash/opsync.sh"
+
+  def __init__(self):
+    super().__init__()
+    self._button_rect = rl.Rectangle(0, 0, 0, 0)
+    self._update_button_rect = rl.Rectangle(0, 0, 0, 0)
+    self._click_callback: Callable[[], None] | None = None
+
+  def set_click_callback(self, callback: Callable[[], None]):
+    self._click_callback = callback
+
+  def _handle_mouse_release(self, mouse_pos: MousePos):
+    super()._handle_mouse_release(mouse_pos)
+
+    if self._click_callback is not None and rl.check_collision_point_rec(mouse_pos, self._button_rect):
+      self._click_callback()
+
+    elif rl.check_collision_point_rec(mouse_pos, self._update_button_rect):
+      if os.path.exists(self.OPSYNC_PATH):
+        subprocess.Popen(
+          [self.OPSYNC_PATH],
+          stdout=subprocess.DEVNULL,
+          stderr=subprocess.DEVNULL,
+        )
+
+  def _render(self, rect: rl.Rectangle):
+    rl.draw_rectangle_rounded(rect, 0.04, 16, rl.Color(30, 30, 30, 255))
+
+    title_font = gui_app.font(FontWeight.BOLD)
+    body_font = gui_app.font(FontWeight.NORMAL)
+    button_font = gui_app.font(FontWeight.MEDIUM)
+
+    x = rect.x + 55
+    y = rect.y + 55
+    w = rect.width - 110
+
+    title = "nrdr"
+    subtitle = "Making Toyota and HKG users jealous, one day at a time."
+    body = "Access your drives from stable.konik.ai."
+
+    rl.draw_text_ex(title_font, title, rl.Vector2(x, y), 74, 0, rl.WHITE)
+
+    rl.draw_text_ex(body_font, subtitle, rl.Vector2(x, y + 110), 45, 0, rl.Color(225, 225, 225, 255))
+
+    max_line_width = int(w)
+    words = body.split()
+    lines = []
+    line = ""
+
+    for word in words:
+      test_line = f"{line} {word}".strip()
+      if measure_text_cached(body_font, test_line, 34).x > max_line_width and line:
+        lines.append(line)
+        line = word
+      else:
+        line = test_line
+
+    if line:
+      lines.append(line)
+
+    body_y = y + 190
+
+    for idx, line_text in enumerate(lines[:4]):
+      rl.draw_text_ex(
+        body_font,
+        line_text,
+        rl.Vector2(x, body_y + idx * 47),
+        34,
+        0,
+        rl.Color(175, 175, 175, 255),
+      )
+
+    self._button_rect = rl.Rectangle(
+      x,
+      rect.y + rect.height - 205,
+      min(455, w),
+      76,
+    )
+
+    rl.draw_rectangle_rounded(
+      self._button_rect,
+      0.32,
+      18,
+      rl.Color(58, 58, 58, 255),
+    )
+
+    button_text = "TUNE YOUR CAR →"
+    button_size = measure_text_cached(button_font, button_text, 36)
+
+    rl.draw_text_ex(
+      button_font,
+      button_text,
+      rl.Vector2(
+        self._button_rect.x + (self._button_rect.width - button_size.x) / 2,
+        self._button_rect.y + (self._button_rect.height - button_size.y) / 2,
+      ),
+      36,
+      0,
+      rl.WHITE,
+    )
+
+    self._update_button_rect = rl.Rectangle(
+      x,
+      rect.y + rect.height - 110,
+      min(455, w),
+      62,
+    )
+
+    rl.draw_rectangle_rounded(
+      self._update_button_rect,
+      0.32,
+      18,
+      rl.Color(44, 44, 44, 255),
+    )
+
+    update_text = "FORCE UPDATE →"
+    update_size = measure_text_cached(button_font, update_text, 30)
+
+    rl.draw_text_ex(
+      button_font,
+      update_text,
+      rl.Vector2(
+        self._update_button_rect.x + (self._update_button_rect.width - update_size.x) / 2,
+        self._update_button_rect.y + (self._update_button_rect.height - update_size.y) / 2,
+      ),
+      30,
+      0,
+      rl.Color(210, 210, 210, 255),
+    )
 
 
 class HomeLayoutState(IntEnum):
@@ -55,8 +189,8 @@ class HomeLayout(Widget):
     self.update_notif_rect = rl.Rectangle(0, 0, 200, HEADER_HEIGHT - 10)
     self.alert_notif_rect = rl.Rectangle(0, 0, 220, HEADER_HEIGHT - 10)
 
-    self._prime_widget = PrimeWidget()
-    self._setup_widget = SetupWidget()
+    self._trips_widget = TripsLayout()
+    self._nrdr_widget = NrdrForkWidget()
 
     self._exp_mode_button = ExperimentalModeButton()
     self._setup_callbacks()
@@ -71,6 +205,7 @@ class HomeLayout(Widget):
     self.update_alert.set_dismiss_callback(lambda: self._set_state(HomeLayoutState.HOME))
     self.offroad_alert.set_dismiss_callback(lambda: self._set_state(HomeLayoutState.HOME))
     self._exp_mode_button.set_click_callback(lambda: self.settings_callback() if self.settings_callback else None)
+    self._nrdr_widget.set_click_callback(lambda: self.settings_callback() if self.settings_callback else None)
 
   def set_settings_callback(self, callback: Callable):
     self.settings_callback = callback
@@ -191,7 +326,7 @@ class HomeLayout(Widget):
     self.offroad_alert.render(self.content_rect)
 
   def _render_left_column(self):
-    self._prime_widget.render(self.left_column_rect)
+    self._trips_widget.render(self.left_column_rect)
 
   def _render_right_column(self):
     exp_height = 125
@@ -206,7 +341,7 @@ class HomeLayout(Widget):
       self.right_column_rect.width,
       self.right_column_rect.height - exp_height - SPACING,
     )
-    self._setup_widget.render(setup_rect)
+    self._nrdr_widget.render(setup_rect)
 
   def _refresh(self):
     self._version_text = self._get_version_text()
@@ -228,6 +363,6 @@ class HomeLayout(Widget):
     self._prev_alerts_present = alerts_present
 
   def _get_version_text(self) -> str:
-    brand = "sunnypilot"
+    brand = "nrdr"
     description = self.params.get("UpdaterCurrentDescription")
     return f"{brand} {description}" if description else brand
