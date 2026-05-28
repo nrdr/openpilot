@@ -70,7 +70,7 @@ NRDR_DEFAULT_VALUE_PARAMS = {
   # Cruise
   "SpeedLimitMode": 3,
   "SpeedLimitOffsetType": 1,
-  "SpeedLimitValueOffset": 5.0,
+  "SpeedLimitValueOffset": 5,
 
   # Visuals
   "ChevronInfo": 3,
