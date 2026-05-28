@@ -66,7 +66,7 @@ class NrdrForkWidget(Widget):
 
     rl.draw_text_ex(title_font, title, rl.Vector2(x, y), 74, 0, rl.WHITE)
 
-    rl.draw_text_ex(body_font, subtitle, rl.Vector2(x, y + 110), 45, 0, rl.Color(225, 225, 225, 255))
+    rl.draw_text_ex(body_font, subtitle, rl.Vector2(x, y + 110), 32, 0, rl.Color(225, 225, 225, 255))
 
     max_line_width = int(w)
     words = body.split()
@@ -110,7 +110,7 @@ class NrdrForkWidget(Widget):
       rl.Color(58, 58, 58, 255),
     )
 
-    button_text = "TUNE YOUR CAR →"
+    button_text = "TUNE YOUR CAR"
     button_size = measure_text_cached(button_font, button_text, 36)
 
     rl.draw_text_ex(
@@ -139,7 +139,7 @@ class NrdrForkWidget(Widget):
       rl.Color(44, 44, 44, 255),
     )
 
-    update_text = "FORCE UPDATE →"
+    update_text = "FORCE UPDATE"
     update_size = measure_text_cached(button_font, update_text, 30)
 
     rl.draw_text_ex(
