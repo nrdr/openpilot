@@ -64,7 +64,7 @@ class NrdrForkWidget(Widget):
       self._force_update_status_color = rl.Color(190, 68, 68, 255)
       return
 
-    self._force_update_status_text = "SYNCING WITH UPSTREAM"
+    self._force_update_status_text = "FETCHING UPSTREAM"
     self._force_update_status_color = rl.Color(58, 150, 90, 255)
 
     subprocess.Popen(
