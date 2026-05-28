@@ -24,13 +24,19 @@ REFRESH_INTERVAL = 10.0
 
 
 class NrdrForkWidget(Widget):
-  OPSYNC_PATH = "/data/openpilot/scripts/bash/opsync.sh"
+  OPSYNC_PATHS = (
+    "/data/openpilot/scripts/bash/opsync.sh",
+    "/data/openpilot/scripts/opsync.sh",
+  )
 
   def __init__(self):
     super().__init__()
     self._button_rect = rl.Rectangle(0, 0, 0, 0)
     self._update_button_rect = rl.Rectangle(0, 0, 0, 0)
     self._tune_click_callback: Callable[[], None] | None = None
+    self._force_update_flash_until = 0.0
+    self._force_update_status_text = "FORCE UPDATE"
+    self._force_update_status_color = rl.Color(70, 135, 255, 255)
 
   def set_click_callback(self, callback: Callable[[], None]):
     self._tune_click_callback = callback
@@ -40,12 +46,7 @@ class NrdrForkWidget(Widget):
     # handler may treat this whole card as clickable, so FORCE UPDATE must be
     # consumed here before the Tune Your Car callback can fire.
     if rl.check_collision_point_rec(mouse_pos, self._update_button_rect):
-      if os.path.exists(self.OPSYNC_PATH):
-        subprocess.Popen(
-          [self.OPSYNC_PATH],
-          stdout=subprocess.DEVNULL,
-          stderr=subprocess.DEVNULL,
-        )
+      self._run_force_update()
       return
 
     if self._tune_click_callback is not None and rl.check_collision_point_rec(mouse_pos, self._button_rect):
@@ -53,6 +54,25 @@ class NrdrForkWidget(Widget):
       return
 
     super()._handle_mouse_release(mouse_pos)
+
+  def _run_force_update(self):
+    opsync_path = next((path for path in self.OPSYNC_PATHS if os.path.exists(path)), None)
+    self._force_update_flash_until = time.monotonic() + 1.5
+
+    if opsync_path is None:
+      self._force_update_status_text = "SCRIPT MISSING"
+      self._force_update_status_color = rl.Color(190, 68, 68, 255)
+      return
+
+    self._force_update_status_text = "UPDATE SENT"
+    self._force_update_status_color = rl.Color(58, 150, 90, 255)
+
+    subprocess.Popen(
+      ["bash", opsync_path],
+      stdout=subprocess.DEVNULL,
+      stderr=subprocess.DEVNULL,
+      cwd="/data/openpilot",
+    )
 
   def _render(self, rect: rl.Rectangle):
     rl.draw_rectangle_rounded(rect, 0.04, 16, rl.Color(30, 30, 30, 255))
@@ -125,13 +145,13 @@ class NrdrForkWidget(Widget):
         rl.Color(175, 175, 175, 255),
       )
 
-    button_width = min(590, w)
+    button_width = min(650, w)
     button_x = rect.x + (rect.width - button_width) / 2
 
-    tune_button_height = 99
-    update_button_height = 70
-    button_gap = 28
-    bottom_margin = 51
+    tune_button_height = 109
+    update_button_height = 109
+    button_gap = 24
+    bottom_margin = 45
 
     self._update_button_rect = rl.Rectangle(
       button_x,
@@ -155,7 +175,7 @@ class NrdrForkWidget(Widget):
     )
 
     button_text = "TUNE YOUR CAR"
-    button_size = measure_text_cached(button_font, button_text, 47)
+    button_size = measure_text_cached(button_font, button_text, 52)
 
     rl.draw_text_ex(
       button_font,
@@ -164,20 +184,23 @@ class NrdrForkWidget(Widget):
         self._button_rect.x + (self._button_rect.width - button_size.x) / 2,
         self._button_rect.y + (self._button_rect.height - button_size.y) / 2,
       ),
-      47,
+      52,
       0,
       rl.WHITE,
     )
+
+    force_update_active = time.monotonic() < self._force_update_flash_until
+    update_color = self._force_update_status_color if force_update_active else rl.Color(58, 58, 58, 255)
+    update_text = self._force_update_status_text if force_update_active else "FORCE UPDATE"
 
     rl.draw_rectangle_rounded(
       self._update_button_rect,
       0.32,
       18,
-      rl.Color(58, 58, 58, 255),
+      update_color,
     )
 
-    update_text = "FORCE UPDATE"
-    update_size = measure_text_cached(button_font, update_text, 39)
+    update_size = measure_text_cached(button_font, update_text, 52)
 
     rl.draw_text_ex(
       button_font,
@@ -186,7 +209,7 @@ class NrdrForkWidget(Widget):
         self._update_button_rect.x + (self._update_button_rect.width - update_size.x) / 2,
         self._update_button_rect.y + (self._update_button_rect.height - update_size.y) / 2,
       ),
-      39,
+      52,
       0,
       rl.WHITE,
     )
