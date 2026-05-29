@@ -189,12 +189,14 @@ class LatControlPID(LatControl):
 
       self.frame += 1
       if self.frame % 300 == 0:
+        # default/min/max are in runtime multiplier units; scale converts the stored
+        # percent param (100 -> 1.0x). Unset -> 1.0x (neutral, as if the tuner were off).
         self.lat_pid_tune_scale = get_param_float(
           self.params,
           "LatPidTuneScale",
-          100.0,
+          1.0,
           0.0,
-          500.0,
+          5.0,
           scale=100.0,
         )
 

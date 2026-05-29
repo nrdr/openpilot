@@ -104,7 +104,7 @@ class NrdrLayout(Widget):
       max_value=10000,
       value_change_step=10,
       description=lambda: tr("Controls the maximum upward steering torque rate when the rate limiter is enabled."),
-      label_callback=lambda value: f"{value / 100:.2f}",
+      label_callback=lambda value: f"{value / 100:.1f}",
       use_float_scaling=True,
     )
 
@@ -115,7 +115,7 @@ class NrdrLayout(Widget):
       max_value=10000,
       value_change_step=10,
       description=lambda: tr("Controls the maximum downward steering torque rate when the rate limiter is enabled."),
-      label_callback=lambda value: f"{value / 100:.2f}",
+      label_callback=lambda value: f"{value / 100:.1f}",
       use_float_scaling=True,
     )
 
