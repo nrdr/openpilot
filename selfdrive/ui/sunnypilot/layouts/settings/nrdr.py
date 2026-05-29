@@ -108,8 +108,8 @@ class NrdrLayout(Widget):
 
     self._driver_assist_during_override = toggle_item_sp(
       param="HondaDriverAssistDuringOverride",
-      title=lambda: tr("Pass-through standard assist torque on override (Default: ON)"),
-      description=lambda: tr("When ON, openpilot gives way while you steer (normal manual feel). When OFF, openpilot keeps applying torque (more resistant)."),
+      title=lambda: tr("Pass-through assist torque on override (Default: ON)"),
+      description=lambda: tr("When ON, openpilot tells the EPS it is fully inactive (normal manual feel). When OFF, openpilot keeps sending standby messages to the EPS, which makes the steering feel more resistive."),
     )
 
     self._override_fade_down = option_item_sp(
