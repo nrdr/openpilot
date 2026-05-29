@@ -17,6 +17,26 @@ class NrdrLayout(Widget):
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
+    self._lat_pid_tune_scale = option_item_sp(
+      param="LatPidTuneScale",
+      title=lambda: tr("Lateral PID Tune Scale"),
+      min_value=0,
+      max_value=500,
+      value_change_step=5,
+      description=lambda: tr("Scales lateral PID controller values from their configured base tune."),
+      label_callback=lambda value: f"{value}%",
+    )
+
+    self._long_pid_tune_scale = option_item_sp(
+      param="LongPidTuneScale",
+      title=lambda: tr("Longitudinal PID Tune Scale"),
+      min_value=0,
+      max_value=500,
+      value_change_step=5,
+      description=lambda: tr("Scales longitudinal PID controller values from their configured base tune."),
+      label_callback=lambda value: f"{value}%",
+    )
+
     self._increase_override_tolerance = toggle_item_sp(
       param="NrdrIncreaseOverrideTolerance",
       title=lambda: tr("Increase Driver Override Tolerance"),
@@ -97,16 +117,6 @@ class NrdrLayout(Widget):
       label_callback=lambda value: f"{value}",
     )
 
-    self._pid_tune_scale = option_item_sp(
-      param="HondaPidTuneScale",
-      title=lambda: tr("PID Tune Scale"),
-      min_value=0,
-      max_value=500,
-      value_change_step=5,
-      description=lambda: tr("Scales Honda PID tuning values from their configured base tune."),
-      label_callback=lambda value: f"{value}%",
-    )
-
     self._stopping_decel_rate = option_item_sp(
       param="HondaStoppingDecelRate",
       title=lambda: tr("Stopping Decel Rate"),
@@ -131,7 +141,8 @@ class NrdrLayout(Widget):
       self._steer_delta_up,
       self._steer_delta_down,
       LineSeparatorSP(40),
-      self._pid_tune_scale,
+      self._lat_pid_tune_scale,
+      self._long_pid_tune_scale,
       self._stopping_decel_rate,
     ]
 
@@ -142,7 +153,8 @@ class NrdrLayout(Widget):
     steer_delta_limiter_enabled = self._steer_delta_limiter.action_item.get_state()
 
     self._increase_override_tolerance.action_item.set_enabled(offroad)
-    self._pid_tune_scale.action_item.set_enabled(offroad)
+    self._lat_pid_tune_scale.action_item.set_enabled(offroad)
+    self._long_pid_tune_scale.action_item.set_enabled(offroad)
 
     self._steer_delta_up.set_visible(steer_delta_limiter_enabled)
     self._steer_delta_down.set_visible(steer_delta_limiter_enabled)

@@ -271,6 +271,9 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"SmartCruiseControlVision", {PERSISTENT | BACKUP, BOOL, "0"}},
 
     // nrdr params
+    {"LatPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
+    {"LongPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
+    {"HondaStoppingDecelRate", {PERSISTENT | BACKUP, INT, "30"}},
     {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaOverrideFadeDownSecs", {PERSISTENT | BACKUP, INT, "2"}},
     {"HondaOverrideFadeUpSecs", {PERSISTENT | BACKUP, INT, "2"}},

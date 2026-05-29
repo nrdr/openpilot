@@ -6,12 +6,30 @@ from opendbc.car.honda.values import CAR
 from opendbc.car.honda.carcontroller import get_eps_modified_steering_pressed
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
+from openpilot.common.params import Params
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 
 
 CENTER_TAPER_FADE_TAU = 0.25
 UNWIND_FF_BOOST_TIME_S = 1.0
+
+
+def get_param_float(params, key, default, min_value=None, max_value=None, scale=1.0):
+  value = params.get(key)
+  if value is None:
+    ret = default
+  else:
+    try:
+      ret = float(value.decode("utf-8")) / scale
+    except (AttributeError, TypeError, ValueError):
+      ret = default
+
+  if min_value is not None:
+    ret = max(min_value, ret)
+  if max_value is not None:
+    ret = min(max_value, ret)
+  return ret
 
 
 def _center_taper_high(car_fingerprint) -> float:
@@ -97,6 +115,7 @@ class LatControlPID(LatControl):
     self.unwind_ff_active = False
     self.unwind_ff_timer = 0.0
     self.dt = dt
+    self.params = Params()
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
              calibrated_pose, curvature_limited, lat_delay):
@@ -166,10 +185,23 @@ class LatControlPID(LatControl):
 
       freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < 5
 
-      output_torque = self.pid.update(error,
-                                      feedforward=ff,
-                                      speed=CS.vEgo,
-                                      freeze_integrator=freeze_integrator)
+      lat_pid_tune_scale = get_param_float(
+        self.params,
+        "LatPidTuneScale",
+        100.0,
+        0.0,
+        500.0,
+        scale=100.0,
+      )
+
+      output_torque = self.pid.update(
+        error,
+        feedforward=ff,
+        speed=CS.vEgo,
+        freeze_integrator=freeze_integrator,
+      )
+
+      output_torque *= lat_pid_tune_scale
 
       if self.is_eps_modified:
         lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))

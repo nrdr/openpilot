@@ -1,5 +1,7 @@
 import numpy as np
+
 from cereal import car
+from openpilot.common.params import Params
 from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
 from openpilot.common.pid import PIDController
@@ -8,6 +10,23 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 
 LongCtrlState = car.CarControl.Actuators.LongControlState
+
+
+def get_param_float(params, key, default, min_value=None, max_value=None, scale=1.0):
+  value = params.get(key)
+  if value is None:
+    ret = default
+  else:
+    try:
+      ret = float(value.decode("utf-8")) / scale
+    except (AttributeError, TypeError, ValueError):
+      ret = default
+
+  if min_value is not None:
+    ret = max(min_value, ret)
+  if max_value is not None:
+    ret = min(max_value, ret)
+  return ret
 
 
 def long_control_state_trans(CP, CP_SP, active, long_control_state, v_ego,
@@ -47,6 +66,7 @@ def long_control_state_trans(CP, CP_SP, active, long_control_state, v_ego,
         long_control_state = LongCtrlState.pid
   return long_control_state
 
+
 class LongControl:
   def __init__(self, CP, CP_SP):
     self.CP = CP
@@ -55,6 +75,7 @@ class LongControl:
     self.pid = PIDController((CP.longitudinalTuning.kpBP, CP.longitudinalTuning.kpV),
                              (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV),
                              rate=1 / DT_CTRL)
+    self.params = Params()
     self.last_output_accel = 0.0
 
   def reset(self):
@@ -70,7 +91,7 @@ class LongControl:
                                                        CS.cruiseState.standstill)
     if self.long_control_state == LongCtrlState.off:
       self.reset()
-      output_accel = 0.
+      output_accel = 0.0
 
     elif self.long_control_state == LongCtrlState.stopping:
       output_accel = self.last_output_accel
@@ -85,8 +106,23 @@ class LongControl:
 
     else:  # LongCtrlState.pid
       error = a_target - CS.aEgo
-      output_accel = self.pid.update(error, speed=CS.vEgo,
-                                     feedforward=a_target)
+
+      long_pid_tune_scale = get_param_float(
+        self.params,
+        "LongPidTuneScale",
+        100.0,
+        0.0,
+        500.0,
+        scale=100.0,
+      )
+
+      output_accel = self.pid.update(
+        error,
+        speed=CS.vEgo,
+        feedforward=a_target,
+      )
+
+      output_accel *= long_pid_tune_scale
 
     self.last_output_accel = np.clip(output_accel, accel_limits[0], accel_limits[1])
     return self.last_output_accel
