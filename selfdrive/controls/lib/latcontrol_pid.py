@@ -155,7 +155,7 @@ class LatControlPID(LatControl):
 
       # Low-speed unwind needs extra feedforward to overcome EPS/tire stiction.
       # The boost is intentionally limited to the first second of each unwind event.
-      unwind_ff_boost = float(np.interp(CS.vEgo, [0.0, 10.0], [10.0, 1.0]))
+      unwind_ff_boost = float(np.interp(CS.vEgo, [0.0, 10.0], [2.0, 1.0]))
       unwinding = phase < -0.2
 
       if unwinding and not self.unwind_ff_active and self.unwind_ff_timer <= 0.0:
