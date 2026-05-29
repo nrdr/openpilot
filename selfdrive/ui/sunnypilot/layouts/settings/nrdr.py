@@ -3,7 +3,7 @@ nrdr experimental settings panel.
 """
 
 from openpilot.system.ui.lib.multilang import tr
-from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp
+from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -23,14 +23,119 @@ class NrdrLayout(Widget):
       description=lambda: tr("Reduces the likelihood of false driver override detections on sensitive Honda EPS platforms."),
     )
 
+    self._override_fade_down = option_item_sp(
+      param="HondaOverrideFadeDownSecs",
+      title=lambda: tr("Override Torque Fade Down"),
+      min_value=0,
+      max_value=10,
+      value_change_step=1,
+      description=lambda: tr("Controls how quickly steering torque fades out when driver override begins."),
+      label_callback=lambda seconds: f"{seconds} s",
+    )
+
+    self._override_fade_up = option_item_sp(
+      param="HondaOverrideFadeUpSecs",
+      title=lambda: tr("Override Torque Fade Up"),
+      min_value=0,
+      max_value=10,
+      value_change_step=1,
+      description=lambda: tr("Controls how quickly steering torque fades back in after driver override ends."),
+      label_callback=lambda seconds: f"{seconds} s",
+    )
+
+    self._lkas_active_during_override = toggle_item_sp(
+      param="HondaLkasActiveDuringOverride",
+      title=lambda: tr("LKAS Active During Override"),
+      description=lambda: tr("Keeps the LKAS active bit enabled while the driver is overriding steering."),
+    )
+
+    self._live_learning_gas = toggle_item_sp(
+      param="HondaLiveLearningGas",
+      title=lambda: tr("Live Learning Gas"),
+      description=lambda: tr("Allows Honda gas and wind compensation factors to learn live while driving."),
+    )
+
+    self._low_pass_filter = toggle_item_sp(
+      param="HondaTorqueLowPassFilter",
+      title=lambda: tr("Low Pass Filter"),
+      description=lambda: tr("Applies smoothing to requested steering torque."),
+    )
+
+    self._steer_delta_limiter = toggle_item_sp(
+      param="HondaSteerDeltaLimiter",
+      title=lambda: tr("Steer Delta Rate Limiter"),
+      description=lambda: tr("Limits how quickly requested steering torque can rise or fall."),
+    )
+
+    self._steer_delta_up = option_item_sp(
+      param="HondaSteerDeltaUp",
+      title=lambda: tr("Steer Delta Up"),
+      min_value=0,
+      max_value=100,
+      value_change_step=1,
+      description=lambda: tr("Controls the maximum upward steering torque rate when the rate limiter is enabled."),
+      label_callback=lambda value: f"{value}",
+    )
+
+    self._steer_delta_down = option_item_sp(
+      param="HondaSteerDeltaDown",
+      title=lambda: tr("Steer Delta Down"),
+      min_value=0,
+      max_value=100,
+      value_change_step=1,
+      description=lambda: tr("Controls the maximum downward steering torque rate when the rate limiter is enabled."),
+      label_callback=lambda value: f"{value}",
+    )
+
+    self._pid_tune_scale = option_item_sp(
+      param="HondaPidTuneScale",
+      title=lambda: tr("PID Tune Scale"),
+      min_value=0,
+      max_value=500,
+      value_change_step=5,
+      description=lambda: tr("Scales Honda PID tuning values from their configured base tune."),
+      label_callback=lambda value: f"{value}%",
+    )
+
+    self._stopping_decel_rate = option_item_sp(
+      param="HondaStoppingDecelRate",
+      title=lambda: tr("Stopping Decel Rate"),
+      min_value=0,
+      max_value=100,
+      value_change_step=1,
+      description=lambda: tr("Controls the deceleration rate used while stopping."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+    )
+
     return [
       self._increase_override_tolerance,
+      LineSeparatorSP(40),
+      self._override_fade_down,
+      self._override_fade_up,
+      self._lkas_active_during_override,
+      LineSeparatorSP(40),
+      self._live_learning_gas,
+      self._low_pass_filter,
+      LineSeparatorSP(40),
+      self._steer_delta_limiter,
+      self._steer_delta_up,
+      self._steer_delta_down,
+      LineSeparatorSP(40),
+      self._pid_tune_scale,
+      self._stopping_decel_rate,
     ]
 
   def _update_state(self):
     super()._update_state()
 
-    self._increase_override_tolerance.action_item.set_enabled(ui_state.is_offroad())
+    offroad = ui_state.is_offroad()
+    steer_delta_limiter_enabled = self._steer_delta_limiter.action_item.get_state()
+
+    self._increase_override_tolerance.action_item.set_enabled(offroad)
+    self._pid_tune_scale.action_item.set_enabled(offroad)
+
+    self._steer_delta_up.set_visible(steer_delta_limiter_enabled)
+    self._steer_delta_down.set_visible(steer_delta_limiter_enabled)
 
   def _render(self, rect):
     self._scroller.render(rect)
