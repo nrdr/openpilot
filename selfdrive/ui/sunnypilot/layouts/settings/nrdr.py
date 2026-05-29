@@ -23,6 +23,12 @@ class NrdrLayout(Widget):
       description=lambda: tr("Reduces the likelihood of false driver override detections on sensitive Honda EPS platforms."),
     )
 
+    self._lkas_active_during_override = toggle_item_sp(
+      param="HondaLkasActiveDuringOverride",
+      title=lambda: tr("Tell EPS LKAS=Active During Override "),
+      description=lambda: tr("When fully overriding, should the EPS feel like driving normally or be more resistant?"),
+    )
+
     self._override_fade_down = option_item_sp(
       param="HondaOverrideFadeDownSecs",
       title=lambda: tr("Override Torque Fade Down"),
@@ -41,12 +47,6 @@ class NrdrLayout(Widget):
       value_change_step=1,
       description=lambda: tr("Controls how quickly steering torque fades back in after driver override ends."),
       label_callback=lambda seconds: f"{seconds} s",
-    )
-
-    self._lkas_active_during_override = toggle_item_sp(
-      param="HondaLkasActiveDuringOverride",
-      title=lambda: tr("LKAS Active During Override"),
-      description=lambda: tr("Keeps the LKAS active bit enabled while the driver is overriding steering."),
     )
 
     self._live_learning_gas = toggle_item_sp(
