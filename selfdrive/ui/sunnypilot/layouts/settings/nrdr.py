@@ -29,6 +29,16 @@ class NrdrLayout(Widget):
       description=lambda: tr("When fully overriding, should the EPS feel like driving normally or be more resistant?"),
     )
 
+    self._override_torque_scale = option_item_sp(
+      param="HondaOverrideTorqueScale",
+      title=lambda: tr("Override Torque Retain"),
+      min_value=0,
+      max_value=100,
+      value_change_step=5,
+      description=lambda: tr("Controls how much openpilot steering torque remains while the driver is overriding."),
+      label_callback=lambda value: f"{value}%",
+    )
+
     self._override_fade_down = option_item_sp(
       param="HondaOverrideFadeDownSecs",
       title=lambda: tr("Override Torque Fade Down"),
