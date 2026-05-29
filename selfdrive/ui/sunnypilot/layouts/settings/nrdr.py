@@ -132,6 +132,9 @@ class NrdrLayout(Widget):
     )
 
     return [
+      self._lat_pid_tune_scale,
+      self._long_pid_tune_scale,
+      LineSeparatorSP(40),
       self._increase_override_tolerance,
       LineSeparatorSP(40),
       self._override_fade_down,
@@ -146,8 +149,6 @@ class NrdrLayout(Widget):
       self._steer_delta_up,
       self._steer_delta_down,
       LineSeparatorSP(40),
-      self._lat_pid_tune_scale,
-      self._long_pid_tune_scale,
       self._stopping_decel_rate,
     ]
 
