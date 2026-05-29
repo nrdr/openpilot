@@ -282,10 +282,9 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaLiveLearningGas", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaTorqueLowPassFilter", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaSteerDeltaLimiter", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"HondaSteerDeltaUp", {PERSISTENT | BACKUP, INT, "3"}},
-    {"HondaSteerDeltaDown", {PERSISTENT | BACKUP, INT, "3"}},
+    {"HondaSteerDeltaUp", {PERSISTENT | BACKUP, FLOAT, "3"}},
+    {"HondaSteerDeltaDown", {PERSISTENT | BACKUP, FLOAT, "3"}},
     {"HondaPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
-    {"HondaStoppingDecelRate", {PERSISTENT | BACKUP, INT, "30"}},
 
     // Torque lateral control custom params
     {"CustomTorqueParams", {PERSISTENT | BACKUP , BOOL}},
