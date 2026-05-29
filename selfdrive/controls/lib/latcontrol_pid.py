@@ -116,6 +116,8 @@ class LatControlPID(LatControl):
     self.unwind_ff_timer = 0.0
     self.dt = dt
     self.params = Params()
+    self.frame = -1
+    self.lat_pid_tune_scale = 1.0
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
              calibrated_pose, curvature_limited, lat_delay):
@@ -185,14 +187,16 @@ class LatControlPID(LatControl):
 
       freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < 5
 
-      lat_pid_tune_scale = get_param_float(
-        self.params,
-        "LatPidTuneScale",
-        100.0,
-        0.0,
-        500.0,
-        scale=100.0,
-      )
+      self.frame += 1
+      if self.frame % 300 == 0:
+        self.lat_pid_tune_scale = get_param_float(
+          self.params,
+          "LatPidTuneScale",
+          100.0,
+          0.0,
+          500.0,
+          scale=100.0,
+        )
 
       output_torque = self.pid.update(
         error,
@@ -201,7 +205,7 @@ class LatControlPID(LatControl):
         freeze_integrator=freeze_integrator,
       )
 
-      output_torque *= lat_pid_tune_scale
+      output_torque *= self.lat_pid_tune_scale
 
       if self.is_eps_modified:
         lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))
