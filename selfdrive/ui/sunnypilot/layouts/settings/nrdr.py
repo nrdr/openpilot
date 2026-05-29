@@ -188,6 +188,50 @@ class NrdrLayout(Widget):
       label_callback=lambda value: f"{value / 100:.2f}",
     )
 
+    self._stop_accel = option_item_sp(
+      param="HondaStopAccel",
+      title=lambda: tr("Stop Accel (Default: -2.0)"),
+      min_value=-400,
+      max_value=0,
+      value_change_step=1,
+      description=lambda: tr("Target acceleration once stopped (holds the brake)."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
+    self._stopping_decel_rate_long = option_item_sp(
+      param="HondaStoppingDecelRateLong",
+      title=lambda: tr("Planner Stopping Rate (Default: 0.3)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=1,
+      description=lambda: tr("How quickly commanded deceleration ramps down while coming to a stop."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
+    self._v_ego_stopping = option_item_sp(
+      param="HondaVEgoStopping",
+      title=lambda: tr("vEgo Stopping (Default: 0.5)"),
+      min_value=0,
+      max_value=300,
+      value_change_step=1,
+      description=lambda: tr("Speed (m/s) below which the planner treats the car as stopping."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
+    self._v_ego_starting = option_item_sp(
+      param="HondaVEgoStarting",
+      title=lambda: tr("vEgo Starting (Default: 0.5)"),
+      min_value=0,
+      max_value=300,
+      value_change_step=1,
+      description=lambda: tr("Speed (m/s) above which the car is considered moving again."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
     return [
       self._lp_steer_ratio,
       self._lp_stiffness,
@@ -216,6 +260,10 @@ class NrdrLayout(Widget):
       self._steer_delta_down,
       LineSeparatorSP(40),
       self._stopping_decel_rate,
+      self._stop_accel,
+      self._stopping_decel_rate_long,
+      self._v_ego_stopping,
+      self._v_ego_starting,
     ]
 
   def _refresh_live_params(self):

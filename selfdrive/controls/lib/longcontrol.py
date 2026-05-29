@@ -34,7 +34,7 @@ def get_param_float(params, key, default, min_value=None, max_value=None, scale=
 
 
 def long_control_state_trans(CP, CP_SP, active, long_control_state, v_ego,
-                             should_stop, brake_pressed, cruise_standstill):
+                             should_stop, brake_pressed, cruise_standstill, v_ego_starting=None):
   # Gas Interceptor
   cruise_standstill = cruise_standstill and not CP_SP.enableGasInterceptor
 
@@ -42,7 +42,7 @@ def long_control_state_trans(CP, CP_SP, active, long_control_state, v_ego,
   starting_condition = (not should_stop and
                         not cruise_standstill and
                         not brake_pressed)
-  started_condition = v_ego > CP.vEgoStarting
+  started_condition = v_ego > (CP.vEgoStarting if v_ego_starting is None else v_ego_starting)
 
   if not active:
     long_control_state = LongCtrlState.off
@@ -81,27 +81,45 @@ class LongControl:
                              rate=1 / DT_CTRL)
     self.params = Params()
     self.last_output_accel = 0.0
+    self.frame = 0
+
+    # Live-tunable longitudinal params; default to the car's configured values so
+    # an unset param means "no change from stock".
+    self.long_pid_tune_scale = 1.0
+    self.stop_accel = CP.stopAccel
+    self.stopping_decel_rate = CP.stoppingDecelRate
+    self.v_ego_starting = CP.vEgoStarting
 
   def reset(self):
     self.pid.reset()
 
+  def _read_live_params(self):
+    self.long_pid_tune_scale = get_param_float(self.params, "LongPidTuneScale", 1.0, 0.0, 5.0, scale=100.0)
+    self.stop_accel = get_param_float(self.params, "HondaStopAccel", self.CP.stopAccel, -10.0, 0.0)
+    self.stopping_decel_rate = get_param_float(self.params, "HondaStoppingDecelRateLong", self.CP.stoppingDecelRate, 0.0, 5.0)
+    self.v_ego_starting = get_param_float(self.params, "HondaVEgoStarting", self.CP.vEgoStarting, 0.0, 5.0)
+
   def update(self, active, CS, a_target, should_stop, accel_limits):
     """Update longitudinal control. This updates the state machine and runs a PID loop"""
+    if self.frame % 300 == 0:
+      self._read_live_params()
+    self.frame += 1
+
     self.pid.neg_limit = accel_limits[0]
     self.pid.pos_limit = accel_limits[1]
 
     self.long_control_state = long_control_state_trans(self.CP, self.CP_SP, active, self.long_control_state, CS.vEgo,
                                                        should_stop, CS.brakePressed,
-                                                       CS.cruiseState.standstill)
+                                                       CS.cruiseState.standstill, v_ego_starting=self.v_ego_starting)
     if self.long_control_state == LongCtrlState.off:
       self.reset()
       output_accel = 0.0
 
     elif self.long_control_state == LongCtrlState.stopping:
       output_accel = self.last_output_accel
-      if output_accel > self.CP.stopAccel:
+      if output_accel > self.stop_accel:
         output_accel = min(output_accel, 0.0)
-        output_accel -= self.CP.stoppingDecelRate * DT_CTRL
+        output_accel -= self.stopping_decel_rate * DT_CTRL
       self.reset()
 
     elif self.long_control_state == LongCtrlState.starting:
@@ -111,24 +129,13 @@ class LongControl:
     else:  # LongCtrlState.pid
       error = a_target - CS.aEgo
 
-      # default/min/max are in runtime multiplier units; scale converts the stored
-      # percent param (100 -> 1.0x). Unset -> 1.0x (neutral, as if the tuner were off).
-      long_pid_tune_scale = get_param_float(
-        self.params,
-        "LongPidTuneScale",
-        1.0,
-        0.0,
-        5.0,
-        scale=100.0,
-      )
-
       output_accel = self.pid.update(
         error,
         speed=CS.vEgo,
         feedforward=a_target,
       )
 
-      output_accel *= long_pid_tune_scale
+      output_accel *= self.long_pid_tune_scale
 
     self.last_output_accel = np.clip(output_accel, accel_limits[0], accel_limits[1])
     return self.last_output_accel
