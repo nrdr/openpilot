@@ -18,7 +18,11 @@ def get_param_float(params, key, default, min_value=None, max_value=None, scale=
     ret = default
   else:
     try:
-      ret = float(value.decode("utf-8")) / scale
+      # sunnypilot Params.get() auto-casts by declared key type, so an INT param
+      # comes back as a python int (not bytes). Handle bytes/str/number uniformly.
+      if isinstance(value, bytes):
+        value = value.decode("utf-8")
+      ret = float(value) / scale
     except (AttributeError, TypeError, ValueError):
       ret = default
 
