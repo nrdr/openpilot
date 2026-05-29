@@ -272,6 +272,16 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
 
     // nrdr params
     {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"HondaOverrideFadeDownSecs", PERSISTENT},
+    {"HondaOverrideFadeUpSecs", PERSISTENT},
+    {"HondaLkasActiveDuringOverride", PERSISTENT},
+    {"HondaLiveLearningGas", PERSISTENT},
+    {"HondaTorqueLowPassFilter", PERSISTENT},
+    {"HondaSteerDeltaLimiter", PERSISTENT},
+    {"HondaSteerDeltaUp", PERSISTENT},
+    {"HondaSteerDeltaDown", PERSISTENT},
+    {"HondaPidTuneScale", PERSISTENT},
+    {"HondaStoppingDecelRate", PERSISTENT},
 
     // Torque lateral control custom params
     {"CustomTorqueParams", {PERSISTENT | BACKUP , BOOL}},
