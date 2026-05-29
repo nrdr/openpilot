@@ -2,8 +2,9 @@
 nrdr experimental settings panel.
 """
 
+from cereal import log
 from openpilot.system.ui.lib.multilang import tr
-from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP, ListItemSP
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -13,13 +14,40 @@ class NrdrLayout(Widget):
   def __init__(self):
     super().__init__()
 
+    # Read-only display of openpilot's learned live parameters.
+    self._lp_text = {
+      "steerRatio": tr("learning…"),
+      "stiffnessFactor": tr("learning…"),
+      "angleOffsetAverageDeg": tr("learning…"),
+      "angleOffsetDeg": tr("learning…"),
+    }
+
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
+    # --- Read-only learned live parameters (top of panel) ---
+    self._lp_steer_ratio = ListItemSP(
+      title=tr("Learned Steer Ratio"),
+      description=lambda: self._lp_text["steerRatio"],
+    )
+    self._lp_stiffness = ListItemSP(
+      title=tr("Learned Tire Stiffness Factor"),
+      description=lambda: self._lp_text["stiffnessFactor"],
+    )
+    self._lp_angle_avg = ListItemSP(
+      title=tr("Learned Angle Offset (avg)"),
+      description=lambda: self._lp_text["angleOffsetAverageDeg"],
+    )
+    self._lp_angle_inst = ListItemSP(
+      title=tr("Learned Angle Offset (instant)"),
+      description=lambda: self._lp_text["angleOffsetDeg"],
+    )
+
+    # --- Tunable params ---
     self._lat_pid_tune_scale = option_item_sp(
       param="LatPidTuneScale",
-      title=lambda: tr("Lateral PID Tune Scale"),
+      title=lambda: tr("Lateral PID Tune Scale (Default: 100%)"),
       min_value=0,
       max_value=500,
       value_change_step=5,
@@ -29,7 +57,7 @@ class NrdrLayout(Widget):
 
     self._long_pid_tune_scale = option_item_sp(
       param="LongPidTuneScale",
-      title=lambda: tr("Longitudinal PID Tune Scale"),
+      title=lambda: tr("Longitudinal PID Tune Scale (Default: 100%)"),
       min_value=0,
       max_value=500,
       value_change_step=5,
@@ -39,29 +67,58 @@ class NrdrLayout(Widget):
 
     self._increase_override_tolerance = toggle_item_sp(
       param="NrdrIncreaseOverrideTolerance",
-      title=lambda: tr("Increase Driver Override Tolerance"),
+      title=lambda: tr("Increase Driver Override Tolerance (Default: ON)"),
       description=lambda: tr("Reduces the likelihood of false driver override detections on sensitive Honda EPS platforms."),
     )
 
-    self._lkas_active_during_override = toggle_item_sp(
-      param="HondaLkasActiveDuringOverride",
-      title=lambda: tr("Tell EPS LKAS=Active During Override "),
-      description=lambda: tr("When fully overriding, should the EPS feel like driving normally or be more resistant?"),
+    self._low_pass_filter = toggle_item_sp(
+      param="HondaTorqueLowPassFilter",
+      title=lambda: tr("Low Pass Filter (tau) (Default: ON)"),
+      description=lambda: tr("Applies smoothing to requested steering torque."),
     )
 
-    self._override_torque_scale = option_item_sp(
-      param="HondaOverrideTorqueScale",
-      title=lambda: tr("Override Torque Retain"),
+    self._lpf_tau_low = option_item_sp(
+      param="HondaLpfTauLowSpeed",
+      title=lambda: tr("Low Speed Tau (Below 25mph) (Default: 0.1)"),
       min_value=0,
-      max_value=100,
+      max_value=500,
       value_change_step=1,
-      description=lambda: tr("Controls how much openpilot steering torque remains while the driver is overriding."),
-      label_callback=lambda value: f"{value}%",
+      description=lambda: tr("Low-pass filter time constant (seconds) below 25 mph."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
+    self._lpf_tau_standard = option_item_sp(
+      param="HondaLpfTauStandard",
+      title=lambda: tr("Standard Tau (25-50mph) (Default: 0.1)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=1,
+      description=lambda: tr("Low-pass filter time constant (seconds) between 25 and 50 mph."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
+    self._lpf_tau_highway = option_item_sp(
+      param="HondaLpfTauHighway",
+      title=lambda: tr("Highway Tau (50mph+) (Default: 0.1)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=1,
+      description=lambda: tr("Low-pass filter time constant (seconds) above 50 mph."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
+    self._driver_assist_during_override = toggle_item_sp(
+      param="HondaDriverAssistDuringOverride",
+      title=lambda: tr("Replace LKAS torque with driver assist torque during override (Default: ON)"),
+      description=lambda: tr("When ON, openpilot gives way while you steer (normal manual feel). When OFF, openpilot keeps applying torque (more resistant)."),
     )
 
     self._override_fade_down = option_item_sp(
       param="HondaOverrideFadeDownSecs",
-      title=lambda: tr("Override Torque Fade Down"),
+      title=lambda: tr("Override Torque Fade Down (Default: 0.0)"),
       min_value=0,
       max_value=1000,
       value_change_step=10,
@@ -72,7 +129,7 @@ class NrdrLayout(Widget):
 
     self._override_fade_up = option_item_sp(
       param="HondaOverrideFadeUpSecs",
-      title=lambda: tr("Override Torque Fade Up"),
+      title=lambda: tr("Override Torque Fade Up (Default: 1.5)"),
       min_value=0,
       max_value=1000,
       value_change_step=10,
@@ -81,27 +138,31 @@ class NrdrLayout(Widget):
       use_float_scaling=True,
     )
 
-    self._live_learning_gas = toggle_item_sp(
-      param="HondaLiveLearningGas",
-      title=lambda: tr("Live Learning Gas"),
-      description=lambda: tr("Allows Honda gas and wind compensation factors to learn live while driving."),
+    self._override_torque_scale = option_item_sp(
+      param="HondaOverrideTorqueScale",
+      title=lambda: tr("Override Torque Retain (Default: 0%)"),
+      min_value=0,
+      max_value=100,
+      value_change_step=1,
+      description=lambda: tr("Controls how much openpilot steering torque remains while the driver is overriding."),
+      label_callback=lambda value: f"{value}%",
     )
 
-    self._low_pass_filter = toggle_item_sp(
-      param="HondaTorqueLowPassFilter",
-      title=lambda: tr("Low Pass Filter"),
-      description=lambda: tr("Applies smoothing to requested steering torque."),
+    self._live_learning_gas = toggle_item_sp(
+      param="HondaLiveLearningGas",
+      title=lambda: tr("Live Learning Gas (Default: OFF)"),
+      description=lambda: tr("Allows Honda gas and wind compensation factors to learn live while driving."),
     )
 
     self._steer_delta_limiter = toggle_item_sp(
       param="HondaSteerDeltaLimiter",
-      title=lambda: tr("Steer Delta Rate Limiter"),
+      title=lambda: tr("Steer Delta Rate Limiter (Default: OFF)"),
       description=lambda: tr("Limits how quickly requested steering torque can rise or fall."),
     )
 
     self._steer_delta_up = option_item_sp(
       param="HondaSteerDeltaUp",
-      title=lambda: tr("Steer Delta Up"),
+      title=lambda: tr("Steer Delta Up (Default: 3.0)"),
       min_value=0,
       max_value=10000,
       value_change_step=10,
@@ -112,7 +173,7 @@ class NrdrLayout(Widget):
 
     self._steer_delta_down = option_item_sp(
       param="HondaSteerDeltaDown",
-      title=lambda: tr("Steer Delta Down"),
+      title=lambda: tr("Steer Delta Down (Default: 3.0)"),
       min_value=0,
       max_value=10000,
       value_change_step=10,
@@ -123,7 +184,7 @@ class NrdrLayout(Widget):
 
     self._stopping_decel_rate = option_item_sp(
       param="HondaStoppingDecelRate",
-      title=lambda: tr("Stopping Decel Rate"),
+      title=lambda: tr("Stopping Decel Rate (Default: 0.3)"),
       min_value=0,
       max_value=100,
       value_change_step=1,
@@ -132,18 +193,27 @@ class NrdrLayout(Widget):
     )
 
     return [
+      self._lp_steer_ratio,
+      self._lp_stiffness,
+      self._lp_angle_avg,
+      self._lp_angle_inst,
+      LineSeparatorSP(40),
       self._lat_pid_tune_scale,
       self._long_pid_tune_scale,
       LineSeparatorSP(40),
       self._increase_override_tolerance,
       LineSeparatorSP(40),
+      self._low_pass_filter,
+      self._lpf_tau_low,
+      self._lpf_tau_standard,
+      self._lpf_tau_highway,
+      LineSeparatorSP(40),
+      self._driver_assist_during_override,
       self._override_fade_down,
       self._override_fade_up,
-      self._lkas_active_during_override,
       self._override_torque_scale,
       LineSeparatorSP(40),
       self._live_learning_gas,
-      self._low_pass_filter,
       LineSeparatorSP(40),
       self._steer_delta_limiter,
       self._steer_delta_up,
@@ -152,18 +222,53 @@ class NrdrLayout(Widget):
       self._stopping_decel_rate,
     ]
 
+  def _refresh_live_params(self):
+    vals = None
+    try:
+      if ui_state.started:
+        lp = ui_state.sm['liveParameters']
+        vals = (lp.steerRatio, lp.stiffnessFactor, lp.angleOffsetAverageDeg, lp.angleOffsetDeg)
+      else:
+        raw = ui_state.params.get("LiveParametersV2")
+        if raw is not None:
+          with log.Event.from_bytes(raw) as msg:
+            lp = msg.liveParameters
+            vals = (lp.steerRatio, lp.stiffnessFactor, lp.angleOffsetAverageDeg, lp.angleOffsetDeg)
+    except Exception:
+      vals = None
+
+    if vals is None:
+      self._lp_text = {k: tr("learning…") for k in self._lp_text}
+    else:
+      sr, sf, aoa, ao = vals
+      self._lp_text = {
+        "steerRatio": f"{sr:.2f}",
+        "stiffnessFactor": f"{sf:.2f}",
+        "angleOffsetAverageDeg": f"{aoa:.2f}°",
+        "angleOffsetDeg": f"{ao:.2f}°",
+      }
+
   def _update_state(self):
     super()._update_state()
+
+    self._refresh_live_params()
 
     steer_delta_limiter_enabled = self._steer_delta_limiter.action_item.get_state()
 
     self._increase_override_tolerance.action_item.set_enabled(True)
     self._lat_pid_tune_scale.action_item.set_enabled(True)
     self._long_pid_tune_scale.action_item.set_enabled(True)
+    self._low_pass_filter.action_item.set_enabled(True)
+    self._lpf_tau_low.action_item.set_enabled(True)
+    self._lpf_tau_standard.action_item.set_enabled(True)
+    self._lpf_tau_highway.action_item.set_enabled(True)
     self._override_torque_scale.action_item.set_enabled(True)
     self._steer_delta_limiter.action_item.set_enabled(True)
     self._steer_delta_up.action_item.set_enabled(True)
     self._steer_delta_down.action_item.set_enabled(True)
+
+    # Live Learning Gas may only be changed offroad.
+    self._live_learning_gas.action_item.set_enabled(ui_state.is_offroad())
 
     self._steer_delta_up.set_visible(steer_delta_limiter_enabled)
     self._steer_delta_down.set_visible(steer_delta_limiter_enabled)
