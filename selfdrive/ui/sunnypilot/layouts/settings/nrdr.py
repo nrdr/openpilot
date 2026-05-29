@@ -22,7 +22,7 @@ class NrdrLayout(Widget):
       title=lambda: tr("Lateral PID Tune Scale"),
       min_value=0,
       max_value=500,
-      value_change_step=1,
+      value_change_step=5,
       description=lambda: tr("Scales lateral PID controller values from their configured base tune."),
       label_callback=lambda value: f"{value}%",
     )
@@ -32,7 +32,7 @@ class NrdrLayout(Widget):
       title=lambda: tr("Longitudinal PID Tune Scale"),
       min_value=0,
       max_value=500,
-      value_change_step=1,
+      value_change_step=5,
       description=lambda: tr("Scales longitudinal PID controller values from their configured base tune."),
       label_callback=lambda value: f"{value}%",
     )
@@ -63,20 +63,22 @@ class NrdrLayout(Widget):
       param="HondaOverrideFadeDownSecs",
       title=lambda: tr("Override Torque Fade Down"),
       min_value=0,
-      max_value=10,
-      value_change_step=1,
+      max_value=1000,
+      value_change_step=10,
       description=lambda: tr("Controls how quickly steering torque fades out when driver override begins."),
-      label_callback=lambda seconds: f"{seconds} s",
+      label_callback=lambda value: f"{value / 100:.1f} s",
+      use_float_scaling=True,
     )
 
     self._override_fade_up = option_item_sp(
       param="HondaOverrideFadeUpSecs",
       title=lambda: tr("Override Torque Fade Up"),
       min_value=0,
-      max_value=10,
-      value_change_step=1,
+      max_value=1000,
+      value_change_step=10,
       description=lambda: tr("Controls how quickly steering torque fades back in after driver override ends."),
-      label_callback=lambda seconds: f"{seconds} s",
+      label_callback=lambda value: f"{value / 100:.1f} s",
+      use_float_scaling=True,
     )
 
     self._live_learning_gas = toggle_item_sp(
