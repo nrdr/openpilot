@@ -28,20 +28,16 @@ class NrdrLayout(Widget):
   def _initialize_items(self):
     # --- Read-only learned live parameters (top of panel) ---
     self._lp_steer_ratio = ListItemSP(
-      title=tr("Learned Steer Ratio"),
-      description=lambda: self._lp_text["steerRatio"],
+      title=lambda: f"{tr('Learned Steer Ratio')}: {self._lp_text['steerRatio']}",
     )
     self._lp_stiffness = ListItemSP(
-      title=tr("Learned Tire Stiffness Factor"),
-      description=lambda: self._lp_text["stiffnessFactor"],
+      title=lambda: f"{tr('Learned Tire Stiffness Factor')}: {self._lp_text['stiffnessFactor']}",
     )
     self._lp_angle_avg = ListItemSP(
-      title=tr("Learned Angle Offset (avg)"),
-      description=lambda: self._lp_text["angleOffsetAverageDeg"],
+      title=lambda: f"{tr('Learned Angle Offset (Average)')}: {self._lp_text['angleOffsetAverageDeg']}",
     )
     self._lp_angle_inst = ListItemSP(
-      title=tr("Learned Angle Offset (instant)"),
-      description=lambda: self._lp_text["angleOffsetDeg"],
+      title=lambda: f"{tr('Learned Angle Offset (Instant)')}: {self._lp_text['angleOffsetDeg']}",
     )
 
     # --- Tunable params ---
@@ -112,7 +108,7 @@ class NrdrLayout(Widget):
 
     self._driver_assist_during_override = toggle_item_sp(
       param="HondaDriverAssistDuringOverride",
-      title=lambda: tr("Replace LKAS torque with driver assist torque during override (Default: ON)"),
+      title=lambda: tr("Pass-through standard assist torque on override (Default: ON)"),
       description=lambda: tr("When ON, openpilot gives way while you steer (normal manual feel). When OFF, openpilot keeps applying torque (more resistant)."),
     )
 
@@ -272,6 +268,12 @@ class NrdrLayout(Widget):
 
     self._steer_delta_up.set_visible(steer_delta_limiter_enabled)
     self._steer_delta_down.set_visible(steer_delta_limiter_enabled)
+
+    # Hide the tau sliders when the low-pass filter is disabled.
+    lpf_enabled = self._low_pass_filter.action_item.get_state()
+    self._lpf_tau_low.set_visible(lpf_enabled)
+    self._lpf_tau_standard.set_visible(lpf_enabled)
+    self._lpf_tau_highway.set_visible(lpf_enabled)
 
   def _render(self, rect):
     self._scroller.render(rect)
