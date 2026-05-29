@@ -152,9 +152,9 @@ class NrdrLayout(Widget):
     offroad = ui_state.is_offroad()
     steer_delta_limiter_enabled = self._steer_delta_limiter.action_item.get_state()
 
-    self._increase_override_tolerance.action_item.set_enabled(offroad)
-    self._lat_pid_tune_scale.action_item.set_enabled(offroad)
-    self._long_pid_tune_scale.action_item.set_enabled(offroad)
+    self._increase_override_tolerance.action_item.set_enabled(True)
+    self._lat_pid_tune_scale.action_item.set_enabled(True)
+    self._long_pid_tune_scale.action_item.set_enabled(True)
 
     self._steer_delta_up.set_visible(steer_delta_limiter_enabled)
     self._steer_delta_down.set_visible(steer_delta_limiter_enabled)
