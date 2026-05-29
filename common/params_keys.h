@@ -272,16 +272,17 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
 
     // nrdr params
     {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"HondaOverrideFadeDownSecs", PERSISTENT},
-    {"HondaOverrideFadeUpSecs", PERSISTENT},
-    {"HondaLkasActiveDuringOverride", PERSISTENT},
-    {"HondaLiveLearningGas", PERSISTENT},
-    {"HondaTorqueLowPassFilter", PERSISTENT},
-    {"HondaSteerDeltaLimiter", PERSISTENT},
-    {"HondaSteerDeltaUp", PERSISTENT},
-    {"HondaSteerDeltaDown", PERSISTENT},
-    {"HondaPidTuneScale", PERSISTENT},
-    {"HondaStoppingDecelRate", PERSISTENT},
+    {"HondaOverrideFadeDownSecs", {PERSISTENT | BACKUP, INT, "2"}},
+    {"HondaOverrideFadeUpSecs", {PERSISTENT | BACKUP, INT, "2"}},
+
+    {"HondaLkasActiveDuringOverride", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"HondaLiveLearningGas", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"HondaTorqueLowPassFilter", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"HondaSteerDeltaLimiter", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"HondaSteerDeltaUp", {PERSISTENT | BACKUP, INT, "3"}},
+    {"HondaSteerDeltaDown", {PERSISTENT | BACKUP, INT, "3"}},
+    {"HondaPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
+    {"HondaStoppingDecelRate", {PERSISTENT | BACKUP, INT, "30"}},
 
     // Torque lateral control custom params
     {"CustomTorqueParams", {PERSISTENT | BACKUP , BOOL}},
