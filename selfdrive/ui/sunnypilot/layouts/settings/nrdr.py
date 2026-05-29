@@ -22,7 +22,7 @@ class NrdrLayout(Widget):
       title=lambda: tr("Lateral PID Tune Scale"),
       min_value=0,
       max_value=500,
-      value_change_step=5,
+      value_change_step=1,
       description=lambda: tr("Scales lateral PID controller values from their configured base tune."),
       label_callback=lambda value: f"{value}%",
     )
@@ -32,7 +32,7 @@ class NrdrLayout(Widget):
       title=lambda: tr("Longitudinal PID Tune Scale"),
       min_value=0,
       max_value=500,
-      value_change_step=5,
+      value_change_step=1,
       description=lambda: tr("Scales longitudinal PID controller values from their configured base tune."),
       label_callback=lambda value: f"{value}%",
     )
@@ -54,7 +54,7 @@ class NrdrLayout(Widget):
       title=lambda: tr("Override Torque Retain"),
       min_value=0,
       max_value=100,
-      value_change_step=5,
+      value_change_step=1,
       description=lambda: tr("Controls how much openpilot steering torque remains while the driver is overriding."),
       label_callback=lambda value: f"{value}%",
     )
@@ -101,20 +101,22 @@ class NrdrLayout(Widget):
       param="HondaSteerDeltaUp",
       title=lambda: tr("Steer Delta Up"),
       min_value=0,
-      max_value=100,
-      value_change_step=1,
+      max_value=10000,
+      value_change_step=10,
       description=lambda: tr("Controls the maximum upward steering torque rate when the rate limiter is enabled."),
-      label_callback=lambda value: f"{value}",
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
     )
 
     self._steer_delta_down = option_item_sp(
       param="HondaSteerDeltaDown",
       title=lambda: tr("Steer Delta Down"),
       min_value=0,
-      max_value=100,
-      value_change_step=1,
+      max_value=10000,
+      value_change_step=10,
       description=lambda: tr("Controls the maximum downward steering torque rate when the rate limiter is enabled."),
-      label_callback=lambda value: f"{value}",
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
     )
 
     self._stopping_decel_rate = option_item_sp(
@@ -133,6 +135,7 @@ class NrdrLayout(Widget):
       self._override_fade_down,
       self._override_fade_up,
       self._lkas_active_during_override,
+      self._override_torque_scale,
       LineSeparatorSP(40),
       self._live_learning_gas,
       self._low_pass_filter,
@@ -149,12 +152,15 @@ class NrdrLayout(Widget):
   def _update_state(self):
     super()._update_state()
 
-    offroad = ui_state.is_offroad()
     steer_delta_limiter_enabled = self._steer_delta_limiter.action_item.get_state()
 
     self._increase_override_tolerance.action_item.set_enabled(True)
     self._lat_pid_tune_scale.action_item.set_enabled(True)
     self._long_pid_tune_scale.action_item.set_enabled(True)
+    self._override_torque_scale.action_item.set_enabled(True)
+    self._steer_delta_limiter.action_item.set_enabled(True)
+    self._steer_delta_up.action_item.set_enabled(True)
+    self._steer_delta_down.action_item.set_enabled(True)
 
     self._steer_delta_up.set_visible(steer_delta_limiter_enabled)
     self._steer_delta_down.set_visible(steer_delta_limiter_enabled)
