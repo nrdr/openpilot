@@ -290,6 +290,10 @@ sections:
     widget: toggle
     title: Unwind Integrator Freeze
     description: Freezes the PID integrator while the steering is returning toward center, so it doesn't hold torque through the unwind.
+  - key: HondaUnwindLookahead
+    widget: toggle
+    title: Unwind Lookahead
+    description: Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops.
   - key: HondaTorqueLowPassFilter
     widget: toggle
     title: Low Pass Filter (tau)

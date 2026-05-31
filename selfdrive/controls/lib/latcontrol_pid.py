@@ -8,6 +8,8 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
+from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
+from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
 CENTER_TAPER_FADE_TAU = 0.25
@@ -16,6 +18,27 @@ CENTER_TAPER_FADE_TAU = 0.25
 # stop accumulating integrator so it doesn't keep pushing torque through the release.
 UNWIND_FREEZE_PHASE_THRESHOLD = -0.2   # phase below this = unwinding
 UNWIND_FREEZE_ANGLE_NEAR_CENTER = 8.0  # deg; only freeze when heading near center
+
+# Model-trajectory unwind lookahead: read the model's planned lateral-accel profile
+# to anticipate the turn release before the instantaneous desired curvature drops.
+UNWIND_LOOKAHEAD_MIN_IDX = 5            # skip samples inside the actuator delay window
+UNWIND_LOOKAHEAD_SECONDS = 1.0         # how far ahead in the plan to look
+UNWIND_LOOKAHEAD_MIN_LAT_ACCEL = 0.3   # m/s^2; ignore near-center noise
+
+
+def _sign(x: float) -> float:
+  return 1.0 if x > 0.0 else (-1.0 if x < 0.0 else 0.0)
+
+
+def _lookahead_release(future_vals, current_val) -> float:
+  # If any future planned value flips sign vs. the current command, the plan shows a
+  # release coming -> return 0.0. Otherwise return the smallest-magnitude same-sign value.
+  if not future_vals:
+    return current_val
+  same_sign = [v for v in future_vals if _sign(v) == _sign(current_val)]
+  if len(same_sign) < len(future_vals):
+    return 0.0
+  return min(same_sign + [current_val], key=lambda x: abs(x))
 
 
 def get_param_float(params, key, default, min_value=None, max_value=None, scale=1.0):
@@ -122,6 +145,13 @@ class LatControlPID(LatControl):
     self.frame = -1
     self.lat_pid_tune_scale = 1.0
     self.unwind_freeze_enabled = False
+    self.unwind_lookahead_enabled = False
+    self.model_v2 = None
+    self.model_valid = False
+
+  def update_model_v2(self, model_v2):
+    self.model_v2 = model_v2
+    self.model_valid = model_v2 is not None and len(model_v2.acceleration.y) >= CONTROL_N
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
              calibrated_pose, curvature_limited, lat_delay):
@@ -168,6 +198,25 @@ class LatControlPID(LatControl):
       if steering_rate_unwind_ff and abs_angle_des > 5.0:
         ff_unwind_weight = max(ff_unwind_weight, 0.5)
 
+      # Forward-looking unwind: read the model's planned lateral-accel profile to see if
+      # the turn is about to release, and ramp the unwind weight early. predicted_unwind_*
+      # stay zero/False unless the lookahead toggle is on AND the model frame is valid,
+      # so default behavior falls back to the backward-difference phase logic above.
+      predicted_unwind_weight = 0.0
+      unwind_predicted = False
+      if self.unwind_lookahead_enabled and self.model_valid:
+        lat_accels = self.model_v2.acceleration.y
+        if len(lat_accels) > UNWIND_LOOKAHEAD_MIN_IDX:
+          current_la = float(lat_accels[0])
+          upper_idx = next((i for i, t in enumerate(ModelConstants.T_IDXS) if t > UNWIND_LOOKAHEAD_SECONDS), len(lat_accels))
+          future = [float(v) for v in lat_accels[UNWIND_LOOKAHEAD_MIN_IDX:upper_idx]]
+          lookahead_la = _lookahead_release(future, current_la)
+          if abs(current_la) > UNWIND_LOOKAHEAD_MIN_LAT_ACCEL:
+            predicted_unwind_weight = min(max(1.0 - abs(lookahead_la) / abs(current_la), 0.0), 1.0)
+            unwind_predicted = lookahead_la == 0.0 or predicted_unwind_weight > 0.5
+
+      ff_unwind_weight = max(ff_unwind_weight, predicted_unwind_weight)
+
       ff_multiplier = ff_scale + ff_unwind_weight * max(unwind_ff_boost - ff_scale, 0.0)
       ff *= ff_multiplier
 
@@ -188,7 +237,7 @@ class LatControlPID(LatControl):
       # Unwind integrator-freeze (opt-in): when the desired angle is dropping toward
       # center, stop the integrator growing so it doesn't push torque through the release.
       unwind_detected = phase < UNWIND_FREEZE_PHASE_THRESHOLD and abs_angle_des < UNWIND_FREEZE_ANGLE_NEAR_CENTER
-      if self.unwind_freeze_enabled and unwind_detected:
+      if self.unwind_freeze_enabled and (unwind_detected or unwind_predicted):
         freeze_integrator = True
 
       self.frame += 1
@@ -213,6 +262,7 @@ class LatControlPID(LatControl):
           5.0,
         )
         self.unwind_freeze_enabled = self.params.get_bool("HondaUnwindFreeze")
+        self.unwind_lookahead_enabled = self.params.get_bool("HondaUnwindLookahead")
 
       output_torque = self.pid.update(
         error,

@@ -8,6 +8,15 @@ Grouped by area, newest work first. Hashes are the branch (parent-repo) commits;
 
 ---
 
+## Lateral tuning additions (post-2026-05-29, uncommitted/in-progress)
+
+- **Center Scale live param** — replaced the per-car `_center_taper_high()` lookup in `latcontrol_pid.py` with a live `HondaCenterScale` param (FLOAT, default 0.5; 0.01-step "Center Scale" slider under Lateral PID Tune Scale). Note: Clarity previously used 1.24 and Civic Bosch 0.25 via the lookup — those cars now default to 0.5 until the slider is set.
+- **Unwind Integrator Freeze** — opt-in `HondaUnwindFreeze` toggle (default OFF). When on, freezes the PID integrator while the desired angle is unwinding (`phase < -0.2`) and heading near center (`< 8°`), so it stops holding torque through the release. Applies regardless of hands-on state. Targets steady-state-error / "torque held into the exit" on the linear EPS.
+- **Unwind Lookahead** — opt-in `HondaUnwindLookahead` toggle (default OFF). Feeds `modelV2` into `latcontrol_pid` and reads the planned lateral-accel profile (~1s ahead) to anticipate the turn release *before* the instantaneous desired curvature drops. Ramps the unwind FF weight early and (with Unwind Freeze also on) freezes the integrator ahead of the release. Falls back to the backward-difference phase logic when the model frame is invalid. `controlsd.py` now feeds `modelV2` to the PID controller. Targets the late-unwind / late-phase-switch on intersections and curves.
+- Exposed in `nrdr.py` and the Sunnylink `steering.yaml`. `HondaCenterScale` (FLOAT), `HondaUnwindFreeze` (BOOL), `HondaUnwindLookahead` (BOOL) added to `params_keys.h` — C++, require a device recompile.
+
+---
+
 ## Live tuning & Honda controls (2026-05-29)
 
 The big push: making the Honda tune adjustable live from the on-device UI, plus fixing several bugs that made the live tuners non-functional.

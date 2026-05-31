@@ -99,6 +99,10 @@ class Controls(ControlsExt):
 
       self.LaC.extension.update_lateral_lag(self.lat_delay)
 
+    elif self.CP.lateralTuning.which() == 'pid':
+      # Feed the planned trajectory to the PID controller for unwind lookahead.
+      self.LaC.update_model_v2(self.sm['modelV2'])
+
     long_plan = self.sm['longitudinalPlan']
     model_v2 = self.sm['modelV2']
 

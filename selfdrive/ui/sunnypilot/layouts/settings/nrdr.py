@@ -84,6 +84,12 @@ class NrdrLayout(Widget):
       description=lambda: tr("Freezes the PID integrator while the steering is returning toward center, so it doesn't hold torque through the unwind."),
     )
 
+    self._unwind_lookahead = toggle_item_sp(
+      param="HondaUnwindLookahead",
+      title=lambda: tr("Unwind Lookahead (Default: OFF)"),
+      description=lambda: tr("Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops."),
+    )
+
     self._low_pass_filter = toggle_item_sp(
       param="HondaTorqueLowPassFilter",
       title=lambda: tr("Low Pass Filter (tau) (Default: ON)"),
@@ -261,6 +267,7 @@ class NrdrLayout(Widget):
       LineSeparatorSP(40),
       self._increase_override_tolerance,
       self._unwind_freeze,
+      self._unwind_lookahead,
       LineSeparatorSP(40),
       self._low_pass_filter,
       self._lpf_tau_low,
@@ -320,6 +327,7 @@ class NrdrLayout(Widget):
 
     self._increase_override_tolerance.action_item.set_enabled(True)
     self._unwind_freeze.action_item.set_enabled(True)
+    self._unwind_lookahead.action_item.set_enabled(True)
     self._lat_pid_tune_scale.action_item.set_enabled(True)
     self._center_scale.action_item.set_enabled(True)
     self._long_pid_tune_scale.action_item.set_enabled(True)
