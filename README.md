@@ -8,6 +8,16 @@ Linearized EPS firmware alters the steering torque response characteristics. As 
 
 ---
 
+## Recent Changes
+
+- **Sunnylink support for all toggles & params** — every nrdr setting is now exposed on the Sunnylink website.
+- **Live Long v2.0** — longitudinal stopping params (stop accel, planner stopping rate, vEgo stopping/starting) tunable live.
+- **Live tuning UI overhaul** — tunable Low Pass Filter tau bands, live learned-params display, default labels, menu reorder, and the override LKAS relabel/behavior change.
+- **UI crash fix + tuner polish** — fixed the vCruise speed-limit UI crash; 5% PID steps; 0.1 s override fade.
+- **Live tuner fixes** — PID / longitudinal tune scale and Honda live params now actually apply; opendbc submodule repointed to nrdr.
+
+---
+
 ## Supported Platforms
 
 - Honda Civic (Nidec)
@@ -28,42 +38,10 @@ installer.comma.ai/nrdr/mvl-staging-03.03.2026
 
 ## Recommended Device Configuration
 
-The following configuration is recommended for optimal behavior with Linear EPS firmware.
-
-### Model
-
-- **Model:** POPv1 (known simply as POP) (Good lane positioning)
-  - OPMv7 can be smoother but hugs more.
-  - GWMv9 has been tried and tested, solid legacy model.
+- **Force Torque Controller:** OFF
+- **NNLC:** OFF
+- **Model:** PopV2
 - **Live Learning Delay:** ON
-
----
-
-### Steering
-
-- **Enforce Torque Lateral Control:** ON
-
----
-
-### Torque Control Settings
-
-- **Version:** v0.0
-  - Default provides very aggressive low speed performance but will be uncomfortable and jerky.
-- **Self Tune:** OFF
-- **Less Restrict Settings (Beta):** OFF
-- **Enable Custom Tuning:** OFF
-- **Manual Real-time Tuning:** OFF
-
-Honda Insight users (and those who want to manually tune):
-- **Version:** v0.0
-- **Self Tune:** OFF
-- **Less Restrict Settings (Beta):** OFF
-- **Enable Custom Tuning:** ON
-- **Manual Real-time Tuning:** ON
-- **LATERAL ACCELERATION FACTOR:** Start with 3.37 and work your way lower for increased response
-- **FRICTION:** Use 1.0 and lower until car feels too lazy
-
-These defaults ensure consistent behavior with linearized EPS firmware.
 
 ---
 

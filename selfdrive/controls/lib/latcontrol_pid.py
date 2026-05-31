@@ -12,7 +12,6 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 
 
 CENTER_TAPER_FADE_TAU = 0.25
-UNWIND_FF_BOOST_TIME_S = 1.0
 
 
 def get_param_float(params, key, default, min_value=None, max_value=None, scale=1.0):
@@ -71,7 +70,7 @@ def _pid_output_scale(
 
   # Center taper is intentionally negative at very low speeds to reduce
   # center twitchiness, then ramps back to the vehicle-specific positive taper by 50 mph.
-  center_taper_low = -0.1764
+  center_taper_low = -0.09
   center_taper_speed_weight = min(max(v_ego / (50.0 * 0.44704), 0.0), 1.0)
   center_taper = (center_taper_low + ((center_taper_high - center_taper_low) * center_taper_speed_weight)) * center_taper_scale
 
@@ -86,12 +85,19 @@ def _pid_output_scale(
   scale += speed_weight * mid_turn_weight * mid_turn_scale
   scale += speed_weight * angle_weight * base_scale
 
-  if phase > 0.2:
-    scale += speed_weight * mid_turn_weight * mid_turn_turn_in_scale
-    scale += speed_weight * angle_weight * turn_in_scale
-  elif phase < unwind_phase_threshold or low_speed_unwind:
-    scale += speed_weight * mid_turn_weight * mid_turn_unwind_scale
-    scale -= speed_weight * angle_weight * unwind_scale
+  # Blend smoothly between turn-in and unwind modifiers instead of hard branches.
+  # Binary if/elif caused a step change in scale the moment phase crossed ±0.2,
+  # which felt like an abrupt torque drop at the start of unwind.
+  # Ramp from 0 at phase=0 to full modifier at |phase|=0.5.
+  turn_in_weight = min(max(phase / 0.5, 0.0), 1.0)
+  unwind_weight  = min(max(-phase / 0.5, 0.0), 1.0)
+
+  if low_speed_unwind and speed_weight < 0.1:
+    # Low-speed unwind: EPS won't self-center, actively boost output
+    scale += low_speed_unwind_weight * mid_turn_weight * 0.18
+  else:
+    scale += speed_weight * mid_turn_weight * (turn_in_weight * mid_turn_turn_in_scale + unwind_weight * mid_turn_unwind_scale)
+    scale += speed_weight * angle_weight    * (turn_in_weight * turn_in_scale          - unwind_weight * unwind_scale)
 
   return max(scale, 0.6863)
 
@@ -116,9 +122,6 @@ class LatControlPID(LatControl):
     self.center_taper_scale = FirstOrderFilter(1.0, CENTER_TAPER_FADE_TAU, dt)
     self.prev_output_torque = 0.0
     self.prev_angle_steers_des_no_offset = 0.0
-    self.unwind_ff_active = False
-    self.unwind_ff_timer = 0.0
-    self.dt = dt
     self.params = Params()
     self.frame = -1
     self.lat_pid_tune_scale = 1.0
@@ -144,9 +147,6 @@ class LatControlPID(LatControl):
       self.center_taper_scale.x = 1.0
       self.prev_output_torque = 0.0
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
-      self.unwind_ff_active = False
-      self.unwind_ff_timer = 0.0
-
     else:
       desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
       phase = angle_steers_des_no_offset * desired_angle_delta
@@ -162,21 +162,20 @@ class LatControlPID(LatControl):
       unwind_ff_boost = float(np.interp(CS.vEgo, [0.0, 10.0], [2.0, 1.0]))
       unwinding = phase < -0.2
 
-      if unwinding and not self.unwind_ff_active and self.unwind_ff_timer <= 0.0:
-        self.unwind_ff_active = True
+      # Smooth FF blend: ramp from ff_scale at phase=0 to unwind_ff_boost at phase=-0.5.
+      # Hard binary (if phase < -0.2) caused a step drop of 3-6x in FF the moment
+      # the path planner's angular rate slowed — the main source of abrupt unwind feel.
+      abs_angle_des = abs(angle_steers_des_no_offset)
+      steering_rate_unwind_ff = (angle_steers_des_no_offset * float(CS.steeringRateDeg)) < -1.0
 
-      if self.unwind_ff_active:
-        ff *= max(ff_scale, unwind_ff_boost)
-        self.unwind_ff_timer += self.dt
+      ff_unwind_weight = min(max(-phase / 0.5, 0.0), 1.0)
+      # Stable floor: if steering rate confirms wheel is still returning and angle is
+      # meaningful, hold at least half the boost so we don't drop prematurely.
+      if steering_rate_unwind_ff and abs_angle_des > 5.0:
+        ff_unwind_weight = max(ff_unwind_weight, 0.5)
 
-        if self.unwind_ff_timer >= UNWIND_FF_BOOST_TIME_S:
-          self.unwind_ff_active = False
-      else:
-        ff *= ff_scale
-
-      if not unwinding:
-        self.unwind_ff_active = False
-        self.unwind_ff_timer = 0.0
+      ff_multiplier = ff_scale + ff_unwind_weight * max(unwind_ff_boost - ff_scale, 0.0)
+      ff *= ff_multiplier
 
       steering_pressed = CS.steeringPressed
       if self.is_eps_modified:
@@ -189,7 +188,8 @@ class LatControlPID(LatControl):
         )
         self.eps_modified_steering_pressed_prev = steering_pressed
 
-      freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < 5
+      freeze_threshold = 2.0 if self.is_eps_modified else 5.0
+      freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < freeze_threshold
 
       self.frame += 1
       if self.frame % 300 == 0:

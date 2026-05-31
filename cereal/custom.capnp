@@ -435,6 +435,14 @@ struct BackupManagerSP @0xf98d843bfd7004a3 {
 
 struct CarStateSP @0xb86e6369214c01c8 {
   speedLimit @0 :Float32;
+  driveMode @1 :DriveMode;
+
+  enum DriveMode {
+    unknown @0;
+    normal @1;
+    eco @2;
+    sport @3;
+  }
 }
 
 struct LiveMapDataSP @0xf416ec09499d9d19 {
