@@ -22,7 +22,7 @@ UNWIND_FREEZE_ANGLE_NEAR_CENTER = 8.0  # deg; only freeze when heading near cent
 # Model-trajectory unwind lookahead: read the model's planned lateral-accel profile
 # to anticipate the turn release before the instantaneous desired curvature drops.
 UNWIND_LOOKAHEAD_MIN_IDX = 5            # skip samples inside the actuator delay window
-UNWIND_LOOKAHEAD_SECONDS = 1.0         # how far ahead in the plan to look
+UNWIND_LOOKAHEAD_SECONDS = 1.5         # how far ahead in the plan to look
 UNWIND_LOOKAHEAD_MIN_LAT_ACCEL = 0.3   # m/s^2; ignore near-center noise
 
 
@@ -184,7 +184,7 @@ class LatControlPID(LatControl):
 
       # Low-speed unwind needs extra feedforward to overcome EPS/tire stiction.
       # The boost is intentionally limited to the first second of each unwind event.
-      unwind_ff_boost = float(np.interp(CS.vEgo, [0.0, 10.0], [2.0, 1.0]))
+      unwind_ff_boost = float(np.interp(CS.vEgo, [0.0, 10.0], [10.0, 1.0]))
 
       # Smooth FF blend: ramp from ff_scale at phase=0 to unwind_ff_boost at phase=-0.5.
       abs_angle_des = abs(angle_steers_des_no_offset)
