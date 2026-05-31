@@ -78,6 +78,12 @@ class NrdrLayout(Widget):
       description=lambda: tr("Reduces the likelihood of false driver override detections on sensitive Honda EPS platforms."),
     )
 
+    self._unwind_freeze = toggle_item_sp(
+      param="HondaUnwindFreeze",
+      title=lambda: tr("Unwind Integrator Freeze (Default: OFF)"),
+      description=lambda: tr("Freezes the PID integrator while the steering is returning toward center, so it doesn't hold torque through the unwind."),
+    )
+
     self._low_pass_filter = toggle_item_sp(
       param="HondaTorqueLowPassFilter",
       title=lambda: tr("Low Pass Filter (tau) (Default: ON)"),
@@ -254,6 +260,7 @@ class NrdrLayout(Widget):
       self._long_pid_tune_scale,
       LineSeparatorSP(40),
       self._increase_override_tolerance,
+      self._unwind_freeze,
       LineSeparatorSP(40),
       self._low_pass_filter,
       self._lpf_tau_low,
@@ -312,6 +319,7 @@ class NrdrLayout(Widget):
     steer_delta_limiter_enabled = self._steer_delta_limiter.action_item.get_state()
 
     self._increase_override_tolerance.action_item.set_enabled(True)
+    self._unwind_freeze.action_item.set_enabled(True)
     self._lat_pid_tune_scale.action_item.set_enabled(True)
     self._center_scale.action_item.set_enabled(True)
     self._long_pid_tune_scale.action_item.set_enabled(True)

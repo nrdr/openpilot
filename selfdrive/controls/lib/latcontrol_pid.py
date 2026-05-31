@@ -12,6 +12,11 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 
 CENTER_TAPER_FADE_TAU = 0.25
 
+# Unwind integrator-freeze: when the desired angle is dropping toward center,
+# stop accumulating integrator so it doesn't keep pushing torque through the release.
+UNWIND_FREEZE_PHASE_THRESHOLD = -0.2   # phase below this = unwinding
+UNWIND_FREEZE_ANGLE_NEAR_CENTER = 8.0  # deg; only freeze when heading near center
+
 
 def get_param_float(params, key, default, min_value=None, max_value=None, scale=1.0):
   value = params.get(key)
@@ -116,6 +121,7 @@ class LatControlPID(LatControl):
     self.params = Params()
     self.frame = -1
     self.lat_pid_tune_scale = 1.0
+    self.unwind_freeze_enabled = False
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
              calibrated_pose, curvature_limited, lat_delay):
@@ -179,6 +185,12 @@ class LatControlPID(LatControl):
       freeze_threshold = 2.0 if self.is_eps_modified else 5.0
       freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < freeze_threshold
 
+      # Unwind integrator-freeze (opt-in): when the desired angle is dropping toward
+      # center, stop the integrator growing so it doesn't push torque through the release.
+      unwind_detected = phase < UNWIND_FREEZE_PHASE_THRESHOLD and abs_angle_des < UNWIND_FREEZE_ANGLE_NEAR_CENTER
+      if self.unwind_freeze_enabled and unwind_detected:
+        freeze_integrator = True
+
       self.frame += 1
       if self.frame % 300 == 0:
         # default/min/max are in runtime multiplier units; scale converts the stored
@@ -200,6 +212,7 @@ class LatControlPID(LatControl):
           0.0,
           5.0,
         )
+        self.unwind_freeze_enabled = self.params.get_bool("HondaUnwindFreeze")
 
       output_torque = self.pid.update(
         error,

@@ -274,6 +274,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"LatPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
     {"LongPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
+    {"HondaUnwindFreeze", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaStoppingDecelRate", {PERSISTENT | BACKUP, INT, "30"}},
     {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"HondaOverrideFadeDownSecs", {PERSISTENT | BACKUP, FLOAT, "0"}},
