@@ -144,14 +144,11 @@ class LatControlPID(LatControl):
 
       # Offset does not contribute to resistive torque.
       ff = self.ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
-
-      # Smooth feedforward scaling: matches PID ramp (0–10 m/s → 0.1–1.0).
-      ff_scale = float(np.interp(CS.vEgo, [0.0, 10.0, 35.0], [0.1, 0.5, 1.0]))
+      ff_scale = 1.0
 
       # Low-speed unwind needs extra feedforward to overcome EPS/tire stiction.
       # The boost is intentionally limited to the first second of each unwind event.
       unwind_ff_boost = float(np.interp(CS.vEgo, [0.0, 10.0], [2.0, 1.0]))
-      unwinding = phase < -0.2
 
       # Smooth FF blend: ramp from ff_scale at phase=0 to unwind_ff_boost at phase=-0.5.
       # Hard binary (if phase < -0.2) caused a step drop of 3-6x in FF the moment
