@@ -104,18 +104,18 @@ def _pid_output_scale(
   scale += speed_weight * angle_weight * base_scale
 
   # Blend smoothly between turn-in and unwind modifiers instead of hard branches.
-  # Binary if/elif caused a step change in scale the moment phase crossed ±0.2,
+  # Binary if/elif caused a step change in scale the moment phase crossed +-0.2,
   # which felt like an abrupt torque drop at the start of unwind.
   # Ramp from 0 at phase=0 to full modifier at |phase|=0.5.
   turn_in_weight = min(max(phase / 0.5, 0.0), 1.0)
-  unwind_weight  = min(max(-phase / 0.5, 0.0), 1.0)
+  unwind_weight = min(max(-phase / 0.5, 0.0), 1.0)
 
   if low_speed_unwind and speed_weight < 0.1:
     # Low-speed unwind: EPS won't self-center, actively boost output
     scale += low_speed_unwind_weight * mid_turn_weight * 0.18
   else:
     scale += speed_weight * mid_turn_weight * (turn_in_weight * mid_turn_turn_in_scale + unwind_weight * mid_turn_unwind_scale)
-    scale += speed_weight * angle_weight    * (turn_in_weight * turn_in_scale          - unwind_weight * unwind_scale)
+    scale += speed_weight * angle_weight * (turn_in_weight * turn_in_scale - unwind_weight * unwind_scale)
 
   return max(scale, 0.6863)
 
@@ -187,8 +187,6 @@ class LatControlPID(LatControl):
       unwind_ff_boost = float(np.interp(CS.vEgo, [0.0, 10.0], [2.0, 1.0]))
 
       # Smooth FF blend: ramp from ff_scale at phase=0 to unwind_ff_boost at phase=-0.5.
-      # Hard binary (if phase < -0.2) caused a step drop of 3-6x in FF the moment
-      # the path planner's angular rate slowed — the main source of abrupt unwind feel.
       abs_angle_des = abs(angle_steers_des_no_offset)
       steering_rate_unwind_ff = (angle_steers_des_no_offset * float(CS.steeringRateDeg)) < -1.0
 
@@ -205,7 +203,7 @@ class LatControlPID(LatControl):
       predicted_unwind_weight = 0.0
       unwind_predicted = False
       if self.unwind_lookahead_enabled and self.model_valid:
-        lat_accels = self.model_v2.acceleration.y
+        lat_accels = list(self.model_v2.acceleration.y)
         if len(lat_accels) > UNWIND_LOOKAHEAD_MIN_IDX:
           current_la = float(lat_accels[0])
           upper_idx = next((i for i, t in enumerate(ModelConstants.T_IDXS) if t > UNWIND_LOOKAHEAD_SECONDS), len(lat_accels))
@@ -216,7 +214,6 @@ class LatControlPID(LatControl):
             unwind_predicted = lookahead_la == 0.0 or predicted_unwind_weight > 0.5
 
       ff_unwind_weight = max(ff_unwind_weight, predicted_unwind_weight)
-
       ff_multiplier = ff_scale + ff_unwind_weight * max(unwind_ff_boost - ff_scale, 0.0)
       ff *= ff_multiplier
 
