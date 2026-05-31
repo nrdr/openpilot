@@ -1,0 +1,154 @@
+CM_ "IMPORT _community.dbc";
+CM_ "IMPORT _honda_common.dbc";
+CM_ "IMPORT _nidec_common.dbc";
+CM_ "IMPORT _lkas_hud_5byte.dbc";
+CM_ "IMPORT _nidec_scm_group_b.dbc";
+CM_ "IMPORT _steering_sensors_a.dbc";
+CM_ "IMPORT _steering_control_a.dbc";
+CM_ "IMPORT _gearbox_common.dbc";
+
+BO_ 476 CLARITY_DRIVE_MODE: 8 XXX
+ SG_ DRIVE_MODE_STATE : 55|8@0+ (1,0) [0|255] "" EON
+
+VAL_ 476 DRIVE_MODE_STATE 0 "normal" 16 "sport" 48 "econ" ;
+
+BO_ 1125 CLARITY_SPORT_MODE: 8 XXX
+ SG_ SPORT_MODE_STATE : 55|8@0+ (1,0) [0|255] "" EON
+
+VAL_ 1125 SPORT_MODE_STATE 1 "sport" 3 "normal_or_eco" ;
+
+CM_ BO_ 476 CLARITY_DRIVE_MODE "Sent by GCM at ~50Hz. Controls REGEN_MEMORY in GEARBOX_AUTO (0x1A3): flips within 20ms of sport mode transition. Cannot be injected without bus contention with GCM.";
+CM_ BO_ 1125 CLARITY_SPORT_MODE "Lags ~370ms behind CLARITY_DRIVE_MODE. Does NOT directly control REGEN_MEMORY.";
+
+BO_ 892 CRUISE_PARAMS: 8 PCM
+ SG_ CRUISE_SPEED_OFFSET : 31|8@0- (0.1,0) [-128|127] "kph" EON
+ SG_ ECO_MODE : 48|1@0+ (1,0) [0|1] "" EON
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|3] "" EON
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" EON
+
+BO_ 904 HV_MODE_STATUS: 8 PCM
+ SG_ EV_RANGE_BUFFER_COARSE : 7|8@0+ (1,0) [0|255] "" EON
+ SG_ HV_MODE_STATE : 15|8@0+ (1,0) [0|255] "" EON
+ SG_ HV_ACTIVE : 9|1@0+ (1,0) [0|1] "" EON
+ SG_ HV_CHARGE_REQUEST : 8|1@0+ (1,0) [0|1] "" EON
+ SG_ EV_RANGE_BUFFER_FINE : 39|16@0+ (1,0) [0|65535] "" EON
+ SG_ EV_RANGE_BUFFER_STATUS : 55|8@0+ (1,0) [0|255] "" EON
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" EON
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" EON
+
+VAL_ 904 HV_MODE_STATE 0 "ev_or_idle" 1 "transition_or_charge_request" 2 "hv_drive_or_generator_active" 4 "hv_sustain_a" 5 "hv_sustain_b" ;
+VAL_ 904 EV_RANGE_BUFFER_STATUS 0 "normal" 4 "depleted_charge_sustain_candidate" 14 "init_top_buffer_candidate" ;
+
+CM_ SG_ 904 EV_RANGE_BUFFER_COARSE "byte[0]: coarse EV range/buffer bucket. Observed values walk 0x13, 0x0C, 0x0B, ... down to 0x02 across captures. Likely the coarse EV range reserve used by HV mode, not a counter.";
+CM_ SG_ 904 HV_MODE_STATE "byte[1]: persistent EV/HV powertrain mode state. Values 0x00/0x01/0x02/0x04/0x05 confirmed across full EV-to-HV-sustain captures. States 0x02 and 0x0C strongly correlate with 0x183 bytes[0:2] HV power activity. Values 0x61 and 0x66 seen in deep HV sustain ??? bits[6:5] semantics TBD.";
+CM_ SG_ 904 HV_ACTIVE "byte[1] bit1: set for state 0x02. NOTE: bit positions at 50,54 in older DBC were wrong (byte[6] is usually 0x00). Prefer HV_MODE_STATE for persistent mode logic.";
+CM_ SG_ 904 HV_CHARGE_REQUEST "byte[1] bit0: set for state 0x01/0x05/0x07/0x09. Exact charge-request semantics TBD from dedicated HV-charge captures.";
+CM_ SG_ 904 EV_RANGE_BUFFER_FINE "bytes[4:6]: dual-mode buffer signal. In EV phase: large value (~30000 raw units at full charge) draining slowly as EV range depletes. In early HV phase: small value (0-448 observed) representing the cycling EV buffer slice; drains to 0 when entering charge-sustain. Steps of 32 raw units confirmed.";
+CM_ SG_ 904 EV_RANGE_BUFFER_STATUS "byte[6]: EV range/buffer status. 0x00 is normal in current captures. 0x04 appears only when EV_RANGE_BUFFER_COARSE=0x02 and EV_RANGE_BUFFER_FINE=0 after buffer depletion, candidate charge-sustain/low-buffer flag. 0x0E appears only during init/top-buffer samples.";
+CM_ SG_ 904 COUNTER "byte[7] bits[5:4]: 2-bit rolling counter (0-3). Verified: sum of all frame nibbles mod 16 = constant (5), confirming standard Honda counter+checksum packing.";
+CM_ SG_ 904 CHECKSUM "byte[7] bits[3:0]: 4-bit checksum. Formula: sum of all nibbles across all 8 bytes mod 16 = 5. byte[7] bits[7:6] participate in the sum but are not independently identified.";
+
+BO_ 387 CLARITY_HV_POWER: 8 PCM
+ SG_ HV_POWER_A : 7|16@0+ (1,0) [0|65535] "" EON
+ SG_ HV_POWER_B : 23|16@0+ (1,0) [0|65535] "" EON
+ SG_ HV_POWER_C : 39|16@0+ (1,0) [0|65535] "" EON
+ SG_ HV_POWER_STATUS : 55|8@0+ (1,0) [0|255] "" EON
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" EON
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" EON
+
+CM_ BO_ 387 "Clarity-specific high-rate HV power/torque frame (~98Hz). bytes[0:2] are the strongest refill/generator signature; bytes[2:4] and [4:6] are a paired estimate that is equal-ish when bytes[0:2]=0 and diverges during generator/refill activity. Units and exact physical meanings TBD.";
+CM_ SG_ 387 HV_POWER_A "bytes[0:2] unsigned primary HV refill/generator correlate. Zero during 0x388[1]=0x01 buffer draw; active during 0x388[1]=0x02/0x0C refill windows. Refill steps consistently occur with this value nonzero except when the buffer is already bottomed.";
+CM_ SG_ 387 HV_POWER_B "bytes[2:4] unsigned paired estimate. When HV_POWER_A is zero, B and C are nearly equal in EV/idle/generator-ready states; when A is active, B is typically much larger than C and roughly tracks A at a lower scale.";
+CM_ SG_ 387 HV_POWER_C "bytes[4:6] unsigned paired estimate. Usually near HV_POWER_B when HV_POWER_A is zero; often falls to low/zero while HV_POWER_A/HV_POWER_B remain active during 0x388[1]=0x02 refill/decel windows.";
+CM_ SG_ 387 HV_POWER_STATUS "byte[6]: status byte observed as mostly 0x00 with 0x80/0x30 variants in current captures. Correlates should be checked against explicit HV Charge, engine start/stop, and buffer depletion events before assigning physical meaning.";
+
+CM_ "0x18F (399) CLARITY_DRIVE_TORQUE_STATUS: NOT declared as BO_ — conflicts with common Honda STEER_STATUS at same ID.";
+CM_ "  bytes[0:2] signed DRIVE_TORQUE_A: positive during tractive bursts, negative during regen/decel, not RPM.";
+CM_ "  bytes[2:4] signed DRIVE_TORQUE_B: smaller paired dynamic value, semantics TBD.";
+CM_ "  byte[4] DRIVE_TORQUE_STATUS: mostly 0x00 in short routes, 0x08 in longer routes — not engine-on detector.";
+
+BO_ 545 ECON_STATUS: 6 XXX
+ SG_ ECON_ON_2 : 37|2@0+ (1,0) [0|3] "" EON
+ SG_ ECON_BTN : 23|1@0+ (1,0) [0|1] "" EON
+ SG_ SPORT_BTN : 22|1@0+ (1,0) [0|1] "" EON
+ SG_ HV_BTN : 19|1@0+ (1,0) [0|1] "" EON
+ SG_ CHECKSUM : 43|4@0+ (1,0) [0|3] "" EON
+ SG_ COUNTER : 45|2@0+ (1,0) [0|3] "" EON
+
+CM_ SG_ 545 ECON_ON_2 "Rolling counter cycling 0???1???2???3 at ~25Hz, NOT a button state";
+CM_ SG_ 545 HV_BTN "EV/HV mode toggle button (switches between EV-Force and HV mode per Techinfo)";
+
+BO_ 768 VEHICLE_STATE: 8 ADAS
+ SG_ SET_ME_XF9 : 7|8@0+ (1,0) [0|255] "" Vector__XXX
+ SG_ VEHICLE_SPEED : 15|8@0+ (1,0) [0|255] "kph" Vector__XXX
+ SG_ SET_ME_X8A : 23|8@0+ (1,0) [0|255] "" XXX
+ SG_ SET_ME_XD0 : 31|8@0+ (1,0) [0|255] "" XXX
+ SG_ SALTED_WITH_IDX : 39|8@0+ (1,0) [0|255] "" XXX
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" XXX
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" XXX
+
+BO_ 769 VEHICLE_STATE2: 8 ADAS
+ SG_ SET_ME_X5D : 23|8@0+ (1,0) [0|255] "" XXX
+ SG_ SET_ME_X02 : 31|8@0+ (1,0) [0|255] "" XXX
+ SG_ SET_ME_X5F : 39|8@0+ (1,0) [0|255] "" XXX
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" XXX
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" XXX
+
+CM_ "=== Clarity-specific F-CAN addresses NOT yet in DBC (observed in log, src=0) ===";
+CM_ "0x039 (25Hz): 3-byte, 8 unique payloads ??? unknown, possibly VSA/stability subsystem";
+CM_ "0x138 (98Hz): 8-byte, ~10k unique ??? high-rate powertrain signal near GAS_PEDAL_2; possible motor inverter data";
+CM_ "0x13B (98Hz): 7-byte, ~8.7k unique ??? high-rate, same cluster as 0x138";
+CM_ "0x14A (98Hz): 8-byte, ~9.5k unique ??? high-rate; byte[1]=byte[6]=0x49 constant, possible PCU signal";
+CM_ "0x183 now decoded above as CLARITY_HV_POWER: high-rate HV/generator power-ish frame, strongest current fingerprint for 0x388[1]=0x02/0x0C activity";
+CM_ "0x18F now decoded above as CLARITY_DRIVE_TORQUE_STATUS: signed traction/regen-ish values, not RPM and not a standalone HV-mode detector";
+CM_ "0x199 (98Hz): 8-byte, 72 unique ??? mostly static with rolling counter; bytes[5:7] switches between 0x3000 and 0x8019";
+CM_ "0x1AC (49Hz): 8-byte, 4 unique ??? byte[0:2]=0x7FFF constant (32767, signed center value), rolling counter only; likely EPS or motor reference signal at max positive";
+CM_ "0x1B9 (49Hz): 5-byte, ~7.8k unique ??? high unique count at 49Hz, likely a 32-bit sensor value";
+CM_ "0x1DE (49Hz): 3-byte, 902 unique ??? bytes[0:2] as uint16 seen at 0 and 400 (40.0 if *0.1 scale), rolling counter at byte[2]; possible EPS motor current or angle delta";
+CM_ "0x201 (48Hz): 6-byte, ~4.4k unique ??? power management or motor control at 48Hz";
+CM_ "0x213 (25Hz): 8-byte, ~4k unique ??? 25Hz powertrain; byte[6] mostly constant 0x04";
+CM_ "0x215 (25Hz): 8-byte, ~3.8k unique ??? 25Hz; bytes[5:7] change significantly, possibly torque/power";
+CM_ "0x21A (25Hz): 5-byte, 336 unique ??? byte[0]=0x80, byte[2]=0x80 constant; delta signals in bytes[1,3]";
+CM_ "0x22F (25Hz): 3-byte, 8 unique ??? byte[0]=0x91 constant; byte[1] toggles 0x81/0x01; likely a mode flag";
+CM_ "0x31B (10Hz): 8-byte, 4 unique ??? rolling counter only, no data content; heartbeat from unknown module";
+CM_ "0x320 (10Hz): 8-byte, 4 unique ??? rolling counter only; heartbeat";
+CM_ "0x328 (10Hz): 8-byte, 12 unique ??? byte[5]=0x20 constant; mostly rolling counter";
+CM_ "0x32F (10Hz): 8-byte, 4 unique ??? rolling counter only; heartbeat";
+CM_ "0x33D (0.4Hz): 5-byte, 12 unique ??? very slow (same rate as CAMERA_MESSAGES); byte[1]=0x10 byte[2]=0x50 constant";
+CM_ "0x33F (10Hz): 5-byte, 4 unique ??? rolling counter only; heartbeat";
+CM_ "0x340 (10Hz): 3-byte, 11 unique ??? byte[0] = 0x80 or 0x82; status flag";
+CM_ "0x341 (10Hz): 8-byte, 9 unique ??? rolling counter; occasional byte[0] non-zero";
+CM_ "0x358 (10Hz): 7-byte, 4 unique ??? byte[1]=0x01 byte[2]=0x80 constant; rolling counter";
+CM_ "0x384 (10Hz): 8-byte, 547 unique ??? byte[1]=0x65 (101 decimal) constant, byte[3]=0x04; active data in other bytes";
+CM_ "0x385 (10Hz): 8-byte, 48 unique ??? mostly zeros with rolling counter";
+CM_ "0x389 (10Hz): 8-byte, 92 unique ??? byte[1]=0x3C(60), bytes[2:4]=0x1FDA(8154); possible battery temperature and voltage";
+CM_ "0x38A (10Hz): 4-byte, 8 unique ??? byte[0] toggles 0x00/0x20; status flag";
+CM_ "0x39B (10Hz): 2-byte ??? byte[0]=0x80 constant, byte[1] rolling counter; no data content";
+CM_ "0x3A1 (5Hz): 8-byte, 8 unique ??? byte[2]=0x10 constant; rolling counter";
+CM_ "0x3D0 (5Hz): 8-byte, 614 unique ??? first frame has large values bytes[3:8]; likely power data (watts?)";
+CM_ "0x3D7 (5Hz): 8-byte, 4 unique ??? byte[0]=0xB0 constant; bytes[1:6] either all-zero or pattern 0xC1314C1";
+CM_ "0x3D9 (5Hz): 3-byte, 13 unique ??? byte[1] varies 0x8C-0x8D; byte[2] rolling counter";
+CM_ "0x400 (3.3Hz): 5-byte, 6 unique ??? bytes[0:4] nearly always zero; byte[2] occasionally 0x02; rolling counter";
+CM_ "0x403 (3.3Hz): 5-byte, 8 unique ??? rolling counter only at 3.3Hz; heartbeat, likely Battery Charger or DC-DC";
+CM_ "0x40C (3.3Hz): Honda segmented VIN broadcast ??? byte[0]=sequence (0x50=hdr, 0x51=data1, 0x52=data2); bytes reconstruct to VIN 'JHMZC5F32JC0...' (Honda Clarity PHEV)";
+CM_ "0x40F (3.3Hz): Honda segmented data broadcast ??? same sequence format as 0x40C; non-ASCII data, likely ECU software version/calibration date";
+CM_ "0x42E (3.3Hz): 8-byte, 4 unique ??? byte[0]=0x28 byte[1]=0x05 byte[2]=0xFF constant; rolling counter";
+CM_ "0x430 (3.3Hz): 4-byte, 4 unique ??? bytes[0:3]=0x000000 constant, byte[3] rolling counter; empty heartbeat";
+CM_ "0x444 (3.2Hz): 1-byte ??? rolling counter only, no data; heartbeat from unknown module";
+CM_ "0x454 (3.3Hz): 8-byte, 6 unique ??? bytes[0:6] constant 0x4CEE0139DC00; byte[7] rolling counter; constant payload = module ID or fixed parameter";
+CM_ "0x459 (3.3Hz): 8-byte, 78 unique ??? bytes[4:7] constant 0x554940; active data in bytes[0:4]; possibly SoH or calibration data";
+CM_ "0x45A (3.3Hz): 2-byte ??? byte[0]=0x00 constant, byte[1] rolling counter; empty heartbeat";
+CM_ "0x468 (3.3Hz): 8-byte, 4 unique ??? bytes[0:7]=0x000FFFFFFF C000 constant; rolling counter; Techinfo: possibly Park Pawl Actuator (0x468 range)";
+CM_ "0x469 (3.3Hz): 8-byte, 4 unique ??? byte[0]=0x40 byte[4]=0x83 constant; rolling counter; adjacent to 0x468";
+CM_ "0x516 (2Hz): 8-byte, 12 unique ??? byte[0]=0x02, bytes[1:4]=0xBDACc0 near-constant; 2Hz rate typical for Battery Condition Monitor";
+CM_ "0x52A (2Hz): 5-byte, 4 unique ??? byte[3]=0x06 constant; rolling counter; heartbeat";
+CM_ "0x533 (2Hz): ASCII 'TRWA9106' ??? Honda module software ID broadcast; TRW=Clarity PHEV model code, A9106=software version/part suffix; 2Hz periodic ID";
+CM_ "0x534 (2Hz): 5-byte, 8 unique ??? rolling counter; near 0x533, likely same module's second ID frame";
+CM_ "0x53D (2Hz): 5-byte, 4 unique ??? rolling counter; cluster near 0x516-0x555";
+CM_ "0x551 (2Hz): 5-byte, 4 unique ??? byte[3]=0x06; rolling counter; Techinfo: possibly Battery Condition Monitor A (F-CAN)";
+CM_ "0x555 (2Hz): 5-byte, 4 unique ??? byte[3]=0x04; rolling counter; Techinfo: possibly Battery Condition Monitor B (F-CAN)";
+CM_ "0x590 (1Hz): 5-byte, 4 unique ??? byte[3]=0x06; near-empty rolling counter; Techinfo: DC-DC Converter or Battery Charger on F-CAN";
+CM_ "0x595 (1Hz): 5-byte, 4 unique ??? byte[0]=0xC1 byte[1]=0x04; rolling counter; adjacent to 0x590";
+CM_ "0x640-0x641 (rare, <1Hz): burst at startup only ??? 0x641 byte[0] counts 0x00-0x07 (8-frame sequence); initialization/handshake exchange";
+CM_ "0x644-0x649 (1Hz): cluster of 1Hz addresses ??? 0x647 and 0x649 use segmented sequence format (byte[0]=0x10/0x11/0x12); likely Battery Condition Monitor A+B periodic data frames";
+CM_ "0x661 (2Hz): 8-byte, 323 unique ??? highly dynamic; byte[1] steps 0x00/0x10/.../0x90 (nibble counter); likely battery pack current/voltage/power; Techinfo: PCU F-CAN side or Battery Charger";
