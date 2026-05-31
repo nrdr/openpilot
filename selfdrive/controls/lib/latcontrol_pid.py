@@ -2,7 +2,6 @@ import math
 import numpy as np
 
 from cereal import log
-from opendbc.car.honda.values import CAR
 from opendbc.car.honda.carcontroller import get_eps_modified_steering_pressed
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
@@ -33,15 +32,6 @@ def get_param_float(params, key, default, min_value=None, max_value=None, scale=
   if max_value is not None:
     ret = min(max_value, ret)
   return ret
-
-
-def _center_taper_high(car_fingerprint) -> float:
-  if car_fingerprint in (CAR.HONDA_CIVIC_BOSCH, CAR.HONDA_CIVIC_BOSCH_DIESEL):
-    return 0.25
-  if car_fingerprint == CAR.HONDA_CLARITY:
-    return 1.24
-
-  return 0.5
 
 
 def _pid_output_scale(
@@ -115,7 +105,8 @@ class LatControlPID(LatControl):
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
 
     self.is_eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
-    self.center_taper_high = _center_taper_high(CP.carFingerprint)
+    # Live-tunable high-speed center taper (replaces the old per-car lookup).
+    self.center_taper_high = 0.5
 
     self.eps_modified_steering_pressed_filter_s = 0.0
     self.eps_modified_steering_pressed_prev = False
@@ -202,6 +193,15 @@ class LatControlPID(LatControl):
           0.0,
           5.0,
           scale=100.0,
+        )
+        # High-speed center taper target. FLOAT param stored as the real value
+        # (UI use_float_scaling), so no scale. Unset -> 0.5 (old generic default).
+        self.center_taper_high = get_param_float(
+          self.params,
+          "HondaCenterScale",
+          0.5,
+          0.0,
+          5.0,
         )
 
       output_torque = self.pid.update(

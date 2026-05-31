@@ -51,6 +51,17 @@ class NrdrLayout(Widget):
       label_callback=lambda value: f"{value}%",
     )
 
+    self._center_scale = option_item_sp(
+      param="HondaCenterScale",
+      title=lambda: tr("Center Scale (Default: 0.50)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=1,
+      description=lambda: tr("High-speed center taper target; higher values increase on-center torque as speed rises."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
     self._long_pid_tune_scale = option_item_sp(
       param="LongPidTuneScale",
       title=lambda: tr("Longitudinal PID Tune Scale (Default: 100%)"),
@@ -239,6 +250,7 @@ class NrdrLayout(Widget):
       self._lp_angle_inst,
       LineSeparatorSP(40),
       self._lat_pid_tune_scale,
+      self._center_scale,
       self._long_pid_tune_scale,
       LineSeparatorSP(40),
       self._increase_override_tolerance,
@@ -301,6 +313,7 @@ class NrdrLayout(Widget):
 
     self._increase_override_tolerance.action_item.set_enabled(True)
     self._lat_pid_tune_scale.action_item.set_enabled(True)
+    self._center_scale.action_item.set_enabled(True)
     self._long_pid_tune_scale.action_item.set_enabled(True)
     self._low_pass_filter.action_item.set_enabled(True)
     self._lpf_tau_low.action_item.set_enabled(True)

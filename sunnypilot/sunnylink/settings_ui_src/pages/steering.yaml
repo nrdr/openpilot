@@ -267,6 +267,13 @@ sections:
     max: 500
     step: 5
     unit: '%'
+  - key: HondaCenterScale
+    widget: option
+    title: Center Scale
+    description: High-speed center taper target; higher values increase on-center torque as speed rises.
+    min: 0.0
+    max: 5.0
+    step: 0.01
   - key: LongPidTuneScale
     widget: option
     title: Longitudinal PID Tune Scale
