@@ -331,6 +331,32 @@ sections:
     - type: param
       key: HondaTorqueLowPassFilter
       equals: true
+  - key: HondaNotchEnabled
+    widget: toggle
+    title: Notch Filter
+    description: Removes a narrow EPS chatter band (around 7Hz) without the lag a low pass filter adds.
+  - key: HondaNotchFreq
+    widget: option
+    title: Notch Frequency
+    description: Center frequency (Hz) of the band the notch removes.
+    min: 1.0
+    max: 20.0
+    step: 0.1
+    enablement:
+    - type: param
+      key: HondaNotchEnabled
+      equals: true
+  - key: HondaNotchQ
+    widget: option
+    title: Notch Q / Width
+    description: Sharpness of the notch; higher = narrower band removed, lower = wider.
+    min: 0.1
+    max: 10.0
+    step: 0.1
+    enablement:
+    - type: param
+      key: HondaNotchEnabled
+      equals: true
   - key: HondaDriverAssistDuringOverride
     widget: toggle
     title: Pass-through standard assist torque on override

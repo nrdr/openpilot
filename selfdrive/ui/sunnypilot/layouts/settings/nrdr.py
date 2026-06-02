@@ -129,6 +129,34 @@ class NrdrLayout(Widget):
       use_float_scaling=True,
     )
 
+    self._notch_enabled = toggle_item_sp(
+      param="HondaNotchEnabled",
+      title=lambda: tr("Notch Filter (Default: OFF)"),
+      description=lambda: tr("Removes a narrow EPS chatter band (around 7Hz) without the lag a low pass filter adds."),
+    )
+
+    self._notch_freq = option_item_sp(
+      param="HondaNotchFreq",
+      title=lambda: tr("Notch Frequency (Default: 7.5)"),
+      min_value=100,
+      max_value=2000,
+      value_change_step=10,
+      description=lambda: tr("Center frequency (Hz) of the band the notch removes."),
+      label_callback=lambda value: f"{value / 100:.1f} Hz",
+      use_float_scaling=True,
+    )
+
+    self._notch_q = option_item_sp(
+      param="HondaNotchQ",
+      title=lambda: tr("Notch Q / Width (Default: 1.5)"),
+      min_value=10,
+      max_value=1000,
+      value_change_step=10,
+      description=lambda: tr("Sharpness of the notch; higher = narrower band removed, lower = wider."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
     self._driver_assist_during_override = toggle_item_sp(
       param="HondaDriverAssistDuringOverride",
       title=lambda: tr("Pass-through assist torque on override (Default: ON)"),
@@ -274,6 +302,10 @@ class NrdrLayout(Widget):
       self._lpf_tau_standard,
       self._lpf_tau_highway,
       LineSeparatorSP(40),
+      self._notch_enabled,
+      self._notch_freq,
+      self._notch_q,
+      LineSeparatorSP(40),
       self._driver_assist_during_override,
       self._override_fade_down,
       self._override_fade_up,
@@ -335,6 +367,9 @@ class NrdrLayout(Widget):
     self._lpf_tau_low.action_item.set_enabled(True)
     self._lpf_tau_standard.action_item.set_enabled(True)
     self._lpf_tau_highway.action_item.set_enabled(True)
+    self._notch_enabled.action_item.set_enabled(True)
+    self._notch_freq.action_item.set_enabled(True)
+    self._notch_q.action_item.set_enabled(True)
     self._override_torque_scale.action_item.set_enabled(True)
     self._steer_delta_limiter.action_item.set_enabled(True)
     self._steer_delta_up.action_item.set_enabled(True)
@@ -351,6 +386,11 @@ class NrdrLayout(Widget):
     self._lpf_tau_low.set_visible(lpf_enabled)
     self._lpf_tau_standard.set_visible(lpf_enabled)
     self._lpf_tau_highway.set_visible(lpf_enabled)
+
+    # Hide the notch freq/Q sliders when the notch filter is disabled.
+    notch_enabled = self._notch_enabled.action_item.get_state()
+    self._notch_freq.set_visible(notch_enabled)
+    self._notch_q.set_visible(notch_enabled)
 
   def _render(self, rect):
     self._scroller.render(rect)
