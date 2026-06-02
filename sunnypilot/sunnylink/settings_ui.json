@@ -391,7 +391,7 @@
                   "min": 0.1,
                   "max": 5.0,
                   "step": 0.1,
-                  "unit": "m/s\u00b2",
+                  "unit": "m/s\u00c2\u00b2",
                   "enablement": [
                     {
                       "type": "param",
@@ -537,6 +537,282 @@
                   "value": 0
                 }
               ]
+            }
+          ]
+        },
+        {
+          "id": "nrdr",
+          "title": "nrdr Settings",
+          "description": "Customize settings related to the nrdr fork",
+          "items": [
+            {
+              "key": "LatPidTuneScale",
+              "widget": "option",
+              "title": "Lateral PID Tune Scale",
+              "description": "Scales lateral PID controller values from their configured base tune.",
+              "min": 0,
+              "max": 500,
+              "step": 5,
+              "unit": "%"
+            },
+            {
+              "key": "HondaCenterScale",
+              "widget": "option",
+              "title": "Center Scale",
+              "description": "High-speed center taper target; higher values increase on-center torque as speed rises.",
+              "min": 0.0,
+              "max": 5.0,
+              "step": 0.01
+            },
+            {
+              "key": "LongPidTuneScale",
+              "widget": "option",
+              "title": "Longitudinal PID Tune Scale",
+              "description": "Scales longitudinal PID controller values from their configured base tune.",
+              "min": 0,
+              "max": 500,
+              "step": 5,
+              "unit": "%"
+            },
+            {
+              "key": "NrdrIncreaseOverrideTolerance",
+              "widget": "toggle",
+              "title": "Increase Driver Override Tolerance",
+              "description": "Reduces the likelihood of false driver override detections on sensitive Honda EPS platforms."
+            },
+            {
+              "key": "HondaUnwindFreeze",
+              "widget": "toggle",
+              "title": "Unwind Integrator Freeze",
+              "description": "Freezes the PID integrator while the steering is returning toward center, so it doesn't hold torque through the unwind."
+            },
+            {
+              "key": "HondaUnwindLookahead",
+              "widget": "toggle",
+              "title": "Unwind Lookahead",
+              "description": "Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops."
+            },
+            {
+              "key": "HondaTorqueLowPassFilter",
+              "widget": "toggle",
+              "title": "Low Pass Filter (tau)",
+              "description": "Applies smoothing to requested steering torque."
+            },
+            {
+              "key": "HondaLpfTauLowSpeed",
+              "widget": "option",
+              "title": "Low Speed Tau (Below 25mph)",
+              "description": "Low-pass filter time constant (seconds) below 25 mph.",
+              "min": 0.0,
+              "max": 5.0,
+              "step": 0.01,
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "HondaTorqueLowPassFilter",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "HondaLpfTauStandard",
+              "widget": "option",
+              "title": "Standard Tau (25-50mph)",
+              "description": "Low-pass filter time constant (seconds) between 25 and 50 mph.",
+              "min": 0.0,
+              "max": 5.0,
+              "step": 0.01,
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "HondaTorqueLowPassFilter",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "HondaLpfTauHighway",
+              "widget": "option",
+              "title": "Highway Tau (50mph+)",
+              "description": "Low-pass filter time constant (seconds) above 50 mph.",
+              "min": 0.0,
+              "max": 5.0,
+              "step": 0.01,
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "HondaTorqueLowPassFilter",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "HondaNotchEnabled",
+              "widget": "toggle",
+              "title": "Notch Filter",
+              "description": "Removes a narrow EPS chatter band (around 7Hz) without the lag a low pass filter adds."
+            },
+            {
+              "key": "HondaNotchFreq",
+              "widget": "option",
+              "title": "Notch Frequency",
+              "description": "Center frequency (Hz) of the band the notch removes.",
+              "min": 1.0,
+              "max": 20.0,
+              "step": 0.1,
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "HondaNotchEnabled",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "HondaNotchQ",
+              "widget": "option",
+              "title": "Notch Q / Width",
+              "description": "Sharpness of the notch; higher = narrower band removed, lower = wider.",
+              "min": 0.1,
+              "max": 10.0,
+              "step": 0.1,
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "HondaNotchEnabled",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "HondaDriverAssistDuringOverride",
+              "widget": "toggle",
+              "title": "Pass-through standard assist torque on override",
+              "description": "When ON, openpilot gives way while you steer (normal manual feel). When OFF, openpilot keeps applying torque (more resistant)."
+            },
+            {
+              "key": "HondaOverrideFadeDownSecs",
+              "widget": "option",
+              "title": "Override Torque Fade Down",
+              "description": "Controls how quickly steering torque fades out when driver override begins.",
+              "min": 0.0,
+              "max": 10.0,
+              "step": 0.1,
+              "unit": "second"
+            },
+            {
+              "key": "HondaOverrideFadeUpSecs",
+              "widget": "option",
+              "title": "Override Torque Fade Up",
+              "description": "Controls how quickly steering torque fades back in after driver override ends.",
+              "min": 0.0,
+              "max": 10.0,
+              "step": 0.1,
+              "unit": "second"
+            },
+            {
+              "key": "HondaOverrideTorqueScale",
+              "widget": "option",
+              "title": "Override Torque Retain",
+              "description": "Controls how much openpilot steering torque remains while the driver is overriding.",
+              "min": 0,
+              "max": 100,
+              "step": 1,
+              "unit": "%"
+            },
+            {
+              "key": "HondaLiveLearningGas",
+              "widget": "toggle",
+              "title": "Live Learning Gas",
+              "description": "Allows Honda gas and wind compensation factors to learn live while driving.",
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                }
+              ]
+            },
+            {
+              "key": "HondaSteerDeltaLimiter",
+              "widget": "toggle",
+              "title": "Steer Delta Rate Limiter",
+              "description": "Limits how quickly requested steering torque can rise or fall."
+            },
+            {
+              "key": "HondaSteerDeltaUp",
+              "widget": "option",
+              "title": "Steer Delta Up",
+              "description": "Maximum upward steering torque rate when the rate limiter is enabled.",
+              "min": 0.0,
+              "max": 100.0,
+              "step": 0.1,
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "HondaSteerDeltaLimiter",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "HondaSteerDeltaDown",
+              "widget": "option",
+              "title": "Steer Delta Down",
+              "description": "Maximum downward steering torque rate when the rate limiter is enabled.",
+              "min": 0.0,
+              "max": 100.0,
+              "step": 0.1,
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "HondaSteerDeltaLimiter",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "HondaStoppingDecelRate",
+              "widget": "option",
+              "title": "Stopping Decel Rate",
+              "description": "Brake-rate limiter used while coming to a stop (carcontroller).",
+              "min": 0,
+              "max": 100,
+              "step": 1
+            },
+            {
+              "key": "HondaStopAccel",
+              "widget": "option",
+              "title": "Stop Accel",
+              "description": "Target acceleration once stopped (holds the brake).",
+              "min": -4.0,
+              "max": 0.0,
+              "step": 0.01
+            },
+            {
+              "key": "HondaStoppingDecelRateLong",
+              "widget": "option",
+              "title": "Planner Stopping Rate",
+              "description": "How quickly commanded deceleration ramps down while coming to a stop.",
+              "min": 0.0,
+              "max": 5.0,
+              "step": 0.01
+            },
+            {
+              "key": "HondaVEgoStopping",
+              "widget": "option",
+              "title": "vEgo Stopping",
+              "description": "Speed (m/s) below which the planner treats the car as stopping.",
+              "min": 0.0,
+              "max": 3.0,
+              "step": 0.01
+            },
+            {
+              "key": "HondaVEgoStarting",
+              "widget": "option",
+              "title": "vEgo Starting",
+              "description": "Speed (m/s) above which the car is considered moving again.",
+              "min": 0.0,
+              "max": 3.0,
+              "step": 0.01
             }
           ]
         }
