@@ -30,8 +30,8 @@ class OverrideTuningLayout(Widget):
 
     self._driver_assist_during_override = toggle_item_sp(
       param="HondaDriverAssistDuringOverride",
-      title=lambda: tr("Pass-through standard assist torque on override (Default: ON)"),
-      description=lambda: tr("When ON, openpilot gives way while you steer (normal manual feel). When OFF, openpilot keeps applying torque (more resistant)."),
+      title=lambda: tr("Pass-through assist torque on override (Default: ON)"),
+      description=lambda: tr("When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling."),
     )
 
     self._override_fade_down = option_item_sp(

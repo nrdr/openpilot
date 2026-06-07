@@ -264,6 +264,18 @@ sections:
     label: Lateral Tuning
     trigger_key: null
     items:
+    - key: NrdrLearnSteerRatio
+      widget: toggle
+      title: Learn Steer Ratio (Auto)
+      description: When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance.
+    - key: NrdrLearnStiffness
+      widget: toggle
+      title: Learn Tire Stiffness (Auto)
+      description: When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0.
+    - key: NrdrLearnAngleOffset
+      widget: toggle
+      title: Learn Angle Offset (Auto)
+      description: When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side.
     - key: LatPidTuneScale
       widget: option
       title: Lateral PID Tune Scale
@@ -386,8 +398,8 @@ sections:
       description: Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms.
     - key: HondaDriverAssistDuringOverride
       widget: toggle
-      title: Pass-through standard assist torque on override
-      description: When ON, openpilot gives way while you steer (normal manual feel). When OFF, openpilot keeps applying torque (more resistant).
+      title: Pass-through assist torque on override
+      description: When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling.
     - key: HondaOverrideFadeDownSecs
       widget: option
       title: Override Torque Fade Down

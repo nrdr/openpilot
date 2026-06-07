@@ -5,7 +5,7 @@ from enum import IntEnum
 
 from cereal import log
 from openpilot.system.ui.lib.multilang import tr
-from openpilot.system.ui.sunnypilot.widgets.list_view import simple_button_item_sp, LineSeparatorSP, ListItemSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import simple_button_item_sp, toggle_item_sp, LineSeparatorSP, ListItemSP
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -45,14 +45,32 @@ class NrdrLayout(Widget):
     self._lp_steer_ratio = ListItemSP(
       title=lambda: f"{tr('Learned Steer Ratio')}: {self._lp_text['steerRatio']}",
     )
+    self._learn_steer_ratio = toggle_item_sp(
+      param="NrdrLearnSteerRatio",
+      title=lambda: tr("Learn Steer Ratio (Auto)"),
+      description=lambda: tr("When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance."),
+      initial_state=True,
+    )
     self._lp_stiffness = ListItemSP(
       title=lambda: f"{tr('Learned Tire Stiffness Factor')}: {self._lp_text['stiffnessFactor']}",
+    )
+    self._learn_stiffness = toggle_item_sp(
+      param="NrdrLearnStiffness",
+      title=lambda: tr("Learn Tire Stiffness (Auto)"),
+      description=lambda: tr("When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0."),
+      initial_state=True,
     )
     self._lp_angle_avg = ListItemSP(
       title=lambda: f"{tr('Learned Angle Offset (Average)')}: {self._lp_text['angleOffsetAverageDeg']}",
     )
     self._lp_angle_inst = ListItemSP(
       title=lambda: f"{tr('Learned Angle Offset (Instant)')}: {self._lp_text['angleOffsetDeg']}",
+    )
+    self._learn_angle_offset = toggle_item_sp(
+      param="NrdrLearnAngleOffset",
+      title=lambda: tr("Learn Angle Offset (Auto)"),
+      description=lambda: tr("When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side."),
+      initial_state=True,
     )
 
     self._lateral_button = simple_button_item_sp(
@@ -73,9 +91,12 @@ class NrdrLayout(Widget):
 
     return [
       self._lp_steer_ratio,
+      self._learn_steer_ratio,
       self._lp_stiffness,
+      self._learn_stiffness,
       self._lp_angle_avg,
       self._lp_angle_inst,
+      self._learn_angle_offset,
       LineSeparatorSP(40),
       self._lateral_button,
       LineSeparatorSP(40),

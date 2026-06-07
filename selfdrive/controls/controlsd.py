@@ -77,13 +77,17 @@ class Controls(ControlsExt):
   def state_control(self):
     CS = self.sm['carState']
 
-    # Update VehicleModel
+    # Update VehicleModel. Each learned value can be turned off (Auto -> static base):
+    #   stiffness -> 1.0, steerRatio -> CP.steerRatio, angleOffset -> 0.0
     lp = self.sm['liveParameters']
-    x = max(lp.stiffnessFactor, 0.1)
-    sr = max(lp.steerRatio, 0.1)
+    stiffness = lp.stiffnessFactor if self.learn_stiffness else 1.0
+    steer_ratio = lp.steerRatio if self.learn_steer_ratio else self.CP.steerRatio
+    angle_offset = lp.angleOffsetDeg if self.learn_angle_offset else 0.0
+    x = max(stiffness, 0.1)
+    sr = max(steer_ratio, 0.1)
     self.VM.update_params(x, sr)
 
-    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - lp.angleOffsetDeg)
+    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - angle_offset)
     self.curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
 
     # Update Torque Params
