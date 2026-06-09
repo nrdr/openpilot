@@ -28,7 +28,7 @@ restore_source_name() {
     git -C "$BUILD_DIR" remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git" 2>/dev/null || true
   fi
 
-  if [ "${DELETE_BUILD_DIR_WHEN_DONE:-1}" = "1" ] && [ -d "$BUILD_DIR" ] && [ "$BUILD_DIR" != "$SRC_DIR" ]; then
+  if [ "${RESTORE_SOURCE_NAME:-0}" = "1" ] && [ "${DELETE_BUILD_DIR_WHEN_DONE:-1}" = "1" ] && [ -d "$BUILD_DIR" ] && [ "$BUILD_DIR" != "$SRC_DIR" ]; then
     echo "[-] Removing runtime build tree $BUILD_DIR"
     rm -rf "$BUILD_DIR" || true
   fi
