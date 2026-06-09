@@ -1,31 +1,88 @@
+```bash
 #!/usr/bin/env bash
 set -euo pipefail
 set -x
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)"
-SOURCE_DIR="$(cd "$DIR/.." && pwd)"     # /data/openpilot-src (repo root)
-BUILD_DIR=/data/openpilot               # runtime tree
+BUILD_DIR=/data/openpilot
+SRC_DIR=/data/openpilot-src
+GITHUB_USER="${GITHUB_USER:=nrdr}"
+GITHUB_REPO="${GITHUB_REPO:=openpilot}"
 
-: "${RELEASE_BRANCH:?RELEASE_BRANCH is not set}"
-: "${PUSH:=0}"       # set to 0 to disable git push
-: "${CLEANUP:=0}"    # set to 0 to keep BUILD_DIR and avoid deleting it
+# Daily defaults
+: "${RELEASE_BRANCH:=nrdr-staging-$(date +%m.%d.%Y)}"
+: "${PUSH:=1}"
+: "${CLEANUP:=0}"
+: "${RESTORE_SOURCE_NAME:=0}"
+: "${DELETE_BUILD_DIR_WHEN_DONE:=1}"
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)"
+SOURCE_DIR="$(cd "$DIR/.." && pwd)"
+
+restore_source_name() {
+  status=$?
+
+  set +e
+  cd /data || true
+
+  if [ -d "$BUILD_DIR/.git" ]; then
+    git -C "$BUILD_DIR" remote set-url origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git" 2>/dev/null || true
+    git -C "$BUILD_DIR" remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git" 2>/dev/null || true
+  fi
+
+  if [ "${DELETE_BUILD_DIR_WHEN_DONE:-1}" = "1" ] && [ -d "$BUILD_DIR" ] && [ "$BUILD_DIR" != "$SRC_DIR" ]; then
+    echo "[-] Removing runtime build tree $BUILD_DIR"
+    rm -rf "$BUILD_DIR" || true
+  fi
+
+  if [ "${RESTORE_SOURCE_NAME:-0}" = "1" ] && [ -d "$SRC_DIR" ] && [ ! -e "$BUILD_DIR" ]; then
+    echo "[-] Restoring source repo $SRC_DIR -> $BUILD_DIR"
+    mv "$SRC_DIR" "$BUILD_DIR" || true
+  fi
+
+  exit "$status"
+}
+
+trap restore_source_name EXIT INT TERM
+
+# If source repo is currently /data/openpilot, move it to /data/openpilot-src,
+# then restart this script from the new location.
+if [ "$SOURCE_DIR" = "$BUILD_DIR" ]; then
+  if [ -e "$SRC_DIR" ]; then
+    echo "ERROR: $SRC_DIR already exists; refusing to overwrite it"
+    exit 1
+  fi
+
+  echo "[-] Moving source repo $BUILD_DIR -> $SRC_DIR"
+  cd /data
+  mv "$BUILD_DIR" "$SRC_DIR"
+
+  export RESTORE_SOURCE_NAME=1
+  exec "$SRC_DIR/release/build_prebuilt.sh" "$@"
+fi
+
+SOURCE_DIR="$SRC_DIR"
+DIR="$SOURCE_DIR/release"
 
 cd "$DIR"
 
-# optional: set git identity if you want
-# source "$DIR/identity.sh"
+echo "[-] Release branch: $RELEASE_BRANCH"
+echo "[-] Source dir: $SOURCE_DIR"
+echo "[-] Build dir: $BUILD_DIR"
 
 echo "[-] Setting up runtime tree T=$SECONDS"
 if [ "$CLEANUP" = "1" ]; then
   rm -rf "$BUILD_DIR"
 else
-  echo "[-] CLEANUP=0: leaving existing $BUILD_DIR in place"
+  echo "[-] CLEANUP=0: leaving existing $BUILD_DIR in place if present"
 fi
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
+
 git init
-git remote add origin https://github.com/nrdr/openpilot.git
+git remote remove origin 2>/dev/null || true
+git remote add origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
+git remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
 git checkout --orphan "$RELEASE_BRANCH"
 
 echo "[-] Copying release files T=$SECONDS"
@@ -34,20 +91,18 @@ cp -pR --parents $(./release/release_files.py) "$BUILD_DIR/"
 
 cd "$BUILD_DIR"
 
-# remove any leftover signed fw artifacts
 rm -f panda/board/obj/panda.bin.signed || true
 rm -f panda/board/obj/panda_h7.bin.signed || true
 
 VERSION="$(cat sunnypilot/common/version.h | awk -F[\"-] '{print $2}')"
 echo "[-] committing version $VERSION T=$SECONDS"
+
 git add -f .
 git commit -a -m "openpilot v$VERSION prebuilt"
 
 echo "[-] Building T=$SECONDS"
 export PYTHONPATH="$BUILD_DIR"
 scons -j"$(nproc)" --minimal
-
-# Build panda (no Comma release certs on community devices)
 scons -j"$(nproc)" panda/
 
 echo "[-] Ensuring no submodules in release"
@@ -65,12 +120,10 @@ find . -name 'moc_*' -delete
 find . -name '__pycache__' -delete
 rm -rf .sconsign.dblite Jenkinsfile release/ || true
 
-# remove big models not needed in prebuilt tree (keep consistent with your fork’s expectations)
 rm -f selfdrive/modeld/models/driving_vision.onnx || true
 rm -f selfdrive/modeld/models/driving_policy.onnx || true
 rm -f sunnypilot/modeld*/models/supercombo.onnx || true
 
-# restore third_party if your release_files pulled extra host junk
 git checkout -- third_party/ || true
 
 touch prebuilt
@@ -78,20 +131,34 @@ touch prebuilt
 git add -f .
 git commit --amend -m "openpilot v$VERSION prebuilt"
 
-echo "[-] (Optional) onroad test"
-#RELEASE=1 pytest -n0 -s selfdrive/test/test_onroad.py
+echo "[-] Optional onroad test skipped"
+# RELEASE=1 pytest -n0 -s selfdrive/test/test_onroad.py
 
 if [ "$PUSH" = "1" ]; then
   echo "[-] PUSH T=$SECONDS"
 
-  # Force HTTPS remote every run because device resets may recreate origin with SSH push URL.
-  git remote set-url origin "https://github.com/nrdr/openpilot.git"
-  git remote set-url --push origin "https://github.com/nrdr/openpilot.git"
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    set +x
+    printf "GitHub PAT for %s: " "$GITHUB_USER"
+    read -r -s GITHUB_TOKEN
+    printf "\n"
+    set -x
+  fi
 
-  git remote -v
+  set +x
+  AUTH_REMOTE="https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
+  git remote set-url origin "$AUTH_REMOTE"
+  git remote set-url --push origin "$AUTH_REMOTE"
   git push -f origin "$RELEASE_BRANCH:$RELEASE_BRANCH"
+
+  git remote set-url origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
+  git remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
+  unset AUTH_REMOTE
+  unset GITHUB_TOKEN
+  set -x
 else
   echo "[-] PUSH=0: skipping git push. Prebuilt tree is local at $BUILD_DIR"
 fi
 
 echo "[-] done T=$SECONDS"
+```
