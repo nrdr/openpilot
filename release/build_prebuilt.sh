@@ -56,7 +56,7 @@ if [ "$SOURCE_DIR" = "$BUILD_DIR" ]; then
   mv "$BUILD_DIR" "$SRC_DIR"
 
   export RESTORE_SOURCE_NAME=1
-  exec "$SRC_DIR/release/build_prebuilt.sh" "$@"
+  exec bash "$SRC_DIR/release/build_prebuilt.sh" "$@"
 fi
 
 SOURCE_DIR="$SRC_DIR"
