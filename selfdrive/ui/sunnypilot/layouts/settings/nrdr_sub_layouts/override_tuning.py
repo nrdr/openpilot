@@ -36,7 +36,7 @@ class OverrideTuningLayout(Widget):
 
     self._override_fade_down = option_item_sp(
       param="HondaOverrideFadeDownSecs",
-      title=lambda: tr("Override Torque Fade Down (Default: 0.0)"),
+      title=lambda: tr("Override Torque Fade Down (Default: 0.1)"),
       min_value=0,
       max_value=1000,
       value_change_step=10,

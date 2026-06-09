@@ -380,7 +380,7 @@ sections:
         equals: true
     - key: HondaSteerDeltaLimiter
       widget: toggle
-      title: Steer Delta Rate Limiter
+      title: Legacy Steer Delta Rate Limiter
       description: Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass and notch filters.
     - key: HondaSteerDeltaUp
       widget: option

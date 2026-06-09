@@ -30,6 +30,9 @@ NRDR_DEFAULT_BOOL_PARAMS = {
   # Device
   "QuietMode": True,
 
+  # Network
+  "GsmMetered": False,
+
   # Toggles
   "ExperimentalMode": True,
   "RecordFront": True,
@@ -42,7 +45,15 @@ NRDR_DEFAULT_BOOL_PARAMS = {
   "DynamicExperimentalControl": True,
   "SmartCruiseControlVision": True,
 
+  # Steering / MADS
+  "MadsMainCruiseAllowed": False,
+
+  # nrdr lateral
+  "HondaUnwindLookahead": True,
+  "HondaNotchEnabled": True,
+
   # Visuals
+  "RocketFuel": True,
   "BlindSpot": True,
   "TorqueBar": True,
   "RainbowMode": False,
@@ -71,6 +82,11 @@ NRDR_DEFAULT_VALUE_PARAMS = {
   "SpeedLimitMode": 3,
   "SpeedLimitOffsetType": 1,
   "SpeedLimitValueOffset": 5,
+  "CustomAccShortPressIncrement": 5,
+  "CustomAccLongPressIncrement": 1,
+
+  # nrdr override
+  "HondaOverrideFadeDownSecs": 0.1,
 
   # Visuals
   "ChevronInfo": 3,

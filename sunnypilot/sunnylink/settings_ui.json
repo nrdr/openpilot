@@ -715,7 +715,7 @@
                 {
                   "key": "HondaSteerDeltaLimiter",
                   "widget": "toggle",
-                  "title": "Steer Delta Rate Limiter",
+                  "title": "Legacy Steer Delta Rate Limiter",
                   "description": "Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass and notch filters."
                 },
                 {
@@ -870,7 +870,7 @@
                   "description": "Speed (m/s) above which the car is considered moving again.",
                   "min": 0.0,
                   "max": 3.0,
-                  "step": 0.01
+                  "step": null
                 }
               ]
             }

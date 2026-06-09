@@ -71,7 +71,7 @@ class LateralTuningLayout(Widget):
 
     self._unwind_lookahead = toggle_item_sp(
       param="HondaUnwindLookahead",
-      title=lambda: tr("Unwind Lookahead (Default: OFF)"),
+      title=lambda: tr("Unwind Lookahead (Default: ON)"),
       description=lambda: tr("Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops."),
     )
 
@@ -116,7 +116,7 @@ class LateralTuningLayout(Widget):
 
     self._notch_enabled = toggle_item_sp(
       param="HondaNotchEnabled",
-      title=lambda: tr("Notch Filter (Default: OFF)"),
+      title=lambda: tr("Notch Filter (Default: ON)"),
       description=lambda: tr("Removes a narrow EPS chatter band (around 7Hz) without the lag a low pass filter adds."),
     )
 
@@ -144,7 +144,7 @@ class LateralTuningLayout(Widget):
 
     self._steer_delta_limiter = toggle_item_sp(
       param="HondaSteerDeltaLimiter",
-      title=lambda: tr("Steer Delta Rate Limiter (Default: OFF)"),
+      title=lambda: tr("Legacy Steer Delta Rate Limiter (Default: OFF)"),
       description=lambda: tr("Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass and notch filters."),
     )
 
