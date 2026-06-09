@@ -296,7 +296,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaLpfTauStandard", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
     {"HondaLpfTauHighway", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
     {"HondaInjectionTest", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"HondaAltDashboard", {PERSISTENT | BACKUP, INT, "0"}},  # 0 Stock, 1 Lead Information, 2 Vehicle Information
+    {"HondaAltDashboard", {PERSISTENT | BACKUP, INT, "0"}},  // 0 Stock, 1 Lead Information, 2 Vehicle Information
     {"HondaSteerDeltaLimiter", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaSteerDeltaUp", {PERSISTENT | BACKUP, FLOAT, "3"}},
     {"HondaSteerDeltaDown", {PERSISTENT | BACKUP, FLOAT, "3"}},
