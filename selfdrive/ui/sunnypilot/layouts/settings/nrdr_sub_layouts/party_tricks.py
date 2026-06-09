@@ -8,7 +8,7 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
-from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, LineSeparatorSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, multiple_button_item_sp, LineSeparatorSP
 
 
 class PartyTricksLayout(Widget):
@@ -27,10 +27,15 @@ class PartyTricksLayout(Widget):
       description=lambda: tr("When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a massive steering command. Use with extreme caution on a safe, empty road."),
     )
 
-    self._alt_dashboard = toggle_item_sp(
+    self._alt_dashboard = multiple_button_item_sp(
+      title=lambda: tr("Alternative Dashboard UI Design (Default: Stock)"),
+      description=lambda: tr("Repurposes the factory ACC cluster (requires openpilot longitudinal). "
+                            "Stock: normal display. "
+                            "Lead Information: the distance bars close in as the lead approaches and the lead's speed shows in place of your set speed (\"Stopped\" below 1 mph, \"--\" when no lead). Best on radar cars. "
+                            "Vehicle Information: shows your own speed, with the bars pushing out under acceleration and pulling in under braking. Good when there's no useful lead."),
+      buttons=[lambda: tr("Stock"), lambda: tr("Lead Information"), lambda: tr("Vehicle Information")],
+      button_width=420,
       param="HondaAltDashboard",
-      title=lambda: tr("Alternative Dashboard UI Design (Default: OFF)"),
-      description=lambda: tr("Repurposes the factory ACC cluster as a live lead display: the distance bars close in as the lead car approaches, and the lead's speed is shown in place of your set speed. Shows \"Stopped\" when the lead is below 1 mph and \"--\" when no lead is present but ACC is engaged."),
     )
 
     return [
