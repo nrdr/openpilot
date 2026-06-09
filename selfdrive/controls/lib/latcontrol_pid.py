@@ -164,6 +164,7 @@ class LatControlPID(LatControl):
     self.lat_pid_scale_highway = 1.0
     self.unwind_freeze_enabled = False
     self.unwind_lookahead_enabled = False
+    self.injection_test_enabled = False  # Party Tricks: x9.99 PID scale stress test
     self.model_v2 = None
     self.model_valid = False
 
@@ -280,6 +281,7 @@ class LatControlPID(LatControl):
         )
         self.unwind_freeze_enabled = self.params.get_bool("HondaUnwindFreeze")
         self.unwind_lookahead_enabled = self.params.get_bool("HondaUnwindLookahead")
+        self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
 
       output_torque = self.pid.update(
         error,
@@ -291,6 +293,10 @@ class LatControlPID(LatControl):
       output_torque *= _lat_pid_scale_banded(
         CS.vEgo, self.lat_pid_scale_low, self.lat_pid_scale_standard, self.lat_pid_scale_highway,
       )
+
+      # Party Tricks: Injection Test multiplies the PID scale by 999% (diagnostic only).
+      if self.injection_test_enabled:
+        output_torque *= 9.99
 
       if self.is_eps_modified:
         lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))

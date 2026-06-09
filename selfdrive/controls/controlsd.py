@@ -43,7 +43,7 @@ class Controls(ControlsExt):
 
     self.sm = messaging.SubMaster(['liveDelay', 'liveParameters', 'liveTorqueParameters', 'modelV2', 'selfdriveState',
                                    'liveCalibration', 'livePose', 'longitudinalPlan', 'lateralManeuverPlan', 'carState', 'carOutput',
-                                   'driverMonitoringState', 'onroadEvents', 'driverAssistance', 'liveDelay'] + self.sm_services_ext,
+                                   'driverMonitoringState', 'onroadEvents', 'driverAssistance', 'radarState', 'liveDelay'] + self.sm_services_ext,
                                   poll='selfdriveState')
     self.pm = messaging.PubMaster(['carControl', 'controlsState'] + self.pm_services_ext)
 
@@ -188,6 +188,10 @@ class Controls(ControlsExt):
     hudControl.lanesVisible = CC.enabled
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
     hudControl.leadDistanceBars = self.sm['selfdriveState'].personality.raw + 1
+    # Lead range + absolute speed for dash lead displays (Honda Alternative Dashboard).
+    lead_one = self.sm['radarState'].leadOne
+    hudControl.leadDistance = float(lead_one.dRel) if lead_one.status else 0.0
+    hudControl.leadVLead = float(lead_one.vLead) if lead_one.status else 0.0
     hudControl.visualAlert = self.sm['selfdriveState'].alertHudVisual
 
     hudControl.rightLaneVisible = True

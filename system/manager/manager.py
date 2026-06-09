@@ -89,7 +89,7 @@ NRDR_DEFAULT_VALUE_PARAMS = {
   "HondaOverrideFadeDownSecs": 0.1,
 
   # Visuals
-  "ChevronInfo": 3,
+  "ChevronInfo": 4,  # 0 Off, 1 Distance, 2 Speed, 3 Time, 4 All
   "DevUIInfo": 3,
 
   # Display

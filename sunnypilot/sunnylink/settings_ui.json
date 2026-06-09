@@ -391,7 +391,7 @@
                   "min": 0.1,
                   "max": 5.0,
                   "step": 0.1,
-                  "unit": "m/s\u00b2",
+                  "unit": "m/s\u00c2\u00b2",
                   "enablement": [
                     {
                       "type": "param",
@@ -870,7 +870,26 @@
                   "description": "Speed (m/s) above which the car is considered moving again.",
                   "min": 0.0,
                   "max": 3.0,
-                  "step": null
+                  "step": 0.01
+                }
+              ]
+            },
+            {
+              "id": "nrdr_party_tricks",
+              "label": "Party Tricks",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "HondaInjectionTest",
+                  "widget": "toggle",
+                  "title": "Injection Test (Caution!)",
+                  "description": "When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a massive steering command. Use with extreme caution on a safe, empty road."
+                },
+                {
+                  "key": "HondaAltDashboard",
+                  "widget": "toggle",
+                  "title": "Alternative Dashboard UI Design",
+                  "description": "Repurposes the factory ACC cluster as a live lead display - the distance bars close in as the lead car approaches, and the lead's speed is shown in place of your set speed. Shows \"Stopped\" when the lead is below 1 mph and \"--\" when no lead is present but ACC is engaged."
                 }
               ]
             }
