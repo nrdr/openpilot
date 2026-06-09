@@ -13,6 +13,12 @@ GITHUB_REPO="${GITHUB_REPO:=openpilot}"
 : "${CLEANUP:=0}"
 : "${RESTORE_SOURCE_NAME:=0}"
 : "${DELETE_BUILD_DIR_WHEN_DONE:=1}"
+# Unattended auth: drop your PAT here during your daily SSH bootstrap (chmod 600).
+# Env GITHUB_TOKEN still wins; this file is just so the build never stops to prompt.
+: "${GITHUB_TOKEN_FILE:=/data/gh_token}"
+# Strip the baked-in driving model from the release (smaller, relies on model download).
+# Set STRIP_ONNX=0 to keep a model floor so a fresh device is driveable without a download.
+: "${STRIP_ONNX:=1}"
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)"
 SOURCE_DIR="$(cd "$DIR/.." && pwd)"
@@ -51,11 +57,14 @@ if [ "$SOURCE_DIR" = "$BUILD_DIR" ]; then
     exit 1
   fi
 
+  # Arm the restore BEFORE the move, so a failure between here and the re-exec
+  # can't leave you with the source stranded at $SRC_DIR.
+  export RESTORE_SOURCE_NAME=1
+
   echo "[-] Moving source repo $BUILD_DIR -> $SRC_DIR"
   cd /data
   mv "$BUILD_DIR" "$SRC_DIR"
 
-  export RESTORE_SOURCE_NAME=1
   exec bash "$SRC_DIR/release/build_prebuilt.sh" "$@"
 fi
 
@@ -105,8 +114,8 @@ scons -j"$(nproc)" --minimal
 scons -j"$(nproc)" panda/
 
 echo "[-] Ensuring no submodules in release"
-if test "$(git submodule--helper list | wc -l)" -gt "0"; then
-  git submodule--helper list
+if test "$(git submodule status --recursive | wc -l)" -gt "0"; then
+  git submodule status --recursive
   exit 1
 fi
 
@@ -119,9 +128,14 @@ find . -name 'moc_*' -delete
 find . -name '__pycache__' -delete
 rm -rf .sconsign.dblite Jenkinsfile release/ || true
 
-rm -f selfdrive/modeld/models/driving_vision.onnx || true
-rm -f selfdrive/modeld/models/driving_policy.onnx || true
-rm -f sunnypilot/modeld*/models/supercombo.onnx || true
+if [ "$STRIP_ONNX" = "1" ]; then
+  echo "[-] Stripping baked-in driving model (STRIP_ONNX=1)"
+  rm -f selfdrive/modeld/models/driving_vision.onnx || true
+  rm -f selfdrive/modeld/models/driving_policy.onnx || true
+  rm -f sunnypilot/modeld*/models/supercombo.onnx || true
+else
+  echo "[-] STRIP_ONNX=0: keeping baked-in model so a fresh device is driveable without a download"
+fi
 
 git checkout -- third_party/ || true
 
@@ -136,15 +150,18 @@ echo "[-] Optional onroad test skipped"
 if [ "$PUSH" = "1" ]; then
   echo "[-] PUSH T=$SECONDS"
 
+  set +x
+  # Token precedence: env GITHUB_TOKEN -> $GITHUB_TOKEN_FILE -> interactive prompt.
+  if [ -z "${GITHUB_TOKEN:-}" ] && [ -f "$GITHUB_TOKEN_FILE" ]; then
+    echo "[-] Using GitHub token from $GITHUB_TOKEN_FILE"
+    GITHUB_TOKEN="$(tr -d '[:space:]' < "$GITHUB_TOKEN_FILE")"
+  fi
   if [ -z "${GITHUB_TOKEN:-}" ]; then
-    set +x
     printf "GitHub PAT for %s: " "$GITHUB_USER"
     read -r -s GITHUB_TOKEN
     printf "\n"
-    set -x
   fi
 
-  set +x
   AUTH_REMOTE="https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
   git remote set-url origin "$AUTH_REMOTE"
   git remote set-url --push origin "$AUTH_REMOTE"
