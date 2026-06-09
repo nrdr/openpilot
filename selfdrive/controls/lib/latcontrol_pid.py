@@ -26,6 +26,21 @@ UNWIND_LOOKAHEAD_SECONDS = 1.0         # how far ahead in the plan to look
 UNWIND_LOOKAHEAD_MIN_LAT_ACCEL = 0.3   # m/s^2; ignore near-center noise
 
 
+_MPH_TO_MS = 0.44704
+_LAT_SCALE_LOW_MAX = 25.0 * _MPH_TO_MS    # below this -> low-speed scale
+_LAT_SCALE_STD_MAX = 50.0 * _MPH_TO_MS    # below this -> standard scale, else highway
+
+
+def _lat_pid_scale_banded(v_ego: float, low: float, standard: float, highway: float) -> float:
+  # Speed-banded lateral PID output scale. Hard bands mirror carcontroller.torque_lpf_tau
+  # so the scale and tau bands line up at the same 25/50 mph boundaries.
+  if v_ego < _LAT_SCALE_LOW_MAX:
+    return low
+  if v_ego < _LAT_SCALE_STD_MAX:
+    return standard
+  return highway
+
+
 def _sign(x: float) -> float:
   return 1.0 if x > 0.0 else (-1.0 if x < 0.0 else 0.0)
 
@@ -143,7 +158,10 @@ class LatControlPID(LatControl):
     self.prev_angle_steers_des_no_offset = 0.0
     self.params = Params()
     self.frame = -1
-    self.lat_pid_tune_scale = 1.0
+    # Speed-banded lateral PID output scale (multiplier units; 1.0 = neutral).
+    self.lat_pid_scale_low = 1.0
+    self.lat_pid_scale_standard = 1.0
+    self.lat_pid_scale_highway = 1.0
     self.unwind_freeze_enabled = False
     self.unwind_lookahead_enabled = False
     self.model_v2 = None
@@ -239,15 +257,17 @@ class LatControlPID(LatControl):
 
       self.frame += 1
       if self.frame % 300 == 0:
-        # default/min/max are in runtime multiplier units; scale converts the stored
-        # percent param (100 -> 1.0x). Unset -> 1.0x (neutral, as if the tuner were off).
-        self.lat_pid_tune_scale = get_param_float(
-          self.params,
-          "LatPidTuneScale",
-          1.0,
-          0.0,
-          5.0,
-          scale=100.0,
+        # Speed-banded PID output scale. default/min/max are in runtime multiplier
+        # units; scale converts the stored percent param (100 -> 1.0x). Each band
+        # unset -> 1.0x (neutral). Band selection by vEgo happens every frame below.
+        self.lat_pid_scale_low = get_param_float(
+          self.params, "LatPidScaleLowSpeed", 1.0, 0.0, 5.0, scale=100.0,
+        )
+        self.lat_pid_scale_standard = get_param_float(
+          self.params, "LatPidScaleStandard", 1.0, 0.0, 5.0, scale=100.0,
+        )
+        self.lat_pid_scale_highway = get_param_float(
+          self.params, "LatPidScaleHighway", 1.0, 0.0, 5.0, scale=100.0,
         )
         # High-speed center taper target. FLOAT param stored as the real value
         # (UI use_float_scaling), so no scale. Unset -> 0.5 (old generic default).
@@ -268,7 +288,9 @@ class LatControlPID(LatControl):
         freeze_integrator=freeze_integrator,
       )
 
-      output_torque *= self.lat_pid_tune_scale
+      output_torque *= _lat_pid_scale_banded(
+        CS.vEgo, self.lat_pid_scale_low, self.lat_pid_scale_standard, self.lat_pid_scale_highway,
+      )
 
       if self.is_eps_modified:
         lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))

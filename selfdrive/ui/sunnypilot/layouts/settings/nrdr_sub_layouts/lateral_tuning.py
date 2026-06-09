@@ -22,13 +22,33 @@ class LateralTuningLayout(Widget):
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
-    self._lat_pid_tune_scale = option_item_sp(
-      param="LatPidTuneScale",
-      title=lambda: tr("Lateral PID Tune Scale (Default: 100%)"),
+    self._lat_scale_low = option_item_sp(
+      param="LatPidScaleLowSpeed",
+      title=lambda: tr("Low Speed PID Scale (Below 25mph) (Default: 100%)"),
       min_value=0,
       max_value=500,
       value_change_step=5,
-      description=lambda: tr("Scales lateral PID controller values. Use this to get a feel for what tuning your car needs. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections."),
+      description=lambda: tr("Scales lateral PID output below 25 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections."),
+      label_callback=lambda value: f"{value}%",
+    )
+
+    self._lat_scale_standard = option_item_sp(
+      param="LatPidScaleStandard",
+      title=lambda: tr("Standard Speed PID Scale (25-50mph) (Default: 100%)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=5,
+      description=lambda: tr("Scales lateral PID output between 25 and 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections."),
+      label_callback=lambda value: f"{value}%",
+    )
+
+    self._lat_scale_highway = option_item_sp(
+      param="LatPidScaleHighway",
+      title=lambda: tr("Highway PID Scale (50mph+) (Default: 100%)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=5,
+      description=lambda: tr("Scales lateral PID output above 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections."),
       label_callback=lambda value: f"{value}%",
     )
 
@@ -63,7 +83,7 @@ class LateralTuningLayout(Widget):
 
     self._lpf_tau_low = option_item_sp(
       param="HondaLpfTauLowSpeed",
-      title=lambda: tr("Low Speed Tau (Below 25mph) (Default: 0.1)"),
+      title=lambda: tr("Low Pass Filter Tau (Below 25mph) (Default: 0.1)"),
       min_value=0,
       max_value=500,
       value_change_step=1,
@@ -151,16 +171,18 @@ class LateralTuningLayout(Widget):
     )
 
     return [
-      self._lat_pid_tune_scale,
+      self._low_pass_filter,
+      self._lat_scale_low,
+      self._lpf_tau_low,
+      self._lat_scale_standard,
+      self._lpf_tau_standard,
+      self._lat_scale_highway,
+      self._lpf_tau_highway,
+      LineSeparatorSP(40),
       self._center_scale,
       LineSeparatorSP(40),
       self._unwind_freeze,
       self._unwind_lookahead,
-      LineSeparatorSP(40),
-      self._low_pass_filter,
-      self._lpf_tau_low,
-      self._lpf_tau_standard,
-      self._lpf_tau_highway,
       LineSeparatorSP(40),
       self._notch_enabled,
       self._notch_freq,

@@ -391,7 +391,7 @@
                   "min": 0.1,
                   "max": 5.0,
                   "step": 0.1,
-                  "unit": "m/s\u00c2\u00b2",
+                  "unit": "m/s\u00b2",
                   "enablement": [
                     {
                       "type": "param",
@@ -570,14 +570,88 @@
                   "description": "When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side."
                 },
                 {
-                  "key": "LatPidTuneScale",
+                  "key": "HondaTorqueLowPassFilter",
+                  "widget": "toggle",
+                  "title": "Low Pass Filter (tau)",
+                  "description": "Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations."
+                },
+                {
+                  "key": "LatPidScaleLowSpeed",
                   "widget": "option",
-                  "title": "Lateral PID Tune Scale",
-                  "description": "Scales lateral PID controller values. Use this to get a feel for what tuning your car needs. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.",
+                  "title": "Low Speed PID Scale (Below 25mph)",
+                  "description": "Scales lateral PID output below 25 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.",
                   "min": 0,
                   "max": 500,
                   "step": 5,
                   "unit": "%"
+                },
+                {
+                  "key": "HondaLpfTauLowSpeed",
+                  "widget": "option",
+                  "title": "Low Pass Filter Tau (Below 25mph)",
+                  "description": "Low-pass filter time constant (seconds) below 25 mph.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaTorqueLowPassFilter",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "LatPidScaleStandard",
+                  "widget": "option",
+                  "title": "Standard Speed PID Scale (25-50mph)",
+                  "description": "Scales lateral PID output between 25 and 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "HondaLpfTauStandard",
+                  "widget": "option",
+                  "title": "Standard Tau (25-50mph)",
+                  "description": "Low-pass filter time constant (seconds) between 25 and 50 mph.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaTorqueLowPassFilter",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "LatPidScaleHighway",
+                  "widget": "option",
+                  "title": "Highway PID Scale (50mph+)",
+                  "description": "Scales lateral PID output above 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "HondaLpfTauHighway",
+                  "widget": "option",
+                  "title": "Highway Tau (50mph+)",
+                  "description": "Low-pass filter time constant (seconds) above 50 mph.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaTorqueLowPassFilter",
+                      "equals": true
+                    }
+                  ]
                 },
                 {
                   "key": "HondaCenterScale",
@@ -599,60 +673,6 @@
                   "widget": "toggle",
                   "title": "Unwind Lookahead",
                   "description": "Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops."
-                },
-                {
-                  "key": "HondaTorqueLowPassFilter",
-                  "widget": "toggle",
-                  "title": "Low Pass Filter (tau)",
-                  "description": "Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations."
-                },
-                {
-                  "key": "HondaLpfTauLowSpeed",
-                  "widget": "option",
-                  "title": "Low Speed Tau (Below 25mph)",
-                  "description": "Low-pass filter time constant (seconds) below 25 mph.",
-                  "min": 0.0,
-                  "max": 5.0,
-                  "step": 0.01,
-                  "enablement": [
-                    {
-                      "type": "param",
-                      "key": "HondaTorqueLowPassFilter",
-                      "equals": true
-                    }
-                  ]
-                },
-                {
-                  "key": "HondaLpfTauStandard",
-                  "widget": "option",
-                  "title": "Standard Tau (25-50mph)",
-                  "description": "Low-pass filter time constant (seconds) between 25 and 50 mph.",
-                  "min": 0.0,
-                  "max": 5.0,
-                  "step": 0.01,
-                  "enablement": [
-                    {
-                      "type": "param",
-                      "key": "HondaTorqueLowPassFilter",
-                      "equals": true
-                    }
-                  ]
-                },
-                {
-                  "key": "HondaLpfTauHighway",
-                  "widget": "option",
-                  "title": "Highway Tau (50mph+)",
-                  "description": "Low-pass filter time constant (seconds) above 50 mph.",
-                  "min": 0.0,
-                  "max": 5.0,
-                  "step": 0.01,
-                  "enablement": [
-                    {
-                      "type": "param",
-                      "key": "HondaTorqueLowPassFilter",
-                      "equals": true
-                    }
-                  ]
                 },
                 {
                   "key": "HondaNotchEnabled",
