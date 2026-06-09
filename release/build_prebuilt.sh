@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 set -euo pipefail
 set -x
@@ -161,4 +160,3 @@ else
 fi
 
 echo "[-] done T=$SECONDS"
-```
