@@ -109,6 +109,11 @@ def apply_nrdr_default_params(params: Params) -> None:
     if params.get(key) is None:
       params.put(key, value)
 
+  # nrdr is PID-only on these platforms. The Torque and NNLC lateral controllers are
+  # hidden in the UI, so force them off every boot to guarantee PID lateral control.
+  params.put_bool("EnforceTorqueControl", False)
+  params.put_bool("NeuralNetworkLateralControl", False)
+
 
 def manager_init() -> None:
   save_bootlog()
