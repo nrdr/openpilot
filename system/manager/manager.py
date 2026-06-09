@@ -44,6 +44,7 @@ NRDR_DEFAULT_BOOL_PARAMS = {
   # Cruise
   "DynamicExperimentalControl": True,
   "SmartCruiseControlVision": True,
+  "CustomAccIncrementsEnabled": True,  # stored preference; only acts where the car supports custom increments
 
   # Steering / MADS
   "MadsMainCruiseAllowed": False,
