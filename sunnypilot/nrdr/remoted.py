@@ -111,16 +111,21 @@ def run_force_update(params) -> None:
 
 
 def _extract_summary(path: str) -> str:
-  # Pull the PER-SPEED SUMMARY table out of the full report for remote viewing.
+  # Pull the friendly TUNE SCORE section (score + findings + suggestions) out of
+  # the full report for remote viewing; fall back to the per-speed table.
   try:
     with open(path) as f:
       text = f.read()
   except OSError:
     return ""
-  start = text.find("PER-SPEED SUMMARY")
+  start = text.find("TUNE SCORE")
+  end_marker = "PER-SPEED SUMMARY"
+  if start == -1:
+    start = text.find(end_marker)
+    end_marker = "PER-SPEED x DIRECTION"
   if start == -1:
     return text.strip()[:SUMMARY_MAX_CHARS]
-  end = text.find("PER-SPEED x DIRECTION", start)
+  end = text.find(end_marker, start + 20)
   chunk = text[start:end] if end > start else text[start:]
   return chunk.strip().strip("=").strip()[:SUMMARY_MAX_CHARS]
 
