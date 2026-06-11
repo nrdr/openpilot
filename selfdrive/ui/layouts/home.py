@@ -1,5 +1,6 @@
 import time
 import os
+import socket
 import pyray as rl
 from collections.abc import Callable
 from enum import IntEnum
@@ -20,6 +21,17 @@ CONTENT_MARGIN = 40
 SPACING = 25
 RIGHT_COLUMN_WIDTH = 750
 REFRESH_INTERVAL = 10.0
+
+
+def _local_ip() -> str:
+  # UDP "connect" never sends a packet; it just resolves which local address would
+  # route there. Works on wifi or tethering, returns -- with no network at all.
+  try:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+      s.connect(("8.8.8.8", 80))
+      return s.getsockname()[0]
+  except Exception:
+    return "--"
 
 
 
@@ -52,6 +64,8 @@ class NrdrForkWidget(Widget):
     self._fu_saw_active = False
     self._fu_baseline_failed_count = 0
     self._fu_last_poll = 0.0
+    self._ip_text = "--"
+    self._ip_last_check = 0.0
 
   def set_click_callback(self, callback: Callable[[], None]):
     self._tune_click_callback = callback
@@ -202,9 +216,14 @@ class NrdrForkWidget(Widget):
     y = rect.y + 75
     w = rect.width - 110
 
+    now = time.monotonic()
+    if now - self._ip_last_check > REFRESH_INTERVAL:
+      self._ip_last_check = now
+      self._ip_text = _local_ip()
+
     title = "nrdr"
     subtitle = "Your drives will upload to stable.konik.ai."
-    body = "Making Toyota and HKG users jealous, one day at a time."
+    body = f"IP: {self._ip_text}"
 
     rl.draw_text_ex(title_font, title, rl.Vector2(x, y), 97, 0, rl.WHITE)
 
