@@ -86,6 +86,7 @@ class LongControl:
     # Live-tunable longitudinal params; default to the car's configured values so
     # an unset param means "no change from stock".
     self.long_pid_tune_scale = 1.0
+    self.scale_excludes_kf = False  # when True, PID scale multiplies P+I only, not feedforward
     self.stop_accel = CP.stopAccel
     self.stopping_decel_rate = CP.stoppingDecelRate
     self.v_ego_starting = CP.vEgoStarting
@@ -95,6 +96,7 @@ class LongControl:
 
   def _read_live_params(self):
     self.long_pid_tune_scale = get_param_float(self.params, "LongPidTuneScale", 1.0, 0.0, 5.0, scale=100.0)
+    self.scale_excludes_kf = self.params.get_bool("NrdrPidScaleExcludeKf")
     self.stop_accel = get_param_float(self.params, "HondaStopAccel", self.CP.stopAccel, -10.0, 0.0)
     self.stopping_decel_rate = get_param_float(self.params, "HondaStoppingDecelRateLong", self.CP.stoppingDecelRate, 0.0, 5.0)
     self.v_ego_starting = get_param_float(self.params, "HondaVEgoStarting", self.CP.vEgoStarting, 0.0, 5.0)
@@ -135,7 +137,11 @@ class LongControl:
         feedforward=a_target,
       )
 
-      output_accel *= self.long_pid_tune_scale
+      if self.scale_excludes_kf:
+        # Live PID scale multiplies only the feedback (P+I); feedforward keeps its tuned value.
+        output_accel = (output_accel - self.pid.f) * self.long_pid_tune_scale + self.pid.f
+      else:
+        output_accel *= self.long_pid_tune_scale
 
     self.last_output_accel = np.clip(output_accel, accel_limits[0], accel_limits[1])
     return self.last_output_accel

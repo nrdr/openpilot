@@ -165,6 +165,7 @@ class LatControlPID(LatControl):
     self.unwind_freeze_enabled = False
     self.unwind_lookahead_enabled = False
     self.injection_test_enabled = False  # Party Tricks: x9.99 PID scale stress test
+    self.scale_excludes_kf = False  # when True, PID scale multiplies P+I only, not feedforward
     self.model_v2 = None
     self.model_valid = False
 
@@ -282,6 +283,7 @@ class LatControlPID(LatControl):
         self.unwind_freeze_enabled = self.params.get_bool("HondaUnwindFreeze")
         self.unwind_lookahead_enabled = self.params.get_bool("HondaUnwindLookahead")
         self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
+        self.scale_excludes_kf = self.params.get_bool("NrdrPidScaleExcludeKf")
 
       output_torque = self.pid.update(
         error,
@@ -290,9 +292,14 @@ class LatControlPID(LatControl):
         freeze_integrator=freeze_integrator,
       )
 
-      output_torque *= _lat_pid_scale_banded(
+      scale = _lat_pid_scale_banded(
         CS.vEgo, self.lat_pid_scale_low, self.lat_pid_scale_standard, self.lat_pid_scale_highway,
       )
+      if self.scale_excludes_kf:
+        # Live PID scale multiplies only the feedback (P+I); feedforward keeps its tuned value.
+        output_torque = (output_torque - self.pid.f) * scale + self.pid.f
+      else:
+        output_torque *= scale
 
       # Party Tricks: Injection Test multiplies the PID scale by 999% (diagnostic only).
       if self.injection_test_enabled:

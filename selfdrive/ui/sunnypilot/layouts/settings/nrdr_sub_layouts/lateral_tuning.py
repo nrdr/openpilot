@@ -52,6 +52,12 @@ class LateralTuningLayout(Widget):
       label_callback=lambda value: f"{value}%",
     )
 
+    self._scale_exclude_kf = toggle_item_sp(
+      param="NrdrPidScaleExcludeKf",
+      title=lambda: tr("Keep Feedforward Static (Default: OFF)"),
+      description=lambda: tr("When ON, the PID scales above (and the longitudinal PID scale) multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it."),
+    )
+
     self._center_scale = option_item_sp(
       param="HondaCenterScale",
       title=lambda: tr("Center Scale (Default: 0.50)"),
@@ -178,6 +184,7 @@ class LateralTuningLayout(Widget):
       self._lpf_tau_standard,
       self._lat_scale_highway,
       self._lpf_tau_highway,
+      self._scale_exclude_kf,
       LineSeparatorSP(40),
       self._center_scale,
       LineSeparatorSP(40),

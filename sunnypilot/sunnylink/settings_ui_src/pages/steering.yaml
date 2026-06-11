@@ -213,6 +213,10 @@ sections:
       - type: param
         key: HondaTorqueLowPassFilter
         equals: true
+    - key: NrdrPidScaleExcludeKf
+      widget: toggle
+      title: Keep Feedforward Static
+      description: When ON, the PID scales (and the longitudinal PID scale) multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it.
     - key: HondaCenterScale
       widget: option
       title: Center Scale
