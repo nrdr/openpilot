@@ -21,6 +21,10 @@ GITHUB_REPO="${GITHUB_REPO:=openpilot}"
 # Strip the baked-in driving model from the release (smaller, relies on model download).
 # Set STRIP_ONNX=0 to keep a model floor so a fresh device is driveable without a download.
 : "${STRIP_ONNX:=1}"
+# Reboot after a successful run. The build moves/deletes/restores /data/openpilot
+# underneath the running openpilot processes, leaving a corrupted "ghost build" in
+# memory until the device restarts. Set REBOOT_WHEN_DONE=0 to skip.
+: "${REBOOT_WHEN_DONE:=1}"
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)"
 SOURCE_DIR="$(cd "$DIR/.." && pwd)"
@@ -44,6 +48,15 @@ restore_source_name() {
   if [ "${RESTORE_SOURCE_NAME:-0}" = "1" ] && [ -d "$SRC_DIR" ] && [ ! -e "$BUILD_DIR" ]; then
     echo "[-] Restoring source repo $SRC_DIR -> $BUILD_DIR"
     mv "$SRC_DIR" "$BUILD_DIR" || true
+  fi
+
+  # Reboot only after a fully successful device run, and only after the restore
+  # above is done - the running processes are still on the deleted build tree
+  # (the "ghost build") until the device comes back up on the restored repo.
+  if [ "$status" = "0" ] && [ "${REBOOT_WHEN_DONE:-1}" = "1" ] && [ "${RESTORE_SOURCE_NAME:-0}" = "1" ]; then
+    echo "[-] Rebooting to leave the ghost build behind (REBOOT_WHEN_DONE=0 to skip)"
+    sync
+    sudo reboot
   fi
 
   exit "$status"
