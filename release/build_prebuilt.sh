@@ -149,30 +149,32 @@ git commit --amend -m "openpilot v$VERSION prebuilt"
 echo "[-] Optional onroad test skipped"
 # RELEASE=1 pytest -n0 -s selfdrive/test/test_onroad.py
 
-# Commits whose changes must never appear in nrdr-clean. They are reverse-applied
-# to the prebuilt tree BEFORE the clean branch's single commit is created, so the
-# published history never contains them (no add-then-revert).
+# Changes that must never appear in nrdr-clean. Static reverse-patches are shipped
+# in release/clean_excludes/ (generated from commits 181c61ee + a1c50bb6) because a
+# fresh device install is shallow/prebuilt and does NOT have those commits in its
+# local history (that is why 'git show <sha>' failed here on 06.11). The patches are
+# reverse-applied to the prebuilt tree BEFORE the clean branch's single commit is
+# created, so the published history never contains the excluded changes.
 CLEAN_BRANCH="${CLEAN_BRANCH:=nrdr-clean}"
 NIGHTLY_BRANCH="${NIGHTLY_BRANCH:=nrdr-nightly}"
-CLEAN_EXCLUDE_COMMITS=(
-  181c61ee64eb1982dbad259b8fbb788988050279  # Quality of Life Module
-  a1c50bb6642c55c3420ae7617d0d69e409302c77  # stable.konik.ai Full Support
-)
+CLEAN_EXCLUDES_DIR="$SOURCE_DIR/release/clean_excludes"
 
 build_clean_tree() {
-  # Reverse-apply the excluded commits onto the current prebuilt working tree.
+  # Reverse-apply the excluded patches onto the current prebuilt working tree.
   # Returns nonzero (without dying, caller checks) if any patch doesn't apply.
-  local c
-  for c in "${CLEAN_EXCLUDE_COMMITS[@]}"; do
-    if ! git -C "$SOURCE_DIR" show "$c" > /tmp/nrdr_clean_revert.patch 2>/dev/null; then
-      echo "[!] WARNING: commit $c not found in $SOURCE_DIR"
+  local p found=0
+  for p in "$CLEAN_EXCLUDES_DIR"/*.patch; do
+    if [ ! -f "$p" ]; then
+      echo "[!] WARNING: no patches found in $CLEAN_EXCLUDES_DIR"
       return 1
     fi
-    if ! git apply -R --whitespace=nowarn /tmp/nrdr_clean_revert.patch; then
-      echo "[!] WARNING: could not reverse-apply $c onto the prebuilt tree"
+    found=1
+    if ! git apply -R --whitespace=nowarn "$p"; then
+      echo "[!] WARNING: could not reverse-apply $(basename "$p") onto the prebuilt tree"
       return 1
     fi
   done
+  [ "$found" = "1" ] || return 1
 
   # nrdr-clean must not ship the konik API/Athena host exports.
   sed -i '/^export API_HOST=.*konik\.ai/d; /^export ATHENA_HOST=.*konik\.ai/d' launch_openpilot.sh
