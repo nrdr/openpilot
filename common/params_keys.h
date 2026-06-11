@@ -303,7 +303,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaInjectionTest", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaAltDashboardSpeed", {PERSISTENT | BACKUP, INT, "0"}},     // 0 Stock, 1 Lead Speed, 2 GPS Speed, 3 Cluster Speed
     {"HondaAltDashboardDistance", {PERSISTENT | BACKUP, INT, "0"}},  // 0 Stock, 1 Radar, 2 Velocity
-    {"NrdrDistanceButtonSubMode", {PERSISTENT | BACKUP, BOOL, "1"}}, // Dynamic HUD: distance/set buttons preview before acting
+    {"NrdrCruiseButtonSubMode", {PERSISTENT | BACKUP, BOOL, "1"}},   // Dynamic HUD: distance/set/resume buttons preview before acting
     {"NrdrHudSubModeUntil", {CLEAR_ON_MANAGER_START, FLOAT, "0"}},   // monotonic deadline of the active HUD sub-mode window
     // Sunnylink remote actions (consumed and cleared by nrdr_remoted)
     {"NrdrRemoteForceUpdate", {CLEAR_ON_MANAGER_START, BOOL, "0"}},  // website "button": run the updater chain

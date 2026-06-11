@@ -58,7 +58,7 @@ class VCruiseHelper(VCruiseHelperSP):
     self.v_cruise_kph_last = 0
     self.button_timers = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0}
     self.button_change_states = {btn: {"standstill": False, "enabled": False} for btn in self.button_timers}
-    self._submode_params = Params()  # Dynamic HUD (Distance Button Sub-Mode) press gate
+    self._submode_params = Params()  # Dynamic HUD (Cruise Button Sub-Mode) press gate
 
     # Persist units so initialize_v_cruise can use the same mode as update_v_cruise.
     self.is_metric = True

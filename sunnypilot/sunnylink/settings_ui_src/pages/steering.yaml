@@ -424,10 +424,10 @@ sections:
         label: Radar
       - value: 2
         label: Velocity
-    - key: NrdrDistanceButtonSubMode
+    - key: NrdrCruiseButtonSubMode
       widget: toggle
-      title: Distance Button Sub-Mode
-      description: Dynamic HUD - pressing the distance button or set/resume first wakes a 15-second preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed.
+      title: Cruise Button Sub-Mode
+      description: Dynamic HUD - pressing the distance button or set/resume first wakes a 15-second preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed. The blink starts lazy and accelerates continuously until it cuts off.
   - id: nrdr_remote_actions
     label: Remote Actions
     trigger_key: null

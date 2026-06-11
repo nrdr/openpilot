@@ -1,13 +1,14 @@
 """
-nrdr Dynamic HUD (Distance Button Sub-Mode) shared press gate.
+nrdr Dynamic HUD (Cruise Button Sub-Mode) shared press gate.
 
-When NrdrDistanceButtonSubMode is ON, the first distance / set / resume press only
+When NrdrCruiseButtonSubMode is ON, the first distance / set / resume press only
 wakes an invisible 15-second HUD sub-mode (the cluster shows the current personality
-on the distance bars and, if engaged, the set speed - all blinking). Only presses
-made while the sub-mode window is already open perform their normal action, and each
-press refreshes the window. The window deadline is shared with the Honda
-carcontroller (which renders the blink) through the NrdrHudSubModeUntil param,
-stored as a time.monotonic() deadline (CLEAR_ON_MANAGER_START, so reboots reset it).
+on the distance bars and, if engaged, the set speed - all blinking, faster and
+faster as the window runs out). Only presses made while the sub-mode window is
+already open perform their normal action, and each press refreshes the window. The
+window deadline is shared with the Honda carcontroller (which renders the blink)
+through the NrdrHudSubModeUntil param, stored as a time.monotonic() deadline
+(CLEAR_ON_MANAGER_START, so reboots reset it).
 """
 import time
 
@@ -23,7 +24,7 @@ def consume_button_press(params) -> bool:
   rebuild) falls back to stock behavior instead of swallowing the press.
   """
   try:
-    if not params.get_bool("NrdrDistanceButtonSubMode"):
+    if not params.get_bool("NrdrCruiseButtonSubMode"):
       return True
     now = time.monotonic()
     try:

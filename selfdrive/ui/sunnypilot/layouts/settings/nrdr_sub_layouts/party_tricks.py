@@ -51,13 +51,13 @@ class PartyTricksLayout(Widget):
       param="HondaAltDashboardDistance",
     )
 
-    self._distance_button_sub_mode = toggle_item_sp(
-      param="NrdrDistanceButtonSubMode",
-      title=lambda: tr("Distance Button Sub-Mode (Default: ON)"),
+    self._cruise_button_sub_mode = toggle_item_sp(
+      param="NrdrCruiseButtonSubMode",
+      title=lambda: tr("Cruise Button Sub-Mode (Default: ON)"),
       description=lambda: tr("Dynamic HUD: pressing the distance button or set/resume first wakes a 15-second preview on the cluster - "
                             "the distance bars light up with your CURRENT personality (parked or driving, any design) and the set speed shows if cruise is engaged, all blinking. "
                             "Only presses made during the preview actually change the personality or set speed. "
-                            "The blink speeds up over the final 10 and 5 seconds before it times out."),
+                            "The blink starts lazy and accelerates continuously until it cuts off."),
     )
 
     return [
@@ -66,7 +66,7 @@ class PartyTricksLayout(Widget):
       self._alt_dashboard_speed,
       self._alt_dashboard_distance,
       LineSeparatorSP(40),
-      self._distance_button_sub_mode,
+      self._cruise_button_sub_mode,
     ]
 
   def _update_state(self):
@@ -74,7 +74,7 @@ class PartyTricksLayout(Widget):
     self._injection_test.action_item.set_enabled(True)
     self._alt_dashboard_speed.action_item.set_enabled(True)
     self._alt_dashboard_distance.action_item.set_enabled(True)
-    self._distance_button_sub_mode.action_item.set_enabled(True)
+    self._cruise_button_sub_mode.action_item.set_enabled(True)
 
   def _render(self, rect):
     self._back_button.set_position(self._rect.x, self._rect.y + 20)
