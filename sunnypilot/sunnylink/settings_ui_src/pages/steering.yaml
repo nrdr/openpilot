@@ -1,0 +1,394 @@
+# Page: steering
+# Edit this file. Run compile_settings_ui.py to emit settings_ui.json.
+id: steering
+label: Steering
+icon: steering_wheel
+order: 1
+remote_configurable: true
+description: Lateral control, lane changes, and steering behavior
+sections:
+- id: mads
+  title: Modular Assistive Driving System (MADS)
+  description: ''
+  items:
+  - key: Mads
+    widget: toggle
+    title: Enable Modular Assistive Driving System (MADS)
+    description: Enable MADS. Disable toggle to revert back to stock sunnypilot engagement/disengagement.
+    enablement:
+    - $ref: '#/macros/offroad'
+  sub_panels:
+  - id: mads_settings
+    label: MADS Settings
+    trigger_key: Mads
+    trigger_condition:
+      type: param
+      key: Mads
+      equals: true
+    items:
+    - key: MadsMainCruiseAllowed
+      widget: toggle
+      title: Toggle with Main Cruise
+      description: 'Note: For vehicles without LFA/LKAS button, disabling this will prevent lateral control engagement.'
+      enablement:
+      - $ref: '#/macros/offroad'
+      - $ref: '#/macros/mads_full_platforms'
+    - key: MadsUnifiedEngagementMode
+      widget: toggle
+      title: Unified Engagement Mode (UEM)
+      description: 'Engage lateral and longitudinal control with cruise control engagement. Note: Once lateral control is
+        engaged via UEM, it will remain engaged until it is manually disabled via the MADS button or car shut off.'
+      enablement:
+      - $ref: '#/macros/offroad'
+      - $ref: '#/macros/mads_full_platforms'
+    - key: MadsSteeringMode
+      widget: multiple_button
+      title: Steering Mode on Brake Pedal
+      description: Choose how Automatic Lane Centering (ALC) behaves after the brake pedal is manually pressed in sunnypilot.
+      options:
+      - value: 0
+        label: Remain Active
+        enablement:
+        - $ref: '#/macros/mads_full_platforms'
+      - value: 1
+        label: Pause
+        enablement:
+        - $ref: '#/macros/mads_full_platforms'
+      - value: 2
+        label: Disengage
+      enablement:
+      - $ref: '#/macros/offroad'
+- id: blinker
+  title: Blinker Control
+  description: Lateral pause behavior during turn signals
+  items:
+  - key: BlinkerPauseLateralControl
+    widget: toggle
+    title: Pause Lateral Control with Blinker
+    description: Pause lateral control with blinker when traveling below the desired speed selected.
+    sub_items:
+    - key: BlinkerMinLateralControlSpeed
+      widget: option
+      title: Minimum Speed to Pause Lateral Control
+      min: 0
+      max: 255
+      step: 5
+      unit:
+        metric: km/h
+        imperial: mph
+      enablement:
+      - type: param
+        key: BlinkerPauseLateralControl
+        equals: true
+    - key: BlinkerLateralReengageDelay
+      widget: option
+      title: Post-Blinker Delay
+      description: Delay before lateral control resumes after the turn signal ends.
+      min: 0
+      max: 10
+      step: 1
+      unit: second
+      enablement:
+      - type: param
+        key: BlinkerPauseLateralControl
+        equals: true
+- id: lane_change
+  title: Lane Change
+  description: Automatic lane change timing and behavior
+  items:
+  - key: AutoLaneChangeTimer
+    widget: option
+    title: Auto Lane Change by Blinker
+    description: |-
+      Set a timer to delay the auto lane change operation when the blinker is used. No nudge on the steering wheel is required to auto lane change if a timer is set. Default is Nudge.
+    details: |-
+      Please use caution when using this feature. Only use the blinker when traffic and road conditions permit.
+    options:
+    - value: -1
+      label: 'Off'
+    - value: 0
+      label: Nudge
+    - value: 1
+      label: Nudgeless
+    - value: 2
+      label: 0.5 second
+    - value: 3
+      label: 1 second
+    - value: 4
+      label: 2 seconds
+    - value: 5
+      label: 3 seconds
+  - key: AutoLaneChangeBsmDelay
+    widget: toggle
+    title: 'Auto Lane Change: Delay with Blind Spot'
+    description: Toggle to enable a delay timer for lane changes when blind spot monitoring (BSM) detects a vehicle in your blind
+      spot.
+    enablement:
+    - type: capability
+      field: enable_bsm
+      equals: true
+    - type: param_compare
+      key: AutoLaneChangeTimer
+      op: '>'
+      value: 0
+- id: nrdr
+  title: nrdr Settings
+  description: Customize settings related to the nrdr fork
+  items: []
+  sub_panels:
+  - id: nrdr_lateral
+    label: Lateral Tuning
+    trigger_key: null
+    items:
+    - key: NrdrLearnSteerRatio
+      widget: toggle
+      title: Learn Steer Ratio (Auto)
+      description: When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance.
+    - key: NrdrLearnStiffness
+      widget: toggle
+      title: Learn Tire Stiffness (Auto)
+      description: When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0.
+    - key: NrdrLearnAngleOffset
+      widget: toggle
+      title: Learn Angle Offset (Auto)
+      description: When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side.
+    - key: HondaTorqueLowPassFilter
+      widget: toggle
+      title: Low Pass Filter (tau)
+      description: Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations.
+    - key: LatPidScaleLowSpeed
+      widget: option
+      title: Low Speed PID Scale (Below 25mph)
+      description: Scales lateral PID output below 25 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: HondaLpfTauLowSpeed
+      widget: option
+      title: Low Pass Filter Tau (Below 25mph)
+      description: Low-pass filter time constant (seconds) below 25 mph.
+      min: 0.0
+      max: 5.0
+      step: 0.01
+      enablement:
+      - type: param
+        key: HondaTorqueLowPassFilter
+        equals: true
+    - key: LatPidScaleStandard
+      widget: option
+      title: Standard Speed PID Scale (25-50mph)
+      description: Scales lateral PID output between 25 and 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: HondaLpfTauStandard
+      widget: option
+      title: Standard Tau (25-50mph)
+      description: Low-pass filter time constant (seconds) between 25 and 50 mph.
+      min: 0.0
+      max: 5.0
+      step: 0.01
+      enablement:
+      - type: param
+        key: HondaTorqueLowPassFilter
+        equals: true
+    - key: LatPidScaleHighway
+      widget: option
+      title: Highway PID Scale (50mph+)
+      description: Scales lateral PID output above 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: HondaLpfTauHighway
+      widget: option
+      title: Highway Tau (50mph+)
+      description: Low-pass filter time constant (seconds) above 50 mph.
+      min: 0.0
+      max: 5.0
+      step: 0.01
+      enablement:
+      - type: param
+        key: HondaTorqueLowPassFilter
+        equals: true
+    - key: NrdrPidScaleExcludeKf
+      widget: toggle
+      title: Keep Feedforward Static
+      description: When ON, the PID scales (and the longitudinal PID scale) multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it.
+    - key: HondaCenterScale
+      widget: option
+      title: Center Scale
+      description: Raise this to add extra error correction while driving straight at high speeds. Sometimes the perfect lateral tune is too soft for driving in a straight line.
+      min: 0.0
+      max: 5.0
+      step: 0.01
+    - key: HondaUnwindFreeze
+      widget: toggle
+      title: Unwind Integrator Freeze
+      description: Freezes the PID integrator while the steering is returning toward center, so it doesn't hold torque through the unwind.
+    - key: HondaUnwindLookahead
+      widget: toggle
+      title: Unwind Lookahead
+      description: Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops.
+    - key: HondaNotchEnabled
+      widget: toggle
+      title: Notch Filter
+      description: Removes a narrow EPS chatter band (around 7Hz) without the lag a low pass filter adds.
+    - key: HondaNotchFreq
+      widget: option
+      title: Notch Frequency
+      description: Frequency (Hz) of the band eliminated from the controller. If you know what Hz your EPS growls at, this can help block that out without adding any extra lag into the controller. Best used in pair with a well-tuned low pass filter.
+      min: 1.0
+      max: 20.0
+      step: 0.1
+      enablement:
+      - type: param
+        key: HondaNotchEnabled
+        equals: true
+    - key: HondaNotchQ
+      widget: option
+      title: Notch Q / Width
+      description: Tolerance of the removed frequency. Higher = smaller portion removed, lower = wider (nearby frequencies will be removed as well).
+      min: 0.1
+      max: 10.0
+      step: 0.1
+      enablement:
+      - type: param
+        key: HondaNotchEnabled
+        equals: true
+    - key: HondaSteerDeltaLimiter
+      widget: toggle
+      title: Legacy Steer Delta Rate Limiter
+      description: Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass and notch filters.
+    - key: HondaSteerDeltaUp
+      widget: option
+      title: Steer Delta Up
+      description: Controls the maximum upward steering torque rate when the rate limiter is enabled. Too low will add lag.
+      min: 0.0
+      max: 100.0
+      step: 0.1
+      enablement:
+      - type: param
+        key: HondaSteerDeltaLimiter
+        equals: true
+    - key: HondaSteerDeltaDown
+      widget: option
+      title: Steer Delta Down
+      description: Controls the maximum downward steering torque rate when the rate limiter is enabled. Too low will add lag.
+      min: 0.0
+      max: 100.0
+      step: 0.1
+      enablement:
+      - type: param
+        key: HondaSteerDeltaLimiter
+        equals: true
+  - id: nrdr_override
+    label: Override Tuning
+    trigger_key: null
+    items:
+    - key: NrdrIncreaseOverrideTolerance
+      widget: toggle
+      title: Increase Driver Override Tolerance
+      description: Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms.
+    - key: HondaDriverAssistDuringOverride
+      widget: toggle
+      title: Pass-through assist torque on override
+      description: When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling.
+    - key: HondaOverrideFadeDownSecs
+      widget: option
+      title: Override Torque Fade Down
+      description: Controls how quickly steering torque fades out when driver override begins.
+      min: 0.0
+      max: 10.0
+      step: 0.1
+      unit: second
+    - key: HondaOverrideFadeUpSecs
+      widget: option
+      title: Override Torque Fade Up
+      description: Controls how quickly steering torque fades back in after driver override ends.
+      min: 0.0
+      max: 10.0
+      step: 0.1
+      unit: second
+    - key: HondaOverrideTorqueScale
+      widget: option
+      title: Override Torque Retain
+      description: Controls how much openpilot steering torque remains when the override has gone past Override Torque Fade Down.
+      min: 0
+      max: 100
+      step: 1
+      unit: '%'
+  - id: nrdr_longitudinal
+    label: Longitudinal Tuning
+    trigger_key: null
+    items:
+    - key: LongPidTuneScale
+      widget: option
+      title: Longitudinal PID Tune Scale
+      description: Scales longitudinal PID controller values from their configured base tune.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: HondaLiveLearningGas
+      widget: toggle
+      title: Live Learning Gas
+      description: Allows Honda gas and wind compensation factors to learn live while driving.
+      enablement:
+      - $ref: '#/macros/offroad'
+    - key: HondaStoppingDecelRate
+      widget: option
+      title: Stopping Decel Rate
+      description: Brake-rate limiter used while coming to a stop (carcontroller).
+      min: 0
+      max: 100
+      step: 1
+    - key: HondaStopAccel
+      widget: option
+      title: Stop Accel
+      description: Target acceleration once stopped (holds the brake).
+      min: -4.0
+      max: 0.0
+      step: 0.01
+    - key: HondaStoppingDecelRateLong
+      widget: option
+      title: Planner Stopping Rate
+      description: How quickly commanded deceleration ramps down while coming to a stop.
+      min: 0.0
+      max: 5.0
+      step: 0.01
+    - key: HondaVEgoStopping
+      widget: option
+      title: vEgo Stopping
+      description: Speed (m/s) below which the planner treats the car as stopping.
+      min: 0.0
+      max: 3.0
+      step: 0.01
+    - key: HondaVEgoStarting
+      widget: option
+      title: vEgo Starting
+      description: Speed (m/s) above which the car is considered moving again.
+      min: 0.0
+      max: 3.0
+      step: 0.01
+  - id: nrdr_party_tricks
+    label: Party Tricks
+    trigger_key: null
+    items:
+    - key: HondaInjectionTest
+      widget: toggle
+      title: Injection Test (Caution!)
+      description: When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a massive steering command. Use with extreme caution on a safe, empty road.
+    - key: HondaAltDashboard
+      widget: multiple_button
+      title: Alternative Dashboard UI Design
+      description: Repurposes the factory ACC cluster (requires openpilot longitudinal). Lead Information shows the lead's speed and distance bars that close in as it approaches (best on radar cars). Vehicle Information shows your own speed with bars that push out under acceleration and pull in under braking.
+      options:
+      - value: 0
+        label: Stock
+      - value: 1
+        label: Lead Information
+      - value: 2
+        label: Vehicle Information
