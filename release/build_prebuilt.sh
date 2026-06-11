@@ -8,7 +8,9 @@ GITHUB_USER="${GITHUB_USER:=nrdr}"
 GITHUB_REPO="${GITHUB_REPO:=openpilot}"
 
 # Daily defaults
-: "${RELEASE_BRANCH:=nrdr-staging-$(date +%m.%d.%Y)}"
+# Branch date follows your local (Eastern) calendar day, not the device's UTC clock,
+# so an evening build doesn't roll over to tomorrow's date.
+: "${RELEASE_BRANCH:=nrdr-staging-$(TZ='America/New_York' date +%m.%d.%Y)}"
 : "${PUSH:=1}"
 : "${CLEANUP:=0}"
 : "${RESTORE_SOURCE_NAME:=0}"
