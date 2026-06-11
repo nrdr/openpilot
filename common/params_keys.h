@@ -282,7 +282,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaUnwindFreeze", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaUnwindLookahead", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaStoppingDecelRate", {PERSISTENT | BACKUP, INT, "30"}},
-    {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "1"}},  // UI label: Increase Driver Override Hysteresis
+    {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "0"}},  // UI label: Increase Driver Override Hysteresis (default OFF)
     {"NrdrDriverOverrideThreshold", {PERSISTENT | BACKUP, INT, "1200"}},  // steeringPressed threshold; 1200 = stock, proportional on non-1200 cars
     {"HondaOverrideFadeDownSecs", {PERSISTENT | BACKUP, FLOAT, "0"}},
     {"HondaOverrideFadeUpSecs", {PERSISTENT | BACKUP, FLOAT, "1.5"}},

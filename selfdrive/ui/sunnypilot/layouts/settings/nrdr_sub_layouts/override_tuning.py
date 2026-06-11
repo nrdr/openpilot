@@ -24,7 +24,7 @@ class OverrideTuningLayout(Widget):
   def _initialize_items(self):
     self._increase_override_tolerance = toggle_item_sp(
       param="NrdrIncreaseOverrideTolerance",
-      title=lambda: tr("Increase Driver Override Hysteresis (Default: ON)"),
+      title=lambda: tr("Increase Driver Override Hysteresis (Default: OFF)"),
       description=lambda: tr("Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below."),
     )
 
