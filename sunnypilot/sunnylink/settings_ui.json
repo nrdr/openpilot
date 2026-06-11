@@ -453,8 +453,8 @@
                 {
                   "key": "HondaCenterScale",
                   "widget": "option",
-                  "title": "Center Scale",
-                  "description": "Raise this to add extra error correction while driving straight. One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line.",
+                  "title": "Center Boost",
+                  "description": "Extra error correction added while driving straight, as a boost on top of the normal output (0.50 = 50% boost). One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line.",
                   "min": 0.0,
                   "max": 5.0,
                   "step": 0.01
@@ -463,7 +463,7 @@
                   "key": "HondaCenterBoostThreshold",
                   "widget": "option",
                   "title": "Center Boost Threshold (deg)",
-                  "description": "How centered should the steering wheel be when center scale is actually active?",
+                  "description": "How centered should the steering wheel be when center boost is actually active?",
                   "min": 0.0,
                   "max": 10.0,
                   "step": 0.1,
@@ -733,7 +733,7 @@
                 },
                 {
                   "key": "HondaAltDashboardDistance",
-                  "widget": "multiple_button",
+                  "widget": "option",
                   "title": "Alternative Dashboard Distance Design",
                   "description": "Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). Radar closes the bars in as the lead approaches. Velocity pushes the bars out under acceleration and pulls them in under braking. Non-stock designs stay on the cluster permanently, even when not engaged.",
                   "options": [
@@ -752,10 +752,59 @@
                   ]
                 },
                 {
-                  "key": "NrdrDistanceButtonSubMode",
+                  "key": "NrdrCruiseButtonSubMode",
                   "widget": "toggle",
-                  "title": "Distance Button Sub-Mode",
-                  "description": "Dynamic HUD - pressing the distance button or set/resume first wakes a 15-second preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed."
+                  "title": "Cruise Button Sub-Mode",
+                  "description": "Dynamic HUD - pressing the distance button or set/resume first wakes a preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed. The blink starts lazy and accelerates continuously until it cuts off."
+                },
+                {
+                  "key": "NrdrCruiseButtonSubModeSecs",
+                  "widget": "option",
+                  "title": "Sub-Mode Visibility Time",
+                  "description": "How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and rapid right before it falls off.",
+                  "min": 5,
+                  "max": 60,
+                  "step": 1,
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrCruiseButtonSubMode",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nrdr_remote_actions",
+              "label": "Remote Actions",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "NrdrRemoteForceUpdate",
+                  "widget": "toggle",
+                  "title": "Force Update",
+                  "description": "Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status below for progress."
+                },
+                {
+                  "key": "NrdrRemoteTuneScan",
+                  "widget": "toggle",
+                  "title": "Run Tune Report Scan",
+                  "description": "Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full day of logs can take a few minutes; the per-speed summary appears below when finished, and the full report is saved to /data/nrdr_tune_report.txt (grab it via the copyparty file server in Developer)."
+                },
+                {
+                  "key": "NrdrRemoteStatus",
+                  "widget": "info",
+                  "blocked": true,
+                  "title": "Remote Action Status"
+                },
+                {
+                  "key": "NrdrTuneReportSummary",
+                  "widget": "info",
+                  "blocked": true,
+                  "title": "Tune Report Summary (per speed)",
+                  "description": "mean_err >0 means under-steering vs desired. High flip/100 means the controller is hunting (lower kp). High sat% means out of steering authority."
                 }
               ]
             }

@@ -8,6 +8,7 @@ import subprocess
 from collections.abc import Callable
 import pyray as rl
 
+from cereal import car
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
@@ -15,7 +16,7 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.button import Button, ButtonStyle
 from openpilot.system.ui.widgets.list_view import (BUTTON_BORDER_RADIUS, BUTTON_FONT_SIZE, BUTTON_FONT_WEIGHT, BUTTON_HEIGHT,
-                                                   BUTTON_WIDTH, RIGHT_ITEM_PADDING, ItemAction, ListItem)
+                                                   BUTTON_WIDTH, RIGHT_ITEM_PADDING, ItemAction, ListItem, button_item)
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.html_render import HtmlModalSP
@@ -131,6 +132,75 @@ class LateralTuningLayout(Widget):
       pass
     gui_app.push_widget(HtmlModalSP(text=text))
 
+  # --- PID Tune Information ---
+
+  @staticmethod
+  def _fmt_vals(vals) -> str:
+    return ", ".join(f"{float(v):g}" for v in vals)
+
+  @staticmethod
+  def _fmt_bp_mph(bps) -> str:
+    return ", ".join(f"{float(v) * 2.23694:.0f}" for v in bps)
+
+  def _build_pid_tune_info(self) -> str:
+    try:
+      cp_bytes = ui_state.params.get("CarParamsPersistent") or ui_state.params.get("CarParams")
+    except Exception:
+      cp_bytes = None
+    if not cp_bytes:
+      return tr("No car fingerprinted yet. Drive the car once so it can identify itself, then check back here.")
+
+    try:
+      CP = car.CarParams.from_bytes(cp_bytes)
+    except Exception as e:
+      return tr("Could not read the stored car parameters.") + f"<br><br>{e}"
+
+    lines = [f"<b>{CP.carFingerprint}</b>", ""]
+
+    # Lateral tuning (interface.py values, as actually loaded for this car)
+    try:
+      which = CP.lateralTuning.which()
+      if which == "pid":
+        pid = CP.lateralTuning.pid
+        lines.append("<b>" + tr("LATERAL PID") + "</b>")
+        lines.append(f"kp: [{self._fmt_vals(pid.kpV)}] @ [{self._fmt_bp_mph(pid.kpBP)}] mph")
+        lines.append(f"ki: [{self._fmt_vals(pid.kiV)}] @ [{self._fmt_bp_mph(pid.kiBP)}] mph")
+        lines.append(f"kf: {float(pid.kf):g}")
+      else:
+        lines.append(tr("Lateral tuning type: {} (not PID)").format(which))
+    except Exception:
+      lines.append(tr("Lateral tuning: unavailable"))
+    lines.append("")
+
+    # Longitudinal tuning
+    try:
+      lt = CP.longitudinalTuning
+      lines.append("<b>" + tr("LONGITUDINAL PID") + "</b>")
+      lines.append(f"kp: [{self._fmt_vals(lt.kpV)}] @ [{self._fmt_bp_mph(lt.kpBP)}] mph")
+      lines.append(f"ki: [{self._fmt_vals(lt.kiV)}] @ [{self._fmt_bp_mph(lt.kiBP)}] mph")
+      try:
+        lines.append(f"kf: {float(lt.kf):g}")
+      except Exception:
+        pass
+    except Exception:
+      lines.append(tr("Longitudinal tuning: unavailable"))
+    lines.append("")
+
+    # Related interface.py geometry/actuator values that shape the same tune
+    try:
+      lines.append("<b>" + tr("RELATED") + "</b>")
+      lines.append(f"steerRatio: {float(CP.steerRatio):g}")
+      lines.append(f"steerActuatorDelay: {float(CP.steerActuatorDelay):g} s")
+      lines.append(f"wheelbase: {float(CP.wheelbase):g} m")
+      lines.append(f"mass: {float(CP.mass):.0f} kg")
+    except Exception:
+      pass
+
+    return "<br>".join(lines)
+
+  def _show_pid_tune_info(self):
+    gui_app.push_widget(HtmlModalSP(text=self._build_pid_tune_info()))
+
   def _initialize_items(self):
     self._tune_report_item = ListItem(
       title=lambda: tr("Tune Report"),
@@ -141,6 +211,13 @@ class LateralTuningLayout(Widget):
         scan_callback=self._on_tune_report_scan,
         view_callback=self._show_tune_report,
       ),
+    )
+
+    self._pid_tune_info_item = button_item(
+      lambda: tr("PID Tune Information"),
+      lambda: tr("VIEW"),
+      lambda: tr("The kp/ki/kf values currently loaded for your car's fingerprint (what interface.py configured), plus the related geometry values."),
+      callback=self._show_pid_tune_info,
     )
 
     self._lat_scale_low = option_item_sp(
@@ -310,6 +387,7 @@ class LateralTuningLayout(Widget):
 
     return [
       self._tune_report_item,
+      self._pid_tune_info_item,
       LineSeparatorSP(40),
       self._low_pass_filter,
       self._lat_scale_low,
