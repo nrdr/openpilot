@@ -282,7 +282,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaUnwindFreeze", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaUnwindLookahead", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaStoppingDecelRate", {PERSISTENT | BACKUP, INT, "30"}},
-    {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "1"}},  // UI label: Increase Driver Override Hysteresis
+    {"NrdrDriverOverrideThreshold", {PERSISTENT | BACKUP, INT, "1200"}},  // steeringPressed threshold; 1200 = stock, proportional on non-1200 cars
     {"HondaOverrideFadeDownSecs", {PERSISTENT | BACKUP, FLOAT, "0"}},
     {"HondaOverrideFadeUpSecs", {PERSISTENT | BACKUP, FLOAT, "1.5"}},
     {"HondaOverrideTorqueScale", {PERSISTENT | BACKUP, INT, "0"}},
@@ -297,9 +298,14 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaLpfTauHighway", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
     {"NrdrFirstRunSetupDone", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrAutoSelectModel", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"NrdrPidScaleExcludeKf", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"StaticFeedforwardLateral", {PERSISTENT | BACKUP, BOOL, "1"}},  // lat PID scales multiply P+I only; kf stays tuned
+    {"StaticFeedforwardLong", {PERSISTENT | BACKUP, BOOL, "1"}},     // long PID scale multiplies P+I only; kf stays tuned
     {"HondaInjectionTest", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"HondaAltDashboard", {PERSISTENT | BACKUP, INT, "0"}},  // 0 Stock, 1 Lead Information, 2 Vehicle Information
+    {"HondaAltDashboardSpeed", {PERSISTENT | BACKUP, INT, "0"}},     // 0 Stock, 1 Lead Speed, 2 GPS Speed, 3 Cluster Speed
+    {"HondaAltDashboardDistance", {PERSISTENT | BACKUP, INT, "0"}},  // 0 Stock, 1 Radar, 2 Velocity
+    {"NrdrDistanceButtonSubMode", {PERSISTENT | BACKUP, BOOL, "1"}}, // Dynamic HUD: distance/set buttons preview before acting
+    {"NrdrHudSubModeUntil", {CLEAR_ON_MANAGER_START, FLOAT, "0"}},   // monotonic deadline of the active HUD sub-mode window
+    {"HondaCenterBoostThreshold", {PERSISTENT | BACKUP, FLOAT, "3"}},  // deg from center where Center Scale is active
     {"HondaSteerDeltaLimiter", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaSteerDeltaUp", {PERSISTENT | BACKUP, FLOAT, "3"}},
     {"HondaSteerDeltaDown", {PERSISTENT | BACKUP, FLOAT, "3"}},

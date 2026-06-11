@@ -213,17 +213,25 @@ sections:
       - type: param
         key: HondaTorqueLowPassFilter
         equals: true
-    - key: NrdrPidScaleExcludeKf
+    - key: StaticFeedforwardLateral
       widget: toggle
       title: Keep Feedforward Static
-      description: When ON, the PID scales (and the longitudinal PID scale) multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it.
+      description: When ON, the lateral PID scales multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it. The longitudinal PID scale has its own toggle.
     - key: HondaCenterScale
       widget: option
       title: Center Scale
-      description: Raise this to add extra error correction while driving straight at high speeds. Sometimes the perfect lateral tune is too soft for driving in a straight line.
+      description: Raise this to add extra error correction while driving straight. One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line.
       min: 0.0
       max: 5.0
       step: 0.01
+    - key: HondaCenterBoostThreshold
+      widget: option
+      title: Center Boost Threshold (deg)
+      description: How centered should the steering wheel be when center scale is actually active?
+      min: 0.0
+      max: 10.0
+      step: 0.1
+      unit: deg
     - key: HondaUnwindFreeze
       widget: toggle
       title: Unwind Integrator Freeze
@@ -290,8 +298,15 @@ sections:
     items:
     - key: NrdrIncreaseOverrideTolerance
       widget: toggle
-      title: Increase Driver Override Tolerance
-      description: Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms.
+      title: Increase Driver Override Hysteresis
+      description: Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below.
+    - key: NrdrDriverOverrideThreshold
+      widget: option
+      title: Driver Override Threshold
+      description: Raw steering torque sensor reading above which you are considered to be steering (driver override). 1200 is Honda's stock threshold; on the few cars with a different stock threshold, your value is applied proportionally so 1200 always means stock.
+      min: 100
+      max: 5000
+      step: 100
     - key: HondaDriverAssistDuringOverride
       widget: toggle
       title: Pass-through assist torque on override
@@ -332,6 +347,10 @@ sections:
       max: 500
       step: 5
       unit: '%'
+    - key: StaticFeedforwardLong
+      widget: toggle
+      title: Keep Feedforward Static
+      description: When ON, the longitudinal PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle.
     - key: HondaLiveLearningGas
       widget: toggle
       title: Live Learning Gas
@@ -381,14 +400,31 @@ sections:
       widget: toggle
       title: Injection Test (Caution!)
       description: When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a massive steering command. Use with extreme caution on a safe, empty road.
-    - key: HondaAltDashboard
+    - key: HondaAltDashboardSpeed
       widget: multiple_button
-      title: Alternative Dashboard UI Design
-      description: Repurposes the factory ACC cluster (requires openpilot longitudinal). Lead Information shows the lead's speed and distance bars that close in as it approaches (best on radar cars). Vehicle Information shows your own speed with bars that push out under acceleration and pull in under braking.
+      title: Alternative Dashboard Speed Design
+      description: Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph ("Stopped" below 1 mph, "--" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash cluster reads.
       options:
       - value: 0
         label: Stock
       - value: 1
-        label: Lead Information
+        label: Lead Speed
       - value: 2
-        label: Vehicle Information
+        label: GPS Speed
+      - value: 3
+        label: Cluster Speed
+    - key: HondaAltDashboardDistance
+      widget: multiple_button
+      title: Alternative Dashboard Distance Design
+      description: Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). Radar closes the bars in as the lead approaches. Velocity pushes the bars out under acceleration and pulls them in under braking. Non-stock designs stay on the cluster permanently, even when not engaged.
+      options:
+      - value: 0
+        label: Stock
+      - value: 1
+        label: Radar
+      - value: 2
+        label: Velocity
+    - key: NrdrDistanceButtonSubMode
+      widget: toggle
+      title: Distance Button Sub-Mode
+      description: Dynamic HUD - pressing the distance button or set/resume first wakes a 15-second preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed.

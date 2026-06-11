@@ -1,15 +1,61 @@
 """
 nrdr Lateral Tuning sub-panel.
 """
+import datetime
+import glob
+import os
+import subprocess
 from collections.abc import Callable
 import pyray as rl
 
+from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
+from openpilot.system.ui.widgets.button import Button, ButtonStyle
+from openpilot.system.ui.widgets.list_view import (BUTTON_BORDER_RADIUS, BUTTON_FONT_SIZE, BUTTON_FONT_WEIGHT, BUTTON_HEIGHT,
+                                                   BUTTON_WIDTH, RIGHT_ITEM_PADDING, ItemAction, ListItem)
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
+from openpilot.system.ui.sunnypilot.widgets.html_render import HtmlModalSP
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP
+
+TUNE_REPORT_PATH = "/data/nrdr_tune_report.txt"
+TUNE_REPORT_TMP = TUNE_REPORT_PATH + ".tmp"
+RLOG_GLOBS = ("/data/media/0/realdata/*/rlog.zst", "/data/media/0/realdata/*/rlog.bz2")
+
+
+class _TuneReportAction(ItemAction):
+  """Two compact buttons (SCAN / VIEW) on the right side of a single list item."""
+
+  def __init__(self, scan_text: Callable[[], str], scan_enabled: Callable[[], bool],
+               scan_callback: Callable[[], None], view_callback: Callable[[], None]):
+    super().__init__(width=2 * BUTTON_WIDTH + RIGHT_ITEM_PADDING, enabled=True)
+    self._scan_text = scan_text
+    self._scan_enabled = scan_enabled
+    self._scan_button = Button("", font_size=BUTTON_FONT_SIZE, font_weight=BUTTON_FONT_WEIGHT,
+                               button_style=ButtonStyle.LIST_ACTION, border_radius=BUTTON_BORDER_RADIUS,
+                               click_callback=scan_callback, text_padding=0)
+    self._view_button = Button(tr("VIEW"), font_size=BUTTON_FONT_SIZE, font_weight=BUTTON_FONT_WEIGHT,
+                               button_style=ButtonStyle.LIST_ACTION, border_radius=BUTTON_BORDER_RADIUS,
+                               click_callback=view_callback, text_padding=0)
+
+  def set_touch_valid_callback(self, touch_callback: Callable[[], bool]) -> None:
+    super().set_touch_valid_callback(touch_callback)
+    self._scan_button.set_touch_valid_callback(touch_callback)
+    self._view_button.set_touch_valid_callback(touch_callback)
+
+  def _render(self, rect: rl.Rectangle) -> bool:
+    self._scan_button.set_text(self._scan_text())
+    self._scan_button.set_enabled(self._scan_enabled())
+
+    button_y = rect.y + (rect.height - BUTTON_HEIGHT) / 2
+    view_rect = rl.Rectangle(rect.x + rect.width - BUTTON_WIDTH, button_y, BUTTON_WIDTH, BUTTON_HEIGHT)
+    scan_rect = rl.Rectangle(view_rect.x - RIGHT_ITEM_PADDING - BUTTON_WIDTH, button_y, BUTTON_WIDTH, BUTTON_HEIGHT)
+    self._scan_button.render(scan_rect)
+    self._view_button.render(view_rect)
+    return False
 
 
 class LateralTuningLayout(Widget):
@@ -18,10 +64,85 @@ class LateralTuningLayout(Widget):
     self._back_button = NavButton(tr("Back"))
     self._back_button.set_click_callback(back_btn_callback)
 
+    self._scan_proc: subprocess.Popen | None = None
+    self._scan_fh = None
+
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
+  # --- Tune Report ---
+
+  def _scanning(self) -> bool:
+    return self._scan_proc is not None
+
+  def _on_tune_report_scan(self):
+    if self._scanning():
+      return
+
+    paths = []
+    for pattern in RLOG_GLOBS:
+      paths.extend(sorted(glob.glob(pattern)))
+    if not paths:
+      gui_app.push_widget(HtmlModalSP(text=tr("No drive logs found in /data/media/0/realdata.")))
+      return
+
+    try:
+      self._scan_fh = open(TUNE_REPORT_TMP, "w")
+      self._scan_proc = subprocess.Popen(
+        ["python3", os.path.join(BASEDIR, "tune_report.py"), *paths],
+        stdout=self._scan_fh,
+        stderr=subprocess.STDOUT,
+        cwd=BASEDIR,
+      )
+    except Exception as e:
+      if self._scan_fh is not None:
+        self._scan_fh.close()
+        self._scan_fh = None
+      self._scan_proc = None
+      gui_app.push_widget(HtmlModalSP(text=tr("Could not start the tune report scan.") + f"<br><br>{e}"))
+
+  def _poll_tune_report_scan(self):
+    if self._scan_proc is None or self._scan_proc.poll() is None:
+      return
+
+    if self._scan_fh is not None:
+      self._scan_fh.close()
+      self._scan_fh = None
+    self._scan_proc = None
+
+    # Keep the output either way: on failure it contains the traceback, which is useful.
+    try:
+      os.replace(TUNE_REPORT_TMP, TUNE_REPORT_PATH)
+    except OSError:
+      pass
+
+    self._show_tune_report()
+
+  def _show_tune_report(self):
+    if not os.path.exists(TUNE_REPORT_PATH):
+      gui_app.push_widget(HtmlModalSP(text=tr("No tune report yet. Press SCAN to analyze the drive logs on this device.")))
+      return
+
+    text = f"<b>{datetime.datetime.fromtimestamp(os.path.getmtime(TUNE_REPORT_PATH)).strftime('%d-%b-%Y %H:%M:%S').upper()}</b><br><br>"
+    try:
+      with open(TUNE_REPORT_PATH) as f:
+        text += f.read().replace("\n", "<br>")
+    except Exception:
+      pass
+    gui_app.push_widget(HtmlModalSP(text=text))
+
   def _initialize_items(self):
+    self._tune_report_item = ListItem(
+      title=lambda: tr("Tune Report"),
+      description=lambda: tr("Analyze the drive logs on this device and report, per speed band and turn direction, how well the lateral tune is tracking. Scanning a full day of logs can take a few minutes."),
+      action_item=_TuneReportAction(
+        scan_text=lambda: tr("SCANNING") if self._scanning() else tr("SCAN"),
+        scan_enabled=lambda: not self._scanning(),
+        scan_callback=self._on_tune_report_scan,
+        view_callback=self._show_tune_report,
+      ),
+    )
+
     self._lat_scale_low = option_item_sp(
       param="LatPidScaleLowSpeed",
       title=lambda: tr("Low Speed PID Scale (Below 25mph) (Default: 100%)"),
@@ -53,9 +174,9 @@ class LateralTuningLayout(Widget):
     )
 
     self._scale_exclude_kf = toggle_item_sp(
-      param="NrdrPidScaleExcludeKf",
-      title=lambda: tr("Keep Feedforward Static (Default: OFF)"),
-      description=lambda: tr("When ON, the PID scales above (and the longitudinal PID scale) multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it."),
+      param="StaticFeedforwardLateral",
+      title=lambda: tr("Keep Feedforward Static (Default: ON)"),
+      description=lambda: tr("When ON, the lateral PID scales above multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it. The longitudinal PID scale has its own toggle in Longitudinal Tuning."),
     )
 
     self._center_scale = option_item_sp(
@@ -64,8 +185,19 @@ class LateralTuningLayout(Widget):
       min_value=0,
       max_value=500,
       value_change_step=1,
-      description=lambda: tr("Raise this to add extra error correction while driving straight at high speeds. Sometimes the perfect lateral tune is too soft for driving in a straight line."),
+      description=lambda: tr("Raise this to add extra error correction while driving straight. One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line."),
       label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
+    self._center_boost_threshold = option_item_sp(
+      param="HondaCenterBoostThreshold",
+      title=lambda: tr("Center Boost Threshold (°) (Default: 3°)"),
+      min_value=0,
+      max_value=1000,
+      value_change_step=10,
+      description=lambda: tr("How centered should the steering wheel be when center scale is actually active?"),
+      label_callback=lambda value: f"{value / 100:.1f}°",
       use_float_scaling=True,
     )
 
@@ -177,6 +309,8 @@ class LateralTuningLayout(Widget):
     )
 
     return [
+      self._tune_report_item,
+      LineSeparatorSP(40),
       self._low_pass_filter,
       self._lat_scale_low,
       self._lpf_tau_low,
@@ -187,6 +321,7 @@ class LateralTuningLayout(Widget):
       self._scale_exclude_kf,
       LineSeparatorSP(40),
       self._center_scale,
+      self._center_boost_threshold,
       LineSeparatorSP(40),
       self._unwind_freeze,
       self._unwind_lookahead,
@@ -202,6 +337,8 @@ class LateralTuningLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
+
+    self._poll_tune_report_scan()
 
     lpf_enabled = self._low_pass_filter.action_item.get_state()
     self._lpf_tau_low.set_visible(lpf_enabled)

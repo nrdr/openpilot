@@ -84,11 +84,10 @@ def _pid_output_scale(
   v_ego: float,
   center_taper_scale: float = 1.0,
   center_taper_high: float = 2.0,
+  center_boost_threshold_deg: float = 3.0,
 ) -> float:
   abs_angle = abs(desired_angle_deg)
   speed_weight = min(max((v_ego - 4.0) / 10.0, 0.0), 1.0)
-  center_speed_weight = 0.65 + (0.35 * speed_weight)
-  center_weight = min(max((16.0 - abs_angle) / 16.0, 0.0), 1.0)
   mid_turn_weight = min(max((abs_angle - 10.0) / 10.0, 0.0), 1.0)
   angle_weight = min(max((abs_angle - 16.0) / 12.0, 0.0), 1.0)
   phase = desired_angle_deg * desired_angle_delta_deg
@@ -101,11 +100,13 @@ def _pid_output_scale(
   steering_rate_unwind = desired_angle_deg * steering_rate_deg < -1.0
   low_speed_unwind = low_speed_unwind_weight > 0.0 and steering_rate_unwind
 
-  # Center taper is intentionally negative at very low speeds to reduce
-  # center twitchiness, then ramps back to the vehicle-specific positive taper by 50 mph.
-  center_taper_low = -0.09
-  center_taper_speed_weight = min(max(v_ego / (50.0 * 0.44704), 0.0), 1.0)
-  center_taper = (center_taper_low + ((center_taper_high - center_taper_low) * center_taper_speed_weight)) * center_taper_scale
+  # Center boost: one static value across all speed ranges (the old low-speed
+  # negative taper and 0-50 mph interp are gone). Active only while the desired
+  # angle is within the Center Boost Threshold of dead-center, with a short 1 deg
+  # linear fade past the threshold so the boost doesn't step off abruptly.
+  center_fade_deg = 1.0
+  center_weight = min(max((center_boost_threshold_deg + center_fade_deg - abs_angle) / center_fade_deg, 0.0), 1.0)
+  center_taper = center_taper_high * center_taper_scale
 
   mid_turn_scale = 0.1200 if is_left else 0.0150
   mid_turn_turn_in_scale = -0.5500 if is_left else -0.0524
@@ -114,7 +115,7 @@ def _pid_output_scale(
   turn_in_scale = -0.0799 if is_left else 0.0888
   unwind_scale = 0.1600 if is_left else 0.2000
 
-  scale = 1.0 + (center_speed_weight * center_weight * center_taper)
+  scale = 1.0 + (center_weight * center_taper)
   scale += speed_weight * mid_turn_weight * mid_turn_scale
   scale += speed_weight * angle_weight * base_scale
 
@@ -148,8 +149,10 @@ class LatControlPID(LatControl):
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
 
     self.is_eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
-    # Live-tunable high-speed center taper (replaces the old per-car lookup).
+    # Live-tunable center boost (replaces the old per-car lookup). Static across
+    # all speeds; active only within the Center Boost Threshold of dead-center.
     self.center_taper_high = 0.5
+    self.center_boost_threshold = 3.0
 
     self.eps_modified_steering_pressed_filter_s = 0.0
     self.eps_modified_steering_pressed_prev = False
@@ -165,7 +168,7 @@ class LatControlPID(LatControl):
     self.unwind_freeze_enabled = False
     self.unwind_lookahead_enabled = False
     self.injection_test_enabled = False  # Party Tricks: x9.99 PID scale stress test
-    self.scale_excludes_kf = False  # when True, PID scale multiplies P+I only, not feedforward
+    self.scale_excludes_kf = True  # when True, PID scale multiplies P+I only, not feedforward (StaticFeedforwardLateral, default ON)
     self.model_v2 = None
     self.model_valid = False
 
@@ -271,7 +274,7 @@ class LatControlPID(LatControl):
         self.lat_pid_scale_highway = get_param_float(
           self.params, "LatPidScaleHighway", 1.0, 0.0, 5.0, scale=100.0,
         )
-        # High-speed center taper target. FLOAT param stored as the real value
+        # Center boost target. FLOAT param stored as the real value
         # (UI use_float_scaling), so no scale. Unset -> 0.5 (old generic default).
         self.center_taper_high = get_param_float(
           self.params,
@@ -280,10 +283,18 @@ class LatControlPID(LatControl):
           0.0,
           5.0,
         )
+        # Degrees from dead-center within which the center boost is active.
+        self.center_boost_threshold = get_param_float(
+          self.params,
+          "HondaCenterBoostThreshold",
+          3.0,
+          0.0,
+          10.0,
+        )
         self.unwind_freeze_enabled = self.params.get_bool("HondaUnwindFreeze")
         self.unwind_lookahead_enabled = self.params.get_bool("HondaUnwindLookahead")
         self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
-        self.scale_excludes_kf = self.params.get_bool("NrdrPidScaleExcludeKf")
+        self.scale_excludes_kf = self.params.get_bool("StaticFeedforwardLateral")
 
       output_torque = self.pid.update(
         error,
@@ -321,6 +332,7 @@ class LatControlPID(LatControl):
           CS.vEgo,
           center_taper_scale,
           self.center_taper_high,
+          self.center_boost_threshold,
         )
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
 

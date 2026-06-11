@@ -24,8 +24,18 @@ class OverrideTuningLayout(Widget):
   def _initialize_items(self):
     self._increase_override_tolerance = toggle_item_sp(
       param="NrdrIncreaseOverrideTolerance",
-      title=lambda: tr("Increase Driver Override Tolerance (Default: ON)"),
-      description=lambda: tr("Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms."),
+      title=lambda: tr("Increase Driver Override Hysteresis (Default: ON)"),
+      description=lambda: tr("Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below."),
+    )
+
+    self._driver_override_threshold = option_item_sp(
+      param="NrdrDriverOverrideThreshold",
+      title=lambda: tr("Driver Override Threshold (Default: 1200)"),
+      min_value=100,
+      max_value=5000,
+      value_change_step=100,
+      description=lambda: tr("Raw steering torque sensor reading above which you are considered to be steering (driver override). 1200 is Honda's stock threshold; on the few cars with a different stock threshold, your value is applied proportionally so 1200 always means stock."),
+      label_callback=lambda value: f"{value}",
     )
 
     self._driver_assist_during_override = toggle_item_sp(
@@ -68,6 +78,7 @@ class OverrideTuningLayout(Widget):
 
     return [
       self._increase_override_tolerance,
+      self._driver_override_threshold,
       LineSeparatorSP(40),
       self._driver_assist_during_override,
       self._override_fade_down,
@@ -78,6 +89,7 @@ class OverrideTuningLayout(Widget):
   def _update_state(self):
     super()._update_state()
     self._increase_override_tolerance.action_item.set_enabled(True)
+    self._driver_override_threshold.action_item.set_enabled(True)
     self._driver_assist_during_override.action_item.set_enabled(True)
     self._override_fade_down.action_item.set_enabled(True)
     self._override_fade_up.action_item.set_enabled(True)

@@ -1,6 +1,5 @@
 import time
 import os
-import subprocess
 import pyray as rl
 from collections.abc import Callable
 from enum import IntEnum
@@ -25,13 +24,21 @@ REFRESH_INTERVAL = 10.0
 
 
 class NrdrForkWidget(Widget):
-  OPSYNC_PATHS = (
-    "/data/openpilot/scripts/bash/opsync.sh",
-    "/data/openpilot/scripts/opsync.sh",
-  )
+  # Force Update drives the real updater daemon (system.updated.updated) through its
+  # full check -> download -> install sequence automatically. SIGUSR1 = check,
+  # SIGHUP = fetch/download, DoReboot = finalize/install. No opsync.sh involved.
+  FU_IDLE = 0
+  FU_CHECKING = 1
+  FU_DOWNLOADING = 2
+  FU_REBOOTING = 3
+
+  FU_POLL_INTERVAL = 0.5     # seconds between param polls while active
+  FU_WAKE_TIMEOUT = 15.0     # seconds to wait for updated to leave "idle" after a signal
+  FU_PHASE_TIMEOUT = 900.0   # hard cap per phase (downloads can be slow)
 
   def __init__(self):
     super().__init__()
+    self._params = Params()
     self._button_rect = rl.Rectangle(0, 0, 0, 0)
     self._update_button_rect = rl.Rectangle(0, 0, 0, 0)
     self._tune_click_callback: Callable[[], None] | None = None
@@ -40,6 +47,11 @@ class NrdrForkWidget(Widget):
     self._force_update_status_color = rl.Color(70, 135, 255, 255)
     self._tune_flash_until = 0.0
     self._pending_tune_callback = False
+    self._fu_state = self.FU_IDLE
+    self._fu_phase_start = 0.0
+    self._fu_saw_active = False
+    self._fu_baseline_failed_count = 0
+    self._fu_last_poll = 0.0
 
   def set_click_callback(self, callback: Callable[[], None]):
     self._tune_click_callback = callback
@@ -59,26 +71,122 @@ class NrdrForkWidget(Widget):
 
     super()._handle_mouse_release(mouse_pos)
 
-  def _run_force_update(self):
-    opsync_path = next((path for path in self.OPSYNC_PATHS if os.path.exists(path)), None)
-    self._force_update_flash_until = time.monotonic() + 1.5
+  def _fu_set_status(self, text: str, color: rl.Color, flash_secs: float | None = None):
+    self._force_update_status_text = text
+    self._force_update_status_color = color
+    if flash_secs is not None:
+      self._force_update_flash_until = time.monotonic() + flash_secs
 
-    if opsync_path is None:
-      self._force_update_status_text = "SCRIPT MISSING"
-      self._force_update_status_color = rl.Color(190, 68, 68, 255)
+  def _fu_enter(self, state: int):
+    self._fu_state = state
+    self._fu_phase_start = time.monotonic()
+    self._fu_saw_active = False
+
+  def _fu_fail(self, text: str):
+    self._fu_state = self.FU_IDLE
+    self._fu_set_status(text, rl.Color(190, 68, 68, 255), flash_secs=4.0)
+
+  def _run_force_update(self):
+    if self._fu_state != self.FU_IDLE:
+      return  # already running
+
+    try:
+      update_available = self._params.get_bool("UpdateAvailable")
+      fetch_available = self._params.get_bool("UpdaterFetchAvailable")
+      self._fu_baseline_failed_count = self._params.get("UpdateFailedCount") or 0
+    except Exception:
+      update_available = fetch_available = False
+      self._fu_baseline_failed_count = 0
+
+    if update_available:
+      self._fu_install()
       return
 
-    self._force_update_status_text = "FETCHING UPSTREAM"
-    self._force_update_status_color = rl.Color(58, 150, 90, 255)
+    if fetch_available:
+      # Update already found by a previous check; go straight to download
+      os.system("pkill -SIGHUP -f system.updated.updated")
+      self._fu_enter(self.FU_DOWNLOADING)
+      self._fu_set_status("DOWNLOADING", rl.Color(58, 150, 90, 255))
+      return
 
-    subprocess.Popen(
-      ["bash", opsync_path],
-      stdout=subprocess.DEVNULL,
-      stderr=subprocess.DEVNULL,
-      cwd="/data/openpilot",
-    )
+    os.system("pkill -SIGUSR1 -f system.updated.updated")
+    self._fu_enter(self.FU_CHECKING)
+    self._fu_set_status("CHECKING", rl.Color(58, 150, 90, 255))
+
+  def _fu_install(self):
+    self._fu_enter(self.FU_REBOOTING)
+    self._fu_set_status("REBOOTING TO INSTALL", rl.Color(70, 135, 255, 255))
+    try:
+      self._params.put_bool("DoReboot", True)
+    except Exception:
+      self._fu_fail("REBOOT FAILED")
+
+  def _fu_poll(self):
+    if self._fu_state in (self.FU_IDLE, self.FU_REBOOTING):
+      return
+
+    now = time.monotonic()
+    if now - self._fu_last_poll < self.FU_POLL_INTERVAL:
+      return
+    self._fu_last_poll = now
+
+    try:
+      updater_state = (self._params.get("UpdaterState") or "idle").strip()
+      fetch_available = self._params.get_bool("UpdaterFetchAvailable")
+      update_available = self._params.get_bool("UpdateAvailable")
+      failed_count = self._params.get("UpdateFailedCount") or 0
+    except Exception:
+      return
+
+    elapsed = now - self._fu_phase_start
+
+    if updater_state != "idle":
+      # Updater is actively working; reflect its own status text
+      self._fu_saw_active = True
+      self._fu_set_status(updater_state.rstrip(".").upper(), rl.Color(58, 150, 90, 255))
+      if elapsed > self.FU_PHASE_TIMEOUT:
+        self._fu_fail("UPDATER TIMED OUT")
+      return
+
+    # Updater is idle: either it finished this phase, or it hasn't woken up yet
+    if not self._fu_saw_active:
+      # Results can land before we ever observe a non-idle state, so check them first
+      if self._fu_state == self.FU_CHECKING and (fetch_available or update_available or failed_count > self._fu_baseline_failed_count):
+        pass  # fall through to the phase-complete logic below
+      elif self._fu_state == self.FU_DOWNLOADING and (update_available or failed_count > self._fu_baseline_failed_count):
+        pass
+      elif elapsed < self.FU_WAKE_TIMEOUT:
+        return  # still waiting for updated to respond
+      else:
+        self._fu_fail("UPDATER NOT RESPONDING")
+        return
+
+    if failed_count > self._fu_baseline_failed_count:
+      self._fu_fail("UPDATE CHECK FAILED")
+      return
+
+    if self._fu_state == self.FU_CHECKING:
+      if update_available:
+        self._fu_install()
+      elif fetch_available:
+        os.system("pkill -SIGHUP -f system.updated.updated")
+        self._fu_enter(self.FU_DOWNLOADING)
+        self._fu_set_status("DOWNLOADING", rl.Color(58, 150, 90, 255))
+      elif self._fu_saw_active:
+        # Check completed and found nothing
+        self._fu_state = self.FU_IDLE
+        self._fu_set_status("UP TO DATE", rl.Color(58, 150, 90, 255), flash_secs=3.0)
+      return
+
+    if self._fu_state == self.FU_DOWNLOADING:
+      if update_available:
+        self._fu_install()
+      elif self._fu_saw_active:
+        self._fu_fail("DOWNLOAD FAILED")
 
   def _render(self, rect: rl.Rectangle):
+    self._fu_poll()
+
     if self._pending_tune_callback and time.monotonic() >= self._tune_flash_until:
       self._pending_tune_callback = False
       if self._tune_click_callback is not None:
@@ -201,7 +309,7 @@ class NrdrForkWidget(Widget):
       rl.WHITE,
     )
 
-    force_update_active = time.monotonic() < self._force_update_flash_until
+    force_update_active = self._fu_state != self.FU_IDLE or time.monotonic() < self._force_update_flash_until
     update_color = self._force_update_status_color if force_update_active else rl.Color(58, 58, 58, 255)
     update_text = self._force_update_status_text if force_update_active else "FORCE UPDATE"
 

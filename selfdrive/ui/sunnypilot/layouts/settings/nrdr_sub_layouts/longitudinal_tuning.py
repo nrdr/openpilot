@@ -32,6 +32,12 @@ class LongitudinalTuningLayout(Widget):
       label_callback=lambda value: f"{value}%",
     )
 
+    self._static_feedforward_long = toggle_item_sp(
+      param="StaticFeedforwardLong",
+      title=lambda: tr("Keep Feedforward Static (Default: ON)"),
+      description=lambda: tr("When ON, the longitudinal PID scale above multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle in Lateral Tuning."),
+    )
+
     self._live_learning_gas = toggle_item_sp(
       param="HondaLiveLearningGas",
       title=lambda: tr("Live Learning Gas"),
@@ -94,6 +100,7 @@ class LongitudinalTuningLayout(Widget):
 
     return [
       self._long_pid_tune_scale,
+      self._static_feedforward_long,
       LineSeparatorSP(40),
       self._live_learning_gas,
       LineSeparatorSP(40),

@@ -149,6 +149,36 @@ git commit --amend -m "openpilot v$VERSION prebuilt"
 echo "[-] Optional onroad test skipped"
 # RELEASE=1 pytest -n0 -s selfdrive/test/test_onroad.py
 
+# Commits whose changes must never appear in nrdr-clean. They are reverse-applied
+# to the prebuilt tree BEFORE the clean branch's single commit is created, so the
+# published history never contains them (no add-then-revert).
+CLEAN_BRANCH="${CLEAN_BRANCH:=nrdr-clean}"
+NIGHTLY_BRANCH="${NIGHTLY_BRANCH:=nrdr-nightly}"
+CLEAN_EXCLUDE_COMMITS=(
+  181c61ee64eb1982dbad259b8fbb788988050279  # Quality of Life Module
+  a1c50bb6642c55c3420ae7617d0d69e409302c77  # stable.konik.ai Full Support
+)
+
+build_clean_tree() {
+  # Reverse-apply the excluded commits onto the current prebuilt working tree.
+  # Returns nonzero (without dying, caller checks) if any patch doesn't apply.
+  local c
+  for c in "${CLEAN_EXCLUDE_COMMITS[@]}"; do
+    if ! git -C "$SOURCE_DIR" show "$c" > /tmp/nrdr_clean_revert.patch 2>/dev/null; then
+      echo "[!] WARNING: commit $c not found in $SOURCE_DIR"
+      return 1
+    fi
+    if ! git apply -R --whitespace=nowarn /tmp/nrdr_clean_revert.patch; then
+      echo "[!] WARNING: could not reverse-apply $c onto the prebuilt tree"
+      return 1
+    fi
+  done
+
+  # nrdr-clean must not ship the konik API/Athena host exports.
+  sed -i '/^export API_HOST=.*konik\.ai/d; /^export ATHENA_HOST=.*konik\.ai/d' launch_openpilot.sh
+  return 0
+}
+
 if [ "$PUSH" = "1" ]; then
   echo "[-] PUSH T=$SECONDS"
 
@@ -167,8 +197,27 @@ if [ "$PUSH" = "1" ]; then
   AUTH_REMOTE="https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
   git remote set-url origin "$AUTH_REMOTE"
   git remote set-url --push origin "$AUTH_REMOTE"
-  git push -f origin "$RELEASE_BRANCH:$RELEASE_BRANCH"
+  set -x
 
+  # 1) Dated staging branch (kept), 2) nightly (overwritten every run).
+  git push -f origin "$RELEASE_BRANCH:$RELEASE_BRANCH"
+  git push -f origin "$RELEASE_BRANCH:$NIGHTLY_BRANCH"
+
+  # 3) nrdr-clean (overwritten every run): a fresh single commit whose tree never
+  # contained the excluded changes. Failure here must not fail the whole build,
+  # staging and nightly are already published.
+  echo "[-] Building $CLEAN_BRANCH tree T=$SECONDS"
+  if build_clean_tree; then
+    git branch -D "$CLEAN_BRANCH" 2>/dev/null || true  # stale local branch from a CLEANUP=0 rerun
+    git checkout --orphan "$CLEAN_BRANCH"
+    git add -f .
+    git commit -m "openpilot v$VERSION prebuilt"
+    git push -f origin "$CLEAN_BRANCH:$CLEAN_BRANCH"
+  else
+    echo "[!] WARNING: skipping $CLEAN_BRANCH this run (see above); staging/nightly were pushed"
+  fi
+
+  set +x
   git remote set-url origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
   git remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
   unset AUTH_REMOTE

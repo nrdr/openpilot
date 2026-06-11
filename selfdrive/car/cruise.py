@@ -3,6 +3,8 @@ import numpy as np
 
 from cereal import car
 from openpilot.common.constants import CV
+from openpilot.common.params import Params
+from openpilot.selfdrive.controls.lib.nrdr_hud_submode import consume_button_press
 from openpilot.sunnypilot.selfdrive.car.cruise_ext import VCruiseHelperSP
 
 
@@ -56,6 +58,7 @@ class VCruiseHelper(VCruiseHelperSP):
     self.v_cruise_kph_last = 0
     self.button_timers = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0}
     self.button_change_states = {btn: {"standstill": False, "enabled": False} for btn in self.button_timers}
+    self._submode_params = Params()  # Dynamic HUD (Distance Button Sub-Mode) press gate
 
     # Persist units so initialize_v_cruise can use the same mode as update_v_cruise.
     self.is_metric = True
@@ -134,6 +137,13 @@ class VCruiseHelper(VCruiseHelperSP):
     # True: Disallow set speed changes when user confirmed the target set speed during preActive state
     # False: Allow set speed changes as SLA is not requesting user confirmation
     if self.update_speed_limit_assist_pre_active_confirmed(button_type):
+      return
+
+    # Dynamic HUD: the first set/resume press only opens the HUD sub-mode preview
+    # (set speed + personality blink on the cluster); only presses made while it's
+    # already open actually adjust the set speed. Engagement is unaffected - this
+    # path only runs while cruise is already enabled.
+    if not consume_button_press(self._submode_params):
       return
 
     # Honda imperial rounding fix:
