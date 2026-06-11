@@ -12,6 +12,7 @@ from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.lateral
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.override_tuning import OverrideTuningLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.longitudinal_tuning import LongitudinalTuningLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.party_tricks import PartyTricksLayout
+from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.footage import FootageLayout
 
 
 class PanelType(IntEnum):
@@ -21,6 +22,7 @@ class PanelType(IntEnum):
   LONGITUDINAL = 3
   PARTY_TRICKS = 4
   LEARNED = 5
+  FOOTAGE = 6
 
 
 class NrdrLayout(Widget):
@@ -33,11 +35,17 @@ class NrdrLayout(Widget):
     self._override_layout = OverrideTuningLayout(lambda: self._set_current_panel(PanelType.NRDR))
     self._longitudinal_layout = LongitudinalTuningLayout(lambda: self._set_current_panel(PanelType.NRDR))
     self._party_tricks_layout = PartyTricksLayout(lambda: self._set_current_panel(PanelType.NRDR))
+    self._footage_layout = FootageLayout(lambda: self._set_current_panel(PanelType.NRDR))
 
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
+    self._footage_button = simple_button_item_sp(
+      button_text=lambda: tr("Show Footage"),
+      button_width=800,
+      callback=lambda: self._set_current_panel(PanelType.FOOTAGE),
+    )
     self._learned_button = simple_button_item_sp(
       button_text=lambda: tr("Learned Parameters"),
       button_width=800,
@@ -65,6 +73,8 @@ class NrdrLayout(Widget):
     )
 
     return [
+      self._footage_button,
+      LineSeparatorSP(40),
       self._learned_button,
       LineSeparatorSP(40),
       self._lateral_button,
@@ -90,6 +100,8 @@ class NrdrLayout(Widget):
       self._longitudinal_layout.render(rect)
     elif self._current_panel == PanelType.PARTY_TRICKS:
       self._party_tricks_layout.render(rect)
+    elif self._current_panel == PanelType.FOOTAGE:
+      self._footage_layout.render(rect)
     else:
       self._scroller.render(rect)
 

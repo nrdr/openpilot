@@ -1,6 +1,7 @@
 import time
 import os
 import socket
+import subprocess
 import pyray as rl
 from collections.abc import Callable
 from enum import IntEnum
@@ -24,8 +25,24 @@ REFRESH_INTERVAL = 10.0
 
 
 def _local_ip() -> str:
-  # UDP "connect" never sends a packet; it just resolves which local address would
-  # route there. Works on wifi or tethering, returns -- with no network at all.
+  # The address you'd SSH to / point a phone at: prefer the hotspot subnet, then
+  # wlan. The default-route trick is only a fallback - with LTE up it returns the
+  # cellular address, which nothing on your local network can reach.
+  try:
+    out = subprocess.check_output(["ip", "-4", "-o", "addr"], encoding="utf8", timeout=2)
+    addrs = []
+    for line in out.splitlines():
+      parts = line.split()
+      if len(parts) >= 4 and parts[2] == "inet":
+        addrs.append((parts[1], parts[3].split("/")[0]))
+    for _ifname, ip in addrs:
+      if ip.startswith("192.168.43."):
+        return ip
+    for ifname, ip in addrs:
+      if ifname.startswith("wlan"):
+        return ip
+  except Exception:
+    pass
   try:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
       s.connect(("8.8.8.8", 80))
