@@ -219,15 +219,15 @@ sections:
       description: When ON, the lateral PID scales multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it. The longitudinal PID scale has its own toggle.
     - key: HondaCenterScale
       widget: option
-      title: Center Scale
-      description: Raise this to add extra error correction while driving straight. One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line.
+      title: Center Boost
+      description: Extra error correction added while driving straight, as a boost on top of the normal output (0.50 = 50% boost). One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line.
       min: 0.0
       max: 5.0
       step: 0.01
     - key: HondaCenterBoostThreshold
       widget: option
       title: Center Boost Threshold (deg)
-      description: How centered should the steering wheel be when center scale is actually active?
+      description: How centered should the steering wheel be when center boost is actually active?
       min: 0.0
       max: 10.0
       step: 0.1
@@ -414,7 +414,7 @@ sections:
       - value: 3
         label: Cluster Speed
     - key: HondaAltDashboardDistance
-      widget: multiple_button
+      widget: option
       title: Alternative Dashboard Distance Design
       description: Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). Radar closes the bars in as the lead approaches. Velocity pushes the bars out under acceleration and pulls them in under braking. Non-stock designs stay on the cluster permanently, even when not engaged.
       options:

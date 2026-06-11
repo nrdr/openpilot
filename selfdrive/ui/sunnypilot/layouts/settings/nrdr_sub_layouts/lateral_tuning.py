@@ -181,12 +181,12 @@ class LateralTuningLayout(Widget):
 
     self._center_scale = option_item_sp(
       param="HondaCenterScale",
-      title=lambda: tr("Center Scale (Default: 0.50)"),
+      title=lambda: tr("Center Boost (Default: 50%)"),
       min_value=0,
       max_value=500,
       value_change_step=1,
-      description=lambda: tr("Raise this to add extra error correction while driving straight. One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line."),
-      label_callback=lambda value: f"{value / 100:.2f}",
+      description=lambda: tr("Extra error correction added while driving straight, as a percentage boost on top of the normal output. One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line."),
+      label_callback=lambda value: f"{value}%",
       use_float_scaling=True,
     )
 
@@ -196,7 +196,7 @@ class LateralTuningLayout(Widget):
       min_value=0,
       max_value=1000,
       value_change_step=10,
-      description=lambda: tr("How centered should the steering wheel be when center scale is actually active?"),
+      description=lambda: tr("How centered should the steering wheel be when center boost is actually active?"),
       label_callback=lambda value: f"{value / 100:.1f}°",
       use_float_scaling=True,
     )
