@@ -178,6 +178,9 @@ build_clean_tree() {
 
   # nrdr-clean must not ship the konik API/Athena host exports.
   sed -i '/^export API_HOST=.*konik\.ai/d; /^export ATHENA_HOST=.*konik\.ai/d' launch_openpilot.sh
+
+  # nrdr-clean uploads to comma, so the home screen must say so.
+  sed -i 's|Your drives will upload to stable\.konik\.ai\.|Your drives will upload to connect.comma.ai.|' selfdrive/ui/layouts/home.py
   return 0
 }
 
