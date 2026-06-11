@@ -428,3 +428,24 @@ sections:
       widget: toggle
       title: Distance Button Sub-Mode
       description: Dynamic HUD - pressing the distance button or set/resume first wakes a 15-second preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed.
+  - id: nrdr_remote_actions
+    label: Remote Actions
+    trigger_key: null
+    items:
+    - key: NrdrRemoteForceUpdate
+      widget: toggle
+      title: Force Update
+      description: Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status below for progress.
+    - key: NrdrRemoteTuneScan
+      widget: toggle
+      title: Run Tune Report Scan
+      description: Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full day of logs can take a few minutes; the per-speed summary appears below when finished, and the full report is saved to /data/nrdr_tune_report.txt (grab it via the copyparty file server in Developer).
+    - key: NrdrRemoteStatus
+      widget: info
+      title: Remote Action Status
+      blocked: true
+    - key: NrdrTuneReportSummary
+      widget: info
+      title: Tune Report Summary (per speed)
+      description: mean_err >0 means under-steering vs desired. High flip/100 means the controller is hunting (lower kp). High sat% means out of steering authority.
+      blocked: true
