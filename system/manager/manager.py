@@ -79,9 +79,6 @@ NRDR_DEFAULT_VALUE_PARAMS = {
   # Steering
   "AutoLaneChangeTimer": 1,
 
-  # Longitudinal
-  "LongitudinalPersonality": 3,  # 0 aggressive, 1 standard, 2 relaxed, 3 econ
-
   # Cruise
   "SpeedLimitMode": 3,
   "SpeedLimitOffsetType": 1,
@@ -116,16 +113,6 @@ def apply_nrdr_default_params(params: Params) -> None:
   # hidden in the UI, so force them off every boot to guarantee PID lateral control.
   params.put_bool("EnforceTorqueControl", False)
   params.put_bool("NeuralNetworkLateralControl", False)
-
-  # Satisfy onboarding here in manager_init (before the UI process starts) so terms /
-  # training / sunnylink prompts never show on a factory-fresh boot. hardwared.py also
-  # writes these, but as a daemon it can lose the race against the UI's onboarding check.
-  from openpilot.system.version import terms_version, terms_version_sp, training_version, sunnylink_consent_version
-  params.put("HasAcceptedTerms", terms_version)
-  params.put("HasAcceptedTermsSP", terms_version_sp)
-  params.put("CompletedTrainingVersion", training_version)
-  params.put("CompletedSunnylinkConsentVersion", sunnylink_consent_version)
-  params.put_bool("SunnylinkEnabled", True)
 
 
 def manager_init() -> None:

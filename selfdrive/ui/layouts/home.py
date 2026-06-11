@@ -11,8 +11,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
 from openpilot.system.ui.lib.multilang import tr, trn
 from openpilot.system.ui.widgets.label import gui_label
-from openpilot.system.ui.widgets import DialogResult, Widget
-from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
+from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.trips import TripsLayout
 
 HEADER_HEIGHT = 80
@@ -237,7 +236,6 @@ class HomeLayout(Widget):
   def __init__(self):
     super().__init__()
     self.params = Params()
-    self._first_run_prompt_shown = False  # nrdr first-run model/map setup popup
 
     self.update_alert = UpdateAlert()
     self.offroad_alert = OffroadAlert()
@@ -312,46 +310,7 @@ class HomeLayout(Widget):
     elif self.current_state == HomeLayoutState.ALERTS:
       self._render_alerts_view()
 
-  def _maybe_show_first_run(self):
-    # First boot only: two short, independent prompts (model, then maps). The home
-    # screen only renders offroad, so no extra ignition check is needed.
-    if self._first_run_prompt_shown or self.params.get_bool("NrdrFirstRunSetupDone"):
-      return
-    self._first_run_prompt_shown = True
-    self._show_first_run_model_prompt()
-
-  def _show_first_run_model_prompt(self):
-    def _cb(result):
-      if result == DialogResult.CONFIRM:
-        # Ask the model daemon to find + download Pop V2 (it has the bundle list).
-        self.params.put_bool("NrdrAutoSelectModel", True)
-      self._show_first_run_maps_prompt()
-
-    msg = tr("Download the recommended Pop V2 driving model? It downloads in the background over Wi-Fi.")
-    gui_app.push_widget(ConfirmDialog(msg, tr("Download model"), callback=_cb))
-
-  def _show_first_run_maps_prompt(self):
-    def _cb(result):
-      if result == DialogResult.CONFIRM:
-        self._start_us_map_download()
-      self.params.put_bool("NrdrFirstRunSetupDone", True)
-
-    msg = tr("Also download offline maps for the entire United States (about 6 GB) over Wi-Fi?")
-    gui_app.push_widget(ConfirmDialog(msg, tr("Download maps"), callback=_cb))
-
-  def _start_us_map_download(self):
-    p = self.params
-    # Entire US OSM map (matches the osm.py "All states" selection), then trigger mapd.
-    p.put("OsmLocationName", "US")
-    p.put("OsmLocationTitle", "United States")
-    p.put_bool("OsmLocal", True)
-    p.put("OsmStateName", "All")
-    p.put("OsmStateTitle", "All states (~6.0 GB)")
-    p.put_bool("OsmDbUpdatesCheck", True)
-
   def _update_state(self):
-    self._maybe_show_first_run()
-
     self.header_rect = rl.Rectangle(
       self._rect.x + CONTENT_MARGIN, self._rect.y + CONTENT_MARGIN, self._rect.width - 2 * CONTENT_MARGIN, HEADER_HEIGHT
     )
