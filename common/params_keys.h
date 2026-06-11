@@ -303,6 +303,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaInjectionTest", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaAltDashboardSpeed", {PERSISTENT | BACKUP, INT, "0"}},     // 0 Stock, 1 Lead Speed, 2 GPS Speed, 3 Cluster Speed
     {"HondaAltDashboardDistance", {PERSISTENT | BACKUP, INT, "0"}},  // 0 Stock, 1 Radar, 2 Velocity
+    {"NrdrClearDashFaults", {PERSISTENT | BACKUP, BOOL, "1"}},       // zero FCM/icon faults + FCW chime on the cluster; OFF = stock passthrough
+    {"HondaSpoofCameraMessages", {PERSISTENT | BACKUP, BOOL, "0"}},  // dead camera: spoof CAMERA_MESSAGES (0x35E) to stop the Auto High Beam fault
     {"NrdrCruiseButtonSubMode", {PERSISTENT | BACKUP, BOOL, "1"}},   // Dynamic HUD: distance/set/resume buttons preview before acting
     {"NrdrCruiseButtonSubModeSecs", {PERSISTENT | BACKUP, INT, "15"}}, // sub-mode window length (5-60s); blink ramp spans the whole window
     {"NrdrHudSubModeUntil", {CLEAR_ON_MANAGER_START, FLOAT, "0"}},   // monotonic deadline of the active HUD sub-mode window

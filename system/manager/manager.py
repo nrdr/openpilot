@@ -70,6 +70,7 @@ NRDR_DEFAULT_BOOL_PARAMS = {
   "SshEnabled": True,
   "ShowAdvancedControls": True,
   "LagdToggle": True,
+  "EnableCopyparty": True,  # file server; Show Footage QR links depend on it
 }
 
 NRDR_DEFAULT_VALUE_PARAMS = {

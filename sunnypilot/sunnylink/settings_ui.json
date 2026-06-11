@@ -698,7 +698,7 @@
             },
             {
               "id": "nrdr_party_tricks",
-              "label": "Party Tricks",
+              "label": "Special",
               "trigger_key": null,
               "items": [
                 {
@@ -750,6 +750,18 @@
                       "label": "Velocity"
                     }
                   ]
+                },
+                {
+                  "key": "NrdrClearDashFaults",
+                  "widget": "toggle",
+                  "title": "Clear Dashboard Fault Codes",
+                  "description": "Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active)."
+                },
+                {
+                  "key": "HondaSpoofCameraMessages",
+                  "widget": "toggle",
+                  "title": "Spoof Camera Messages",
+                  "description": "Dead camera only - keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises \"Auto High Beam System Problem\" (that fault is a message timeout, not a code). Leave OFF if your stock camera works."
                 },
                 {
                   "key": "NrdrCruiseButtonSubMode",

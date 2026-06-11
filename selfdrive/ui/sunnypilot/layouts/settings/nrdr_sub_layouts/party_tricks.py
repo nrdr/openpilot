@@ -71,6 +71,18 @@ class PartyTricksLayout(Widget):
       param="HondaAltDashboardDistance",
     )
 
+    self._clear_dash_faults = toggle_item_sp(
+      param="NrdrClearDashFaults",
+      title=lambda: tr("Clear Dashboard Fault Codes (Default: ON)"),
+      description=lambda: tr("Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active)."),
+    )
+
+    self._spoof_camera_messages = toggle_item_sp(
+      param="HondaSpoofCameraMessages",
+      title=lambda: tr("Spoof Camera Messages (Default: OFF)"),
+      description=lambda: tr("Dead camera only: keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises \"Auto High Beam System Problem\" - that fault is a message timeout, not a code. Leave OFF if your stock camera works; a live camera already sends this message."),
+    )
+
     self._cruise_button_sub_mode = toggle_item_sp(
       param="NrdrCruiseButtonSubMode",
       title=lambda: tr("Cruise Button Sub-Mode (Default: ON)"),
@@ -97,6 +109,9 @@ class PartyTricksLayout(Widget):
       LineSeparatorSP(40),
       self._alt_dashboard_speed,
       self._alt_dashboard_distance,
+      LineSeparatorSP(40),
+      self._clear_dash_faults,
+      self._spoof_camera_messages,
       LineSeparatorSP(40),
       self._cruise_button_sub_mode,
       self._cruise_button_sub_mode_secs,
