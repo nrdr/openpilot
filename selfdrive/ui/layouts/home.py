@@ -315,7 +315,16 @@ class HomeLayout(Widget):
   def _maybe_show_first_run(self):
     # First boot only: two short, independent prompts (model, then maps). The home
     # screen only renders offroad, so no extra ignition check is needed.
-    if self._first_run_prompt_shown or self.params.get_bool("NrdrFirstRunSetupDone"):
+    if self._first_run_prompt_shown:
+      return
+    try:
+      first_run_done = self.params.get_bool("NrdrFirstRunSetupDone")
+    except Exception:
+      # Key not in this build's params registry (params lib not rebuilt for the new
+      # keys). Disable the first-run flow instead of crashing the UI every frame.
+      self._first_run_prompt_shown = True
+      return
+    if first_run_done:
       return
     self._first_run_prompt_shown = True
     self._show_first_run_model_prompt()
