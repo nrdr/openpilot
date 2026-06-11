@@ -393,7 +393,7 @@ sections:
       max: 3.0
       step: 0.01
   - id: nrdr_party_tricks
-    label: Party Tricks
+    label: Special
     trigger_key: null
     items:
     - key: HondaInjectionTest

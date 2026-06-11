@@ -1,14 +1,17 @@
 """
-nrdr Party Tricks sub-panel: fun / experimental dashboard and diagnostic toggles.
+nrdr "Special" sub-panel (formerly Party Tricks): dashboard designs, the Dynamic
+HUD, diagnostics, and the Show Footage QR flow.
 """
 from collections.abc import Callable
 import pyray as rl
 
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
+from openpilot.system.ui.widgets.list_view import button_item
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, multiple_button_item_sp, option_item_sp, LineSeparatorSP
+from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.footage import FootageLayout
 
 
 class PartyTricksLayout(Widget):
@@ -17,10 +20,27 @@ class PartyTricksLayout(Widget):
     self._back_button = NavButton(tr("Back"))
     self._back_button.set_click_callback(back_btn_callback)
 
+    self._showing_footage = False
+    self._footage_layout = FootageLayout(self._close_footage)
+
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
+  def _open_footage(self):
+    self._showing_footage = True
+    self._footage_layout.show_event()
+
+  def _close_footage(self):
+    self._showing_footage = False
+
   def _initialize_items(self):
+    self._show_footage_item = button_item(
+      lambda: tr("Show Footage"),
+      lambda: tr("OPEN"),
+      lambda: tr("Pick a drive and get a QR code that lets a phone on this device's hotspot (or the same Wi-Fi) watch the recorded video. Made for the roadside \"can I see the footage?\" moment."),
+      callback=self._open_footage,
+    )
+
     self._injection_test = toggle_item_sp(
       param="HondaInjectionTest",
       title=lambda: tr("Injection Test (Caution!) (Default: OFF)"),
@@ -71,6 +91,8 @@ class PartyTricksLayout(Widget):
     )
 
     return [
+      self._show_footage_item,
+      LineSeparatorSP(40),
       self._injection_test,
       LineSeparatorSP(40),
       self._alt_dashboard_speed,
@@ -90,10 +112,14 @@ class PartyTricksLayout(Widget):
     self._cruise_button_sub_mode_secs.set_visible(self._cruise_button_sub_mode.action_item.get_state())
 
   def _render(self, rect):
+    if self._showing_footage:
+      self._footage_layout.render(rect)
+      return
     self._back_button.set_position(self._rect.x, self._rect.y + 20)
     self._back_button.render()
     content_rect = rl.Rectangle(rect.x, rect.y + self._back_button.rect.height + 40, rect.width, rect.height - self._back_button.rect.height - 40)
     self._scroller.render(content_rect)
 
   def show_event(self):
+    self._showing_footage = False
     self._scroller.show_event()
