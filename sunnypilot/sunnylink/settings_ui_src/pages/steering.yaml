@@ -427,7 +427,19 @@ sections:
     - key: NrdrCruiseButtonSubMode
       widget: toggle
       title: Cruise Button Sub-Mode
-      description: Dynamic HUD - pressing the distance button or set/resume first wakes a 15-second preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed. The blink starts lazy and accelerates continuously until it cuts off.
+      description: Dynamic HUD - pressing the distance button or set/resume first wakes a preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed. The blink starts lazy and accelerates continuously until it cuts off.
+    - key: NrdrCruiseButtonSubModeSecs
+      widget: option
+      title: Sub-Mode Visibility Time
+      description: How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and rapid right before it falls off.
+      min: 5
+      max: 60
+      step: 1
+      unit: second
+      enablement:
+      - type: param
+        key: NrdrCruiseButtonSubMode
+        equals: true
   - id: nrdr_remote_actions
     label: Remote Actions
     trigger_key: null

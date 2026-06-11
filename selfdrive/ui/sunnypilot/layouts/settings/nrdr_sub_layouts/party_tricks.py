@@ -8,7 +8,7 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
-from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, multiple_button_item_sp, LineSeparatorSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, multiple_button_item_sp, option_item_sp, LineSeparatorSP
 
 
 class PartyTricksLayout(Widget):
@@ -60,6 +60,16 @@ class PartyTricksLayout(Widget):
                             "The blink starts lazy and accelerates continuously until it cuts off."),
     )
 
+    self._cruise_button_sub_mode_secs = option_item_sp(
+      param="NrdrCruiseButtonSubModeSecs",
+      title=lambda: tr("Sub-Mode Visibility Time (Default: 15s)"),
+      min_value=5,
+      max_value=60,
+      value_change_step=1,
+      description=lambda: tr("How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and rapid right before it falls off."),
+      label_callback=lambda value: f"{value}s",
+    )
+
     return [
       self._injection_test,
       LineSeparatorSP(40),
@@ -67,6 +77,7 @@ class PartyTricksLayout(Widget):
       self._alt_dashboard_distance,
       LineSeparatorSP(40),
       self._cruise_button_sub_mode,
+      self._cruise_button_sub_mode_secs,
     ]
 
   def _update_state(self):
@@ -75,6 +86,8 @@ class PartyTricksLayout(Widget):
     self._alt_dashboard_speed.action_item.set_enabled(True)
     self._alt_dashboard_distance.action_item.set_enabled(True)
     self._cruise_button_sub_mode.action_item.set_enabled(True)
+    # Visibility time only matters while the sub-mode itself is enabled.
+    self._cruise_button_sub_mode_secs.set_visible(self._cruise_button_sub_mode.action_item.get_state())
 
   def _render(self, rect):
     self._back_button.set_position(self._rect.x, self._rect.y + 20)
