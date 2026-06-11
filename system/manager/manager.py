@@ -79,6 +79,9 @@ NRDR_DEFAULT_VALUE_PARAMS = {
   # Steering
   "AutoLaneChangeTimer": 1,
 
+  # Longitudinal
+  "LongitudinalPersonality": 3,  # 0 aggressive, 1 standard, 2 relaxed, 3 econ
+
   # Cruise
   "SpeedLimitMode": 3,
   "SpeedLimitOffsetType": 1,
@@ -100,19 +103,49 @@ NRDR_DEFAULT_VALUE_PARAMS = {
 
 
 def apply_nrdr_default_params(params: Params) -> None:
-  """Apply nrdr fork defaults without overriding user-selected values."""
+  """Apply nrdr fork defaults without overriding user-selected values.
+
+  Every write is best-effort. A single unregistered/odd params key (e.g. on a
+  Comma 4, whose params handling differs) must never raise out of here and crash
+  manager_init -- that would leave the device stuck on the boot logo. Each write is
+  isolated so one bad key is logged and skipped instead of taking down the boot.
+  """
+  def _default_if_unset(key, value, setter):
+    try:
+      if params.get(key) is None:
+        setter(key, value)
+    except Exception:
+      cloudlog.exception("apply_nrdr_default_params: skipped default %s", key)
+
+  def _force(key, value, setter):
+    try:
+      setter(key, value)
+    except Exception:
+      cloudlog.exception("apply_nrdr_default_params: skipped %s", key)
+
   for key, value in NRDR_DEFAULT_BOOL_PARAMS.items():
-    if params.get(key) is None:
-      params.put_bool(key, value)
+    _default_if_unset(key, value, params.put_bool)
 
   for key, value in NRDR_DEFAULT_VALUE_PARAMS.items():
-    if params.get(key) is None:
-      params.put(key, value)
+    _default_if_unset(key, value, params.put)
 
   # nrdr is PID-only on these platforms. The Torque and NNLC lateral controllers are
   # hidden in the UI, so force them off every boot to guarantee PID lateral control.
-  params.put_bool("EnforceTorqueControl", False)
-  params.put_bool("NeuralNetworkLateralControl", False)
+  _force("EnforceTorqueControl", False, params.put_bool)
+  _force("NeuralNetworkLateralControl", False, params.put_bool)
+
+  # Satisfy onboarding here in manager_init (before the UI process starts) so terms /
+  # training / sunnylink prompts never show on a factory-fresh boot. Wrapped so a
+  # device that can't take one of these writes just skips it instead of failing to boot.
+  try:
+    from openpilot.system.version import terms_version, terms_version_sp, training_version, sunnylink_consent_version
+    _force("HasAcceptedTerms", terms_version, params.put)
+    _force("HasAcceptedTermsSP", terms_version_sp, params.put)
+    _force("CompletedTrainingVersion", training_version, params.put)
+    _force("CompletedSunnylinkConsentVersion", sunnylink_consent_version, params.put)
+    _force("SunnylinkEnabled", True, params.put_bool)
+  except Exception:
+    cloudlog.exception("apply_nrdr_default_params: onboarding defaults skipped")
 
 
 def manager_init() -> None:
