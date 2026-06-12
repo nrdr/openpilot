@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+export API_HOST=https://api.konik.ai
+export ATHENA_HOST=wss://athena.konik.ai
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -15,6 +17,15 @@ if [ "$MODEL" = "comma tici" ]; then
 
   # If it exists, run it
   exec "$C3_LAUNCH_SH"
+fi
+
+if is_device_runtime; then
+  # Recreate local developer helpers after branch switches, reinstalls, or factory resets.
+  if [[ -f "${DIR}/scripts/setup_dev_helpers.sh" ]]; then
+    bash "${DIR}/scripts/setup_dev_helpers.sh" || true
+  fi
+
+  exec ./launch_chffrplus.sh "$@"
 fi
 
 exec ./launch_chffrplus.sh
