@@ -43,7 +43,7 @@ class Controls(ControlsExt):
 
     self.sm = messaging.SubMaster(['liveDelay', 'liveParameters', 'liveTorqueParameters', 'modelV2', 'selfdriveState',
                                    'liveCalibration', 'livePose', 'longitudinalPlan', 'lateralManeuverPlan', 'carState', 'carOutput',
-                                   'driverMonitoringState', 'onroadEvents', 'driverAssistance', 'liveDelay'] + self.sm_services_ext,
+                                   'driverMonitoringState', 'onroadEvents', 'driverAssistance', 'radarState', 'liveDelay'] + self.sm_services_ext,
                                   poll='selfdriveState')
     self.pm = messaging.PubMaster(['carControl', 'controlsState'] + self.pm_services_ext)
 
@@ -77,13 +77,17 @@ class Controls(ControlsExt):
   def state_control(self):
     CS = self.sm['carState']
 
-    # Update VehicleModel
+    # Update VehicleModel. Each learned value can be turned off (Auto -> static base):
+    #   stiffness -> 1.0, steerRatio -> CP.steerRatio, angleOffset -> 0.0
     lp = self.sm['liveParameters']
-    x = max(lp.stiffnessFactor, 0.1)
-    sr = max(lp.steerRatio, 0.1)
+    stiffness = lp.stiffnessFactor if self.learn_stiffness else 1.0
+    steer_ratio = lp.steerRatio if self.learn_steer_ratio else self.CP.steerRatio
+    angle_offset = lp.angleOffsetDeg if self.learn_angle_offset else 0.0
+    x = max(stiffness, 0.1)
+    sr = max(steer_ratio, 0.1)
     self.VM.update_params(x, sr)
 
-    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - lp.angleOffsetDeg)
+    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - angle_offset)
     self.curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
 
     # Update Torque Params
@@ -98,6 +102,10 @@ class Controls(ControlsExt):
       self.LaC.extension.update_model_v2(self.sm['modelV2'])
 
       self.LaC.extension.update_lateral_lag(self.lat_delay)
+
+    elif self.CP.lateralTuning.which() == 'pid':
+      # Feed the planned trajectory to the PID controller for unwind lookahead.
+      self.LaC.update_model_v2(self.sm['modelV2'])
 
     long_plan = self.sm['longitudinalPlan']
     model_v2 = self.sm['modelV2']
@@ -180,6 +188,10 @@ class Controls(ControlsExt):
     hudControl.lanesVisible = CC.enabled
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
     hudControl.leadDistanceBars = self.sm['selfdriveState'].personality.raw + 1
+    # Lead range + absolute speed for dash lead displays (Honda Alternative Dashboard).
+    lead_one = self.sm['radarState'].leadOne
+    hudControl.leadDistance = float(lead_one.dRel) if lead_one.status else 0.0
+    hudControl.leadVLead = float(lead_one.vLead) if lead_one.status else 0.0
     hudControl.visualAlert = self.sm['selfdriveState'].alertHudVisual
 
     hudControl.rightLaneVisible = True
