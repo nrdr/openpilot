@@ -44,7 +44,7 @@ class MadsSettingsLayout(Widget):
 
   def _initialize_items(self):
     self._main_cruise_toggle = toggle_item_sp(
-      title=lambda: tr("Toggle with Main Cruise"),
+      title=lambda: tr("Enable with Main Cruise & Vehicle Startup"),
       description=MADS_MAIN_CRUISE_BASE_DESC,
       param="MadsMainCruiseAllowed",
     )
