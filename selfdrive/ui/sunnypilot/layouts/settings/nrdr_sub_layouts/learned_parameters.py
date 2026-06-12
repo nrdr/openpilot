@@ -22,10 +22,10 @@ class LearnedParametersLayout(Widget):
 
     # Read-only display of openpilot's learned live parameters.
     self._lp_text = {
-      "steerRatio": tr("learning…"),
-      "stiffnessFactor": tr("learning…"),
-      "angleOffsetAverageDeg": tr("learning…"),
-      "angleOffsetDeg": tr("learning…"),
+      "steerRatio": tr("learning..."),
+      "stiffnessFactor": tr("learning..."),
+      "angleOffsetAverageDeg": tr("learning..."),
+      "angleOffsetDeg": tr("learning..."),
     }
 
     items = self._initialize_items()
@@ -89,7 +89,7 @@ class LearnedParametersLayout(Widget):
       vals = None
 
     if vals is None:
-      self._lp_text = {k: tr("learning…") for k in self._lp_text}
+      self._lp_text = {k: tr("learning...") for k in self._lp_text}
     else:
       sr, sf, aoa, ao = vals
       self._lp_text = {
