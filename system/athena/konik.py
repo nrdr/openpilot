@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+import time
+import json
+import jwt
+
+from typing import cast
+from datetime import datetime, timedelta, UTC
+
+from openpilot.common.api import api_get, get_key_pair
+from openpilot.common.params import Params
+from openpilot.common.spinner import Spinner
+from openpilot.selfdrive.selfdrived.alertmanager import set_offroad_alert
+from openpilot.system.hardware import HARDWARE, PC
+from openpilot.common.swaglog import cloudlog
+
+
+UNREGISTERED_DONGLE_ID = "UnregisteredDevice"
+
+
+def is_registered_device() -> bool:
+  dongle = Params().get("DongleId")
+  return dongle not in (None, UNREGISTERED_DONGLE_ID)
+
+
+def register(show_spinner=False) -> str | None:
+  params = Params()
+
+  # Keep an already-valid dongle. Konik's pilotauth returns 403 for a device it
+  # already knows, so force-re-registering every boot (the old behavior) made a
+  # registered device fail and clobbered its DongleId to UnregisteredDevice,
+  # knocking it offline. Only register fresh when there is no valid dongle yet.
+  existing = params.get("DongleId")
+  if existing not in (None, UNREGISTERED_DONGLE_ID):
+    return existing
+
+  dongle_id: str | None = None
+
+  jwt_algo, private_key, public_key = get_key_pair()
+
+  if not public_key:
+    dongle_id = UNREGISTERED_DONGLE_ID
+    cloudlog.warning("missing public key")
+  elif dongle_id is None:
+    spinner = None
+    if show_spinner:
+      spinner = Spinner()
+      spinner.update("registering device")
+
+    serial = HARDWARE.get_serial()
+    start_time = time.monotonic()
+    imei1: str | None = None
+    imei2: str | None = None
+
+    while imei1 is None and imei2 is None:
+      try:
+        imei1, imei2 = HARDWARE.get_imei(0), HARDWARE.get_imei(1)
+      except Exception:
+        cloudlog.exception("Error getting imei, trying again...")
+        time.sleep(1)
+
+      if time.monotonic() - start_time > 60 and show_spinner and spinner is not None:
+        spinner.update(f"registering device - serial: {serial}, IMEI: ({imei1}, {imei2})")
+
+    backoff = 0
+    start_time = time.monotonic()
+
+    while True:
+      try:
+        register_token = jwt.encode(
+          {
+            "register": True,
+            "exp": datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=1),
+          },
+          cast(str, private_key),
+          algorithm=jwt_algo,
+        )
+
+        cloudlog.info("getting pilotauth")
+        resp = api_get(
+          "v2/pilotauth/",
+          method="POST",
+          timeout=15,
+          imei=imei1,
+          imei2=imei2,
+          serial=serial,
+          public_key=public_key,
+          register_token=register_token,
+        )
+
+        if resp.status_code in (402, 403):
+          cloudlog.info(f"Unable to register device, got {resp.status_code}")
+          dongle_id = UNREGISTERED_DONGLE_ID
+        else:
+          dongleauth = json.loads(resp.text)
+          dongle_id = dongleauth["dongle_id"]
+
+        break
+
+      except Exception:
+        cloudlog.exception("failed to authenticate")
+        backoff = min(backoff + 1, 15)
+        time.sleep(backoff)
+
+      if time.monotonic() - start_time > 60:
+        if show_spinner and spinner is not None:
+          spinner.update(f"registering device - serial: {serial}, IMEI: ({imei1}, {imei2})")
+
+        dongle_id = UNREGISTERED_DONGLE_ID
+        break
+
+    if show_spinner and spinner is not None:
+      spinner.close()
+
+  # Never clobber a previously-valid dongle with UnregisteredDevice on a failed
+  # attempt; only write the result when we got a real id, or when we had nothing.
+  if dongle_id == UNREGISTERED_DONGLE_ID and existing not in (None, UNREGISTERED_DONGLE_ID):
+    return existing
+
+  if dongle_id:
+    params.put("DongleId", dongle_id)
+    set_offroad_alert("Offroad_UnregisteredHardware", (dongle_id == UNREGISTERED_DONGLE_ID) and not PC)
+
+  return dongle_id
+
+
+if __name__ == "__main__":
+  print(register())
