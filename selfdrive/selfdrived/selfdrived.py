@@ -10,6 +10,7 @@ from msgq.visionipc import VisionIpcClient, VisionStreamType
 
 
 from openpilot.common.params import Params
+from openpilot.selfdrive.controls.lib.nrdr_hud_submode import consume_button_press
 from openpilot.common.realtime import config_realtime_process, Priority, Ratekeeper, DT_CTRL
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.gps import get_gps_location_service
@@ -476,9 +477,12 @@ class SelfdriveD(CruiseHelper):
     if self.CP.openpilotLongitudinalControl:
       if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
         if not self.experimental_mode_switched:
-          self.personality = (self.personality - 1) % 3
-          self.params.put('LongitudinalPersonality', self.personality)
-          self.events.add(EventName.personalityChanged)
+          # Dynamic HUD: the first press only opens the HUD sub-mode preview; only
+          # presses made while it's already open actually change the personality.
+          if consume_button_press(self.params):
+            self.personality = (self.personality - 1) % len(log.LongitudinalPersonality.schema.enumerants)
+            self.params.put('LongitudinalPersonality', self.personality)
+            self.events.add(EventName.personalityChanged)
         self.experimental_mode_switched = False
 
     self.icbm.run(CS, self.sm['carControl'], self.sm['longitudinalPlanSP'], self.is_metric)
