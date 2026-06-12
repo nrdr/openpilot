@@ -97,28 +97,37 @@ def _process_font(font_path: Path, codepoints: tuple[int, ...]):
   file_buf = rl.ffi.new("unsigned char[]", data)
   cp_buffer = rl.ffi.new("int[]", codepoints)
   cp_ptr = rl.ffi.cast("int *", cp_buffer)
-  # raylib changed LoadFontData across versions: newer builds (AGNOS 18.x venv) take a
-  # 7th glyph-count out-parameter, older ones (AGNOS 17.x and earlier) take 6 args.
-  # Try new-style first and fall back, so the same tree builds on every device.
+  # raylib changed LoadFontData across versions. New builds (AGNOS 18.x venv) take a
+  # 7th glyph-count out-parameter AND only return the glyphs actually found in the
+  # font - everything downstream must use that count, or we read past the array
+  # (atlas-resize spam, then segfault). Old builds (AGNOS 17.x and earlier) take 6
+  # args and always return len(codepoints) entries. Handle both.
   try:
     glyph_count_ptr = rl.ffi.new("int *", 0)
     glyphs = rl.load_font_data(rl.ffi.cast("unsigned char *", file_buf), len(data), font_size, cp_ptr, len(codepoints),
                                rl.FontType.FONT_DEFAULT, glyph_count_ptr)
+    glyph_count = int(glyph_count_ptr[0])
   except (RuntimeError, TypeError):
     glyphs = rl.load_font_data(rl.ffi.cast("unsigned char *", file_buf), len(data), font_size, cp_ptr, len(codepoints),
                                rl.FontType.FONT_DEFAULT)
-  if glyphs == rl.ffi.NULL:
+    glyph_count = len(codepoints)
+  if glyphs == rl.ffi.NULL or glyph_count <= 0:
     raise RuntimeError("raylib failed to load font data")
+  if glyph_count != len(codepoints):
+    print(f"  note: {len(codepoints) - glyph_count} requested glyphs are missing from {font_path.name}")
 
   rects_ptr = rl.ffi.new("Rectangle **")
-  image = rl.gen_image_font_atlas(glyphs, rects_ptr, len(codepoints), font_size, GLYPH_PADDING, 0)
+  image = rl.gen_image_font_atlas(glyphs, rects_ptr, glyph_count, font_size, GLYPH_PADDING, 0)
   if image.width == 0 or image.height == 0:
     raise RuntimeError("raylib returned an empty atlas")
 
   rects = rects_ptr[0]
   atlas_name = f"{font_path.stem}.png"
   atlas_path = FONT_DIR / atlas_name
-  entries, line_height, base = _glyph_metrics(glyphs, rects, codepoints)
+  # Map metrics by each glyph's own codepoint, not the requested list - with missing
+  # glyphs the two no longer line up index-for-index on new raylib.
+  found_codepoints = [int(glyphs[i].value) for i in range(glyph_count)]
+  entries, line_height, base = _glyph_metrics(glyphs, rects, found_codepoints)
 
   if not rl.export_image(image, atlas_path.as_posix()):
     raise RuntimeError("Failed to export atlas image")
