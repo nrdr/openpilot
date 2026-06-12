@@ -29,6 +29,7 @@ ACC_ENABLED_DESCRIPTION = tr_noop("Enable custom Short & Long press increments f
 ACC_NOLONG_DESCRIPTION = tr_noop("This feature can only be used with sunnypilot longitudinal control enabled.")
 ACC_PCMCRUISE_DISABLED_DESCRIPTION = tr_noop("This feature is not supported on this platform due to vehicle limitations.")
 ONROAD_ONLY_DESCRIPTION = tr_noop("Start the vehicle to check vehicle compatibility.")
+ACC_PENDING_DESCRIPTION = tr_noop("You can set this now. It activates once your car is detected and supports custom cruise increments.")
 
 
 class CruiseLayout(Widget):
@@ -144,28 +145,35 @@ class CruiseLayout(Widget):
 
       if has_long or has_icbm:
         self.custom_acc_toggle.action_item.set_enabled(((has_long and not ui_state.CP.pcmCruise) or has_icbm) and ui_state.is_offroad())
-        self.dec_toggle.action_item.set_enabled(has_long)
+        self.dec_toggle.action_item.set_enabled(has_long or ui_state.is_offroad())
         self.scc_v_toggle.action_item.set_enabled(True)
         self.scc_m_toggle.action_item.set_enabled(True)
       else:
-        ui_state.params.remove("CustomAccIncrementsEnabled")
-        ui_state.params.remove("DynamicExperimentalControl")
-        ui_state.params.remove("SmartCruiseControlVision")
-        ui_state.params.remove("SmartCruiseControlMap")
-        self.custom_acc_toggle.action_item.set_enabled(False)
-        self.dec_toggle.action_item.set_enabled(False)
-        self.scc_v_toggle.action_item.set_enabled(False)
-        self.scc_m_toggle.action_item.set_enabled(False)
+        # Capability not present yet (e.g. car not detected). Do NOT wipe the user's
+        # stored preferences; let them be edited offroad as pending choices that the
+        # control code only acts on once the car actually supports them.
+        editable = ui_state.is_offroad()
+        self.custom_acc_toggle.action_item.set_enabled(editable)
+        self.dec_toggle.action_item.set_enabled(editable)
+        self.scc_v_toggle.action_item.set_enabled(editable)
+        self.scc_m_toggle.action_item.set_enabled(editable)
 
     else:
       has_icbm = has_long = False
       self.icbm_toggle.action_item.set_enabled(False)
       self.icbm_toggle.set_description(tr(ONROAD_ONLY_DESCRIPTION))
+      # Car not detected yet: keep stored preferences and still allow setting them
+      # offroad as pending choices (activated once the car is detected).
+      editable = ui_state.is_offroad()
+      self.custom_acc_toggle.action_item.set_enabled(editable)
+      self.dec_toggle.action_item.set_enabled(editable)
+      self.scc_v_toggle.action_item.set_enabled(editable)
+      self.scc_m_toggle.action_item.set_enabled(editable)
 
     show_custom_acc_desc = False
 
     if ui_state.is_offroad():
-      new_custom_acc_desc = tr(ONROAD_ONLY_DESCRIPTION)
+      new_custom_acc_desc = tr(ACC_PENDING_DESCRIPTION)
       show_custom_acc_desc = True
     else:
       if has_long or has_icbm:
