@@ -27,6 +27,11 @@ class ControlsExt(ModelStateBase):
     self._param_update_time: float = 0.0
     self.blinker_pause_lateral = BlinkerPauseLateral()
 
+    # Auto/learn toggles for live vehicle params (default ON = use learned value).
+    self.learn_steer_ratio = True
+    self.learn_stiffness = True
+    self.learn_angle_offset = True
+
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
     cloudlog.info("controlsd_ext got CarParamsSP")
@@ -53,6 +58,12 @@ class ControlsExt(ModelStateBase):
 
       if self.CP.lateralTuning.which() == 'torque':
         self.lat_delay = get_lat_delay(self.params, sm["liveDelay"].lateralDelay)
+
+      # Auto/learn toggles. getBool() returns False for an UNSET param (it does get()=="1"
+      # with no default fallback), so default to ON (learn) unless explicitly set to "0".
+      self.learn_steer_ratio = self.params.get("NrdrLearnSteerRatio") != b"0"
+      self.learn_stiffness = self.params.get("NrdrLearnStiffness") != b"0"
+      self.learn_angle_offset = self.params.get("NrdrLearnAngleOffset") != b"0"
 
       self._param_update_time = time.monotonic()
 
