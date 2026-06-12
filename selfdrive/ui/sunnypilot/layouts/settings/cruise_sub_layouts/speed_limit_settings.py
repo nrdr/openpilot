@@ -123,7 +123,8 @@ class SpeedLimitSettingsLayout(Widget):
   def _update_state(self):
     super()._update_state()
 
-    speed_limit_mode_param = ui_state.params.get("SpeedLimitMode", return_default=True)
+    sla_disallow_in_release = False
+    sla_always_disallow = False
     if ui_state.CP is not None and ui_state.CP_SP is not None:
       brand = ui_state.CP.brand
       has_long = ui_state.has_longitudinal_control
@@ -139,18 +140,23 @@ class SpeedLimitSettingsLayout(Widget):
       sla_always_disallow = brand == "rivian"
       sla_available = (has_long or has_icbm) and not sla_disallow_in_release and not sla_always_disallow
 
-      if not sla_available and speed_limit_mode_param == int(SpeedLimitMode.assist):
-        ui_state.params.put("SpeedLimitMode", int(SpeedLimitMode.warning))
+      # Do NOT downgrade a stored Assist preference to Warning when the car isn't
+      # detected yet. It stays Assist (pending) and activates once the car supports it.
 
     else:
       sla_available = False
 
     if not sla_available:
-      self._speed_limit_mode.action_item.set_enabled_buttons({
+      enabled_buttons = {
         int(SpeedLimitMode.off),
         int(SpeedLimitMode.information),
         int(SpeedLimitMode.warning),
-      })
+      }
+      # Let the user pick Assist offroad as a pending preference (it activates once
+      # the car is detected with longitudinal control). Brand bans still apply.
+      if ui_state.is_offroad() and not sla_always_disallow and not sla_disallow_in_release:
+        enabled_buttons.add(int(SpeedLimitMode.assist))
+      self._speed_limit_mode.action_item.set_enabled_buttons(enabled_buttons)
     else:
       self._speed_limit_mode.action_item.set_enabled_buttons(None)
 
