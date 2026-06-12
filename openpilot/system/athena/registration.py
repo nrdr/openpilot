@@ -101,6 +101,22 @@ def register(show_spinner=False) -> str | None:
   if dongle_id:
     params.put("DongleId", dongle_id, block=True)
     set_offroad_alert("Offroad_UnregisteredHardware", (dongle_id == UNREGISTERED_DONGLE_ID) and not PC)
+
+    # nrdr: mirror a valid dongle to /persist/comma/dongle_id so it survives param
+    # wipes, factory resets, and fresh clones. register() reads this file as its
+    # fallback (above), so once it exists the device never has to re-register.
+    # This matters because konik's pilotauth returns 403 for a serial it already
+    # knows instead of re-issuing the existing dongle, so a device that loses its
+    # only cached copy can otherwise never recover. Write-once: never overwrite.
+    if dongle_id != UNREGISTERED_DONGLE_ID:
+      try:
+        dongle_path = Path(Paths.persist_root() + "/comma/dongle_id")
+        if not dongle_path.is_file():
+          dongle_path.parent.mkdir(parents=True, exist_ok=True)
+          dongle_path.write_text(dongle_id)
+      except Exception:
+        cloudlog.exception("failed to mirror dongle_id to persist")
+
   return dongle_id
 
 
