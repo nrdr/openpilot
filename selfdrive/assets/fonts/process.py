@@ -97,7 +97,16 @@ def _process_font(font_path: Path, codepoints: tuple[int, ...]):
   file_buf = rl.ffi.new("unsigned char[]", data)
   cp_buffer = rl.ffi.new("int[]", codepoints)
   cp_ptr = rl.ffi.cast("int *", cp_buffer)
-  glyphs = rl.load_font_data(rl.ffi.cast("unsigned char *", file_buf), len(data), font_size, cp_ptr, len(codepoints), rl.FontType.FONT_DEFAULT)
+  # raylib changed LoadFontData across versions: newer builds (AGNOS 18.x venv) take a
+  # 7th glyph-count out-parameter, older ones (AGNOS 17.x and earlier) take 6 args.
+  # Try new-style first and fall back, so the same tree builds on every device.
+  try:
+    glyph_count_ptr = rl.ffi.new("int *", 0)
+    glyphs = rl.load_font_data(rl.ffi.cast("unsigned char *", file_buf), len(data), font_size, cp_ptr, len(codepoints),
+                               rl.FontType.FONT_DEFAULT, glyph_count_ptr)
+  except (RuntimeError, TypeError):
+    glyphs = rl.load_font_data(rl.ffi.cast("unsigned char *", file_buf), len(data), font_size, cp_ptr, len(codepoints),
+                               rl.FontType.FONT_DEFAULT)
   if glyphs == rl.ffi.NULL:
     raise RuntimeError("raylib failed to load font data")
 
