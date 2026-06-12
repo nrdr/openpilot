@@ -385,6 +385,16 @@ class LateralTuningLayout(Widget):
       use_float_scaling=True,
     )
 
+    self._min_steer_speed = option_item_sp(
+      param="NrdrMinSteerSpeed",
+      title=lambda: tr("Minimum Steer Speed (Default: 0mph)"),
+      min_value=0,
+      max_value=45,
+      value_change_step=1,
+      description=lambda: tr("Below this speed no steering torque is commanded at all. 0 = steer at any speed (stock). For those who don't want the wheel moving at a standstill or parking-lot speeds."),
+      label_callback=lambda value: f"{value} mph",
+    )
+
     return [
       self._tune_report_item,
       self._pid_tune_info_item,
@@ -411,6 +421,8 @@ class LateralTuningLayout(Widget):
       self._steer_delta_limiter,
       self._steer_delta_up,
       self._steer_delta_down,
+      LineSeparatorSP(40),
+      self._min_steer_speed,
     ]
 
   def _update_state(self):

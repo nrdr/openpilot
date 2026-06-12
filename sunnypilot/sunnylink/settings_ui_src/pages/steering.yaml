@@ -292,6 +292,14 @@ sections:
       - type: param
         key: HondaSteerDeltaLimiter
         equals: true
+    - key: NrdrMinSteerSpeed
+      widget: option
+      title: Minimum Steer Speed
+      description: Below this speed no steering torque is commanded at all. 0 = steer at any speed (stock). For those who don't want the wheel moving at a standstill or parking-lot speeds.
+      min: 0
+      max: 45
+      step: 1
+      unit: mph
   - id: nrdr_override
     label: Override Tuning
     trigger_key: null
