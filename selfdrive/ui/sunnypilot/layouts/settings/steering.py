@@ -106,11 +106,8 @@ class SteeringLayout(Widget):
       self._blinker_control_toggle,
       self._blinker_control_options,
       self._blinker_reengage_delay,
-      LineSeparatorSP(40),
-      self._torque_control_toggle,
-      self._torque_customization_button,
-      LineSeparatorSP(40),
-      self._nnlc_toggle,
+      # Torque Lateral Control + NNLC are intentionally hidden: nrdr is PID-only on
+      # these platforms and exposing them caused confusion. Forced off in manager.py.
     ]
     return items
 
@@ -120,7 +117,6 @@ class SteeringLayout(Widget):
   def _update_state(self):
     super()._update_state()
 
-    torque_allowed = ui_state.CP is not None and ui_state.CP.steerControlType != car.CarParams.SteerControlType.angle
     if ui_state.CP is not None:
       mads_main_desc = self._mads_limited_desc if self._mads_settings_layout._mads_limited_settings() else self._mads_full_desc
       self._mads_toggle.set_description(f"<b>{mads_main_desc}</b><br><br>{self._mads_base_desc}")
@@ -131,12 +127,7 @@ class SteeringLayout(Widget):
     self._mads_settings_button.action_item.set_enabled(ui_state.is_offroad() and self._mads_toggle.action_item.get_state())
     self._blinker_control_options.set_visible(self._blinker_control_toggle.action_item.get_state())
     self._blinker_reengage_delay.set_visible(self._blinker_control_toggle.action_item.get_state())
-
-    enforce_torque_enabled = self._torque_control_toggle.action_item.get_state()
-    nnlc_enabled = self._nnlc_toggle.action_item.get_state()
-    self._nnlc_toggle.action_item.set_enabled(ui_state.is_offroad() and torque_allowed and not enforce_torque_enabled)
-    self._torque_control_toggle.action_item.set_enabled(ui_state.is_offroad() and torque_allowed and not nnlc_enabled)
-    self._torque_customization_button.action_item.set_enabled(self._torque_control_toggle.action_item.get_state())
+    # Torque/NNLC controls are hidden (PID-only); no enable/disable handling needed here.
 
   def _render(self, rect):
     if self._current_panel == PanelType.LANE_CHANGE:
