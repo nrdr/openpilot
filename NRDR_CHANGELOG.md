@@ -1,39 +1,24 @@
-sunnypilot Version 2026.002.000 (2026-06-28)
-========================
-* What's Changed (sunnypilot/sunnypilot)
-  * ui: update gates for certain toggles by @sunnyhaibin in https://github.com/sunnypilot/sunnypilot/pull/1830
-  * release: ignore upstream IsReleaseBranch by @sunnyhaibin in https://github.com/sunnypilot/sunnypilot/pull/1831
-  * manager: disable DEVELOPMENT_ONLY reset by @sunnyhaibin in https://github.com/sunnypilot/sunnypilot/pull/1833
-  * sunnylink: fix max time offroad values by @nayan8teen in https://github.com/sunnypilot/sunnypilot/pull/1835
-  * ui: show default model name by @nayan8teen in https://github.com/sunnypilot/sunnypilot/pull/1837
-  * sunnylink: add CarParams fallback for brand-specific capabilities by @sunnyhaibin in https://github.com/sunnypilot/sunnypilot/pull/1839
-  * sunnylink SDUI: tweak DisableUpdate param for clarity by @sunnyhaibin in https://github.com/sunnypilot/sunnypilot/pull/1842
-  * Revert "DM: Lancia Delta HF Integrale model" by @sunnyhaibin in https://github.com/sunnypilot/sunnypilot/pull/1849
-  * modeld_v2: safe model validation by @Discountchubbs in https://github.com/sunnypilot/sunnypilot/pull/1855
-  * Revert "deprecate `carState.brake`" for Honda Gas Interceptor by @mvl-boston in https://github.com/sunnypilot/sunnypilot/pull/1860
-  * sunnylink: deprecate legacy params metadata by @sunnyhaibin in https://github.com/sunnypilot/sunnypilot/pull/1862
-  * ui: reset Enforce Torque Control and NNLC if both are enabled by @sunnyhaibin in https://github.com/sunnypilot/sunnypilot/pull/1863
-* What's Changed (sunnypilot/opendbc)
-  * Rivian: suppress ACM hold-the-wheel warning during MADS-only lateral by @lukasloetkolben in https://github.com/sunnypilot/opendbc/pull/465
-  * Sync: `commaai/opendbc:master` → `sunnypilot/opendbc:master` by @sunnyhaibin in https://github.com/sunnypilot/opendbc/pull/479
-  * safety: add option to ignore frequency check for RX checks by @sunnyhaibin in https://github.com/sunnypilot/opendbc/pull/480
-  * Revert "deprecate carState.brake" for Honda Gas Interceptor by @mvl-boston in https://github.com/sunnypilot/opendbc/pull/481
-* New Contributors (sunnypilot/sunnypilot)
-  * @mvl-boston made their first contribution in https://github.com/sunnypilot/sunnypilot/pull/1860
-* Full Changelog: https://github.com/sunnypilot/sunnypilot/compare/v2026.001.007...v2026.002.000
-************************
-* Synced with commaai's openpilot (v0.11.1)
-  * master commit 69e2c321e49760e52f7983eaa0a5f77cb95de637 (June 02, 2026)
-* New driver monitoring model
-* Improved image processing pipeline for driver camera
-* Improved thermal policy for comma four
-* Acura MDX 2022-24 support thanks to mvl-boston!
-* Rivian R1S and R1T 2025 support thanks to lukasloetkolben!
+# nrdr branch — Changelog
+
 **Baseline:** `c93469ed00 🔧 Prerequisites` (2026-02-11)
 **Through:** `98a7320289 Live Long v2.0!` (HEAD, 2026-05-29)
 **Scope:** 72 commits on the `mvl-testing-05.28.2026` branch of `nrdr/openpilot`, plus the linked `opendbc` submodule (`nrdr/opendbc`).
 
 Grouped by area, newest work first. Hashes are the branch (parent-repo) commits; the opendbc section summarizes the submodule changes those pointers reference.
+
+---
+
+## Lateral tuning additions (post-2026-05-29, uncommitted/in-progress)
+
+- **Center Scale live param** — replaced the per-car `_center_taper_high()` lookup in `latcontrol_pid.py` with a live `HondaCenterScale` param (FLOAT, default 0.5; 0.01-step "Center Scale" slider under Lateral PID Tune Scale). Note: Clarity previously used 1.24 and Civic Bosch 0.25 via the lookup — those cars now default to 0.5 until the slider is set.
+- **Unwind Integrator Freeze** — opt-in `HondaUnwindFreeze` toggle (default OFF). When on, freezes the PID integrator while the desired angle is unwinding (`phase < -0.2`) and heading near center (`< 8°`), so it stops holding torque through the release. Applies regardless of hands-on state. Targets steady-state-error / "torque held into the exit" on the linear EPS.
+- **Unwind Lookahead** — opt-in `HondaUnwindLookahead` toggle (default OFF). Feeds `modelV2` into `latcontrol_pid` and reads the planned lateral-accel profile (~1s ahead) to anticipate the turn release *before* the instantaneous desired curvature drops. Ramps the unwind FF weight early and (with Unwind Freeze also on) freezes the integrator ahead of the release. Falls back to the backward-difference phase logic when the model frame is invalid. `controlsd.py` now feeds `modelV2` to the PID controller. Targets the late-unwind / late-phase-switch on intersections and curves.
+- Exposed in `nrdr.py` and the Sunnylink `steering.yaml`. `HondaCenterScale` (FLOAT), `HondaUnwindFreeze` (BOOL), `HondaUnwindLookahead` (BOOL) added to `params_keys.h` — C++, require a device recompile.
+- **Notch Filter (steering chatter)** — opt-in `HondaNotchEnabled` toggle (default OFF), with `HondaNotchFreq` (default 7.5 Hz) and `HondaNotchQ` (default 1.5). RBJ notch biquad in `carcontroller.py` (opendbc submodule), applied in series after the LPF and before the steer-delta limiter; resets when lat control is inactive. Targets a measured ~7 Hz EPS resonance (FFT of logged steering torque showed ~47% of >0.5 Hz energy in the 5–9 Hz band). Removes the chatter without the broadband lag a low-pass filter adds — verified in sim: 7.5 Hz → 0.0, 0.5–1.5 Hz control band → ~1.0. Exposed in `nrdr.py` + `steering.yaml`. Params are C++ → device recompile.
+- **nrdr UI restructured into sub-panels** — the flat nrdr panel is now a top-level page (learned-param display rows + three navigation buttons) leading to `Lateral Tuning`, `Override Tuning`, and `Longitudinal Tuning` sub-panels, mirroring the MADS/Torque sub-panel pattern. New device files: `nrdr_sub_layouts/{lateral,override,longitudinal}_tuning.py`; `nrdr.py` slimmed to the page + dispatch. `steering.yaml` restructured into three `sub_panels` (navigation-only, `trigger_key: null`) and `settings_ui.json` recompiled. All tuning descriptions rewritten from on-road testing.
+- **Live Learning Gas default is now platform-aware** — `carcontroller.py` defaults `HondaLiveLearningGas` ON for Bosch, OFF for Nidec (only applies when the param is unset).
+- **Sunnylink fix:** `settings_ui.json` is the compiled artifact the website reads; it must be regenerated via `compile_settings_ui.py` after any `steering.yaml` edit and committed. (Earlier missing-settings bug was a stale JSON that predated the yaml edits.)
+- **Learned-param Auto toggles** — `NrdrLearnSteerRatio`, `NrdrLearnStiffness`, `NrdrLearnAngleOffset` (BOOL, default ON/Auto). When a toggle is OFF, `controlsd.py` feeds the static base to the vehicle model instead of the live-learned value: steerRatio → `CP.steerRatio` (values.py spec), stiffness → `1.0`, angleOffset → `0.0`. Lets you bypass a drifted/garbage learned value that's hurting performance. Read on the `get_params_sp` cadence in `controlsd_ext.py` (raw `get() != b"0"` so unset = ON, sidestepping `getBool`'s false-when-unset behavior). Learning still runs in the background; toggles only choose whether the controller uses it. The learned values keep displaying for reference even when bypassed. Toggles on the nrdr main page (paired with the display rows) + Sunnylink Lateral Tuning panel.
 
 ---
 
