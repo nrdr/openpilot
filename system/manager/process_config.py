@@ -176,6 +176,9 @@ procs += [
   # Backup
   PythonProcess("backup_manager", "sunnypilot.sunnylink.backups.manager", and_(only_offroad, sunnylink_ready_shim)),
 
+  # nrdr remote actions (Sunnylink website "buttons": Force Update, Tune Scan)
+  PythonProcess("nrdr_remoted", "sunnypilot.nrdr.remoted", only_offroad),
+
   # mapd
   NativeProcess("mapd", Paths.mapd_root(), ["bash", "-c", f"{MAPD_PATH} > /dev/null 2>&1"], mapd_ready),
   PythonProcess("mapd_manager", "sunnypilot.mapd.mapd_manager", always_run),
