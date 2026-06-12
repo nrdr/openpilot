@@ -67,6 +67,8 @@ class NrdrLayout(Widget):
     return [
       self._learned_button,
       LineSeparatorSP(40),
+      self._radar_tryout,
+      LineSeparatorSP(40),
       self._lateral_button,
       LineSeparatorSP(40),
       self._override_button,
