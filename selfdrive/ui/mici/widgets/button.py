@@ -382,7 +382,14 @@ class BigMultiParamToggle(BigMultiToggle):
     self._load_value()
 
   def _load_value(self):
-    self.set_value(self._options[self._params.get(self._param) or 0])
+    # Clamp to a valid index. A param value past the end of options (e.g. an econ
+    # personality = 3 against a 3-option list) must never IndexError here -- this runs in
+    # the UI's __init__, so it would crash the UI on startup and crash-loop the device at
+    # the boot logo. Fall back to the first option on any out-of-range value.
+    idx = self._params.get(self._param) or 0
+    if not 0 <= idx < len(self._options):
+      idx = 0
+    self.set_value(self._options[idx])
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     super()._handle_mouse_release(mouse_pos)

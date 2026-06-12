@@ -6,6 +6,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.layouts.sidebar import Sidebar, SIDEBAR_WIDTH
 from openpilot.selfdrive.ui.layouts.home import HomeLayout
 from openpilot.selfdrive.ui.layouts.settings.settings import SettingsLayout, PanelType
+import openpilot.selfdrive.ui.layouts.settings.settings as OP
 from openpilot.selfdrive.ui.onroad.augmented_road_view import AugmentedRoadView
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from openpilot.selfdrive.ui.layouts.onboarding import OnboardingWindow
@@ -57,8 +58,7 @@ class MainLayout(Widget):
     self._sidebar.set_callbacks(on_settings=self._on_settings_clicked,
                                 on_flag=self._on_bookmark_clicked,
                                 open_settings=lambda: self.open_settings(PanelType.TOGGLES))
-    self._layouts[MainState.HOME]._setup_widget.set_open_settings_callback(lambda: self.open_settings(PanelType.FIREHOSE))
-    self._layouts[MainState.HOME].set_settings_callback(lambda: self.open_settings(PanelType.TOGGLES))
+    self._layouts[MainState.HOME].set_settings_callback(lambda: self.open_settings(OP.PanelType.NRDR))
     self._layouts[MainState.SETTINGS].set_callbacks(on_close=self._set_mode_for_state)
 
     for layout in (self._layouts[MainState.ONROAD], self._home_body_layout):
@@ -68,7 +68,12 @@ class MainLayout(Widget):
     ui_state.add_on_body_changed_callbacks(self._on_body_changed)
 
   def _update_layout_rects(self):
-    self._sidebar_rect = rl.Rectangle(self._rect.x, self._rect.y, SIDEBAR_WIDTH, self._rect.height)
+    self._sidebar_rect = rl.Rectangle(
+      self._rect.x,
+      self._rect.y,
+      SIDEBAR_WIDTH,
+      self._rect.height,
+    )
 
     x_offset = SIDEBAR_WIDTH if self._sidebar.is_visible else 0
     self._content_rect = rl.Rectangle(self._rect.x + x_offset, self._rect.y, self._rect.width - x_offset, self._rect.height)
@@ -76,7 +81,6 @@ class MainLayout(Widget):
   def _handle_onroad_transition(self):
     if ui_state.started != self._prev_onroad:
       self._prev_onroad = ui_state.started
-
       self._set_mode_for_state()
 
   def _set_mode_for_state(self):
@@ -90,7 +94,9 @@ class MainLayout(Widget):
       # Don't hide sidebar from interactive timeout
       if self._current_mode != MainState.ONROAD:
         self._sidebar.set_visible(False)
+
       self._set_current_layout(MainState.ONROAD)
+
     else:
       self._set_current_layout(MainState.HOME)
       self._sidebar.set_visible(True)
