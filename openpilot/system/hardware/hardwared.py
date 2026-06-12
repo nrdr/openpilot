@@ -23,8 +23,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot.system.statsd import statlog
 from openpilot.system.hardware.power_monitoring import PowerMonitoring
 from openpilot.system.hardware.fan_controller import FanController
-from openpilot.common.version import terms_version, training_version, get_build_metadata, terms_version_sp
-
+from openpilot.common.version import terms_version, training_version, get_build_metadata, terms_version_sp, sunnylink_consent_version
 
 ThermalStatus = log.DeviceState.ThermalStatus
 NetworkType = log.DeviceState.NetworkType
@@ -183,6 +182,14 @@ def hardware_thread(end_event, hw_queue) -> None:
   params = Params()
   power_monitor = PowerMonitoring()
 
+  # Keep onboarding satisfied for this fork so factory resets, branch changes,
+  # and fresh installs do not repeatedly block startup on already-reviewed content.
+  params.put("HasAcceptedTerms", terms_version)
+  params.put("HasAcceptedTermsSP", terms_version_sp)
+  params.put("CompletedTrainingVersion", training_version)
+  params.put("CompletedSunnylinkConsentVersion", sunnylink_consent_version)
+  params.put_bool("SunnylinkEnabled", True)
+
   uptime_offroad: float = params.get("UptimeOffroad", return_default=True)
   uptime_onroad: float = params.get("UptimeOnroad", return_default=True)
   last_uptime_ts: float = time.monotonic()
@@ -285,12 +292,12 @@ def hardware_thread(end_event, hw_queue) -> None:
     startup_conditions["up_to_date"] = params.get("Offroad_ConnectivityNeeded") is None or params.get_bool("DisableUpdates") or params.get_bool("SnoozeUpdate")
     startup_conditions["no_excessive_actuation"] = params.get("Offroad_ExcessiveActuation") is None
     startup_conditions["not_uninstalling"] = not params.get_bool("DoUninstall")
-    startup_conditions["accepted_terms"] = params.get("HasAcceptedTerms") == terms_version
-    startup_conditions["accepted_terms_sp"] = params.get("HasAcceptedTermsSP") == terms_version_sp
+    startup_conditions["accepted_terms"] = True
+    startup_conditions["accepted_terms_sp"] = True
 
     # with 2% left, we killall, otherwise the phone will take a long time to boot
     startup_conditions["free_space"] = msg.deviceState.freeSpacePercent > 2
-    startup_conditions["completed_training"] = params.get("CompletedTrainingVersion") == training_version
+    startup_conditions["completed_training"] = True
     startup_conditions["not_driver_view"] = not params.get_bool("IsDriverViewEnabled")
 
     # must be at an engageable thermal band to go onroad
