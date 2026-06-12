@@ -1,0 +1,105 @@
+import glob
+import json
+import os
+from SCons.Script import Value
+from openpilot.common.file_chunker import chunk_file, get_chunk_paths
+from tinygrad import Device
+
+Import('env', 'arch')
+chunker_file = File("#common/file_chunker.py")
+lenv = env.Clone()
+
+tinygrad_root = env.Dir("#").abspath
+tinygrad_files = ["#"+x for x in glob.glob(env.Dir("#tinygrad_repo").relpath + "/**", recursive=True, root_dir=tinygrad_root)
+                  if 'pycache' not in x and os.path.isfile(os.path.join(tinygrad_root, x))]
+
+def estimate_pickle_max_size(onnx_size):
+  return 1.2 * onnx_size  + 10 * 1024 * 1024  # 20% + 10MB is plenty
+
+# THREADS=0 is need to prevent bug: https://github.com/tinygrad/tinygrad/issues/14689
+# get fastest TG config
+available = set(Device.get_available_devices())
+# FIXME-SP: reset when we bump tg
+if False:  # 'CUDA' in available:
+  tg_backend = 'CUDA'
+  tg_flags = f'DEV={tg_backend}'
+elif 'QCOM' in available:
+  tg_backend = 'QCOM'
+  tg_flags = f'DEV={tg_backend} FLOAT16=1 NOLOCALS=1 JIT_BATCH_SIZE=0'
+else:
+  tg_backend = 'CPU' if arch == 'Darwin' else 'CPU CPU_LLVM=1'  # FIXME-SP: reset when we bump tg
+  tg_flags = f'DEV={tg_backend} THREADS=0'
+
+def write_tg_compiled_flags(target, source, env):
+  with open(str(target[0]), "w") as f:
+    json.dump({"DEV": tg_backend}, f)
+    f.write("\n")
+
+compiled_flags_node = lenv.Command(
+  File("models/tg_compiled_flags.json").abspath,
+  tinygrad_files + [Value(tg_backend)],
+  write_tg_compiled_flags,
+)
+
+# tinygrad calls brew which needs a $HOME in the env
+mac_brew_string = f'HOME={os.path.expanduser("~")}' if arch == 'Darwin' else ''
+
+# On prebuilt/release branches the compiled *_tinygrad.pkl artifacts ship committed and are
+# authoritative: a model is only compiled if its .onnx source exists AND its shipped artifacts
+# are absent. This covers two cases: the large driving-model .onnx sources are stripped from
+# the tree (can't compile), and dmonitoring_model whose .onnx IS present but whose committed
+# artifacts must win -- otherwise tg_compile registers it, chunk_file deletes the .pkl after
+# the first build, and any scons-cache eviction triggers a 20-40 min recompile on a later
+# cold boot. Same guard pattern as sunnypilot/modeld_v2/SConscript.
+ALL_MODELS = ['driving_vision', 'driving_policy', 'dmonitoring_model']
+def has_shipped_artifacts(m):
+  return all(os.path.exists(File(f"models/{m}{suffix}").abspath) for suffix in ("_tinygrad.pkl", "_metadata.pkl"))
+buildable_models = [m for m in ALL_MODELS if os.path.exists(File(f"models/{m}.onnx").abspath) and not has_shipped_artifacts(m)]
+for model_name in ALL_MODELS:
+  if model_name not in buildable_models:
+    assert has_shipped_artifacts(model_name), \
+      f"models/{model_name}.onnx is missing and shipped artifacts not found -- tree can neither build nor run this model"
+    print(f"modeld: using shipped artifacts for {model_name} (prebuilt branch)")
+
+# Get model metadata
+for model_name in buildable_models:
+  fn = File(f"models/{model_name}").abspath
+  script_files = [File(Dir("#selfdrive/modeld").File("get_model_metadata.py").abspath)]
+  cmd = f'{tg_flags} {mac_brew_string} python3 {Dir("#selfdrive/modeld").abspath}/get_model_metadata.py {fn}.onnx'
+  lenv.Command(fn + "_metadata.pkl", [fn + ".onnx"] + tinygrad_files + script_files + [compiled_flags_node], cmd)
+
+image_flag = {
+     'larch64': 'IMAGE=2',
+}.get(arch, 'IMAGE=0')
+script_files = [File(Dir("#selfdrive/modeld").File("compile_warp.py").abspath)]
+compile_warp_cmd = f'{tg_flags} {mac_brew_string} python3 {Dir("#selfdrive/modeld").abspath}/compile_warp.py '
+from openpilot.common.transformations.camera import _ar_ox_fisheye, _os_fisheye
+warp_targets = []
+for cam in [_ar_ox_fisheye, _os_fisheye]:
+  w, h = cam.width, cam.height
+  warp_targets += [File(f"models/warp_{w}x{h}_tinygrad.pkl").abspath, File(f"models/dm_warp_{w}x{h}_tinygrad.pkl").abspath]
+lenv.Command(warp_targets, tinygrad_files + script_files + [compiled_flags_node], compile_warp_cmd)
+
+def tg_compile(flags, model_name):
+  pythonpath_string = 'PYTHONPATH="${PYTHONPATH}:' + env.Dir("#tinygrad_repo").abspath + '"'
+  fn = File(f"models/{model_name}").abspath
+  pkl = fn + "_tinygrad.pkl"
+  onnx_path = fn + ".onnx"
+  chunk_targets = get_chunk_paths(pkl, estimate_pickle_max_size(os.path.getsize(onnx_path)))
+  compile_node = lenv.Command(
+    pkl,
+    [onnx_path] + tinygrad_files + [chunker_file, compiled_flags_node],
+    f'{pythonpath_string} {flags} {image_flag} python3 {Dir("#tinygrad_repo").abspath}/examples/openpilot/compile3.py {fn}.onnx {pkl}',
+  )
+  def do_chunk(target, source, env):
+    chunk_file(pkl, chunk_targets)
+  return lenv.Command(
+    chunk_targets,
+    compile_node,
+    do_chunk,
+  )
+
+# Compile small models
+for model_name in buildable_models:
+  tg_compile(tg_flags, model_name)
+
