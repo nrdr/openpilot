@@ -14,6 +14,6 @@ PCM_LONG_REQUIRED_MAX_SET_SPEED = {
 }
 
 CONFIRM_SPEED_THRESHOLD = {
-  True: 80,   # km/h
-  False: 50,  # mph
+  True: 10,   # km/h
+  False: 5,  # mph
 }
