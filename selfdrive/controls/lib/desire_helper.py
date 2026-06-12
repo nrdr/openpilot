@@ -10,6 +10,7 @@ TurnDirection = custom.ModelDataV2SP.TurnDirection
 
 LANE_CHANGE_SPEED_MIN = 20 * CV.MPH_TO_MS
 LANE_CHANGE_TIME_MAX = 10.
+LANE_CHANGE_NUDGE_TORQUE_THRESHOLD = 1200
 
 DESIRES = {
   LaneChangeDirection.none: {
@@ -84,7 +85,10 @@ class DesireHelper:
         # Update lane change direction
         self.lane_change_direction = self.get_lane_change_direction(carstate)
 
-        torque_applied = carstate.steeringPressed and \
+        # Keep lane-change nudge sensitivity aligned with the old driver-torque threshold,
+        # even if the platform raises steeringPressed elsewhere for override filtering.
+        torque_nudged = carstate.steeringPressed or abs(carstate.steeringTorque) > LANE_CHANGE_NUDGE_TORQUE_THRESHOLD
+        torque_applied = torque_nudged and \
                          ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
                           (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right))
 
