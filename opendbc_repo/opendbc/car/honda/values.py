@@ -193,7 +193,10 @@ class CAR(Platforms):
       HondaCarDocs("Honda Civic Hatchback 2019-21", "All", min_steer_speed=12. * CV.MPH_TO_MS),
     ],
     CarSpecs(mass=1326, wheelbase=2.7, steerRatio=15.38, centerToFrontRatio=0.4),  # steerRatio: 10.93 is end-to-end spec
-    {Bus.pt: 'honda_civic_hatchback_ex_2017_can_generated'},
+    # Bus.radar = the hand-written 36802-TBA Bosch FINE per-track DBC (0x280 block; range in B2:B3 of the
+    # b1 range-carrier header: 0x74 moving OR 0x94 stationary — see BOSCH_RADAR_HDR_TAG_SET).
+    # RX-parse only; AEB stays live. (Supersedes the dormant coarse 0x2C8/0x2C9 source.)
+    {Bus.pt: 'honda_civic_hatchback_ex_2017_can_generated', Bus.radar: 'honda_civic_bosch_radar'},
   )
   HONDA_CIVIC_BOSCH_DIESEL = HondaBoschPlatformConfig(
     [],  # don't show in docs
@@ -474,6 +477,12 @@ HONDA_BOSCH = CAR.with_flags(HondaFlags.BOSCH)
 HONDA_BOSCH_RADARLESS = CAR.with_flags(HondaFlags.BOSCH_RADARLESS)
 HONDA_BOSCH_CANFD = CAR.with_flags(HondaFlags.BOSCH_CANFD)
 HONDA_BOSCH_ALT_RADAR = CAR.with_flags(HondaFlags.BOSCH_ALT_RADAR)
+
+# fwdRadar firmware confirmed (on-car) to keep streaming the 0x280 fine-range objects under openpilot
+# longitudinal control (op-long does NOT mute this radar). ONLY a Civic Bosch reporting this radar fw is
+# kept radar-live for the 0x280 ingest; any other radar fw falls back to the stock path (radar off) for
+# safety. Substring match so fwVersion padding/null bytes don't matter.
+RADAR_FW_0X280_INGEST = b"36802-TBA-A160"
 HONDA_BOSCH_TJA_CONTROL = CAR.with_flags(HondaFlags.BOSCH_TJA_CONTROL)
 HONDA_LKAS_MINSPEED_CUTOFF = CAR.with_flags(HondaFlags.LKAS_MINSPEED_CUTOFF)
 

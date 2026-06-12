@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import numpy as np
 from opendbc.car import get_safety_config, structs, uds
+from openpilot.common.params import Params, UnknownKeyName
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.disable_ecu import disable_ecu
 from opendbc.car.honda.hondacan import CanBus
 from opendbc.car.honda.values import CarControllerParams, HondaFlags, CAR, HONDA_BOSCH, HONDA_BOSCH_CANFD, \
-                                                 HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_RADARLESS, HondaSafetyFlags
+                                                 HONDA_NIDEC_ALT_SCM_MESSAGES, HONDA_BOSCH_RADARLESS, HondaSafetyFlags, \
+                                                 RADAR_FW_0X280_INGEST
 from opendbc.car.honda.carcontroller import CarController
 from opendbc.car.honda.carstate import CarState
 from opendbc.car.honda.radar_interface import RadarInterface
@@ -55,6 +57,31 @@ class CarInterface(CarInterfaceBase):
       ret.alphaLongitudinalAvailable = True
       ret.openpilotLongitudinalControl = alpha_long
       ret.pcmCruise = not ret.openpilotLongitudinalControl
+
+      # 0x280 fine-range radar ingest is GATED on the confirmed radar firmware (RADAR_FW_0X280_INGEST in
+      # values.py). Only that radar keeps streaming 0x280 objects under op-long, so only it is kept
+      # radar-live (radarUnavailable=False); any other Civic Bosch radar fw keeps the standard HONDA_BOSCH
+      # path above (radarUnavailable=True) as the safe default. alpha-long/op-long are standard for all
+      # Bosch (set above). Factory AEB does NOT stay live under op-long (accepted). Fail-safe: if car_fw
+      # is empty/unknown the radar stays off.
+      #
+      # "Try-out" toggle (HondaCivicRadarTryout): lets a user enable the 0x280 radar on a Civic Bosch whose
+      # radar fw is NOT in the verified fingerprint list, without hand-adding firmware strings. The 0x280
+      # fine-range decode is cross-car validated (R2~0.99 across Civic Bosch radars), so a try-out radar is
+      # treated IDENTICALLY to a fingerprint-matched one: radar-live, and usable by op-long when the user
+      # enables experimental/alpha longitudinal (op-long stays = alpha_long, same as a matched car).
+      # EXPERIMENTAL: the decode is reverse-engineered and not validated on every individual car — the user
+      # must confirm lead distance/closing-rate before relying on it for longitudinal control.
+      try:
+        _tryout_enabled = Params().get_bool("HondaCivicRadarTryout")
+      except UnknownKeyName:
+        # stale prebuilt params_pyx.so that predates the key -- fail safe: radar try-out off
+        _tryout_enabled = False
+      _radar_tryout = candidate == CAR.HONDA_CIVIC_BOSCH and not docs and _tryout_enabled
+      _radar_fw_match = candidate == CAR.HONDA_CIVIC_BOSCH and \
+        any(fw.ecu == structs.CarParams.Ecu.fwdRadar and RADAR_FW_0X280_INGEST in fw.fwVersion for fw in car_fw)
+      if _radar_fw_match or _radar_tryout:
+        ret.radarUnavailable = False
     else:
       ret.safetyConfigs = [get_safety_config(structs.CarParams.SafetyModel.hondaNidec)]
       ret.openpilotLongitudinalControl = True
@@ -431,4 +458,4 @@ class CarInterface(CarInterfaceBase):
   def deinit(CP, can_recv, can_send):
     communication_control = bytes([uds.SERVICE_TYPE.COMMUNICATION_CONTROL, 0x80 | uds.CONTROL_TYPE.ENABLE_RX_ENABLE_TX,
                                    uds.MESSAGE_TYPE.NORMAL_AND_NETWORK_MANAGEMENT])
-    CarInterface.init(CP, can_recv, can_send, communication_control)
+    CarInterface.init(CP, None, can_recv, can_send, communication_control)
