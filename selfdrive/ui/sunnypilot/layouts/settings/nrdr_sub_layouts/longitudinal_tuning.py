@@ -98,6 +98,12 @@ class LongitudinalTuningLayout(Widget):
       use_float_scaling=True,
     )
 
+    self._radar_tryout = toggle_item_sp(
+      param="HondaCivicRadarTryout",
+      title=lambda: tr("Try Honda Bosch Radar (Default: OFF)"),
+      description=lambda: tr("EXPERIMENTAL — Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and treats this car like a fingerprint-matched radar car (radarUnavailable=False + the custom honda_civic_bosch_radar DBC). If you ALSO enable openpilot experimental/alpha longitudinal, this radar WILL feed openpilot's lead tracking and command braking/acceleration — exactly like a matched car. With openpilot longitudinal OFF (stock ACC) it is perception only. The 0x280 decode is reverse-engineered and cross-car validated (~0.99) but NOT verified on your specific car: before enabling openpilot longitudinal, VALIDATE that lead distance and closing-rate match reality. Honda Civic Bosch only. Leave OFF if unsure."),
+    )
+
     return [
       self._long_pid_tune_scale,
       self._static_feedforward_long,
@@ -109,6 +115,8 @@ class LongitudinalTuningLayout(Widget):
       self._stopping_decel_rate_long,
       self._v_ego_stopping,
       self._v_ego_starting,
+      LineSeparatorSP(40),
+      self._radar_tryout,
     ]
 
   def _update_state(self):
