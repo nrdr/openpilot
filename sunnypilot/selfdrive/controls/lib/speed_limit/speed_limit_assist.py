@@ -228,7 +228,15 @@ class SpeedLimitAssist:
     if self.state != SpeedLimitAssistState.preActive:
       return False
 
-    req_plus, req_minus = compare_cluster_target(self.v_cruise_cluster, self._speed_limit_final_last, self.is_metric)
+    honda_imperial = (not self.is_metric) and (
+      getattr(self.CP, "brand", "").lower() == "honda" or getattr(self.CP, "carName", "").lower() == "honda"
+    )
+    req_plus, req_minus = compare_cluster_target(
+      self.v_cruise_cluster,
+      self._speed_limit_final_last,
+      self.is_metric,
+      honda_imperial=honda_imperial
+    )
 
     return self._get_button_release(req_plus, req_minus)
 
