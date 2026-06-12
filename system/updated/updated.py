@@ -210,7 +210,10 @@ def handle_agnos_update() -> None:
   cloudlog.info(f"Beginning background installation for AGNOS {updated_version}")
   set_offroad_alert("Offroad_NeosUpdate", True)
 
-  manifest_path = os.path.join(OVERLAY_MERGED, "system/hardware/tici/agnos.json")
+  # AGNOS manifests are per-device: agnos.json is tici/tizi, the mici (comma 4)
+  # has its own image set. Never flash mici images on a C3/C3X (PR #3 lesson).
+  manifest_name = "agnos-mici.json" if HARDWARE.get_device_type() == "mici" else "agnos.json"
+  manifest_path = os.path.join(OVERLAY_MERGED, "system/hardware/tici", manifest_name)
   target_slot_number = get_target_slot_number()
   flash_agnos_update(manifest_path, target_slot_number, cloudlog)
   set_offroad_alert("Offroad_NeosUpdate", False)
