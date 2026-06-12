@@ -21,6 +21,10 @@ function agnos_init {
   if [ $(< /VERSION) != "$AGNOS_VERSION" ]; then
     AGNOS_PY="$DIR/system/hardware/tici/agnos.py"
     MANIFEST="$DIR/system/hardware/tici/agnos.json"
+    # mici (comma 4) flashes its own image set; agnos.json is tici/tizi only
+    if grep -q "comma mici" /sys/firmware/devicetree/base/model 2>/dev/null; then
+      MANIFEST="$DIR/system/hardware/tici/agnos-mici.json"
+    fi
     if $AGNOS_PY --verify $MANIFEST; then
       sudo reboot
     fi
