@@ -1,74 +1,96 @@
-![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
+# Night Rider Linear EPS Fork
 
-## 🌞 What is sunnypilot?
-[sunnypilot](https://github.com/sunnyhaibin/sunnypilot) is a fork of comma.ai's openpilot, an open source driver assistance system. sunnypilot offers the user a unique driving experience for over 300+ supported car makes and models with modified behaviors of driving assist engagements. sunnypilot complies with comma.ai's safety rules as accurately as possible.
+## Overview
 
-## 💭 Join our Community Forum
-Join the official sunnypilot community forum to stay up to date with all the latest features and be a part of shaping the future of sunnypilot!
-* https://community.sunnypilot.ai/
+This fork supports the Linear EPS firmware modification available for select Honda platforms.
 
-## Documentation
-https://docs.sunnypilot.ai/ is your one stop shop for everything from features to installation to FAQ about the sunnypilot
+Linearized EPS firmware alters the steering torque response characteristics. As a result, stock lateral tuning is not appropriate. This fork applies the required adjustments to support linear torque curves, along with additional refinements/QOL developed within the Honda Openpilot/Sunnypilot community.
 
-## 🚘 Running on a dedicated device in a car
-First, check out this list of items you'll need to [get started](https://community.sunnypilot.ai/t/getting-started-using-sunnypilot-in-your-supported-car/251).
+---
+
+## Recent Changes
+
+- **Tune Report with scoring & advice** — scan your drives on-device (or from Sunnylink) and get a 0–10 tuning score with plain-English findings and suggestions that name the exact slider to move. PID Tune Information shows your car's live kp/ki/kf.
+- **Dynamic HUD (Cruise Button Sub-Mode)** — distance / set / resume presses first wake a blinking preview of your personality and set speed on the real dashboard; only presses during the preview act. Adjustable 5–60 s window.
+- **Special panel** — Alternative Dashboard split into independent Speed (lead / GPS / cluster) and Distance (radar / velocity) designs that stay on the cluster permanently, Show Footage (QR a phone straight to your drive videos, roadside-ready), Clear Dashboard Fault Codes toggle, and dead-camera support that finally silences "Auto High Beam System Problem".
+- **Sunnylink Remote Actions** — fire Force Update or a Tune Scan from the website and watch status come back; econ 4th personality now shows there too.
+- **Per-device AGNOS** — comma 4 runs 18.4, C3X runs 18.3, C3 keeps its own lane; one branch safely serves all of them. Force Update drives the real updater chain end to end.
+
+---
+
+## Supported Platforms
+
+- Honda Civic (Nidec)
+- Honda Civic (Bosch)
+- Honda Clarity (Nidec)
+- Honda Pilot (Nidec, including dead/absent stock camera via Spoof Camera Messages)
+
+Devices: comma 3, comma 3X, comma 4 (per-device AGNOS and UI handling). Additional EPS firmware variants may be supported as they are validated.
+
+---
 
 ## Installation
-Next, refer to the sunnypilot community forum for [installation instructions](https://community.sunnypilot.ai/t/read-before-installing-sunnypilot/254), as well as a complete list of [Recommended Branch Installations](https://community.sunnypilot.ai/t/recommended-branch-installations/235).
 
-## 🎆 Pull Requests
-We welcome both pull requests and issues on GitHub. Bug fixes are encouraged.
+```
+installer.comma.ai/nrdr/nrdr-nightly
+```
 
-Pull requests should be against the most current `master` branch.
+`nrdr-nightly` always tracks the latest build. Dated `nrdr-staging-MM.DD.YYYY` branches are frozen daily snapshots. `nrdr-clean` is the same build minus the konik-specific pieces — it uploads to comma's servers (connect.comma.ai) for those staying in the stock ecosystem.
 
-## 📊 User Data
+---
 
-By default, sunnypilot uploads the driving data to comma servers. You can also access your data through [comma connect](https://connect.comma.ai/).
+## Recommended Device Configuration
 
-sunnypilot is open source software. The user is free to disable data collection if they wish to do so.
+- **Force Torque Controller:** OFF
+- **NNLC:** OFF
+- **Model:** PopV2
+- **Live Learning Delay:** ON
 
-sunnypilot logs the road-facing camera, CAN, GPS, IMU, magnetometer, thermal sensors, crashes, and operating system logs.
-The driver-facing camera and microphone are only logged if you explicitly opt-in in settings.
+---
 
-By using this software, you understand that use of this software or its related services will generate certain types of user data, which may be logged and stored at the sole discretion of comma. By accepting this agreement, you grant an irrevocable, perpetual, worldwide right to comma for the use of this data.
+## Steering Assist Activation Behavior
 
-## Licensing
+Configure steering assist activation according to preference:
 
-sunnypilot is released under the [MIT License](LICENSE). This repository includes original work as well as significant portions of code derived from [openpilot by comma.ai](https://github.com/commaai/openpilot), which is also released under the MIT license with additional disclaimers.
+### Activate on Every Startup
+```
+STEERING → CUSTOMIZE MADS → TOGGLE MADS WITH CRUISE MAIN: ON
+```
 
-The original openpilot license notice, including comma.ai’s indemnification and alpha software disclaimer, is reproduced below as required:
+### Activate Only After LKAS Button Press
+```
+STEERING → CUSTOMIZE MADS → TOGGLE MADS WITH CRUISE MAIN: OFF
+```
 
-> openpilot is released under the MIT license. Some parts of the software are released under other licenses as specified.
->
-> Any user of this software shall indemnify and hold harmless Comma.ai, Inc. and its directors, officers, employees, agents, stockholders, affiliates, subcontractors and customers from and against all allegations, claims, actions, suits, demands, damages, liabilities, obligations, losses, settlements, judgments, costs and expenses (including without limitation attorneys’ fees and costs) which arise out of, relate to or result from any use of this software by user.
->
-> **THIS IS ALPHA QUALITY SOFTWARE FOR RESEARCH PURPOSES ONLY. THIS IS NOT A PRODUCT.
-> YOU ARE RESPONSIBLE FOR COMPLYING WITH LOCAL LAWS AND REGULATIONS.
-> NO WARRANTY EXPRESSED OR IMPLIED.**
+---
 
-For full license terms, please see the [`LICENSE`](LICENSE) file.
+## Drive Uploads
 
-## 💰 Support sunnypilot
-If you find any of the features useful, consider becoming a [sponsor on GitHub](https://github.com/sponsors/sunnyhaibin) to support future feature development and improvements.
+This fork routes drive uploads through:
 
+```
+stable.konik.ai
+```
 
-By becoming a sponsor, you will gain access to exclusive content, early access to new features, and the opportunity to directly influence the project's development.
+---
 
+## Device Pairing / Offline Issues
 
-<h3>GitHub Sponsor</h3>
+If the device appears offline or cannot be paired, refer to:
 
-<a href="https://github.com/sponsors/sunnyhaibin">
-  <img src="https://user-images.githubusercontent.com/47793918/244135584-9800acbd-69fd-4b2b-bec9-e5fa2d85c817.png" alt="Become a Sponsor" width="300" style="max-width: 100%; height: auto;">
-</a>
-<br>
+https://community.sunnypilot.ai/t/using-stable-konik-or-any-other-hosted-routes/945
 
-<h3>PayPal</h3>
+---
 
-<a href="https://paypal.me/sunnyhaibin0850" target="_blank">
-<img src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="PayPal this" title="PayPal - The safer, easier way to pay online!" border="0" />
-</a>
-<br></br>
+## Important Notes
 
-Your continuous love and support are greatly appreciated! Enjoy 🥰
+- While running this fork, the device communicates with `stable.konik.ai` and does not connect to Comma servers.
+- When switching to another fork, always perform a factory reset first.
+  - This preserves your Comma Connect account.
+  - It reduces the risk of pairing or account-related issues.
 
-<span>-</span> Jason, Founder of sunnypilot
+---
+
+## Disclaimer
+
+This fork is intended for use with compatible Linear EPS firmware. Users are responsible for ensuring the correct firmware is installed prior to use. Running this fork without the appropriate EPS firmware will result in incorrect lateral control behavior.
