@@ -11,8 +11,8 @@ MAX_VEL_ERR = 5.0  # m/s
 MIN_STABLE_DELAY = 0.3
 
 # EU guidelines
-MAX_LATERAL_JERK = 5.0  # m/s^3
-MAX_LATERAL_ACCEL_NO_ROLL = 3.0  # m/s^2
+MAX_LATERAL_JERK = 10.0  # m/s^3
+MAX_LATERAL_ACCEL_NO_ROLL = 10.0  # m/s^2
 
 
 def should_stop(v_ego: float, a_target: float) -> bool:
