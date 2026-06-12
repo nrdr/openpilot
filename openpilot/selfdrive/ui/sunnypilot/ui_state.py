@@ -202,10 +202,12 @@ class UIStateSP:
       self.params.remove("NeuralNetworkLateralControl")
       self.params.remove("AlphaLongitudinalEnabled")
 
-    # No longitudinal control: no experimental mode or DEC
-    if not has_long:
-      self.params.remove("ExperimentalMode")
-      self.params.remove("DynamicExperimentalControl")
+    # NOTE: This used to remove ExperimentalMode and DynamicExperimentalControl
+    # whenever long control was absent. That wiped the user's stored preferences on
+    # the couch and during the boot race (has_long is briefly False before
+    # CarParamsPersistent loads), which is what made Experimental Mode "turn itself
+    # back off". We now keep the stored values; the longitudinal planner / DEC only
+    # act on them when the car actually has openpilot longitudinal control.
 
     # ICBM: clear if not available or if full longitudinal control is active
     if self.CP_SP is not None:
@@ -216,11 +218,10 @@ class UIStateSP:
       self.params.remove("IntelligentCruiseButtonManagement")
       self.has_icbm = False
 
-    # Cruise features requiring longitudinal or ICBM
-    if not (has_long or self.has_icbm):
-      self.params.remove("CustomAccIncrementsEnabled")
-      self.params.remove("SmartCruiseControlVision")
-      self.params.remove("SmartCruiseControlMap")
+    # NOTE: This used to remove CustomAccIncrementsEnabled / SmartCruiseControlVision /
+    # SmartCruiseControlMap when neither long nor ICBM was present, wiping couch-set
+    # preferences. They are kept now as pending preferences; the cruise / SCC
+    # controllers ignore them until the car actually supports the feature.
 
 
 class DeviceSP:
