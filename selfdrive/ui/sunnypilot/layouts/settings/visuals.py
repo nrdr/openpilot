@@ -135,14 +135,16 @@ class VisualsLayout(Widget):
 
     self._dev_ui_info.action_item.set_selected_button(ui_state.params.get("DevUIInfo", return_default=True))
 
+    self._chevron_info.action_item.set_selected_button(ui_state.params.get("ChevronInfo", return_default=True))
     if ui_state.has_longitudinal_control:
       self._chevron_info.set_description(tr(CHEVRON_INFO_DESCRIPTION["enabled"]))
-      self._chevron_info.action_item.set_selected_button(ui_state.params.get("ChevronInfo", return_default=True))
       self._chevron_info.action_item.set_enabled(True)
     else:
+      # No long control yet (e.g. car not detected): let the user pick offroad as a
+      # stored preference instead of forcing the value to 0. It activates once the
+      # car is detected with longitudinal control.
       self._chevron_info.set_description(tr(CHEVRON_INFO_DESCRIPTION["disabled"]))
-      self._chevron_info.action_item.set_enabled(False)
-      ui_state.params.put("ChevronInfo", 0)
+      self._chevron_info.action_item.set_enabled(ui_state.is_offroad())
 
   def _render(self, rect):
     self._scroller.render(rect)
