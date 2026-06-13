@@ -42,10 +42,7 @@ class PartyTricksLayout(Widget):
     # already-konik device cannot re-register (konik 403s a device it knows), so
     # a stray tap on a road trip would strand it. Require an explicit confirm.
     dialog = ConfirmDialog(
-      tr("Only use this if you switched FROM comma connect and the device won't come online on konik.\n\n"
-         "This clears your dongle ID and re-registers from scratch. A device already on konik will be "
-         "knocked OFFLINE and may not recover until it can register again. If you are already on konik, "
-         "press Cancel."),
+      tr("Re-register with konik? Clears the dongle ID and registers fresh. Only if the device won't come online."),
       tr("Re-register"),
       tr("Cancel"),
       callback=self._on_reregister_confirmed,
