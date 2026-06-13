@@ -277,6 +277,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"LatPidScaleHighway", {PERSISTENT | BACKUP, INT, "200"}},
     {"LongPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
+    {"NrdrAngleFfBoostEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrAngleFfBoost", {PERSISTENT | BACKUP, INT, "200"}},
     {"NrdrLearnSteerRatio", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrLearnStiffness", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrLearnAngleOffset", {PERSISTENT | BACKUP, BOOL, "0"}},

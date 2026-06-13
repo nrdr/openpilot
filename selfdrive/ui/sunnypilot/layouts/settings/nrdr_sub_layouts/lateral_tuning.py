@@ -281,6 +281,22 @@ class LateralTuningLayout(Widget):
       use_float_scaling=True,
     )
 
+    self._angle_ff_boost_toggle = toggle_item_sp(
+      param="NrdrAngleFfBoostEnabled",
+      title=lambda: tr("Angle Feedforward Boost (Default: OFF)"),
+      description=lambda: tr("Boosts feedforward torque on large steering angles, ramping in from 60° of desired angle to full strength at 80°. Adds large-turn authority without the jitter cost of higher P - feedforward follows the commanded angle, not the error, so it cannot amplify noise. Mostly felt in sharp low-speed turns; angles this large don't occur at speed."),
+    )
+
+    self._angle_ff_boost = option_item_sp(
+      param="NrdrAngleFfBoost",
+      title=lambda: tr("Angle Feedforward Boost Scale (Default: 200%)"),
+      min_value=100,
+      max_value=500,
+      value_change_step=5,
+      description=lambda: tr("Feedforward multiplier reached at full ramp (80°+ desired angle). 100% = no boost."),
+      label_callback=lambda value: f"{value}%",
+    )
+
     self._unwind_freeze = toggle_item_sp(
       param="HondaUnwindFreeze",
       title=lambda: tr("Unwind Integrator Freeze (Default: OFF)"),
@@ -413,6 +429,8 @@ class LateralTuningLayout(Widget):
       LineSeparatorSP(40),
       self._center_scale,
       self._center_boost_threshold,
+      self._angle_ff_boost_toggle,
+      self._angle_ff_boost,
       LineSeparatorSP(40),
       self._unwind_freeze,
       self._unwind_lookahead,
@@ -437,6 +455,8 @@ class LateralTuningLayout(Widget):
     self._lpf_tau_low.set_visible(lpf_enabled)
     self._lpf_tau_standard.set_visible(lpf_enabled)
     self._lpf_tau_highway.set_visible(lpf_enabled)
+
+    self._angle_ff_boost.set_visible(self._angle_ff_boost_toggle.action_item.get_state())
 
     notch_enabled = self._notch_enabled.action_item.get_state()
     self._notch_freq.set_visible(notch_enabled)

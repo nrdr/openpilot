@@ -30,6 +30,12 @@ _MPH_TO_MS = 0.44704
 _LAT_SCALE_LOW_MAX = 25.0 * _MPH_TO_MS    # below this -> low-speed scale
 _LAT_SCALE_STD_MAX = 50.0 * _MPH_TO_MS    # below this -> standard scale, else highway
 
+# Angle-based feedforward boost: ramps in linearly from START over RAMP degrees of
+# desired angle (full boost at START+RAMP). Angles this large only occur at low
+# speed, so no speed gate is needed.
+ANGLE_FF_BOOST_START_DEG = 60.0
+ANGLE_FF_BOOST_RAMP_DEG = 20.0
+
 
 def _lat_pid_scale_banded(v_ego: float, low: float, standard: float, highway: float) -> float:
   # Speed-banded lateral PID output scale. Hard bands mirror carcontroller.torque_lpf_tau
@@ -169,6 +175,8 @@ class LatControlPID(LatControl):
     self.unwind_lookahead_enabled = False
     self.injection_test_enabled = False  # Party Tricks: x9.99 PID scale stress test
     self.scale_excludes_kf = True  # when True, PID scale multiplies P+I only, not feedforward (StaticFeedforwardLateral, default ON)
+    self.angle_ff_boost_enabled = False
+    self.angle_ff_boost = 2.0  # multiplier at full ramp (runtime units; param stored as percent)
     self.model_v2 = None
     self.model_valid = False
 
@@ -240,6 +248,13 @@ class LatControlPID(LatControl):
       ff_multiplier = ff_scale + ff_unwind_weight * max(unwind_ff_boost - ff_scale, 0.0)
       ff *= ff_multiplier
 
+      # Angle-based feedforward boost: extra ff on large desired angles. FF follows the
+      # commanded angle rather than the error, so this adds large-turn authority without
+      # the jitter cost of higher P. Linear ramp avoids any torque step at the threshold.
+      if self.angle_ff_boost_enabled and self.angle_ff_boost > 1.0:
+        angle_ff_weight = min(max((abs_angle_des - ANGLE_FF_BOOST_START_DEG) / ANGLE_FF_BOOST_RAMP_DEG, 0.0), 1.0)
+        ff *= 1.0 + angle_ff_weight * (self.angle_ff_boost - 1.0)
+
       steering_pressed = CS.steeringPressed
       if self.is_eps_modified:
         self.eps_modified_steering_pressed_filter_s, steering_pressed = get_eps_modified_steering_pressed(
@@ -290,6 +305,10 @@ class LatControlPID(LatControl):
           3.0,
           0.0,
           10.0,
+        )
+        self.angle_ff_boost_enabled = self.params.get_bool("NrdrAngleFfBoostEnabled")
+        self.angle_ff_boost = get_param_float(
+          self.params, "NrdrAngleFfBoost", 2.0, 1.0, 5.0, scale=100.0,
         )
         self.unwind_freeze_enabled = self.params.get_bool("HondaUnwindFreeze")
         self.unwind_lookahead_enabled = self.params.get_bool("HondaUnwindLookahead")
