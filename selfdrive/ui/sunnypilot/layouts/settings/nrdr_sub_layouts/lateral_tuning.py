@@ -245,7 +245,7 @@ class LateralTuningLayout(Widget):
 
     self._lat_scale_highway = option_item_sp(
       param="LatPidScaleHighway",
-      title=lambda: tr("Highway PID Scale (50mph+) (Default: 100%)"),
+      title=lambda: tr("Highway PID Scale (50mph+) (Default: 200%)"),
       min_value=0,
       max_value=500,
       value_change_step=5,
