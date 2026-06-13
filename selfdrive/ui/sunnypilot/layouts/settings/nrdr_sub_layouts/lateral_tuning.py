@@ -151,10 +151,13 @@ class LateralTuningLayout(Widget):
       return tr("No car fingerprinted yet. Drive the car once so it can identify itself, then check back here.")
 
     try:
-      CP = car.CarParams.from_bytes(cp_bytes)
+      # pycapnp >= 2.x: from_bytes returns a context manager, not the message itself
+      with car.CarParams.from_bytes(cp_bytes) as CP:
+        return self._format_pid_tune_lines(CP)
     except Exception as e:
       return tr("Could not read the stored car parameters.") + f"<br><br>{e}"
 
+  def _format_pid_tune_lines(self, CP) -> str:
     lines = [f"<b>{CP.carFingerprint}</b>", ""]
 
     # Lateral tuning (interface.py values, as actually loaded for this car)
