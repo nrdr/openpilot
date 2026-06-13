@@ -42,7 +42,7 @@ def consume_button_press(params) -> bool:
       until = float(params.get("NrdrHudSubModeUntil") or 0.0)
     except (TypeError, ValueError):
       until = 0.0
-    params.put_nonblocking("NrdrHudSubModeUntil", now + _window_s(params))
+    params.put("NrdrHudSubModeUntil", now + _window_s(params))
     return until > now
   except Exception:
     return True
