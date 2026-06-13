@@ -25,9 +25,14 @@ def is_registered_device() -> bool:
 def register(show_spinner=False) -> str | None:
   params = Params()
 
-  # Force a fresh registration against the currently configured API_HOST.
-  # This intentionally ignores any existing comma DongleId stored in params
-  # or /persist so the Konik backend can issue its own dongle ID.
+  # Keep an already-valid dongle. Konik's pilotauth returns 403 for a device it
+  # already knows, so force-re-registering every boot (the old behavior) made a
+  # registered device fail and clobbered its DongleId to UnregisteredDevice,
+  # knocking it offline. Only register fresh when there is no valid dongle yet.
+  existing = params.get("DongleId")
+  if existing not in (None, UNREGISTERED_DONGLE_ID):
+    return existing
+
   dongle_id: str | None = None
 
   jwt_algo, private_key, public_key = get_key_pair()
@@ -105,6 +110,11 @@ def register(show_spinner=False) -> str | None:
 
     if show_spinner and spinner is not None:
       spinner.close()
+
+  # Never clobber a previously-valid dongle with UnregisteredDevice on a failed
+  # attempt; only write the result when we got a real id, or when we had nothing.
+  if dongle_id == UNREGISTERED_DONGLE_ID and existing not in (None, UNREGISTERED_DONGLE_ID):
+    return existing
 
   if dongle_id:
     params.put("DongleId", dongle_id)
