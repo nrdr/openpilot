@@ -40,9 +40,18 @@ restore_source_name() {
     git -C "$BUILD_DIR" remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git" 2>/dev/null || true
   fi
 
-  if [ "${RESTORE_SOURCE_NAME:-0}" = "1" ] && [ "${DELETE_BUILD_DIR_WHEN_DONE:-1}" = "1" ] && [ -d "$BUILD_DIR" ] && [ "$BUILD_DIR" != "$SRC_DIR" ]; then
+  # Only delete the built tree on a FULLY SUCCESSFUL run. On any failure (e.g. a
+  # push 408) the build is expensive (20-40 min) and must be preserved so the push
+  # can be retried without rebuilding. This is the guard that was missing.
+  if [ "$status" = "0" ] && [ "${RESTORE_SOURCE_NAME:-0}" = "1" ] && [ "${DELETE_BUILD_DIR_WHEN_DONE:-1}" = "1" ] && [ -d "$BUILD_DIR" ] && [ "$BUILD_DIR" != "$SRC_DIR" ]; then
     echo "[-] Removing runtime build tree $BUILD_DIR"
     rm -rf "$BUILD_DIR" || true
+  elif [ "$status" != "0" ] && [ -d "$BUILD_DIR/.git" ]; then
+    echo "[!] Run failed (status $status) - PRESERVING built tree at $BUILD_DIR (source parked at $SRC_DIR)."
+    echo "[!] Retry the push without rebuilding:"
+    echo "[!]   cd $BUILD_DIR && git remote set-url origin git@github.com:${GITHUB_USER}/${GITHUB_REPO}.git"
+    echo "[!]   git push -f origin ${RELEASE_BRANCH}:${RELEASE_BRANCH} && git push -f origin ${RELEASE_BRANCH}:${NIGHTLY_BRANCH:-nrdr-nightly}"
+    echo "[!] When done: rm -rf $BUILD_DIR && mv $SRC_DIR $BUILD_DIR && sudo reboot"
   fi
 
   if [ "${RESTORE_SOURCE_NAME:-0}" = "1" ] && [ -d "$SRC_DIR" ] && [ ! -e "$BUILD_DIR" ]; then
@@ -221,9 +230,30 @@ if [ "$PUSH" = "1" ]; then
   git remote set-url --push origin "$AUTH_REMOTE"
   set -x
 
+  # Harden the push. HTTP/2 multiplexing chokes on the ~450 MiB prebuilt pack and
+  # GitHub returns HTTP 408; HTTP/1.1 + a large buffer + a patient low-speed window
+  # is far more reliable over a slow uplink.
+  git config http.version HTTP/1.1
+  git config http.postBuffer 524288000
+  git config http.lowSpeedLimit 1000
+  git config http.lowSpeedTime 600
+
+  push_with_retry() {
+    local refspec="$1" tries=0
+    while :; do
+      if git push -f origin "$refspec"; then return 0; fi
+      tries=$((tries + 1))
+      [ "$tries" -ge 3 ] && return 1
+      echo "[!] push '$refspec' failed (try $tries/3); retrying in 15s..."
+      sleep 15
+    done
+  }
+
   # 1) Dated staging branch (kept), 2) nightly (overwritten every run).
-  git push -f origin "$RELEASE_BRANCH:$RELEASE_BRANCH"
-  git push -f origin "$RELEASE_BRANCH:$NIGHTLY_BRANCH"
+  # If either fails after retries, bail with status 1 so the trap PRESERVES the
+  # built tree (Fix above) instead of nuking it.
+  if ! push_with_retry "$RELEASE_BRANCH:$RELEASE_BRANCH"; then exit 1; fi
+  if ! push_with_retry "$RELEASE_BRANCH:$NIGHTLY_BRANCH"; then exit 1; fi
 
   # 3) nrdr-clean (overwritten every run): a fresh single commit whose tree never
   # contained the excluded changes. Failure here must not fail the whole build,
@@ -234,7 +264,7 @@ if [ "$PUSH" = "1" ]; then
     git checkout --orphan "$CLEAN_BRANCH"
     git add -f .
     git commit -m "openpilot v$VERSION prebuilt"
-    git push -f origin "$CLEAN_BRANCH:$CLEAN_BRANCH"
+    push_with_retry "$CLEAN_BRANCH:$CLEAN_BRANCH" || echo "[!] WARNING: $CLEAN_BRANCH push failed; staging/nightly are already up. Retry from $BUILD_DIR."
   else
     echo "[!] WARNING: skipping $CLEAN_BRANCH this run (see above); staging/nightly were pushed"
   fi
