@@ -2,14 +2,20 @@
 nrdr "Special" sub-panel (formerly Party Tricks): dashboard designs, the Dynamic
 HUD, diagnostics, and the Show Footage QR flow.
 """
+import os
+import subprocess
 from collections.abc import Callable
 import pyray as rl
 
+from openpilot.common.basedir import BASEDIR
+from openpilot.common.params import Params
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.list_view import button_item
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
+from openpilot.system.ui.sunnypilot.widgets.html_render import HtmlModalSP
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, multiple_button_item_sp, option_item_sp, LineSeparatorSP
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.footage import FootageLayout
 
@@ -23,8 +29,27 @@ class PartyTricksLayout(Widget):
     self._showing_footage = False
     self._footage_layout = FootageLayout(self._close_footage)
 
+    self._reregister_proc: subprocess.Popen | None = None
+
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
+
+  def _on_reregister(self):
+    if self._reregister_proc is not None:
+      return
+    # Clear the cached dongle so konik.register() does a fresh registration
+    # (it keeps an existing valid dongle otherwise). Mainly for comma->konik
+    # migrants; existing konik users never need this.
+    Params().remove("DongleId")
+    self._reregister_proc = subprocess.Popen(
+      ["python3", "-m", "openpilot.system.athena.konik"],
+      cwd=BASEDIR,
+    )
+    gui_app.push_widget(HtmlModalSP(text=tr("Re-registering with konik... this can take up to a minute. Check the connect status on the sidebar when it finishes.")))
+
+  def _poll_reregister(self):
+    if self._reregister_proc is not None and self._reregister_proc.poll() is not None:
+      self._reregister_proc = None
 
   def _open_footage(self):
     self._showing_footage = True
@@ -39,6 +64,13 @@ class PartyTricksLayout(Widget):
       lambda: tr("OPEN"),
       lambda: tr("Pick a drive and get a QR code that lets a phone on this device's hotspot (or the same Wi-Fi) watch the recorded video. Made for the roadside \"can I see the footage?\" moment."),
       callback=self._open_footage,
+    )
+
+    self._reregister_item = button_item(
+      lambda: tr("Re-register with konik"),
+      lambda: tr("RE-REGISTER"),
+      lambda: tr("Forces a fresh konik registration by clearing the cached dongle ID. Use this only if you switched from comma connect and the device won't come online on konik. Existing konik users never need this - your dongle is kept automatically."),
+      callback=self._on_reregister,
     )
 
     self._injection_test = toggle_item_sp(
@@ -104,6 +136,7 @@ class PartyTricksLayout(Widget):
 
     return [
       self._show_footage_item,
+      self._reregister_item,
       LineSeparatorSP(40),
       self._injection_test,
       LineSeparatorSP(40),
@@ -119,6 +152,7 @@ class PartyTricksLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
+    self._poll_reregister()
     self._injection_test.action_item.set_enabled(True)
     self._alt_dashboard_speed.action_item.set_enabled(True)
     self._alt_dashboard_distance.action_item.set_enabled(True)
