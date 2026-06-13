@@ -80,10 +80,18 @@ def get_uds_client(can_addr, bus):
 
   return uds_client
 
+def _normalize_app_id(value):
+  # TRW/Honda software IDs use '-' and ',' interchangeably as field separators,
+  # and the ECU reports them differently than they're stored in the .rwd headers
+  # (e.g. ECU 'b39990,TRW,A020' vs header 'b39990-TRW-A020'). Normalize both
+  # separators to ',' and drop trailing NULs so the lookup matches on content.
+  return value.replace(b'-', b',').rstrip(b'\x00')
+
 def get_seed_secret(fw, app_id):
   headers = fw.file_headers
+  target = _normalize_app_id(app_id)
   for i in range(len(headers[4].values)):
-    if headers[3].values[i].value == app_id:
+    if _normalize_app_id(headers[3].values[i].value) == target:
       return headers[4].values[i].value
 
   raise RuntimeError(f"Couldn't find software seed for software application ID {app_id}")
