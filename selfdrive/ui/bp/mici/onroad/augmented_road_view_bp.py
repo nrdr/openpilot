@@ -45,7 +45,6 @@ class MiciAugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
 
   def _render(self, _):
     """Override render to place confidence ball on left, offset driver state, and conditionally hide border."""
-    start_draw = time.monotonic()
     self._switch_stream_if_needed(ui_state.sm)
     self._update_calibration()
 
@@ -124,8 +123,3 @@ class MiciAugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
     if not ui_state.started:
       rl.draw_rectangle(int(self.rect.x), int(self.rect.y), int(self.rect.width), int(self.rect.height), rl.Color(0, 0, 0, 175))
       self._offroad_label.render(self._content_rect)
-
-    # Publish uiDebug
-    msg = messaging.new_message('uiDebug')
-    msg.uiDebug.drawTimeMillis = (time.monotonic() - start_draw) * 1000
-    self._pm.send('uiDebug', msg)

@@ -83,7 +83,6 @@ class AugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
 
   def _render(self, rect):
     """Override render to add blindspot, gauges, confidence ball on left."""
-    start_draw = time.monotonic()
     bp_ui_log.tick()
     if not ui_state.started:
       return
@@ -216,11 +215,6 @@ class AugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
     # BluePilot: Conditionally draw border
     if not self._hide_onroad_border:
       self._draw_border(rect)
-
-    # Publish uiDebug
-    msg = messaging.new_message('uiDebug')
-    msg.uiDebug.drawTimeMillis = (time.monotonic() - start_draw) * 1000
-    self._pm.send('uiDebug', msg)
 
   def _get_dm_center_y(self, content_rect: rl.Rectangle) -> float:
     """Get the driver monitor face icon's vertical center Y coordinate.

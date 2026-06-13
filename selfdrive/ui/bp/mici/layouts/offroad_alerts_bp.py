@@ -103,6 +103,9 @@ class MiciOffroadAlertsBP(Widget):
   def active_alerts(self) -> int:
     return sum(1 for a in self._sorted_alerts if a.visible)
 
+  def max_severity(self) -> int | None:
+    return max((a.severity for a in self._sorted_alerts if a.visible), default=None)
+
   def scrolling(self) -> bool:
     # Pager handles its own touch; report False so MainLayout doesn't gate.
     return False

@@ -184,9 +184,9 @@ class HybridBatteryGaugeArched(Widget):
 
       # 1) Battery arc background (continues powerflow arch on the left)
       bg_pts = arc_bar_pts(
-        cx, cy, bg_mid_radius, bg_height,
+        bg_mid_radius, bg_height,
         battery_start_angle, battery_end_angle
-      )
+      ) + np.array([cx, cy], dtype=np.float32)
       draw_polygon(rect, bg_pts, color=POWERFLOW_BG_COLOR)
 
       # 2) Battery arc border (outer and inner edges)
@@ -220,9 +220,9 @@ class HybridBatteryGaugeArched(Widget):
       bar_height = POWERFLOW_BAR_HEIGHT * s
       if animated_soc > 0.5:
         fill_pts = arc_bar_pts(
-          cx, cy, mid_r, bar_height,
+          mid_r, bar_height,
           fill_start_angle, fill_end_angle
-        )
+        ) + np.array([cx, cy], dtype=np.float32)
         draw_polygon(rect, fill_pts, color=fill_color)
 
       # SOC % text in center of upper half

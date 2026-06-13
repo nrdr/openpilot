@@ -179,7 +179,7 @@ class BluePilotLayoutMici(NavWidget):
           self._params.remove("ModelManager_ActiveBundle")
         except Exception:
           pass
-        self._params.put_bool_nonblocking("DoReboot", True)
+        self._params.put_bool("DoReboot", True)
         cloudlog.info("BluePilot: Cleared model cache (ModelRunnerTypeCache, ModelManager_ActiveBundle), triggered reboot")
 
     dialog = ConfirmDialog(

@@ -148,9 +148,9 @@ class PowerflowGauge(Widget):
 
       # Draw expanded powerflow arch background (includes text area)
       bg_pts = arc_bar_pts(
-        cx, cy, bg_mid_radius, bg_height,
+        bg_mid_radius, bg_height,
         powerflow_start_angle, powerflow_end_angle
-      )
+      ) + np.array([cx, cy], dtype=np.float32)
       draw_polygon(rect, bg_pts, color=POWERFLOW_BG_COLOR)
 
       # Draw border around the arch (outer and inner edges)
@@ -441,9 +441,9 @@ class PowerflowGauge(Widget):
 
     # Draw the power flow bar as an arc with solid color
     bar_pts = arc_bar_pts(
-      cx, cy, mid_r, POWERFLOW_BAR_HEIGHT,
+      mid_r, POWERFLOW_BAR_HEIGHT,
       bar_start_angle, bar_end_angle
-    )
+    ) + np.array([cx, cy], dtype=np.float32)
 
     # Draw with solid color instead of gradient
     draw_polygon(rect, bar_pts, color=bar_color)

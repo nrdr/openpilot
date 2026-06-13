@@ -37,6 +37,9 @@ class MiciHomeLayoutBP(Widget):
   def __init__(self):
     super().__init__()
     self._on_settings_click: Callable | None = None
+    self._on_alerts_click: Callable | None = None
+    self._alert_count_callback: Callable[[], int] | None = None
+    self._max_severity_callback: Callable[[], int | None] | None = None
 
     # Long-press state
     self._mouse_down_t: float | None = None
@@ -70,8 +73,17 @@ class MiciHomeLayoutBP(Widget):
     )
 
   # ---- public API mirroring MiciHomeLayout ----
-  def set_callbacks(self, on_settings: Callable | None = None):
+  def set_callbacks(
+      self,
+      on_settings: Callable | None = None,
+      on_alerts: Callable | None = None,
+      alert_count_callback: Callable[[], int] | None = None,
+      max_severity_callback: Callable[[], int | None] | None = None,
+  ):
     self._on_settings_click = on_settings
+    self._on_alerts_click = on_alerts
+    self._alert_count_callback = alert_count_callback
+    self._max_severity_callback = max_severity_callback
 
   # ---- mode helpers ----
   def _mode(self) -> str:

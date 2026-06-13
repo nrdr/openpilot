@@ -13,8 +13,6 @@ venv/
 a.out
 .hypothesis
 .cache/
-.lfsconfig
-.gitattributes
 bin/
 
 *.mp4
@@ -46,8 +44,10 @@ bin/
 config.json
 compile_commands.json
 compare_runtime*.html
+selfdrive/modeld/models/tg_input_devices.json
 
 # build artifacts
+docs_site/
 selfdrive/pandad/pandad
 cereal/services.h
 cereal/gen
@@ -67,9 +67,6 @@ htmlcov
 *.rlog
 
 build/
-
-# Local/generated; Python sources live in common/transformations/*.py
-common/transformations/transformations.cpp
 
 !**/.gitkeep
 
@@ -99,6 +96,7 @@ SKILL.md
 !.idea/tools/*
 !.run/*
 
-### Agent Info ###
+### BluePilot: local agent docs/tools (gitignored) ###
 bluepilot/agent_info/
 bluepilot/agent_tools/
+tools/jotpluggler/layouts/Path_Angle_Analysis.json

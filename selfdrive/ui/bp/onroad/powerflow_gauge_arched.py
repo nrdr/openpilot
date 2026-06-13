@@ -150,9 +150,9 @@ class PowerflowGaugeArched(Widget):
       bg_height = bg_top_radius - bg_bottom_radius
 
       bg_pts = arc_bar_pts(
-        cx, cy, bg_mid_radius, bg_height,
+        bg_mid_radius, bg_height,
         powerflow_start_angle, powerflow_end_angle
-      )
+      ) + np.array([cx, cy], dtype=np.float32)
       draw_polygon(rect, bg_pts, color=POWERFLOW_BG_COLOR)
 
       outer_radius = mid_r + line_h / 2
@@ -345,7 +345,7 @@ class PowerflowGaugeArched(Widget):
       bar_end_angle = min(bar_end_angle, end_angle)
       bar_color = POWERFLOW_DEMAND_COLOR
     bar_pts = arc_bar_pts(
-      cx, cy, mid_r, bar_height,
+      mid_r, bar_height,
       bar_start_angle, bar_end_angle
-    )
+    ) + np.array([cx, cy], dtype=np.float32)
     draw_polygon(rect, bar_pts, color=bar_color)

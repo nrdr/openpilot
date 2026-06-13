@@ -84,7 +84,7 @@ class BluePilotLayoutBP(BPSubPanel):
   def _clear_model_cache(self):
     self._params.remove("ModelRunnerTypeCache")
     self._params.remove("ModelManager_ActiveBundle")
-    self._params.put_bool_nonblocking("DoReboot", True)
+    self._params.put_bool("DoReboot", True)
 
   # ---- pages ----
   def _build_pages(self):

@@ -81,10 +81,9 @@ class TestFordSafetyBase(common.CarSafetyTest):
   MAX_CURVATURE_ERROR = 0.002
   CURVATURE_ERROR_MIN_SPEED = 10.0  # m/s
 
-  # Must match ford.h FORD_LIMITS (symmetric looser ROCs). Python control uses stricter up row in values_ext.
-  ANGLE_RATE_BP = [5., 16., 25.]
-  ANGLE_RATE_UP = [0.0025, 0.0014, 0.00018]
-  ANGLE_RATE_DOWN = [0.0025, 0.0014, 0.00018]
+  ANGLE_RATE_BP = [5., 25., 25.]
+  ANGLE_RATE_UP = [0.00045, 0.0001, 0.0001]  # windup limit
+  ANGLE_RATE_DOWN = [0.00045, 0.00015, 0.00015]  # unwind limit
 
   cnt_speed = 0
   cnt_speed_2 = 0
@@ -392,7 +391,7 @@ class TestFordSafetyBase(common.CarSafetyTest):
           with self.subTest("main_button_msg_valid", state_valid=main_button_msg_valid):
             self.safety.set_mads_params(enable_mads, False, False)
             self._rx(self._pcm_status_msg(main_button_msg_valid))
-            self.assertEqual(enable_mads and main_button_msg_valid, self.safety.get_controls_allowed_lat())
+            self.assertEqual(enable_mads and main_button_msg_valid, self.safety.get_controls_allowed_lateral())
 
 
 class TestFordCANFDStockSafety(TestFordSafetyBase):

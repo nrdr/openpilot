@@ -27,7 +27,7 @@ class AuroraWordmark(Widget):
     self._label = UnifiedLabel(
       "bluepilot",
       font_size=P.FS_WORDMARK,
-      font_weight=FontWeight.DISPLAY,
+      font_weight=FontWeight.AUDIOWIDE,
       text_color=P.WORDMARK_BLUE,
       max_width=520,
       wrap_text=False,
@@ -60,7 +60,7 @@ class AuroraWordmark(Widget):
       # Three radial passes give a soft falloff with fixed-cost circle draws.
       for r_mul, alpha_mul in ((1.00, 1.00), (0.62, 0.85), (0.35, 0.70)):
         col = rl.Color(inner.r, inner.g, inner.b, int(inner.a * alpha_mul))
-        rl.draw_circle_gradient(int(cx), int(cy), radius * r_mul, col, P.AURORA_OUTER)
+        rl.draw_circle_gradient(rl.Vector2(int(cx), int(cy)), radius * r_mul, col, P.AURORA_OUTER)
 
     # ---- Wordmark ----
     # UnifiedLabel doesn't expose center alignment cleanly with wrap_text=False,

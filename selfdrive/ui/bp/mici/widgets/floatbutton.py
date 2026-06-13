@@ -70,7 +70,7 @@ class BigParamFloatControl(BigButtonBP):
     elif self.max is not None and value > self.max:
       value = self.max
 
-    self.params.put_nonblocking(self.param, value)
+    self.params.put(self.param, value)
     self.update_label(value)
 
   def update_label(self, value: float = None):
@@ -182,7 +182,7 @@ class BigParamIntControl(BigButtonBP):
     elif self.max is not None and value > self.max:
       value = self.max
 
-    self.params.put_nonblocking(self.param, value)
+    self.params.put(self.param, value)
     self.update_label(value)
 
   def update_label(self, value: int = None):

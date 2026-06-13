@@ -61,7 +61,7 @@ class FloatControlAction(ItemAction):
     """Set parameter value."""
     # Clamp to min/max
     value = max(self.min_value, min(self.max_value, value))
-    self.params.put_nonblocking(self.param, value)
+    self.params.put(self.param, value)
     if self.callback:
       self.callback(value)
   

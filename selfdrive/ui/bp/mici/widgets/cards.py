@@ -253,12 +253,12 @@ class BigMultiToggleCard(Widget):
       # at construction time, so try int first (covers LongitudinalPersonality,
       # mici_complication, etc.), then fall back to bool for 2-option keys.
       try:
-        self._params.put_nonblocking(self._param_key, int(self._idx))
+        self._params.put(self._param_key, int(self._idx))
       except TypeError:
         try:
-          self._params.put_bool_nonblocking(self._param_key, bool(self._idx))
+          self._params.put_bool(self._param_key, bool(self._idx))
         except TypeError:
-          self._params.put_nonblocking(self._param_key, str(self._idx))
+          self._params.put(self._param_key, str(self._idx))
     if self._on_change:
       self._on_change(self._idx)
 

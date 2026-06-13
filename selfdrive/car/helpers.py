@@ -42,7 +42,7 @@ def convert_to_capnp(struct: structs.CarParamsSP | structs.CarStateSP | structs.
     struct_capnp = custom.CarParamsSP.new_message(**struct_dict)
   elif isinstance(struct, structs.CarStateSP):
     struct_capnp = custom.CarStateSP.new_message(**struct_dict)
-  elif isinstance(struct, structs.ControllerStateBP):
+  elif isinstance(struct, structs.ControllerStateBP):  # BluePilot: controllerStateBP (lateral uncertainty)
     struct_capnp = custom.ControllerStateBP.new_message(**struct_dict)
   else:
     raise ValueError(f"Unsupported struct type: {type(struct)}")

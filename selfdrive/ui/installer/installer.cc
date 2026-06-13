@@ -6,7 +6,7 @@
 #include "common/swaglog.h"
 #include "common/util.h"
 #include "system/hardware/hw.h"
-#include "third_party/raylib/include/raylib.h"
+#include "raylib.h"
 
 int freshClone();
 int cachedFetch(const std::string &cache);
@@ -144,6 +144,7 @@ int cachedFetch(const std::string &cache) {
   LOGD("Fetching with cache: %s", cache.c_str());
 
   run(util::string_format("cp -rp %s %s", cache.c_str(), TMP_INSTALL_PATH).c_str());
+  run(util::string_format("cd %s && git remote set-url origin %s", TMP_INSTALL_PATH, GIT_URL.c_str()).c_str());
   run(util::string_format("cd %s && git remote set-branches --add origin %s", TMP_INSTALL_PATH, migrated_branch.c_str()).c_str());
 
   renderProgress(10);

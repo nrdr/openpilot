@@ -1,3 +1,4 @@
+# BluePilot: collections used by STEER_ASSIST_DATA radar tracking
 import collections
 import numpy as np
 from typing import cast
@@ -16,6 +17,7 @@ DELPHI_ESR_RADAR_MSGS = list(range(0x500, 0x540))
 DELPHI_MRR_RADAR_START_ADDR = 0x120
 DELPHI_MRR_RADAR_HEADER_ADDR = 0x174  # MRR_Header_SensorCoverage
 DELPHI_MRR_RADAR_MSG_COUNT = 64
+# BluePilot: DELPHI_MRR_64 / STEER_ASSIST_DATA radar constants
 DELPHI_MRR_RADAR_MSG_COUNT_64 = 22  # 22 messages in CANFD
 
 DELPHI_MRR_RADAR_RANGE_COVERAGE = {0: 42, 1: 164, 2: 45, 3: 175}  # scan index to detection range (m)
@@ -92,6 +94,7 @@ def _create_delphi_mrr_radar_can_parser(CP) -> CANParser:
   return CANParser(RADAR.DELPHI_MRR, messages, CanBus(CP).radar)
 
 
+# BluePilot: CAN-FD 64-message MRR (DELPHI_MRR_64) radar parser
 def _create_delphi_mrr_radar_can_parser_64(CP) -> CANParser:
   messages = []
 
@@ -101,6 +104,7 @@ def _create_delphi_mrr_radar_can_parser_64(CP) -> CANParser:
 
   return CANParser(RADAR.DELPHI_MRR_64, messages, CanBus(CP).radar)
 
+# BluePilot: Steer_Assist_Data (Cmbb) pseudo-radar parser
 def _create_steer_assist_data(CP) -> CANParser:
   messages = [("Steer_Assist_Data", 20)]
   return CANParser(RADAR.STEER_ASSIST_DATA, messages, CanBus(CP).camera)
@@ -111,6 +115,7 @@ class RadarInterface(RadarInterfaceBase):
 
     self.points: list[list[float]] = []
     self.clusters: list[Cluster] = []
+    # BluePilot: vRel history buffer for STEER_ASSIST_DATA
     self.vRelCol = {}
 
     self.updated_messages = set()
@@ -128,6 +133,7 @@ class RadarInterface(RadarInterfaceBase):
     elif self.radar == RADAR.DELPHI_MRR:
       self.rcp = _create_delphi_mrr_radar_can_parser(CP)
       self.trigger_msg = DELPHI_MRR_RADAR_HEADER_ADDR
+    # BluePilot: DELPHI_MRR_64 / STEER_ASSIST_DATA radar setup branches
     elif self.radar == RADAR.DELPHI_MRR_64:
       self.rcp = _create_delphi_mrr_radar_can_parser_64(CP)
       self.trigger_msg = DELPHI_MRR_RADAR_START_ADDR + DELPHI_MRR_RADAR_MSG_COUNT_64 - 1
@@ -158,6 +164,7 @@ class RadarInterface(RadarInterfaceBase):
       _update = self._update_delphi_mrr(ret)
       if not _update:
         return None
+    # BluePilot: DELPHI_MRR_64 / STEER_ASSIST_DATA radar update branches
     elif self.radar == RADAR.DELPHI_MRR_64:
       _update = self._update_delphi_mrr_64(ret)
       if not _update:
@@ -170,6 +177,7 @@ class RadarInterface(RadarInterfaceBase):
     ret.points = list(self.pts.values())
     return ret
 
+  # BluePilot: Steer_Assist_Data (Cmbb) radar point update
   def _update_steer_assist_data(self):
     msg = self.rcp.vl["Steer_Assist_Data"]
 
@@ -316,6 +324,7 @@ class RadarInterface(RadarInterfaceBase):
     self.do_clustering()
     return True
 
+  # BluePilot: DELPHI_MRR_64 radar update
   def _update_delphi_mrr_64(self, ret: structs.RadarData):
     # Ensure all point IDs match. Note that this message is sent first, but trigger_msg waits for the last message to come in
     headerScanIndex = int(self.rcp.vl["MRR_Detection_001"]['CAN_SCAN_INDEX_2LSB_01_01'])
