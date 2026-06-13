@@ -11,7 +11,8 @@ from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
-from openpilot.system.ui.widgets import Widget
+from openpilot.system.ui.widgets import Widget, DialogResult
+from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.system.ui.widgets.list_view import button_item
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
@@ -37,9 +38,25 @@ class PartyTricksLayout(Widget):
   def _on_reregister(self):
     if self._reregister_proc is not None:
       return
+    # Two-tap guard: this knocks a device offline until it re-registers, and an
+    # already-konik device cannot re-register (konik 403s a device it knows), so
+    # a stray tap on a road trip would strand it. Require an explicit confirm.
+    dialog = ConfirmDialog(
+      tr("Only use this if you switched FROM comma connect and the device won't come online on konik.\n\n"
+         "This clears your dongle ID and re-registers from scratch. A device already on konik will be "
+         "knocked OFFLINE and may not recover until it can register again. If you are already on konik, "
+         "press Cancel."),
+      tr("Re-register"),
+      tr("Cancel"),
+      callback=self._on_reregister_confirmed,
+    )
+    gui_app.push_widget(dialog)
+
+  def _on_reregister_confirmed(self, result: DialogResult):
+    if result != DialogResult.CONFIRM or self._reregister_proc is not None:
+      return
     # Clear the cached dongle so konik.register() does a fresh registration
-    # (it keeps an existing valid dongle otherwise). Mainly for comma->konik
-    # migrants; existing konik users never need this.
+    # (it keeps an existing valid dongle otherwise).
     Params().remove("DongleId")
     self._reregister_proc = subprocess.Popen(
       ["python3", "-m", "openpilot.system.athena.konik"],
