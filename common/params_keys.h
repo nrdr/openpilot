@@ -319,6 +319,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrRemoteTuneScan", {CLEAR_ON_MANAGER_START, BOOL, "0"}},     // website "button": run tune_report.py
     {"NrdrRemoteStatus", {CLEAR_ON_MANAGER_START, STRING, "idle"}},  // remote action status line shown on the website
     {"NrdrTuneReportSummary", {PERSISTENT, STRING, ""}},             // per-speed summary table from the last tune scan
+    {"NrdrCarTuneInfo", {PERSISTENT, STRING, ""}},                   // Car & Tune Info readout for the Sunnylink info row (written by nrdr_remoted)
     {"HondaCenterBoostThreshold", {PERSISTENT | BACKUP, FLOAT, "3"}},  // deg from center where Center Scale is active
     {"HondaSteerDeltaLimiter", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaSteerDeltaUp", {PERSISTENT | BACKUP, FLOAT, "3"}},

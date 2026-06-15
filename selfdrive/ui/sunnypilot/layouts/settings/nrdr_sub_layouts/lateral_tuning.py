@@ -160,6 +160,22 @@ class LateralTuningLayout(Widget):
   def _format_pid_tune_lines(self, CP) -> str:
     lines = [f"<b>{CP.carFingerprint}</b>", ""]
 
+    # Car hardware / config (what the tune is built around)
+    lines.append("<b>" + tr("CAR") + "</b>")
+    try:
+      eps_fw = next((bytes(fw.fwVersion).decode("latin-1", "replace").strip("\x00").strip()
+                     for fw in CP.carFw if fw.ecu == "eps"), "")
+      lines.append(tr("EPS firmware: {}").format(eps_fw) if eps_fw else tr("EPS firmware: (not reported)"))
+    except Exception:
+      lines.append(tr("EPS firmware: unavailable"))
+    try:
+      interceptor = str(bool(ui_state.CP_SP.enableGasInterceptor)).lower() if ui_state.CP_SP is not None else tr("unavailable")
+    except Exception:
+      interceptor = tr("unavailable")
+    lines.append(f"gas pedal interceptor: {interceptor}")
+    lines.append(f"radar messages used: {str(not CP.radarUnavailable).lower()}")
+    lines.append("")
+
     # Lateral tuning (interface.py values, as actually loaded for this car)
     try:
       which = CP.lateralTuning.which()
@@ -217,9 +233,9 @@ class LateralTuningLayout(Widget):
     )
 
     self._pid_tune_info_item = button_item(
-      lambda: tr("PID Tune Information"),
+      lambda: tr("Car & Tune Info"),
       lambda: tr("VIEW"),
-      lambda: tr("The kp/ki/kf values currently loaded for your car's fingerprint (what interface.py configured), plus the related geometry values."),
+      lambda: tr("Your car's full profile: fingerprint, EPS firmware, gas interceptor and radar status, plus the lateral/longitudinal kp/ki/kf and geometry currently loaded for it."),
       callback=self._show_pid_tune_info,
     )
 

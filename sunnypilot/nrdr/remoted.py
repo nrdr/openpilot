@@ -24,6 +24,7 @@ import os
 import subprocess
 import time
 
+from cereal import car, custom, messaging
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
@@ -164,6 +165,53 @@ def run_tune_scan(params) -> None:
   _set_status(params, "scan: done " + time.strftime("%H:%M") + suffix)
 
 
+def _fmt_vals(vals) -> str:
+  return "[" + ", ".join(f"{float(v):g}" for v in vals) + "]"
+
+
+def write_car_tune_info(params, cache: dict) -> None:
+  """Publish a compact 'Car & Tune Info' readout to NrdrCarTuneInfo for the Sunnylink info row -
+  the same facts as the on-device modal: fingerprint, EPS firmware, gas interceptor, radar, and
+  the lateral/longitudinal kp/ki/kf loaded for this car. Static per drive, so only written when
+  it changes (best-effort; a missing key on an un-rebuilt params lib just no-ops)."""
+  try:
+    cp_bytes = params.get("CarParamsPersistent") or params.get("CarParams")
+    if not cp_bytes:
+      return
+    with car.CarParams.from_bytes(cp_bytes) as CP:
+      eps = next((bytes(fw.fwVersion).decode("latin-1", "replace").strip("\x00").strip()
+                  for fw in CP.carFw if fw.ecu == "eps"), "") or "n/a"
+      interceptor = "n/a"
+      cp_sp_bytes = params.get("CarParamsSPPersistent")
+      if cp_sp_bytes:
+        cp_sp = messaging.log_from_bytes(cp_sp_bytes, custom.CarParamsSP)
+        interceptor = str(bool(cp_sp.enableGasInterceptor)).lower()
+      parts = [str(CP.carFingerprint),
+               f"EPS firmware: {eps}",
+               f"gas pedal interceptor: {interceptor}",
+               f"radar messages used: {str(not CP.radarUnavailable).lower()}"]
+      if CP.lateralTuning.which() == "pid":
+        p = CP.lateralTuning.pid
+        parts.append(f"lat kp/ki/kf: {_fmt_vals(p.kpV)}/{_fmt_vals(p.kiV)}/{float(p.kf):g}")
+      lt = CP.longitudinalTuning
+      long_part = f"long kp/ki: {_fmt_vals(lt.kpV)}/{_fmt_vals(lt.kiV)}"
+      try:
+        long_part += f"/kf {float(lt.kf):g}"
+      except Exception:
+        pass
+      parts.append(long_part)
+      info = "  ·  ".join(parts)
+  except Exception:
+    cloudlog.exception("nrdr_remoted: failed to build car/tune info")
+    return
+  if info != cache.get("car_tune_info"):
+    try:
+      params.put("NrdrCarTuneInfo", info)
+      cache["car_tune_info"] = info
+    except Exception:
+      cloudlog.exception("nrdr_remoted: failed to set NrdrCarTuneInfo")
+
+
 def main():
   params = Params()
 
@@ -178,9 +226,11 @@ def main():
       time.sleep(3600)
 
   _set_status(params, "idle")
+  info_cache: dict = {}
 
   while True:
     try:
+      write_car_tune_info(params, info_cache)
       if params.get_bool("NrdrRemoteForceUpdate"):
         params.put_bool("NrdrRemoteForceUpdate", False)
         cloudlog.info("nrdr_remoted: remote force update triggered")

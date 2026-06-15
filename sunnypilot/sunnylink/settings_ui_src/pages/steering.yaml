@@ -140,6 +140,10 @@ sections:
     label: Lateral Tuning
     trigger_key: null
     items:
+    - key: NrdrCarTuneInfo
+      widget: info
+      title: Car & Tune Info
+      description: Your car's loaded profile - fingerprint, EPS firmware, gas pedal interceptor and radar status, and the lateral/longitudinal kp/ki/kf. Written by the device once it has fingerprinted the car.
     - key: NrdrLearnSteerRatio
       widget: toggle
       title: Learn Steer Ratio (Auto)
