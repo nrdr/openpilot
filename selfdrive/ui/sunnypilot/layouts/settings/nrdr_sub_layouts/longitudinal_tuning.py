@@ -40,7 +40,7 @@ class LongitudinalTuningLayout(Widget):
 
     self._ecu_matched_long = toggle_item_sp(
       param="NrdrHondaEcuMatchedLong",
-      title=lambda: tr("Honda Nidec: ECU-matched longitudinal improvements (Default: OFF)"),
+      title=lambda: tr("Nidec ECU-Matched Long (Default: OFF)"),
       description=lambda: tr("Honda Nidec only. Shapes the longitudinal command to match the factory ECU: rate-limits the acceleration command to the ECU's ramp rates, applies a speed-dependent coasting deadband (wide at low speed, tight on the highway), and briefly coasts through gas/brake transitions to avoid lurch. Calibrated on the 2019 Pilot; other Nidec cars may need tuning. OFF = stock command path."),
     )
 
