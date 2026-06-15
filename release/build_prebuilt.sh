@@ -152,6 +152,15 @@ find . -name 'moc_*' -delete
 find . -name '__pycache__' -delete
 rm -rf .sconsign.dblite Jenkinsfile release/ || true
 
+# big_driving_vision.onnx is ~282 MB. The release branch commits models RAW (no LFS) so a
+# device can clone-and-run, but GitHub hard-rejects any single file >100 MB at the pre-receive
+# hook (this is what was killing the push). So this one ALWAYS comes out, independent of
+# STRIP_ONNX. The device's on-UI model downloader (a fresh install is prompted for model
+# download right after setup) fetches it; the smaller driving_vision.onnx stays baked in for
+# out-of-box drivability until the big model is pulled.
+echo "[-] Stripping oversized vision model (>100 MB GitHub limit): big_driving_vision.onnx"
+rm -f selfdrive/modeld/models/big_driving_vision.onnx || true
+
 if [ "$STRIP_ONNX" = "1" ]; then
   echo "[-] Stripping baked-in driving model (STRIP_ONNX=1)"
   rm -f selfdrive/modeld/models/driving_vision.onnx || true
@@ -167,6 +176,16 @@ touch prebuilt
 
 git add -f .
 git commit --amend -m "openpilot v$VERSION prebuilt"
+
+# Safety net: GitHub rejects any file >100 MB at push time, AFTER a full upload. Fail fast here
+# with a clear list instead of a confusing 'pre-receive hook declined' after a ~450 MB push.
+oversized="$(find . -type f -size +100M -not -path './.git/*' 2>/dev/null)"
+if [ -n "$oversized" ]; then
+  echo "[!] ERROR: files over GitHub's 100 MB limit remain - push WILL be rejected:"
+  echo "$oversized" | sed 's#^#[!]   #'
+  echo "[!] Strip them (like big_driving_vision.onnx above) or host externally, then re-run."
+  exit 1
+fi
 
 echo "[-] Optional onroad test skipped"
 # RELEASE=1 pytest -n0 -s selfdrive/test/test_onroad.py
