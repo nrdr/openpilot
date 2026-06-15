@@ -643,6 +643,16 @@
                   "unit": "%"
                 },
                 {
+                  "key": "NrdrCruiseMismatchCorrection",
+                  "widget": "option",
+                  "title": "Cruise Mismatch Correction",
+                  "description": "Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.",
+                  "min": 95.0,
+                  "max": 105.0,
+                  "step": 0.1,
+                  "unit": "%"
+                },
+                {
                   "key": "StaticFeedforwardLong",
                   "widget": "toggle",
                   "title": "Keep Feedforward Static",
@@ -819,13 +829,7 @@
                   "key": "NrdrRemoteForceUpdate",
                   "widget": "toggle",
                   "title": "Force Update",
-                  "description": "Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status below for progress."
-                },
-                {
-                  "key": "NrdrRemoteTuneScan",
-                  "widget": "toggle",
-                  "title": "Run Tune Report Scan",
-                  "description": "Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full day of logs can take a few minutes; the per-speed summary appears b"
+                  "description": "Flip ON"
                 }
               ]
             }

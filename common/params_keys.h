@@ -276,6 +276,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"LatPidScaleStandard", {PERSISTENT | BACKUP, INT, "135"}},
     {"LatPidScaleHighway", {PERSISTENT | BACKUP, INT, "200"}},
     {"LongPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
+    {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}}, // % scale on final cruise target so actual speed matches set (100.0 = off)
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
     {"NrdrAngleFfBoostEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrAngleFfBoost", {PERSISTENT | BACKUP, INT, "200"}},

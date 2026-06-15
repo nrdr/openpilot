@@ -355,6 +355,14 @@ sections:
       max: 500
       step: 5
       unit: '%'
+    - key: NrdrCruiseMismatchCorrection
+      widget: option
+      title: Cruise Mismatch Correction
+      description: Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.
+      min: 95.0
+      max: 105.0
+      step: 0.1
+      unit: '%'
     - key: StaticFeedforwardLong
       widget: toggle
       title: Keep Feedforward Static

@@ -44,6 +44,19 @@ class LongitudinalTuningLayout(Widget):
       description=lambda: tr("Honda Nidec only. Shapes the longitudinal command to match the factory ECU: rate-limits the acceleration command to the ECU's ramp rates, applies a speed-dependent coasting deadband (wide at low speed, tight on the highway), and briefly coasts through gas/brake transitions to avoid lurch. Calibrated on the 2019 Pilot; other Nidec cars may need tuning. OFF = stock command path."),
     )
 
+    # use_float_scaling stores param = slider/100, so slider 9500-10500 -> 95.0-105.0 percent,
+    # step 10 -> 0.1% increments. The longitudinal planner reads that percent and divides by 100.
+    self._cruise_mismatch_correction = option_item_sp(
+      param="NrdrCruiseMismatchCorrection",
+      title=lambda: tr("Cruise Mismatch Correction (Default: 100.0%)"),
+      min_value=9500,
+      max_value=10500,
+      value_change_step=10,
+      description=lambda: tr("Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem."),
+      label_callback=lambda value: f"{value / 100:.1f}%",
+      use_float_scaling=True,
+    )
+
     self._live_learning_gas = toggle_item_sp(
       param="HondaLiveLearningGas",
       title=lambda: tr("Live Learning Gas"),
@@ -114,6 +127,7 @@ class LongitudinalTuningLayout(Widget):
       self._long_pid_tune_scale,
       self._static_feedforward_long,
       self._ecu_matched_long,
+      self._cruise_mismatch_correction,
       LineSeparatorSP(40),
       self._live_learning_gas,
       LineSeparatorSP(40),
