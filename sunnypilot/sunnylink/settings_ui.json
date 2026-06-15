@@ -343,6 +343,12 @@
               "trigger_key": null,
               "items": [
                 {
+                  "key": "NrdrCarTuneInfo",
+                  "widget": "info",
+                  "title": "Car & Tune Info",
+                  "description": "Your car's loaded profile - fingerprint, EPS firmware, gas pedal interceptor and radar status, and the lateral/longitudinal kp/ki/kf. Written by the device once it has fingerprinted the car."
+                },
+                {
                   "key": "NrdrLearnSteerRatio",
                   "widget": "toggle",
                   "title": "Learn Steer Ratio (Auto)",
@@ -566,6 +572,79 @@
                   "max": 45,
                   "step": 1,
                   "unit": "mph"
+                }
+              ]
+            },
+            {
+              "id": "nrdr_ford_lateral",
+              "label": "Ford Lateral Tuning",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "NrdrFordOemLateral",
+                  "widget": "toggle",
+                  "title": "Ford: OEM-Style Lateral",
+                  "description": "Ford only. Replaces stock curvature-only steering with Ford's full four-signal command (adds curvature-rate plus a lane-centering path-angle), the way the factory system actually drives. Targets the two stock complaints - the wheel fighting you after you grab it, and running out of steering authority in vigorous turns. OFF = stock curvature-only path, unchanged. BETA - first test on an empty road with hands ready. No effect on non-Ford cars."
+                },
+                {
+                  "key": "NrdrFordHumanTurn",
+                  "widget": "toggle",
+                  "title": "Ford: Human Turn Detection",
+                  "description": "When you hold the wheel into a turn past 45 degrees, openpilot stops commanding steering so it is not fighting you, then ramps smoothly back in when you let go instead of snapping. This is the fix for the wheel trying to throw you off the road after you touch it. Only active when OEM-Style Lateral is on.",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrFordOemLateral",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrFordLanePositioning",
+                  "widget": "toggle",
+                  "title": "Ford: Lane Positioning",
+                  "description": "Drives the path-angle signal with a lane-centering PID for extra steering authority and tighter in-lane position - the main lever against running out of torque. Engages at highway speed and steps aside during auto lane changes. Only active when OEM-Style Lateral is on.",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrFordOemLateral",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrFordLanePosGain",
+                  "widget": "option",
+                  "title": "Ford: Lane Positioning Strength",
+                  "description": "How hard the lane-centering path-angle pulls toward lane center. 100 percent is baseline. Raise for stronger centering, lower if it feels busy. Only used when Lane Positioning is on.",
+                  "min": 0,
+                  "max": 300,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrFordOemLateral",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrFordMaxLatAccel",
+                  "widget": "option",
+                  "title": "Ford: Max Lateral Accel",
+                  "description": "Raises the lateral-acceleration ceiling that caps how hard the car will corner - the most direct knob for running out of torque. Stock is about 2.4, set low on purpose because the safety model cannot see road banking. Raising it gives more cornering authority but removes that conservative margin; increase in small steps and validate on-road. Only used when OEM-Style Lateral is on.",
+                  "min": 2.0,
+                  "max": 3.5,
+                  "step": 0.05,
+                  "unit": "m/s2",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrFordOemLateral",
+                      "equals": true
+                    }
+                  ]
                 }
               ]
             },
@@ -829,7 +908,26 @@
                   "key": "NrdrRemoteForceUpdate",
                   "widget": "toggle",
                   "title": "Force Update",
-                  "description": "Flip ON"
+                  "description": "Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status below for progress."
+                },
+                {
+                  "key": "NrdrRemoteTuneScan",
+                  "widget": "toggle",
+                  "title": "Run Tune Report Scan",
+                  "description": "Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full day of logs can take a few minutes; the per-speed summary appears below when finished, and the full report is saved to /data/nrdr_tune_report.txt (grab it via the copyparty file server in Developer)."
+                },
+                {
+                  "key": "NrdrRemoteStatus",
+                  "widget": "info",
+                  "blocked": true,
+                  "title": "Remote Action Status"
+                },
+                {
+                  "key": "NrdrTuneReportSummary",
+                  "widget": "info",
+                  "blocked": true,
+                  "title": "Tune Report Summary (per speed)",
+                  "description": "mean_err >0 means under-steering vs desired. High flip/100 means the controller is hunting (lower kp). High sat% means out of steering authority."
                 }
               ]
             }
