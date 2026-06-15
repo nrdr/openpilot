@@ -38,6 +38,12 @@ class LongitudinalTuningLayout(Widget):
       description=lambda: tr("When ON, the longitudinal PID scale above multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle in Lateral Tuning."),
     )
 
+    self._ecu_matched_long = toggle_item_sp(
+      param="NrdrHondaEcuMatchedLong",
+      title=lambda: tr("Honda Nidec: ECU-matched longitudinal improvements (Default: OFF)"),
+      description=lambda: tr("Honda Nidec only. Shapes the longitudinal command to match the factory ECU: rate-limits the acceleration command to the ECU's ramp rates, applies a speed-dependent coasting deadband (wide at low speed, tight on the highway), and briefly coasts through gas/brake transitions to avoid lurch. Calibrated on the 2019 Pilot; other Nidec cars may need tuning. OFF = stock command path."),
+    )
+
     self._live_learning_gas = toggle_item_sp(
       param="HondaLiveLearningGas",
       title=lambda: tr("Live Learning Gas"),
@@ -107,6 +113,7 @@ class LongitudinalTuningLayout(Widget):
     return [
       self._long_pid_tune_scale,
       self._static_feedforward_long,
+      self._ecu_matched_long,
       LineSeparatorSP(40),
       self._live_learning_gas,
       LineSeparatorSP(40),

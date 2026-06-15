@@ -303,6 +303,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrAutoSelectModel", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"StaticFeedforwardLateral", {PERSISTENT | BACKUP, BOOL, "1"}},  // lat PID scales multiply P+I only; kf stays tuned
     {"StaticFeedforwardLong", {PERSISTENT | BACKUP, BOOL, "1"}},     // long PID scale multiplies P+I only; kf stays tuned
+    {"NrdrHondaEcuMatchedLong", {PERSISTENT | BACKUP, BOOL, "0"}},   // Honda Nidec: ECU-matched longitudinal (accel rate-limit + coast deadband + sign-change hold-off); OFF = stock
     {"HondaInjectionTest", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaAltDashboardSpeed", {PERSISTENT | BACKUP, INT, "0"}},     // 0 Stock, 1 Lead Speed, 2 GPS Speed, 3 Cluster Speed
     {"HondaAltDashboardDistance", {PERSISTENT | BACKUP, INT, "0"}},  // 0 Stock, 1 Radar, 2 Velocity
