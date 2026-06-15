@@ -338,8 +338,8 @@
           "items": [],
           "sub_panels": [
             {
-              "id": "nrdr_lateral",
-              "label": "Lateral Tuning",
+              "id": "nrdr_learned",
+              "label": "Learned Parameters",
               "trigger_key": null,
               "items": [
                 {
@@ -359,7 +359,14 @@
                   "widget": "toggle",
                   "title": "Learn Angle Offset (Auto)",
                   "description": "When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side."
-                },
+                }
+              ]
+            },
+            {
+              "id": "nrdr_lateral",
+              "label": "Lateral Tuning",
+              "trigger_key": null,
+              "items": [
                 {
                   "key": "HondaTorqueLowPassFilter",
                   "widget": "toggle",
