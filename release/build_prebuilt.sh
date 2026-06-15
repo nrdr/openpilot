@@ -191,7 +191,7 @@ echo "[-] Optional onroad test skipped"
 # RELEASE=1 pytest -n0 -s selfdrive/test/test_onroad.py
 
 # Changes that must never appear in nrdr-clean. Static reverse-patches are shipped
-# in release/clean_excludes/ (generated from commits 181c61ee + a1c50bb6) because a
+# in release/clean_excludes/ (181c61ee quality-of-life + bf4d05369b DM nerf) because a
 # fresh device install is shallow/prebuilt and does NOT have those commits in its
 # local history (that is why 'git show <sha>' failed here on 06.11). The patches are
 # reverse-applied to the prebuilt tree BEFORE the clean branch's single commit is
@@ -216,6 +216,12 @@ build_clean_tree() {
     fi
   done
   [ "$found" = "1" ] || return 1
+
+  # nrdr-clean must not contain the konik integration at all. konik.py is *created* (not edited)
+  # by its source commit, so a static reverse-patch rots the moment the file changes - just delete
+  # it. Nothing imports it at module load (party_tricks only runs it as a subprocess), so removal
+  # is safe; the host reverts below repoint registration/upload at comma instead.
+  rm -f system/athena/konik.py || true
 
   # nrdr-clean must not ship the konik API/Athena host exports.
   sed -i '/^export API_HOST=.*konik\.ai/d; /^export ATHENA_HOST=.*konik\.ai/d' launch_openpilot.sh launch_env.sh
