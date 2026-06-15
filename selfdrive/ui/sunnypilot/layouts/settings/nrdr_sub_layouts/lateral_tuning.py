@@ -20,7 +20,8 @@ from openpilot.system.ui.widgets.list_view import (BUTTON_BORDER_RADIUS, BUTTON_
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.html_render import HtmlModalSP
-from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP, simple_button_item_sp
+from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.ford_lateral_tuning import FordLateralTuningLayout
 
 TUNE_REPORT_PATH = "/data/nrdr_tune_report.txt"
 TUNE_REPORT_TMP = TUNE_REPORT_PATH + ".tmp"
@@ -68,8 +69,15 @@ class LateralTuningLayout(Widget):
     self._scan_proc: subprocess.Popen | None = None
     self._scan_fh = None
 
+    # Nested Ford Lateral Tuning sub-menu (opens one level below this panel)
+    self._ford_panel_active = False
+    self._ford_layout = FordLateralTuningLayout(lambda: self._set_ford_panel(False))
+
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
+
+  def _set_ford_panel(self, active: bool):
+    self._ford_panel_active = active
 
   # --- Tune Report ---
 
@@ -430,6 +438,13 @@ class LateralTuningLayout(Widget):
       label_callback=lambda value: f"{value} mph",
     )
 
+    # Ford OEM-style lateral lives in its own sub-menu (Ford only)
+    self._ford_lateral_button = simple_button_item_sp(
+      button_text=lambda: tr("Ford Lateral Tuning"),
+      button_width=800,
+      callback=lambda: self._set_ford_panel(True),
+    )
+
     return [
       self._tune_report_item,
       self._pid_tune_info_item,
@@ -460,6 +475,8 @@ class LateralTuningLayout(Widget):
       self._steer_delta_down,
       LineSeparatorSP(40),
       self._min_steer_speed,
+      LineSeparatorSP(40),
+      self._ford_lateral_button,
     ]
 
   def _update_state(self):
@@ -483,10 +500,14 @@ class LateralTuningLayout(Widget):
     self._steer_delta_down.set_visible(steer_delta_limiter_enabled)
 
   def _render(self, rect):
+    if self._ford_panel_active:
+      self._ford_layout.render(rect)
+      return
     self._back_button.set_position(self._rect.x, self._rect.y + 20)
     self._back_button.render()
     content_rect = rl.Rectangle(rect.x, rect.y + self._back_button.rect.height + 40, rect.width, rect.height - self._back_button.rect.height - 40)
     self._scroller.render(content_rect)
 
   def show_event(self):
+    self._set_ford_panel(False)
     self._scroller.show_event()

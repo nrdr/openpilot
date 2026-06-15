@@ -305,6 +305,11 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"StaticFeedforwardLateral", {PERSISTENT | BACKUP, BOOL, "1"}},  // lat PID scales multiply P+I only; kf stays tuned
     {"StaticFeedforwardLong", {PERSISTENT | BACKUP, BOOL, "1"}},     // long PID scale multiplies P+I only; kf stays tuned
     {"NrdrHondaEcuMatchedLong", {PERSISTENT | BACKUP, BOOL, "0"}},   // Honda Nidec: ECU-matched longitudinal (accel rate-limit + coast deadband + sign-change hold-off); OFF = stock
+    {"NrdrFordOemLateral", {PERSISTENT | BACKUP, BOOL, "0"}},        // Ford: OEM-style 4-signal lateral (curvature_rate + path_angle + human-turn); OFF = stock curvature-only
+    {"NrdrFordHumanTurn", {PERSISTENT | BACKUP, BOOL, "1"}},         // Ford OEM lateral: zero steer during a held manual turn, ramp back on release (anti-"throws me off")
+    {"NrdrFordLanePositioning", {PERSISTENT | BACKUP, BOOL, "1"}},   // Ford OEM lateral: path_angle lane-centering PID (added authority/centering)
+    {"NrdrFordLanePosGain", {PERSISTENT | BACKUP, INT, "100"}},      // Ford OEM lateral: lane-centering strength % (100 = 1.0x)
+    {"NrdrFordMaxLatAccel", {PERSISTENT | BACKUP, FLOAT, "2.4"}},    // Ford OEM lateral: max lateral-accel ceiling m/s^2 (stock ~2.4; raise to fix "runs out of torque")
     {"HondaInjectionTest", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaAltDashboardSpeed", {PERSISTENT | BACKUP, INT, "0"}},     // 0 Stock, 1 Lead Speed, 2 GPS Speed, 3 Cluster Speed
     {"HondaAltDashboardDistance", {PERSISTENT | BACKUP, INT, "0"}},  // 0 Stock, 1 Radar, 2 Velocity
