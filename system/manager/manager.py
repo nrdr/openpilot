@@ -100,15 +100,6 @@ NRDR_DEFAULT_VALUE_PARAMS = {
   # Display
   "OnroadScreenOffBrightness": 1,
   "InteractivityTimeout": 120,
-
-  # Developer / SSH -- debug aid for THIS throwaway test branch only.
-  # Pre-authorize Aragon7777 so a fresh install is SSH-reachable straight from boot with
-  # zero UI interaction (SshEnabled is already defaulted True above; sshd authorizes from
-  # /data/params/d/GithubSshKeys). This means any device running this branch is one
-  # Aragon7777 can SSH into -- keep it off main/nightly/release and strip it from any
-  # public prebuilt (the way build_prebuilt.sh strips the konik hosts).
-  "GithubUsername": "Aragon7777",
-  "GithubSshKeys": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC1Dv2NX9FCARm1XlSxe6h7hQG+I7eYqKNub1HRO11wCxFKM8hort9jNx0JQLJQrlWlf551bcH7xQU79Up7n3d0JwTpzIqgOhBRhLSwwHDPMZZUayrwN9YMbIlr6XgAkOIa+r+oSyX102Nf3s8Lfbvm/ZAKTUNHH/K15Q4+KXOrjqyDOtXStjQSaOoluNUpdpCIrng1aBgFwLWl3fiKCopV2pmpxmksvA9nT57vo/CBMlrB8onWZU+jrCyMjLxFQvdtAyuzqs5RLQB3leFOn+pnKbL2+ouTWVCM+iHLgSEW/aV67OT++dcOtWNOz5pO2TOLWwAqcFy23no3qJFw4WsdtVWupSI5++CkHd5IdR1vWRi9l92CA1K92dkLsnGkb0rLntmn7IwvqI2JYfCctcN62/zWnnVJh8p7+eBL+qAHcLRqCuI6pw2QPRhGvG2lN+TVSCMBxZ7PT84OSZmhd9y+gN5fy84GjYvYsrNgXxeglWu4L51FUE85kd27cYXDx5fdEJ1HXWerAE6vBlT/XNt33ZgD2wCAs7MCj8pivw2DSgtDXfTTf+Kl7V24rpoK8l1/f1QPHcU4/aW7Tad2t3bQkmmemIYtP+7HjXtaPjTaEsfhmCWpxlTKZeefrzNQpg1ZCr7BqoAaHKJWmQKqgiP6oUIZkwS9PdC8coRSJxk6Hw==",
 }
 
 
