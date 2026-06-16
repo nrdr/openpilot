@@ -160,10 +160,26 @@ sections:
       widget: toggle
       title: Low Pass Filter (tau)
       description: Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations.
-    - key: LatPidScaleLowSpeed
+    - key: LatPScaleLowSpeed
       widget: option
-      title: Low Speed PID Scale (Below 25mph)
-      description: Scales lateral PID output below 25 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.
+      title: Low Speed Proportional Scale (Below 25mph)
+      description: Scales the proportional (P) term below 25 mph. Higher = more error correction (tighter, can cut corners); lower = looser with wider swings.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatIScaleLowSpeed
+      widget: option
+      title: Low Speed Integral Scale (Below 25mph)
+      description: Scales the integral (I) term below 25 mph. Builds correction over time to erase steady-state error; too high oscillates.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatFScaleLowSpeed
+      widget: option
+      title: Low Speed Feedforward Scale (Below 25mph)
+      description: Scales the feedforward (kf) term below 25 mph. Follows the commanded angle rather than error, adding authority without amplifying noise. 100% = tuned value (static).
       min: 0
       max: 500
       step: 5
@@ -179,10 +195,26 @@ sections:
       - type: param
         key: HondaTorqueLowPassFilter
         equals: true
-    - key: LatPidScaleStandard
+    - key: LatPScaleStandard
       widget: option
-      title: Standard Speed PID Scale (25-50mph)
-      description: Scales lateral PID output between 25 and 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.
+      title: Standard Speed Proportional Scale (25-50mph)
+      description: Scales the proportional (P) term between 25 and 50 mph.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatIScaleStandard
+      widget: option
+      title: Standard Speed Integral Scale (25-50mph)
+      description: Scales the integral (I) term between 25 and 50 mph.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatFScaleStandard
+      widget: option
+      title: Standard Speed Feedforward Scale (25-50mph)
+      description: Scales the feedforward (kf) term between 25 and 50 mph. 100% = tuned value (static).
       min: 0
       max: 500
       step: 5
@@ -198,10 +230,26 @@ sections:
       - type: param
         key: HondaTorqueLowPassFilter
         equals: true
-    - key: LatPidScaleHighway
+    - key: LatPScaleHighway
       widget: option
-      title: Highway PID Scale (50mph+)
-      description: Scales lateral PID output above 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.
+      title: Highway Proportional Scale (50mph+)
+      description: Scales the proportional (P) term above 50 mph.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatIScaleHighway
+      widget: option
+      title: Highway Integral Scale (50mph+)
+      description: Scales the integral (I) term above 50 mph.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatFScaleHighway
+      widget: option
+      title: Highway Feedforward Scale (50mph+)
+      description: Scales the feedforward (kf) term above 50 mph. 100% = tuned value (static).
       min: 0
       max: 500
       step: 5
@@ -217,10 +265,6 @@ sections:
       - type: param
         key: HondaTorqueLowPassFilter
         equals: true
-    - key: StaticFeedforwardLateral
-      widget: toggle
-      title: Keep Feedforward Static
-      description: When ON, the lateral PID scales multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it. The longitudinal PID scale has its own toggle.
     - key: HondaCenterScale
       widget: option
       title: Center Boost

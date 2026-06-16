@@ -30,12 +30,6 @@ _MPH_TO_MS = 0.44704
 _LAT_SCALE_LOW_MAX = 25.0 * _MPH_TO_MS    # below this -> low-speed scale
 _LAT_SCALE_STD_MAX = 50.0 * _MPH_TO_MS    # below this -> standard scale, else highway
 
-# Angle-based feedforward boost: ramps in linearly from START over RAMP degrees of
-# desired angle (full boost at START+RAMP). Angles this large only occur at low
-# speed, so no speed gate is needed.
-ANGLE_FF_BOOST_START_DEG = 60.0
-ANGLE_FF_BOOST_RAMP_DEG = 20.0
-
 
 def _lat_pid_scale_banded(v_ego: float, low: float, standard: float, highway: float) -> float:
   # Speed-banded lateral PID output scale. Hard bands mirror carcontroller.torque_lpf_tau
@@ -167,16 +161,19 @@ class LatControlPID(LatControl):
     self.prev_angle_steers_des_no_offset = 0.0
     self.params = Params()
     self.frame = -1
-    # Speed-banded lateral PID output scale (multiplier units; 1.0 = neutral).
-    self.lat_pid_scale_low = 1.0
-    self.lat_pid_scale_standard = 1.0
-    self.lat_pid_scale_highway = 1.0
+    # Independent speed-banded P / I / F output scales (multiplier units; 1.0 = neutral).
+    self.lat_p_scale_low = 1.0
+    self.lat_p_scale_standard = 1.0
+    self.lat_p_scale_highway = 1.0
+    self.lat_i_scale_low = 1.0
+    self.lat_i_scale_standard = 1.0
+    self.lat_i_scale_highway = 1.0
+    self.lat_f_scale_low = 1.0
+    self.lat_f_scale_standard = 1.0
+    self.lat_f_scale_highway = 1.0
     self.unwind_freeze_enabled = False
     self.unwind_lookahead_enabled = False
     self.injection_test_enabled = False  # Party Tricks: x9.99 PID scale stress test
-    self.scale_excludes_kf = True  # when True, PID scale multiplies P+I only, not feedforward (StaticFeedforwardLateral, default ON)
-    self.angle_ff_boost_enabled = False
-    self.angle_ff_boost = 2.0  # multiplier at full ramp (runtime units; param stored as percent)
     self.model_v2 = None
     self.model_valid = False
 
@@ -248,13 +245,6 @@ class LatControlPID(LatControl):
       ff_multiplier = ff_scale + ff_unwind_weight * max(unwind_ff_boost - ff_scale, 0.0)
       ff *= ff_multiplier
 
-      # Angle-based feedforward boost: extra ff on large desired angles. FF follows the
-      # commanded angle rather than the error, so this adds large-turn authority without
-      # the jitter cost of higher P. Linear ramp avoids any torque step at the threshold.
-      if self.angle_ff_boost_enabled and self.angle_ff_boost > 1.0:
-        angle_ff_weight = min(max((abs_angle_des - ANGLE_FF_BOOST_START_DEG) / ANGLE_FF_BOOST_RAMP_DEG, 0.0), 1.0)
-        ff *= 1.0 + angle_ff_weight * (self.angle_ff_boost - 1.0)
-
       steering_pressed = CS.steeringPressed
       if self.is_eps_modified:
         self.eps_modified_steering_pressed_filter_s, steering_pressed = get_eps_modified_steering_pressed(
@@ -277,18 +267,19 @@ class LatControlPID(LatControl):
 
       self.frame += 1
       if self.frame % 300 == 0:
-        # Speed-banded PID output scale. default/min/max are in runtime multiplier
-        # units; scale converts the stored percent param (100 -> 1.0x). Each band
-        # unset -> 1.0x (neutral). Band selection by vEgo happens every frame below.
-        self.lat_pid_scale_low = get_param_float(
-          self.params, "LatPidScaleLowSpeed", 1.0, 0.0, 5.0, scale=100.0,
-        )
-        self.lat_pid_scale_standard = get_param_float(
-          self.params, "LatPidScaleStandard", 1.0, 0.0, 5.0, scale=100.0,
-        )
-        self.lat_pid_scale_highway = get_param_float(
-          self.params, "LatPidScaleHighway", 1.0, 0.0, 5.0, scale=100.0,
-        )
+        # Independent speed-banded P / I / F scales. default/min/max are runtime
+        # multipliers; scale converts the stored percent (100 -> 1.0x). Band selection
+        # by vEgo happens every frame below. Defaults preserve the prior P+I = 100/135/200
+        # tune (split equally across P and I) with feedforward left static (F = 100%).
+        self.lat_p_scale_low = get_param_float(self.params, "LatPScaleLowSpeed", 1.0, 0.0, 5.0, scale=100.0)
+        self.lat_p_scale_standard = get_param_float(self.params, "LatPScaleStandard", 1.35, 0.0, 5.0, scale=100.0)
+        self.lat_p_scale_highway = get_param_float(self.params, "LatPScaleHighway", 2.0, 0.0, 5.0, scale=100.0)
+        self.lat_i_scale_low = get_param_float(self.params, "LatIScaleLowSpeed", 1.0, 0.0, 5.0, scale=100.0)
+        self.lat_i_scale_standard = get_param_float(self.params, "LatIScaleStandard", 1.35, 0.0, 5.0, scale=100.0)
+        self.lat_i_scale_highway = get_param_float(self.params, "LatIScaleHighway", 2.0, 0.0, 5.0, scale=100.0)
+        self.lat_f_scale_low = get_param_float(self.params, "LatFScaleLowSpeed", 1.0, 0.0, 5.0, scale=100.0)
+        self.lat_f_scale_standard = get_param_float(self.params, "LatFScaleStandard", 1.0, 0.0, 5.0, scale=100.0)
+        self.lat_f_scale_highway = get_param_float(self.params, "LatFScaleHighway", 1.0, 0.0, 5.0, scale=100.0)
         # Center boost target. FLOAT param stored as the real value
         # (UI use_float_scaling), so no scale. Unset -> 0.5 (old generic default).
         self.center_taper_high = get_param_float(
@@ -306,14 +297,9 @@ class LatControlPID(LatControl):
           0.0,
           10.0,
         )
-        self.angle_ff_boost_enabled = self.params.get_bool("NrdrAngleFfBoostEnabled")
-        self.angle_ff_boost = get_param_float(
-          self.params, "NrdrAngleFfBoost", 2.0, 1.0, 5.0, scale=100.0,
-        )
         self.unwind_freeze_enabled = self.params.get_bool("HondaUnwindFreeze")
         self.unwind_lookahead_enabled = self.params.get_bool("HondaUnwindLookahead")
         self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
-        self.scale_excludes_kf = self.params.get_bool("StaticFeedforwardLateral")
 
       output_torque = self.pid.update(
         error,
@@ -322,14 +308,12 @@ class LatControlPID(LatControl):
         freeze_integrator=freeze_integrator,
       )
 
-      scale = _lat_pid_scale_banded(
-        CS.vEgo, self.lat_pid_scale_low, self.lat_pid_scale_standard, self.lat_pid_scale_highway,
-      )
-      if self.scale_excludes_kf:
-        # Live PID scale multiplies only the feedback (P+I); feedforward keeps its tuned value.
-        output_torque = (output_torque - self.pid.f) * scale + self.pid.f
-      else:
-        output_torque *= scale
+      # Independently scale each PID term by its own speed-banded multiplier (P / I / F).
+      # Preserve-tune defaults (P=I per band, F=1.0) reproduce the prior single P+I scale.
+      p_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_p_scale_low, self.lat_p_scale_standard, self.lat_p_scale_highway)
+      i_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_i_scale_low, self.lat_i_scale_standard, self.lat_i_scale_highway)
+      f_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_f_scale_low, self.lat_f_scale_standard, self.lat_f_scale_highway)
+      output_torque = self.pid.p * p_scale + self.pid.i * i_scale + self.pid.d + self.pid.f * f_scale
 
       # Party Tricks: Injection Test multiplies the PID scale by 999% (diagnostic only).
       if self.injection_test_enabled:

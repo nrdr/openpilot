@@ -247,40 +247,71 @@ class LateralTuningLayout(Widget):
       callback=self._show_pid_tune_info,
     )
 
-    self._lat_scale_low = option_item_sp(
-      param="LatPidScaleLowSpeed",
-      title=lambda: tr("Low Speed PID Scale (Below 25mph) (Default: 100%)"),
-      min_value=0,
-      max_value=500,
-      value_change_step=5,
-      description=lambda: tr("Scales lateral PID output below 25 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections."),
+    # --- Independent P / I / F scales per speed band (grouped with tau in the list below) ---
+    self._lat_p_low = option_item_sp(
+      param="LatPScaleLowSpeed",
+      title=lambda: tr("Low Speed Proportional Scale (Below 25mph) (Default: 100%)"),
+      min_value=0, max_value=500, value_change_step=5,
+      description=lambda: tr("Scales the proportional (P) term below 25 mph. Higher = more error correction (tighter, can cut corners); lower = looser with wider swings."),
+      label_callback=lambda value: f"{value}%",
+    )
+    self._lat_i_low = option_item_sp(
+      param="LatIScaleLowSpeed",
+      title=lambda: tr("Low Speed Integral Scale (Below 25mph) (Default: 100%)"),
+      min_value=0, max_value=500, value_change_step=5,
+      description=lambda: tr("Scales the integral (I) term below 25 mph. Builds correction over time to erase steady-state error; too high oscillates."),
+      label_callback=lambda value: f"{value}%",
+    )
+    self._lat_f_low = option_item_sp(
+      param="LatFScaleLowSpeed",
+      title=lambda: tr("Low Speed Feedforward Scale (Below 25mph) (Default: 100%)"),
+      min_value=0, max_value=500, value_change_step=5,
+      description=lambda: tr("Scales the feedforward (kf) term below 25 mph. Follows the commanded angle rather than error, so it adds authority without amplifying noise. 100% = tuned value (static)."),
       label_callback=lambda value: f"{value}%",
     )
 
-    self._lat_scale_standard = option_item_sp(
-      param="LatPidScaleStandard",
-      title=lambda: tr("Standard Speed PID Scale (25-50mph) (Default: 135%)"),
-      min_value=0,
-      max_value=500,
-      value_change_step=5,
-      description=lambda: tr("Scales lateral PID output between 25 and 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections."),
+    self._lat_p_standard = option_item_sp(
+      param="LatPScaleStandard",
+      title=lambda: tr("Standard Speed Proportional Scale (25-50mph) (Default: 135%)"),
+      min_value=0, max_value=500, value_change_step=5,
+      description=lambda: tr("Scales the proportional (P) term between 25 and 50 mph."),
+      label_callback=lambda value: f"{value}%",
+    )
+    self._lat_i_standard = option_item_sp(
+      param="LatIScaleStandard",
+      title=lambda: tr("Standard Speed Integral Scale (25-50mph) (Default: 135%)"),
+      min_value=0, max_value=500, value_change_step=5,
+      description=lambda: tr("Scales the integral (I) term between 25 and 50 mph."),
+      label_callback=lambda value: f"{value}%",
+    )
+    self._lat_f_standard = option_item_sp(
+      param="LatFScaleStandard",
+      title=lambda: tr("Standard Speed Feedforward Scale (25-50mph) (Default: 100%)"),
+      min_value=0, max_value=500, value_change_step=5,
+      description=lambda: tr("Scales the feedforward (kf) term between 25 and 50 mph. 100% = tuned value (static)."),
       label_callback=lambda value: f"{value}%",
     )
 
-    self._lat_scale_highway = option_item_sp(
-      param="LatPidScaleHighway",
-      title=lambda: tr("Highway PID Scale (50mph+) (Default: 200%)"),
-      min_value=0,
-      max_value=500,
-      value_change_step=5,
-      description=lambda: tr("Scales lateral PID output above 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections."),
+    self._lat_p_highway = option_item_sp(
+      param="LatPScaleHighway",
+      title=lambda: tr("Highway Proportional Scale (50mph+) (Default: 200%)"),
+      min_value=0, max_value=500, value_change_step=5,
+      description=lambda: tr("Scales the proportional (P) term above 50 mph."),
       label_callback=lambda value: f"{value}%",
     )
-
-    self._scale_exclude_kf = toggle_item_sp(
-      param="StaticFeedforwardLateral",
-      title=lambda: tr("Keep Feedforward Static (Default: ON)"),
-      description=lambda: tr("When ON, the lateral PID scales above multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it. The longitudinal PID scale has its own toggle in Longitudinal Tuning."),
+    self._lat_i_highway = option_item_sp(
+      param="LatIScaleHighway",
+      title=lambda: tr("Highway Integral Scale (50mph+) (Default: 200%)"),
+      min_value=0, max_value=500, value_change_step=5,
+      description=lambda: tr("Scales the integral (I) term above 50 mph."),
+      label_callback=lambda value: f"{value}%",
+    )
+    self._lat_f_highway = option_item_sp(
+      param="LatFScaleHighway",
+      title=lambda: tr("Highway Feedforward Scale (50mph+) (Default: 100%)"),
+      min_value=0, max_value=500, value_change_step=5,
+      description=lambda: tr("Scales the feedforward (kf) term above 50 mph. 100% = tuned value (static)."),
+      label_callback=lambda value: f"{value}%",
     )
 
     self._center_scale = option_item_sp(
@@ -303,22 +334,6 @@ class LateralTuningLayout(Widget):
       description=lambda: tr("How centered should the steering wheel be when center boost is actually active?"),
       label_callback=lambda value: f"{value / 100:.1f}°",
       use_float_scaling=True,
-    )
-
-    self._angle_ff_boost_toggle = toggle_item_sp(
-      param="NrdrAngleFfBoostEnabled",
-      title=lambda: tr("Angle Feedforward Boost (Default: OFF)"),
-      description=lambda: tr("Boosts feedforward torque on large steering angles, ramping in from 60° of desired angle to full strength at 80°. Adds large-turn authority without the jitter cost of higher P - feedforward follows the commanded angle, not the error, so it cannot amplify noise. Mostly felt in sharp low-speed turns; angles this large don't occur at speed."),
-    )
-
-    self._angle_ff_boost = option_item_sp(
-      param="NrdrAngleFfBoost",
-      title=lambda: tr("Angle Feedforward Boost Scale (Default: 200%)"),
-      min_value=100,
-      max_value=500,
-      value_change_step=5,
-      description=lambda: tr("Feedforward multiplier reached at full ramp (80°+ desired angle). 100% = no boost."),
-      label_callback=lambda value: f"{value}%",
     )
 
     self._unwind_freeze = toggle_item_sp(
@@ -450,18 +465,27 @@ class LateralTuningLayout(Widget):
       self._pid_tune_info_item,
       LineSeparatorSP(40),
       self._low_pass_filter,
-      self._lat_scale_low,
+      LineSeparatorSP(40),
+      # Low speed (below 25mph): P / I / F / Tau
+      self._lat_p_low,
+      self._lat_i_low,
+      self._lat_f_low,
       self._lpf_tau_low,
-      self._lat_scale_standard,
+      LineSeparatorSP(40),
+      # Standard speed (25-50mph): P / I / F / Tau
+      self._lat_p_standard,
+      self._lat_i_standard,
+      self._lat_f_standard,
       self._lpf_tau_standard,
-      self._lat_scale_highway,
+      LineSeparatorSP(40),
+      # Highway (50mph+): P / I / F / Tau
+      self._lat_p_highway,
+      self._lat_i_highway,
+      self._lat_f_highway,
       self._lpf_tau_highway,
-      self._scale_exclude_kf,
       LineSeparatorSP(40),
       self._center_scale,
       self._center_boost_threshold,
-      self._angle_ff_boost_toggle,
-      self._angle_ff_boost,
       LineSeparatorSP(40),
       self._unwind_freeze,
       self._unwind_lookahead,
@@ -488,8 +512,6 @@ class LateralTuningLayout(Widget):
     self._lpf_tau_low.set_visible(lpf_enabled)
     self._lpf_tau_standard.set_visible(lpf_enabled)
     self._lpf_tau_highway.set_visible(lpf_enabled)
-
-    self._angle_ff_boost.set_visible(self._angle_ff_boost_toggle.action_item.get_state())
 
     notch_enabled = self._notch_enabled.action_item.get_state()
     self._notch_freq.set_visible(notch_enabled)

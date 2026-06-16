@@ -272,14 +272,18 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"SmartCruiseControlVision", {PERSISTENT | BACKUP, BOOL, "0"}},
 
     // nrdr params
-    {"LatPidScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},
-    {"LatPidScaleStandard", {PERSISTENT | BACKUP, INT, "135"}},
-    {"LatPidScaleHighway", {PERSISTENT | BACKUP, INT, "200"}},
+    {"LatPScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},   // lateral P scale (below 25 mph)
+    {"LatPScaleStandard", {PERSISTENT | BACKUP, INT, "135"}},   // lateral P scale (25-50 mph)
+    {"LatPScaleHighway", {PERSISTENT | BACKUP, INT, "200"}},    // lateral P scale (50 mph+)
+    {"LatIScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},   // lateral I scale (below 25 mph)
+    {"LatIScaleStandard", {PERSISTENT | BACKUP, INT, "135"}},   // lateral I scale (25-50 mph)
+    {"LatIScaleHighway", {PERSISTENT | BACKUP, INT, "200"}},    // lateral I scale (50 mph+)
+    {"LatFScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},   // lateral feedforward scale (below 25 mph)
+    {"LatFScaleStandard", {PERSISTENT | BACKUP, INT, "100"}},   // lateral feedforward scale (25-50 mph)
+    {"LatFScaleHighway", {PERSISTENT | BACKUP, INT, "100"}},    // lateral feedforward scale (50 mph+)
     {"LongPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
     {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}}, // % scale on final cruise target so actual speed matches set (100.0 = off)
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
-    {"NrdrAngleFfBoostEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"NrdrAngleFfBoost", {PERSISTENT | BACKUP, INT, "200"}},
     {"NrdrLearnSteerRatio", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrLearnStiffness", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrLearnAngleOffset", {PERSISTENT | BACKUP, BOOL, "0"}},
@@ -302,7 +306,6 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaLpfTauHighway", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
     {"NrdrFirstRunSetupDone", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrAutoSelectModel", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"StaticFeedforwardLateral", {PERSISTENT | BACKUP, BOOL, "1"}},  // lat PID scales multiply P+I only; kf stays tuned
     {"StaticFeedforwardLong", {PERSISTENT | BACKUP, BOOL, "1"}},     // long PID scale multiplies P+I only; kf stays tuned
     {"NrdrHondaEcuMatchedLong", {PERSISTENT | BACKUP, BOOL, "0"}},   // Honda Nidec: ECU-matched longitudinal (accel rate-limit + coast deadband + sign-change hold-off); OFF = stock
     {"NrdrFordOemLateral", {PERSISTENT | BACKUP, BOOL, "0"}},        // Ford: OEM-style 4-signal lateral (curvature_rate + path_angle + human-turn); OFF = stock curvature-only
