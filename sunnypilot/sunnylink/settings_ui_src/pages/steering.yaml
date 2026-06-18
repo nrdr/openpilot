@@ -280,6 +280,14 @@ sections:
       max: 10.0
       step: 0.1
       unit: deg
+    - key: HondaCenterBoostMinSpeed
+      widget: option
+      title: Center Boost Minimum Speed
+      description: Below this speed center boost is disabled. Center boost is meant for straight, higher-speed roads; gating it off at low speed stops the wheel from oscillating at stops and in parking-lot crawling.
+      min: 0
+      max: 80
+      step: 1
+      unit: mph
     - key: HondaUnwindFreeze
       widget: toggle
       title: Unwind Integrator Freeze
@@ -288,6 +296,21 @@ sections:
       widget: toggle
       title: Unwind Lookahead
       description: Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops.
+    - key: HondaUnwindBoostSeconds
+      widget: option
+      title: Unwind Boost
+      description: How long the extra unwind feedforward is held at the start of each unwind before it fades out. Caps the low-speed return assist so it doesn't keep pushing torque through a long unwind. 0 = off.
+      min: 0.0
+      max: 3.0
+      step: 0.1
+      unit: s
+    - key: HondaUnwindFfMultiplier
+      widget: option
+      title: Unwind Feedforward Multiplier
+      description: Peak feedforward multiplier during an unwind, strongest at a standstill and fading to 1x (no boost) by about 22 mph. Raise for more low-speed return authority if the wheel is lazy coming back to center.
+      min: 1.0
+      max: 4.0
+      step: 0.1
     - key: HondaNotchEnabled
       widget: toggle
       title: Notch Filter
@@ -579,13 +602,4 @@ sections:
     - key: NrdrRemoteTuneScan
       widget: toggle
       title: Run Tune Report Scan
-      description: Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full day of logs can take a few minutes; the per-speed summary appears below when finished, and the full report is saved to /data/nrdr_tune_report.txt (grab it via the copyparty file server in Developer).
-    - key: NrdrRemoteStatus
-      widget: info
-      title: Remote Action Status
-      blocked: true
-    - key: NrdrTuneReportSummary
-      widget: info
-      title: Tune Report Summary (per speed)
-      description: mean_err >0 means under-steering vs desired. High flip/100 means the controller is hunting (lower kp). High sat% means out of steering authority.
-      blocked: true
+      description: Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full da
