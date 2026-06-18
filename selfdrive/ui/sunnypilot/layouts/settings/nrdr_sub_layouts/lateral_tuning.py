@@ -336,6 +336,16 @@ class LateralTuningLayout(Widget):
       use_float_scaling=True,
     )
 
+    self._center_boost_min_speed = option_item_sp(
+      param="HondaCenterBoostMinSpeed",
+      title=lambda: tr("Center Boost Minimum Speed (Default: 50mph)"),
+      min_value=0,
+      max_value=80,
+      value_change_step=1,
+      description=lambda: tr("Below this speed, center boost is disabled. Center boost is meant for straight, higher-speed roads, so gating it off at low speed stops the wheel from oscillating at stops and in parking-lot crawling."),
+      label_callback=lambda value: f"{value} mph",
+    )
+
     self._unwind_freeze = toggle_item_sp(
       param="HondaUnwindFreeze",
       title=lambda: tr("Unwind Integrator Freeze (Default: OFF)"),
@@ -346,6 +356,28 @@ class LateralTuningLayout(Widget):
       param="HondaUnwindLookahead",
       title=lambda: tr("Unwind Lookahead (Default: ON)"),
       description=lambda: tr("Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops."),
+    )
+
+    self._unwind_boost_seconds = option_item_sp(
+      param="HondaUnwindBoostSeconds",
+      title=lambda: tr("Unwind Boost (Default: 1.0s)"),
+      min_value=0,
+      max_value=300,
+      value_change_step=10,
+      description=lambda: tr("How long the extra unwind feedforward is held at the start of each unwind before it fades out. Caps the low-speed return assist so it doesn't keep pushing torque through a long unwind. 0 = off."),
+      label_callback=lambda value: f"{value / 100:.1f}s",
+      use_float_scaling=True,
+    )
+
+    self._unwind_ff_multiplier = option_item_sp(
+      param="HondaUnwindFfMultiplier",
+      title=lambda: tr("Unwind Feedforward Multiplier (Default: 2.0x)"),
+      min_value=100,
+      max_value=400,
+      value_change_step=10,
+      description=lambda: tr("Peak feedforward multiplier during an unwind, strongest at a standstill and fading to 1x (no boost) by ~22 mph. Raise for more low-speed return authority if the wheel is lazy coming back to center."),
+      label_callback=lambda value: f"{value / 100:.1f}x",
+      use_float_scaling=True,
     )
 
     self._low_pass_filter = toggle_item_sp(
@@ -486,9 +518,12 @@ class LateralTuningLayout(Widget):
       LineSeparatorSP(40),
       self._center_scale,
       self._center_boost_threshold,
+      self._center_boost_min_speed,
       LineSeparatorSP(40),
       self._unwind_freeze,
       self._unwind_lookahead,
+      self._unwind_boost_seconds,
+      self._unwind_ff_multiplier,
       LineSeparatorSP(40),
       self._notch_enabled,
       self._notch_freq,
