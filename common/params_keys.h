@@ -285,14 +285,15 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"LongPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
     {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}}, // % scale on final cruise target so actual speed matches set (100.0 = off)
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
-    {"NrdrLearnSteerRatio", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"NrdrLearnStiffness", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"NrdrLearnAngleOffset", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrLearnSteerRatio", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrLearnStiffness", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrLearnAngleOffset", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"HondaUnwindFreeze", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaUnwindLookahead", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaStoppingDecelRate", {PERSISTENT | BACKUP, INT, "30"}},
     {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "0"}},  // UI label: Increase Driver Override Hysteresis (default OFF)
-    {"NrdrDriverOverrideThreshold", {PERSISTENT | BACKUP, INT, "1200"}},  // steeringPressed threshold; 1200 = stock, proportional on non-1200 cars
+    {"NrdrDriverOverrideThreshold", {PERSISTENT | BACKUP, INT, "2400"}},  // steeringPressed threshold; 1200 = stock, proportional on non-1200 cars
+    {"NrdrOverrideThresholdCenterBoost", {PERSISTENT | BACKUP, INT, "1200"}},  // override threshold used when wheel is within the Center Boost degree band (straights); easy override on straights, no false drops on curves
     {"HondaOverrideFadeDownSecs", {PERSISTENT | BACKUP, FLOAT, "0"}},
     {"HondaOverrideFadeUpSecs", {PERSISTENT | BACKUP, FLOAT, "1.5"}},
     {"HondaOverrideTorqueScale", {PERSISTENT | BACKUP, INT, "0"}},
