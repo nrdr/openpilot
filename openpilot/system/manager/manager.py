@@ -49,6 +49,7 @@ NRDR_DEFAULT_BOOL_PARAMS = {
   "MadsMainCruiseAllowed": False,
 
   # nrdr lateral
+  "HondaTorqueLowPassFilter": True,
   "HondaUnwindLookahead": True,
   "HondaNotchEnabled": True,
 
