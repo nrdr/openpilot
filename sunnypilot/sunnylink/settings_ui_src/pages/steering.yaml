@@ -282,7 +282,7 @@ sections:
       description: Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops.
     - key: HondaUnwindBoostSeconds
       widget: option
-      title: Unwind Boost
+      title: Unwind Boost Duration
       description: How long the extra unwind feedforward is held at the start of each unwind before it fades out. Caps the low-speed return assist so it doesn't keep pushing torque through a long unwind. 0 = off.
       min: 0.0
       max: 3.0
