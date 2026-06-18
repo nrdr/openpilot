@@ -30,11 +30,21 @@ class OverrideTuningLayout(Widget):
 
     self._driver_override_threshold = option_item_sp(
       param="NrdrDriverOverrideThreshold",
-      title=lambda: tr("Driver Override Threshold (Default: 1200)"),
+      title=lambda: tr("Driver Override Threshold (Default: 2400)"),
       min_value=100,
       max_value=5000,
       value_change_step=100,
       description=lambda: tr("Raw steering torque sensor reading above which you are considered to be steering (driver override). 1200 is Honda's stock threshold; on the few cars with a different stock threshold, your value is applied proportionally so 1200 always means stock."),
+      label_callback=lambda value: f"{value}",
+    )
+
+    self._driver_override_threshold_cb = option_item_sp(
+      param="NrdrOverrideThresholdCenterBoost",
+      title=lambda: tr("Override Threshold Center Boost (Default: 1200)"),
+      min_value=100,
+      max_value=5000,
+      value_change_step=100,
+      description=lambda: tr("When the wheel is within the Center Boost degree band (on a straight), this lower override threshold applies instead of the one above - so you can override easily on straights while curves keep the higher threshold and don't drop torque from a false override. Set equal to Driver Override Threshold to disable."),
       label_callback=lambda value: f"{value}",
     )
 
@@ -79,6 +89,7 @@ class OverrideTuningLayout(Widget):
     return [
       self._increase_override_tolerance,
       self._driver_override_threshold,
+      self._driver_override_threshold_cb,
       LineSeparatorSP(40),
       self._driver_assist_during_override,
       self._override_fade_down,
@@ -90,6 +101,7 @@ class OverrideTuningLayout(Widget):
     super()._update_state()
     self._increase_override_tolerance.action_item.set_enabled(True)
     self._driver_override_threshold.action_item.set_enabled(True)
+    self._driver_override_threshold_cb.action_item.set_enabled(True)
     self._driver_assist_during_override.action_item.set_enabled(True)
     self._override_fade_down.action_item.set_enabled(True)
     self._override_fade_up.action_item.set_enabled(True)
