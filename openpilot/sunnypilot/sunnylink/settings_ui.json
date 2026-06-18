@@ -1531,6 +1531,12 @@
                   "min": 0.0,
                   "max": 3.0,
                   "step": 0.01
+                },
+                {
+                  "key": "NrdrHondaDashVariantB",
+                  "widget": "toggle",
+                  "title": "Honda Dashboard Variant B",
+                  "description": "Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is Variant B. Placeholder for now - has no effect until the rounding correction is built."
                 }
               ]
             }
