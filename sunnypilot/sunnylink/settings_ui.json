@@ -333,13 +333,20 @@
         },
         {
           "id": "nrdr",
-          "title": "nrdr Settings",
-          "description": "Customize settings related to the nrdr fork",
-          "items": [],
+          "title": "nrdr Lateral Tuning",
+          "description": "Lateral tuning specific to the nrdr fork.",
+          "items": [
+            {
+              "key": "NrdrRemoteTuneScan",
+              "widget": "toggle",
+              "title": "Run Tune Report Scan",
+              "description": "Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full da"
+            }
+          ],
           "sub_panels": [
             {
-              "id": "nrdr_lateral",
-              "label": "Lateral Tuning",
+              "id": "nrdr_car_info",
+              "label": "Car & Tune Info",
               "trigger_key": null,
               "items": [
                 {
@@ -347,31 +354,14 @@
                   "widget": "info",
                   "title": "Car & Tune Info",
                   "description": "Your car's loaded profile - fingerprint, EPS firmware, gas pedal interceptor and radar status, and the lateral/longitudinal kp/ki/kf. Written by the device once it has fingerprinted the car."
-                },
-                {
-                  "key": "NrdrLearnSteerRatio",
-                  "widget": "toggle",
-                  "title": "Learn Steer Ratio (Auto)",
-                  "description": "When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance."
-                },
-                {
-                  "key": "NrdrLearnStiffness",
-                  "widget": "toggle",
-                  "title": "Learn Tire Stiffness (Auto)",
-                  "description": "When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0."
-                },
-                {
-                  "key": "NrdrLearnAngleOffset",
-                  "widget": "toggle",
-                  "title": "Learn Angle Offset (Auto)",
-                  "description": "When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side."
-                },
-                {
-                  "key": "HondaTorqueLowPassFilter",
-                  "widget": "toggle",
-                  "title": "Low Pass Filter (tau)",
-                  "description": "Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations."
-                },
+                }
+              ]
+            },
+            {
+              "id": "nrdr_pidf_ground",
+              "label": "PID/F Tuning Ground",
+              "trigger_key": null,
+              "items": [
                 {
                   "key": "LatPScaleLowSpeed",
                   "widget": "option",
@@ -401,22 +391,6 @@
                   "max": 500,
                   "step": 5,
                   "unit": "%"
-                },
-                {
-                  "key": "HondaLpfTauLowSpeed",
-                  "widget": "option",
-                  "title": "Low Pass Filter Tau (Below 25mph)",
-                  "description": "Low-pass filter time constant (seconds) below 25 mph.",
-                  "min": 0.0,
-                  "max": 5.0,
-                  "step": 0.01,
-                  "enablement": [
-                    {
-                      "type": "param",
-                      "key": "HondaTorqueLowPassFilter",
-                      "equals": true
-                    }
-                  ]
                 },
                 {
                   "key": "LatPScaleStandard",
@@ -449,22 +423,6 @@
                   "unit": "%"
                 },
                 {
-                  "key": "HondaLpfTauStandard",
-                  "widget": "option",
-                  "title": "Standard Tau (25-50mph)",
-                  "description": "Low-pass filter time constant (seconds) between 25 and 50 mph.",
-                  "min": 0.0,
-                  "max": 5.0,
-                  "step": 0.01,
-                  "enablement": [
-                    {
-                      "type": "param",
-                      "key": "HondaTorqueLowPassFilter",
-                      "equals": true
-                    }
-                  ]
-                },
-                {
                   "key": "LatPScaleHighway",
                   "widget": "option",
                   "title": "Highway Proportional Scale (50mph+)",
@@ -495,22 +453,6 @@
                   "unit": "%"
                 },
                 {
-                  "key": "HondaLpfTauHighway",
-                  "widget": "option",
-                  "title": "Highway Tau (50mph+)",
-                  "description": "Low-pass filter time constant (seconds) above 50 mph.",
-                  "min": 0.0,
-                  "max": 5.0,
-                  "step": 0.01,
-                  "enablement": [
-                    {
-                      "type": "param",
-                      "key": "HondaTorqueLowPassFilter",
-                      "equals": true
-                    }
-                  ]
-                },
-                {
                   "key": "HondaCenterScale",
                   "widget": "option",
                   "title": "Center Boost",
@@ -538,7 +480,14 @@
                   "max": 80,
                   "step": 1,
                   "unit": "mph"
-                },
+                }
+              ]
+            },
+            {
+              "id": "nrdr_unwind",
+              "label": "Unwind Helpers",
+              "trigger_key": null,
+              "items": [
                 {
                   "key": "HondaUnwindFreeze",
                   "widget": "toggle",
@@ -569,6 +518,125 @@
                   "min": 1.0,
                   "max": 4.0,
                   "step": 0.1
+                }
+              ]
+            },
+            {
+              "id": "nrdr_override",
+              "label": "Override Tuning",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "NrdrIncreaseOverrideTolerance",
+                  "widget": "toggle",
+                  "title": "Increase Driver Override Hysteresis",
+                  "description": "Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below."
+                },
+                {
+                  "key": "NrdrDriverOverrideThreshold",
+                  "widget": "option",
+                  "title": "Driver Override Threshold",
+                  "description": "Raw steering torque sensor reading above which you are considered to be steering (driver override). 1200 is Honda's stock threshold; on the few cars with a different stock threshold, your value is applied proportionally so 1200 always means stock.",
+                  "min": 100,
+                  "max": 5000,
+                  "step": 100
+                },
+                {
+                  "key": "HondaDriverAssistDuringOverride",
+                  "widget": "toggle",
+                  "title": "Pass-through assist torque on override",
+                  "description": "When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling."
+                },
+                {
+                  "key": "HondaOverrideFadeDownSecs",
+                  "widget": "option",
+                  "title": "Override Torque Fade Down",
+                  "description": "Controls how quickly steering torque fades out when driver override begins.",
+                  "min": 0.0,
+                  "max": 10.0,
+                  "step": 0.1,
+                  "unit": "second"
+                },
+                {
+                  "key": "HondaOverrideFadeUpSecs",
+                  "widget": "option",
+                  "title": "Override Torque Fade Up",
+                  "description": "Controls how quickly steering torque fades back in after driver override ends.",
+                  "min": 0.0,
+                  "max": 10.0,
+                  "step": 0.1,
+                  "unit": "second"
+                },
+                {
+                  "key": "HondaOverrideTorqueScale",
+                  "widget": "option",
+                  "title": "Override Torque Retain",
+                  "description": "Controls how much openpilot steering torque remains when the override has gone past Override Torque Fade Down.",
+                  "min": 0,
+                  "max": 100,
+                  "step": 1,
+                  "unit": "%"
+                }
+              ]
+            },
+            {
+              "id": "nrdr_steer_filters",
+              "label": "Steer Filters",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "HondaTorqueLowPassFilter",
+                  "widget": "toggle",
+                  "title": "Low Pass Filter (tau)",
+                  "description": "Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations."
+                },
+                {
+                  "key": "HondaLpfTauLowSpeed",
+                  "widget": "option",
+                  "title": "Low Pass Filter Tau (Below 25mph)",
+                  "description": "Low-pass filter time constant (seconds) below 25 mph.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaTorqueLowPassFilter",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaLpfTauStandard",
+                  "widget": "option",
+                  "title": "Standard Tau (25-50mph)",
+                  "description": "Low-pass filter time constant (seconds) between 25 and 50 mph.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaTorqueLowPassFilter",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaLpfTauHighway",
+                  "widget": "option",
+                  "title": "Highway Tau (50mph+)",
+                  "description": "Low-pass filter time constant (seconds) above 50 mph.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaTorqueLowPassFilter",
+                      "equals": true
+                    }
+                  ]
                 },
                 {
                   "key": "HondaNotchEnabled",
@@ -730,274 +798,37 @@
                   ]
                 }
               ]
-            },
+            }
+          ]
+        },
+        {
+          "id": "nrdr_learned",
+          "title": "nrdr Learned Params",
+          "description": "Live-learned vehicle parameters.",
+          "items": [],
+          "sub_panels": [
             {
-              "id": "nrdr_override",
-              "label": "Override Tuning",
+              "id": "nrdr_learned_params",
+              "label": "Learned Parameters",
               "trigger_key": null,
               "items": [
                 {
-                  "key": "NrdrIncreaseOverrideTolerance",
+                  "key": "NrdrLearnSteerRatio",
                   "widget": "toggle",
-                  "title": "Increase Driver Override Hysteresis",
-                  "description": "Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below."
+                  "title": "Learn Steer Ratio (Auto)",
+                  "description": "When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance."
                 },
                 {
-                  "key": "NrdrDriverOverrideThreshold",
-                  "widget": "option",
-                  "title": "Driver Override Threshold",
-                  "description": "Raw steering torque sensor reading above which you are considered to be steering (driver override). 1200 is Honda's stock threshold; on the few cars with a different stock threshold, your value is applied proportionally so 1200 always means stock.",
-                  "min": 100,
-                  "max": 5000,
-                  "step": 100
-                },
-                {
-                  "key": "HondaDriverAssistDuringOverride",
+                  "key": "NrdrLearnStiffness",
                   "widget": "toggle",
-                  "title": "Pass-through assist torque on override",
-                  "description": "When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling."
+                  "title": "Learn Tire Stiffness (Auto)",
+                  "description": "When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0."
                 },
                 {
-                  "key": "HondaOverrideFadeDownSecs",
-                  "widget": "option",
-                  "title": "Override Torque Fade Down",
-                  "description": "Controls how quickly steering torque fades out when driver override begins.",
-                  "min": 0.0,
-                  "max": 10.0,
-                  "step": 0.1,
-                  "unit": "second"
-                },
-                {
-                  "key": "HondaOverrideFadeUpSecs",
-                  "widget": "option",
-                  "title": "Override Torque Fade Up",
-                  "description": "Controls how quickly steering torque fades back in after driver override ends.",
-                  "min": 0.0,
-                  "max": 10.0,
-                  "step": 0.1,
-                  "unit": "second"
-                },
-                {
-                  "key": "HondaOverrideTorqueScale",
-                  "widget": "option",
-                  "title": "Override Torque Retain",
-                  "description": "Controls how much openpilot steering torque remains when the override has gone past Override Torque Fade Down.",
-                  "min": 0,
-                  "max": 100,
-                  "step": 1,
-                  "unit": "%"
-                }
-              ]
-            },
-            {
-              "id": "nrdr_longitudinal",
-              "label": "Longitudinal Tuning",
-              "trigger_key": null,
-              "items": [
-                {
-                  "key": "LongPidTuneScale",
-                  "widget": "option",
-                  "title": "Longitudinal PID Tune Scale",
-                  "description": "Scales longitudinal PID controller values from their configured base tune.",
-                  "min": 0,
-                  "max": 500,
-                  "step": 5,
-                  "unit": "%"
-                },
-                {
-                  "key": "NrdrCruiseMismatchCorrection",
-                  "widget": "option",
-                  "title": "Cruise Mismatch Correction",
-                  "description": "Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.",
-                  "min": 95.0,
-                  "max": 105.0,
-                  "step": 0.1,
-                  "unit": "%"
-                },
-                {
-                  "key": "StaticFeedforwardLong",
+                  "key": "NrdrLearnAngleOffset",
                   "widget": "toggle",
-                  "title": "Keep Feedforward Static",
-                  "description": "When ON, the longitudinal PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle."
-                },
-                {
-                  "key": "NrdrHondaEcuMatchedLong",
-                  "widget": "toggle",
-                  "title": "Honda Nidec: ECU-matched longitudinal improvements",
-                  "description": "Honda Nidec only. Shapes the longitudinal command to match the factory ECU - rate-limits the acceleration command to the ECU's ramp rates, applies a speed-dependent coasting deadband (wide at low speed, tight on the highway), and briefly coasts through gas/brake transitions to avoid lurch. Calibrated on the 2019 Pilot; other Nidec cars may need tuning. OFF = stock command path."
-                },
-                {
-                  "key": "HondaLiveLearningGas",
-                  "widget": "toggle",
-                  "title": "Live Learning Gas",
-                  "description": "Allows Honda gas and wind compensation factors to learn live while driving.",
-                  "enablement": [
-                    {
-                      "type": "offroad_only"
-                    }
-                  ]
-                },
-                {
-                  "key": "HondaCivicRadarTryout",
-                  "widget": "toggle",
-                  "title": "Try Honda Bosch Radar (experimental)",
-                  "description": "EXPERIMENTAL \u2014 Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller."
-                },
-                {
-                  "key": "HondaStoppingDecelRate",
-                  "widget": "option",
-                  "title": "Stopping Decel Rate",
-                  "description": "Brake-rate limiter used while coming to a stop (carcontroller).",
-                  "min": 0,
-                  "max": 100,
-                  "step": 1
-                },
-                {
-                  "key": "HondaStopAccel",
-                  "widget": "option",
-                  "title": "Stop Accel",
-                  "description": "Target acceleration once stopped (holds the brake).",
-                  "min": -4.0,
-                  "max": 0.0,
-                  "step": 0.01
-                },
-                {
-                  "key": "HondaStoppingDecelRateLong",
-                  "widget": "option",
-                  "title": "Planner Stopping Rate",
-                  "description": "How quickly commanded deceleration ramps down while coming to a stop.",
-                  "min": 0.0,
-                  "max": 5.0,
-                  "step": 0.01
-                },
-                {
-                  "key": "HondaVEgoStopping",
-                  "widget": "option",
-                  "title": "vEgo Stopping",
-                  "description": "Speed (m/s) below which the planner treats the car as stopping.",
-                  "min": 0.0,
-                  "max": 3.0,
-                  "step": 0.01
-                },
-                {
-                  "key": "HondaVEgoStarting",
-                  "widget": "option",
-                  "title": "vEgo Starting",
-                  "description": "Speed (m/s) above which the car is considered moving again.",
-                  "min": 0.0,
-                  "max": 3.0,
-                  "step": 0.01
-                }
-              ]
-            },
-            {
-              "id": "nrdr_party_tricks",
-              "label": "Special",
-              "trigger_key": null,
-              "items": [
-                {
-                  "key": "HondaInjectionTest",
-                  "widget": "toggle",
-                  "title": "Injection Test (Caution!)",
-                  "description": "When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a massive steering command. Use with extreme caution on a safe, empty road."
-                },
-                {
-                  "key": "HondaAltDashboardSpeed",
-                  "widget": "multiple_button",
-                  "title": "Alternative Dashboard Speed Design",
-                  "description": "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph (\"Stopped\" below 1 mph, \"--\" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash cluster reads.",
-                  "options": [
-                    {
-                      "value": 0,
-                      "label": "Stock"
-                    },
-                    {
-                      "value": 1,
-                      "label": "Lead Speed"
-                    },
-                    {
-                      "value": 2,
-                      "label": "GPS Speed"
-                    },
-                    {
-                      "value": 3,
-                      "label": "Cluster Speed"
-                    }
-                  ]
-                },
-                {
-                  "key": "HondaAltDashboardDistance",
-                  "widget": "option",
-                  "title": "Alternative Dashboard Distance Design",
-                  "description": "Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). Radar closes the bars in as the lead approaches. Velocity pushes the bars out under acceleration and pulls them in under braking. Non-stock designs stay on the cluster permanently, even when not engaged.",
-                  "options": [
-                    {
-                      "value": 0,
-                      "label": "Stock"
-                    },
-                    {
-                      "value": 1,
-                      "label": "Radar"
-                    },
-                    {
-                      "value": 2,
-                      "label": "Velocity"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrClearDashFaults",
-                  "widget": "toggle",
-                  "title": "Clear Dashboard Fault Codes",
-                  "description": "Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active)."
-                },
-                {
-                  "key": "HondaSpoofCameraMessages",
-                  "widget": "toggle",
-                  "title": "Spoof Camera Messages",
-                  "description": "Dead camera only - keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises \"Auto High Beam System Problem\" (that fault is a message timeout, not a code). Leave OFF if your stock camera works."
-                },
-                {
-                  "key": "NrdrCruiseButtonSubMode",
-                  "widget": "toggle",
-                  "title": "Cruise Button Sub-Mode",
-                  "description": "Dynamic HUD - pressing the distance button or set/resume first wakes a preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed. The blink starts lazy and accelerates continuously until it cuts off."
-                },
-                {
-                  "key": "NrdrCruiseButtonSubModeSecs",
-                  "widget": "option",
-                  "title": "Sub-Mode Visibility Time",
-                  "description": "How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and rapid right before it falls off.",
-                  "min": 5,
-                  "max": 60,
-                  "step": 1,
-                  "unit": "second",
-                  "enablement": [
-                    {
-                      "type": "param",
-                      "key": "NrdrCruiseButtonSubMode",
-                      "equals": true
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "id": "nrdr_remote_actions",
-              "label": "Remote Actions",
-              "trigger_key": null,
-              "items": [
-                {
-                  "key": "NrdrRemoteForceUpdate",
-                  "widget": "toggle",
-                  "title": "Force Update",
-                  "description": "Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status below for progress."
-                },
-                {
-                  "key": "NrdrRemoteTuneScan",
-                  "widget": "toggle",
-                  "title": "Run Tune Report Scan",
-                  "description": "Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full da"
+                  "title": "Learn Angle Offset (Auto)",
+                  "description": "When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side."
                 }
               ]
             }
@@ -1460,7 +1291,235 @@
                       "equals": true
                     },
                     {
-                      "type": "ca"
+                      "type": "capability",
+                      "field": "has_icbm",
+                      "equals": true
+                    }
+                  ]
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_icbm",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "nrdr",
+          "title": "nrdr Longitudinal Tuning",
+          "description": "Longitudinal tuning specific to the nrdr fork.",
+          "items": [],
+          "sub_panels": [
+            {
+              "id": "nrdr_longitudinal",
+              "label": "Longitudinal Tuning",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "LongPidTuneScale",
+                  "widget": "option",
+                  "title": "Longitudinal PID Tune Scale",
+                  "description": "Scales longitudinal PID controller values from their configured base tune.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "NrdrCruiseMismatchCorrection",
+                  "widget": "option",
+                  "title": "Cruise Mismatch Correction",
+                  "description": "Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.",
+                  "min": 95.0,
+                  "max": 105.0,
+                  "step": 0.1,
+                  "unit": "%"
+                },
+                {
+                  "key": "StaticFeedforwardLong",
+                  "widget": "toggle",
+                  "title": "Keep Feedforward Static",
+                  "description": "When ON, the longitudinal PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle."
+                },
+                {
+                  "key": "NrdrHondaEcuMatchedLong",
+                  "widget": "toggle",
+                  "title": "Honda Nidec: ECU-matched longitudinal improvements",
+                  "description": "Honda Nidec only. Shapes the longitudinal command to match the factory ECU - rate-limits the acceleration command to the ECU's ramp rates, applies a speed-dependent coasting deadband (wide at low speed, tight on the highway), and briefly coasts through gas/brake transitions to avoid lurch. Calibrated on the 2019 Pilot; other Nidec cars may need tuning. OFF = stock command path."
+                },
+                {
+                  "key": "HondaLiveLearningGas",
+                  "widget": "toggle",
+                  "title": "Live Learning Gas",
+                  "description": "Allows Honda gas and wind compensation factors to learn live while driving.",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaCivicRadarTryout",
+                  "widget": "toggle",
+                  "title": "Try Honda Bosch Radar (experimental)",
+                  "description": "EXPERIMENTAL \u2014 Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller."
+                },
+                {
+                  "key": "HondaStoppingDecelRate",
+                  "widget": "option",
+                  "title": "Stopping Decel Rate",
+                  "description": "Brake-rate limiter used while coming to a stop (carcontroller).",
+                  "min": 0,
+                  "max": 100,
+                  "step": 1
+                },
+                {
+                  "key": "HondaStopAccel",
+                  "widget": "option",
+                  "title": "Stop Accel",
+                  "description": "Target acceleration once stopped (holds the brake).",
+                  "min": -4.0,
+                  "max": 0.0,
+                  "step": 0.01
+                },
+                {
+                  "key": "HondaStoppingDecelRateLong",
+                  "widget": "option",
+                  "title": "Planner Stopping Rate",
+                  "description": "How quickly commanded deceleration ramps down while coming to a stop.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01
+                },
+                {
+                  "key": "HondaVEgoStopping",
+                  "widget": "option",
+                  "title": "vEgo Stopping",
+                  "description": "Speed (m/s) below which the planner treats the car as stopping.",
+                  "min": 0.0,
+                  "max": 3.0,
+                  "step": 0.01
+                },
+                {
+                  "key": "HondaVEgoStarting",
+                  "widget": "option",
+                  "title": "vEgo Starting",
+                  "description": "Speed (m/s) above which the car is considered moving again.",
+                  "min": 0.0,
+                  "max": 3.0,
+                  "step": 0.01
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "nrdr_special",
+          "title": "nrdr Special",
+          "description": "Dashboard, diagnostics, and special features.",
+          "items": [],
+          "sub_panels": [
+            {
+              "id": "nrdr_party_tricks",
+              "label": "Special",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "HondaInjectionTest",
+                  "widget": "toggle",
+                  "title": "Injection Test (Caution!)",
+                  "description": "When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a massive steering command. Use with extreme caution on a safe, empty road."
+                },
+                {
+                  "key": "HondaAltDashboardSpeed",
+                  "widget": "multiple_button",
+                  "title": "Alternative Dashboard Speed Design",
+                  "description": "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph (\"Stopped\" below 1 mph, \"--\" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash cluster reads.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Stock"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Lead Speed"
+                    },
+                    {
+                      "value": 2,
+                      "label": "GPS Speed"
+                    },
+                    {
+                      "value": 3,
+                      "label": "Cluster Speed"
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaAltDashboardDistance",
+                  "widget": "option",
+                  "title": "Alternative Dashboard Distance Design",
+                  "description": "Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). Radar closes the bars in as the lead approaches. Velocity pushes the bars out under acceleration and pulls them in under braking. Non-stock designs stay on the cluster permanently, even when not engaged.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Stock"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Radar"
+                    },
+                    {
+                      "value": 2,
+                      "label": "Velocity"
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrClearDashFaults",
+                  "widget": "toggle",
+                  "title": "Clear Dashboard Fault Codes",
+                  "description": "Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active)."
+                },
+                {
+                  "key": "HondaSpoofCameraMessages",
+                  "widget": "toggle",
+                  "title": "Spoof Camera Messages",
+                  "description": "Dead camera only - keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises \"Auto High Beam System Problem\" (that fault is a message timeout, not a code). Leave OFF if your stock camera works."
+                },
+                {
+                  "key": "NrdrCruiseButtonSubMode",
+                  "widget": "toggle",
+                  "title": "Cruise Button Sub-Mode",
+                  "description": "Dynamic HUD - pressing the distance button or set/resume first wakes a preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed. The blink starts lazy and accelerates continuously until it cuts off."
+                },
+                {
+                  "key": "NrdrCruiseButtonSubModeSecs",
+                  "widget": "option",
+                  "title": "Sub-Mode Visibility Time",
+                  "description": "How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and rapid right before it falls off.",
+                  "min": 5,
+                  "max": 60,
+                  "step": 1,
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrCruiseButtonSubMode",
+                      "equals": true
                     }
                   ]
                 }
@@ -2131,6 +2190,20 @@
               ]
             }
           ]
+        },
+        {
+          "id": "nrdr",
+          "title": "nrdr Force Update",
+          "description": "Trigger a remote device update.",
+          "items": [
+            {
+              "key": "NrdrRemoteForceUpdate",
+              "widget": "toggle",
+              "title": "Force Update",
+              "description": "Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status below for progress."
+            }
+          ],
+          "sub_panels": []
         }
       ]
     },
