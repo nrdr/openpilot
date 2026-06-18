@@ -59,7 +59,7 @@ class LongitudinalTuningLayout(Widget):
 
     self._live_learning_gas = toggle_item_sp(
       param="HondaLiveLearningGas",
-      title=lambda: tr("Live Learning Gas"),
+      title=lambda: tr("Live Learning Gas (Default: ON)"),
       description=lambda: tr("Allows Honda gas and wind compensation factors to learn live while driving."),
     )
 
@@ -123,6 +123,12 @@ class LongitudinalTuningLayout(Widget):
       description=lambda: tr("EXPERIMENTAL - Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and treats this car like a fingerprint-matched radar car (radarUnavailable=False + the custom honda_civic_bosch_radar DBC). If you ALSO enable openpilot experimental/alpha longitudinal, this radar WILL feed openpilot's lead tracking and command braking/acceleration - exactly like a matched car. With openpilot longitudinal OFF (stock ACC) it is perception only. The 0x280 decode is reverse-engineered and cross-car validated (~0.99) but NOT verified on your specific car: before enabling openpilot longitudinal, VALIDATE that lead distance and closing-rate match reality. Honda Civic Bosch only. Leave OFF if unsure."),
     )
 
+    self._dashboard_variant = toggle_item_sp(
+      param="NrdrHondaDashVariantB",
+      title=lambda: tr("Honda Dashboard Variant B (Default: OFF)"),
+      description=lambda: tr("Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is Variant B. Placeholder for now - has no effect until the rounding correction is built."),
+    )
+
     return [
       self._long_pid_tune_scale,
       self._static_feedforward_long,
@@ -138,6 +144,8 @@ class LongitudinalTuningLayout(Widget):
       self._v_ego_starting,
       LineSeparatorSP(40),
       self._radar_tryout,
+      LineSeparatorSP(40),
+      self._dashboard_variant,
     ]
 
   def _update_state(self):
