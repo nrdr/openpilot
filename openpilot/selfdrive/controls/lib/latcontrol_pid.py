@@ -30,6 +30,14 @@ _MPH_TO_MS = 0.44704
 _LAT_SCALE_LOW_MAX = 25.0 * _MPH_TO_MS    # below this -> low-speed scale
 _LAT_SCALE_STD_MAX = 50.0 * _MPH_TO_MS    # below this -> standard scale, else highway
 
+# Center boost speed gate: boost ramps in over this many mph above the min-speed floor,
+# so it engages smoothly instead of stepping in the moment the car crosses the threshold.
+CENTER_BOOST_SPEED_FADE_MS = 5.0 * _MPH_TO_MS
+
+# Unwind FF boost fades out over this many seconds approaching its time cap, so the boost
+# doesn't drop as a torque step the instant the cap is reached.
+UNWIND_BOOST_FADE_S = 0.3
+
 
 def _lat_pid_scale_banded(v_ego: float, low: float, standard: float, highway: float) -> float:
   # Speed-banded lateral PID output scale. Hard bands mirror carcontroller.torque_lpf_tau
@@ -85,6 +93,7 @@ def _pid_output_scale(
   center_taper_scale: float = 1.0,
   center_taper_high: float = 2.0,
   center_boost_threshold_deg: float = 3.0,
+  center_boost_min_speed_ms: float = 0.0,
 ) -> float:
   abs_angle = abs(desired_angle_deg)
   speed_weight = min(max((v_ego - 4.0) / 10.0, 0.0), 1.0)
@@ -106,7 +115,15 @@ def _pid_output_scale(
   # linear fade past the threshold so the boost doesn't step off abruptly.
   center_fade_deg = 1.0
   center_weight = min(max((center_boost_threshold_deg + center_fade_deg - abs_angle) / center_fade_deg, 0.0), 1.0)
-  center_taper = center_taper_high * center_taper_scale
+  # Speed gate: no center boost below center_boost_min_speed_ms, with a short ramp just
+  # above it so the boost doesn't step in abruptly. Center boost is meant for straight,
+  # higher-speed roads; gating it off at low speed stops the wheel oscillating at stops
+  # and in parking-lot crawl, where the near-center boost was wildly overtuned.
+  if center_boost_min_speed_ms > 0.0:
+    center_speed_weight = min(max((v_ego - center_boost_min_speed_ms) / CENTER_BOOST_SPEED_FADE_MS, 0.0), 1.0)
+  else:
+    center_speed_weight = 1.0
+  center_taper = center_taper_high * center_taper_scale * center_speed_weight
 
   mid_turn_scale = 0.1200 if is_left else 0.0150
   mid_turn_turn_in_scale = -0.5500 if is_left else -0.0524
@@ -153,6 +170,13 @@ class LatControlPID(LatControl):
     # all speeds; active only within the Center Boost Threshold of dead-center.
     self.center_taper_high = 0.5
     self.center_boost_threshold = 3.0
+    self.center_boost_min_speed = 50.0  # mph; below this (with a short ramp) center boost is gated off
+    # Unwind FF boost: peak multiplier (strongest at a standstill) + a real time cap that
+    # holds the boost only for the first N seconds of each unwind, then fades it out.
+    self.dt = dt
+    self.unwind_ff_multiplier = 2.0
+    self.unwind_boost_cap_s = 1.0
+    self.unwind_boost_elapsed = 0.0
 
     self.eps_modified_steering_pressed_filter_s = 0.0
     self.eps_modified_steering_pressed_prev = False
@@ -202,6 +226,7 @@ class LatControlPID(LatControl):
       self.center_taper_scale.x = 1.0
       self.prev_output_torque = 0.0
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
+      self.unwind_boost_elapsed = 0.0
     else:
       desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
       phase = angle_steers_des_no_offset * desired_angle_delta
@@ -210,9 +235,10 @@ class LatControlPID(LatControl):
       ff = self.ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
       ff_scale = 1.0
 
-      # Low-speed unwind needs extra feedforward to overcome EPS/tire stiction.
-      # The boost is intentionally limited to the first second of each unwind event.
-      unwind_ff_boost = float(np.interp(CS.vEgo, [0.0, 10.0], [2.0, 1.0]))
+      # Low-speed unwind needs extra feedforward to overcome EPS/tire stiction. The peak
+      # multiplier is live-tunable and fades to 1x (no boost) by ~22 mph; a separate time
+      # cap (applied below) limits how long the boost is held into each unwind.
+      unwind_ff_boost = float(np.interp(CS.vEgo, [0.0, 10.0], [self.unwind_ff_multiplier, 1.0]))
 
       # Smooth FF blend: ramp from ff_scale at phase=0 to unwind_ff_boost at phase=-0.5.
       abs_angle_des = abs(angle_steers_des_no_offset)
@@ -242,6 +268,22 @@ class LatControlPID(LatControl):
             unwind_predicted = lookahead_la == 0.0 or predicted_unwind_weight > 0.5
 
       ff_unwind_weight = max(ff_unwind_weight, predicted_unwind_weight)
+
+      # Time cap: hold the boost only for the first unwind_boost_cap_s of each unwind event.
+      # Accumulate elapsed while the (pre-cap) unwind weight is active and reset when the
+      # unwind ends, so the timer tracks the real event; fade out over UNWIND_BOOST_FADE_S
+      # approaching the cap so the boost doesn't drop as a torque step. cap == 0 -> no boost.
+      if ff_unwind_weight > 0.0:
+        self.unwind_boost_elapsed += self.dt
+      else:
+        self.unwind_boost_elapsed = 0.0
+      if self.unwind_boost_cap_s > 0.0:
+        fade = min(UNWIND_BOOST_FADE_S, self.unwind_boost_cap_s)
+        time_gate = min(max((self.unwind_boost_cap_s - self.unwind_boost_elapsed) / fade, 0.0), 1.0)
+      else:
+        time_gate = 0.0
+      ff_unwind_weight *= time_gate
+
       ff_multiplier = ff_scale + ff_unwind_weight * max(unwind_ff_boost - ff_scale, 0.0)
       ff *= ff_multiplier
 
@@ -297,8 +339,19 @@ class LatControlPID(LatControl):
           0.0,
           10.0,
         )
+        # mph floor below which center boost is disabled (low-speed center-oscillation fix).
+        self.center_boost_min_speed = get_param_float(
+          self.params,
+          "HondaCenterBoostMinSpeed",
+          50.0,
+          0.0,
+          90.0,
+        )
         self.unwind_freeze_enabled = self.params.get_bool("HondaUnwindFreeze")
         self.unwind_lookahead_enabled = self.params.get_bool("HondaUnwindLookahead")
+        # Unwind FF boost: peak multiplier + time cap (both FLOAT, stored as real values).
+        self.unwind_ff_multiplier = get_param_float(self.params, "HondaUnwindFfMultiplier", 2.0, 1.0, 4.0)
+        self.unwind_boost_cap_s = get_param_float(self.params, "HondaUnwindBoostSeconds", 1.0, 0.0, 3.0)
         self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
 
       output_torque = self.pid.update(
@@ -336,6 +389,7 @@ class LatControlPID(LatControl):
           center_taper_scale,
           self.center_taper_high,
           self.center_boost_threshold,
+          self.center_boost_min_speed * _MPH_TO_MS,
         )
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
 

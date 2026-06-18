@@ -373,10 +373,30 @@
                   "description": "Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations."
                 },
                 {
-                  "key": "LatPidScaleLowSpeed",
+                  "key": "LatPScaleLowSpeed",
                   "widget": "option",
-                  "title": "Low Speed PID Scale (Below 25mph)",
-                  "description": "Scales lateral PID output below 25 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.",
+                  "title": "Low Speed Proportional Scale (Below 25mph)",
+                  "description": "Scales the proportional (P) term below 25 mph. Higher = more error correction (tighter, can cut corners); lower = looser with wider swings.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LatIScaleLowSpeed",
+                  "widget": "option",
+                  "title": "Low Speed Integral Scale (Below 25mph)",
+                  "description": "Scales the integral (I) term below 25 mph. Builds correction over time to erase steady-state error; too high oscillates.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LatFScaleLowSpeed",
+                  "widget": "option",
+                  "title": "Low Speed Feedforward Scale (Below 25mph)",
+                  "description": "Scales the feedforward (kf) term below 25 mph. Follows the commanded angle rather than error, adding authority without amplifying noise. 100% = tuned value (static).",
                   "min": 0,
                   "max": 500,
                   "step": 5,
@@ -399,10 +419,30 @@
                   ]
                 },
                 {
-                  "key": "LatPidScaleStandard",
+                  "key": "LatPScaleStandard",
                   "widget": "option",
-                  "title": "Standard Speed PID Scale (25-50mph)",
-                  "description": "Scales lateral PID output between 25 and 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.",
+                  "title": "Standard Speed Proportional Scale (25-50mph)",
+                  "description": "Scales the proportional (P) term between 25 and 50 mph.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LatIScaleStandard",
+                  "widget": "option",
+                  "title": "Standard Speed Integral Scale (25-50mph)",
+                  "description": "Scales the integral (I) term between 25 and 50 mph.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LatFScaleStandard",
+                  "widget": "option",
+                  "title": "Standard Speed Feedforward Scale (25-50mph)",
+                  "description": "Scales the feedforward (kf) term between 25 and 50 mph. 100% = tuned value (static).",
                   "min": 0,
                   "max": 500,
                   "step": 5,
@@ -425,10 +465,30 @@
                   ]
                 },
                 {
-                  "key": "LatPidScaleHighway",
+                  "key": "LatPScaleHighway",
                   "widget": "option",
-                  "title": "Highway PID Scale (50mph+)",
-                  "description": "Scales lateral PID output above 50 mph. Higher results in more error correction and cutting corners, lower results in wider swings on curves and fewer corrections.",
+                  "title": "Highway Proportional Scale (50mph+)",
+                  "description": "Scales the proportional (P) term above 50 mph.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LatIScaleHighway",
+                  "widget": "option",
+                  "title": "Highway Integral Scale (50mph+)",
+                  "description": "Scales the integral (I) term above 50 mph.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LatFScaleHighway",
+                  "widget": "option",
+                  "title": "Highway Feedforward Scale (50mph+)",
+                  "description": "Scales the feedforward (kf) term above 50 mph. 100% = tuned value (static).",
                   "min": 0,
                   "max": 500,
                   "step": 5,
@@ -451,12 +511,6 @@
                   ]
                 },
                 {
-                  "key": "StaticFeedforwardLateral",
-                  "widget": "toggle",
-                  "title": "Keep Feedforward Static",
-                  "description": "When ON, the lateral PID scales multiply only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with them. Turn this on if you raise a PID scale but don't want the feedforward boosted with it. The longitudinal PID scale has its own toggle."
-                },
-                {
                   "key": "HondaCenterScale",
                   "widget": "option",
                   "title": "Center Boost",
@@ -476,6 +530,16 @@
                   "unit": "deg"
                 },
                 {
+                  "key": "HondaCenterBoostMinSpeed",
+                  "widget": "option",
+                  "title": "Center Boost Minimum Speed",
+                  "description": "Below this speed center boost is disabled. Center boost is meant for straight, higher-speed roads; gating it off at low speed stops the wheel from oscillating at stops and in parking-lot crawling.",
+                  "min": 0,
+                  "max": 80,
+                  "step": 1,
+                  "unit": "mph"
+                },
+                {
                   "key": "HondaUnwindFreeze",
                   "widget": "toggle",
                   "title": "Unwind Integrator Freeze",
@@ -486,6 +550,25 @@
                   "widget": "toggle",
                   "title": "Unwind Lookahead",
                   "description": "Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops."
+                },
+                {
+                  "key": "HondaUnwindBoostSeconds",
+                  "widget": "option",
+                  "title": "Unwind Boost",
+                  "description": "How long the extra unwind feedforward is held at the start of each unwind before it fades out. Caps the low-speed return assist so it doesn't keep pushing torque through a long unwind. 0 = off.",
+                  "min": 0.0,
+                  "max": 3.0,
+                  "step": 0.1,
+                  "unit": "s"
+                },
+                {
+                  "key": "HondaUnwindFfMultiplier",
+                  "widget": "option",
+                  "title": "Unwind Feedforward Multiplier",
+                  "description": "Peak feedforward multiplier during an unwind, strongest at a standstill and fading to 1x (no boost) by about 22 mph. Raise for more low-speed return authority if the wheel is lazy coming back to center.",
+                  "min": 1.0,
+                  "max": 4.0,
+                  "step": 0.1
                 },
                 {
                   "key": "HondaNotchEnabled",
@@ -914,20 +997,7 @@
                   "key": "NrdrRemoteTuneScan",
                   "widget": "toggle",
                   "title": "Run Tune Report Scan",
-                  "description": "Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full day of logs can take a few minutes; the per-speed summary appears below when finished, and the full report is saved to /data/nrdr_tune_report.txt (grab it via the copyparty file server in Developer)."
-                },
-                {
-                  "key": "NrdrRemoteStatus",
-                  "widget": "info",
-                  "blocked": true,
-                  "title": "Remote Action Status"
-                },
-                {
-                  "key": "NrdrTuneReportSummary",
-                  "widget": "info",
-                  "blocked": true,
-                  "title": "Tune Report Summary (per speed)",
-                  "description": "mean_err >0 means under-steering vs desired. High flip/100 means the controller is hunting (lower kp). High sat% means out of steering authority."
+                  "description": "Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full da"
                 }
               ]
             }
@@ -1390,26 +1460,7 @@
                       "equals": true
                     },
                     {
-                      "type": "capability",
-                      "field": "has_icbm",
-                      "equals": true
-                    }
-                  ]
-                }
-              ],
-              "enablement": [
-                {
-                  "type": "any",
-                  "conditions": [
-                    {
-                      "type": "capability",
-                      "field": "has_longitudinal_control",
-                      "equals": true
-                    },
-                    {
-                      "type": "capability",
-                      "field": "has_icbm",
-                      "equals": true
+                      "type": "ca"
                     }
                   ]
                 }
