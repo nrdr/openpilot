@@ -39,7 +39,7 @@ class UnwindHelpersLayout(Widget):
 
     self._unwind_boost_seconds = option_item_sp(
       param="HondaUnwindBoostSeconds",
-      title=lambda: tr("Unwind Boost (Default: 1.0s)"),
+      title=lambda: tr("Unwind Boost Duration (Default: 1.0s)"),
       min_value=0,
       max_value=300,
       value_change_step=10,
