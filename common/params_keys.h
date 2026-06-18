@@ -318,6 +318,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaInjectionTest", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaAltDashboardSpeed", {PERSISTENT | BACKUP, INT, "0"}},     // 0 Stock, 1 Lead Speed, 2 GPS Speed, 3 Cluster Speed
     {"HondaAltDashboardDistance", {PERSISTENT | BACKUP, INT, "0"}},  // 0 Stock, 1 Radar, 2 Velocity
+    {"NrdrHondaDashVariantB", {PERSISTENT | BACKUP, BOOL, "0"}},     // Honda cluster mini-speed rounding variant: OFF = Variant A (3 dashed lanes, default), ON = Variant B (4 dashed lanes). UI placeholder; no backend yet.
     {"NrdrMinSteerSpeed", {PERSISTENT | BACKUP, INT, "0"}},          // mph; below this speed no steering torque is commanded (0 = stock, steer always)
     {"NrdrClearDashFaults", {PERSISTENT | BACKUP, BOOL, "1"}},       // zero FCM/icon faults + FCW chime on the cluster; OFF = stock passthrough
     {"HondaSpoofCameraMessages", {PERSISTENT | BACKUP, BOOL, "0"}},  // dead camera: spoof CAMERA_MESSAGES (0x35E) to stop the Auto High Beam fault
