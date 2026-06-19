@@ -1,6 +1,7 @@
 #/usr/bin/env python3
 
 import struct
+import tqdm
 from panda import Panda
 from opendbc.car.structs import CarParams
 from opendbc.car.uds import UdsClient, SESSION_TYPE, ACCESS_TYPE, DATA_IDENTIFIER_TYPE
@@ -60,15 +61,18 @@ if __name__ == "__main__":
 
     start_addr = args.start_address
     end_addr = args.end_address
+    total = end_addr - start_addr + 1
     print("Reading memory from 0x{:08x} to 0x{:08x}".format(start_addr, end_addr))
     DEFAULT_BLOCK_SIZE = 512
     image = bytes()
-    while start_addr <= end_addr:
-      block_size = min(DEFAULT_BLOCK_SIZE, end_addr - start_addr + 1)
-      #uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.READ_MEMORY, struct.pack('!IH', start_addr, block_size))
-      #image += uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.READ_MEMORY, struct.pack('!IH', start_addr, block_size))
-      image += uds_client.read_memory_by_address(start_addr, block_size, 4, 2)
-      start_addr += block_size
+    with tqdm.tqdm(total=total, unit='B', unit_scale=True) as t:
+      while start_addr <= end_addr:
+        block_size = min(DEFAULT_BLOCK_SIZE, end_addr - start_addr + 1)
+        #uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.READ_MEMORY, struct.pack('!IH', start_addr, block_size))
+        #image += uds_client.routine_control(ROUTINE_CONTROL_TYPE.START, ROUTINE_IDENTIFIER_TYPE.READ_MEMORY, struct.pack('!IH', start_addr, block_size))
+        image += uds_client.read_memory_by_address(start_addr, block_size, 4, 2)
+        start_addr += block_size
+        t.update(block_size)
 
     with open(args.output, "wb") as f:
       f.write(image)
