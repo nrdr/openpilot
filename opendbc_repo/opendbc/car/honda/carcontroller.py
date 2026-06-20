@@ -899,6 +899,10 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
     if below_min_steer_speed:
       torque_cmd = 0.0
 
+    # nrdr: driver override only applies below 20 mph (hardcoded band-aid - no param).
+    # Above 20 mph the EPS/car handles override fine, so retain 100% torque and never give way.
+    override_allowed = CS.out.vEgo < 20.0 * CV.MPH_TO_MS
+
     if CC.latActive:
       if live["increase_override_tolerance"]:
         steering_pressed = self._filtered_steering_pressed(CS, torque_cmd)
@@ -908,7 +912,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
       if not self.lat_active_prev:
         self.override_ramp = 0.0
 
-      if steering_pressed:
+      if steering_pressed and override_allowed:
         fade_down_s = live["override_fade_down_s"]
         self.override_ramp = live["override_torque_scale"] if fade_down_s <= 0.0 else max(live["override_torque_scale"], self.override_ramp - DT_CTRL / fade_down_s)
       else:
@@ -954,7 +958,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
     # "Driver assist during override" ON  -> openpilot gives way while you steer (LKAS torque drops out).
     # OFF -> openpilot keeps applying torque during override (more resistant).
-    lkas_active = CC.latActive and (not live["driver_assist_during_override"] or not steering_pressed) and not below_min_steer_speed
+    lkas_active = CC.latActive and (not live["driver_assist_during_override"] or not steering_pressed or not override_allowed) and not below_min_steer_speed
     return limited_torque, lkas_active
 
   def update(self, CC, CC_SP, CS, now_nanos):
