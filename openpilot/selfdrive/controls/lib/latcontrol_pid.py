@@ -38,6 +38,17 @@ CENTER_BOOST_SPEED_FADE_MS = 5.0 * _MPH_TO_MS
 # doesn't drop as a torque step the instant the cap is reached.
 UNWIND_BOOST_FADE_S = 0.3
 
+# Rate-damping (D) reference gain: output torque per (deg/s) of steering-wheel rate at 100%
+# strength. The wheel is torque-commanded, so the plant is a double integrator that pure P
+# can't damp at low speed (tire self-aligning torque and the v^2 feedforward both vanish);
+# this is the derivative term that flattens it. 0.010 -> 1.0 torque at 100 deg/s @ 100%.
+RATE_DAMPING_REF = 0.010
+
+# Derivative Tuning Experiment: during winddown the D term fights the pullback we want at high
+# angle, but helps the wheel settle cleanly at center. So while unwinding, fade D out above this
+# wheel angle (deg) and back in below it. Full D for normal driving and windup.
+D_UNWIND_FADE_ANGLE = 30.0
+
 
 def _lat_pid_scale_banded(v_ego: float, low: float, standard: float, highway: float) -> float:
   # Speed-banded lateral PID output scale. Hard bands mirror carcontroller.torque_lpf_tau
@@ -177,6 +188,10 @@ class LatControlPID(LatControl):
     self.unwind_ff_multiplier = 2.0
     self.unwind_boost_cap_s = 1.0
     self.unwind_boost_elapsed = 0.0
+    # Rate damping (the missing "D"): live-tunable strength (0 = off) and the speed at which
+    # it fades out (above which tire self-aligning torque damps the steering on its own).
+    self.rate_damping_scale = 0.0
+    self.rate_damping_fade_speed_ms = 30.0 * _MPH_TO_MS
 
     self.eps_modified_steering_pressed_filter_s = 0.0
     self.eps_modified_steering_pressed_prev = False
@@ -307,6 +322,11 @@ class LatControlPID(LatControl):
       if self.unwind_freeze_enabled and (unwind_detected or unwind_predicted):
         freeze_integrator = True
 
+      # Derivative Tuning Experiment: force the integrator off during ANY winddown (phase < 0),
+      # independent of the opt-in freeze above. Pullback is exactly what we want here; I fights it.
+      if phase < 0.0:
+        freeze_integrator = True
+
       self.frame += 1
       if self.frame % 300 == 0:
         # Independent speed-banded P / I / F scales. default/min/max are runtime
@@ -350,8 +370,11 @@ class LatControlPID(LatControl):
         self.unwind_freeze_enabled = self.params.get_bool("HondaUnwindFreeze")
         self.unwind_lookahead_enabled = self.params.get_bool("HondaUnwindLookahead")
         # Unwind FF boost: peak multiplier + time cap (both FLOAT, stored as real values).
-        self.unwind_ff_multiplier = get_param_float(self.params, "HondaUnwindFfMultiplier", 2.0, 1.0, 4.0)
+        self.unwind_ff_multiplier = get_param_float(self.params, "HondaUnwindFfMultiplier", 2.0, 1.0, 10.0)
         self.unwind_boost_cap_s = get_param_float(self.params, "HondaUnwindBoostSeconds", 1.0, 0.0, 3.0)
+        # Rate damping (D): strength (stored 0-300% -> 0.0-3.0) and fade-out speed (mph).
+        self.rate_damping_scale = get_param_float(self.params, "NrdrLatRateDamping", 0.0, 0.0, 3.0, scale=100.0)
+        self.rate_damping_fade_speed_ms = get_param_float(self.params, "NrdrLatRateDampingFadeSpeed", 30.0, 0.0, 60.0) * _MPH_TO_MS
         self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
 
       output_torque = self.pid.update(
@@ -391,6 +414,23 @@ class LatControlPID(LatControl):
           self.center_boost_threshold,
           self.center_boost_min_speed * _MPH_TO_MS,
         )
+
+        # Rate damping (the missing "D"): torque opposing how fast the wheel is moving, applied
+        # after the output scale so it's a clean physical term. Strongest at low speed (where the
+        # plant is an undamped double integrator) and faded to zero by rate_damping_fade_speed,
+        # where tire self-aligning torque resumes damping. Relies on this EPS being precise + low-lag.
+        rate_damp_fade = 0.0
+        if self.rate_damping_fade_speed_ms > 0.0:
+          rate_damp_fade = min(max((self.rate_damping_fade_speed_ms - CS.vEgo) / self.rate_damping_fade_speed_ms, 0.0), 1.0)
+        # Unwind/angle scheduling: during winddown, D resists the pullback we want at high angle
+        # but helps the wheel settle at center, so fade D out above D_UNWIND_FADE_ANGLE and in
+        # below it. Blend by the unwind phase weight so D doesn't step when phase crosses zero;
+        # full D for normal driving and windup.
+        unwind_weight = min(max(-phase / 0.5, 0.0), 1.0)
+        d_angle_fade = min(max((D_UNWIND_FADE_ANGLE - abs(CS.steeringAngleDeg)) / D_UNWIND_FADE_ANGLE, 0.0), 1.0)
+        d_unwind_factor = (1.0 - unwind_weight) + unwind_weight * d_angle_fade
+        output_torque += -self.rate_damping_scale * RATE_DAMPING_REF * float(CS.steeringRateDeg) * rate_damp_fade * d_unwind_factor
+
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
 
       pid_log.active = True

@@ -52,7 +52,7 @@ class UnwindHelpersLayout(Widget):
       param="HondaUnwindFfMultiplier",
       title=lambda: tr("Unwind Feedforward Multiplier (Default: 2.0x)"),
       min_value=100,
-      max_value=400,
+      max_value=1000,
       value_change_step=10,
       description=lambda: tr("Peak feedforward multiplier during an unwind, strongest at a standstill and fading to 1x (no boost) by ~22 mph. Raise for more low-speed return authority if the wheel is lazy coming back to center."),
       label_callback=lambda value: f"{value / 100:.1f}x",

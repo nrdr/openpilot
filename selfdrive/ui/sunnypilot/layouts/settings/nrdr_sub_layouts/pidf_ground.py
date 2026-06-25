@@ -91,6 +91,22 @@ class PidfGroundLayout(Widget):
       label_callback=lambda value: f"{value}%",
     )
 
+    # --- Rate damping (D) ---
+    self._rate_damping = option_item_sp(
+      param="NrdrLatRateDamping",
+      title=lambda: tr("Rate Damping (D) Strength (Default: 0%)"),
+      min_value=0, max_value=300, value_change_step=5,
+      description=lambda: tr("The derivative term openpilot normally can't use. Adds torque opposing how fast the wheel is moving, which damps the low-speed oscillation plain P can't (the wheel is torque-commanded, so P alone rings). Relies on a clean steering-rate signal and a low-lag EPS - which this car has. 0 = off. Raise until the low-speed wobble flattens; too high makes turn-in feel heavy."),
+      label_callback=lambda value: f"{value}%",
+    )
+    self._rate_damping_fade_speed = option_item_sp(
+      param="NrdrLatRateDampingFadeSpeed",
+      title=lambda: tr("Rate Damping Fade-Out Speed (Default: 30mph)"),
+      min_value=0, max_value=60, value_change_step=1,
+      description=lambda: tr("Speed at which rate damping tapers to zero. Damping is strongest at a standstill and gone by this speed, where tire self-aligning torque resumes damping the steering itself. Keeps the D term out of your highway feel."),
+      label_callback=lambda value: f"{value} mph",
+    )
+
     # --- Center boost ---
     self._center_scale = option_item_sp(
       param="HondaCenterScale",
@@ -139,6 +155,10 @@ class PidfGroundLayout(Widget):
       self._lat_p_highway,
       self._lat_i_highway,
       self._lat_f_highway,
+      LineSeparatorSP(40),
+      # Rate damping (D)
+      self._rate_damping,
+      self._rate_damping_fade_speed,
       LineSeparatorSP(40),
       # Center boost
       self._center_scale,

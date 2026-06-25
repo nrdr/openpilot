@@ -340,6 +340,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaCenterBoostMinSpeed", {PERSISTENT | BACKUP, INT, "50"}},  // mph; below this speed center boost is disabled (low-speed center-oscillation fix)
     {"HondaUnwindBoostSeconds", {PERSISTENT | BACKUP, FLOAT, "1"}},  // s; unwind FF boost is held for the first N seconds of each unwind, then fades out
     {"HondaUnwindFfMultiplier", {PERSISTENT | BACKUP, FLOAT, "2"}},  // peak unwind feedforward multiplier at a standstill (fades to 1x by ~22mph)
+    {"NrdrLatRateDamping", {PERSISTENT | BACKUP, INT, "0"}},          // %; rate-damping (D) strength, 0 = off (torque opposing steering-wheel rate to damp low-speed oscillation)
+    {"NrdrLatRateDampingFadeSpeed", {PERSISTENT | BACKUP, INT, "30"}},  // mph; rate damping fades to zero by this speed, where tire self-aligning torque resumes damping
     {"HondaSteerDeltaLimiter", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaSteerDeltaUp", {PERSISTENT | BACKUP, FLOAT, "3"}},
     {"HondaSteerDeltaDown", {PERSISTENT | BACKUP, FLOAT, "3"}},

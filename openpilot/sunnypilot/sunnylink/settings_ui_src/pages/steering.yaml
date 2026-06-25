@@ -245,6 +245,22 @@ sections:
       max: 500
       step: 5
       unit: '%'
+    - key: NrdrLatRateDamping
+      widget: option
+      title: Rate Damping (D) Strength
+      description: The derivative term openpilot normally can't use. Adds torque opposing how fast the wheel is moving, which damps the low-speed oscillation plain P can't (the wheel is torque-commanded, so P alone rings). Relies on a clean steering-rate signal and a low-lag EPS - which this car has. 0 = off. Raise until the low-speed wobble flattens; too high makes turn-in feel heavy.
+      min: 0
+      max: 300
+      step: 5
+      unit: '%'
+    - key: NrdrLatRateDampingFadeSpeed
+      widget: option
+      title: Rate Damping Fade-Out Speed
+      description: Speed at which rate damping tapers to zero. Damping is strongest at a standstill and gone by this speed, where tire self-aligning torque resumes damping the steering itself. Keeps the D term out of your highway feel.
+      min: 0
+      max: 60
+      step: 1
+      unit: mph
     - key: HondaCenterScale
       widget: option
       title: Center Boost
@@ -293,7 +309,7 @@ sections:
       title: Unwind Feedforward Multiplier
       description: Peak feedforward multiplier during an unwind, strongest at a standstill and fading to 1x (no boost) by about 22 mph. Raise for more low-speed return authority if the wheel is lazy coming back to center.
       min: 1.0
-      max: 4.0
+      max: 10.0
       step: 0.1
   - id: nrdr_override
     label: Override Tuning
