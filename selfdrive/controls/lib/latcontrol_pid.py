@@ -38,6 +38,12 @@ CENTER_BOOST_SPEED_FADE_MS = 5.0 * _MPH_TO_MS
 # doesn't drop as a torque step the instant the cap is reached.
 UNWIND_BOOST_FADE_S = 0.3
 
+# Rate-damping (D) reference gain: output torque per (deg/s) of steering-wheel rate at 100%
+# strength. The wheel is torque-commanded, so the plant is a double integrator that pure P
+# can't damp at low speed (tire self-aligning torque and the v^2 feedforward both vanish);
+# this is the derivative term that flattens it. 0.010 -> 1.0 torque at 100 deg/s @ 100%.
+RATE_DAMPING_REF = 0.010
+
 
 def _lat_pid_scale_banded(v_ego: float, low: float, standard: float, highway: float) -> float:
   # Speed-banded lateral PID output scale. Hard bands mirror carcontroller.torque_lpf_tau
@@ -177,6 +183,10 @@ class LatControlPID(LatControl):
     self.unwind_ff_multiplier = 2.0
     self.unwind_boost_cap_s = 1.0
     self.unwind_boost_elapsed = 0.0
+    # Rate damping (the missing "D"): live-tunable strength (0 = off) and the speed at which
+    # it fades out (above which tire self-aligning torque damps the steering on its own).
+    self.rate_damping_scale = 0.0
+    self.rate_damping_fade_speed_ms = 30.0 * _MPH_TO_MS
 
     self.eps_modified_steering_pressed_filter_s = 0.0
     self.eps_modified_steering_pressed_prev = False
@@ -352,6 +362,9 @@ class LatControlPID(LatControl):
         # Unwind FF boost: peak multiplier + time cap (both FLOAT, stored as real values).
         self.unwind_ff_multiplier = get_param_float(self.params, "HondaUnwindFfMultiplier", 2.0, 1.0, 4.0)
         self.unwind_boost_cap_s = get_param_float(self.params, "HondaUnwindBoostSeconds", 1.0, 0.0, 3.0)
+        # Rate damping (D): strength (stored 0-300% -> 0.0-3.0) and fade-out speed (mph).
+        self.rate_damping_scale = get_param_float(self.params, "NrdrLatRateDamping", 0.0, 0.0, 3.0, scale=100.0)
+        self.rate_damping_fade_speed_ms = get_param_float(self.params, "NrdrLatRateDampingFadeSpeed", 30.0, 0.0, 60.0) * _MPH_TO_MS
         self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
 
       output_torque = self.pid.update(
@@ -391,6 +404,16 @@ class LatControlPID(LatControl):
           self.center_boost_threshold,
           self.center_boost_min_speed * _MPH_TO_MS,
         )
+
+        # Rate damping (the missing "D"): torque opposing how fast the wheel is moving, applied
+        # after the output scale so it's a clean physical term. Strongest at low speed (where the
+        # plant is an undamped double integrator) and faded to zero by rate_damping_fade_speed,
+        # where tire self-aligning torque resumes damping. Relies on this EPS being precise + low-lag.
+        rate_damp_fade = 0.0
+        if self.rate_damping_fade_speed_ms > 0.0:
+          rate_damp_fade = min(max((self.rate_damping_fade_speed_ms - CS.vEgo) / self.rate_damping_fade_speed_ms, 0.0), 1.0)
+        output_torque += -self.rate_damping_scale * RATE_DAMPING_REF * float(CS.steeringRateDeg) * rate_damp_fade
+
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
 
       pid_log.active = True
