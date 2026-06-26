@@ -173,18 +173,14 @@ class LatControlPID(LatControl):
                              pos_limit=self.steer_max, neg_limit=-self.steer_max)
 
     self.ff_factor = CP.lateralTuning.pid.kf
-    # Speed-banded feedforward (kfBP/kfV). When set (baked-tune cars) kf is interpolated by speed
-    # like kp/ki; when empty, fall back to the scalar kf above. getattr stays safe against a stale
-    # capnp that predates the kfBP/kfV fields.
+    # Speed-banded feedforward (kfBP/kfV): interpolate kf by speed like kp/ki when present, else
+    # fall back to the scalar kf above. getattr stays safe against a stale capnp without the fields.
     self.kf_bp = list(getattr(CP.lateralTuning.pid, "kfBP", []) or [])
     self.kf_v = list(getattr(CP.lateralTuning.pid, "kfV", []) or [])
     self.CI = CI
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
 
     self.is_eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
-    # Baked-tune cars carry their full per-band P/I/F tune in interface.py, so the UI scale sliders
-    # are forced neutral (1.0) for them in update() -- the tune lives in the base, not the scales.
-    self.lat_tune_baked = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.LAT_TUNE_BAKED.value)
     # Live-tunable center boost (replaces the old per-car lookup). Static across
     # all speeds; active only within the Center Boost Threshold of dead-center.
     self.center_taper_high = 0.5
@@ -198,7 +194,7 @@ class LatControlPID(LatControl):
     self.unwind_boost_elapsed = 0.0
     # Rate damping (the missing "D"): live-tunable strength (0 = off) and the speed at which
     # it fades out (above which tire self-aligning torque damps the steering on its own).
-    self.rate_damping_scale = 0.0
+    self.rate_damping_scale = 0.3
     self.rate_damping_fade_speed_ms = 30.0 * _MPH_TO_MS
 
     self.eps_modified_steering_pressed_filter_s = 0.0
@@ -341,14 +337,14 @@ class LatControlPID(LatControl):
       if self.frame % 300 == 0:
         # Independent speed-banded P / I / F scales. default/min/max are runtime
         # multipliers; scale converts the stored percent (100 -> 1.0x). Band selection
-        # by vEgo happens every frame below. Defaults preserve the prior P+I = 100/135/200
-        # tune (split equally across P and I) with feedforward left static (F = 100%).
+        # by vEgo happens every frame below. Defaults are a neutral 100% across the board --
+        # the per-car tune lives in interface.py and these act as fine-trim on top.
         self.lat_p_scale_low = get_param_float(self.params, "LatPScaleLowSpeed", 1.0, 0.0, 5.0, scale=100.0)
-        self.lat_p_scale_standard = get_param_float(self.params, "LatPScaleStandard", 1.35, 0.0, 5.0, scale=100.0)
-        self.lat_p_scale_highway = get_param_float(self.params, "LatPScaleHighway", 2.0, 0.0, 5.0, scale=100.0)
+        self.lat_p_scale_standard = get_param_float(self.params, "LatPScaleStandard", 1.0, 0.0, 5.0, scale=100.0)
+        self.lat_p_scale_highway = get_param_float(self.params, "LatPScaleHighway", 1.0, 0.0, 5.0, scale=100.0)
         self.lat_i_scale_low = get_param_float(self.params, "LatIScaleLowSpeed", 1.0, 0.0, 5.0, scale=100.0)
-        self.lat_i_scale_standard = get_param_float(self.params, "LatIScaleStandard", 1.35, 0.0, 5.0, scale=100.0)
-        self.lat_i_scale_highway = get_param_float(self.params, "LatIScaleHighway", 2.0, 0.0, 5.0, scale=100.0)
+        self.lat_i_scale_standard = get_param_float(self.params, "LatIScaleStandard", 1.0, 0.0, 5.0, scale=100.0)
+        self.lat_i_scale_highway = get_param_float(self.params, "LatIScaleHighway", 1.0, 0.0, 5.0, scale=100.0)
         self.lat_f_scale_low = get_param_float(self.params, "LatFScaleLowSpeed", 1.0, 0.0, 5.0, scale=100.0)
         self.lat_f_scale_standard = get_param_float(self.params, "LatFScaleStandard", 1.0, 0.0, 5.0, scale=100.0)
         self.lat_f_scale_highway = get_param_float(self.params, "LatFScaleHighway", 1.0, 0.0, 5.0, scale=100.0)
@@ -383,7 +379,7 @@ class LatControlPID(LatControl):
         self.unwind_ff_multiplier = get_param_float(self.params, "HondaUnwindFfMultiplier", 2.0, 1.0, 10.0)
         self.unwind_boost_cap_s = get_param_float(self.params, "HondaUnwindBoostSeconds", 1.0, 0.0, 3.0)
         # Rate damping (D): strength (stored 0-300% -> 0.0-3.0) and fade-out speed (mph).
-        self.rate_damping_scale = get_param_float(self.params, "NrdrLatRateDamping", 0.0, 0.0, 3.0, scale=100.0)
+        self.rate_damping_scale = get_param_float(self.params, "NrdrLatRateDamping", 0.3, 0.0, 3.0, scale=100.0)
         self.rate_damping_fade_speed_ms = get_param_float(self.params, "NrdrLatRateDampingFadeSpeed", 30.0, 0.0, 60.0) * _MPH_TO_MS
         self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
 
@@ -395,15 +391,10 @@ class LatControlPID(LatControl):
       )
 
       # Independently scale each PID term by its own speed-banded multiplier (P / I / F).
-      # Preserve-tune defaults (P=I per band, F=1.0) reproduce the prior single P+I scale.
-      # Baked-tune cars carry the full per-band tune in interface.py, so their sliders are forced
-      # neutral here -- the tune stands on the base alone (and ignores any stale stored scales).
-      if self.lat_tune_baked:
-        p_scale = i_scale = f_scale = 1.0
-      else:
-        p_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_p_scale_low, self.lat_p_scale_standard, self.lat_p_scale_highway)
-        i_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_i_scale_low, self.lat_i_scale_standard, self.lat_i_scale_highway)
-        f_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_f_scale_low, self.lat_f_scale_standard, self.lat_f_scale_highway)
+      # Defaults are a neutral 100% (the per-car tune lives in interface.py); these act as trim.
+      p_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_p_scale_low, self.lat_p_scale_standard, self.lat_p_scale_highway)
+      i_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_i_scale_low, self.lat_i_scale_standard, self.lat_i_scale_highway)
+      f_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_f_scale_low, self.lat_f_scale_standard, self.lat_f_scale_highway)
       output_torque = self.pid.p * p_scale + self.pid.i * i_scale + self.pid.d + self.pid.f * f_scale
 
       # Party Tricks: Injection Test multiplies the PID scale by 999% (diagnostic only).
