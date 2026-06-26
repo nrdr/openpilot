@@ -173,10 +173,18 @@ class LatControlPID(LatControl):
                              pos_limit=self.steer_max, neg_limit=-self.steer_max)
 
     self.ff_factor = CP.lateralTuning.pid.kf
+    # Speed-banded feedforward (kfBP/kfV). When set (baked-tune cars) kf is interpolated by speed
+    # like kp/ki; when empty, fall back to the scalar kf above. getattr stays safe against a stale
+    # capnp that predates the kfBP/kfV fields.
+    self.kf_bp = list(getattr(CP.lateralTuning.pid, "kfBP", []) or [])
+    self.kf_v = list(getattr(CP.lateralTuning.pid, "kfV", []) or [])
     self.CI = CI
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
 
     self.is_eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
+    # Baked-tune cars carry their full per-band P/I/F tune in interface.py, so the UI scale sliders
+    # are forced neutral (1.0) for them in update() -- the tune lives in the base, not the scales.
+    self.lat_tune_baked = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.LAT_TUNE_BAKED.value)
     # Live-tunable center boost (replaces the old per-car lookup). Static across
     # all speeds; active only within the Center Boost Threshold of dead-center.
     self.center_taper_high = 0.5
@@ -246,8 +254,10 @@ class LatControlPID(LatControl):
       desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
       phase = angle_steers_des_no_offset * desired_angle_delta
 
-      # Offset does not contribute to resistive torque.
-      ff = self.ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
+      # Offset does not contribute to resistive torque. Speed-banded kf (kfBP/kfV) when present,
+      # else the scalar kf.
+      ff_factor = float(np.interp(CS.vEgo, self.kf_bp, self.kf_v)) if self.kf_v else self.ff_factor
+      ff = ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
       ff_scale = 1.0
 
       # Low-speed unwind needs extra feedforward to overcome EPS/tire stiction. The peak
@@ -386,9 +396,14 @@ class LatControlPID(LatControl):
 
       # Independently scale each PID term by its own speed-banded multiplier (P / I / F).
       # Preserve-tune defaults (P=I per band, F=1.0) reproduce the prior single P+I scale.
-      p_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_p_scale_low, self.lat_p_scale_standard, self.lat_p_scale_highway)
-      i_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_i_scale_low, self.lat_i_scale_standard, self.lat_i_scale_highway)
-      f_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_f_scale_low, self.lat_f_scale_standard, self.lat_f_scale_highway)
+      # Baked-tune cars carry the full per-band tune in interface.py, so their sliders are forced
+      # neutral here -- the tune stands on the base alone (and ignores any stale stored scales).
+      if self.lat_tune_baked:
+        p_scale = i_scale = f_scale = 1.0
+      else:
+        p_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_p_scale_low, self.lat_p_scale_standard, self.lat_p_scale_highway)
+        i_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_i_scale_low, self.lat_i_scale_standard, self.lat_i_scale_highway)
+        f_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_f_scale_low, self.lat_f_scale_standard, self.lat_f_scale_highway)
       output_torque = self.pid.p * p_scale + self.pid.i * i_scale + self.pid.d + self.pid.f * f_scale
 
       # Party Tricks: Injection Test multiplies the PID scale by 999% (diagnostic only).
