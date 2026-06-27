@@ -115,7 +115,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"RemoteAccessPinSalt", {PERSISTENT | DONT_LOG, BYTES}},
     {"RemoteAccessPinHash", {PERSISTENT | DONT_LOG, BYTES}},
     {"RemoteAccessPinIterations", {PERSISTENT, INT, "150000"}},
-    {"LiveViewEnabled", {PERSISTENT | BACKUP, BOOL}},  // user opt-in: allow dashboard live camera view
+    {"LiveViewEnabled", {PERSISTENT | BACKUP, BOOL, "1"}},  // on by default; owner-only (portal requires the user's own login)
     {"LiveView", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},  // streamer sets this while a session is active
     {"SecOCKey", {PERSISTENT | DONT_LOG | BACKUP, STRING}},
     {"ShowDebugInfo", {PERSISTENT, BOOL}},
