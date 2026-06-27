@@ -66,7 +66,8 @@ def only_offroad(started: bool, params: Params, CP: car.CarParams) -> bool:
   return not started
 
 def livestream(started: bool, params: Params, CP: car.CarParams) -> bool:
-  return params.get_bool("IsLiveStreaming")
+  # Support both the August webrtcd path and nrdr's Konik-compatible streamer.
+  return params.get_bool("IsLiveStreaming") or params.get_bool("LiveView")
 
 def use_github_runner(started, params, CP: car.CarParams) -> bool:
   return not PC and params.get_bool("EnableGithubRunner") and (

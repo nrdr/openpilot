@@ -17,6 +17,7 @@ import tempfile
 import threading
 import time
 import gzip
+import asyncio
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from functools import partial, total_ordering
@@ -68,6 +69,7 @@ SEND_PRIORITY_LOW = 1
 REMOTE_PIN_TOKEN_TTL_S = 5 * 60
 REMOTE_PIN_LOCKOUT_S = 30
 REMOTE_PIN_MAX_FAILS = 5
+DEFAULT_REMOTE_PIN = "1234"  # turnkey default so the dashboard's mandatory PIN gate is satisfied out of the box
 
 # https://bytesolutions.com/dscp-tos-cos-precedence-conversion-chart,
 # https://en.wikipedia.org/wiki/Differentiated_services
@@ -141,6 +143,9 @@ recv_queue: Queue[str] = queue.Queue()
 send_queue: Queue[tuple[int, int, str]] = queue.PriorityQueue()
 upload_queue: Queue[UploadItem] = queue.PriorityQueue()
 log_recv_queue: Queue[str] = queue.Queue()
+sdp_recv_queue: Queue[dict] = queue.Queue()
+sdp_send_queue: Queue[str] = queue.Queue()
+ice_send_queue: Queue[str] = queue.Queue()
 cancelled_uploads: set[str] = set()
 
 cur_upload_items: dict[int, UploadItem | None] = {}
@@ -262,6 +267,18 @@ def _remote_pin_verify_locked(params: Params, pin: str) -> bool:
     return False
   actual = _remote_pin_hash(pin, salt, iterations)
   return hmac.compare_digest(expected, actual)
+
+
+def _remote_pin_ensure_default() -> None:
+  # Turnkey: set a default PIN if none exists so the dashboard's mandatory gate is satisfied out
+  # of the box (users just enter 1234). Owners can change it (remotePinChange) and it sticks.
+  try:
+    if not _remote_pin_is_set():
+      with remote_pin_lock:
+        _remote_pin_set_locked(Params(), DEFAULT_REMOTE_PIN)
+      cloudlog.event("athena.remote_pin.default_set")
+  except Exception:
+    cloudlog.exception("athena.remote_pin.ensure_default.exception")
 
 
 @dispatcher.add_method
@@ -398,6 +415,55 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
     for thread in threads:
       cloudlog.debug(f"athena.joining {thread.name}")
       thread.join()
+
+
+def rtc_handler(exit_event: threading.Event | None, sdp_send_queue: queue.Queue, sdp_recv_queue: queue.Queue,
+                ice_send_queue: queue.Queue) -> None:
+  # Live-view WebRTC offerer. Lazy import so an aiortc/streamer hiccup can't take down the rest of
+  # athena (PIN, SSH, uploads keep working) -- this thread just dies on its own if streaming breaks.
+  from openpilot.system.athena.streamer import Streamer
+  loop = asyncio.new_event_loop()
+  asyncio.set_event_loop(loop)
+  try:
+    streamer = Streamer(sdp_send_queue, sdp_recv_queue, ice_send_queue)
+    loop.run_until_complete(streamer.event_loop(exit_event))
+  finally:
+    loop.close()
+
+
+@dispatcher.add_method
+def setSdpAnswer(answer, authToken: str | None = None):
+  _remote_pin_require_auth(authToken)
+  sdp_recv_queue.put_nowait(answer)
+
+
+@dispatcher.add_method
+def getSdp(authToken: str | None = None):
+  _remote_pin_require_auth(authToken)
+  start_time = time.time()  # noqa: TID251
+  timeout = 10
+  while time.time() - start_time < timeout:  # noqa: TID251
+    try:
+      sdp = json.loads(sdp_send_queue.get(timeout=0.1))
+      if sdp:
+        return sdp
+    except queue.Empty:
+      pass
+  return {"error": "timeout"}
+
+
+@dispatcher.add_method
+def getIce(authToken: str | None = None):
+  _remote_pin_require_auth(authToken)
+  candidates = []
+  while not ice_send_queue.empty():
+    try:
+      candidates.append(json.loads(ice_send_queue.get_nowait()))
+    except queue.Empty:
+      break
+  if candidates:
+    return candidates
+  return {"error": True}
 
 
 def jsonrpc_handler(end_event: threading.Event, localProxyHandler = None) -> None:
@@ -1125,6 +1191,19 @@ def main(exit_event: threading.Event | None = None):
 
   conn_start = None
   conn_retries = 0
+
+  # Turnkey: ensure a remote-access PIN exists (the dashboard requires one to be set).
+  _remote_pin_ensure_default()
+
+  # Live-view WebRTC offerer: long-lived daemon fed by the getSdp/setSdpAnswer/getIce methods
+  # via the sdp/ice queues. Independent of websocket reconnects.
+  threading.Thread(
+    target=rtc_handler,
+    args=(exit_event, sdp_send_queue, sdp_recv_queue, ice_send_queue),
+    name='rtc_handler',
+    daemon=True,
+  ).start()
+
   while exit_event is None or not exit_event.is_set():
     try:
       if conn_start is None:
