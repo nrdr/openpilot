@@ -21,6 +21,12 @@ def driverview(started: bool, params: Params, CP: car.CarParams) -> bool:
 def notcar(started: bool, params: Params, CP: car.CarParams) -> bool:
   return started and CP.notCar
 
+
+def live_view_active(started: bool, params: Params, CP: car.CarParams) -> bool:
+  # The streamer sets the LiveView param while a session is open (offroad) and clears it on
+  # disconnect, so the livestream encoders run only while someone is actually watching -- no idle drain.
+  return params.get_bool("LiveView")
+
 def iscar(started: bool, params: Params, CP: car.CarParams) -> bool:
   return started and not CP.notCar
 
@@ -111,7 +117,7 @@ procs = [
 
   NativeProcess("loggerd", "system/loggerd", ["./loggerd"], logging),
   NativeProcess("encoderd", "system/loggerd", ["./encoderd"], only_onroad),
-  NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"], notcar),
+  NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"], or_(notcar, live_view_active)),
   PythonProcess("logmessaged", "system.logmessaged", always_run),
 
   NativeProcess("camerad", "system/camerad", ["./camerad"], driverview, enabled=not WEBCAM),
