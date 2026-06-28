@@ -9,6 +9,7 @@ from openpilot.common.params import Params
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
+from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
@@ -209,6 +210,8 @@ class LatControlPID(LatControl):
     self.prev_output_torque = 0.0
     self.prev_angle_steers_des_no_offset = 0.0
     self.params = Params()
+    # 2D online lateral auto-tuner: bounded, gated, per-(speed, angle) learned FF trim. Off by default.
+    self.tune_learner = TuneLearner(dt, self.steer_max)
     self.frame = -1
     # Independent speed-banded P / I / F output scales (multiplier units; 1.0 = neutral).
     self.lat_p_scale_low = 1.0
@@ -447,7 +450,16 @@ class LatControlPID(LatControl):
         d_unwind_factor = (1.0 - unwind_weight) + unwind_weight * d_angle_fade
         output_torque += -self.rate_damping_scale * RATE_DAMPING_REF * float(CS.steeringRateDeg) * rate_damp_fade * d_unwind_factor
 
+        # 2D learned tune trim: a small, hard-clamped per-(speed, angle) feedforward correction learned
+        # live from the steady-state tracking error (nrdr_tune_learner). Added in front of the steer_max
+        # clamp so it can only ever nudge within the existing torque envelope. No-op unless NrdrTuneLearner.
+        output_torque += self.tune_learner.apply(CS.vEgo, angle_steers_des)
+
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
+
+        # Online learning step for the trim map: this frame's steady-state error, gated inside the learner
+        # to clean hands-off quasi-steady driving. Updates the learned map only -- never the torque above.
+        self.tune_learner.learn(CS.vEgo, angle_steers_des, error, float(CS.steeringRateDeg), steering_pressed, self.frame)
 
       pid_log.active = True
       pid_log.p = float(self.pid.p)

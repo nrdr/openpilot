@@ -288,6 +288,30 @@ sections:
       max: 80
       step: 1
       unit: mph
+    - key: NrdrTuneLearner
+      widget: toggle
+      title: 2D Auto-Tuner (Learned Trim)
+      description: Learns a per-(speed, angle) feedforward trim live while you drive, cancelling the systematic over/under-turn the tune report measures. A bounded, slow, gated correction on top of the base PID/F + D - the PID always does the driving. Off by default; Reset below wipes what it has learned.
+    - key: NrdrTuneLearnerStrength
+      widget: option
+      title: Auto-Tuner Strength
+      description: Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Start low; raise once you trust it.
+      min: 0
+      max: 30
+      step: 1
+      unit: '%'
+    - key: NrdrTuneLearnerRate
+      widget: option
+      title: Auto-Tuner Learning Speed
+      description: How fast the trim adapts to the measured error. Lower = slower, calmer, safer; higher = converges quicker but reacts more to each drive. 0 freezes learning (the trim it already has still applies).
+      min: 0
+      max: 100
+      step: 5
+      unit: '%'
+    - key: NrdrTuneLearnerReset
+      widget: toggle
+      title: Reset Learned Trim
+      description: Wipes the learned map back to zero on the next drive, then flips itself off. Use it to start the auto-tuner fresh after a base-tune change or a bad learning session.
   - id: nrdr_unwind
     label: Unwind Helpers
     trigger_key: null

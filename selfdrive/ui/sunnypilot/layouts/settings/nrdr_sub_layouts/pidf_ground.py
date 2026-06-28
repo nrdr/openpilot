@@ -147,6 +147,32 @@ class PidfGroundLayout(Widget):
       label_callback=lambda value: f"{value} mph",
     )
 
+    # --- 2D online auto-tuner (learned per-speed/angle trim) ---
+    self._tune_learner = toggle_item_sp(
+      title=tr("2D Auto-Tuner (Learned Trim)"),
+      description=tr("Learns a per-(speed, angle) feedforward trim live while you drive, cancelling the systematic over/under-turn the tune report measures. A bounded, slow, gated correction on top of the base PID/F + D - the PID always does the driving. Off by default; Reset below wipes what it has learned."),
+      param="NrdrTuneLearner",
+    )
+    self._tune_learner_strength = option_item_sp(
+      param="NrdrTuneLearnerStrength",
+      title=lambda: tr("Auto-Tuner Strength (Default: 10%)"),
+      min_value=0, max_value=30, value_change_step=1,
+      description=lambda: tr("Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Start low; raise once you trust it."),
+      label_callback=lambda value: f"{value}%",
+    )
+    self._tune_learner_rate = option_item_sp(
+      param="NrdrTuneLearnerRate",
+      title=lambda: tr("Auto-Tuner Learning Speed (Default: 30%)"),
+      min_value=0, max_value=100, value_change_step=5,
+      description=lambda: tr("How fast the trim adapts to the measured error. Lower = slower, calmer, safer; higher = converges quicker but reacts more to each drive. 0 freezes learning (the trim it already has still applies)."),
+      label_callback=lambda value: f"{value}%",
+    )
+    self._tune_learner_reset = toggle_item_sp(
+      title=tr("Reset Learned Trim"),
+      description=tr("Wipes the learned map back to zero on the next drive, then flips itself off. Use it to start the auto-tuner fresh after a base-tune change or a bad learning session."),
+      param="NrdrTuneLearnerReset",
+    )
+
     return [
       self._starpilot,
       LineSeparatorSP(40),
@@ -173,6 +199,12 @@ class PidfGroundLayout(Widget):
       self._center_scale,
       self._center_boost_threshold,
       self._center_boost_min_speed,
+      LineSeparatorSP(40),
+      # 2D online auto-tuner (learned trim)
+      self._tune_learner,
+      self._tune_learner_strength,
+      self._tune_learner_rate,
+      self._tune_learner_reset,
     ]
 
   def _render(self, rect):
