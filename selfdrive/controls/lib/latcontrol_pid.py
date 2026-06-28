@@ -216,6 +216,7 @@ class LatControlPID(LatControl):
     self.lat_f_scale_highway = 1.0
     self.unwind_freeze_enabled = False
     self.unwind_lookahead_enabled = False
+    self.starpilot_enabled = False  # borrowed _pid_output_scale; off by default (param NrdrStarPilotPid)
     self.injection_test_enabled = False  # Party Tricks: x9.99 PID scale stress test
     self.model_v2 = None
     self.model_valid = False
@@ -382,6 +383,7 @@ class LatControlPID(LatControl):
         self.rate_damping_scale = get_param_float(self.params, "NrdrLatRateDamping", 0.3, 0.0, 3.0, scale=100.0)
         self.rate_damping_fade_speed_ms = get_param_float(self.params, "NrdrLatRateDampingFadeSpeed", 30.0, 0.0, 60.0) * _MPH_TO_MS
         self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
+        self.starpilot_enabled = self.params.get_bool("NrdrStarPilotPid")
 
       output_torque = self.pid.update(
         error,
@@ -410,16 +412,17 @@ class LatControlPID(LatControl):
         else:
           center_taper_scale = float(self.center_taper_scale.update(1.0))
 
-        output_torque *= _pid_output_scale(
-          angle_steers_des_no_offset,
-          desired_angle_delta,
-          float(CS.steeringRateDeg),
-          CS.vEgo,
-          center_taper_scale,
-          self.center_taper_high,
-          self.center_boost_threshold,
-          self.center_boost_min_speed * _MPH_TO_MS,
-        )
+        if self.starpilot_enabled:  # off = clean PID/F + D, the borrowed turn-in/center scaling removed
+          output_torque *= _pid_output_scale(
+            angle_steers_des_no_offset,
+            desired_angle_delta,
+            float(CS.steeringRateDeg),
+            CS.vEgo,
+            center_taper_scale,
+            self.center_taper_high,
+            self.center_boost_threshold,
+            self.center_boost_min_speed * _MPH_TO_MS,
+          )
 
         # Rate damping (the missing "D"): torque opposing how fast the wheel is moving, applied
         # after the output scale so it's a clean physical term. Strongest at low speed (where the

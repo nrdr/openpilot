@@ -11,7 +11,7 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
-from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp, LineSeparatorSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp, toggle_item_sp, LineSeparatorSP
 
 
 class PidfGroundLayout(Widget):
@@ -24,6 +24,13 @@ class PidfGroundLayout(Widget):
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
+    # --- StarPilot PID additions master toggle ---
+    self._starpilot = toggle_item_sp(
+      title=tr("StarPilot PID Additions"),
+      description=tr("The borrowed turn-in / center-boost output scaling (_pid_output_scale) that wasn't built for Honda. Off = clean banded PID/F + rate-damping D. Turn on to A/B it against the raw base."),
+      param="NrdrStarPilotPid",
+    )
+
     # --- Independent P / I / F scales per speed band ---
     self._lat_p_low = option_item_sp(
       param="LatPScaleLowSpeed",
@@ -141,6 +148,8 @@ class PidfGroundLayout(Widget):
     )
 
     return [
+      self._starpilot,
+      LineSeparatorSP(40),
       # Low speed (below 25mph): P / I / F
       self._lat_p_low,
       self._lat_i_low,
