@@ -105,6 +105,7 @@ def _pid_output_scale(
   center_taper_high: float = 2.0,
   center_boost_threshold_deg: float = 3.0,
   center_boost_min_speed_ms: float = 0.0,
+  starpilot_enabled: bool = True,
 ) -> float:
   abs_angle = abs(desired_angle_deg)
   speed_weight = min(max((v_ego - 4.0) / 10.0, 0.0), 1.0)
@@ -144,6 +145,11 @@ def _pid_output_scale(
   unwind_scale = 0.1600 if is_left else 0.2000
 
   scale = 1.0 + (center_weight * center_taper)
+
+  if not starpilot_enabled:
+    # Center boost (yours) only -- the borrowed StarPilot turn-in/unwind/per-direction scaling is gated off.
+    return scale
+
   scale += speed_weight * mid_turn_weight * mid_turn_scale
   scale += speed_weight * angle_weight * base_scale
 
@@ -412,17 +418,18 @@ class LatControlPID(LatControl):
         else:
           center_taper_scale = float(self.center_taper_scale.update(1.0))
 
-        if self.starpilot_enabled:  # off = clean PID/F + D, the borrowed turn-in/center scaling removed
-          output_torque *= _pid_output_scale(
-            angle_steers_des_no_offset,
-            desired_angle_delta,
-            float(CS.steeringRateDeg),
-            CS.vEgo,
-            center_taper_scale,
-            self.center_taper_high,
-            self.center_boost_threshold,
-            self.center_boost_min_speed * _MPH_TO_MS,
-          )
+        # Center boost (kept always) + StarPilot turn-in scaling (gated inside by starpilot_enabled).
+        output_torque *= _pid_output_scale(
+          angle_steers_des_no_offset,
+          desired_angle_delta,
+          float(CS.steeringRateDeg),
+          CS.vEgo,
+          center_taper_scale,
+          self.center_taper_high,
+          self.center_boost_threshold,
+          self.center_boost_min_speed * _MPH_TO_MS,
+          self.starpilot_enabled,
+        )
 
         # Rate damping (the missing "D"): torque opposing how fast the wheel is moving, applied
         # after the output scale so it's a clean physical term. Strongest at low speed (where the
