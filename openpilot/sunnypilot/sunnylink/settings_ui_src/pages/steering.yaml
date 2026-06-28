@@ -173,6 +173,10 @@ sections:
     label: PID/F Tuning Ground
     trigger_key: null
     items:
+    - key: NrdrStarPilotPid
+      widget: toggle
+      title: StarPilot PID Additions
+      description: The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base.
     - key: LatPScaleLowSpeed
       widget: option
       title: Low Speed Proportional Scale (Below 25mph)
