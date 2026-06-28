@@ -27,7 +27,7 @@ class PidfGroundLayout(Widget):
     # --- StarPilot PID additions master toggle ---
     self._starpilot = toggle_item_sp(
       title=tr("StarPilot PID Additions"),
-      description=tr("The borrowed turn-in / center-boost output scaling (_pid_output_scale) that wasn't built for Honda. Off = clean banded PID/F + rate-damping D. Turn on to A/B it against the raw base."),
+      description=tr("The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base."),
       param="NrdrStarPilotPid",
     )
 
