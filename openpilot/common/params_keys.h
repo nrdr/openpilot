@@ -343,6 +343,11 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrTuneReportSummary", {PERSISTENT, STRING, ""}},             // per-speed summary table from the last tune scan
     {"NrdrCarTuneInfo", {PERSISTENT, STRING, ""}},                   // Car & Tune Info readout for the Sunnylink info row (written by nrdr_remoted)
     {"NrdrStarPilotPid", {PERSISTENT | BACKUP, BOOL, "0"}},          // borrowed StarPilot _pid_output_scale (center boost + turn-in/per-direction scaling); 0 = clean PID/F + D
+    {"NrdrTuneLearner", {PERSISTENT | BACKUP, BOOL, "0"}},           // 2D online lateral auto-tuner (learned per-cell FF trim); 0 = off
+    {"NrdrTuneLearnerReset", {PERSISTENT, BOOL, "0"}},               // momentary: device zeroes the learned trim map, then clears this
+    {"NrdrTuneLearnerStrength", {PERSISTENT | BACKUP, INT, "10"}},   // learned-trim authority cap, % of steer_max (hard-limited to 30)
+    {"NrdrTuneLearnerRate", {PERSISTENT | BACKUP, INT, "30"}},       // learning speed, % of reference rate (0 freezes learning)
+    {"NrdrTuneLearnerMap", {PERSISTENT | BACKUP | DONT_LOG, BYTES}}, // learned trim surface (2 x speed x angle float32 blob)
     {"HondaCenterBoostThreshold", {PERSISTENT | BACKUP, FLOAT, "3"}},  // deg from center where Center Scale is active
     {"HondaCenterBoostMinSpeed", {PERSISTENT | BACKUP, INT, "50"}},  // mph; below this speed center boost is disabled (low-speed center-oscillation fix)
     {"HondaUnwindBoostSeconds", {PERSISTENT | BACKUP, FLOAT, "1"}},  // s; unwind FF boost is held for the first N seconds of each unwind, then fades out
