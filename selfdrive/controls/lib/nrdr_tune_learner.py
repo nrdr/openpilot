@@ -15,7 +15,9 @@ SAFETY -- this moves the wheel, so every lever is deliberately conservative:
   * learning is SLOW (LEARN_RATE_REF, scaled by a <=100% user rate) -- far below the control
     rate, so it cannot chase noise into the loop.
   * learning is GATED to clean, quasi-steady, hands-off, lat-active driving: low steering rate
-    (so it learns the steady bias, not transient slew lag), sane speed, bounded error.
+    (so it learns the steady bias, not transient slew lag), sane speed, bounded error, and
+    paramsd settled (its own valid flags) -- so it never chases the kinematic estimator (steer
+    ratio / offset / stiffness) while that is still adapting. Different layer, no turf war.
   * bilinear apply + bilinear-weighted learn -> smooth output, no torque steps at bin edges.
   * defaults OFF (NrdrTuneLearner). Viewable, resettable (NrdrTuneLearnerReset), and seedable
     offline. The learned surface persists in NrdrTuneLearnerMap.
@@ -112,7 +114,7 @@ class TuneLearner:
     return trim_norm if desired_deg > 0.0 else -trim_norm
 
   # --- learning: nudge the map from this frame's steady-state error (map only; never the output) ---
-  def learn(self, v_ego, desired_deg, error, steering_rate_deg, steering_pressed, frame):
+  def learn(self, v_ego, desired_deg, error, steering_rate_deg, steering_pressed, paramsd_ok, frame):
     if frame % PARAM_REFRESH_FRAMES == 0:
       self._refresh_params()
     if self.dirty and self.enabled and frame % SAVE_FRAMES == 0:
@@ -120,7 +122,9 @@ class TuneLearner:
     if not self.enabled:
       return
     abs_des = abs(desired_deg)
-    if (steering_pressed or abs_des < MIN_ABS_DES or v_ego < LEARN_MIN_SPEED_MS
+    # paramsd_ok gates out frames where the kinematic estimator (steer ratio / offset / stiffness)
+    # isn't vouching for itself -- don't learn a tracking trim against a target that's still moving.
+    if (steering_pressed or not paramsd_ok or abs_des < MIN_ABS_DES or v_ego < LEARN_MIN_SPEED_MS
         or abs(steering_rate_deg) > RATE_GATE_DEG_S or abs(error) > ERR_REJECT_DEG):
       return
     # Direction-normalize so +error = under-turn = needs more turn (tune_grid's convention);

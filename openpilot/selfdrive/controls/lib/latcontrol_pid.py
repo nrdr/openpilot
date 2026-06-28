@@ -459,7 +459,10 @@ class LatControlPID(LatControl):
 
         # Online learning step for the trim map: this frame's steady-state error, gated inside the learner
         # to clean hands-off quasi-steady driving. Updates the learned map only -- never the torque above.
-        self.tune_learner.learn(CS.vEgo, angle_steers_des, error, float(CS.steeringRateDeg), steering_pressed, self.frame)
+        # paramsd_ok = the kinematic estimator vouches for its own estimate (valid + per-field valid flags),
+        # so the trim learner stays in its lane and never chases steer-ratio/offset/stiffness mid-adaptation.
+        paramsd_ok = bool(params.valid and params.angleOffsetValid and params.steerRatioValid and params.stiffnessFactorValid)
+        self.tune_learner.learn(CS.vEgo, angle_steers_des, error, float(CS.steeringRateDeg), steering_pressed, paramsd_ok, self.frame)
 
       pid_log.active = True
       pid_log.p = float(self.pid.p)
