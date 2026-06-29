@@ -283,8 +283,8 @@ class HudRenderer(Widget):
 
     cluster_x = int(rect.x + 32)
     cluster_y = int(rect.y + 20)
-    real_size = FONT_SIZES.current_speed     # white real-speed glyph height
-    set_size = FONT_SIZES.set_speed - 44     # smaller green set speed beside it
+    real_size = FONT_SIZES.set_speed         # exactly the old MAX/set-speed size -- the "perfect size"
+    set_size = 60                            # green set speed, clearly smaller (superscript-style) beside it
     green = rl.Color(0, 255, 70, 255)
 
     # Real speed (white)
