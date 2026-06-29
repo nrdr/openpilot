@@ -99,8 +99,8 @@ sections:
   - key: InteractivityTimeout
     widget: multiple_button
     title: Interactivity Timeout
-    description: Apply a custom timeout for settings UI. This is the time after which settings UI closes automatically if
-      user is not interacting with the screen.
+    description: Apply a custom timeout after which the settings UI closes automatically when idle.
+    details: Apply a custom timeout for settings UI. This is the time after which settings UI closes automatically if user is not interacting with the screen.
     options:
     - value: 0
       label: Default

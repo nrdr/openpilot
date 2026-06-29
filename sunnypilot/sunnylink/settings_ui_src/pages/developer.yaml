@@ -15,8 +15,8 @@ sections:
     widget: toggle
     blocked: true
     title: Enable ADB
-    description: ADB (Android Debug Bridge) allows connecting to your device over USB or over the network. See https://docs.comma.ai/how-to/connect-to-comma
-      for more info.
+    description: ADB (Android Debug Bridge) allows connecting to your device over USB or over the network.
+    details: ADB (Android Debug Bridge) allows connecting to your device over USB or over the network. See https://docs.comma.ai/how-to/connect-to-comma for more info.
     enablement:
     - $ref: '#/macros/offroad'
   - key: SshEnabled
@@ -32,10 +32,8 @@ sections:
     widget: toggle
     needs_onroad_cycle: true
     title: sunnypilot Longitudinal Control (Alpha)
-    description: 'WARNING: sunnypilot longitudinal control is in alpha for this car and will disable Automatic Emergency Braking
-      (AEB). On this car, sunnypilot defaults to the car''s built-in ACC instead of sunnypilot''s longitudinal control. Enable
-      this to switch to sunnypilot longitudinal control. Enabling Experimental mode is recommended when enabling sunnypilot
-      longitudinal control alpha. Changing this setting will restart sunnypilot if the car is powered on.'
+    description: 'WARNING: alpha longitudinal control for this car disables Automatic Emergency Braking (AEB).'
+    details: 'WARNING: sunnypilot longitudinal control is in alpha for this car and will disable Automatic Emergency Braking (AEB). On this car, sunnypilot defaults to the car''s built-in ACC instead of sunnypilot''s longitudinal control. Enable this to switch to sunnypilot longitudinal control. Enabling Experimental mode is recommended when enabling sunnypilot longitudinal control alpha. Changing this setting will restart sunnypilot if the car is powered on.'
     visibility:
     - type: all
       conditions:
@@ -99,8 +97,8 @@ sections:
   - key: ShowAdvancedControls
     widget: toggle
     title: Show Advanced Controls
-    description: Toggle visibility of advanced sunnypilot controls. This only changes the visibility of the toggles; it does
-      not change the actual enabled/disabled state.
+    description: Toggle visibility of advanced sunnypilot controls.
+    details: Toggle visibility of advanced sunnypilot controls. This only changes the visibility of the toggles; it does not change the actual enabled/disabled state.
   - key: EnableGithubRunner
     widget: toggle
     title: GitHub Runner Service
@@ -112,8 +110,8 @@ sections:
   - key: EnableCopyparty
     widget: toggle
     title: copyparty Service
-    description: copyparty is a very capable file server, you can use it to download your routes, view your logs and even
-      make some edits on some files from your browser. Requires you to connect to your comma locally via its IP address.
+    description: copyparty is a capable file server for downloading routes, viewing logs, and editing some files from your browser.
+    details: copyparty is a very capable file server, you can use it to download your routes, view your logs and even make some edits on some files from your browser. Requires you to connect to your comma locally via its IP address.
     enablement:
     - $ref: '#/macros/advanced_only'
   - key: QuickBootToggle

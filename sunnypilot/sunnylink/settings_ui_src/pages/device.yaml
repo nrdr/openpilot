@@ -17,8 +17,8 @@ sections:
   - key: DeviceBootMode
     widget: option
     title: Wake Up Behavior
-    description: 'Controls state of the device after boot/sleep. Default: Device will boot/wake-up normally and will be ready
-      to engage. Offroad: Device will be in Always Offroad mode after boot/wake-up.'
+    description: Controls the state of the device after boot or sleep.
+    details: 'Controls state of the device after boot/sleep. Default: Device will boot/wake-up normally and will be ready to engage. Offroad: Device will be in Always Offroad mode after boot/wake-up.'
     options:
     - value: 0
       label: Standard
@@ -33,7 +33,7 @@ sections:
   - key: MaxTimeOffroad
     widget: option
     title: Max Time Offroad
-    description: Device will automatically shutdown after set time once the engine is turned off. 30h is the default.
+    description: Device will automatically shutdown after the set time once the engine is turned off (30h is the default).
     options:
     - value: 0
       label: Always On

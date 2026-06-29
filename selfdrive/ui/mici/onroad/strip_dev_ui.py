@@ -21,8 +21,8 @@ from openpilot.system.ui.widgets import Widget
 
 
 class StripDevUiRenderer(Widget):
-  TOP_OFFSET = 40       # ball moved off the strip onto the feed, so metrics start near the top
-  ROW_SPACING = 56      # tightened (was 74) so four rows group neatly instead of sprawling
+  TOP_OFFSET = 28       # bumped up: less dead space above REAL (kept clear of the strip's top inset)
+  ROW_SPACING = 44      # tightened so all four rows (through LSPD) clear the bottom edge of the short strip
   LABEL_SIZE = 17
   VALUE_SIZE = 18
   LABEL_COLOR = rl.Color(255, 255, 255, 180)
