@@ -177,6 +177,10 @@ class HudRenderer(Widget):
     if self.is_cruise_set:
       self._draw_set_speed(rect)
 
+    # Persistent top-left cluster: real speed (white) + set speed (green). Drawn after _draw_set_speed
+    # so it can read the change-transient alpha and hide the real speed while a change is on screen.
+    self._draw_persistent_speed(rect)
+
     self._draw_steering_wheel(rect)
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
@@ -238,8 +242,9 @@ class HudRenderer(Widget):
     rl.draw_circle_gradient(rl.Vector2(x + circle_radius, y + circle_radius), circle_radius,
                             rl.Color(0, 0, 0, int(255 / 2 * alpha)), rl.BLANK)
 
-    set_speed_color = rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
-    max_color = rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
+    # Set speed is permanently green (C4 spec), including during the show-on-change transient.
+    set_speed_color = rl.Color(0, 255, 70, int(255 * 0.9 * alpha))
+    max_color = rl.Color(0, 255, 70, int(255 * 0.9 * alpha))
 
     set_speed = self.set_speed
     if self.is_cruise_set and not ui_state.is_metric:
@@ -264,6 +269,40 @@ class HudRenderer(Widget):
       0,
       max_color,
     )
+
+  def _draw_persistent_speed(self, rect: rl.Rectangle) -> None:
+    """Persistent top-left cluster: big white real speed + 'mph', with a smaller green set speed
+    beside it. Hidden while the set-speed-change transient is on screen, so a change shows the set
+    speed alone (per spec). Positions/sizes are first-draft knobs -- tune to taste on the C4."""
+    # Hide the real speed while a set-speed change is on screen -- mirror the transient's exact
+    # window (engaged + within persistence + top icons allowed) so the two never both show.
+    changing = (self._engaged and self._can_draw_top_icons and
+                0 < rl.get_time() - self._set_speed_changed_time < SET_SPEED_PERSISTENCE)
+    if changing:
+      return
+
+    cluster_x = int(rect.x + 32)
+    cluster_y = int(rect.y + 20)
+    real_size = FONT_SIZES.current_speed     # white real-speed glyph height
+    set_size = FONT_SIZES.set_speed - 44     # smaller green set speed beside it
+    green = rl.Color(0, 255, 70, 255)
+
+    # Real speed (white)
+    speed_text = str(round(self.speed))
+    speed_size = measure_text_cached(self._font_bold, speed_text, real_size)
+    rl.draw_text_ex(self._font_bold, speed_text, rl.Vector2(cluster_x, cluster_y), real_size, 0, COLORS.WHITE)
+
+    # Unit under the number
+    unit_text = tr("km/h") if ui_state.is_metric else tr("mph")
+    rl.draw_text_ex(self._font_medium, unit_text, rl.Vector2(cluster_x + 6, cluster_y + speed_size.y - 26),
+                    FONT_SIZES.speed_unit, 0, COLORS.WHITE_TRANSLUCENT)
+
+    # Set speed (green), smaller, to the upper-right of the real-speed number
+    if self.is_cruise_set:
+      set_speed = self.set_speed * KM_TO_MILE if not ui_state.is_metric else self.set_speed
+      set_text = str(round(set_speed))
+      rl.draw_text_ex(self._font_display, set_text, rl.Vector2(cluster_x + speed_size.x + 14, cluster_y + 6),
+                      set_size, 0, green)
 
   def _draw_current_speed(self, rect: rl.Rectangle) -> None:
     """Draw the current vehicle speed and unit."""

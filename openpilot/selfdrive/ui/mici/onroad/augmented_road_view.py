@@ -10,6 +10,7 @@ from openpilot.selfdrive.ui.mici.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
+from openpilot.selfdrive.ui.mici.onroad.strip_dev_ui import StripDevUiRenderer
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
 from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, MouseEvent
 from openpilot.system.ui.widgets.label import UnifiedLabel
@@ -156,6 +157,7 @@ class AugmentedRoadView(CameraView):
     self._alert_renderer = AlertRenderer()
     self._driver_state_renderer = DriverStateRenderer()
     self._confidence_ball = ConfidenceBall()
+    self._strip_dev_ui = StripDevUiRenderer()  # compact devUI in the side strip, under the pinned ball
     self._offroad_label = UnifiedLabel("start the car to\nuse sunnypilot", 54, FontWeight.DISPLAY,
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
@@ -223,11 +225,15 @@ class AugmentedRoadView(CameraView):
 
     alert_to_render, not_animating_out = self._alert_renderer.will_render()
 
-    # Hide DMoji when disengaged unless AlwaysOnDM is enabled
-    should_draw_dmoji = (not self._hud_renderer.drawing_top_icons() and
-                         (ui_state.status != UIStatus.DISENGAGED or ui_state.always_on_dm))
+    # DM lives bottom-right now, clear of the top-left set-speed readout, so it no longer needs to
+    # hide while the top icons draw -- only hide it when disengaged (unless AlwaysOnDM).
+    should_draw_dmoji = (ui_state.status != UIStatus.DISENGAGED or ui_state.always_on_dm)
     self._driver_state_renderer.set_should_draw(should_draw_dmoji)
-    self._driver_state_renderer.set_position(self._rect.x + 16, self._rect.y + 10)
+    dm_size = 60  # DriverStateRenderer BASE_SIZE
+    self._driver_state_renderer.set_position(
+      self._rect.x + self._rect.width - SIDE_PANEL_WIDTH - dm_size - 16,
+      self._rect.y + self._rect.height - dm_size - 16,
+    )
     self._driver_state_renderer.render()
 
     self._hud_renderer.set_can_draw_top_icons(alert_to_render is None)
@@ -245,6 +251,7 @@ class AugmentedRoadView(CameraView):
     # Custom UI extension point - add custom overlays here
     # Use self._content_rect for positioning within camera bounds
     self._confidence_ball.render(self.rect)
+    self._strip_dev_ui.render(self.rect)  # compact metrics in the strip, below the pinned ball
 
     self._bookmark_icon.render(self.rect)
 
