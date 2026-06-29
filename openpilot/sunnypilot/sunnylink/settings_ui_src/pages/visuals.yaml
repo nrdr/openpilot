@@ -14,8 +14,8 @@ sections:
   - key: BlindSpot
     widget: toggle
     title: Show Blind Spot Warnings
-    description: Enabling this will display warnings when a vehicle is detected in your blind spot as long as your car has
-      BSM supported.
+    description: Display warnings when a vehicle is detected in your blind spot (requires BSM support).
+    details: Enabling this will display warnings when a vehicle is detected in your blind spot as long as your car has BSM supported.
   - key: TorqueBar
     widget: toggle
     title: Steering Arc
@@ -27,8 +27,8 @@ sections:
   - key: RoadNameToggle
     widget: toggle
     title: Display Road Name
-    description: Displays the name of the road the car is traveling on. The OpenStreetMap database of the location must be
-      downloaded to fetch the road name.
+    description: Displays the name of the road the car is traveling on.
+    details: Displays the name of the road the car is traveling on. The OpenStreetMap database of the location must be downloaded to fetch the road name.
     visibility:
     - $ref: '#/macros/hide_on_mici'
   - key: StandstillTimer
@@ -40,8 +40,8 @@ sections:
   - key: RocketFuel
     widget: toggle
     title: Real-time Acceleration Bar
-    description: Show an indicator on the left side of the screen to display real-time vehicle acceleration and deceleration.
-      This displays what the car is currently doing, not what the planner is requesting.
+    description: Show a left-side indicator of real-time vehicle acceleration and deceleration.
+    details: Show an indicator on the left side of the screen to display real-time vehicle acceleration and deceleration. This displays what the car is currently doing, not what the planner is requesting.
     visibility:
     - $ref: '#/macros/hide_on_mici'
   - key: ChevronInfo
@@ -96,16 +96,14 @@ sections:
   - key: GreenLightAlert
     widget: toggle
     title: Green Traffic Light Alert (Beta)
-    description: 'A chime and on-screen alert will play when the traffic light you are waiting for turns green and you have
-      no vehicle in front of you. On-screen visual alert is only available on comma 3X. Note: This chime is only designed
-      as a notification. It is the driver''s responsibility to observe their environment and make decisions accordingly.'
+    description: A chime and on-screen alert play when the light you are waiting for turns green with no vehicle ahead.
+    details: 'A chime and on-screen alert will play when the traffic light you are waiting for turns green and you have no vehicle in front of you. On-screen visual alert is only available on comma 3X. Note: This chime is only designed as a notification. It is the driver''s responsibility to observe their environment and make decisions accordingly.'
   - key: LeadDepartAlert
     widget: toggle
     title: Lead Departure Alert (Beta)
-    description: 'A chime and on-screen alert will play when you are stopped, and the vehicle in front of you start moving.
-      On-screen visual alert is only available on comma 3X. Note: This chime is only designed as a notification. It is the
-      driver''s responsibility to observe their environment and make decisions accordingly.'
+    description: A chime and on-screen alert play when you are stopped and the vehicle in front of you starts moving.
+    details: 'A chime and on-screen alert will play when you are stopped, and the vehicle in front of you start moving. On-screen visual alert is only available on comma 3X. Note: This chime is only designed as a notification. It is the driver''s responsibility to observe their environment and make decisions accordingly.'
   - key: RainbowMode
     widget: toggle
     title: Tesla Rainbow Mode
-    description: Display a rainbow effect on the path the model wants to take. It does not affect driving in any way.
+    description: Display a rainbow effect on the path the model wants to take (it does not affect driving in any way).
