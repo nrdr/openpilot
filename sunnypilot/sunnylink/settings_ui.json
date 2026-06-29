@@ -373,7 +373,7 @@
               "key": "NrdrRemoteTuneScan",
               "widget": "toggle",
               "title": "Run Tune Report Scan",
-              "description": "Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full da"
+              "description": "Flip ON to scan every drive log into a tune report. The device flips it back OFF on the next start."
             }
           ],
           "sub_panels": [
@@ -386,7 +386,7 @@
                   "key": "NrdrCarTuneInfo",
                   "widget": "info",
                   "title": "Car & Tune Info",
-                  "description": "Your car's loaded profile - fingerprint, EPS firmware, gas pedal interceptor and radar status, and the lateral/longitudinal kp/ki/kf. Written by the device once it has fingerprinted the car."
+                  "details": "Your car's loaded profile and lat/long kp/ki/kf, written by the device once it fingerprints the car. Shown on the cluster's Car & Tune Info row and via the device's own settings."
                 }
               ]
             },
@@ -922,7 +922,80 @@
                   "key": "HondaAltDashboardSpeed",
                   "widget": "multiple_button",
                   "title": "Alternative Dashboard Speed Design",
-                  "description": "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph (\"Stopped\" below 1 mph, \"--\" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash clu"
+                  "description": "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph (\"Stopped\" below 1 mph, \"--\" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash cluster reads.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Stock"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Lead Speed"
+                    },
+                    {
+                      "value": 2,
+                      "label": "GPS Speed"
+                    },
+                    {
+                      "value": 3,
+                      "label": "Cluster Speed"
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaAltDashboardDistance",
+                  "widget": "option",
+                  "title": "Alternative Dashboard Distance Design",
+                  "description": "Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). Radar closes the bars in as the lead approaches. Velocity pushes the bars out under acceleration and pulls them in under braking. Non-stock designs stay on the cluster permanently, even when not engaged.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Stock"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Radar"
+                    },
+                    {
+                      "value": 2,
+                      "label": "Velocity"
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrClearDashFaults",
+                  "widget": "toggle",
+                  "title": "Clear Dashboard Fault Codes",
+                  "description": "Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active)."
+                },
+                {
+                  "key": "HondaSpoofCameraMessages",
+                  "widget": "toggle",
+                  "title": "Spoof Camera Messages",
+                  "description": "Dead camera only - keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises \"Auto High Beam System Problem\" (that fault is a message timeout, not a code). Leave OFF if your stock camera works."
+                },
+                {
+                  "key": "NrdrCruiseButtonSubMode",
+                  "widget": "toggle",
+                  "title": "Cruise Button Sub-Mode",
+                  "description": "Dynamic HUD - pressing the distance button or set/resume first wakes a preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed. The blink starts lazy and accelerates continuously until it cuts off."
+                },
+                {
+                  "key": "NrdrCruiseButtonSubModeSecs",
+                  "widget": "option",
+                  "title": "Sub-Mode Visibility Time",
+                  "description": "How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and rapid right before it falls off.",
+                  "min": 5,
+                  "max": 60,
+                  "step": 1,
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrCruiseButtonSubMode",
+                      "equals": true
+                    }
+                  ]
                 }
               ]
             }
@@ -1470,7 +1543,7 @@
                   "key": "HondaCivicRadarTryout",
                   "widget": "toggle",
                   "title": "Try Honda Bosch Radar (experimental)",
-                  "description": "EXPERIMENTAL \u2014 Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller."
+                  "description": "EXPERIMENTAL \u00e2\u20ac\u201d Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller."
                 },
                 {
                   "key": "HondaStoppingDecelRate",

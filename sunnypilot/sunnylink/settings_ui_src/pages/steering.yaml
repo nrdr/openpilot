@@ -168,7 +168,7 @@ sections:
     - key: NrdrCarTuneInfo
       widget: info
       title: Car & Tune Info
-      description: Your car's loaded profile and lat/long kp/ki/kf, written by the device once it fingerprints the car.
+      details: Your car's loaded profile and lat/long kp/ki/kf, written by the device once it fingerprints the car. Shown on the cluster's Car & Tune Info row and via the device's own settings.
   - id: nrdr_pidf_ground
     label: PID/F Tuning Ground
     trigger_key: null
