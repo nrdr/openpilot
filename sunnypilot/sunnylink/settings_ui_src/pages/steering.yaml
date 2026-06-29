@@ -1,0 +1,601 @@
+# Page: steering
+# Edit this file. Run compile_settings_ui.py to emit settings_ui.json.
+id: steering
+label: Steering
+icon: steering_wheel
+order: 1
+remote_configurable: true
+description: Lateral control, lane changes, and steering behavior
+sections:
+- id: mads
+  title: Modular Assistive Driving System (MADS)
+  description: ''
+  items:
+  - key: Mads
+    widget: toggle
+    title: Enable Modular Assistive Driving System (MADS)
+    description: Enable MADS. Disable toggle to revert back to stock sunnypilot engagement/disengagement.
+    enablement:
+    - $ref: '#/macros/offroad'
+  sub_panels:
+  - id: mads_settings
+    label: MADS Settings
+    trigger_key: Mads
+    trigger_condition:
+      type: param
+      key: Mads
+      equals: true
+    items:
+    - key: MadsMainCruiseAllowed
+      widget: toggle
+      title: Toggle with Main Cruise
+      description: 'Note: For vehicles without LFA/LKAS button, disabling this will prevent lateral control engagement.'
+      enablement:
+      - $ref: '#/macros/offroad'
+      - $ref: '#/macros/mads_full_platforms'
+    - key: MadsUnifiedEngagementMode
+      widget: toggle
+      title: Unified Engagement Mode (UEM)
+      description: 'Engage lateral and longitudinal control with cruise control engagement. Note: Once lateral control is
+        engaged via UEM, it will remain engaged until it is manually disabled via the MADS button or car shut off.'
+      enablement:
+      - $ref: '#/macros/offroad'
+      - $ref: '#/macros/mads_full_platforms'
+    - key: MadsSteeringMode
+      widget: multiple_button
+      title: Steering Mode on Brake Pedal
+      description: Choose how Automatic Lane Centering (ALC) behaves after the brake pedal is manually pressed in sunnypilot.
+      options:
+      - value: 0
+        label: Remain Active
+        enablement:
+        - $ref: '#/macros/mads_full_platforms'
+      - value: 1
+        label: Pause
+        enablement:
+        - $ref: '#/macros/mads_full_platforms'
+      - value: 2
+        label: Disengage
+      enablement:
+      - $ref: '#/macros/offroad'
+- id: blinker
+  title: Blinker Control
+  description: Lateral pause behavior during turn signals
+  items:
+  - key: BlinkerPauseLateralControl
+    widget: toggle
+    title: Pause Lateral Control with Blinker
+    description: Pause lateral control with blinker when traveling below the desired speed selected.
+    sub_items:
+    - key: BlinkerMinLateralControlSpeed
+      widget: option
+      title: Minimum Speed to Pause Lateral Control
+      min: 0
+      max: 255
+      step: 5
+      unit:
+        metric: km/h
+        imperial: mph
+      enablement:
+      - type: param
+        key: BlinkerPauseLateralControl
+        equals: true
+    - key: BlinkerLateralReengageDelay
+      widget: option
+      title: Post-Blinker Delay
+      description: Delay before lateral control resumes after the turn signal ends.
+      min: 0
+      max: 10
+      step: 1
+      unit: second
+      enablement:
+      - type: param
+        key: BlinkerPauseLateralControl
+        equals: true
+- id: lane_change
+  title: Lane Change
+  description: Automatic lane change timing and behavior
+  items:
+  - key: AutoLaneChangeTimer
+    widget: option
+    title: Auto Lane Change by Blinker
+    description: |-
+      Set a timer to delay the auto lane change operation when the blinker is used. No nudge on the steering wheel is required to auto lane change if a timer is set. Default is Nudge.
+    details: |-
+      Please use caution when using this feature. Only use the blinker when traffic and road conditions permit.
+    options:
+    - value: -1
+      label: 'Off'
+    - value: 0
+      label: Nudge
+    - value: 1
+      label: Nudgeless
+    - value: 2
+      label: 0.5 second
+    - value: 3
+      label: 1 second
+    - value: 4
+      label: 2 seconds
+    - value: 5
+      label: 3 seconds
+  - key: AutoLaneChangeBsmDelay
+    widget: toggle
+    title: 'Auto Lane Change: Delay with Blind Spot'
+    description: Toggle to enable a delay timer for lane changes when blind spot monitoring (BSM) detects a vehicle in your blind
+      spot.
+    enablement:
+    - type: capability
+      field: enable_bsm
+      equals: true
+    - type: param_compare
+      key: AutoLaneChangeTimer
+      op: '>'
+      value: 0
+- id: nrdr_learned
+  title: nrdr Learned Params
+  description: Live-learned vehicle parameters.
+  items: []
+  sub_panels:
+  - id: nrdr_learned_params
+    label: Learned Parameters
+    trigger_key: null
+    items:
+    - key: NrdrLearnSteerRatio
+      widget: toggle
+      title: Learn Steer Ratio (Auto)
+      description: When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance.
+    - key: NrdrLearnStiffness
+      widget: toggle
+      title: Learn Tire Stiffness (Auto)
+      description: When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0.
+    - key: NrdrLearnAngleOffset
+      widget: toggle
+      title: Learn Angle Offset (Auto)
+      description: When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side.
+- id: nrdr
+  title: nrdr Lateral Tuning
+  description: Lateral tuning specific to the nrdr fork.
+  items:
+  - key: NrdrRemoteTuneScan
+    widget: toggle
+    title: Run Tune Report Scan
+    description: Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full da
+  sub_panels:
+  - id: nrdr_car_info
+    label: Car & Tune Info
+    trigger_key: null
+    items:
+    - key: NrdrCarTuneInfo
+      widget: info
+      title: Car & Tune Info
+      description: Your car's loaded profile - fingerprint, EPS firmware, gas pedal interceptor and radar status, and the lateral/longitudinal kp/ki/kf. Written by the device once it has fingerprinted the car.
+  - id: nrdr_pidf_ground
+    label: PID/F Tuning Ground
+    trigger_key: null
+    items:
+    - key: NrdrStarPilotPid
+      widget: toggle
+      title: StarPilot PID Additions
+      description: The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base.
+    - key: LatPScaleLowSpeed
+      widget: option
+      title: Low Speed Proportional Scale (Below 25mph)
+      description: Scales the proportional (P) term below 25 mph. Higher = more error correction (tighter, can cut corners); lower = looser with wider swings.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatIScaleLowSpeed
+      widget: option
+      title: Low Speed Integral Scale (Below 25mph)
+      description: Scales the integral (I) term below 25 mph. Builds correction over time to erase steady-state error; too high oscillates.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatFScaleLowSpeed
+      widget: option
+      title: Low Speed Feedforward Scale (Below 25mph)
+      description: Scales the feedforward (kf) term below 25 mph. Follows the commanded angle rather than error, adding authority without amplifying noise. 100% = tuned value (static).
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatPScaleStandard
+      widget: option
+      title: Standard Speed Proportional Scale (25-50mph)
+      description: Scales the proportional (P) term between 25 and 50 mph.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatIScaleStandard
+      widget: option
+      title: Standard Speed Integral Scale (25-50mph)
+      description: Scales the integral (I) term between 25 and 50 mph.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatFScaleStandard
+      widget: option
+      title: Standard Speed Feedforward Scale (25-50mph)
+      description: Scales the feedforward (kf) term between 25 and 50 mph. 100% = tuned value (static).
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatPScaleHighway
+      widget: option
+      title: Highway Proportional Scale (50mph+)
+      description: Scales the proportional (P) term above 50 mph.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatIScaleHighway
+      widget: option
+      title: Highway Integral Scale (50mph+)
+      description: Scales the integral (I) term above 50 mph.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LatFScaleHighway
+      widget: option
+      title: Highway Feedforward Scale (50mph+)
+      description: Scales the feedforward (kf) term above 50 mph. 100% = tuned value (static).
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: NrdrLatRateDamping
+      widget: option
+      title: Rate Damping (D) Strength
+      description: The derivative term openpilot normally can't use. Adds torque opposing how fast the wheel is moving, which damps the low-speed oscillation plain P can't (the wheel is torque-commanded, so P alone rings). Relies on a clean steering-rate signal and a low-lag EPS - which this car has. 0 = off. Raise until the low-speed wobble flattens; too high makes turn-in feel heavy.
+      min: 0
+      max: 300
+      step: 5
+      unit: '%'
+    - key: NrdrLatRateDampingFadeSpeed
+      widget: option
+      title: Rate Damping Fade-Out Speed
+      description: Speed at which rate damping tapers to zero. Damping is strongest at a standstill and gone by this speed, where tire self-aligning torque resumes damping the steering itself. Keeps the D term out of your highway feel.
+      min: 0
+      max: 60
+      step: 1
+      unit: mph
+    - key: HondaCenterScale
+      widget: option
+      title: Center Boost
+      description: Extra error correction added while driving straight, as a boost on top of the normal output (0.50 = 50% boost). One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line.
+      min: 0.0
+      max: 5.0
+      step: 0.01
+    - key: HondaCenterBoostThreshold
+      widget: option
+      title: Center Boost Threshold (deg)
+      description: How centered should the steering wheel be when center boost is actually active?
+      min: 0.0
+      max: 10.0
+      step: 0.1
+      unit: deg
+    - key: HondaCenterBoostMinSpeed
+      widget: option
+      title: Center Boost Minimum Speed
+      description: Below this speed center boost is disabled. Center boost is meant for straight, higher-speed roads; gating it off at low speed stops the wheel from oscillating at stops and in parking-lot crawling.
+      min: 0
+      max: 80
+      step: 1
+      unit: mph
+    - key: NrdrTuneLearner
+      widget: toggle
+      title: 2D Auto-Tuner (Learned Trim)
+      description: Learns a per-(speed, angle) feedforward trim live while you drive, cancelling the systematic over/under-turn the tune report measures. A bounded, slow, gated correction on top of the base PID/F + D - the PID always does the driving. Off by default; Reset below wipes what it has learned.
+    - key: NrdrTuneLearnerStrength
+      widget: option
+      title: Auto-Tuner Strength
+      description: Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Start low; raise once you trust it.
+      min: 0
+      max: 30
+      step: 1
+      unit: '%'
+    - key: NrdrTuneLearnerRate
+      widget: option
+      title: Auto-Tuner Learning Speed
+      description: How fast the trim adapts to the measured error. Lower = slower, calmer, safer; higher = converges quicker but reacts more to each drive. 0 freezes learning (the trim it already has still applies).
+      min: 0
+      max: 100
+      step: 5
+      unit: '%'
+    - key: NrdrTuneLearnerReset
+      widget: toggle
+      title: Reset Learned Trim
+      description: Wipes the learned map back to zero on the next drive, then flips itself off. Use it to start the auto-tuner fresh after a base-tune change or a bad learning session.
+  - id: nrdr_unwind
+    label: Unwind Helpers
+    trigger_key: null
+    items:
+    - key: HondaUnwindFreeze
+      widget: toggle
+      title: Unwind Integrator Freeze
+      description: Freezes the PID integrator while the steering is returning toward center, so it doesn't hold torque through the unwind.
+    - key: HondaUnwindLookahead
+      widget: toggle
+      title: Unwind Lookahead
+      description: Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops.
+    - key: HondaUnwindBoostSeconds
+      widget: option
+      title: Unwind Boost Duration
+      description: How long the extra unwind feedforward is held at the start of each unwind before it fades out. Caps the low-speed return assist so it doesn't keep pushing torque through a long unwind. 0 = off.
+      min: 0.0
+      max: 3.0
+      step: 0.1
+      unit: s
+    - key: HondaUnwindFfMultiplier
+      widget: option
+      title: Unwind Feedforward Multiplier
+      description: Peak feedforward multiplier during an unwind, strongest at a standstill and fading to 1x (no boost) by about 22 mph. Raise for more low-speed return authority if the wheel is lazy coming back to center.
+      min: 1.0
+      max: 10.0
+      step: 0.1
+  - id: nrdr_override
+    label: Override Tuning
+    trigger_key: null
+    items:
+    - key: NrdrIncreaseOverrideTolerance
+      widget: toggle
+      title: Increase Driver Override Hysteresis
+      description: Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below.
+    - key: NrdrDriverOverrideThreshold
+      widget: option
+      title: Driver Override Threshold
+      description: Raw steering torque sensor reading above which you are considered to be steering (driver override). 1200 is Honda's stock threshold; on the few cars with a different stock threshold, your value is applied proportionally so 1200 always means stock.
+      min: 100
+      max: 5000
+      step: 100
+    - key: NrdrOverrideThresholdCenterBoost
+      widget: option
+      title: Override Threshold Center Boost
+      description: When the wheel is within the Center Boost degree band (on a straight), this lower override threshold applies instead of the one above - so you can override easily on straights while curves keep the higher threshold and do not drop torque from a false override. Set equal to Driver Override Threshold to disable.
+      min: 100
+      max: 5000
+      step: 100
+    - key: HondaDriverAssistDuringOverride
+      widget: toggle
+      title: Pass-through assist torque on override
+      description: When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling.
+    - key: HondaOverrideFadeDownSecs
+      widget: option
+      title: Override Torque Fade Down
+      description: Controls how quickly steering torque fades out when driver override begins.
+      min: 0.0
+      max: 10.0
+      step: 0.1
+      unit: second
+    - key: HondaOverrideFadeUpSecs
+      widget: option
+      title: Override Torque Fade Up
+      description: Controls how quickly steering torque fades back in after driver override ends.
+      min: 0.0
+      max: 10.0
+      step: 0.1
+      unit: second
+    - key: HondaOverrideTorqueScale
+      widget: option
+      title: Override Torque Retain
+      description: Controls how much openpilot steering torque remains when the override has gone past Override Torque Fade Down.
+      min: 0
+      max: 100
+      step: 1
+      unit: '%'
+  - id: nrdr_steer_filters
+    label: Steer Filters
+    trigger_key: null
+    items:
+    - key: HondaTorqueLowPassFilter
+      widget: toggle
+      title: Low Pass Filter (tau)
+      description: Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations.
+    - key: HondaLpfTauLowSpeed
+      widget: option
+      title: Low Pass Filter Tau (Below 25mph)
+      description: Low-pass filter time constant (seconds) below 25 mph.
+      min: 0.0
+      max: 5.0
+      step: 0.01
+      enablement:
+      - type: param
+        key: HondaTorqueLowPassFilter
+        equals: true
+    - key: HondaLpfTauStandard
+      widget: option
+      title: Standard Tau (25-50mph)
+      description: Low-pass filter time constant (seconds) between 25 and 50 mph.
+      min: 0.0
+      max: 5.0
+      step: 0.01
+      enablement:
+      - type: param
+        key: HondaTorqueLowPassFilter
+        equals: true
+    - key: HondaLpfTauHighway
+      widget: option
+      title: Highway Tau (50mph+)
+      description: Low-pass filter time constant (seconds) above 50 mph.
+      min: 0.0
+      max: 5.0
+      step: 0.01
+      enablement:
+      - type: param
+        key: HondaTorqueLowPassFilter
+        equals: true
+    - key: HondaNotchEnabled
+      widget: toggle
+      title: Notch Filter
+      description: Removes a narrow EPS chatter band (around 7Hz) without the lag a low pass filter adds.
+    - key: HondaNotchFreq
+      widget: option
+      title: Notch Frequency
+      description: Frequency (Hz) of the band eliminated from the controller. If you know what Hz your EPS growls at, this can help block that out without adding any extra lag into the controller. Best used in pair with a well-tuned low pass filter.
+      min: 1.0
+      max: 20.0
+      step: 0.1
+      enablement:
+      - type: param
+        key: HondaNotchEnabled
+        equals: true
+    - key: HondaNotchQ
+      widget: option
+      title: Notch Q / Width
+      description: Tolerance of the removed frequency. Higher = smaller portion removed, lower = wider (nearby frequencies will be removed as well).
+      min: 0.1
+      max: 10.0
+      step: 0.1
+      enablement:
+      - type: param
+        key: HondaNotchEnabled
+        equals: true
+    - key: HondaSteerDeltaLimiter
+      widget: toggle
+      title: Legacy Steer Delta Rate Limiter
+      description: Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass and notch filters.
+    - key: HondaSteerDeltaUp
+      widget: option
+      title: Steer Delta Up
+      description: Controls the maximum upward steering torque rate when the rate limiter is enabled. Too low will add lag.
+      min: 0.0
+      max: 100.0
+      step: 0.1
+      enablement:
+      - type: param
+        key: HondaSteerDeltaLimiter
+        equals: true
+    - key: HondaSteerDeltaDown
+      widget: option
+      title: Steer Delta Down
+      description: Controls the maximum downward steering torque rate when the rate limiter is enabled. Too low will add lag.
+      min: 0.0
+      max: 100.0
+      step: 0.1
+      enablement:
+      - type: param
+        key: HondaSteerDeltaLimiter
+        equals: true
+    - key: NrdrMinSteerSpeed
+      widget: option
+      title: Minimum Steer Speed
+      description: Below this speed no steering torque is commanded at all. 0 = steer at any speed (stock). For those who don't want the wheel moving at a standstill or parking-lot speeds.
+      min: 0
+      max: 45
+      step: 1
+      unit: mph
+  - id: nrdr_ford_lateral
+    label: Ford Lateral Tuning
+    trigger_key: null
+    items:
+    - key: NrdrFordOemLateral
+      widget: toggle
+      title: 'Ford: OEM-Style Lateral'
+      description: Ford only. Replaces stock curvature-only steering with Ford's full four-signal command (adds curvature-rate plus a lane-centering path-angle), the way the factory system actually drives. Targets the two stock complaints - the wheel fighting you after you grab it, and running out of steering authority in vigorous turns. OFF = stock curvature-only path, unchanged. BETA - first test on an empty road with hands ready. No effect on non-Ford cars.
+    - key: NrdrFordHumanTurn
+      widget: toggle
+      title: 'Ford: Human Turn Detection'
+      description: When you hold the wheel into a turn past 45 degrees, openpilot stops commanding steering so it is not fighting you, then ramps smoothly back in when you let go instead of snapping. This is the fix for the wheel trying to throw you off the road after you touch it. Only active when OEM-Style Lateral is on.
+      enablement:
+      - type: param
+        key: NrdrFordOemLateral
+        equals: true
+    - key: NrdrFordLanePositioning
+      widget: toggle
+      title: 'Ford: Lane Positioning'
+      description: Drives the path-angle signal with a lane-centering PID for extra steering authority and tighter in-lane position - the main lever against running out of torque. Engages at highway speed and steps aside during auto lane changes. Only active when OEM-Style Lateral is on.
+      enablement:
+      - type: param
+        key: NrdrFordOemLateral
+        equals: true
+    - key: NrdrFordLanePosGain
+      widget: option
+      title: 'Ford: Lane Positioning Strength'
+      description: How hard the lane-centering path-angle pulls toward lane center. 100 percent is baseline. Raise for stronger centering, lower if it feels busy. Only used when Lane Positioning is on.
+      min: 0
+      max: 300
+      step: 5
+      unit: '%'
+      enablement:
+      - type: param
+        key: NrdrFordOemLateral
+        equals: true
+    - key: NrdrFordMaxLatAccel
+      widget: option
+      title: 'Ford: Max Lateral Accel'
+      description: Raises the lateral-acceleration ceiling that caps how hard the car will corner - the most direct knob for running out of torque. Stock is about 2.4, set low on purpose because the safety model cannot see road banking. Raising it gives more cornering authority but removes that conservative margin; increase in small steps and validate on-road. Only used when OEM-Style Lateral is on.
+      min: 2.0
+      max: 3.5
+      step: 0.05
+      unit: m/s2
+      enablement:
+      - type: param
+        key: NrdrFordOemLateral
+        equals: true
+- id: nrdr_special
+  title: nrdr Special
+  description: Dashboard, diagnostics, and special features.
+  items: []
+  sub_panels:
+  - id: nrdr_party_tricks
+    label: Special
+    trigger_key: null
+    items:
+    - key: HondaInjectionTest
+      widget: toggle
+      title: Injection Test (Caution!)
+      description: When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a massive steering command. Use with extreme caution on a safe, empty road.
+    - key: HondaAltDashboardSpeed
+      widget: multiple_button
+      title: Alternative Dashboard Speed Design
+      description: Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph ("Stopped" below 1 mph, "--" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash cluster reads.
+      options:
+      - value: 0
+        label: Stock
+      - value: 1
+        label: Lead Speed
+      - value: 2
+        label: GPS Speed
+      - value: 3
+        label: Cluster Speed
+    - key: HondaAltDashboardDistance
+      widget: option
+      title: Alternative Dashboard Distance Design
+      description: Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). Radar closes the bars in as the lead approaches. Velocity pushes the bars out under acceleration and pulls them in under braking. Non-stock designs stay on the cluster permanently, even when not engaged.
+      options:
+      - value: 0
+        label: Stock
+      - value: 1
+        label: Radar
+      - value: 2
+        label: Velocity
+    - key: NrdrClearDashFaults
+      widget: toggle
+      title: Clear Dashboard Fault Codes
+      description: Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active).
+    - key: HondaSpoofCameraMessages
+      widget: toggle
+      title: Spoof Camera Messages
+      description: Dead camera only - keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises "Auto High Beam System Problem" (that fault is a message timeout, not a code). Leave OFF if your stock camera works.
+    - key: NrdrCruiseButtonSubMode
+      widget: toggle
+      title: Cruise Button Sub-Mode
+      description: Dynamic HUD - pressing the distance button or set/resume first wakes a preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed. The blink starts lazy and accelerates continuously until it cuts off.
+    - key: NrdrCruiseButtonSubModeSecs
+      widget: option
+      title: Sub-Mode Visibility Time
+      description: How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and rapid right before it falls off.
+      min: 5
+      max: 60
+      step: 1
+      unit: second
+      enablement:
+      - type: param
+        key: NrdrCruiseButtonSubMode
+        equals: true
