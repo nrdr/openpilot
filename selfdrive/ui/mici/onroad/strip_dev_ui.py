@@ -31,7 +31,7 @@ LABEL_ABBR = {
 
 
 class StripDevUiRenderer(Widget):
-  TOP_OFFSET = 86       # clear the pinned ball at the top of the strip
+  TOP_OFFSET = 116      # clear the pinned ball (now dropped to clear the top edge)
   ROW_SPACING = 74
   LABEL_SIZE = 20
   VALUE_SIZE = 30
