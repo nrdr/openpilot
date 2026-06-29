@@ -297,7 +297,7 @@ sections:
       title: Auto-Tuner Strength
       description: Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Start low; raise once you trust it.
       min: 0
-      max: 30
+      max: 100
       step: 1
       unit: '%'
     - key: NrdrTuneLearnerRate

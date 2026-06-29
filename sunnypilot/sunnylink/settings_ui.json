@@ -552,7 +552,7 @@
                   "title": "Auto-Tuner Strength",
                   "description": "Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Start low; raise once you trust it.",
                   "min": 0,
-                  "max": 30,
+                  "max": 100,
                   "step": 1,
                   "unit": "%"
                 },
@@ -922,7 +922,7 @@
                   "key": "HondaAltDashboardSpeed",
                   "widget": "multiple_button",
                   "title": "Alternative Dashboard Speed Design",
-                  "description": "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph (\"Stopped\" below 1 mph, \"--\" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash clus"
+                  "description": "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph (\"Stopped\" below 1 mph, \"--\" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash clu"
                 }
               ]
             }

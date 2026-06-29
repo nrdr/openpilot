@@ -39,7 +39,7 @@ N_ANGLE = int(ANGLE_MAX_DEG / ANGLE_BIN_DEG)   # 25 angle columns
 MIN_ABS_DES = 1.0          # deg: dead-ahead band -- no trim, no learning (center boost owns center)
 
 # --- safety / learning constants ---
-TRIM_HARD_FRAC = 0.30      # hard cap on any stored cell, as a fraction of steer_max (never exceeded)
+TRIM_HARD_FRAC = 1.0       # hard cap on any stored cell, as a fraction of steer_max (still bounded by the final steer_max clamp)
 LEARN_RATE_REF = 2.0e-5    # torque per (deg of error) per frame at 100% user rate
 LEARN_MIN_SPEED_MS = 5.0 / MS_TO_MPH   # ~5 mph: below this the steering signal is transient junk
 RATE_GATE_DEG_S = 25.0     # only learn when the wheel is quasi-steady (filters turn-in / unwind lag)

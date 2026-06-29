@@ -156,7 +156,7 @@ class PidfGroundLayout(Widget):
     self._tune_learner_strength = option_item_sp(
       param="NrdrTuneLearnerStrength",
       title=lambda: tr("Auto-Tuner Strength (Default: 10%)"),
-      min_value=0, max_value=30, value_change_step=1,
+      min_value=0, max_value=100, value_change_step=1,
       description=lambda: tr("Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Start low; raise once you trust it."),
       label_callback=lambda value: f"{value}%",
     )

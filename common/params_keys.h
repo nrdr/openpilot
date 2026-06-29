@@ -328,7 +328,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrMinSteerSpeed", {PERSISTENT | BACKUP, INT, "0"}},          // mph; below this speed no steering torque is commanded (0 = stock, steer always)
     {"NrdrClearDashFaults", {PERSISTENT | BACKUP, BOOL, "1"}},       // zero FCM/icon faults + FCW chime on the cluster; OFF = stock passthrough
     {"HondaSpoofCameraMessages", {PERSISTENT | BACKUP, BOOL, "0"}},  // dead camera: spoof CAMERA_MESSAGES (0x35E) to stop the Auto High Beam fault
-    {"NrdrCruiseButtonSubMode", {PERSISTENT | BACKUP, BOOL, "1"}},   // Dynamic HUD: distance/set/resume buttons preview before acting
+    {"NrdrCruiseButtonSubMode", {PERSISTENT | BACKUP, BOOL, "0"}},   // Dynamic HUD: distance/set/resume buttons preview before acting (default OFF)
     {"NrdrCruiseButtonSubModeSecs", {PERSISTENT | BACKUP, INT, "15"}}, // sub-mode window length (5-60s); blink ramp spans the whole window
     {"NrdrHudSubModeUntil", {CLEAR_ON_MANAGER_START, FLOAT, "0"}},   // monotonic deadline of the active HUD sub-mode window
     // Sunnylink remote actions (consumed and cleared by nrdr_remoted)
