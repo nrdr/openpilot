@@ -159,7 +159,7 @@ sections:
   - key: NrdrRemoteTuneScan
     widget: toggle
     title: Run Tune Report Scan
-    description: Flip ON to analyze all drive logs on the device. The device flips this back OFF when it starts. A full da
+    description: Flip ON to scan every drive log into a tune report. The device flips it back OFF on the next start.
   sub_panels:
   - id: nrdr_car_info
     label: Car & Tune Info
@@ -168,7 +168,7 @@ sections:
     - key: NrdrCarTuneInfo
       widget: info
       title: Car & Tune Info
-      description: Your car's loaded profile - fingerprint, EPS firmware, gas pedal interceptor and radar status, and the lateral/longitudinal kp/ki/kf. Written by the device once it has fingerprinted the car.
+      description: Your car's loaded profile and lat/long kp/ki/kf, written by the device once it fingerprints the car.
   - id: nrdr_pidf_ground
     label: PID/F Tuning Ground
     trigger_key: null
