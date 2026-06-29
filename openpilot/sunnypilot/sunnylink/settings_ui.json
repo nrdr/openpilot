@@ -922,7 +922,8 @@
                   "key": "HondaAltDashboardSpeed",
                   "widget": "multiple_button",
                   "title": "Alternative Dashboard Speed Design",
-                  "description": "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph (\"Stopped\" below 1 mph, \"--\" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash cluster reads.",
+                  "description": "Repurposes the cluster's set-speed slot to show lead, GPS, or true cluster speed (needs openpilot longitudinal).",
+                  "details": "Lead Speed shows the lead's speed in whole mph (\"Stopped\" below 1 mph, \"--\" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash cluster reads.",
                   "options": [
                     {
                       "value": 0,
