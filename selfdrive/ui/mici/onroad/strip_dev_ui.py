@@ -21,20 +21,17 @@ from openpilot.system.ui.widgets import Widget
 
 # Long element labels -> short tags that fit ~60px. Anything unmapped falls back to its first word.
 LABEL_ABBR = {
-  "REL DIST": "DIST",
-  "REL SPEED": "RSPD",
-  "REAL STEER": "STEER",
-  "DESIRED STEER": "DES",
-  "ACTUAL L.A.": "LAT",
-  "DESIRED L.A.": "dLAT",
+  "REAL STEER": "REAL",
+  "DESIRED STEER": "DESIRED",
+  "DESIRED L.A.": "DESIRED",
 }
 
 
 class StripDevUiRenderer(Widget):
   TOP_OFFSET = 116      # clear the pinned ball (now dropped to clear the top edge)
   ROW_SPACING = 74
-  LABEL_SIZE = 20
-  VALUE_SIZE = 30
+  LABEL_SIZE = 17       # ~15% smaller so REAL/DESIRED + values fit the 60px strip
+  VALUE_SIZE = 18       # shrunk ~30% more so a -12.3-style readout fits the 60px lane
 
   def __init__(self):
     super().__init__()
@@ -55,19 +52,16 @@ class StripDevUiRenderer(Widget):
     if sm.recv_frame["carState"] < ui_state.started_frame:
       return
 
-    elements = [
-      self.rel_dist_elem.update(sm, ui_state.is_metric),
-      self.rel_speed_elem.update(sm, ui_state.is_metric),
-      self.steering_angle_elem.update(sm, ui_state.is_metric),
-    ]
+    # Only two metrics fit the 60px strip for now: REAL + DESIRED steering angle. The rest are
+    # parked (instances kept) until there's a user picker for which to show.
+    elements = [self.steering_angle_elem.update(sm, ui_state.is_metric)]   # REAL
     which = sm['controlsState'].lateralControlState.which()
-    if which == 'torqueState':
-      elements.append(self.desired_lat_accel_elem.update(sm, ui_state.is_metric))
+    if which == 'pidState':
+      elements.append(self.desired_pid_steer_elem.update(sm, ui_state.is_metric))   # DESIRED
     elif which == 'angleState':
       elements.append(self.desired_steer_elem.update(sm, ui_state.is_metric))
-    elif which == 'pidState':
-      elements.append(self.desired_pid_steer_elem.update(sm, ui_state.is_metric))
-    elements.append(self.actual_lat_accel_elem.update(sm, ui_state.is_metric))
+    elif which == 'torqueState':
+      elements.append(self.desired_lat_accel_elem.update(sm, ui_state.is_metric))
 
     cx = int(self._rect.x + self._rect.width - SIDE_PANEL_WIDTH / 2)
     y = int(self._rect.y + self.TOP_OFFSET)

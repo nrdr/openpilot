@@ -274,6 +274,9 @@ class HudRenderer(Widget):
     """Persistent top-left cluster: big white real speed + 'mph', with a smaller green set speed
     beside it. Hidden while the set-speed-change transient is on screen, so a change shows the set
     speed alone (per spec). Positions/sizes are first-draft knobs -- tune to taste on the C4."""
+    # Never draw the speed while an alert (or the calibration banner) is on screen -- alerts own the view.
+    if not self._can_draw_top_icons:
+      return
     # Hide the real speed while a set-speed change is on screen -- mirror the transient's exact
     # window (engaged + within persistence + top icons allowed) so the two never both show.
     changing = (self._engaged and self._can_draw_top_icons and
@@ -281,10 +284,10 @@ class HudRenderer(Widget):
     if changing:
       return
 
-    cluster_x = int(rect.x + 32)
-    cluster_y = int(rect.y + 20)
-    real_size = FONT_SIZES.set_speed         # exactly the old MAX/set-speed size -- the "perfect size"
-    set_size = 60                            # green set speed, clearly smaller (superscript-style) beside it
+    cluster_x = int(rect.x + 16)             # nudged toward the top-left corner
+    cluster_y = int(rect.y + 12)
+    real_size = 100                          # ~10% smaller than the old set-speed size (112)
+    set_size = 54                            # green set, ~10% smaller, superscript-style
     green = rl.Color(0, 255, 70, 255)
 
     # Real speed (white)
@@ -292,13 +295,13 @@ class HudRenderer(Widget):
     speed_size = measure_text_cached(self._font_bold, speed_text, real_size)
     rl.draw_text_ex(self._font_bold, speed_text, rl.Vector2(cluster_x, cluster_y), real_size, 0, COLORS.WHITE)
 
-    # Unit under the number
+    # Unit ('mph') ~50% smaller; position is relative to the cluster, so it follows the new corner
     unit_text = tr("km/h") if ui_state.is_metric else tr("mph")
     rl.draw_text_ex(self._font_medium, unit_text, rl.Vector2(cluster_x + 6, cluster_y + speed_size.y - 26),
-                    FONT_SIZES.speed_unit, 0, COLORS.WHITE_TRANSLUCENT)
+                    FONT_SIZES.speed_unit // 2, 0, COLORS.WHITE_TRANSLUCENT)
 
-    # Set speed (green), smaller, to the upper-right of the real-speed number
-    if self.is_cruise_set:
+    # Green set speed, superscript -- only when cruise control is actually engaged
+    if self.is_cruise_set and self._engaged:
       set_speed = self.set_speed * KM_TO_MILE if not ui_state.is_metric else self.set_speed
       set_text = str(round(set_speed))
       rl.draw_text_ex(self._font_display, set_text, rl.Vector2(cluster_x + speed_size.x + 14, cluster_y + 6),
