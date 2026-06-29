@@ -135,11 +135,14 @@ class SpeedLimitResolver:
     self._calculate_map_data_limits(sm, speed_limit, next_speed_limit)
 
   def _calculate_map_data_limits(self, sm: messaging.SubMaster, speed_limit: float, next_speed_limit: float) -> None:
-    gps_data = sm[self._gps_location_service]
     map_data = sm['liveMapDataSP']
 
-    distance_since_fix = self.v_ego * (time.monotonic() - gps_data.unixTimestampMillis * 1e-3)
-    distance_to_speed_limit_ahead = max(0., map_data.speedLimitAheadDistance - distance_since_fix)
+    # FIX: the old distance_since_fix correction subtracted the GPS *unix* timestamp (~1.78e9 s) from
+    # time.monotonic() (seconds since boot, ~1e4) -- a ~1.78e9 mismatch that made distance_since_fix
+    # hugely negative and distance_to_speed_limit_ahead ~2e10 m, so the preemptive swap below (<= 1000 m)
+    # could NEVER fire and the limit only ever changed AT the sign. mapd already publishes
+    # speedLimitAheadDistance from the current GPS fix, so use it directly.
+    distance_to_speed_limit_ahead = max(0., map_data.speedLimitAheadDistance)
 
     self.limit_solutions[SpeedLimitSource.map] = speed_limit
     self.distance_solutions[SpeedLimitSource.map] = 0.
