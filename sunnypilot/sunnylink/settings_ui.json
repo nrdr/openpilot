@@ -396,6 +396,12 @@
               "trigger_key": null,
               "items": [
                 {
+                  "key": "NrdrStarPilotPid",
+                  "widget": "toggle",
+                  "title": "StarPilot PID Additions",
+                  "description": "The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base."
+                },
+                {
                   "key": "LatPScaleLowSpeed",
                   "widget": "option",
                   "title": "Low Speed Proportional Scale (Below 25mph)",
@@ -533,6 +539,38 @@
                   "max": 80,
                   "step": 1,
                   "unit": "mph"
+                },
+                {
+                  "key": "NrdrTuneLearner",
+                  "widget": "toggle",
+                  "title": "2D Auto-Tuner (Learned Trim)",
+                  "description": "Learns a per-(speed, angle) feedforward trim live while you drive, cancelling the systematic over/under-turn the tune report measures. A bounded, slow, gated correction on top of the base PID/F + D - the PID always does the driving. Off by default; Reset below wipes what it has learned."
+                },
+                {
+                  "key": "NrdrTuneLearnerStrength",
+                  "widget": "option",
+                  "title": "Auto-Tuner Strength",
+                  "description": "Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Start low; raise once you trust it.",
+                  "min": 0,
+                  "max": 30,
+                  "step": 1,
+                  "unit": "%"
+                },
+                {
+                  "key": "NrdrTuneLearnerRate",
+                  "widget": "option",
+                  "title": "Auto-Tuner Learning Speed",
+                  "description": "How fast the trim adapts to the measured error. Lower = slower, calmer, safer; higher = converges quicker but reacts more to each drive. 0 freezes learning (the trim it already has still applies).",
+                  "min": 0,
+                  "max": 100,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "NrdrTuneLearnerReset",
+                  "widget": "toggle",
+                  "title": "Reset Learned Trim",
+                  "description": "Wipes the learned map back to zero on the next drive, then flips itself off. Use it to start the auto-tuner fresh after a base-tune change or a bad learning session."
                 }
               ]
             },
@@ -884,80 +922,7 @@
                   "key": "HondaAltDashboardSpeed",
                   "widget": "multiple_button",
                   "title": "Alternative Dashboard Speed Design",
-                  "description": "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph (\"Stopped\" below 1 mph, \"--\" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash cluster reads.",
-                  "options": [
-                    {
-                      "value": 0,
-                      "label": "Stock"
-                    },
-                    {
-                      "value": 1,
-                      "label": "Lead Speed"
-                    },
-                    {
-                      "value": 2,
-                      "label": "GPS Speed"
-                    },
-                    {
-                      "value": 3,
-                      "label": "Cluster Speed"
-                    }
-                  ]
-                },
-                {
-                  "key": "HondaAltDashboardDistance",
-                  "widget": "option",
-                  "title": "Alternative Dashboard Distance Design",
-                  "description": "Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). Radar closes the bars in as the lead approaches. Velocity pushes the bars out under acceleration and pulls them in under braking. Non-stock designs stay on the cluster permanently, even when not engaged.",
-                  "options": [
-                    {
-                      "value": 0,
-                      "label": "Stock"
-                    },
-                    {
-                      "value": 1,
-                      "label": "Radar"
-                    },
-                    {
-                      "value": 2,
-                      "label": "Velocity"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrClearDashFaults",
-                  "widget": "toggle",
-                  "title": "Clear Dashboard Fault Codes",
-                  "description": "Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active)."
-                },
-                {
-                  "key": "HondaSpoofCameraMessages",
-                  "widget": "toggle",
-                  "title": "Spoof Camera Messages",
-                  "description": "Dead camera only - keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises \"Auto High Beam System Problem\" (that fault is a message timeout, not a code). Leave OFF if your stock camera works."
-                },
-                {
-                  "key": "NrdrCruiseButtonSubMode",
-                  "widget": "toggle",
-                  "title": "Cruise Button Sub-Mode",
-                  "description": "Dynamic HUD - pressing the distance button or set/resume first wakes a preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed. The blink starts lazy and accelerates continuously until it cuts off."
-                },
-                {
-                  "key": "NrdrCruiseButtonSubModeSecs",
-                  "widget": "option",
-                  "title": "Sub-Mode Visibility Time",
-                  "description": "How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and rapid right before it falls off.",
-                  "min": 5,
-                  "max": 60,
-                  "step": 1,
-                  "unit": "second",
-                  "enablement": [
-                    {
-                      "type": "param",
-                      "key": "NrdrCruiseButtonSubMode",
-                      "equals": true
-                    }
-                  ]
+                  "description": "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). Lead Speed shows the lead's speed in whole mph (\"Stopped\" below 1 mph, \"--\" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash clus"
                 }
               ]
             }
@@ -1505,7 +1470,7 @@
                   "key": "HondaCivicRadarTryout",
                   "widget": "toggle",
                   "title": "Try Honda Bosch Radar (experimental)",
-                  "description": "EXPERIMENTAL \u00e2\u20ac\u201d Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller."
+                  "description": "EXPERIMENTAL \u2014 Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller."
                 },
                 {
                   "key": "HondaStoppingDecelRate",

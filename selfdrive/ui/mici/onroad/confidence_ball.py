@@ -57,7 +57,8 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
     status_dot_radius = 24
     # Pinned (C4): the dot no longer slides with confidence -- it sits near the top of the strip as a
     # stationary status light (color still conveys confidence). The strip below it holds the mini devUI.
-    dot_height = self._rect.y + status_dot_radius + 8
+    # Dropped low enough to clear the strip's top inset, which was clipping the dot at +8.
+    dot_height = self._rect.y + status_dot_radius + 36
 
     # confidence zones
     if ui_state.status == UIStatus.ENGAGED or self._demo:
