@@ -90,8 +90,9 @@ class Controls(ControlsExt):
     steer_angle_without_offset = math.radians(CS.steeringAngleDeg - angle_offset)
     self.curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
 
-    # Update Torque Params
-    if self.CP.lateralTuning.which() == 'torque':
+    # Update Torque Params. Angle-steer cars (Ford, ported from BluePilot) use LatControlAngle,
+    # which has no update_model_v2 and no torque .extension, so gate both branches on non-angle.
+    if self.CP.lateralTuning.which() == 'torque' and self.CP.steerControlType != car.CarParams.SteerControlType.angle:
       torque_params = self.sm['liveTorqueParameters']
       if self.sm.all_checks(['liveTorqueParameters']) and torque_params.useParams:
         self.LaC.update_live_torque_params(torque_params.latAccelFactorFiltered, torque_params.latAccelOffsetFiltered,
@@ -103,7 +104,7 @@ class Controls(ControlsExt):
 
       self.LaC.extension.update_lateral_lag(self.lat_delay)
 
-    elif self.CP.lateralTuning.which() == 'pid':
+    elif self.CP.lateralTuning.which() == 'pid' and self.CP.steerControlType != car.CarParams.SteerControlType.angle:
       # Feed the planned trajectory to the PID controller for unwind lookahead.
       self.LaC.update_model_v2(self.sm['modelV2'])
 
