@@ -3,6 +3,7 @@ import os
 import random
 import time
 import jwt
+from pathlib import Path
 from typing import cast
 from datetime import datetime, timedelta, UTC
 
@@ -47,8 +48,35 @@ class SunnylinkApi(BaseApi):
 
   def _resolve_dongle_ids(self):
     sunnylink_dongle_id = self.params.get("SunnylinkDongleId")
+    # nrdr: fall back to the durable /persist copy so the sunnylink dongle survives
+    # param wipes / factory resets. sunnylink returns 409 ("public key already in
+    # use") for a device it already knows, so a wiped device can't re-register --
+    # the durable copy lets it restore instead. Mirror of comma's dongle_id fallback.
+    if sunnylink_dongle_id in (None, UNREGISTERED_SUNNYLINK_DONGLE_ID):
+      try:
+        persist_path = Path(Paths.persist_root() + "/comma/sunnylink_dongle_id")
+        if persist_path.is_file():
+          restored = persist_path.read_text().strip()
+          if restored:
+            sunnylink_dongle_id = restored
+            self.params.put("SunnylinkDongleId", restored, block=True)
+      except Exception:
+        pass
     comma_dongle_id = self.dongle_id or self.params.get("DongleId")
     return sunnylink_dongle_id, comma_dongle_id
+
+  @staticmethod
+  def _persist_sunnylink_dongle(dongle_id):
+    # Write-once durable copy; never overwrite an existing file.
+    if not dongle_id or dongle_id == UNREGISTERED_SUNNYLINK_DONGLE_ID:
+      return
+    try:
+      persist_path = Path(Paths.persist_root() + "/comma/sunnylink_dongle_id")
+      if not persist_path.is_file():
+        persist_path.parent.mkdir(parents=True, exist_ok=True)
+        persist_path.write_text(dongle_id)
+    except Exception:
+      pass
 
   def _resolve_imeis(self):
     imei1, imei2 = None, None
@@ -141,7 +169,8 @@ class SunnylinkApi(BaseApi):
           time.sleep(3)
           break
 
-    self.params.put("SunnylinkDongleId", sunnylink_dongle_id or UNREGISTERED_SUNNYLINK_DONGLE_ID)
+    self.params.put("SunnylinkDongleId", sunnylink_dongle_id or UNREGISTERED_SUNNYLINK_DONGLE_ID, block=True)
+    self._persist_sunnylink_dongle(sunnylink_dongle_id)
 
     # Set the last ping time to the current time since we were just talking to the API
     last_ping = int((time.monotonic() if successful_registration else start_time) * 1e9)
