@@ -24,20 +24,21 @@ def to_percent(v):
 
 class DRIVER_MONITOR_SETTINGS:
   def __init__(self):
-    # https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:42018X1947&rid=2
-    self._WHEELTOUCH_POLICY_ALERT_1_TIMEOUT = 15.
-    self._WHEELTOUCH_POLICY_ALERT_2_TIMEOUT = 24.
-    self._WHEELTOUCH_POLICY_ALERT_3_TIMEOUT = 30.
-    # https://cdn.euroncap.com/cars/assets/euro_ncap_protocol_safe_driving_driver_engagement_v11_a30e874152.pdf
-    self._VISION_POLICY_ALERT_1_TIMEOUT = 3.
-    self._VISION_POLICY_ALERT_2_TIMEOUT = 5.
-    self._VISION_POLICY_ALERT_3_TIMEOUT = 11.
+    # nrdr: 86400s (24h) windows so DM effectively never terminates, ported from the old
+    # helpers.py nerf. Redundant with the vehicle's OEM driver monitoring (BlueCruise wheel
+    # camera stays armed while OP drives; it only disarms on the brake/cancel that also drops OP).
+    self._WHEELTOUCH_POLICY_ALERT_1_TIMEOUT = 86400. - 15.
+    self._WHEELTOUCH_POLICY_ALERT_2_TIMEOUT = 86400. - 6.
+    self._WHEELTOUCH_POLICY_ALERT_3_TIMEOUT = 86400.
+    self._VISION_POLICY_ALERT_1_TIMEOUT = 86400. - 8.
+    self._VISION_POLICY_ALERT_2_TIMEOUT = 86400. - 6.
+    self._VISION_POLICY_ALERT_3_TIMEOUT = 86400.
 
     self._TIMEOUT_RECOVERY_FACTOR_MAX = 5.
     self._TIMEOUT_RECOVERY_FACTOR_MIN = 1.25
 
-    self._MAX_TERMINAL_ALERTS = 3  # not allowed to engage after 3 terminal alerts
-    self._MAX_TERMINAL_DURATION = int(30 / DT_DMON)  # not allowed to engage after 30s of terminal alerts
+    self._MAX_TERMINAL_ALERTS = 86400  # nrdr: never lock out engagement
+    self._MAX_TERMINAL_DURATION = 86400  # nrdr: never lock out engagement
 
     self._FACE_THRESHOLD = 0.7
     self._EYE_THRESHOLD = 0.65

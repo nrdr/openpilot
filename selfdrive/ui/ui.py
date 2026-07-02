@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import sys
 import time
 
 from cereal import messaging
@@ -24,10 +25,20 @@ def main():
   else:
     MiciMainLayout()
 
+  _offroad_since = None
   pm = messaging.PubMaster(['uiDebug'])
   for should_render, frame_time, cpu_time in gui_app.render():
     extra_start = time.monotonic()
     ui_state.update()
+
+    # nrdr: UI-leak workaround - ~60s after going offroad, exit so the manager respawns a fresh
+    # UI and drops the accumulated leak (manager relaunches in ~3s; uploads untouched).
+    if ui_state.started:
+      _offroad_since = None
+    elif _offroad_since is None:
+      _offroad_since = time.monotonic()
+    elif time.monotonic() - _offroad_since > 60:
+      sys.exit(0)
 
     if should_render:
       # reaffine after power save offlines our core
