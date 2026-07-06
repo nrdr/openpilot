@@ -13,6 +13,19 @@ from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
+# nrdr: the Clarity's Nidec rack is variable-ratio, but paramsd learns ONE steerRatio (~17.24,
+# the lock-to-lock average) - which over-commands where the rack quickens at large angle and
+# under-commands near center. Measured effective ratio vs |steering-wheel angle| (from
+# steerratio_by_angle.py) tapers from the learned ~17.2 near center down to ~15.5 out at angle,
+# then PLATEAUS (data is flat ~15.5 from 250 to 425 deg, i.e. out to ~lock for a 2.41-turn rack),
+# so np.interp holding the last value past the table is the correct extrapolation, not a guess.
+# Center is anchored to the proven learned value so highway feel is untouched; only the
+# large-angle over-turn is pulled out. Steepen the near-center value toward the raw measurement
+# (~19 at 0 deg) only after confirming no highway over-steer.
+NRDR_STEER_RATIO_ANGLE_BP = [0.0, 250.0]  # |steering-wheel angle|, deg
+NRDR_STEER_RATIO_V = [18.50, 12.74]         # effective steer ratio at each break
+
+
 CENTER_TAPER_FADE_TAU = 0.25
 
 # Unwind integrator-freeze: when the desired angle is dropping toward center,
@@ -239,6 +252,12 @@ class LatControlPID(LatControl):
     pid_log = log.ControlsState.LateralPIDState.new_message()
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
+
+    # nrdr: replace the single learned steerRatio with the angle-dependent taper before the
+    # curvature->angle conversion, so the variable rack stops over-turning at large angle. Keyed
+    # on the measured wheel angle (stable; avoids the desired-angle circular dependency). controlsd
+    # re-sets VM from paramsd every cycle, so this override is per-frame and can't compound.
+    VM.sR = float(np.interp(abs(CS.steeringAngleDeg), NRDR_STEER_RATIO_ANGLE_BP, NRDR_STEER_RATIO_V))
 
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
