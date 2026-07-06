@@ -88,7 +88,12 @@ class LatControlTorque(LatControl):
     ff = gravity_adjusted_future_lateral_accel
     # latAccelOffset corrects roll compensation bias from device roll misalignment relative to car roll
     ff -= self.torque_params.latAccelOffset
-    ff += get_friction(error + JERK_GAIN * desired_lateral_jerk, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
+    # nrdr: no stiction/friction feedforward during lane changes. laneChangeState is stamped onto
+    # modelV2.meta by modeld's DesireHelper; the extension already holds model_v2 (via update_model_v2).
+    lane_changing = self.extension.model_valid and \
+                    self.extension.model_v2.meta.laneChangeState != log.LaneChangeState.off
+    if not lane_changing:
+      ff += get_friction(error + JERK_GAIN * desired_lateral_jerk, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
 
     if not active:
       output_torque = 0.0
