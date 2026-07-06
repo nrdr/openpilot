@@ -24,6 +24,11 @@ CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 ALLOW_THROTTLE_THRESHOLD = 0.4
 MIN_ALLOW_THROTTLE_SPEED = 2.5
 
+LAUNCH_DISARM_SPEED = 2.0
+LAUNCH_COMMIT_T = 3.5
+LAUNCH_MOVING_SPEED = 1.2
+LAUNCH_MAX_ACCEL = 3.5
+
 # Lookup table for turns
 _A_TOTAL_MAX_V = [1.7, 3.2]
 _A_TOTAL_MAX_BP = [20., 40.]
@@ -68,6 +73,7 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.prev_accel_clip = [ACCEL_MIN, ACCEL_MAX]
     self.output_a_target = 0.0
     self.output_should_stop = False
+    self.launch_armed = False
 
     self.v_desired_trajectory = np.zeros(CONTROL_N)
     self.a_desired_trajectory = np.zeros(CONTROL_N)
@@ -116,6 +122,14 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.v_desired_filter.x = max(0.0, self.v_desired_filter.update(v_ego))
     throttle_probs = sm['modelV2'].meta.disengagePredictions.gasPressProbs
     throttle_prob = throttle_probs[1] if len(throttle_probs) > 1 else 1.0
+    if (len(sm['modelV2'].velocity.x) == ModelConstants.IDX_N and
+        len(sm['modelV2'].acceleration.x) == ModelConstants.IDX_N):
+      model_v = np.interp(T_IDXS_MPC, ModelConstants.T_IDXS, sm['modelV2'].velocity.x)
+      model_a = np.interp(T_IDXS_MPC, ModelConstants.T_IDXS, sm['modelV2'].acceleration.x)
+    else:
+      # Fail safe: an invalid model trajectory must never arm the green-light launch boost.
+      model_v = np.zeros(len(T_IDXS_MPC))
+      model_a = np.zeros(len(T_IDXS_MPC))
     # Don't clip at low speeds since throttle_prob doesn't account for creep
     self.allow_throttle = throttle_prob > ALLOW_THROTTLE_THRESHOLD or v_ego <= MIN_ALLOW_THROTTLE_SPEED
 
@@ -160,6 +174,23 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
                                                                         action_t=action_t, vEgoStopping=self.v_ego_stopping)
     output_a_target_e2e = sm['modelV2'].action.desiredAcceleration
     output_should_stop_e2e = sm['modelV2'].action.shouldStop
+
+    # nrdr: upstream green-light launch (commaai 25a7520) - boost the e2e accel target off a green
+    # from a standstill. Adapted to fork: gated on is_e2e (not experimentalMode) and uses the
+    # live-tuned v_ego_stopping, so it fires exactly when output_a_target_e2e is actually consumed.
+    if sm['carState'].standstill:
+      self.launch_armed = True
+    elif v_ego > LAUNCH_DISARM_SPEED:
+      self.launch_armed = False
+    if (self.launch_armed and self.is_e2e(sm) and not output_should_stop_e2e and
+        np.interp(LAUNCH_COMMIT_T, T_IDXS_MPC, model_v) > LAUNCH_DISARM_SPEED):
+      t_cut = min(float(T_IDXS_MPC[np.argmax(model_v > LAUNCH_MOVING_SPEED)]), LAUNCH_COMMIT_T)
+      t_shifted = T_IDXS_MPC + t_cut
+      v_shifted = np.interp(t_shifted, T_IDXS_MPC, model_v)
+      a_shifted = np.interp(t_shifted, T_IDXS_MPC, model_a)
+      a_launch = get_accel_from_plan(v_shifted, a_shifted, T_IDXS_MPC, action_t=action_t, vEgoStopping=self.v_ego_stopping)[0]
+      a_launch_max = np.interp(v_ego, [LAUNCH_MOVING_SPEED, LAUNCH_DISARM_SPEED], [LAUNCH_MAX_ACCEL, 0.])
+      output_a_target_e2e = max(output_a_target_e2e, min(a_launch, a_launch_max))
 
     if self.is_e2e(sm):
       output_a_target = min(output_a_target_e2e, output_a_target_mpc)
