@@ -104,7 +104,15 @@ class LatControlTorque(LatControl):
 
       freeze_integrator = steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
       output_lataccel = self.pid.update(pid_log.error, speed=CS.vEgo, feedforward=ff, freeze_integrator=freeze_integrator)
+      # nrdr: double latAccelFactor during a lane change. torque = lataccel / latAccelFactor, so a
+      # 2x factor => half the commanded torque => a softer, less-jerky lane change. Uses whatever
+      # value is live (paramsd/torqued learned it, else the default). Tight save/restore so nothing
+      # downstream sees the doubled value.
+      laf_orig = self.torque_params.latAccelFactor
+      if lane_changing:
+        self.torque_params.latAccelFactor = laf_orig * 2.0
       output_torque = self.torque_from_lateral_accel(output_lataccel, self.torque_params)
+      self.torque_params.latAccelFactor = laf_orig
 
       # Lateral acceleration torque controller extension updates
       # Overrides pid_log.error and output_torque
