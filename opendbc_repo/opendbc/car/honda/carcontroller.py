@@ -537,7 +537,7 @@ BRAKE_PROFILES_PATH = "/data/honda_brake_profiles.json"
 BRAKE_LEARN_VERSION = 1
 
 _BRAKE_EMA_ALPHA = 0.1          # EMA on brake RELEASE folding the converged integrator into its bin
-_BRAKE_PRELOAD_CAP = -0.5       # m/s^2: most negative preload allowed (conservative; pos side capped at 0.0)
+_BRAKE_PRELOAD_CAP = -0.15       # m/s^2: most negative preload allowed (conservative; pos side capped at 0.0)
 _BRAKE_DECAY_PER_MIN = 0.01     # whole map decays toward 0 at x0.99/min while idle
 _BRAKE_LEARNER_DT = 2 * DT_CTRL # update() runs on the frame % 2 == 0 cadence -> 0.02 s/tick
 _BRAKE_DECAY_PER_TICK = _BRAKE_DECAY_PER_MIN / 60.0 * _BRAKE_LEARNER_DT
@@ -798,7 +798,7 @@ class CarController(CarControllerBase, MadsCarController, GasInterceptorCarContr
 
     # Bosch extra-brake controller
     self.brake_pid = PIDController(k_p=0.0,
-                                   k_i=1.0,
+                                   k_i=0.5,
                                    pos_limit=0.0,
                                    neg_limit=-2.0,
                                    rate=50)
