@@ -22,8 +22,8 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 # Center is anchored to the proven learned value so highway feel is untouched; only the
 # large-angle over-turn is pulled out. Steepen the near-center value toward the raw measurement
 # (~19 at 0 deg) only after confirming no highway over-steer.
-NRDR_STEER_RATIO_ANGLE_BP = [0.0, 75.0, 150.0, 250.0]  # |steering-wheel angle|, deg
-NRDR_STEER_RATIO_V = [17.24, 16.6, 15.9, 15.5]         # effective steer ratio at each break
+NRDR_STEER_RATIO_ANGLE_BP = [0.0, 250.0]  # |steering-wheel angle|, deg
+NRDR_STEER_RATIO_V = [18.50, 12.74]         # effective steer ratio at each break
 
 
 CENTER_TAPER_FADE_TAU = 0.25
