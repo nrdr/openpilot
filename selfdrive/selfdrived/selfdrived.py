@@ -90,11 +90,11 @@ class SelfdriveD(CruiseHelper):
     self.car_state_sock = messaging.sub_sock('carState', timeout=20)
 
     ignore = self.sensor_packets + self.gps_packets + ['alertDebug'] + ['modelDataV2SP']
-    # nrdr: DM fully disabled on this unit (no driver camera / OEM-monitored). The two dmonitoring
-    # processes are gated off in process_config, so driverMonitoringState is never published -
-    # ignore it here so its absence can't fail all_valid() and block engagement.
-    if os.path.exists('/data/disable_dm'):
-      ignore += ['driverMonitoringState']
+    # nrdr: no driver camera on this build - DM is disabled in process_config, so
+    # driverMonitoringState is never published. Ignore it unconditionally so its absence can't
+    # fail all_valid() and block engagement. Baked into the image (not a /data marker) so it
+    # survives factory reset / corruption and needs no SSH.
+    ignore += ['driverMonitoringState']
     if SIMULATION:
       ignore += ['driverCameraState', 'managerState']
     if REPLAY:
