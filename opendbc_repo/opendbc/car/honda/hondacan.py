@@ -88,7 +88,10 @@ def create_acc_commands(packer, CAN, enabled, active, accel, gas, stopping_count
   control_on = 5 if enabled else 0
   gas_command = gas if active and gas_force > min_gas_accel else -30000
   accel_command = accel if active else 0
-  braking = 1 if active and gas_force < min_gas_accel else 0
+  # nrdr: stock brake-bit computation. The fork used gas_force (accel + wind + hill feedforward) at a
+  # 0.0 threshold, which jittered BRAKE_REQUEST/BRAKE_LIGHTS around light decel on the radar Bosch.
+  # Reverted to comma's accel-based logic + stock -0.2 threshold (independent of the fork's gas BP).
+  braking = 1 if active and accel < -0.2 else 0
   standstill = 1 if active and stopping_counter > 0 else 0
   standstill_release = 1 if active and stopping_counter == 0 else 0
 
