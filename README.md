@@ -16,7 +16,8 @@ To flash your car:
 * Turn the car into full accessory mode (ON) but keep the engine off. Turn off the A/C to avoid wasting battery.
 * Run python eps-update.py REPLACE_WITH_YOUR_FIRMWARE -b 1
 * When you see that it aborts before peforming mutating actions, this is your key that it's ready.
-* After you are fully commited and ready to flash, run python eps-update.py REPLACE_WITH_YOUR_FIRMWARE -b 1 --skip-checksum --danger 
+* After you are fully commited and ready to flash, run python eps-update.py REPLACE_WITH_YOUR_FIRMWARE -b 1 --danger
+* If your firmware is not supported by the checksum checker then you'll need to run --skip-checksum (Be carefull a rwd with invalid checksums will result in a brick)
 
 * An example command would look like: python eps-update.py 39990-TXM-A040-linear-max.rwd --skip-checksum --danger
 * Wait for the flashing process to take place, you will see errors on your dash as this happens.
