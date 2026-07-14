@@ -59,11 +59,11 @@ class ControlsExt(ModelStateBase):
       if self.CP.lateralTuning.which() == 'torque':
         self.lat_delay = get_lat_delay(self.params, sm["liveDelay"].lateralDelay)
 
-      # Auto/learn toggles. getBool() returns False for an UNSET param (it does get()=="1"
-      # with no default fallback), so default to ON (learn) unless explicitly set to "0".
-      self.learn_steer_ratio = self.params.get("NrdrLearnSteerRatio") != b"0"
-      self.learn_stiffness = self.params.get("NrdrLearnStiffness") != b"0"
-      self.learn_angle_offset = self.params.get("NrdrLearnAngleOffset") != b"0"
+      # Auto/learn toggles. Params.get() for BOOL keys returns a Python bool, so
+      # comparing to b"0"/b"1" was wrong; get_bool matches ToggleSP and key defaults.
+      self.learn_steer_ratio = self.params.get_bool("NrdrLearnSteerRatio")
+      self.learn_stiffness = self.params.get_bool("NrdrLearnStiffness")
+      self.learn_angle_offset = self.params.get_bool("NrdrLearnAngleOffset")
 
       self._param_update_time = time.monotonic()
 
