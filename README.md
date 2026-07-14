@@ -34,6 +34,7 @@ Linearized EPS firmware alters the steering torque response characteristics. As 
 - Honda Civic (Nidec)
 - Honda Civic (Bosch)
 - Honda Clarity (Nidec)
+- Honda CR-V 5G (2017–22 Bosch, `39990-TLA-A040` EPS)
 - Ford Expedition (OEM-style lateral, optional)
 
 Additional EPS firmware variants may be supported as they are validated.
@@ -238,6 +239,28 @@ https://community.sunnypilot.ai/t/using-stable-konik-or-any-other-hosted-routes/
 - When switching to another fork, always perform a factory reset first.
   - This preserves your Comma Connect account.
   - It reduces the risk of pairing or account-related issues.
+
+---
+
+## EPS Firmware Flashing (`eps_tools/`)
+
+This fork requires Linear EPS firmware (see Disclaimer), and it bundles a self-contained toolkit to flash it — and restore stock — directly from the comma. No separate flasher branch or AGNOS downgrade needed. It lives in `eps_tools/`.
+
+- **`flash.py`** — guided flasher (recommended). Detects your car's current EPS firmware, lists only the `.rwd` images compatible with it, validates checksums, walks the safe power sequence (car OFF → stop openpilot → accessory mode), runs a dry run, and only flashes after you confirm. Afterward it offers a post-flash menu: EPS diagnostic, restore openpilot, or reboot.
+- **`check_rwd.py`** — validate any `.rwd` offline (file + firmware checksums).
+- **`eps-diag.py`** — confirm the EPS is alive on the CAN bus after a flash.
+- **`rwd/`** — checksum-validated stock + linear-max image pairs for the included Honda platforms.
+
+Run it over SSH:
+
+```
+cd /data/openpilot/eps_tools
+python3 flash.py
+```
+
+Full usage, the firmware list, and contribution guidelines are in `eps_tools/README.md`.
+
+> ⚠️ Flashing EPS firmware can permanently brick your power-steering ECU. Always dry-run first, keep the matching `stock` image for recovery, and flash at your own risk.
 
 ---
 
