@@ -39,7 +39,7 @@ class LearnedParametersLayout(Widget):
       param="NrdrLearnSteerRatio",
       title=lambda: tr("Learn Steer Ratio (Auto)"),
       description=lambda: tr("When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance."),
-      initial_state=True,
+      initial_state=False,
     )
     self._lp_stiffness = ListItemSP(
       title=lambda: f"{tr('Learned Tire Stiffness Factor')}: {self._lp_text['stiffnessFactor']}",
@@ -48,7 +48,7 @@ class LearnedParametersLayout(Widget):
       param="NrdrLearnStiffness",
       title=lambda: tr("Learn Tire Stiffness (Auto)"),
       description=lambda: tr("When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0."),
-      initial_state=True,
+      initial_state=False,
     )
     self._lp_angle_avg = ListItemSP(
       title=lambda: f"{tr('Learned Angle Offset (Average)')}: {self._lp_text['angleOffsetAverageDeg']}",
@@ -60,7 +60,7 @@ class LearnedParametersLayout(Widget):
       param="NrdrLearnAngleOffset",
       title=lambda: tr("Learn Angle Offset (Auto)"),
       description=lambda: tr("When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side."),
-      initial_state=True,
+      initial_state=False,
     )
 
     return [

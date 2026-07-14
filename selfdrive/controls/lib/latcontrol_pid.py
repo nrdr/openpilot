@@ -26,6 +26,17 @@ NRDR_STEER_RATIO_ANGLE_BP = [0.0, 250.0]  # |steering-wheel angle|, deg
 NRDR_STEER_RATIO_V = [18.50, 12.74]         # effective steer ratio at each break
 
 
+# nrdr: CR-V 5G (2017-22 Bosch) has a variable-ratio rack. paramsd learns ONE steerRatio
+# (~16.7) and values.py ships 16.0 — both under-command near center vs the measured rack.
+# Measured effective ratio vs |steering-wheel angle| from steerratio_by_angle.py on all
+# device rlogs (incl. mountain turns). Center anchored ~18.5 (not the noisy 0-25° bin mean
+# of 21.65). Outer end from 150-175° bins; np.interp holds the last value past the table.
+# controlsd re-sets VM from paramsd every cycle, so this override is per-frame.
+NRDR_CRV_5G_STEER_RATIO_ANGLE_BP = [0.0, 50.0, 100.0, 150.0, 175.0]  # |SWA|, deg
+NRDR_CRV_5G_STEER_RATIO_V = [18.5, 18.0, 16.5, 15.5, 14.8]           # effective steer ratio
+
+
+
 CENTER_TAPER_FADE_TAU = 0.25
 
 # Unwind integrator-freeze: when the desired angle is dropping toward center,
@@ -200,7 +211,11 @@ class LatControlPID(LatControl):
     self.CI = CI
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
 
+    self.CP = CP
     self.is_eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
+    # Per-car angle-dependent steerRatio tapers (Clarity / CR-V 5G variable racks).
+    self.use_clarity_steer_ratio_taper = CP.carFingerprint == "HONDA_CLARITY"
+    self.use_crv_steer_ratio_taper = CP.carFingerprint == "HONDA_CRV_5G"
     # Live-tunable center boost (replaces the old per-car lookup). Static across
     # all speeds; active only within the Center Boost Threshold of dead-center.
     self.center_taper_high = 0.5
@@ -253,11 +268,16 @@ class LatControlPID(LatControl):
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
 
-    # nrdr: replace the single learned steerRatio with the angle-dependent taper before the
-    # curvature->angle conversion, so the variable rack stops over-turning at large angle. Keyed
-    # on the measured wheel angle (stable; avoids the desired-angle circular dependency). controlsd
-    # re-sets VM from paramsd every cycle, so this override is per-frame and can't compound.
-    VM.sR = float(np.interp(abs(CS.steeringAngleDeg), NRDR_STEER_RATIO_ANGLE_BP, NRDR_STEER_RATIO_V))
+    # nrdr: per-car angle-dependent steerRatio taper before curvature->angle. Clarity and
+    # CR-V 5G have variable-ratio racks; other cars keep paramsd/static CP.steerRatio.
+    # Keyed on measured wheel angle (stable; avoids desired-angle circular dependency).
+    # controlsd re-sets VM from paramsd every cycle, so this override is per-frame.
+    if self.use_clarity_steer_ratio_taper:
+      VM.sR = float(np.interp(abs(CS.steeringAngleDeg), NRDR_STEER_RATIO_ANGLE_BP, NRDR_STEER_RATIO_V))
+    elif self.use_crv_steer_ratio_taper:
+      VM.sR = float(np.interp(abs(CS.steeringAngleDeg),
+                              NRDR_CRV_5G_STEER_RATIO_ANGLE_BP,
+                              NRDR_CRV_5G_STEER_RATIO_V))
 
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
