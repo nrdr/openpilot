@@ -101,8 +101,16 @@ class TuneLearner:
                     (s0, a1, (1.0 - ws) * wa), (s1, a1, ws * wa)):
       m[s, a] = min(max(float(m[s, a]) + delta * w, -hard), hard)
 
-  # --- runtime: bounded learned trim, added to the output every active frame ---
-  def apply(self, v_ego, desired_deg):
+  # --- runtime: error-gated learned trim (nrdr rework) ---
+  # The learned surface is only a CEILING: torque is applied in proportion to the PRESENT
+  # direction-normalized tracking error, and only when that error agrees with the learned
+  # direction. The old unconditional version had feedforward character - it pushed purely off
+  # commanded (speed, angle), swinging the wheel on grooved pavement and turning in early
+  # whether or not any error existed. Proportional gating trades a little steady-state
+  # authority (a small residual error is now needed to hold the trim) for never pushing
+  # against a car that is already tracking. The kf feedforward path is untouched.
+  def apply(self, v_ego, desired_deg, error_deg):
+    ERR_GATE_FULL_DEG = 2.0  # deg of agreeing error for full trim authority
     if not self.enabled:
       return 0.0
     abs_des = abs(desired_deg)
@@ -111,6 +119,12 @@ class TuneLearner:
     m = self.map_l if desired_deg > 0.0 else self.map_r
     trim_norm = self._bilinear(m, v_ego, abs_des)
     trim_norm = min(max(trim_norm, -self.max_trim), self.max_trim)
+    # direction-normalized error: + = under-turning = "needs more turn" (learn() convention)
+    norm_err = error_deg if desired_deg > 0.0 else -error_deg
+    gate = min(max(norm_err / ERR_GATE_FULL_DEG, -1.0), 1.0)
+    if trim_norm * gate <= 0.0:
+      return 0.0
+    trim_norm *= abs(gate)
     return trim_norm if desired_deg > 0.0 else -trim_norm
 
   # --- learning: nudge the map from this frame's steady-state error (map only; never the output) ---

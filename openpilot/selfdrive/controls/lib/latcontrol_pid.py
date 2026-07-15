@@ -469,10 +469,11 @@ class LatControlPID(LatControl):
         d_unwind_factor = (1.0 - unwind_weight) + unwind_weight * d_angle_fade
         output_torque += -self.rate_damping_scale * RATE_DAMPING_REF * float(CS.steeringRateDeg) * rate_damp_fade * d_unwind_factor
 
-        # 2D learned tune trim: a small, hard-clamped per-(speed, angle) feedforward correction learned
-        # live from the steady-state tracking error (nrdr_tune_learner). Added in front of the steer_max
-        # clamp so it can only ever nudge within the existing torque envelope. No-op unless NrdrTuneLearner.
-        output_torque += self.tune_learner.apply(CS.vEgo, angle_steers_des)
+        # 2D learned tune trim (error-gated): the learned per-(speed, angle) surface is only a
+        # ceiling - torque is applied in proportion to the PRESENT tracking error and only when it
+        # agrees with the learned direction, i.e. scheduled proportional help rather than blind
+        # feedforward. Added in front of the steer_max clamp. No-op unless NrdrTuneLearner.
+        output_torque += self.tune_learner.apply(CS.vEgo, angle_steers_des, error)
 
         output_torque = float(max(min(output_torque, self.steer_max), -self.steer_max))
 
