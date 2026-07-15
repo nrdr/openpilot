@@ -16,7 +16,7 @@ from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import PCM_LONG_REQUIRED_MAX_SET_SPEED, CONFIRM_SPEED_THRESHOLD
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode
-from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import compare_cluster_target, set_speed_limit_assist_availability
+from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import set_speed_limit_assist_availability
 
 ButtonType = car.CarState.ButtonEvent.Type
 EventNameSP = custom.OnroadEventSP.EventName
@@ -150,27 +150,17 @@ class SpeedLimitAssist:
     self._last_carstate_ts = now
 
     for b in CS.buttonEvents:
-      if not b.pressed:
-        if b.type in CRUISE_BUTTONS_PLUS:
-          self._plus_hold = max(self._plus_hold, now + CRUISE_BUTTON_CONFIRM_HOLD)
-        elif b.type in CRUISE_BUTTONS_MINUS:
-          self._minus_hold = max(self._minus_hold, now + CRUISE_BUTTON_CONFIRM_HOLD)
+      # nrdr: the distance/gap button is the ONLY confirmation input. +/- never confirms -
+      # the driver must always be able to adjust set speed without accepting a pending limit.
+      if not b.pressed and b.type == ButtonType.gapAdjustCruise:
+        self._gap_hold = max(getattr(self, "_gap_hold", 0.), now + CRUISE_BUTTON_CONFIRM_HOLD)
 
-  def _get_button_release(self, req_plus: bool, req_minus: bool) -> bool:
+  def _get_confirm_button_release(self) -> bool:
+    # consume a recent distance/gap button release (the sole confirmation input)
     now = time.monotonic()
-    if req_plus and now <= self._plus_hold:
-      self._plus_hold = 0.
-      return True
-    elif req_minus and now <= self._minus_hold:
-      self._minus_hold = 0.
-      return True
-
-    # expired
-    if now > self._plus_hold:
-      self._plus_hold = 0.
-    if now > self._minus_hold:
-      self._minus_hold = 0.
-    return False
+    hold = getattr(self, "_gap_hold", 0.)
+    self._gap_hold = 0.
+    return bool(now <= hold)
 
   def update_calculations(self, v_cruise_cluster: float) -> None:
     speed_conv = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
@@ -222,23 +212,12 @@ class SpeedLimitAssist:
       self.state = SpeedLimitAssistState.pending
 
   def _update_non_pcm_long_confirmed_state(self) -> bool:
-    if self.target_set_speed_confirmed:
-      return True
-
+    # nrdr: confirmation comes ONLY from the distance/gap button. Neither +/- presses nor the
+    # set speed happening to land on the target may accept a pending limit (both used to -
+    # a driver adjusting set speed manually could accidentally confirm a bad proposal).
     if self.state != SpeedLimitAssistState.preActive:
       return False
-
-    honda_imperial = (not self.is_metric) and (
-      getattr(self.CP, "brand", "").lower() == "honda" or getattr(self.CP, "carName", "").lower() == "honda"
-    )
-    req_plus, req_minus = compare_cluster_target(
-      self.v_cruise_cluster,
-      self._speed_limit_final_last,
-      self.is_metric,
-      honda_imperial=honda_imperial
-    )
-
-    return self._get_button_release(req_plus, req_minus)
+    return self._get_confirm_button_release()
 
   def update_state_machine_pcm_op_long(self):
     self.long_engaged_timer = max(0, self.long_engaged_timer - 1)
@@ -272,7 +251,7 @@ class SpeedLimitAssist:
 
         # PENDING
         elif self.state == SpeedLimitAssistState.pending:
-          if self.target_set_speed_confirmed:
+          if self._get_confirm_button_release():
             self._update_confirmed_state()
           elif self.speed_limit_changed:
             self.state = SpeedLimitAssistState.preActive
@@ -280,7 +259,7 @@ class SpeedLimitAssist:
 
         # PRE_ACTIVE
         elif self.state == SpeedLimitAssistState.preActive:
-          if self.target_set_speed_confirmed:
+          if self._get_confirm_button_release():
             self._update_confirmed_state()
           elif self.pre_active_timer <= 0:
             # Timeout - session ended
@@ -298,7 +277,7 @@ class SpeedLimitAssist:
           self.long_engaged_timer = int(DISABLED_GUARD_PERIOD / DT_MDL)
 
         elif self.long_engaged_timer <= 0:
-          if self.target_set_speed_confirmed:
+          if self._get_confirm_button_release():
             self._update_confirmed_state()
           elif self._has_speed_limit:
             self.state = SpeedLimitAssistState.preActive

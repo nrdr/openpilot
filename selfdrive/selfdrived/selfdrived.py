@@ -471,10 +471,17 @@ class SelfdriveD(CruiseHelper):
     if CS.gearShifter == car.CarState.GearShifter.park and self.mads.enabled:
       self.events.remove(EventName.canBusMissing)
 
-    CruiseHelper.update(self, CS, self.events_sp, self.experimental_mode)
+    # nrdr: while a Speed Limit Assist proposal is pending (preActive), the distance button
+    # is the confirmation input - suppress its normal functions (personality cycling and the
+    # experimental-mode long press) so accepting a limit doesn't also trigger them.
+    sla_pre_active = self.sm['longitudinalPlanSP'].speedLimit.assist.state == \
+        custom.LongitudinalPlanSP.SpeedLimit.AssistState.preActive
+
+    if not sla_pre_active:
+      CruiseHelper.update(self, CS, self.events_sp, self.experimental_mode)
 
     # decrement personality on distance button press
-    if self.CP.openpilotLongitudinalControl:
+    if self.CP.openpilotLongitudinalControl and not sla_pre_active:
       if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
         if not self.experimental_mode_switched:
           # Dynamic HUD: the first press only opens the HUD sub-mode preview; only
