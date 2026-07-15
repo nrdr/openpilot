@@ -133,11 +133,8 @@ class VCruiseHelper(VCruiseHelperSP):
     if not self.button_change_states[button_type]["enabled"]:
       return
 
-    # Speed Limit Assist for Non PCM long cars.
-    # True: Disallow set speed changes when user confirmed the target set speed during preActive state
-    # False: Allow set speed changes as SLA is not requesting user confirmation
-    if self.update_speed_limit_assist_pre_active_confirmed(button_type):
-      return
+    # nrdr: +/- always adjusts the set speed - it never confirms Speed Limit Assist
+    # proposals (confirmation is the distance/gap button; see speed_limit_assist.py).
 
     # Dynamic HUD: the first set/resume press only opens the HUD sub-mode preview
     # (set speed + personality blink on the cluster); only presses made while it's
