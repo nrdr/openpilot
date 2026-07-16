@@ -325,15 +325,15 @@ sections:
       title: Reset Learned Trim
       description: Wipes the learned map back to zero on the next drive, then flips itself off.
       details: Wipes the learned map back to zero on the next drive, then flips itself off. Use it to start the auto-tuner fresh after a base-tune change or a bad learning session.
-  - id: nrdr_unwind
-    label: Unwind Helpers
-    trigger_key: null
-    items:
     - key: NrdrCurvatureTrim
       widget: toggle
       title: Cascade Curvature Trim (EXPERIMENTAL)
       description: Outer loop trims the steering setpoint from true IMU curvature error so geometry-map errors become transients.
       details: Outer control loop - slowly trims the steering setpoint using TRUE curvature error (IMU yaw vs desired, no steer ratio in the signal), so geometry-map errors become transients instead of permanent biases. Bounded to 2.5 deg, self-disarms if pegged. Do NOT enable until the offline log replay gate has passed (NRDR_CASCADE_DESIGN.md).
+  - id: nrdr_unwind
+    label: Unwind Helpers
+    trigger_key: null
+    items:
     - key: HondaUnwindFreeze
       widget: toggle
       title: Unwind Integrator Freeze
