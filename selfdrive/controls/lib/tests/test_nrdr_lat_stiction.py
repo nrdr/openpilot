@@ -1,16 +1,9 @@
-"""
-MoveHold unit tests. Core claims: standing dither never reaches the EPS while
-holding (the point of the feature), breakaway is decisive on real error / plan
-motion / drift accumulation, transitions are bumpless and chatter-proof, and
-every bypass condition is exact live passthrough.
-
-Run:  PYTHONPATH=<repo parent> python3 selfdrive/controls/lib/tests/test_nrdr_move_hold.py
-"""
+"""LatStiction unit tests. See NRDR_LATERAL_STICTION.md for design and constants."""
 import math
 import random
 import unittest
 
-from openpilot.selfdrive.controls.lib.nrdr_move_hold import MoveHold
+from openpilot.selfdrive.controls.lib.nrdr_lat_stiction import LatStiction
 
 DT = 0.01
 STEER_MAX = 1.0
@@ -18,7 +11,7 @@ V = 25.0
 
 
 def make():
-  return MoveHold(DT, STEER_MAX)
+  return LatStiction(DT, STEER_MAX)
 
 
 def settle_into_hold(mh, torque=0.30, n=120):
@@ -29,7 +22,7 @@ def settle_into_hold(mh, torque=0.30, n=120):
   return out
 
 
-class TestMoveHold(unittest.TestCase):
+class TestLatStiction(unittest.TestCase):
 
   def test_enters_hold_and_kills_dither(self):
     mh = make()

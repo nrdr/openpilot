@@ -341,7 +341,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrCarTuneInfo", {PERSISTENT, STRING, ""}},                   // Car & Tune Info readout for the Sunnylink info row (written by nrdr_remoted)
     {"NrdrStarPilotPid", {PERSISTENT | BACKUP, BOOL, "0"}},          // borrowed StarPilot _pid_output_scale (center boost + turn-in/per-direction scaling); 0 = clean PID/F + D
     {"NrdrTuneLearner", {PERSISTENT | BACKUP, BOOL, "1"}},           // 2D online lateral auto-tuner (learned per-cell FF trim); 0 = off
-    {"NrdrMoveHold", {PERSISTENT | BACKUP, BOOL, "0"}},              // move/hold output stage: software EPS breakaway (park-and-move texture); 0 = off
+    {"NrdrLatStiction", {PERSISTENT | BACKUP, BOOL, "0"}},           // lateral stiction: emulated EPS breakaway hold/move stage (NRDR_LATERAL_STICTION.md)
     {"NrdrTuneLearnerReset", {PERSISTENT, BOOL, "0"}},               // momentary: device zeroes the learned trim map, then clears this
     {"NrdrTuneLearnerStrength", {PERSISTENT | BACKUP, INT, "100"}},   // learned-trim authority cap, % of steer_max (0-100 via UI slider)
     {"NrdrTuneLearnerRate", {PERSISTENT | BACKUP, INT, "50"}},       // learning speed, % of reference rate (0 freezes learning)

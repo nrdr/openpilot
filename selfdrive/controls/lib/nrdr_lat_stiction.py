@@ -1,4 +1,4 @@
-# nrdr stiction
+# nrdr lateral stiction - design and measured reference data: NRDR_LATERAL_STICTION.md
 
 def _interp(x, xp, fp):
   if x <= xp[0]:
@@ -16,19 +16,11 @@ def _clip(x, lo, hi):
   return lo if x < lo else (hi if x > hi else x)
 
 
-class MoveHold:
-  # Constants below the ES350 line are calibrated against measured Lexus ES350 city
-  # driving (8-15 m/s, 63 s engaged, hands-off): hold fraction 53% of drive time,
-  # hold durations p50 0.76 s, wheel span tolerated within a hold p50 0.51 / p90 1.16 deg,
-  # move durations p50 0.33 s, step amplitudes p50 0.54 / p75 1.78 deg, peak move rate
-  # p50 6.5 deg/s. Commanded curvature is flat to 4 decimals during holds (plan steady).
-  # Highway-end values remain physics estimates until a highway route is measured.
+class LatStiction:
   E_HI_BP = (8.0, 30.0)       # m/s
-  E_HI_V = (0.9, 0.4)         # deg; breakaway into MOVE (ES350 measured span p75-p90 at city)
+  E_HI_V = (0.9, 0.4)         # deg; breakaway threshold
   E_LO_BP = (8.0, 30.0)       # m/s
-  E_LO_V = (0.35, 0.20)       # deg; error small enough to allow HOLD (ES350 holds begin
-                              # with ~0.3-0.5 deg wander; 0.15 was tighter than the real car
-                              # and risked never parking on a jittery Honda error signal)
+  E_LO_V = (0.35, 0.20)       # deg; hold-entry gate
   DES_RATE_MOVE = 2.0         # deg/s; plan actively turning -> MOVE (FF leads, never waits)
   DES_RATE_QUIET = 0.8        # deg/s; plan quiet enough to allow HOLD
   WHEEL_RATE_QUIET = 3.0      # deg/s; wheel actually settled before parking it
