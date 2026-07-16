@@ -8,7 +8,8 @@ ok = 0
 
 def step(tr, err, **kw):
   d = dict(active=True, v_ego=27.0, dtheta_err_deg=err, steering_pressed=False,
-           steering_rate_deg=0.0, lane_changing=False, pose_ok=True, saturated=False)
+           steering_rate_deg=0.0, lane_changing=False, pose_ok=True, saturated=False,
+           near_center=False)
   d.update(kw)
   return tr.update(**d)
 
@@ -69,6 +70,15 @@ for i in range(400):
 for i in range(int(60.0 / DT)):
   step(tr, 0.0, active=False)
 assert abs(tr.trim_deg) < 0.35, f"leak too slow: {tr.trim_deg}"
+ok += 1
+
+# 7b. near-center gate: no integration on straights (leak only)
+tr = CurvatureTrim(DT)
+for i in range(400):
+  step(tr, 2.0 - tr.trim_deg)
+before = tr.trim_deg
+step(tr, 5.0, near_center=True)
+assert tr.trim_deg <= before, "near_center integrated!"
 ok += 1
 
 # 7. sign symmetry

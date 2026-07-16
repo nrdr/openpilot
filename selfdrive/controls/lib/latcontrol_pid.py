@@ -265,10 +265,11 @@ class LatControlPID(LatControl):
         dtheta_err_deg = angle_steers_des_no_offset - math.degrees(VM.get_steer_from_curvature(-kappa_meas, CS.vEgo, params.roll))
       lane_changing = self.model_valid and self.model_v2.meta.laneChangeState != log.LaneChangeState.off
       pressed_for_trim = bool(CS.steeringPressed) or self.eps_modified_steering_pressed_prev
+      near_center = abs(angle_steers_des_no_offset) < 2.5  # map error ~0 at center; trim there = noise coupling
       was_disarmed = self.curvature_trim.disarmed
       angle_steers_des_no_offset += self.curvature_trim.update(
         active, CS.vEgo, dtheta_err_deg, pressed_for_trim,
-        float(CS.steeringRateDeg), lane_changing, pose_ok, self.prev_saturated)
+        float(CS.steeringRateDeg), lane_changing, pose_ok, self.prev_saturated, near_center)
       if self.curvature_trim.disarmed and not was_disarmed:
         cloudlog.error("CurvatureTrim watchdog disarm: trim pegged at clamp - check yaw sign convention / sensors")
     else:

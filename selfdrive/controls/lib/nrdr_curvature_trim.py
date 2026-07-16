@@ -48,7 +48,8 @@ class CurvatureTrim:
 
   def update(self, active: bool, v_ego: float, dtheta_err_deg: float,
              steering_pressed: bool, steering_rate_deg: float,
-             lane_changing: bool, pose_ok: bool, saturated: bool) -> float:
+             lane_changing: bool, pose_ok: bool, saturated: bool,
+             near_center: bool = False) -> float:
     """dtheta_err_deg: (setpoint-domain) angle equivalent of the curvature error,
     computed by the caller through the SAME curvature->angle map used for the
     setpoint, so the correction sign is right by construction for any convention."""
@@ -56,8 +57,11 @@ class CurvatureTrim:
       self.trim_deg = 0.0
       return 0.0
 
+    # near_center: map error is ~zero at zero angle by definition (any steer ratio is
+    # correct there), so integrating near center couples pure IMU noise into the setpoint
+    # (owner-felt as 'loose on straights'). Freeze + leak instead.
     integrate = (active and pose_ok and not steering_pressed and not lane_changing
-                 and not saturated and v_ego > self.MIN_SPEED
+                 and not saturated and not near_center and v_ego > self.MIN_SPEED
                  and abs(steering_rate_deg) < self.RATE_FREEZE_DEGS)
 
     if integrate:
