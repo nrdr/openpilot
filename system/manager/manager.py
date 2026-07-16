@@ -125,7 +125,13 @@ def apply_nrdr_default_params(params: Params) -> None:
     except Exception:
       cloudlog.exception("apply_nrdr_default_params: skipped %s", key)
 
-  for key, value in NRDR_DEFAULT_BOOL_PARAMS.items():
+  # nrdr: the Comma Four ships with sounds ON - quiet mode stays opt-in there.
+  # Other devices keep the fork's quiet-by-default seeding.
+  bool_defaults = dict(NRDR_DEFAULT_BOOL_PARAMS)
+  if HARDWARE.get_device_type() == 'mici':
+    bool_defaults.pop("QuietMode", None)
+
+  for key, value in bool_defaults.items():
     _default_if_unset(key, value, params.put_bool)
 
   for key, value in NRDR_DEFAULT_VALUE_PARAMS.items():

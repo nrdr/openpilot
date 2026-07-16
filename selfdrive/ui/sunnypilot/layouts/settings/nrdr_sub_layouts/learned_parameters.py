@@ -38,8 +38,8 @@ class LearnedParametersLayout(Widget):
     self._learn_steer_ratio = toggle_item_sp(
       param="NrdrLearnSteerRatio",
       title=lambda: tr("Learn Steer Ratio (Auto)"),
-      description=lambda: tr("When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance."),
-      initial_state=True,
+      description=lambda: tr("When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. OFF by default: on VGR racks (measured SR curve cars) the scalar is redundant and its drift pollutes the angle-offset estimate."),
+      initial_state=False,
     )
     self._lp_stiffness = ListItemSP(
       title=lambda: f"{tr('Learned Tire Stiffness Factor')}: {self._lp_text['stiffnessFactor']}",
