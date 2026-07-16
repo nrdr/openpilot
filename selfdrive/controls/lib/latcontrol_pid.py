@@ -9,6 +9,7 @@ from openpilot.common.params import Params
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
+from openpilot.selfdrive.controls.lib.nrdr_move_hold import MoveHold
 from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
@@ -240,6 +241,9 @@ class LatControlPID(LatControl):
     self.unwind_lookahead_enabled = False
     self.starpilot_enabled = False  # borrowed _pid_output_scale; off by default (param NrdrStarPilotPid)
     self.injection_test_enabled = False  # Party Tricks: x9.99 PID scale stress test
+    self.move_hold = MoveHold(dt, self.steer_max)
+    self.move_hold_enabled = False
+    self.prev_saturated = False
     self.model_v2 = None
     self.model_valid = False
 
@@ -275,6 +279,8 @@ class LatControlPID(LatControl):
       self.prev_output_torque = 0.0
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
       self.unwind_boost_elapsed = 0.0
+      self.prev_saturated = False
+      self.move_hold.reset()
     else:
       desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
       phase = angle_steers_des_no_offset * desired_angle_delta
@@ -484,6 +490,16 @@ class LatControlPID(LatControl):
         paramsd_ok = bool(params.valid and params.angleOffsetValid and params.steerRatioValid and params.stiffnessFactorValid)
         self.tune_learner.learn(CS.vEgo, angle_steers_des, error, float(CS.steeringRateDeg), steering_pressed, paramsd_ok, self.frame)
 
+      # nrdr stiction output stage:
+      if self.move_hold_enabled:
+        des_rate_degs = desired_angle_delta / self.dt
+        lane_change_mh = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))
+        output_torque = float(self.move_hold.update(
+          active, CS.vEgo, error, des_rate_degs, float(CS.steeringRateDeg), output_torque,
+          steering_pressed, lane_change_mh, self.prev_saturated))
+      else:
+        self.move_hold.reset()
+
       pid_log.active = True
       pid_log.p = float(self.pid.p)
       pid_log.i = float(self.pid.i)
@@ -498,5 +514,6 @@ class LatControlPID(LatControl):
 
       self.prev_output_torque = float(output_torque)
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
+      self.prev_saturated = bool(pid_log.saturated)
 
     return output_torque, angle_steers_des, pid_log
