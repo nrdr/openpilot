@@ -173,6 +173,14 @@ class PidfGroundLayout(Widget):
       param="NrdrTuneLearnerReset",
     )
 
+    # --- cascade outer loop (EXPERIMENTAL) ---
+    self._curvature_trim = toggle_item_sp(
+      title=tr("Cascade Curvature Trim (EXPERIMENTAL)"),
+      description=tr("Outer control loop: slowly trims the steering setpoint using TRUE curvature error (IMU yaw vs desired - no steer ratio in the signal), so geometry-map errors become transients instead of permanent biases. Bounded to 2.5 deg, self-disarms if it pegs. Do NOT enable until the offline log replay gate has passed - see NRDR_CASCADE_DESIGN.md."),
+      param="NrdrCurvatureTrim",
+      initial_state=False,
+    )
+
     return [
       self._starpilot,
       LineSeparatorSP(40),
@@ -205,6 +213,7 @@ class PidfGroundLayout(Widget):
       self._tune_learner_strength,
       self._tune_learner_rate,
       self._tune_learner_reset,
+      self._curvature_trim,
     ]
 
   def _render(self, rect):

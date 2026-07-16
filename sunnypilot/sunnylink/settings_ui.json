@@ -596,6 +596,13 @@
               "trigger_key": null,
               "items": [
                 {
+                  "key": "NrdrCurvatureTrim",
+                  "widget": "toggle",
+                  "title": "Cascade Curvature Trim (EXPERIMENTAL)",
+                  "description": "Outer loop trims the steering setpoint from true IMU curvature error so geometry-map errors become transients.",
+                  "details": "Outer control loop - slowly trims the steering setpoint using TRUE curvature error (IMU yaw vs desired, no steer ratio in the signal), so geometry-map errors become transients instead of permanent biases. Bounded to 2.5 deg, self-disarms if pegged. Do NOT enable until the offline log replay gate has passed (NRDR_CASCADE_DESIGN.md)."
+                },
+                {
                   "key": "HondaUnwindFreeze",
                   "widget": "toggle",
                   "title": "Unwind Integrator Freeze",

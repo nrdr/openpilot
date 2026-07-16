@@ -6,24 +6,13 @@ from opendbc.car.honda.carcontroller import get_eps_modified_steering_pressed
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
+from openpilot.common.swaglog import cloudlog
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
+from openpilot.selfdrive.controls.lib.nrdr_curvature_trim import CurvatureTrim
 from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
-
-
-# nrdr: the Clarity's Nidec rack is variable-ratio, but paramsd learns ONE steerRatio (~17.24,
-# the lock-to-lock average) - which over-commands where the rack quickens at large angle and
-# under-commands near center. Measured effective ratio vs |steering-wheel angle| (from
-# steerratio_by_angle.py) tapers from the learned ~17.2 near center down to ~15.5 out at angle,
-# then PLATEAUS (data is flat ~15.5 from 250 to 425 deg, i.e. out to ~lock for a 2.41-turn rack),
-# so np.interp holding the last value past the table is the correct extrapolation, not a guess.
-# Center is anchored to the proven learned value so highway feel is untouched; only the
-# large-angle over-turn is pulled out. Steepen the near-center value toward the raw measurement
-# (~19 at 0 deg) only after confirming no highway over-steer.
-NRDR_STEER_RATIO_ANGLE_BP = [0.0, 250.0]  # |steering-wheel angle|, deg
-NRDR_STEER_RATIO_V = [18.50, 12.74]         # effective steer ratio at each break
 
 
 CENTER_TAPER_FADE_TAU = 0.25
@@ -225,6 +214,10 @@ class LatControlPID(LatControl):
     self.params = Params()
     # 2D online lateral auto-tuner: bounded, gated, per-(speed, angle) learned FF trim. Off by default.
     self.tune_learner = TuneLearner(dt, self.steer_max)
+    # Cascade outer loop (NrdrCurvatureTrim): dormant unless the param is set.
+    self.curvature_trim = CurvatureTrim(dt)
+    self.curvature_trim_enabled = False
+    self.prev_saturated = False
     self.frame = -1
     # Independent speed-banded P / I / F output scales (multiplier units; 1.0 = neutral).
     self.lat_p_scale_low = 1.0
@@ -253,13 +246,34 @@ class LatControlPID(LatControl):
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
 
-    # nrdr: replace the single learned steerRatio with the angle-dependent taper before the
-    # curvature->angle conversion, so the variable rack stops over-turning at large angle. Keyed
-    # on the measured wheel angle (stable; avoids the desired-angle circular dependency). controlsd
-    # re-sets VM from paramsd every cycle, so this override is per-frame and can't compound.
-    VM.sR = float(np.interp(abs(CS.steeringAngleDeg), NRDR_STEER_RATIO_ANGLE_BP, NRDR_STEER_RATIO_V))
-
+    # nrdr: geometry has ONE source of truth - the vehicle model (measured SR(angle) curve
+    # for curve-equipped cars, paramsd/CP scalar otherwise). The old in-file hand table that
+    # force-overwrote VM.sR every frame is gone; on curve cars it was only a fixed-point seed.
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+
+    # nrdr cascade (NrdrCurvatureTrim, dormant by default): slow setpoint trim driven by TRUE
+    # curvature error (IMU yaw/v vs desired - no steer ratio in the error signal), so rack-map
+    # error of ANY origin is a transient the trim eats, never a steady-state bias. The angle
+    # error below is structurally blind to map error; this outer loop is what can see it.
+    if self.curvature_trim_enabled:
+      pose_ok = calibrated_pose is not None and CS.vEgo > 0.1
+      dtheta_err_deg = 0.0
+      if pose_ok:
+        kappa_meas = float(calibrated_pose.angular_velocity.xyz[2]) / max(CS.vEgo, 0.1)
+        # error mapped through the SAME curvature->angle transform as the setpoint: correction
+        # sign is right by construction for any convention, and roll compensation cancels
+        dtheta_err_deg = angle_steers_des_no_offset - math.degrees(VM.get_steer_from_curvature(-kappa_meas, CS.vEgo, params.roll))
+      lane_changing = self.model_valid and self.model_v2.meta.laneChangeState != log.LaneChangeState.off
+      pressed_for_trim = bool(CS.steeringPressed) or self.eps_modified_steering_pressed_prev
+      was_disarmed = self.curvature_trim.disarmed
+      angle_steers_des_no_offset += self.curvature_trim.update(
+        active, CS.vEgo, dtheta_err_deg, pressed_for_trim,
+        float(CS.steeringRateDeg), lane_changing, pose_ok, self.prev_saturated)
+      if self.curvature_trim.disarmed and not was_disarmed:
+        cloudlog.error("CurvatureTrim watchdog disarm: trim pegged at clamp - check yaw sign convention / sensors")
+    else:
+      self.curvature_trim.reset()
+
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
     error = angle_steers_des - CS.steeringAngleDeg
 
@@ -275,6 +289,7 @@ class LatControlPID(LatControl):
       self.prev_output_torque = 0.0
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
       self.unwind_boost_elapsed = 0.0
+      self.prev_saturated = False
     else:
       desired_angle_delta = angle_steers_des_no_offset - self.prev_angle_steers_des_no_offset
       phase = angle_steers_des_no_offset * desired_angle_delta
@@ -412,6 +427,7 @@ class LatControlPID(LatControl):
         self.rate_damping_fade_speed_ms = get_param_float(self.params, "NrdrLatRateDampingFadeSpeed", 30.0, 0.0, 60.0) * _MPH_TO_MS
         self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
         self.starpilot_enabled = self.params.get_bool("NrdrStarPilotPid")
+        self.curvature_trim_enabled = self.params.get_bool("NrdrCurvatureTrim")
 
       output_torque = self.pid.update(
         error,
@@ -498,5 +514,6 @@ class LatControlPID(LatControl):
 
       self.prev_output_torque = float(output_torque)
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
+      self.prev_saturated = bool(pid_log.saturated)
 
     return output_torque, angle_steers_des, pid_log
