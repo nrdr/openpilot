@@ -150,19 +150,19 @@ class PidfGroundLayout(Widget):
     # --- 2D online auto-tuner (learned per-speed/angle trim) ---
     self._tune_learner = toggle_item_sp(
       title=tr("2D Auto-Tuner (Learned Trim)"),
-      description=tr("Learns a per-(speed, angle) feedforward trim live while you drive, cancelling the systematic over/under-turn the tune report measures. A bounded, slow, gated correction on top of the base PID/F + D - the PID always does the driving. Off by default; Reset below wipes what it has learned."),
+      description=tr("Learns a per-(speed, angle) feedforward trim live while you drive, cancelling the systematic over/under-turn the tune report measures. A bounded, slow, gated correction on top of the base PID/F + D - the PID always does the driving. On by default - error-gated, so it only pushes in proportion to present, agreeing error. Reset below wipes what it has learned."),
       param="NrdrTuneLearner",
     )
     self._tune_learner_strength = option_item_sp(
       param="NrdrTuneLearnerStrength",
-      title=lambda: tr("Auto-Tuner Strength (Default: 10%)"),
+      title=lambda: tr("Auto-Tuner Strength (Default: 100%)"),
       min_value=0, max_value=100, value_change_step=1,
-      description=lambda: tr("Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Start low; raise once you trust it."),
+      description=lambda: tr("Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Error gating makes this a ceiling, not a constant push - trim only flows when real, agreeing error exists."),
       label_callback=lambda value: f"{value}%",
     )
     self._tune_learner_rate = option_item_sp(
       param="NrdrTuneLearnerRate",
-      title=lambda: tr("Auto-Tuner Learning Speed (Default: 30%)"),
+      title=lambda: tr("Auto-Tuner Learning Speed (Default: 50%)"),
       min_value=0, max_value=100, value_change_step=5,
       description=lambda: tr("How fast the trim adapts to the measured error. Lower = slower, calmer, safer; higher = converges quicker but reacts more to each drive. 0 freezes learning (the trim it already has still applies)."),
       label_callback=lambda value: f"{value}%",

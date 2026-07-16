@@ -557,14 +557,14 @@
                   "widget": "toggle",
                   "title": "2D Auto-Tuner (Learned Trim)",
                   "description": "Learns a per-(speed, angle) feedforward trim live while you drive to cancel systematic over/under-turn.",
-                  "details": "Learns a per-(speed, angle) feedforward trim live while you drive, cancelling the systematic over/under-turn the tune report measures. A bounded, slow, gated correction on top of the base PID/F + D - the PID always does the driving. Off by default; Reset below wipes what it has learned."
+                  "details": "Learns a per-(speed, angle) feedforward trim live while you drive, cancelling the systematic over/under-turn the tune report measures. A bounded, slow, gated correction on top of the base PID/F + D - the PID always does the driving. On by default - error-gated, so it only pushes in proportion to present, agreeing error. Reset below wipes what it has learned."
                 },
                 {
                   "key": "NrdrTuneLearnerStrength",
                   "widget": "option",
                   "title": "Auto-Tuner Strength",
                   "description": "Hard cap on how much steering authority the learned trim may add, as a percent of full output.",
-                  "details": "Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Start low; raise once you trust it.",
+                  "details": "Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Error gating makes this a ceiling, not a constant push - trim only flows when real, agreeing error exists.",
                   "min": 0,
                   "max": 100,
                   "step": 1,
