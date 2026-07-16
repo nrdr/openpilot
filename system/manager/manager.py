@@ -52,7 +52,6 @@ NRDR_DEFAULT_BOOL_PARAMS = {
   # nrdr lateral
   "HondaTorqueLowPassFilter": True,
   "HondaUnwindLookahead": True,
-  "HondaNotchEnabled": True,
 
   # Visuals
   "RocketFuel": True,
