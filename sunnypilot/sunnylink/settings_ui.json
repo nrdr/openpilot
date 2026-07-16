@@ -589,11 +589,11 @@
                   "details": "Wipes the learned map back to zero on the next drive, then flips itself off. Use it to start the auto-tuner fresh after a base-tune change or a bad learning session."
                 },
                 {
-                  "key": "NrdrMoveHold",
+                  "key": "NrdrLatStiction",
                   "widget": "toggle",
-                  "title": "Move/Hold Steering (EXPERIMENTAL)",
-                  "description": "Software EPS breakaway - the wheel parks solid between decisive corrections, like Toyota/Lexus hardware does.",
-                  "details": "Emulates a high-friction EPS at the end of the torque pipeline. Between corrections the wheel is parked on a frozen hold torque (zero dither reaches the EPS), and it breaks away into a decisive move when real error accumulates or the plan starts turning. This replaces what the low-pass filter was trying to do, without the lag - consider lowering the LPF once this is on. Expect visible move-pause-move stepping; that is the feature."
+                  "title": "Lateral Stiction (EXPERIMENTAL)",
+                  "description": "Emulated EPS breakaway friction - the wheel holds solid between decisive corrections.",
+                  "details": "Final-stage hold/move state machine emulating the breakaway friction of high-torque EPS units. Holding sends a frozen torque (no dither reaches the EPS); breakaway triggers on real error, plan motion, or accumulated drift. Consider lowering the steering LPF once enabled. Reference - NRDR_LATERAL_STICTION.md."
                 }
               ]
             },
