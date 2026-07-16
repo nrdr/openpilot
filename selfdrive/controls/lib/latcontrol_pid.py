@@ -11,6 +11,7 @@ from openpilot.common.pid import PIDController
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
 from openpilot.selfdrive.controls.lib.nrdr_curvature_trim import CurvatureTrim
+from openpilot.selfdrive.controls.lib.nrdr_curv_servo import CurvServo
 from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
@@ -217,6 +218,9 @@ class LatControlPID(LatControl):
     # Cascade outer loop (NrdrCurvatureTrim): dormant unless the param is set.
     self.curvature_trim = CurvatureTrim(dt)
     self.curvature_trim_enabled = False
+    # Pure-feedback setpoint servo (NrdrCurvServo): dormant; overrides the trim when set.
+    self.curv_servo = CurvServo(dt, CP.wheelbase)
+    self.curv_servo_enabled = False
     self.prev_saturated = False
     self.frame = -1
     # Independent speed-banded P / I / F output scales (multiplier units; 1.0 = neutral).
@@ -251,11 +255,28 @@ class LatControlPID(LatControl):
     # force-overwrote VM.sR every frame is gone; on curve cars it was only a fixed-point seed.
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
 
+    # nrdr pure-feedback mode (NrdrCurvServo, dormant by default): the setpoint becomes a servo
+    # STATE slewed by true curvature error - the map value above is demoted to parking-speed duty
+    # and watchdog reference. Subsumes (and overrides) NrdrCurvatureTrim when both are set.
+    if self.curv_servo_enabled:
+      self.curv_servo.ensure_sign(math.degrees(VM.get_steer_from_curvature(-1e-3, 20.0, 0.0)))
+      pose_ok = calibrated_pose is not None and CS.vEgo > 0.1
+      kappa_meas = float(calibrated_pose.angular_velocity.xyz[2]) / max(CS.vEgo, 0.1) if pose_ok else 0.0
+      pressed_for_servo = bool(CS.steeringPressed) or self.eps_modified_steering_pressed_prev
+      theta_meas_no_offset = float(CS.steeringAngleDeg) - params.angleOffsetDeg
+      was_disarmed = self.curv_servo.disarmed
+      angle_steers_des_no_offset = self.curv_servo.update(
+        active, CS.vEgo, float(desired_curvature), kappa_meas, angle_steers_des_no_offset,
+        theta_meas_no_offset, pressed_for_servo, pose_ok, self.prev_saturated)
+      if self.curv_servo.disarmed and not was_disarmed:
+        cloudlog.error("CurvServo divergence disarm: servo vs map beyond %.0f deg for %.0f s - map fallback",
+                       CurvServo.DIVERGE_DEG, CurvServo.DISARM_S)
+      self.curvature_trim.reset()
     # nrdr cascade (NrdrCurvatureTrim, dormant by default): slow setpoint trim driven by TRUE
     # curvature error (IMU yaw/v vs desired - no steer ratio in the error signal), so rack-map
     # error of ANY origin is a transient the trim eats, never a steady-state bias. The angle
     # error below is structurally blind to map error; this outer loop is what can see it.
-    if self.curvature_trim_enabled:
+    elif self.curvature_trim_enabled:
       pose_ok = calibrated_pose is not None and CS.vEgo > 0.1
       dtheta_err_deg = 0.0
       if pose_ok:
@@ -272,8 +293,10 @@ class LatControlPID(LatControl):
         float(CS.steeringRateDeg), lane_changing, pose_ok, self.prev_saturated, near_center)
       if self.curvature_trim.disarmed and not was_disarmed:
         cloudlog.error("CurvatureTrim watchdog disarm: trim pegged at clamp - check yaw sign convention / sensors")
+      self.curv_servo.reset()
     else:
       self.curvature_trim.reset()
+      self.curv_servo.reset()
 
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
     error = angle_steers_des - CS.steeringAngleDeg
@@ -429,6 +452,7 @@ class LatControlPID(LatControl):
         self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
         self.starpilot_enabled = self.params.get_bool("NrdrStarPilotPid")
         self.curvature_trim_enabled = self.params.get_bool("NrdrCurvatureTrim")
+        self.curv_servo_enabled = self.params.get_bool("NrdrCurvServo")
 
       output_torque = self.pid.update(
         error,

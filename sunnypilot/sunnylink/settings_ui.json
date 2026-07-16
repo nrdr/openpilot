@@ -594,6 +594,13 @@
                   "title": "Cascade Curvature Trim (EXPERIMENTAL)",
                   "description": "Outer loop trims the steering setpoint from true IMU curvature error so geometry-map errors become transients.",
                   "details": "Outer control loop - slowly trims the steering setpoint using TRUE curvature error (IMU yaw vs desired, no steer ratio in the signal), so geometry-map errors become transients instead of permanent biases. Bounded to 2.5 deg, self-disarms if pegged. Do NOT enable until the offline log replay gate has passed (NRDR_CASCADE_DESIGN.md)."
+                },
+                {
+                  "key": "NrdrCurvServo",
+                  "widget": "toggle",
+                  "title": "Curvature Servo - No Steer Ratio (EXPERIMENTAL)",
+                  "description": "Pure feedback steering setpoint from IMU curvature error - the steer ratio map is bypassed above ~10 mph.",
+                  "details": "The steering setpoint becomes a servo state driven by true curvature error (IMU yaw vs desired) - no steer ratio map above ~10 mph, so no SR value can bias tracking. The map still steers at parking speeds and acts as a safety fallback (auto-disarm on sustained disagreement). Overrides Cascade Curvature Trim. Turn the Lateral Auto-Tuner OFF while testing this - the learner would fight the servo. Expect slightly later turn-in and a beat of lag entering banked curves."
                 }
               ]
             },
