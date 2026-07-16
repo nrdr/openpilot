@@ -2,7 +2,7 @@
 nrdr Steer Filters sub-panel.
 
 Signal-conditioning on the steering-torque command: low-pass filter (tau bands),
-notch filter, the legacy steer-delta rate limiter, and the minimum steer speed.
+the legacy steer-delta rate limiter, and the minimum steer speed.
 One level under Lateral Tuning.
 """
 from collections.abc import Callable
@@ -64,38 +64,10 @@ class SteerFiltersLayout(Widget):
       use_float_scaling=True,
     )
 
-    self._notch_enabled = toggle_item_sp(
-      param="HondaNotchEnabled",
-      title=lambda: tr("Notch Filter (Default: ON)"),
-      description=lambda: tr("Removes a narrow EPS chatter band (around 7Hz) without the lag a low pass filter adds."),
-    )
-
-    self._notch_freq = option_item_sp(
-      param="HondaNotchFreq",
-      title=lambda: tr("Notch Frequency (Default: 7.5)"),
-      min_value=100,
-      max_value=2000,
-      value_change_step=10,
-      description=lambda: tr("Frequency (Hz) of the band eliminated from the controller. If you know what Hz your EPS growls at, this can help block that out without adding any extra lag into the controller. Best used in pair with a well-tuned low pass filter."),
-      label_callback=lambda value: f"{value / 100:.1f} Hz",
-      use_float_scaling=True,
-    )
-
-    self._notch_q = option_item_sp(
-      param="HondaNotchQ",
-      title=lambda: tr("Notch Q / Width (Default: 1.5)"),
-      min_value=10,
-      max_value=1000,
-      value_change_step=10,
-      description=lambda: tr("Tolerance of the removed frequency. Higher = smaller portion removed, lower = wider (nearby frequencies will be removed as well)."),
-      label_callback=lambda value: f"{value / 100:.2f}",
-      use_float_scaling=True,
-    )
-
     self._steer_delta_limiter = toggle_item_sp(
       param="HondaSteerDeltaLimiter",
       title=lambda: tr("Legacy Steer Delta Rate Limiter (Default: OFF)"),
-      description=lambda: tr("Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass and notch filters."),
+      description=lambda: tr("Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass filter."),
     )
 
     self._steer_delta_up = option_item_sp(
@@ -122,7 +94,7 @@ class SteerFiltersLayout(Widget):
 
     self._min_steer_speed = option_item_sp(
       param="NrdrMinSteerSpeed",
-      title=lambda: tr("Minimum Steer Speed (Default: 0mph)"),
+      title=lambda: tr("Minimum Steer Speed (Default: 1mph)"),
       min_value=0,
       max_value=45,
       value_change_step=1,
@@ -135,10 +107,6 @@ class SteerFiltersLayout(Widget):
       self._lpf_tau_low,
       self._lpf_tau_standard,
       self._lpf_tau_highway,
-      LineSeparatorSP(40),
-      self._notch_enabled,
-      self._notch_freq,
-      self._notch_q,
       LineSeparatorSP(40),
       self._steer_delta_limiter,
       self._steer_delta_up,
@@ -154,10 +122,6 @@ class SteerFiltersLayout(Widget):
     self._lpf_tau_low.set_visible(lpf_enabled)
     self._lpf_tau_standard.set_visible(lpf_enabled)
     self._lpf_tau_highway.set_visible(lpf_enabled)
-
-    notch_enabled = self._notch_enabled.action_item.get_state()
-    self._notch_freq.set_visible(notch_enabled)
-    self._notch_q.set_visible(notch_enabled)
 
     steer_delta_limiter_enabled = self._steer_delta_limiter.action_item.get_state()
     self._steer_delta_up.set_visible(steer_delta_limiter_enabled)
