@@ -16,6 +16,7 @@ current opendbc layout and adding the safety checks.
 
 ```
 eps_tools/
+  flash.py          guided flash: stop op -> pick image -> dry run -> --danger
   eps-update.py     UDS .rwd flasher (validate + erase/program over CAN)
   check_rwd.py      offline .rwd checksum validator (stdlib only)
   eps-diag.py       EPS CAN liveness/diagnostic (sniff, UDS ping, part number)
@@ -26,6 +27,26 @@ eps_tools/
 Run the scripts **from this folder** so `rwd_format` resolves; `opendbc`/`panda`
 come from the openpilot install (prefix with `PYTHONPATH=/data/openpilot` if you
 hit import errors).
+
+## Guided flash (recommended)
+
+`flash.py` walks the whole thing for you: reads the car's current EPS firmware
+and lists only the `.rwd` images compatible with it (with their checksum status),
+lets you pick one, runs a dry run, and only flashes after you confirm. If nothing
+matches your EPS (or the car isn't fingerprinted yet) it asks before listing all
+images. Images that fail validation are flagged and flashed with `--skip-checksum`
+(with an extra warning).
+
+```bash
+cd eps_tools
+python3 flash.py            # default CAN bus 1
+python3 flash.py --bus 0
+```
+It confirms the car is OFF, stops openpilot, then prompts you to switch to
+accessory mode (ignition ON, engine OFF) before the dry run and flash. After the
+flash it offers a menu: run `eps-diag.py` as a post-flash check (which loops back
+to the menu), restore openpilot (it was stopped for flashing), or reboot. The
+manual steps below are the same flow if you'd rather run each command yourself.
 
 ## How to flash
 

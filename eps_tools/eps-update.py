@@ -1,6 +1,7 @@
 import gzip
 import os
 import struct
+import sys
 import tqdm
 import traceback
 from argparse import ArgumentParser
@@ -136,6 +137,10 @@ if __name__ == "__main__":
   can_addr = get_can_address(fw)
   print(f"Connecting to CAN address 0x{can_addr:08X}")
   uds_client = get_uds_client(can_addr, args.bus)
+  # --danger must never proceed on the mock fallback — it would "succeed" without
+  # programming the EPS.
+  if args.danger and isinstance(uds_client, mock.Mock):
+    raise SystemExit("ERROR: --danger requires a real Panda connection (got mock client)")
 
   debug_output: list[bytes | None] = list()
 
@@ -209,8 +214,14 @@ if __name__ == "__main__":
     data = uds_client.ecu_reset(RESET_TYPE.HARD)
     debug_output = debug_output + [data]
 
-  except Exception:
+  except Exception as e:
     print(traceback.format_exc())
+    # Dry-run intentionally raises here; treat that as success. Any other failure
+    # must be a non-zero exit so callers (e.g. flash.py) don't treat it as done.
+    if isinstance(e, RuntimeError) and str(e) == "Safe mode: aborting before mutating actions":
+      pass
+    else:
+      sys.exit(1)
 
   if isinstance(uds_client, mock.Mock):
     from unittest.mock import ANY, call
