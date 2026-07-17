@@ -84,6 +84,11 @@ Thin new data must **not** yank a well-proven curve (fingerprint seed from large
 
 ## Change Log
 
+### 2026-07-17 — Install branch `nrdr-sr-curve-07.17.2026-prebuilt`
+- **What:** Pushed install branch with `prebuilt` marker removed so first comma boot SCons-bakes new SR curve params into `params_pyx.so`.
+- **Why:** Stale aarch64 `params_pyx.so` on the nightly prebuilt base does not contain `NrdrSteerRatioCurve*` keys; cannot recompile ARM `.so` on Mac.
+- **Check:** On device Software → install `nrdr-sr-curve-07.17.2026-prebuilt`; wait through first-boot build; Developer → Quickboot ON afterward.
+
 ### 2026-07-17 — Device Fit-from-logs SCAN + remoted
 - **What:** Learned Parameters SCAN/VIEW for `sr_curve_fit.py fit --apply`; `NrdrRemoteSrCurveFit` + summary in remoted/params/yaml.
 - **Why:** Phase C usable on-device without SSH; website can trigger the same merge fit.
