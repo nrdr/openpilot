@@ -5,7 +5,7 @@ from openpilot.cereal import log
 from opendbc.car.honda.carcontroller import get_eps_modified_steering_pressed
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.common.params import Params
+from openpilot.common.params import Params, UnknownKeyName
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
@@ -90,8 +90,22 @@ def _lookahead_release(future_vals, current_val) -> float:
   return min(same_sign + [current_val], key=lambda x: abs(x))
 
 
+def get_param_bool(params, key, default=False):
+  # A removed/unregistered key must never crash the card. Params.get() raises
+  # UnknownKeyName on an unregistered key (it does NOT return None), so catch it.
+  try:
+    if params.get(key) is None:
+      return default
+    return params.get_bool(key)
+  except UnknownKeyName:
+    return default
+
+
 def get_param_float(params, key, default, min_value=None, max_value=None, scale=1.0):
-  value = params.get(key)
+  try:
+    value = params.get(key)
+  except UnknownKeyName:
+    value = None
   if value is None:
     ret = default
   else:
@@ -408,17 +422,17 @@ class LatControlPID(LatControl):
           0.0,
           90.0,
         )
-        self.unwind_freeze_enabled = self.params.get_bool("HondaUnwindFreeze")
-        self.unwind_lookahead_enabled = self.params.get_bool("HondaUnwindLookahead")
+        self.unwind_freeze_enabled = get_param_bool(self.params, "HondaUnwindFreeze")
+        self.unwind_lookahead_enabled = get_param_bool(self.params, "HondaUnwindLookahead")
         # Unwind FF boost: peak multiplier + time cap (both FLOAT, stored as real values).
         self.unwind_ff_multiplier = get_param_float(self.params, "HondaUnwindFfMultiplier", 2.0, 1.0, 10.0)
         self.unwind_boost_cap_s = get_param_float(self.params, "HondaUnwindBoostSeconds", 1.0, 0.0, 3.0)
         # Rate damping (D): strength (stored 0-300% -> 0.0-3.0) and fade-out speed (mph).
         self.rate_damping_scale = get_param_float(self.params, "NrdrLatRateDamping", 0.3, 0.0, 3.0, scale=100.0)
         self.rate_damping_fade_speed_ms = get_param_float(self.params, "NrdrLatRateDampingFadeSpeed", 30.0, 0.0, 60.0) * _MPH_TO_MS
-        self.injection_test_enabled = self.params.get_bool("HondaInjectionTest")
-        self.starpilot_enabled = self.params.get_bool("NrdrStarPilotPid")
-        self.lat_stiction_enabled = self.params.get_bool("NrdrLatStiction")
+        self.injection_test_enabled = get_param_bool(self.params, "HondaInjectionTest")
+        self.starpilot_enabled = get_param_bool(self.params, "NrdrStarPilotPid")
+        self.lat_stiction_enabled = get_param_bool(self.params, "NrdrLatStiction")
 
       output_torque = self.pid.update(
         error,
