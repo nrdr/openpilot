@@ -142,8 +142,35 @@ sections:
     - key: NrdrLearnSteerRatio
       widget: toggle
       title: Learn Steer Ratio (Auto)
-      description: When ON (Auto), uses openpilot's live-learned steer ratio; OFF uses the car's static base value.
-      details: When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance.
+      description: When ON, uses paramsd's live-learned scalar; OFF allows Curve Auto / seeds.
+      details: When ON, uses paramsd's live-learned scalar steer ratio (wins over the curve). When OFF: Curve Auto can apply device→seed→nearest; Clarity Min/Max and CR-V seed still available. OFF by default.
+    - key: NrdrSteerRatioCurve
+      widget: toggle
+      title: Steer Ratio Curve (Auto)
+      description: Learn+apply angle-dependent SR curve (device→seed→nearest→scalar).
+      details: Learn and apply together. Samples hands-off turns via yaw vs wheel angle. Recommend Learn Steer Ratio OFF. ON by default.
+    - key: NrdrSteerRatioCurveRate
+      widget: option
+      title: Curve Learning Speed
+      description: Promote EMA rate for device curve bins. 0 freezes the map.
+      min: 0
+      max: 100
+      step: 5
+      unit: '%'
+    - key: NrdrSteerRatioCalibrate
+      widget: toggle
+      title: SR Calibrate (guided)
+      description: Guided lot/cul-de-sac bin fill to lock; clears on complete/timeout/ignition.
+      details: Coaches Hold ~angle L then R. Relaxes lat/hands-off. ≥7 mph, hold still. Partial promotes OK.
+    - key: NrdrSteerRatioCurveReset
+      widget: toggle
+      title: Reset Steer Ratio Curve
+      description: Clears device-learned curve and bin stats (seeds remain).
+    - key: NrdrRemoteSrCurveFit
+      widget: toggle
+      title: Fit Steer Ratio Curve from Logs
+      description: Flip ON (offroad) to merge drive logs into the device SR curve; flips OFF when done.
+      details: Runs sr_curve_fit.py fit --apply (merge). Same gates as live Curve Auto. Result in /data/nrdr_sr_curve_fit.txt and NrdrSrCurveFitSummary.
     - key: NrdrLearnStiffness
       widget: toggle
       title: Learn Tire Stiffness (Auto)
@@ -182,16 +209,16 @@ sections:
     - key: NrdrSteerRatioMin
       widget: option
       title: Steer Ratio Min (On-Center)
-      description: Steer ratio on-center. Only applies when Learn Steer Ratio (Auto) is off.
-      details: Effective steer ratio on-center, the start of the two-point taper down to Steer Ratio Max at lock. Higher = gentler on-center turn-in. Only applies when Learn Steer Ratio (Auto) is off; when on, the live-learned scalar is used instead.
+      description: Clarity only. On-center SR for Min/Max twopoint when Learn Steer Ratio is off.
+      details: Clarity only. Effective steer ratio on-center, start of the taper to Steer Ratio Max at lock. Ignored on other cars (CR-V uses its seed curve). Only when Learn Steer Ratio is off.
       min: 10.0
       max: 20.0
       step: 0.01
     - key: NrdrSteerRatioMax
       widget: option
       title: Steer Ratio Max (Lock)
-      description: Steer ratio at full lock. Only applies when Learn Steer Ratio (Auto) is off.
-      details: Effective steer ratio at ~full lock, the end of the two-point taper from Steer Ratio Min at center (held past 250 deg). Only applies when Learn Steer Ratio (Auto) is off; when on, the live-learned scalar is used instead.
+      description: Clarity only. Lock-end SR for Min/Max twopoint when Learn Steer Ratio is off.
+      details: Clarity only. Effective steer ratio at ~full lock (held past 250 deg). Ignored on other cars. Only when Learn Steer Ratio is off.
       min: 10.0
       max: 20.0
       step: 0.01

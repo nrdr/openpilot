@@ -16,11 +16,10 @@ The taper of steerRatio_eff vs angle is exactly the curve openpilot's single sca
 Feed it a route with real cornering (your switchback) - highway frames are all near-center
 and won't populate the large-angle bins.
 
-Gate: lat active, hands off (not steeringPressed), moving, and actually turning, so
-straight-line frames don't pollute the ratio.
+Gate: lat active, hands off (not steeringPressed), moving, hold-still, and actually turning.
 
-Note: livePose yaw is device-frame, so absolute values may carry a small constant scale
-from the mount tilt - but the SHAPE of the taper (what we program as the lookup) is intact.
+For writing device CurveData / exporting NRDR_STEER_RATIO_CURVES seeds, prefer:
+  python3 sr_curve_fit.py fit <rlogs> [--apply] [--export --fingerprint HONDA_CRV_5G]
 
 Usage:
   python3 steerratio_by_angle.py /data/media/0/realdata/<switchback-route>--*/rlog.zst
@@ -35,13 +34,14 @@ from openpilot.tools.lib.logreader import LogReader
 ANGLE_BIN = 25.0      # deg per bin
 MIN_ANGLE = 5.0       # deg: ratio is pure noise below this
 MIN_YAW = 0.03        # rad/s: ignore near-straight
-MIN_V = 3.0           # m/s: ignore crawl (yaw/v blows up)
+MIN_V = 7.0 * 0.44704 # ~7 mph (author protocol; yaw/v blows up at crawl)
+RATE_GATE = 20.0      # deg/s: hold still
 MIN_N = 15            # frames a bin needs before it's trusted
 
 
 def main(paths):
   wheelbase = None
-  v = a = yaw = 0.0
+  v = a = yaw = rate = 0.0
   pressed = True
   lat = False
   bins = defaultdict(list)
@@ -60,12 +60,14 @@ def main(paths):
       elif w == 'carState':
         v = m.carState.vEgo
         a = m.carState.steeringAngleDeg
+        rate = m.carState.steeringRateDeg
         pressed = m.carState.steeringPressed
       elif w == 'carControl':
         lat = m.carControl.latActive
       elif w == 'livePose':
         yaw = m.livePose.angularVelocityDevice.z
-        if wheelbase and lat and not pressed and v > MIN_V and abs(yaw) > MIN_YAW and abs(a) > MIN_ANGLE:
+        if (wheelbase and lat and not pressed and v > MIN_V and abs(rate) <= RATE_GATE
+            and abs(yaw) > MIN_YAW and abs(a) > MIN_ANGLE):
           curv = yaw / v
           rw = math.atan(wheelbase * curv)
           if abs(rw) > 1e-4:

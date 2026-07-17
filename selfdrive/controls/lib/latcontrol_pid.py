@@ -1,3 +1,4 @@
+import json
 import math
 import numpy as np
 
@@ -11,15 +12,25 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
 from openpilot.selfdrive.controls.lib.nrdr_lat_stiction import LatStiction
 from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
+from openpilot.selfdrive.controls.lib.nrdr_steer_ratio_curve import SteerRatioCurveLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
-# nrdr: the Clarity's Nidec rack is variable-ratio; paramsd learns one scalar. Model it as a
-# two-point linear taper of effective steer ratio vs |steering-wheel angle|: NrdrSteerRatioMin at
-# center down to NrdrSteerRatioMax at ~lock (np.interp holds the last value past the table). Both
-# endpoints are live-tunable params (clamped 10-20), applied only when NrdrLearnSteerRatio is off;
-# when on, paramsd's learned scalar is used instead. Replaces the old multi-knot SR_ANGLE_CURVES fit.
+# nrdr: angle-dependent steer ratio for variable-ratio racks, fingerprint-gated.
+# Applied only when NrdrLearnSteerRatio is off; when on, paramsd's learned scalar stands.
+# Unsupported cars keep controlsd's VM.sR (learned or static CP.steerRatio) untouched.
+#
+# Clarity: live-tunable two-point (NrdrSteerRatioMin at center -> NrdrSteerRatioMax at ~lock).
 NRDR_STEER_RATIO_ANGLE_BP = [0.0, 250.0]  # |steering-wheel angle|, deg: center -> ~lock
+NRDR_STEER_RATIO_TWOPOINT_CARS = frozenset({"HONDA_CLARITY"})
+
+# CR-V 5G: measured multi-point taper from sr_extract (IMU yaw / vEgo). Clarity's 12.74 lock
+# endpoint undershoots the measured ~14.6 and over-commands sharp turns.
+NRDR_CRV_5G_STEER_RATIO_ANGLE_BP = [0.0, 50.0, 100.0, 150.0, 175.0, 200.0]
+NRDR_CRV_5G_STEER_RATIO_V = [18.1, 17.8, 16.3, 15.3, 14.9, 14.6]
+NRDR_STEER_RATIO_CURVES = {
+  "HONDA_CRV_5G": (NRDR_CRV_5G_STEER_RATIO_ANGLE_BP, NRDR_CRV_5G_STEER_RATIO_V),
+}
 
 
 CENTER_TAPER_FADE_TAU = 0.25
@@ -235,11 +246,24 @@ class LatControlPID(LatControl):
     self.params = Params()
     # 2D online lateral auto-tuner: bounded, gated, per-(speed, angle) learned FF trim. Off by default.
     self.tune_learner = TuneLearner(dt, self.steer_max)
-    # Two-point steer ratio endpoints (live-tunable; applied only when Learn Steer Ratio is off).
-    self.sr_min = 16.84   # SR at center
-    self.sr_max = 12.74   # SR at ~lock
+    # Fingerprint-gated angle-dependent steer ratio (applied only when Learn Steer Ratio is off).
+    self.sr_min = 16.84   # Clarity two-point: SR at center
+    self.sr_max = 12.74   # Clarity two-point: SR at ~lock
     self.learn_steer_ratio = False
+    self.car_fingerprint = str(CP.carFingerprint)
+    self.cp_steer_ratio = float(CP.steerRatio)
+    fp = self.car_fingerprint
+    self.steer_ratio_curve = NRDR_STEER_RATIO_CURVES.get(fp)  # fixed multi-point, or None
+    self.steer_ratio_twopoint = fp in NRDR_STEER_RATIO_TWOPOINT_CARS  # live Min/Max 2-point
+    self.sr_curve_learner = SteerRatioCurveLearner(float(CP.wheelbase), max_angle_deg=250.0)
+    self.applied_sr = self.cp_steer_ratio
+    self.applied_sr_mode = "scalar_cp"
+    self._last_p_scale = 1.0
+    self._last_i_scale = 1.0
+    self._last_f_scale = 1.0
     self.frame = -1
+    self._sr_frame = 0
+    self._snapshot_counter = 0
     # Independent speed-banded P / I / F output scales (multiplier units; 1.0 = neutral).
     self.lat_p_scale_low = 1.0
     self.lat_p_scale_standard = 1.0
@@ -270,20 +294,50 @@ class LatControlPID(LatControl):
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
 
-    # nrdr: two-point angle-dependent steer ratio, keyed on measured wheel angle (stable; avoids
-    # the desired-angle circular dependency). sr_curve is force-cleared so any baked SR_ANGLE_CURVES
-    # cannot override this. Applied only when Learn Steer Ratio is off; when on, paramsd's learned
-    # scalar (set by controlsd each cycle) stands. Per-frame, so it can't compound.
+    # nrdr: angle-dependent steer ratio. Force-clear baked sr_curve. When Learn SR is off,
+    # Curve Auto merges device promoted → fingerprint seed / Clarity Min–Max → nearest → scalar.
+    # When Learn SR is on, paramsd's scalar wins (curve learner may still accumulate).
     VM.sr_curve = None
+    abs_swa = abs(CS.steeringAngleDeg)
     if not self.learn_steer_ratio:
-      VM.sR = float(np.interp(abs(CS.steeringAngleDeg), NRDR_STEER_RATIO_ANGLE_BP, [self.sr_min, self.sr_max]))
-
+      seed_bp = seed_v = None
+      twopoint = None
+      if self.steer_ratio_curve is not None:
+        seed_bp, seed_v = self.steer_ratio_curve
+      elif self.steer_ratio_twopoint:
+        twopoint = (self.sr_min, self.sr_max)
+      sr, mode = self.sr_curve_learner.apply(
+        abs_swa, float(VM.sR), seed_bp, seed_v, twopoint)
+      VM.sR = float(sr)
+      self.applied_sr_mode = mode
+    else:
+      self.applied_sr_mode = "scalar_learned"
+    self.applied_sr = float(VM.sR)
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
     error = angle_steers_des - CS.steeringAngleDeg
 
     pid_log.steeringAngleDesiredDeg = angle_steers_des
     pid_log.angleError = error
+
+    # Gap-filler / guided calibrate: sample every frame (gated inside learner).
+    # Own counter so calibrate works while lat inactive (self.frame only advances when active).
+    self._sr_frame += 1
+    yaw = None
+    if calibrated_pose is not None:
+      try:
+        yaw = float(calibrated_pose.angular_velocity.yaw)
+      except Exception:
+        yaw = None
+    self.sr_curve_learner.update(
+      self._sr_frame,
+      float(CS.vEgo),
+      float(CS.steeringAngleDeg),
+      float(CS.steeringRateDeg),
+      yaw,
+      bool(active),
+      bool(CS.steeringPressed),
+    )
 
     if not active:
       output_torque = 0.0
@@ -451,6 +505,9 @@ class LatControlPID(LatControl):
       i_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_i_scale_low, self.lat_i_scale_standard, self.lat_i_scale_highway)
       f_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_f_scale_low, self.lat_f_scale_standard, self.lat_f_scale_highway)
       output_torque = self.pid.p * p_scale + self.pid.i * i_scale + self.pid.d + self.pid.f * f_scale
+      self._last_p_scale = float(p_scale)
+      self._last_i_scale = float(i_scale)
+      self._last_f_scale = float(f_scale)
 
       # Party Tricks: Injection Test multiplies the PID scale by 999% (diagnostic only).
       if self.injection_test_enabled:
@@ -535,4 +592,45 @@ class LatControlPID(LatControl):
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
       self.prev_saturated = bool(pid_log.saturated)
 
+    self._maybe_write_applied_tune_snapshot(CS, active)
     return output_torque, angle_steers_des, pid_log
+
+  def _maybe_write_applied_tune_snapshot(self, CS, active: bool):
+    """Persist currently applied SR / PID scales / TuneLearner trim for Car & Tune Info VIEW.
+
+    Slow cadence (~3 s). Not a live stream — UI reads last snapshot.
+    """
+    self._snapshot_counter += 1
+    if self._snapshot_counter % 300 != 1:
+      return
+    try:
+      mph = float(CS.vEgo) * 2.23694
+      snap = {
+        "version": 1,
+        "fingerprint": self.car_fingerprint,
+        "srMode": self.applied_sr_mode,
+        "appliedSteerRatio": round(float(self.applied_sr), 3),
+        "cpSteerRatio": round(float(self.cp_steer_ratio), 3),
+        "steerAngleDeg": round(float(CS.steeringAngleDeg), 2),
+        "learnSteerRatio": bool(self.learn_steer_ratio),
+        "pScale": round(float(self._last_p_scale), 3),
+        "iScale": round(float(self._last_i_scale), 3),
+        "fScale": round(float(self._last_f_scale), 3),
+        "pidP": round(float(self.pid.p), 4),
+        "pidI": round(float(self.pid.i), 4),
+        "pidF": round(float(self.pid.f), 4),
+        "effP": round(float(self.pid.p) * float(self._last_p_scale), 4),
+        "effI": round(float(self.pid.i) * float(self._last_i_scale), 4),
+        "effF": round(float(self.pid.f) * float(self._last_f_scale), 4),
+        "speedMph": round(mph, 1),
+        "epsModified": bool(self.is_eps_modified),
+        "tuneLearnerEnabled": bool(self.tune_learner.enabled),
+        "tuneTrimApplied": round(float(self.tune_learner.last_trim_applied), 4),
+        "tuneMapCell": round(float(self.tune_learner.last_map_cell), 4),
+        "active": bool(active),
+      }
+      snap.update(self.sr_curve_learner.snapshot_fields())
+      self.params.put("NrdrAppliedTuneSnapshot", snap, block=False)
+    except Exception:
+      pass
+

@@ -19,7 +19,7 @@ SAFETY -- this moves the wheel, so every lever is deliberately conservative:
     paramsd settled (its own valid flags) -- so it never chases the kinematic estimator (steer
     ratio / offset / stiffness) while that is still adapting. Different layer, no turf war.
   * bilinear apply + bilinear-weighted learn -> smooth output, no torque steps at bin edges.
-  * defaults OFF (NrdrTuneLearner). Viewable, resettable (NrdrTuneLearnerReset), and seedable
+  * defaults ON (NrdrTuneLearner). Viewable, resettable (NrdrTuneLearnerReset), and seedable
     offline. The learned surface persists in NrdrTuneLearnerMap.
 """
 import numpy as np
@@ -74,6 +74,9 @@ class TuneLearner:
     self.max_trim = 0.10 * self.steer_max
     self.rate = 0.30
     self.dirty = False
+    # Last apply() diagnostics for NrdrAppliedTuneSnapshot / Car & Tune Info VIEW.
+    self.last_trim_applied = 0.0
+    self.last_map_cell = 0.0
     self._load()
     self._refresh_params()
 
@@ -111,6 +114,8 @@ class TuneLearner:
   # against a car that is already tracking. The kf feedforward path is untouched.
   def apply(self, v_ego, desired_deg, error_deg):
     ERR_GATE_FULL_DEG = 2.0  # deg of agreeing error for full trim authority
+    self.last_map_cell = 0.0
+    self.last_trim_applied = 0.0
     if not self.enabled:
       return 0.0
     abs_des = abs(desired_deg)
@@ -118,6 +123,7 @@ class TuneLearner:
       return 0.0
     m = self.map_l if desired_deg > 0.0 else self.map_r
     trim_norm = self._bilinear(m, v_ego, abs_des)
+    self.last_map_cell = float(trim_norm)
     trim_norm = min(max(trim_norm, -self.max_trim), self.max_trim)
     # direction-normalized error: + = under-turning = "needs more turn" (learn() convention)
     norm_err = error_deg if desired_deg > 0.0 else -error_deg
@@ -125,7 +131,9 @@ class TuneLearner:
     if trim_norm * gate <= 0.0:
       return 0.0
     trim_norm *= abs(gate)
-    return trim_norm if desired_deg > 0.0 else -trim_norm
+    out = trim_norm if desired_deg > 0.0 else -trim_norm
+    self.last_trim_applied = float(out)
+    return out
 
   # --- learning: nudge the map from this frame's steady-state error (map only; never the output) ---
   def learn(self, v_ego, desired_deg, error, steering_rate_deg, steering_pressed, paramsd_ok, frame):

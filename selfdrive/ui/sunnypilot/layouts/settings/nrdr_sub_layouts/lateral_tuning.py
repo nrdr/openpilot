@@ -248,7 +248,7 @@ class LateralTuningLayout(Widget):
       which = CP.lateralTuning.which()
       if which == "pid":
         pid = CP.lateralTuning.pid
-        lines.append("<b>" + tr("LATERAL PID") + "</b>")
+        lines.append("<b>" + tr("LATERAL PID (static base)") + "</b>")
         lines.append(f"kp: [{self._fmt_vals(pid.kpV)}] @ [{self._fmt_bp_mph(pid.kpBP)}] mph")
         lines.append(f"ki: [{self._fmt_vals(pid.kiV)}] @ [{self._fmt_bp_mph(pid.kiBP)}] mph")
         lines.append(f"kf: {float(pid.kf):g}")
@@ -256,6 +256,64 @@ class LateralTuningLayout(Widget):
         lines.append(tr("Lateral tuning type: {} (not PID)").format(which))
     except Exception:
       lines.append(tr("Lateral tuning: unavailable"))
+    lines.append("")
+
+    # Currently applied stack (from LatControlPID snapshot)
+    snap = self._read_applied_tune_snapshot()
+    lines.append("<b>" + tr("CURRENTLY APPLIED") + "</b>")
+    if snap is None:
+      lines.append(tr("(no snapshot yet — engage once so controlsd can publish)"))
+    else:
+      mode = str(snap.get("srMode", "?"))
+      mode_label = {
+        "seed_curve": tr("fingerprint seed curve"),
+        "device_curve": tr("device promoted curve"),
+        "device_seed_blend": tr("device+seed blend (earning trust)"),
+        "nearest_bin": tr("nearest trusted bin"),
+        "clarity_twopoint": tr("Clarity Min/Max twopoint"),
+        "scalar_learned": tr("paramsd learned scalar"),
+        "scalar_cp": tr("CP.steerRatio scalar"),
+      }.get(mode, mode)
+      lines.append(tr("steerRatio mode: {}").format(mode_label))
+      lines.append(tr("applied steerRatio: {} (at |SWA|={}°)").format(
+        snap.get("appliedSteerRatio", "?"), snap.get("steerAngleDeg", "?")))
+      lines.append(tr("CP.steerRatio (static): {}").format(snap.get("cpSteerRatio", "?")))
+      lines.append(tr("Learn Steer Ratio (Auto): {}").format(
+        tr("ON") if snap.get("learnSteerRatio") else tr("OFF")))
+      if snap.get("curveAuto") is not None:
+        lines.append(tr("Curve Auto: {} | promoted bins: {} | coverage {}/{}").format(
+          tr("ON") if snap.get("curveAuto") else tr("OFF"),
+          snap.get("curvePromotedCount", 0),
+          snap.get("curveBinsReady", 0),
+          snap.get("curveBinsTotal", 0)))
+        if snap.get("calibrate"):
+          lines.append(tr("SR Calibrate: Hold ~{}° {} · n={}/{} · {}").format(
+            snap.get("curveTargetDeg", "?"),
+            snap.get("curveTargetSide", "?"),
+            snap.get("curveBinN", 0),
+            snap.get("curveBinNMin", 0),
+            snap.get("curveStatus", "")))
+        else:
+          lines.append(tr("Curve status: {}").format(snap.get("curveStatus", "—")))
+      lines.append(tr("P/I/F scales: {}% / {}% / {}%").format(
+        int(round(float(snap.get("pScale", 1)) * 100)),
+        int(round(float(snap.get("iScale", 1)) * 100)),
+        int(round(float(snap.get("fScale", 1)) * 100))))
+      lines.append(tr("PID terms (raw → scaled): P {} → {}, I {} → {}, F {} → {}").format(
+        snap.get("pidP", "?"), snap.get("effP", "?"),
+        snap.get("pidI", "?"), snap.get("effI", "?"),
+        snap.get("pidF", "?"), snap.get("effF", "?")))
+      if snap.get("epsModified"):
+        lines.append(tr("2D Auto-Tuner: {} | map cell {} | trim applied {}").format(
+          tr("ON") if snap.get("tuneLearnerEnabled") else tr("OFF"),
+          snap.get("tuneMapCell", 0),
+          snap.get("tuneTrimApplied", 0)))
+      else:
+        lines.append(tr("2D Auto-Tuner: n/a (EPS not modified)"))
+      lines.append(tr("snapshot @ {} mph, lat active={}").format(
+        snap.get("speedMph", "?"), snap.get("active", "?")))
+      lines.append("")
+      lines.append(tr("Tip: to harden Auto-Tuner trim into static tune, raise base kf / band scales toward the scaled terms, then Reset Learned Trim."))
     lines.append("")
 
     # Longitudinal tuning
@@ -284,6 +342,24 @@ class LateralTuningLayout(Widget):
 
     return "<br>".join(lines)
 
+  @staticmethod
+  def _read_applied_tune_snapshot():
+    try:
+      raw = ui_state.params.get("NrdrAppliedTuneSnapshot")
+    except Exception:
+      return None
+    if raw is None:
+      return None
+    if isinstance(raw, dict):
+      return raw
+    try:
+      import json
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+      return json.loads(raw)
+    except Exception:
+      return None
+
   def _show_pid_tune_info(self):
     gui_app.push_widget(HtmlModalSP(text=self._build_pid_tune_info()))
 
@@ -303,7 +379,7 @@ class LateralTuningLayout(Widget):
     self._pid_tune_info_item = button_item(
       lambda: tr("Car & Tune Info"),
       lambda: tr("VIEW"),
-      lambda: tr("Your car's full profile: fingerprint, EPS firmware, gas interceptor and radar status, plus the lateral/longitudinal kp/ki/kf and geometry currently loaded for it."),
+      lambda: tr("Your car's profile plus currently applied steer ratio, PID scales, and 2D Auto-Tuner trim (static base ± live)."),
       callback=self._show_pid_tune_info,
     )
 

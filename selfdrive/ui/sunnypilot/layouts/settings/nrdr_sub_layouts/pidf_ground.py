@@ -36,7 +36,7 @@ class PidfGroundLayout(Widget):
       param="NrdrSteerRatioMin",
       title=lambda: tr("Steer Ratio Min / On-Center (Default: 16.84)"),
       min_value=1000, max_value=2000, value_change_step=1,
-      description=lambda: tr("Effective steer ratio on-center, the start of the two-point taper down to Steer Ratio Max at lock. Higher = gentler on-center turn-in. Only applies when Learn Steer Ratio (Auto) is off; when on, the live-learned scalar is used."),
+      description=lambda: tr("Clarity only: effective steer ratio on-center, start of the two-point taper to Steer Ratio Max at lock. Ignored on other cars (CR-V uses its seed curve). Only when Learn Steer Ratio is off."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -44,7 +44,7 @@ class PidfGroundLayout(Widget):
       param="NrdrSteerRatioMax",
       title=lambda: tr("Steer Ratio Max / Lock (Default: 12.74)"),
       min_value=1000, max_value=2000, value_change_step=1,
-      description=lambda: tr("Effective steer ratio at ~full lock, the end of the taper from Steer Ratio Min at center (held past 250 deg). Only applies when Learn Steer Ratio (Auto) is off; when on, the live-learned scalar is used."),
+      description=lambda: tr("Clarity only: effective steer ratio at ~full lock (held past 250 deg). Ignored on other cars. Only when Learn Steer Ratio is off."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )

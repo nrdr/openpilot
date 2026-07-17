@@ -298,8 +298,14 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaNotchFreq", {PERSISTENT | BACKUP, FLOAT, "7.5"}},
     {"HondaNotchQ", {PERSISTENT | BACKUP, FLOAT, "1.5"}},
     {"NrdrLearnSteerRatio", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"NrdrSteerRatioMin", {PERSISTENT | BACKUP, FLOAT, "16.84"}},   // steer ratio at center; applied only when NrdrLearnSteerRatio is off (clamped 10-20)
-    {"NrdrSteerRatioMax", {PERSISTENT | BACKUP, FLOAT, "12.74"}},   // steer ratio at ~lock; applied only when NrdrLearnSteerRatio is off (clamped 10-20)
+    {"NrdrSteerRatioMin", {PERSISTENT | BACKUP, FLOAT, "16.84"}},   // Clarity twopoint: SR at center (clamped 10-20); Learn SR off
+    {"NrdrSteerRatioMax", {PERSISTENT | BACKUP, FLOAT, "12.74"}},   // Clarity twopoint: SR at ~lock (clamped 10-20); Learn SR off
+    {"NrdrSteerRatioCurve", {PERSISTENT | BACKUP, BOOL, "1"}},      // Curve Auto: learn+apply device→seed→nearest→scalar (when Learn SR off)
+    {"NrdrSteerRatioCurveRate", {PERSISTENT | BACKUP, INT, "50"}},  // promote EMA rate % (0 = freeze map, still apply)
+    {"NrdrSteerRatioCalibrate", {CLEAR_ON_IGNITION_ON, BOOL, "0"}}, // guided manual bin-fill; auto-off on lock coverage / timeout
+    {"NrdrSteerRatioCurveReset", {PERSISTENT, BOOL, "0"}},          // momentary: clear device curve + bin stats (seeds remain)
+    {"NrdrSteerRatioCurveData", {PERSISTENT | BACKUP | DONT_LOG, JSON}}, // promoted curve + accumulator bins
+    {"NrdrAppliedTuneSnapshot", {CLEAR_ON_MANAGER_START, JSON}},     // currently applied SR/PID scales/TuneLearner trim (LatControlPID → UI VIEW)
     {"NrdrLearnStiffness", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrLearnAngleOffset", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"HondaUnwindFreeze", {PERSISTENT | BACKUP, BOOL, "0"}},
@@ -339,8 +345,10 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     // Sunnylink remote actions (consumed and cleared by nrdr_remoted)
     {"NrdrRemoteForceUpdate", {CLEAR_ON_MANAGER_START, BOOL, "0"}},  // website "button": run the updater chain
     {"NrdrRemoteTuneScan", {CLEAR_ON_MANAGER_START, BOOL, "0"}},     // website "button": run tune_report.py
+    {"NrdrRemoteSrCurveFit", {CLEAR_ON_MANAGER_START, BOOL, "0"}},   // website/device: sr_curve_fit.py fit --apply (merge)
     {"NrdrRemoteStatus", {CLEAR_ON_MANAGER_START, STRING, "idle"}},  // remote action status line shown on the website
     {"NrdrTuneReportSummary", {PERSISTENT, STRING, ""}},             // per-speed summary table from the last tune scan
+    {"NrdrSrCurveFitSummary", {PERSISTENT, STRING, ""}},             // last SR curve fit table / status
     {"NrdrCarTuneInfo", {PERSISTENT, STRING, ""}},                   // Car & Tune Info readout for the Sunnylink info row (written by nrdr_remoted)
     {"NrdrStarPilotPid", {PERSISTENT | BACKUP, BOOL, "0"}},          // borrowed StarPilot _pid_output_scale (center boost + turn-in/per-direction scaling); 0 = clean PID/F + D
     {"NrdrTuneLearner", {PERSISTENT | BACKUP, BOOL, "1"}},           // 2D online lateral auto-tuner (learned per-cell FF trim); 0 = off

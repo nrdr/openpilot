@@ -14,10 +14,13 @@ Triggers:
                            goes to /data/nrdr_tune_report.txt (grab it via
                            copyparty), and the PER-SPEED SUMMARY table goes into
                            NrdrTuneReportSummary for remote viewing.
+  NrdrRemoteSrCurveFit  -> run sr_curve_fit.py fit --apply (merge) over drive logs;
+                           table goes to /data/nrdr_sr_curve_fit.txt and
+                           NrdrSrCurveFitSummary.
 
 Status text for the website is mirrored into NrdrRemoteStatus (info widget).
 Offroad-only (see process_config): force update is offroad-only anyway, and a
-tune scan while driving would steal CPU from the controls stack.
+tune scan / SR fit while driving would steal CPU from the controls stack.
 """
 import glob
 import os
@@ -33,7 +36,9 @@ POLL_INTERVAL_S = 2.0
 UPDATER_WAKE_TIMEOUT_S = 15.0
 UPDATER_PHASE_TIMEOUT_S = 900.0
 TUNE_SCAN_TIMEOUT_S = 1800
+SR_CURVE_FIT_TIMEOUT_S = 1800
 TUNE_REPORT_PATH = "/data/nrdr_tune_report.txt"
+SR_CURVE_FIT_PATH = "/data/nrdr_sr_curve_fit.txt"
 RLOG_GLOBS = ("/data/media/0/realdata/*/rlog.zst", "/data/media/0/realdata/*/rlog.bz2")
 SUMMARY_MAX_CHARS = 4000
 
@@ -165,6 +170,43 @@ def run_tune_scan(params) -> None:
   _set_status(params, "scan: done " + time.strftime("%H:%M") + suffix)
 
 
+def run_sr_curve_fit(params) -> None:
+  paths: list[str] = []
+  for pattern in RLOG_GLOBS:
+    paths.extend(sorted(glob.glob(pattern)))
+  if not paths:
+    _set_status(params, "sr fit: no drive logs found")
+    return
+
+  _set_status(params, f"sr fit: running on {len(paths)} logs...")
+  tmp = SR_CURVE_FIT_PATH + ".tmp"
+  try:
+    with open(tmp, "w") as fh:
+      ret = subprocess.run(
+        ["python3", os.path.join(BASEDIR, "sr_curve_fit.py"), "fit", *paths, "--apply"],
+        stdout=fh, stderr=subprocess.STDOUT, cwd=BASEDIR, timeout=SR_CURVE_FIT_TIMEOUT_S,
+      ).returncode
+  except Exception:
+    cloudlog.exception("nrdr_remoted: sr curve fit failed to run")
+    _set_status(params, "sr fit: failed to run")
+    return
+
+  try:
+    os.replace(tmp, SR_CURVE_FIT_PATH)
+  except OSError:
+    pass
+
+  try:
+    with open(SR_CURVE_FIT_PATH) as f:
+      text = f.read().strip()
+    params.put("NrdrSrCurveFitSummary", text[:SUMMARY_MAX_CHARS])
+  except Exception:
+    cloudlog.exception("nrdr_remoted: failed to set NrdrSrCurveFitSummary")
+
+  suffix = "" if ret == 0 else " (with errors, see /data/nrdr_sr_curve_fit.txt)"
+  _set_status(params, "sr fit: done " + time.strftime("%H:%M") + suffix)
+
+
 def _fmt_vals(vals) -> str:
   return "[" + ", ".join(f"{float(v):g}" for v in vals) + "]"
 
@@ -220,6 +262,7 @@ def main():
   try:
     params.get_bool("NrdrRemoteForceUpdate")
     params.get_bool("NrdrRemoteTuneScan")
+    params.get_bool("NrdrRemoteSrCurveFit")
   except Exception:
     cloudlog.exception("nrdr_remoted: trigger params unavailable (params not rebuilt?); parking")
     while True:
@@ -239,6 +282,10 @@ def main():
         params.put_bool("NrdrRemoteTuneScan", False)
         cloudlog.info("nrdr_remoted: remote tune scan triggered")
         run_tune_scan(params)
+      if params.get_bool("NrdrRemoteSrCurveFit"):
+        params.put_bool("NrdrRemoteSrCurveFit", False)
+        cloudlog.info("nrdr_remoted: remote SR curve fit triggered")
+        run_sr_curve_fit(params)
     except Exception:
       cloudlog.exception("nrdr_remoted: loop error")
     time.sleep(POLL_INTERVAL_S)
