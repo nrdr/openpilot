@@ -291,6 +291,12 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"LongPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
     {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}}, // % scale on final cruise target so actual speed matches set (100.0 = off)
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
+    // DEPRECATED notch-filter keys: all readers removed, but kept REGISTERED so stale bytecode /
+    // mid-OTA devices resolve them instead of crash-looping the card on UnknownKeyName. Do NOT
+    // delete until the fleet has updated well past this release (see two-phase removal note).
+    {"HondaNotchEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"HondaNotchFreq", {PERSISTENT | BACKUP, FLOAT, "7.5"}},
+    {"HondaNotchQ", {PERSISTENT | BACKUP, FLOAT, "1.5"}},
     {"NrdrLearnSteerRatio", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrLearnStiffness", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrLearnAngleOffset", {PERSISTENT | BACKUP, BOOL, "1"}},
