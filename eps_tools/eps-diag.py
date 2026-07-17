@@ -67,7 +67,7 @@ def passive_sniff(panda: Panda, bus: int, duration: float = SNIFF_DURATION_S):
   all_extended: set[int] = set()
 
   while time.monotonic() < deadline:
-    for addr, _, dat, recv_bus in panda.can_recv():
+    for addr, dat, recv_bus in panda.can_recv():
       if recv_bus != bus:
         continue
       if addr > 0x7FF:                         # 29-bit extended frame
