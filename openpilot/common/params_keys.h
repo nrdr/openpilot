@@ -303,8 +303,6 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaNotchFreq", {PERSISTENT | BACKUP, FLOAT, "7.5"}},
     {"HondaNotchQ", {PERSISTENT | BACKUP, FLOAT, "1.5"}},
     {"NrdrLearnSteerRatio", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"NrdrSteerRatioMin", {PERSISTENT | BACKUP, FLOAT, "16.84"}},   // steer ratio at center; applied only when NrdrLearnSteerRatio is off (clamped 10-20)
-    {"NrdrSteerRatioMax", {PERSISTENT | BACKUP, FLOAT, "12.74"}},   // steer ratio at ~lock; applied only when NrdrLearnSteerRatio is off (clamped 10-20)
     {"NrdrLearnStiffness", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrLearnAngleOffset", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"HondaUnwindFreeze", {PERSISTENT | BACKUP, BOOL, "0"}},
