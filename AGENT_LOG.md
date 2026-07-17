@@ -84,6 +84,11 @@ Thin new data must **not** yank a well-proven curve (fingerprint seed from large
 
 ## Change Log
 
+### 2026-07-17 — True prebuilt: aarch64 params_pyx baked on comma
+- **What:** Rebuilt `params_pyx.so` on-device with new SR curve keys; restored `prebuilt` marker on `nrdr-sr-curve-07.17.2026-prebuilt` and pushed.
+- **Why:** User needs install-ready branch with no first-boot SCons. New param keys require ARM `.so` rebuild (done via SSH to comma).
+- **Check:** Software → `nrdr-sr-curve-07.17.2026-prebuilt` should boot without compile; `Params` accepts `NrdrSteerRatioCurve*`.
+
 ### 2026-07-17 — Install branch `nrdr-sr-curve-07.17.2026-prebuilt`
 - **What:** Pushed install branch with `prebuilt` marker removed so first comma boot SCons-bakes new SR curve params into `params_pyx.so`.
 - **Why:** Stale aarch64 `params_pyx.so` on the nightly prebuilt base does not contain `NrdrSteerRatioCurve*` keys; cannot recompile ARM `.so` on Mac.
