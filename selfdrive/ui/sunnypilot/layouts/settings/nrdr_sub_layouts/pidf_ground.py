@@ -31,21 +31,13 @@ class PidfGroundLayout(Widget):
       param="NrdrStarPilotPid",
     )
 
-    # --- Two-point steer ratio endpoints (only apply when Learn Steer Ratio is off) ---
-    self._sr_min = option_item_sp(
-      param="NrdrSteerRatioMin",
-      title=lambda: tr("Steer Ratio Min / On-Center (Default: 16.84)"),
-      min_value=1000, max_value=2000, value_change_step=1,
-      description=lambda: tr("Effective steer ratio on-center, the start of the two-point taper down to Steer Ratio Max at lock. Higher = gentler on-center turn-in. Only applies when Learn Steer Ratio (Auto) is off; when on, the live-learned scalar is used."),
-      label_callback=lambda value: f"{value / 100:.2f}",
-      use_float_scaling=True,
-    )
-    self._sr_max = option_item_sp(
-      param="NrdrSteerRatioMax",
-      title=lambda: tr("Steer Ratio Max / Lock (Default: 12.74)"),
-      min_value=1000, max_value=2000, value_change_step=1,
-      description=lambda: tr("Effective steer ratio at ~full lock, the end of the taper from Steer Ratio Min at center (held past 250 deg). Only applies when Learn Steer Ratio (Auto) is off; when on, the live-learned scalar is used."),
-      label_callback=lambda value: f"{value / 100:.2f}",
+    # --- Steer ratio offset (uniform shift of the measured curve; only when Learn Steer Ratio is off) ---
+    self._sr_offset = option_item_sp(
+      param="NrdrSteerRatioOffset",
+      title=lambda: tr("Steer Ratio Offset (Default: 0.00)"),
+      min_value=-500, max_value=500, value_change_step=1,
+      description=lambda: tr("Shifts the whole measured steer-ratio curve up or down by this amount (higher = gentler / less turn-in everywhere, lower = sharper). Only applies when Learn Steer Ratio (Auto) is off; when on, the live-learned scalar is used."),
+      label_callback=lambda value: f"{value / 100:+.2f}",
       use_float_scaling=True,
     )
 
@@ -194,9 +186,8 @@ class PidfGroundLayout(Widget):
     return [
       self._starpilot,
       LineSeparatorSP(40),
-      # Two-point steer ratio endpoints (only apply when Learn Steer Ratio is off)
-      self._sr_min,
-      self._sr_max,
+      # Steer ratio offset (uniform shift; only when Learn Steer Ratio is off)
+      self._sr_offset,
       LineSeparatorSP(40),
       # Low speed (below 25mph): P / I / F
       self._lat_p_low,

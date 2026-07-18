@@ -14,12 +14,12 @@ from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
-# nrdr: the Clarity's Nidec rack is variable-ratio; paramsd learns one scalar. Model it as a
-# two-point linear taper of effective steer ratio vs |steering-wheel angle|: NrdrSteerRatioMin at
-# center down to NrdrSteerRatioMax at ~lock (np.interp holds the last value past the table). Both
-# endpoints are live-tunable params (clamped 10-20), applied only when NrdrLearnSteerRatio is off;
-# when on, paramsd's learned scalar is used instead. Replaces the old multi-knot SR_ANGLE_CURVES fit.
-NRDR_STEER_RATIO_ANGLE_BP = [0.0, 250.0]  # |steering-wheel angle|, deg: center -> ~lock
+# nrdr: the Clarity's Nidec rack is variable-ratio; paramsd learns one scalar. Use the measured
+# road-validated SR(|steering-wheel angle|) curve (v2.2) as the base, uniformly shifted by a single
+# live-tunable offset (NrdrSteerRatioOffset, +/-5.0). Effective SR = curve(|angle|) + offset, applied
+# only when NrdrLearnSteerRatio is off; when on, paramsd's learned scalar is used instead.
+NRDR_SR_CURVE_BP = [0., 6., 12., 20., 32., 48., 70., 100., 140., 200., 300., 450.]  # |wheel angle|, deg
+NRDR_SR_CURVE_V = [17.00, 17.00, 16.90, 16.84, 16.84, 16.72, 16.40, 15.94, 15.40, 14.30, 13.40, 12.74]
 
 
 CENTER_TAPER_FADE_TAU = 0.25
@@ -235,9 +235,8 @@ class LatControlPID(LatControl):
     self.params = Params()
     # 2D online lateral auto-tuner: bounded, gated, per-(speed, angle) learned FF trim. Off by default.
     self.tune_learner = TuneLearner(dt, self.steer_max)
-    # Two-point steer ratio endpoints (live-tunable; applied only when Learn Steer Ratio is off).
-    self.sr_min = 16.84   # SR at center
-    self.sr_max = 12.74   # SR at ~lock
+    # Steer ratio offset (live-tunable uniform shift of the SR curve; applied only when Learn Steer Ratio is off).
+    self.sr_offset = 0.0
     self.learn_steer_ratio = False
     self.frame = -1
     # Independent speed-banded P / I / F output scales (multiplier units; 1.0 = neutral).
@@ -276,7 +275,7 @@ class LatControlPID(LatControl):
     # scalar (set by controlsd each cycle) stands. Per-frame, so it can't compound.
     VM.sr_curve = None
     if not self.learn_steer_ratio:
-      VM.sR = float(np.interp(abs(CS.steeringAngleDeg), NRDR_STEER_RATIO_ANGLE_BP, [self.sr_min, self.sr_max]))
+      VM.sR = float(np.interp(abs(CS.steeringAngleDeg), NRDR_SR_CURVE_BP, NRDR_SR_CURVE_V)) + self.sr_offset
 
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
@@ -434,8 +433,7 @@ class LatControlPID(LatControl):
         self.injection_test_enabled = get_param_bool(self.params, "HondaInjectionTest")
         self.starpilot_enabled = get_param_bool(self.params, "NrdrStarPilotPid")
         self.lat_stiction_enabled = get_param_bool(self.params, "NrdrLatStiction")
-        self.sr_min = get_param_float(self.params, "NrdrSteerRatioMin", 16.84, 10.0, 20.0)
-        self.sr_max = get_param_float(self.params, "NrdrSteerRatioMax", 12.74, 10.0, 20.0)
+        self.sr_offset = get_param_float(self.params, "NrdrSteerRatioOffset", 0.0, -5.0, 5.0)
         self.learn_steer_ratio = get_param_bool(self.params, "NrdrLearnSteerRatio")
 
       output_torque = self.pid.update(
