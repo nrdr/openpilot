@@ -1,6 +1,10 @@
 version = 1
 revision = 3
 requires-python = ">=3.12.3, <3.13"
+resolution-markers = [
+    "platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "platform_machine != 'aarch64' or sys_platform != 'linux'",
+]
 
 [[package]]
 name = "acados"
@@ -786,7 +790,8 @@ dependencies = [
     { name = "pyserial" },
     { name = "pyzmq" },
     { name = "qrcode" },
-    { name = "raylib" },
+    { name = "raylib", version = "6.0.0.1", source = { git = "https://github.com/commaai/dependencies.git?subdirectory=raylib&rev=release-raylib#85d64783fb2c3553122db1568640b734c64ad190" }, marker = "platform_machine != 'aarch64' or sys_platform != 'linux'" },
+    { name = "raylib", version = "6.0.0.4", source = { git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=b5dc5f8b201e43ec3eeb0c7681d26250e684b75a#b5dc5f8b201e43ec3eeb0c7681d26250e684b75a" }, marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
     { name = "requests" },
     { name = "scons" },
     { name = "sentry-sdk" },
@@ -880,7 +885,8 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'testing'", git = "https://github.com/sshane/pytest-xdist?rev=2b4372bd62699fb412c4fe2f95bf9f01bd2018da" },
     { name = "pyzmq" },
     { name = "qrcode" },
-    { name = "raylib", git = "https://github.com/commaai/dependencies.git?subdirectory=raylib&rev=release-raylib" },
+    { name = "raylib", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", git = "https://github.com/commaai/dependencies.git?subdirectory=raylib&rev=release-raylib" },
+    { name = "raylib", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'", git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=b5dc5f8b201e43ec3eeb0c7681d26250e684b75a" },
     { name = "requests" },
     { name = "ruff", marker = "extra == 'testing'" },
     { name = "scons" },
@@ -1303,8 +1309,22 @@ wheels = [
 
 [[package]]
 name = "raylib"
-version = "6.0.0.0"
-source = { git = "https://github.com/commaai/dependencies.git?subdirectory=raylib&rev=release-raylib#dbf05cd774c2f74a70a0ee9ebb80015ed70ce718" }
+version = "6.0.0.1"
+source = { git = "https://github.com/commaai/dependencies.git?subdirectory=raylib&rev=release-raylib#85d64783fb2c3553122db1568640b734c64ad190" }
+resolution-markers = [
+    "platform_machine != 'aarch64' or sys_platform != 'linux'",
+]
+dependencies = [
+    { name = "cffi" },
+]
+
+[[package]]
+name = "raylib"
+version = "6.0.0.4"
+source = { git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=b5dc5f8b201e43ec3eeb0c7681d26250e684b75a#b5dc5f8b201e43ec3eeb0c7681d26250e684b75a" }
+resolution-markers = [
+    "platform_machine == 'aarch64' and sys_platform == 'linux'",
+]
 dependencies = [
     { name = "cffi" },
 ]
