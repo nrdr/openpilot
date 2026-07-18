@@ -75,7 +75,7 @@ dependencies = [
   "zstandard",
 
   # ui
-  "raylib @ git+https://github.com/RiskyBiscuit-arc/dependencies.git@8cd804fee6d0a507f8742afb77825794bf71e218#subdirectory=raylib",
+  "raylib @ git+https://github.com/RiskyBiscuit-arc/dependencies.git@8f6ce125799ceeebd950cd1fea6f2a98600accd4#subdirectory=raylib",
   "qrcode",
   "jeepney",
   "pillow",
