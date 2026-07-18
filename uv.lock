@@ -880,7 +880,7 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'testing'", git = "https://github.com/sshane/pytest-xdist?rev=2b4372bd62699fb412c4fe2f95bf9f01bd2018da" },
     { name = "pyzmq" },
     { name = "qrcode" },
-    { name = "raylib", git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=9e8b06a07d9ba2a2ffb2f19acef3a9b9d8927602" },
+    { name = "raylib", git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=8cd804fee6d0a507f8742afb77825794bf71e218" },
     { name = "requests" },
     { name = "ruff", marker = "extra == 'testing'" },
     { name = "scons" },
@@ -1304,7 +1304,7 @@ wheels = [
 [[package]]
 name = "raylib"
 version = "6.0.0.2"
-source = { git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=9e8b06a07d9ba2a2ffb2f19acef3a9b9d8927602#9e8b06a07d9ba2a2ffb2f19acef3a9b9d8927602" }
+source = { git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=8cd804fee6d0a507f8742afb77825794bf71e218#8cd804fee6d0a507f8742afb77825794bf71e218" }
 dependencies = [
     { name = "cffi" },
 ]
