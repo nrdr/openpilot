@@ -791,7 +791,7 @@ dependencies = [
     { name = "pyzmq" },
     { name = "qrcode" },
     { name = "raylib", version = "6.0.0.1", source = { git = "https://github.com/commaai/dependencies.git?subdirectory=raylib&rev=release-raylib#85d64783fb2c3553122db1568640b734c64ad190" }, marker = "platform_machine != 'aarch64' or sys_platform != 'linux'" },
-    { name = "raylib", version = "6.0.0.5", source = { git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=fde40aa777c290741f45fd63019b4cf17ef1d0a8#fde40aa777c290741f45fd63019b4cf17ef1d0a8" }, marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
+    { name = "raylib", version = "6.0.0.6", source = { git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=5ab8a43ddc33907593751ea78697aebba0d1656d#5ab8a43ddc33907593751ea78697aebba0d1656d" }, marker = "platform_machine == 'aarch64' and sys_platform == 'linux'" },
     { name = "requests" },
     { name = "scons" },
     { name = "sentry-sdk" },
@@ -886,7 +886,7 @@ requires-dist = [
     { name = "pyzmq" },
     { name = "qrcode" },
     { name = "raylib", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", git = "https://github.com/commaai/dependencies.git?subdirectory=raylib&rev=release-raylib" },
-    { name = "raylib", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'", git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=fde40aa777c290741f45fd63019b4cf17ef1d0a8" },
+    { name = "raylib", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'", git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=5ab8a43ddc33907593751ea78697aebba0d1656d" },
     { name = "requests" },
     { name = "ruff", marker = "extra == 'testing'" },
     { name = "scons" },
@@ -1320,8 +1320,8 @@ dependencies = [
 
 [[package]]
 name = "raylib"
-version = "6.0.0.5"
-source = { git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=fde40aa777c290741f45fd63019b4cf17ef1d0a8#fde40aa777c290741f45fd63019b4cf17ef1d0a8" }
+version = "6.0.0.6"
+source = { git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=5ab8a43ddc33907593751ea78697aebba0d1656d#5ab8a43ddc33907593751ea78697aebba0d1656d" }
 resolution-markers = [
     "platform_machine == 'aarch64' and sys_platform == 'linux'",
 ]
