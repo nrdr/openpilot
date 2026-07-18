@@ -75,7 +75,7 @@ dependencies = [
   "zstandard",
 
   # ui
-  "raylib @ git+https://github.com/RiskyBiscuit-arc/dependencies.git@b5dc5f8b201e43ec3eeb0c7681d26250e684b75a#subdirectory=raylib ; sys_platform == 'linux' and platform_machine == 'aarch64'",
+  "raylib @ git+https://github.com/RiskyBiscuit-arc/dependencies.git@bc40f601c0311ab71dcb403af9622831cd3f4f49#subdirectory=raylib ; sys_platform == 'linux' and platform_machine == 'aarch64'",
   "raylib @ git+https://github.com/commaai/dependencies.git@release-raylib#subdirectory=raylib ; sys_platform != 'linux' or platform_machine != 'aarch64'",
   "qrcode",
   "jeepney",
