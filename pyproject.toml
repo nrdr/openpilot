@@ -75,7 +75,7 @@ dependencies = [
   "zstandard",
 
   # ui
-  "raylib @ git+https://github.com/commaai/dependencies.git@release-raylib#subdirectory=raylib",
+  "raylib @ git+https://github.com/RiskyBiscuit-arc/dependencies.git@raylib-teal-tearing-fix#subdirectory=raylib",
   "qrcode",
   "jeepney",
   "pillow",
