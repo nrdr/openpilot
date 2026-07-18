@@ -880,7 +880,7 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'testing'", git = "https://github.com/sshane/pytest-xdist?rev=2b4372bd62699fb412c4fe2f95bf9f01bd2018da" },
     { name = "pyzmq" },
     { name = "qrcode" },
-    { name = "raylib", git = "https://github.com/commaai/dependencies.git?subdirectory=raylib&rev=release-raylib" },
+    { name = "raylib", git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=raylib-teal-tearing-fix" },
     { name = "requests" },
     { name = "ruff", marker = "extra == 'testing'" },
     { name = "scons" },
@@ -1303,8 +1303,8 @@ wheels = [
 
 [[package]]
 name = "raylib"
-version = "6.0.0.0"
-source = { git = "https://github.com/commaai/dependencies.git?subdirectory=raylib&rev=release-raylib#dbf05cd774c2f74a70a0ee9ebb80015ed70ce718" }
+version = "6.0.0.1+teal5097a67"
+source = { git = "https://github.com/RiskyBiscuit-arc/dependencies.git?subdirectory=raylib&rev=raylib-teal-tearing-fix#8af79f3374e5129c121489254e011fd38e7d3b72" }
 dependencies = [
     { name = "cffi" },
 ]
