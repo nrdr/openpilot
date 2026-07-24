@@ -14,12 +14,21 @@ from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
-# nrdr: the Clarity's Nidec rack is variable-ratio; paramsd learns one scalar. Use the measured
-# road-validated SR(|steering-wheel angle|) curve (v2.2) as the base, uniformly shifted by a single
-# live-tunable offset (NrdrSteerRatioOffset, +/-5.0). Effective SR = curve(|angle|) + offset, applied
-# only when NrdrLearnSteerRatio is off; when on, paramsd's learned scalar is used instead.
+# nrdr: variable-ratio racks need SR(|steering-wheel angle|), not a single paramsd scalar.
+# Default curve is Clarity road-validated v2.2. Per-car overrides below (e.g. CR-V 5G) replace
+# the base table by fingerprint. A live NrdrSteerRatioOffset (+/-5.0) shifts whichever curve
+# is active. Applied only when NrdrLearnSteerRatio is off; when on, paramsd's scalar stands.
+# (Old Clarity-only Min/Max 2-point is gone — use this curve + offset instead.)
 NRDR_SR_CURVE_BP = [0., 6., 12., 20., 32., 48., 70., 100., 140., 200., 300., 450.]  # |wheel angle|, deg
 NRDR_SR_CURVE_V = [17.00, 17.00, 16.90, 16.84, 16.84, 16.72, 16.40, 15.94, 15.40, 14.30, 13.40, 12.74]
+
+# CR-V 5G: measured from device rlogs (IMU yaw / vEgo, hands-off lat-active). Clarity's lock
+# endpoint (~12.7) undershoots CR-V (~14.6) and over-commands sharp turns.
+NRDR_CRV_5G_SR_CURVE_BP = [0.0, 50.0, 100.0, 150.0, 175.0, 200.0]
+NRDR_CRV_5G_SR_CURVE_V = [18.1, 17.8, 16.3, 15.3, 14.9, 14.6]
+NRDR_SR_CURVE_BY_FP = {
+  "HONDA_CRV_5G": (NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V),
+}
 
 
 CENTER_TAPER_FADE_TAU = 0.25
@@ -235,7 +244,9 @@ class LatControlPID(LatControl):
     self.params = Params()
     # 2D online lateral auto-tuner: bounded, gated, per-(speed, angle) learned FF trim. Off by default.
     self.tune_learner = TuneLearner(dt, self.steer_max)
-    # Steer ratio offset (live-tunable uniform shift of the SR curve; applied only when Learn Steer Ratio is off).
+    # Steer ratio: fingerprint curve (Clarity default, CR-V override) + live offset.
+    self.sr_curve_bp, self.sr_curve_v = NRDR_SR_CURVE_BY_FP.get(
+      CP.carFingerprint, (NRDR_SR_CURVE_BP, NRDR_SR_CURVE_V))
     self.sr_offset = 0.0
     self.learn_steer_ratio = False
     self.frame = -1
@@ -269,13 +280,11 @@ class LatControlPID(LatControl):
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
 
-    # nrdr: two-point angle-dependent steer ratio, keyed on measured wheel angle (stable; avoids
-    # the desired-angle circular dependency). sr_curve is force-cleared so any baked SR_ANGLE_CURVES
-    # cannot override this. Applied only when Learn Steer Ratio is off; when on, paramsd's learned
-    # scalar (set by controlsd each cycle) stands. Per-frame, so it can't compound.
+    # nrdr: measured SR(|angle|) curve (+ live offset), keyed on measured wheel angle.
+    # sr_curve force-cleared so baked SR_ANGLE_CURVES cannot override. Learn-off only.
     VM.sr_curve = None
     if not self.learn_steer_ratio:
-      VM.sR = float(np.interp(abs(CS.steeringAngleDeg), NRDR_SR_CURVE_BP, NRDR_SR_CURVE_V)) + self.sr_offset
+      VM.sR = float(np.interp(abs(CS.steeringAngleDeg), self.sr_curve_bp, self.sr_curve_v)) + self.sr_offset
 
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
