@@ -20,14 +20,14 @@ There are two different measurements in this report:
 Examples (run from the openpilot checkout on the device):
 
   # Instant: show the scalar currently persisted by paramsd.
-  ./steerratio_by_angle.py --cached
+  python3 steerratio_by_angle.py --cached
 
   # Fast historical check using the last 30 days of qlogs.
-  ./steerratio_by_angle.py --learned-only --log-type qlog --since-days 30 \
+  python3 steerratio_by_angle.py --learned-only --log-type qlog --since-days 30 \
     /data/media/0/realdata
 
   # Higher-rate VGR estimate from one or more deliberately curvy routes.
-  ./steerratio_by_angle.py --log-type rlog \
+  python3 steerratio_by_angle.py --log-type rlog \
     /data/media/0/realdata/<route>--*/rlog.zst
 
 Inputs may be local log files, directories, shell globs, route identifiers, or
@@ -69,7 +69,7 @@ def source_time(path: Path) -> datetime | None:
 
 
 def expand_sources(raw_sources: list[str], log_type: str, since: datetime | None) -> list[str]:
-  log_name = f"{log_type}log.zst"
+  log_name = f"{log_type}.zst"
   expanded: list[str] = []
 
   for raw in raw_sources:
