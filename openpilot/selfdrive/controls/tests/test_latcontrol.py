@@ -20,6 +20,26 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 
 class TestLatControl:
 
+  @parameterized.expand([
+    (HONDA.HONDA_CLARITY, "HONDA_CLARITY"),
+    (HONDA.HONDA_CRV_5G, "HONDA_CRV_5G"),
+    (HONDA.HONDA_CIVIC, None),
+  ])
+  def test_nrdr_steer_ratio_curve_is_fingerprint_scoped(self, car_name, expected_fingerprint):
+    CarInterface = interfaces[car_name]
+    CP = CarInterface.get_non_essential_params(car_name)
+    CP_SP = CarInterface.get_non_essential_params_sp(CP, car_name)
+    CI = CarInterface(CP, CP_SP)
+    sunnypilot_interfaces.setup_interfaces(CI)
+
+    controller = LatControlPID(CP.as_reader(), convert_to_capnp(CP_SP).as_reader(), CI, DT_CTRL)
+
+    if expected_fingerprint is None:
+      assert controller.sr_curve is None
+    else:
+      assert str(CP.carFingerprint) == expected_fingerprint
+      assert controller.sr_curve is not None
+
   @parameterized.expand([(HONDA.HONDA_CIVIC, LatControlPID), (TOYOTA.TOYOTA_RAV4, LatControlTorque),
                          (NISSAN.NISSAN_LEAF, LatControlAngle), (GM.CHEVROLET_BOLT_EUV, LatControlTorque)])
   def test_saturation(self, car_name, controller):

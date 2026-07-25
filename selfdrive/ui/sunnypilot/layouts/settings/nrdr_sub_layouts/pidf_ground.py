@@ -36,7 +36,7 @@ class PidfGroundLayout(Widget):
       param="NrdrSteerRatioOffset",
       title=lambda: tr("Steer Ratio Offset (Default: 0.00)"),
       min_value=-500, max_value=500, value_change_step=1,
-      description=lambda: tr("Shifts the whole measured steer-ratio curve up or down by this amount (higher = gentler / less turn-in everywhere, lower = sharper). Only applies when Learn Steer Ratio (Auto) is off; when on, the live-learned scalar is used."),
+      description=lambda: tr("Mapped VGR cars only: shifts the curve up (gentler) or down (sharper). Disabled while Auto steer ratio is on."),
       label_callback=lambda value: f"{value / 100:+.2f}",
       use_float_scaling=True,
     )
