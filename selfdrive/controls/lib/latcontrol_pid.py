@@ -14,20 +14,31 @@ from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
-# Measured effective steer-ratio curves, keyed explicitly by fingerprint.
+# Effective steer-ratio curves, keyed explicitly by fingerprint.
 #
 # paramsd estimates one near-center scalar (it only observes steering angles below
-# 45 degrees), so it cannot learn either rack's off-center taper. When steer-ratio
-# learning is disabled, these curves replace that scalar for the two measured VGR
+# 45 degrees), so it cannot learn a rack's off-center taper. When steer-ratio
+# learning is disabled, these curves replace that scalar for explicitly mapped VGR
 # cars only. Every other car keeps its normal CP.steerRatio behavior.
 NRDR_CLARITY_SR_CURVE_BP = [0., 6., 12., 20., 32., 48., 70., 100., 140., 200., 300., 450.]  # |wheel angle|, deg
 NRDR_CLARITY_SR_CURVE_V = [17.00, 17.00, 16.90, 16.84, 16.84, 16.72, 16.40, 15.94, 15.40, 14.30, 13.40, 12.74]
 
 NRDR_CRV_5G_SR_CURVE_BP = [0., 50., 100., 150., 175., 200.]
 NRDR_CRV_5G_SR_CURVE_V = [18.10, 17.80, 16.30, 15.30, 14.90, 14.60]
+
+# Model-corrected effective ratio from Peter's 10th-gen Civic Bosch telemetry.
+# The tail is strongly supported by repeatable left/right, cross-route samples;
+# the near-center anchor is intentionally conservative while paramsd convergence
+# and tire-stiffness-factor coverage are expanded.
+NRDR_CIVIC_BOSCH_SR_CURVE_BP = [0., 25., 50., 75., 100., 125., 150., 175., 200., 225., 250., 275.]
+NRDR_CIVIC_BOSCH_SR_CURVE_V = [15.25, 15.10, 14.60, 14.10, 13.75, 13.50, 13.25, 13.10, 13.00, 12.90, 12.75, 12.65]
+
 NRDR_SR_CURVE_BY_FP = {
   "HONDA_CLARITY": (NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V),
   "HONDA_CRV_5G": (NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V),
+  "HONDA_CIVIC_BOSCH": (NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V),
+  # Temporary 10th-gen family fallback until Nidec-specific telemetry is available.
+  "HONDA_CIVIC": (NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V),
 }
 
 
