@@ -23,7 +23,9 @@ class TestLatControl:
   @parameterized.expand([
     (HONDA.HONDA_CLARITY, "HONDA_CLARITY"),
     (HONDA.HONDA_CRV_5G, "HONDA_CRV_5G"),
-    (HONDA.HONDA_CIVIC, None),
+    (HONDA.HONDA_CIVIC_BOSCH, "HONDA_CIVIC_BOSCH"),
+    (HONDA.HONDA_CIVIC, "HONDA_CIVIC"),
+    (HONDA.HONDA_CIVIC_BOSCH_DIESEL, None),
   ])
   def test_nrdr_steer_ratio_curve_is_fingerprint_scoped(self, car_name, expected_fingerprint):
     CarInterface = interfaces[car_name]
