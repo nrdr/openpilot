@@ -43,12 +43,14 @@ import math
 from pathlib import Path
 import re
 import sys
+import time
 
 import numpy as np
 
 
 M_PER_MILE = 1609.344
 ROUTE_TIME_RE = re.compile(r"(\d{4}-\d{2}-\d{2}--\d{2}-\d{2}-\d{2})")
+SEGMENT_DIR_RE = re.compile(r"^(.*)--(\d+)$")
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -66,6 +68,22 @@ def source_time(path: Path) -> datetime | None:
     return datetime.fromtimestamp(path.stat().st_mtime)
   except OSError:
     return None
+
+
+def source_sort_key(source: str) -> tuple:
+  """Sort local segment logs by route and numeric segment, not --1/--10/--2."""
+  path = Path(source)
+  match = SEGMENT_DIR_RE.match(path.parent.name)
+  if match is not None:
+    return 0, match.group(1), int(match.group(2)), str(path)
+  return 1, source_time(path) or datetime.min, str(path)
+
+
+def format_duration(seconds: float) -> str:
+  seconds = max(int(seconds), 0)
+  hours, remainder = divmod(seconds, 3600)
+  minutes, seconds = divmod(remainder, 60)
+  return f"{hours:d}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:d}:{seconds:02d}"
 
 
 def expand_sources(raw_sources: list[str], log_type: str, since: datetime | None) -> list[str]:
@@ -91,7 +109,7 @@ def expand_sources(raw_sources: list[str], log_type: str, since: datetime | None
         expanded.append(candidate)
 
   # A repeated glob or overlapping directory should not scan a segment twice.
-  return list(dict.fromkeys(expanded))
+  return sorted(dict.fromkeys(expanded), key=source_sort_key)
 
 
 def print_cached_params() -> bool:
@@ -161,14 +179,17 @@ class SteerRatioReport:
     from openpilot.selfdrive.locationd.helpers import Pose, PoseCalibrator
     from openpilot.tools.lib.logreader import LogReader
 
-    print(f"Scanning {len(sources)} log source(s)...", file=sys.stderr)
+    print(f"Scanning {len(sources)} log source(s)...", file=sys.stderr, flush=True)
+    started = time.monotonic()
+    progress_interval = max(1, min(25, len(sources) // 20))
 
-    for source in sources:
+    for source_index, source in enumerate(sources, start=1):
       try:
         reader = LogReader(source, sort_by_time=True)
       except Exception as exc:
         self.files_failed += 1
         print(f"!! could not open {source}: {exc}", file=sys.stderr)
+        self.print_progress(source_index, len(sources), started, progress_interval)
         continue
 
       # State is reset per source so timestamps that restart between routes cannot
@@ -271,6 +292,26 @@ class SteerRatioReport:
       except Exception as exc:
         self.files_failed += 1
         print(f"!! failed while reading {source}: {exc}", file=sys.stderr)
+
+      self.print_progress(source_index, len(sources), started, progress_interval)
+
+  @staticmethod
+  def print_progress(completed: int, total: int, started: float, interval: int) -> None:
+    if completed != total and completed % interval != 0:
+      return
+    elapsed = time.monotonic() - started
+    rate = completed / elapsed if elapsed > 0.0 else 0.0
+    eta = (total - completed) / rate if rate > 0.0 else 0.0
+    progress = " | ".join((
+      f"Progress: {completed}/{total} ({100.0 * completed / total:.1f}%)",
+      f"elapsed {format_duration(elapsed)}",
+      f"ETA {format_duration(eta)}",
+    ))
+    print(
+      progress,
+      file=sys.stderr,
+      flush=True,
+    )
 
   def print_report(self) -> None:
     print("Log summary")
