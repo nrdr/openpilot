@@ -38,7 +38,7 @@ class LearnedParametersLayout(Widget):
     self._learn_steer_ratio = toggle_item_sp(
       param="NrdrLearnSteerRatio",
       title=lambda: tr("Learn Steer Ratio (Auto)"),
-      description=lambda: tr("When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. OFF by default: on VGR racks (measured SR curve cars) the scalar is redundant and its drift pollutes the angle-offset estimate."),
+      description=lambda: tr("On uses the learned near-center scalar. Off uses a mapped VGR curve when available, otherwise the car's static ratio."),
       initial_state=False,
     )
     self._lp_stiffness = ListItemSP(
