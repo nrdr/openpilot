@@ -1,0 +1,10 @@
+[
+  "system/athena/tests/test_registration.py::TestKonikRegistration::test_durable_konik_id_wins_over_factory_id",
+  "system/athena/tests/test_registration.py::TestKonikRegistration::test_factory_id_is_rejected_and_new_konik_id_is_persisted",
+  "system/athena/tests/test_registration.py::TestKonikRegistration::test_network_failure_keeps_params_id_without_persisting_it",
+  "system/athena/tests/test_registration.py::TestKonikRegistration::test_valid_params_id_is_migrated_to_durable_store",
+  "system/athena/tests/test_registration.py::TestRegistration::test_missing_cache",
+  "system/athena/tests/test_registration.py::TestRegistration::test_no_keys",
+  "system/athena/tests/test_registration.py::TestRegistration::test_unregistered",
+  "system/athena/tests/test_registration.py::TestRegistration::test_valid_cache"
+]
