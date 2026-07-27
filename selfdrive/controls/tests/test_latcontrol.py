@@ -30,11 +30,11 @@ class TestLatControl:
       assert all(left < right for left, right in zip(breakpoints[:-1], breakpoints[1:], strict=True))
       assert all(left >= right for left, right in zip(values[:-1], values[1:], strict=True))
 
-  def test_nrdr_clarity_raw_to_spec_hybrid(self):
-    assert NRDR_CLARITY_SR_CURVE_BP == [0., 6., 12., 20., 32., 48., 70., 100., 140., 200., 250., 300., 350., 400., 434., 450.]
+  def test_nrdr_clarity_center_midpoint_restores_original_tail(self):
+    assert NRDR_CLARITY_SR_CURVE_BP == [0., 6., 12., 20., 24., 26., 28., 30., 32., 34., 36., 38., 40., 48., 70., 100., 140., 200., 300., 450.]
     assert NRDR_CLARITY_SR_CURVE_V == [
-      19.68, 19.68, 19.68, 19.35, 19.15, 18.40, 17.60, 16.67,
-      16.19, 15.53, 15.28, 14.82, 13.84, 12.97, 12.74, 12.74,
+      18.340, 18.340, 18.290, 18.095, 18.062, 17.993, 17.843, 17.641, 17.418, 17.178,
+      16.978, 16.840, 16.780, 16.720, 16.400, 15.940, 15.400, 14.300, 13.400, 12.740,
     ]
 
   @parameterized.expand([
