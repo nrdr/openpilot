@@ -9,7 +9,12 @@ from opendbc.car.gm.values import CAR as GM
 from opendbc.car.vehicle_model import VehicleModel
 from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.car.helpers import convert_to_capnp
-from openpilot.selfdrive.controls.lib.latcontrol_pid import LatControlPID
+from openpilot.selfdrive.controls.lib.latcontrol_pid import (
+  LatControlPID,
+  NRDR_CLARITY_SR_CURVE_BP,
+  NRDR_CLARITY_SR_CURVE_V,
+  NRDR_SR_CURVE_BY_FP,
+)
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.selfdrive.controls.lib.latcontrol_angle import LatControlAngle
 from openpilot.selfdrive.locationd.helpers import Pose
@@ -18,6 +23,19 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 
 
 class TestLatControl:
+
+  def test_nrdr_steer_ratio_curves_are_well_formed(self):
+    for breakpoints, values in NRDR_SR_CURVE_BY_FP.values():
+      assert len(breakpoints) == len(values)
+      assert all(left < right for left, right in zip(breakpoints[:-1], breakpoints[1:], strict=True))
+      assert all(left >= right for left, right in zip(values[:-1], values[1:], strict=True))
+
+  def test_nrdr_clarity_raw_to_spec_hybrid(self):
+    assert NRDR_CLARITY_SR_CURVE_BP == [0., 6., 12., 20., 32., 48., 70., 100., 140., 200., 250., 300., 350., 400., 434., 450.]
+    assert NRDR_CLARITY_SR_CURVE_V == [
+      19.68, 19.68, 19.68, 19.35, 19.15, 18.40, 17.60, 16.67,
+      16.19, 15.53, 15.28, 14.82, 13.84, 12.97, 12.74, 12.74,
+    ]
 
   @parameterized.expand([
     (HONDA.HONDA_CLARITY, "HONDA_CLARITY"),

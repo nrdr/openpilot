@@ -20,8 +20,14 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 # 45 degrees), so it cannot learn a rack's off-center taper. When steer-ratio
 # learning is disabled, these curves replace that scalar for explicitly mapped VGR
 # cars only. Every other car keeps its normal CP.steerRatio behavior.
-NRDR_CLARITY_SR_CURVE_BP = [0., 6., 12., 20., 32., 48., 70., 100., 140., 200., 300., 450.]  # |wheel angle|, deg
-NRDR_CLARITY_SR_CURVE_V = [17.00, 17.00, 16.90, 16.84, 16.84, 16.72, 16.40, 15.94, 15.40, 14.30, 13.40, 12.74]
+# Experimental raw-to-spec Clarity hybrid. Through 250 degrees the knots are a
+# monotonic smoothing of the raw dynamic angle bins (19.68 on center, 15.28 in
+# the last well-populated bin). From there a smoothstep-shaped fade reaches the
+# published 12.74 ratio at the ~434-degree physical lock and holds through the
+# 450-degree interpolation pad. This intentionally tests the raw rather than the
+# model-corrected near-center estimate.
+NRDR_CLARITY_SR_CURVE_BP = [0., 6., 12., 20., 32., 48., 70., 100., 140., 200., 250., 300., 350., 400., 434., 450.]  # |wheel angle|, deg
+NRDR_CLARITY_SR_CURVE_V = [19.68, 19.68, 19.68, 19.35, 19.15, 18.40, 17.60, 16.67, 16.19, 15.53, 15.28, 14.82, 13.84, 12.97, 12.74, 12.74]
 
 NRDR_CRV_5G_SR_CURVE_BP = [0., 50., 100., 150., 175., 200.]
 NRDR_CRV_5G_SR_CURVE_V = [18.10, 17.80, 16.30, 15.30, 14.90, 14.60]
