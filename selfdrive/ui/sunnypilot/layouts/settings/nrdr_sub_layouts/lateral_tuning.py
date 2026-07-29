@@ -2,7 +2,7 @@
 nrdr Lateral Tuning hub.
 
 Top of the lateral menu tree: Tune Report + Car & Tune Info, then nav buttons into
-the lateral sub-panels (PID/F Tuning Ground, Unwind Helpers, Override Tuning,
+the lateral sub-panels (Controller Tuning Dungeon, Unwind Helpers, Override Tuning,
 Steer Filters, Ford Lateral Tuning).
 """
 import datetime
@@ -15,6 +15,7 @@ from enum import IntEnum
 import pyray as rl
 
 from cereal import car
+from opendbc.car.car_helpers import interfaces
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
@@ -243,17 +244,32 @@ class LateralTuningLayout(Widget):
     lines.append(f"radar messages used: {str(not CP.radarUnavailable).lower()}")
     lines.append("")
 
-    # Lateral tuning (interface.py values, as actually loaded for this car)
+    # Lateral tuning (interface.py values, as actually loaded for this car). The
+    # Clarity serializes Torque at runtime for NNLC, so reconstruct the unmodified
+    # per-car PID profile exactly as the hybrid controller does.
     try:
-      which = CP.lateralTuning.which()
-      if which == "pid":
-        pid = CP.lateralTuning.pid
-        lines.append("<b>" + tr("LATERAL PID") + "</b>")
+      pid_source = CP
+      hybrid_base = False
+      if CP.lateralTuning.which() != "pid":
+        CarInterface = interfaces[CP.carFingerprint]
+        reconstructed = CarInterface.get_non_essential_params(CP.carFingerprint)
+        CarInterface.get_non_essential_params_sp(reconstructed, CP.carFingerprint)
+        if reconstructed.lateralTuning.which() == "pid":
+          pid_source = reconstructed
+          hybrid_base = True
+
+      if pid_source.lateralTuning.which() == "pid":
+        pid = pid_source.lateralTuning.pid
+        heading = tr("LATERAL PID (HYBRID BASE)") if hybrid_base else tr("LATERAL PID")
+        lines.append("<b>" + heading + "</b>")
         lines.append(f"kp: [{self._fmt_vals(pid.kpV)}] @ [{self._fmt_bp_mph(pid.kpBP)}] mph")
         lines.append(f"ki: [{self._fmt_vals(pid.kiV)}] @ [{self._fmt_bp_mph(pid.kiBP)}] mph")
-        lines.append(f"kf: {float(pid.kf):g}")
+        if len(pid.kfV):
+          lines.append(f"kf: [{self._fmt_vals(pid.kfV)}] @ [{self._fmt_bp_mph(pid.kfBP)}] mph")
+        else:
+          lines.append(f"kf: {float(pid.kf):g}")
       else:
-        lines.append(tr("Lateral tuning type: {} (not PID)").format(which))
+        lines.append(tr("Lateral tuning type: {} (not PID)").format(CP.lateralTuning.which()))
     except Exception:
       lines.append(tr("Lateral tuning: unavailable"))
     lines.append("")
@@ -308,7 +324,7 @@ class LateralTuningLayout(Widget):
     )
 
     self._pidf_button = simple_button_item_sp(
-      button_text=lambda: tr("PID/F Tuning Ground"),
+      button_text=lambda: tr("Controller Tuning Dungeon"),
       button_width=800,
       callback=lambda: self._set_panel(LateralPanel.PIDF),
     )

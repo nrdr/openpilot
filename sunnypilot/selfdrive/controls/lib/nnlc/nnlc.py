@@ -11,8 +11,9 @@ import numpy as np
 from opendbc.car.lateral import FRICTION_THRESHOLD, get_friction
 from opendbc.sunnypilot.car.interfaces import LatControlInputs
 from opendbc.sunnypilot.car.lateral_ext import get_friction as get_friction_in_torque_space
+from openpilot.common.constants import CV
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.common.params import Params
+from openpilot.common.params import Params, UnknownKeyName
 from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.common.realtime import DT_CTRL
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext_base import LatControlTorqueExtBase, sign
@@ -21,6 +22,8 @@ from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.model import NNTorqueModel
 
 LOW_SPEED_X = [0, 10, 20, 30]
 LOW_SPEED_Y = [12, 3, 1, 0]
+NNLC_SETTINGS_REFRESH_FRAMES = 100
+NNLC_DEFAULT_ACTIVATION_SPEED_MPH = 30.0
 
 
 # At a given roll, if pitch magnitude increases, the
@@ -36,7 +39,11 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
   def __init__(self, lac_torque, CP, CP_SP, CI):
     super().__init__(lac_torque, CP, CP_SP, CI)
     self.params = Params()
-    self.enabled = self.params.get_bool("NeuralNetworkLateralControl") or is_nnlc_forced(CP)
+    self._base_enabled = self.params.get_bool("NeuralNetworkLateralControl") or is_nnlc_forced(CP)
+    self.enabled = False
+    self.activation_speed_mps = NNLC_DEFAULT_ACTIVATION_SPEED_MPH * CV.MPH_TO_MS
+    self._settings_frame = 0
+    self._refresh_nrdr_settings()
     self.has_nn_model = CP_SP.neuralNetworkLateralControl.model.path != MOCK_MODEL_PATH
 
     # NN model takes current v_ego, lateral_accel, lat accel/jerk error, roll, and past/future/planned data
@@ -60,6 +67,49 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
     self.error_deque = deque(maxlen=history_check_frames[0])
     self.past_future_len = len(self.past_times) + len(self.nn_future_times)
     self._prev_kappa = 0.0  # for curvature-rate feature on the 12-feat C120 model
+
+  def _read_bool(self, key: str, default: bool) -> bool:
+    try:
+      return default if self.params.get(key) is None else self.params.get_bool(key)
+    except UnknownKeyName:
+      return default
+
+  def _read_percent(self, key: str, default: float) -> float:
+    try:
+      value = self.params.get(key)
+    except UnknownKeyName:
+      value = None
+    try:
+      return float(default if value is None else value) / 100.0
+    except (TypeError, ValueError):
+      return default / 100.0
+
+  def _read_activation_speed(self) -> float:
+    try:
+      value = self.params.get("NrdrNnlcActivationSpeed")
+    except UnknownKeyName:
+      value = None
+    try:
+      return float(NNLC_DEFAULT_ACTIVATION_SPEED_MPH if value is None else value)
+    except (TypeError, ValueError):
+      return NNLC_DEFAULT_ACTIVATION_SPEED_MPH
+
+  def _refresh_nrdr_settings(self) -> None:
+    """Refresh remote/device NNLC knobs without reconstructing the controller."""
+    was_enabled = self.enabled
+    self.enabled = self._base_enabled and self._read_bool("NrdrNnlcEnabled", True)
+    if was_enabled and not self.enabled:
+      # Never leave a hidden integral/output charge waiting for a later live re-enable.
+      self._nnlc_pid.reset()
+    activation_mph = float(np.clip(self._read_activation_speed(), 0.0, 100.0))
+    self.activation_speed_mps = activation_mph * CV.MPH_TO_MS
+
+    kp = float(np.clip(self._read_percent("NrdrNnlcKpGain", 100.0), 0.0, 3.0))
+    kf = float(np.clip(self._read_percent("NrdrNnlcKfGain", 50.0), 0.0, 3.0))
+    ki = float(np.clip(self._read_percent("NrdrNnlcKiGain", 10.0), 0.0, 3.0))
+    self._nnlc_pid._k_p = [[0.0], [kp]]
+    self._nnlc_pid.k_f = kf
+    self._nnlc_pid._k_i = [[0.0], [ki]]
 
   @property
   def _nnlc_enabled(self):
@@ -94,6 +144,10 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
                                                 freeze_integrator=freeze_integrator)
 
   def update_neural_network_feedforward(self, CS, params, calibrated_pose) -> None:
+    if self._settings_frame % NNLC_SETTINGS_REFRESH_FRAMES == 0:
+      self._refresh_nrdr_settings()
+    self._settings_frame += 1
+
     if not self._nnlc_enabled:
       return
 

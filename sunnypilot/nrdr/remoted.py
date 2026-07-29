@@ -165,15 +165,8 @@ def run_tune_scan(params) -> None:
   _set_status(params, "scan: done " + time.strftime("%H:%M") + suffix)
 
 
-def _fmt_vals(vals) -> str:
-  return "[" + ", ".join(f"{float(v):g}" for v in vals) + "]"
-
-
 def write_car_tune_info(params, cache: dict) -> None:
-  """Publish a compact 'Car & Tune Info' readout to NrdrCarTuneInfo for the Sunnylink info row -
-  the same facts as the on-device modal: fingerprint, EPS firmware, gas interceptor, radar, and
-  the lateral/longitudinal kp/ki/kf loaded for this car. Static per drive, so only written when
-  it changes (best-effort; a missing key on an un-rebuilt params lib just no-ops)."""
+  """Publish a single-line profile summary that fits Sunnylink's info-row layout."""
   try:
     cp_bytes = params.get("CarParamsPersistent") or params.get("CarParams")
     if not cp_bytes:
@@ -186,21 +179,11 @@ def write_car_tune_info(params, cache: dict) -> None:
       if cp_sp_bytes:
         cp_sp = messaging.log_from_bytes(cp_sp_bytes, custom.CarParamsSP)
         interceptor = str(bool(cp_sp.enableGasInterceptor)).lower()
-      parts = [str(CP.carFingerprint),
-               f"EPS firmware: {eps}",
-               f"gas pedal interceptor: {interceptor}",
-               f"radar messages used: {str(not CP.radarUnavailable).lower()}"]
-      if CP.lateralTuning.which() == "pid":
-        p = CP.lateralTuning.pid
-        parts.append(f"lat kp/ki/kf: {_fmt_vals(p.kpV)}/{_fmt_vals(p.kiV)}/{float(p.kf):g}")
-      lt = CP.longitudinalTuning
-      long_part = f"long kp/ki: {_fmt_vals(lt.kpV)}/{_fmt_vals(lt.kiV)}"
-      try:
-        long_part += f"/kf {float(lt.kf):g}"
-      except Exception:
-        pass
-      parts.append(long_part)
-      info = "  ·  ".join(parts)
+      eps_short = eps.rsplit(",", 1)[-1].strip() if "," in eps else eps
+      controller = "PID/NNLC" if str(CP.carFingerprint) == "HONDA_CLARITY" else CP.lateralTuning.which().upper()
+      gas = "gas" if interceptor == "true" else "no gas"
+      radar = "radar" if not CP.radarUnavailable else "no radar"
+      info = " | ".join((str(CP.carFingerprint), f"EPS {eps_short}", gas, radar, controller))
   except Exception:
     cloudlog.exception("nrdr_remoted: failed to build car/tune info")
     return

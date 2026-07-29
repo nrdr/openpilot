@@ -15,7 +15,8 @@ LAT_PLAN_MIN_IDX = 5
 LATERAL_LAG_MOD = 0.0  # seconds, modifies how far in the future we look ahead for the lateral plan
 
 KP = 1.0
-KI = 0.3
+KI = 0.1
+KF = 0.5
 
 
 def get_predicted_lateral_jerk(lat_accels, t_diffs):
@@ -64,7 +65,7 @@ class LatControlTorqueExtBase:
     # NNLC owns its feedback controller. Do not reuse the outer Torque controller's
     # speed-interpolated PID: nnlc.py already supplies its own low-speed curvature
     # compensation, and stacking both low-speed strategies destabilizes the loop.
-    self._nnlc_pid = PIDController(KP, KI, pos_limit=lac_torque.steer_max, neg_limit=-lac_torque.steer_max)
+    self._nnlc_pid = PIDController(KP, KI, k_f=KF, pos_limit=lac_torque.steer_max, neg_limit=-lac_torque.steer_max)
     self._pid_log = None
     self._setpoint = 0.0
     self._measurement = 0.0

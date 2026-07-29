@@ -52,6 +52,7 @@ NRDR_DEFAULT_BOOL_PARAMS = {
   # nrdr lateral
   "HondaTorqueLowPassFilter": True,
   "HondaUnwindLookahead": True,
+  "NrdrNnlcEnabled": True,
 
   # Visuals
   "RocketFuel": True,
@@ -79,6 +80,10 @@ NRDR_DEFAULT_VALUE_PARAMS = {
 
   # Steering
   "AutoLaneChangeTimer": 1,
+  "NrdrNnlcActivationSpeed": 30,
+  "NrdrNnlcKpGain": 100,
+  "NrdrNnlcKfGain": 50,
+  "NrdrNnlcKiGain": 10,
 
   # Longitudinal
   "LongitudinalPersonality": 3,  # 0 aggressive, 1 standard, 2 relaxed, 3 econ

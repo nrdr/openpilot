@@ -45,10 +45,17 @@ class TestNNTorqueModel:
 
   def test_clarity_forces_torque_and_exact_nnlc_model_with_global_toggles_off(self):
     params = Params()
-    previous = {key: params.get(key) for key in ("EnforceTorqueControl", "NeuralNetworkLateralControl")}
+    keys = ("EnforceTorqueControl", "NeuralNetworkLateralControl", "NrdrNnlcEnabled",
+            "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain")
+    previous = {key: params.get(key) for key in keys}
     try:
       params.put_bool("EnforceTorqueControl", False, block=True)
       params.put_bool("NeuralNetworkLateralControl", False, block=True)
+      params.put_bool("NrdrNnlcEnabled", True, block=True)
+      params.put("NrdrNnlcActivationSpeed", 30, block=True)
+      params.put("NrdrNnlcKpGain", 100, block=True)
+      params.put("NrdrNnlcKfGain", 50, block=True)
+      params.put("NrdrNnlcKiGain", 10, block=True)
 
       CarInterface = interfaces[HONDA.HONDA_CLARITY]
       CP = CarInterface.get_non_essential_params(HONDA.HONDA_CLARITY)
@@ -82,8 +89,32 @@ class TestNNTorqueModel:
       assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_i[1], [0.012, 0.016, 0.020], strict=True))
       assert controller.extension.enabled
       assert controller.extension.has_nn_model
+      assert abs(controller.extension.activation_speed_mps - 30.0 * CV.MPH_TO_MS) < 1e-6
+      assert controller.extension._nnlc_pid.k_p == 1.0
+      assert controller.extension._nnlc_pid.k_f == 0.5
+      assert controller.extension._nnlc_pid.k_i == 0.1
       controller.torque_controller.extension.model_valid = True
       assert controller.extension._nnlc_enabled
+
+      # All new Sunnylink/device controls are live; refreshing them must not require
+      # reconstructing the controller or resetting either integrator.
+      params.put("NrdrNnlcActivationSpeed", 50, block=True)
+      params.put("NrdrNnlcKpGain", 125, block=True)
+      params.put("NrdrNnlcKfGain", 60, block=True)
+      params.put("NrdrNnlcKiGain", 15, block=True)
+      controller.extension._refresh_nrdr_settings()
+      assert abs(controller.extension.activation_speed_mps - 50.0 * CV.MPH_TO_MS) < 1e-6
+      assert controller.extension._nnlc_pid.k_p == 1.25
+      assert controller.extension._nnlc_pid.k_f == 0.6
+      assert controller.extension._nnlc_pid.k_i == 0.15
+      controller.extension._nnlc_pid.i = 0.2
+      params.put_bool("NrdrNnlcEnabled", False, block=True)
+      controller.extension._refresh_nrdr_settings()
+      assert not controller.extension.enabled
+      assert controller.extension._nnlc_pid.i == 0.0
+      params.put_bool("NrdrNnlcEnabled", True, block=True)
+      controller.extension._refresh_nrdr_settings()
+      assert controller.extension.enabled
 
       # PID runs first even while Torque/NNLC is the serialized tuning type, so
       # its Clarity VGR curve is also used for NNLC's actual-curvature measurement.
@@ -110,6 +141,10 @@ class TestNNTorqueModel:
     assert clarity_nnlc_blend_target(26.0 * CV.MPH_TO_MS, log.LaneChangeState.off) == 0.0
     assert abs(clarity_nnlc_blend_target(30.0 * CV.MPH_TO_MS, log.LaneChangeState.off) - 0.5) < 1e-6
     assert clarity_nnlc_blend_target(34.0 * CV.MPH_TO_MS, log.LaneChangeState.off) == 1.0
+    assert clarity_nnlc_blend_target(46.0 * CV.MPH_TO_MS, log.LaneChangeState.off, 50.0 * CV.MPH_TO_MS) == 0.0
+    assert abs(clarity_nnlc_blend_target(50.0 * CV.MPH_TO_MS, log.LaneChangeState.off,
+                                         50.0 * CV.MPH_TO_MS) - 0.5) < 1e-6
+    assert clarity_nnlc_blend_target(54.0 * CV.MPH_TO_MS, log.LaneChangeState.off, 50.0 * CV.MPH_TO_MS) == 1.0
 
     for lane_change_state in (log.LaneChangeState.preLaneChange, log.LaneChangeState.laneChangeStarting,
                               log.LaneChangeState.laneChangeFinishing):
