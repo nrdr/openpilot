@@ -101,6 +101,11 @@ class TestNNTorqueModel:
                               log.LaneChangeState.laneChangeFinishing):
       assert clarity_nnlc_blend_target(70.0 * CV.MPH_TO_MS, lane_change_state) == 0.0
 
+    controller = LatControlClarityHybrid.__new__(LatControlClarityHybrid)
+    controller.dt = DT_CTRL
+    controller.nnlc_blend = 1.0
+    assert controller._update_blend(True, 0.0, log.LaneChangeState.preLaneChange) == 0.0
+
   def test_hidden_global_toggles_do_not_force_other_hondas(self):
     params = Params()
     previous = {key: params.get(key) for key in ("EnforceTorqueControl", "NeuralNetworkLateralControl")}
