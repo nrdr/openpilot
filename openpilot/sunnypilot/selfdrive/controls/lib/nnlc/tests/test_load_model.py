@@ -72,6 +72,14 @@ class TestNNTorqueModel:
       assert isinstance(controller, LatControlClarityHybrid)
       assert isinstance(controller.torque_controller, LatControlTorqueV0)
       assert controller.pid_controller.sr_curve is not None
+      assert len(controller.pid_controller.pid._k_p[0]) == len(controller.pid_controller.pid._k_p[1]) == 3
+      assert len(controller.pid_controller.pid._k_i[0]) == len(controller.pid_controller.pid._k_i[1]) == 3
+      assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_p[0],
+                                                    [0.0, 25.0 * CV.MPH_TO_MS, 50.0 * CV.MPH_TO_MS], strict=True))
+      assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_p[1], [0.036, 0.048, 0.060], strict=True))
+      assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_i[0],
+                                                    [0.0, 25.0 * CV.MPH_TO_MS, 50.0 * CV.MPH_TO_MS], strict=True))
+      assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_i[1], [0.012, 0.016, 0.020], strict=True))
       assert controller.extension.enabled
       assert controller.extension.has_nn_model
       controller.torque_controller.extension.model_valid = True
@@ -85,6 +93,12 @@ class TestNNTorqueModel:
       live_params = log.LiveParametersData.new_message()
       controller.update(False, CS, VM, live_params, False, 0.0, None, False, 0.2)
       assert abs(VM.sR - 15.94) < 1e-6
+
+      # Exercise the real PID interpolation while active. The hybrid previously
+      # passed this test only because inactive control never called PIDController.update().
+      controller.torque_controller.extension.model_valid = False
+      CS.vEgo = 10.0 * CV.MPH_TO_MS
+      controller.update(True, CS, VM, live_params, False, 0.0, None, False, 0.2)
     finally:
       for key, value in previous.items():
         if value is None:

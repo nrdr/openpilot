@@ -55,6 +55,12 @@ class LatControlClarityHybrid(LatControl):
     # controlsd starts. Recreate the unmodified per-car parameters solely for the
     # parallel PID controller; this retains the Clarity PID tune and VGR curve.
     pid_cp = CI.get_non_essential_params(CP.carFingerprint)
+    # Honda's nrdr PID tune is applied from _get_params_sp(), which also mutates
+    # the stock CarParams passed to it. get_non_essential_params() alone leaves
+    # the upstream one-point gain values paired with nrdr's three breakpoints.
+    # Re-run the SP pass so PID receives the exact tune used before setup_interfaces
+    # replaces the runtime lateralTuning union with Torque.
+    CI.get_non_essential_params_sp(pid_cp, CP.carFingerprint)
     if pid_cp.lateralTuning.which() != "pid":
       raise RuntimeError(f"Clarity hybrid expected PID defaults, got {pid_cp.lateralTuning.which()}")
 
