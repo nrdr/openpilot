@@ -170,7 +170,12 @@ class TestTorqueOptionGeneration:
     assert versions, "latcontrol_torque_versions.json must have at least one version"
     expected = _build_torque_options(versions)
     item = _find_item(schema, "TorqueControlTune")
-    assert item is not None, "TorqueControlTune item must be present"
+    if item is None:
+      # nrdr intentionally hides the global Torque/NNLC controls. The Clarity
+      # uses its fingerprint-scoped PID/NNLC hybrid and exposes only its safe knobs.
+      assert _find_item(schema, "EnforceTorqueControl") is None
+      assert _find_item(schema, "NrdrNnlcEnabled") is not None
+      return
     assert item.get("options") == expected
 
   def test_torque_versions_path_resolves(self):

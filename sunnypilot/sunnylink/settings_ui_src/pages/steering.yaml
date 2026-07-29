@@ -168,8 +168,38 @@ sections:
     items:
     - key: NrdrCarTuneInfo
       widget: info
-      title: Profile
-      details: Compact fingerprint, EPS, hardware, and active-controller summary written by the device. The full PID and longitudinal tune remains available from Car & Tune Info on the device.
+      title: Loaded Profile
+      details: Live vehicle, controller, base-tune, geometry, and tuning-knob details are written here by the device.
+    - key: NrdrCarControllerInfo
+      widget: info
+      title: Controller
+    - key: NrdrCarPidLowInfo
+      widget: info
+      title: PID Low
+    - key: NrdrCarPidMidInfo
+      widget: info
+      title: PID Mid
+    - key: NrdrCarPidHighInfo
+      widget: info
+      title: PID Hwy
+    - key: NrdrCarDampingInfo
+      widget: info
+      title: Damping
+    - key: NrdrCarCenterInfo
+      widget: info
+      title: Center
+    - key: NrdrCarNnlcInfo
+      widget: info
+      title: NNLC
+    - key: NrdrCarSteerRatioInfo
+      widget: info
+      title: Steer Ratio
+    - key: NrdrCarLearningInfo
+      widget: info
+      title: Learning
+    - key: NrdrCarHelpersInfo
+      widget: info
+      title: Helpers
   - id: nrdr_pidf_ground
     label: Controller Tuning Dungeon
     trigger_key: null

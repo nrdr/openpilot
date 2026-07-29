@@ -343,6 +343,17 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrRemoteStatus", {CLEAR_ON_MANAGER_START, STRING, "idle"}},  // remote action status line shown on the website
     {"NrdrTuneReportSummary", {PERSISTENT, STRING, ""}},             // per-speed summary table from the last tune scan
     {"NrdrCarTuneInfo", {PERSISTENT, STRING, ""}},                   // Car & Tune Info readout for the Sunnylink info row (written by nrdr_remoted)
+    {"NrdrCarTuneDetails", {PERSISTENT, STRING, ""}},                // multiline live data injected into the Sunnylink Profile info modal
+    {"NrdrCarControllerInfo", {PERSISTENT, STRING, ""}},             // concise read-only Controller row in Sunnylink Car & Tune Info
+    {"NrdrCarPidLowInfo", {PERSISTENT, STRING, ""}},                 // concise read-only low-speed PID scale row
+    {"NrdrCarPidMidInfo", {PERSISTENT, STRING, ""}},                 // concise read-only standard-speed PID scale row
+    {"NrdrCarPidHighInfo", {PERSISTENT, STRING, ""}},                // concise read-only highway PID scale row
+    {"NrdrCarDampingInfo", {PERSISTENT, STRING, ""}},                // concise read-only rate-damping row
+    {"NrdrCarCenterInfo", {PERSISTENT, STRING, ""}},                 // concise read-only center-boost row
+    {"NrdrCarNnlcInfo", {PERSISTENT, STRING, ""}},                   // concise read-only NNLC settings row
+    {"NrdrCarSteerRatioInfo", {PERSISTENT, STRING, ""}},             // concise read-only steer-ratio settings row
+    {"NrdrCarLearningInfo", {PERSISTENT, STRING, ""}},               // concise read-only live-learning settings row
+    {"NrdrCarHelpersInfo", {PERSISTENT, STRING, ""}},                // concise read-only stiction/StarPilot row
     {"NrdrStarPilotPid", {PERSISTENT | BACKUP, BOOL, "0"}},          // borrowed StarPilot _pid_output_scale (center boost + turn-in/per-direction scaling); 0 = clean PID/F + D
     {"NrdrNnlcEnabled", {PERSISTENT | BACKUP, BOOL, "1"}},            // Clarity hybrid: allow the NNLC half of the controller (OFF = PID only)
     {"NrdrNnlcActivationSpeed", {PERSISTENT | BACKUP, INT, "30"}},    // mph; center of the smooth PID -> NNLC speed handoff

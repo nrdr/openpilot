@@ -25,6 +25,7 @@ import subprocess
 import time
 
 from cereal import car, custom, messaging
+from opendbc.car.car_helpers import interfaces
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
@@ -165,8 +166,28 @@ def run_tune_scan(params) -> None:
   _set_status(params, "scan: done " + time.strftime("%H:%M") + suffix)
 
 
+def _fmt_vals(vals) -> str:
+  return "/".join(f"{float(value):g}" for value in vals)
+
+
+def _param(params, key):
+  return params.get(key, return_default=True)
+
+
+def _on(params, key) -> str:
+  return "ON" if bool(_param(params, key)) else "OFF"
+
+
+def _write_cached(params, cache: dict, values: dict[str, str]) -> None:
+  for key, value in values.items():
+    if value == cache.get(key):
+      continue
+    params.put(key, value)
+    cache[key] = value
+
+
 def write_car_tune_info(params, cache: dict) -> None:
-  """Publish a single-line profile summary that fits Sunnylink's info-row layout."""
+  """Publish a live, screenshot-friendly controller/tune report to Sunnylink."""
   try:
     cp_bytes = params.get("CarParamsPersistent") or params.get("CarParams")
     if not cp_bytes:
@@ -184,15 +205,103 @@ def write_car_tune_info(params, cache: dict) -> None:
       gas = "gas" if interceptor == "true" else "no gas"
       radar = "radar" if not CP.radarUnavailable else "no radar"
       info = " | ".join((str(CP.carFingerprint), f"EPS {eps_short}", gas, radar, controller))
+
+      pid_source = CP
+      if CP.lateralTuning.which() != "pid":
+        CarInterface = interfaces[CP.carFingerprint]
+        reconstructed = CarInterface.get_non_essential_params(CP.carFingerprint)
+        CarInterface.get_non_essential_params_sp(reconstructed, CP.carFingerprint)
+        if reconstructed.lateralTuning.which() == "pid":
+          pid_source = reconstructed
+
+      if pid_source.lateralTuning.which() == "pid":
+        pid = pid_source.lateralTuning.pid
+        pid_base = f"P {_fmt_vals(pid.kpV)} | I {_fmt_vals(pid.kiV)}"
+        pid_ff = (_fmt_vals([float(value) * 1e6 for value in pid.kfV]) + " x10^-6"
+                  if len(pid.kfV) else f"{float(pid.kf):g}")
+      else:
+        pid_base = f"{CP.lateralTuning.which().upper()} (no PID base)"
+        pid_ff = "n/a"
+
+      lt = CP.longitudinalTuning
+      long_base = f"P {_fmt_vals(lt.kpV)} | I {_fmt_vals(lt.kiV)}"
+      try:
+        long_base += f" | F {float(lt.kf):g}"
+      except Exception:
+        pass
+
+      p_low, i_low, f_low = (_param(params, key) for key in ("LatPScaleLowSpeed", "LatIScaleLowSpeed", "LatFScaleLowSpeed"))
+      p_mid, i_mid, f_mid = (_param(params, key) for key in ("LatPScaleStandard", "LatIScaleStandard", "LatFScaleStandard"))
+      p_high, i_high, f_high = (_param(params, key) for key in ("LatPScaleHighway", "LatIScaleHighway", "LatFScaleHighway"))
+      damping, damping_speed = _param(params, "NrdrLatRateDamping"), _param(params, "NrdrLatRateDampingFadeSpeed")
+      center = float(_param(params, "HondaCenterScale")) * 100.0
+      center_threshold = float(_param(params, "HondaCenterBoostThreshold"))
+      center_speed = _param(params, "HondaCenterBoostMinSpeed")
+      nnlc_speed = _param(params, "NrdrNnlcActivationSpeed")
+      nnlc_kp = float(_param(params, "NrdrNnlcKpGain")) / 100.0
+      nnlc_kf = float(_param(params, "NrdrNnlcKfGain")) / 100.0
+      nnlc_ki = float(_param(params, "NrdrNnlcKiGain")) / 100.0
+      sr_offset = float(_param(params, "NrdrSteerRatioOffset"))
+      nnlc_on = _on(params, "NrdrNnlcEnabled")
+      controller_info = controller
+      if controller == "PID/NNLC":
+        controller_info = "PID/NNLC hybrid | PID for lane changes" if nnlc_on == "ON" else "PID only | NNLC disabled"
+
+      rows = {
+        "NrdrCarTuneInfo": info,
+        "NrdrCarControllerInfo": controller_info,
+        "NrdrCarPidLowInfo": f"P {p_low}% | I {i_low}% | F {f_low}%",
+        "NrdrCarPidMidInfo": f"P {p_mid}% | I {i_mid}% | F {f_mid}%",
+        "NrdrCarPidHighInfo": f"P {p_high}% | I {i_high}% | F {f_high}%",
+        "NrdrCarDampingInfo": f"{damping}% | fades by {damping_speed} mph",
+        "NrdrCarCenterInfo": f"{center:g}% | +/-{center_threshold:g} deg | above {center_speed} mph",
+        "NrdrCarNnlcInfo": f"{nnlc_on} | {nnlc_speed} mph | KP {nnlc_kp:g} | KF {nnlc_kf:g} | KI {nnlc_ki:g}",
+        "NrdrCarSteerRatioInfo": f"Auto {_on(params, 'NrdrLearnSteerRatio')} | offset {sr_offset:+.2f}",
+        "NrdrCarLearningInfo": f"stiffness {_on(params, 'NrdrLearnStiffness')} | angle {_on(params, 'NrdrLearnAngleOffset')}",
+        "NrdrCarHelpersInfo": f"stiction {_on(params, 'NrdrLatStiction')} | StarPilot {_on(params, 'NrdrStarPilotPid')}",
+      }
+
+      details = "\n".join((
+        "VEHICLE",
+        f"Fingerprint: {CP.carFingerprint}",
+        f"EPS firmware: {eps}",
+        f"Gas pedal interceptor: {interceptor}",
+        f"Radar messages used: {str(not CP.radarUnavailable).lower()}",
+        "",
+        "CONTROLLER",
+        rows["NrdrCarControllerInfo"],
+        f"NNLC: {rows['NrdrCarNnlcInfo']}",
+        "",
+        "LATERAL PID BASE (0 / 25 / 50 mph)",
+        pid_base,
+        f"F {pid_ff}",
+        "",
+        "LIVE TUNING KNOBS",
+        f"PID low: {rows['NrdrCarPidLowInfo']}",
+        f"PID mid: {rows['NrdrCarPidMidInfo']}",
+        f"PID highway: {rows['NrdrCarPidHighInfo']}",
+        f"Damping: {rows['NrdrCarDampingInfo']}",
+        f"Center: {rows['NrdrCarCenterInfo']}",
+        f"Steer ratio: {rows['NrdrCarSteerRatioInfo']}",
+        f"Learning: {rows['NrdrCarLearningInfo']}",
+        f"Helpers: {rows['NrdrCarHelpersInfo']}",
+        "",
+        "LONGITUDINAL PID",
+        long_base,
+        "",
+        "GEOMETRY",
+        f"Steer ratio base: {float(CP.steerRatio):g}",
+        f"Actuator delay: {float(CP.steerActuatorDelay):g} s",
+        f"Wheelbase: {float(CP.wheelbase):g} m | mass: {float(CP.mass):.0f} kg",
+      ))
+      rows["NrdrCarTuneDetails"] = details
   except Exception:
     cloudlog.exception("nrdr_remoted: failed to build car/tune info")
     return
-  if info != cache.get("car_tune_info"):
-    try:
-      params.put("NrdrCarTuneInfo", info)
-      cache["car_tune_info"] = info
-    except Exception:
-      cloudlog.exception("nrdr_remoted: failed to set NrdrCarTuneInfo")
+  try:
+    _write_cached(params, cache, rows)
+  except Exception:
+    cloudlog.exception("nrdr_remoted: failed to publish car/tune info")
 
 
 def main():
