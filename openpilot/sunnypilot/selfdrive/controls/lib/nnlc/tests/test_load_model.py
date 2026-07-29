@@ -1,10 +1,13 @@
 import hashlib
 from pathlib import Path
 
+from openpilot.cereal import car, log
 from opendbc.car.car_helpers import interfaces
 from opendbc.car.honda.values import CAR as HONDA
 from opendbc.car.hyundai.values import CAR as HYUNDAI
 from opendbc.car.toyota.values import CAR as TOYOTA
+from opendbc.car.vehicle_model import VehicleModel
+from openpilot.common.constants import CV
 from openpilot.common.parameterized import parameterized
 from openpilot.common.params import Params
 from openpilot.common.realtime import DT_CTRL
@@ -12,6 +15,7 @@ from openpilot.selfdrive.car.helpers import convert_to_capnp
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
+from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_clarity_hybrid import LatControlClarityHybrid, clarity_nnlc_blend_target
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import NRDR_TORQUE_NN_MODEL_PATH
 
@@ -65,17 +69,37 @@ class TestNNTorqueModel:
       controls_ext.params = params
       controller = controls_ext.initialize_lateral_control(object(), CI, DT_CTRL)
 
-      assert isinstance(controller, LatControlTorqueV0)
+      assert isinstance(controller, LatControlClarityHybrid)
+      assert isinstance(controller.torque_controller, LatControlTorqueV0)
+      assert controller.pid_controller.sr_curve is not None
       assert controller.extension.enabled
       assert controller.extension.has_nn_model
-      controller.extension.model_valid = True
+      controller.torque_controller.extension.model_valid = True
       assert controller.extension._nnlc_enabled
+
+      # PID runs first even while Torque/NNLC is the serialized tuning type, so
+      # its Clarity VGR curve is also used for NNLC's actual-curvature measurement.
+      CS = car.CarState.new_message()
+      CS.steeringAngleDeg = 100.0
+      VM = VehicleModel(CP)
+      live_params = log.LiveParametersData.new_message()
+      controller.update(False, CS, VM, live_params, False, 0.0, None, False, 0.2)
+      assert abs(VM.sR - 15.94) < 1e-6
     finally:
       for key, value in previous.items():
         if value is None:
           params.remove(key)
         else:
           params.put(key, value, block=True)
+
+  def test_clarity_hybrid_speed_and_lane_change_policy(self):
+    assert clarity_nnlc_blend_target(26.0 * CV.MPH_TO_MS, log.LaneChangeState.off) == 0.0
+    assert abs(clarity_nnlc_blend_target(30.0 * CV.MPH_TO_MS, log.LaneChangeState.off) - 0.5) < 1e-6
+    assert clarity_nnlc_blend_target(34.0 * CV.MPH_TO_MS, log.LaneChangeState.off) == 1.0
+
+    for lane_change_state in (log.LaneChangeState.preLaneChange, log.LaneChangeState.laneChangeStarting,
+                              log.LaneChangeState.laneChangeFinishing):
+      assert clarity_nnlc_blend_target(70.0 * CV.MPH_TO_MS, lane_change_state) == 0.0
 
   def test_hidden_global_toggles_do_not_force_other_hondas(self):
     params = Params()
