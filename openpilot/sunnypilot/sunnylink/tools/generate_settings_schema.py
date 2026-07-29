@@ -14,6 +14,7 @@ import json
 import os
 from collections.abc import Callable
 
+from openpilot.common.params import Params, UnknownKeyName
 from openpilot.sunnypilot.sunnylink.capabilities import CAPABILITY_FIELDS, CAPABILITY_LABELS
 
 SCHEMA_VERSION = "1.0"
@@ -64,7 +65,26 @@ def _load_definition() -> dict:
   with open(DEFINITION_PATH) as f:
     schema = json.load(f)
   _inject_dynamic_options(schema)
+  _inject_car_tune_details(schema)
   return schema
+
+
+def _inject_car_tune_details(schema: dict) -> None:
+  """Replace the Profile help modal's fallback copy with the device's live report."""
+  try:
+    details = Params().get("NrdrCarTuneDetails")
+  except UnknownKeyName:
+    details = None
+  if isinstance(details, bytes):
+    details = details.decode("utf-8", "replace")
+  if not details:
+    return
+
+  def visitor(item: dict) -> None:
+    if item.get("key") == "NrdrCarTuneInfo":
+      item["details"] = str(details)
+
+  _walk_all_items(schema, visitor)
 
 
 # Public API
