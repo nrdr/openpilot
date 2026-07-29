@@ -61,7 +61,10 @@ class LatControlTorqueExtBase:
     self.torque_params = lac_torque.torque_params
 
     self._ff = 0.0
-    self._pid = PIDController(KP, KI)
+    # NNLC owns its feedback controller. Do not reuse the outer Torque controller's
+    # speed-interpolated PID: nnlc.py already supplies its own low-speed curvature
+    # compensation, and stacking both low-speed strategies destabilizes the loop.
+    self._nnlc_pid = PIDController(KP, KI, pos_limit=lac_torque.steer_max, neg_limit=-lac_torque.steer_max)
     self._pid_log = None
     self._setpoint = 0.0
     self._measurement = 0.0

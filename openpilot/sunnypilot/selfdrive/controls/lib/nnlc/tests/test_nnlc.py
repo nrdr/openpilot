@@ -84,6 +84,13 @@ class TestNeuralNetworkLateralControl:
       controller.update_live_torque_params(torque_params.latAccelFactor, torque_params.latAccelOffset, torque_params.friction)
       controller.extension.update_limits()
       _, _, lac_log = controller.update(True, CS, VM, params, False, 0, pose, True, 0.2)
+    # NNLC has its own constant-gain feedback PID. The outer Torque controller has
+    # a steep low-speed KP_INTERP schedule and must never be substituted here.
+    assert controller.extension._nnlc_pid is not controller.pid
+    controller.extension._nnlc_pid.speed = 1.0
+    controller.pid.speed = 1.0
+    assert controller.extension._nnlc_pid.k_p == 1.0
+    assert controller.pid.k_p == 250.0
     assert lac_log.saturated
 
     for _ in range(1000):

@@ -69,7 +69,7 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
     if not self._nnlc_enabled:
       return
 
-    self._pid.set_limits(self.lac_torque.steer_max, -self.lac_torque.steer_max)
+    self._nnlc_pid.set_limits(self.lac_torque.steer_max, -self.lac_torque.steer_max)
 
   def update_lateral_lag(self, lag):
     super().update_lateral_lag(lag)
@@ -88,10 +88,10 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
 
   def update_output_torque(self, CS):
     freeze_integrator = self._steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
-    self._output_torque = self._pid.update(self._pid_log.error,
-                                           feedforward=self._ff,
-                                           speed=CS.vEgo,
-                                           freeze_integrator=freeze_integrator)
+    self._output_torque = self._nnlc_pid.update(self._pid_log.error,
+                                                feedforward=self._ff,
+                                                speed=CS.vEgo,
+                                                freeze_integrator=freeze_integrator)
 
   def update_neural_network_feedforward(self, CS, params, calibrated_pose) -> None:
     if not self._nnlc_enabled:
