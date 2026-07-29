@@ -16,7 +16,7 @@ from openpilot.common.params import Params
 from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.common.realtime import DT_CTRL
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext_base import LatControlTorqueExtBase, sign
-from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import MOCK_MODEL_PATH
+from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import MOCK_MODEL_PATH, is_nnlc_forced
 from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.model import NNTorqueModel
 
 LOW_SPEED_X = [0, 10, 20, 30]
@@ -36,7 +36,7 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
   def __init__(self, lac_torque, CP, CP_SP, CI):
     super().__init__(lac_torque, CP, CP_SP, CI)
     self.params = Params()
-    self.enabled = self.params.get_bool("NeuralNetworkLateralControl")
+    self.enabled = self.params.get_bool("NeuralNetworkLateralControl") or is_nnlc_forced(CP)
     self.has_nn_model = CP_SP.neuralNetworkLateralControl.model.path != MOCK_MODEL_PATH
 
     # NN model takes current v_ego, lateral_accel, lat accel/jerk error, roll, and past/future/planned data

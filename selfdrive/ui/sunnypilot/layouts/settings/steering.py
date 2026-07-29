@@ -4,7 +4,6 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
-from cereal import car
 from enum import IntEnum
 
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -106,8 +105,8 @@ class SteeringLayout(Widget):
       self._blinker_control_toggle,
       self._blinker_control_options,
       self._blinker_reengage_delay,
-      # Torque Lateral Control + NNLC are intentionally hidden: nrdr is PID-only on
-      # these platforms and exposing them caused confusion. Forced off in manager.py.
+      # Global Torque + NNLC controls remain hidden. Fingerprint-scoped controller
+      # policies can opt in without exposing switches that affect every platform.
     ]
     return items
 

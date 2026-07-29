@@ -10,7 +10,7 @@ from opendbc.car import structs
 from opendbc.car.interfaces import CarInterfaceBase
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
-from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import get_nn_model_path
+from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import get_nn_model_path, is_nnlc_forced
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import set_speed_limit_assist_availability
 
 import openpilot.system.sentry as sentry
@@ -46,7 +46,7 @@ def _initialize_neural_network_lateral_control(CP: structs.CarParams, CP_SP: str
     cloudlog.error({"nnlc event": "car doesn't match any Neural Network model"})
 
   if nnlc_model_name != "MOCK" and CP.steerControlType != structs.CarParams.SteerControlType.angle:
-    enabled = params.get_bool("NeuralNetworkLateralControl")
+    enabled = params.get_bool("NeuralNetworkLateralControl") or is_nnlc_forced(CP)
 
   CP_SP.neuralNetworkLateralControl.model.path = nnlc_model_path
   CP_SP.neuralNetworkLateralControl.model.name = nnlc_model_name
