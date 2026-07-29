@@ -50,7 +50,6 @@ class TestLatControl:
     CP = CarInterface.get_non_essential_params(car_name)
     CP_SP = CarInterface.get_non_essential_params_sp(CP, car_name)
     CI = CarInterface(CP, CP_SP)
-    sunnypilot_interfaces.setup_interfaces(CI)
 
     controller = LatControlPID(CP.as_reader(), convert_to_capnp(CP_SP).as_reader(), CI, DT_CTRL)
 

@@ -10,7 +10,7 @@ from openpilot.cereal import log
 import openpilot.cereal.messaging as messaging
 import openpilot.system.sentry as sentry
 from openpilot.common.utils import atomic_write
-from openpilot.common.params import Params, ParamKeyFlag, UnknownKeyName
+from openpilot.common.params import Params, ParamKeyFlag
 from openpilot.common.text_window import TextWindow
 from openpilot.common.hardware import HARDWARE, PC
 from openpilot.system.manager.helpers import unblock_stdout, save_bootlog
@@ -135,8 +135,9 @@ def apply_nrdr_default_params(params: Params) -> None:
   for key, value in NRDR_DEFAULT_VALUE_PARAMS.items():
     _default_if_unset(key, value, params.put)
 
-  # nrdr is PID-only on these platforms. The Torque and NNLC lateral controllers are
-  # hidden in the UI, so force them off every boot to guarantee PID lateral control.
+  # Keep the global Torque/NNLC switches off: they are hidden in the nrdr UI.
+  # Fingerprint-scoped controller policies (currently the Clarity) opt in in
+  # sunnypilot/selfdrive/car/interfaces.py without depending on these Params.
   _force("EnforceTorqueControl", False, params.put_bool)
   _force("NeuralNetworkLateralControl", False, params.put_bool)
 

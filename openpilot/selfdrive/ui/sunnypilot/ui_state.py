@@ -180,6 +180,8 @@ class UIStateSP:
     CP = self.CP
 
     if CP is not None:
+      # Global toggles stay disabled. Fingerprint-scoped forced controllers do not
+      # use these Params and therefore cannot be undone by this UI constraint.
       if self.params.get_bool("EnforceTorqueControl") and self.params.get_bool("NeuralNetworkLateralControl"):
         self.params.put_bool("EnforceTorqueControl", False, block=True)
         self.params.put_bool("NeuralNetworkLateralControl", False, block=True)
