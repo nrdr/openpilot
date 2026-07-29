@@ -75,7 +75,13 @@ class LatControlClarityHybrid(LatControl):
     model_v2 = self.torque_controller.extension.model_v2
     return log.LaneChangeState.off if model_v2 is None else model_v2.meta.laneChangeState
 
-  def _update_blend(self, active: bool, target: float) -> float:
+  def _update_blend(self, active: bool, target: float, lane_change_state: log.LaneChangeState) -> float:
+    # preLaneChange is emitted before laneChangeStarting. Select the already-warm
+    # PID immediately so the first lane-change curvature cannot receive NNLC torque.
+    if lane_change_state != log.LaneChangeState.off:
+      self.nnlc_blend = 0.0
+      return self.nnlc_blend
+
     if not active:
       self.nnlc_blend = target
       return self.nnlc_blend
@@ -98,10 +104,11 @@ class LatControlClarityHybrid(LatControl):
       calibrated_pose, curvature_limited, lat_delay,
     )
 
-    target = clarity_nnlc_blend_target(CS.vEgo, self._lane_change_state())
+    lane_change_state = self._lane_change_state()
+    target = clarity_nnlc_blend_target(CS.vEgo, lane_change_state)
     if not self.torque_controller.extension._nnlc_enabled:
       target = 0.0
-    blend = self._update_blend(active, target)
+    blend = self._update_blend(active, target, lane_change_state)
 
     output = float((1.0 - blend) * float(pid_output) + blend * float(nnlc_output))
     torque_log.output = output
