@@ -389,7 +389,7 @@
                 {
                   "key": "NrdrCarTuneInfo",
                   "widget": "info",
-                  "title": "Loaded Profile",
+                  "title": "Profile",
                   "details": "Compact fingerprint, EPS, hardware, and active-controller summary written by the device. The full PID and longitudinal tune remains available from Car & Tune Info on the device."
                 }
               ]
