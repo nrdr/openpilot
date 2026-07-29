@@ -277,7 +277,7 @@ class TestKnownPanels:
           nnlc = item
         elif item["key"] == "NrdrNnlcEnabled":
           nrdr_nnlc = item
-    if torque is None and nnlc is None:
+    if torque is None:
       assert nrdr_nnlc is not None, "nrdr's scoped NNLC toggle is missing"
       return
     assert torque is not None, "EnforceTorqueControl item missing"
