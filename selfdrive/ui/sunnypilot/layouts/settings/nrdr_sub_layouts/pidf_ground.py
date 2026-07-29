@@ -1,9 +1,4 @@
-"""
-nrdr PID/F Tuning Ground sub-panel.
-
-Independent P / I / F output scales per speed band, plus the center boost knobs.
-One level under Lateral Tuning.
-"""
+"""nrdr Controller Tuning Dungeon sub-panel."""
 from collections.abc import Callable
 import pyray as rl
 
@@ -157,30 +152,45 @@ class PidfGroundLayout(Widget):
       label_callback=lambda value: f"{value} mph",
     )
 
-    # --- 2D online auto-tuner (learned per-speed/angle trim) ---
-    self._tune_learner = toggle_item_sp(
-      title=tr("2D Auto-Tuner (Learned Trim)"),
-      description=tr("Learns a per-(speed, angle) feedforward trim live while you drive, cancelling the systematic over/under-turn the tune report measures. A bounded, slow, gated correction on top of the base PID/F + D - the PID always does the driving. On by default - error-gated, so it only pushes in proportion to present, agreeing error. Reset below wipes what it has learned."),
-      param="NrdrTuneLearner",
+    self._lat_stiction = toggle_item_sp(
+      title=tr("Lateral Stiction"),
+      description=tr("Emulates EPS breakaway friction so the wheel holds steady between decisive corrections."),
+      param="NrdrLatStiction",
     )
-    self._tune_learner_strength = option_item_sp(
-      param="NrdrTuneLearnerStrength",
-      title=lambda: tr("Auto-Tuner Strength (Default: 100%)"),
+
+    # --- Clarity PID/NNLC hybrid ---
+    self._nnlc_enabled = toggle_item_sp(
+      title=tr("Enable Neural Network Lateral Model (NNLC) (Default: ON)"),
+      description=tr("Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. OFF keeps the proven Clarity PID controller active everywhere."),
+      param="NrdrNnlcEnabled",
+    )
+    self._nnlc_activation_speed = option_item_sp(
+      param="NrdrNnlcActivationSpeed",
+      title=lambda: tr("Activate NNLC Above (Default: 30mph)"),
       min_value=0, max_value=100, value_change_step=1,
-      description=lambda: tr("Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Error gating makes this a ceiling, not a constant push - trim only flows when real, agreeing error exists."),
+      description=lambda: tr("Center speed of the smooth 6 mph PID-to-NNLC handoff. At the 30 mph default, PID is full through 27 mph and NNLC is full from 33 mph. Lane changes always select PID immediately."),
+      label_callback=lambda value: f"{value} mph",
+    )
+    self._nnlc_kp_gain = option_item_sp(
+      param="NrdrNnlcKpGain",
+      title=lambda: tr("NNLC KP Gain Scale (Default: 100%)"),
+      min_value=0, max_value=300, value_change_step=5,
+      description=lambda: tr("NNLC proportional feedback gain. 100% gives kp = 1.0."),
       label_callback=lambda value: f"{value}%",
     )
-    self._tune_learner_rate = option_item_sp(
-      param="NrdrTuneLearnerRate",
-      title=lambda: tr("Auto-Tuner Learning Speed (Default: 50%)"),
-      min_value=0, max_value=100, value_change_step=5,
-      description=lambda: tr("How fast the trim adapts to the measured error. Lower = slower, calmer, safer; higher = converges quicker but reacts more to each drive. 0 freezes learning (the trim it already has still applies)."),
+    self._nnlc_kf_gain = option_item_sp(
+      param="NrdrNnlcKfGain",
+      title=lambda: tr("NNLC KF Gain Scale (Default: 50%)"),
+      min_value=0, max_value=300, value_change_step=5,
+      description=lambda: tr("NNLC neural-model feedforward gain. 50% gives kf = 0.5."),
       label_callback=lambda value: f"{value}%",
     )
-    self._tune_learner_reset = toggle_item_sp(
-      title=tr("Reset Learned Trim"),
-      description=tr("Wipes the learned map back to zero on the next drive, then flips itself off. Use it to start the auto-tuner fresh after a base-tune change or a bad learning session."),
-      param="NrdrTuneLearnerReset",
+    self._nnlc_ki_gain = option_item_sp(
+      param="NrdrNnlcKiGain",
+      title=lambda: tr("NNLC KI Gain Scale (Default: 10%)"),
+      min_value=0, max_value=300, value_change_step=5,
+      description=lambda: tr("NNLC integral feedback gain. 10% gives ki = 0.1."),
+      label_callback=lambda value: f"{value}%",
     )
 
     return [
@@ -212,13 +222,23 @@ class PidfGroundLayout(Widget):
       self._center_scale,
       self._center_boost_threshold,
       self._center_boost_min_speed,
+      self._lat_stiction,
       LineSeparatorSP(40),
-      # 2D online auto-tuner (learned trim)
-      self._tune_learner,
-      self._tune_learner_strength,
-      self._tune_learner_rate,
-      self._tune_learner_reset,
+      # Clarity PID/NNLC hybrid
+      self._nnlc_enabled,
+      self._nnlc_activation_speed,
+      self._nnlc_kp_gain,
+      self._nnlc_kf_gain,
+      self._nnlc_ki_gain,
     ]
+
+  def _update_state(self):
+    super()._update_state()
+    nnlc_enabled = self._nnlc_enabled.action_item.get_state()
+    self._nnlc_activation_speed.set_visible(nnlc_enabled)
+    self._nnlc_kp_gain.set_visible(nnlc_enabled)
+    self._nnlc_kf_gain.set_visible(nnlc_enabled)
+    self._nnlc_ki_gain.set_visible(nnlc_enabled)
 
   def _render(self, rect):
     self._back_button.set_position(self._rect.x, self._rect.y + 20)

@@ -10,18 +10,24 @@ from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import Lat
 
 
 # Keep the road-proven PID fully in charge below the transition and NNLC fully in
-# charge above it. The narrow speed blend plus the time-domain slew limit prevents
-# a step in commanded torque while crossing 30 mph.
-PID_FULL_SPEED = 27.0 * CV.MPH_TO_MS
-NNLC_FULL_SPEED = 33.0 * CV.MPH_TO_MS
+# charge above it. The user-selected speed is the center of a narrow 6 mph blend,
+# so the 30 mph default exactly preserves the road-tested 27-33 mph handoff.
+NNLC_DEFAULT_ACTIVATION_SPEED = 30.0 * CV.MPH_TO_MS
+NNLC_BLEND_HALF_WIDTH = 3.0 * CV.MPH_TO_MS
 BLEND_TO_PID_SECONDS = 0.25
 BLEND_TO_NNLC_SECONDS = 0.75
 
 
-def clarity_nnlc_blend_target(v_ego: float, lane_change_state: log.LaneChangeState) -> float:
+def clarity_nnlc_blend_target(v_ego: float, lane_change_state: log.LaneChangeState,
+                              activation_speed: float = NNLC_DEFAULT_ACTIVATION_SPEED) -> float:
   if lane_change_state != log.LaneChangeState.off:
     return 0.0
-  return float(np.interp(v_ego, [PID_FULL_SPEED, NNLC_FULL_SPEED], [0.0, 1.0]))
+  activation_speed = float(np.clip(activation_speed, 0.0, 100.0 * CV.MPH_TO_MS))
+  pid_full_speed = max(0.0, activation_speed - NNLC_BLEND_HALF_WIDTH)
+  nnlc_full_speed = min(100.0 * CV.MPH_TO_MS, activation_speed + NNLC_BLEND_HALF_WIDTH)
+  if nnlc_full_speed <= pid_full_speed:
+    return float(v_ego >= activation_speed)
+  return float(np.interp(v_ego, [pid_full_speed, nnlc_full_speed], [0.0, 1.0]))
 
 
 class ClarityHybridExtension:
@@ -111,7 +117,8 @@ class LatControlClarityHybrid(LatControl):
     )
 
     lane_change_state = self._lane_change_state()
-    target = clarity_nnlc_blend_target(CS.vEgo, lane_change_state)
+    target = clarity_nnlc_blend_target(CS.vEgo, lane_change_state,
+                                       self.torque_controller.extension.activation_speed_mps)
     if not self.torque_controller.extension._nnlc_enabled:
       target = 0.0
     blend = self._update_blend(active, target, lane_change_state)

@@ -349,6 +349,11 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrTuneReportSummary", {PERSISTENT, STRING, ""}},             // per-speed summary table from the last tune scan
     {"NrdrCarTuneInfo", {PERSISTENT, STRING, ""}},                   // Car & Tune Info readout for the Sunnylink info row (written by nrdr_remoted)
     {"NrdrStarPilotPid", {PERSISTENT | BACKUP, BOOL, "0"}},          // borrowed StarPilot _pid_output_scale (center boost + turn-in/per-direction scaling); 0 = clean PID/F + D
+    {"NrdrNnlcEnabled", {PERSISTENT | BACKUP, BOOL, "1"}},            // Clarity hybrid: allow the NNLC half of the controller (OFF = PID only)
+    {"NrdrNnlcActivationSpeed", {PERSISTENT | BACKUP, INT, "30"}},    // mph; center of the smooth PID -> NNLC speed handoff
+    {"NrdrNnlcKpGain", {PERSISTENT | BACKUP, INT, "100"}},            // NNLC feedback proportional gain, percent of 1.0
+    {"NrdrNnlcKfGain", {PERSISTENT | BACKUP, INT, "50"}},             // NNLC neural feedforward gain, percent of 1.0
+    {"NrdrNnlcKiGain", {PERSISTENT | BACKUP, INT, "10"}},             // NNLC feedback integral gain, percent of 1.0
     {"NrdrTuneLearner", {PERSISTENT | BACKUP, BOOL, "1"}},           // 2D online lateral auto-tuner (learned per-cell FF trim); 0 = off
     {"NrdrLatStiction", {PERSISTENT | BACKUP, BOOL, "0"}},           // lateral stiction: emulated EPS breakaway hold/move stage (NRDR_LATERAL_STICTION.md)
     {"NrdrTuneLearnerReset", {PERSISTENT, BOOL, "0"}},               // momentary: device zeroes the learned trim map, then clears this

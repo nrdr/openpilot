@@ -389,14 +389,14 @@
                 {
                   "key": "NrdrCarTuneInfo",
                   "widget": "info",
-                  "title": "Car & Tune Info",
-                  "details": "Your car's loaded profile and lat/long kp/ki/kf, written by the device once it fingerprints the car. Shown on the cluster's Car & Tune Info row and via the device's own settings."
+                  "title": "Loaded Profile",
+                  "details": "Compact fingerprint, EPS, hardware, and active-controller summary written by the device. The full PID and longitudinal tune remains available from Car & Tune Info on the device."
                 }
               ]
             },
             {
               "id": "nrdr_pidf_ground",
-              "label": "PID/F Tuning Ground",
+              "label": "Controller Tuning Dungeon",
               "trigger_key": null,
               "items": [
                 {
@@ -563,47 +563,88 @@
                   "unit": "mph"
                 },
                 {
-                  "key": "NrdrTuneLearner",
-                  "widget": "toggle",
-                  "title": "2D Auto-Tuner (Learned Trim)",
-                  "description": "Learns a per-(speed, angle) feedforward trim live while you drive to cancel systematic over/under-turn.",
-                  "details": "Learns a per-(speed, angle) feedforward trim live while you drive, cancelling the systematic over/under-turn the tune report measures. A bounded, slow, gated correction on top of the base PID/F + D - the PID always does the driving. On by default - error-gated, so it only pushes in proportion to present, agreeing error. Reset below wipes what it has learned."
-                },
-                {
-                  "key": "NrdrTuneLearnerStrength",
-                  "widget": "option",
-                  "title": "Auto-Tuner Strength",
-                  "description": "Hard cap on how much steering authority the learned trim may add, as a percent of full output.",
-                  "details": "Hard cap on how much steering authority the learned trim may add, as a percent of full output. The learner can never exceed this no matter how long it runs. Error gating makes this a ceiling, not a constant push - trim only flows when real, agreeing error exists.",
-                  "min": 0,
-                  "max": 100,
-                  "step": 1,
-                  "unit": "%"
-                },
-                {
-                  "key": "NrdrTuneLearnerRate",
-                  "widget": "option",
-                  "title": "Auto-Tuner Learning Speed",
-                  "description": "How fast the trim adapts to measured error; 0 freezes learning (existing trim still applies).",
-                  "details": "How fast the trim adapts to the measured error. Lower = slower, calmer, safer; higher = converges quicker but reacts more to each drive. 0 freezes learning (the trim it already has still applies).",
-                  "min": 0,
-                  "max": 100,
-                  "step": 5,
-                  "unit": "%"
-                },
-                {
-                  "key": "NrdrTuneLearnerReset",
-                  "widget": "toggle",
-                  "title": "Reset Learned Trim",
-                  "description": "Wipes the learned map back to zero on the next drive, then flips itself off.",
-                  "details": "Wipes the learned map back to zero on the next drive, then flips itself off. Use it to start the auto-tuner fresh after a base-tune change or a bad learning session."
-                },
-                {
                   "key": "NrdrLatStiction",
                   "widget": "toggle",
-                  "title": "Lateral Stiction (EXPERIMENTAL)",
+                  "title": "Lateral Stiction",
                   "description": "Emulated EPS breakaway friction - the wheel holds solid between decisive corrections.",
                   "details": "Final-stage hold/move state machine emulating the breakaway friction of high-torque EPS units. Holding sends a frozen torque (no dither reaches the EPS); breakaway triggers on real error, plan motion, or accumulated drift. Consider lowering the steering LPF once enabled. Reference - NRDR_LATERAL_STICTION.md."
+                },
+                {
+                  "key": "NrdrNnlcEnabled",
+                  "widget": "toggle",
+                  "title": "Enable Neural Network Lateral Model (NNLC)",
+                  "description": "Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is ON.",
+                  "details": "OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command.",
+                  "sub_items": [
+                    {
+                      "key": "NrdrNnlcActivationSpeed",
+                      "widget": "option",
+                      "title": "Activate NNLC Above",
+                      "description": "Center speed of the smooth 6 mph PID-to-NNLC handoff. Default is 30 mph (PID full through 27 mph, NNLC full from 33 mph).",
+                      "min": 0,
+                      "max": 100,
+                      "step": 1,
+                      "unit": "mph",
+                      "enablement": [
+                        {
+                          "type": "param",
+                          "key": "NrdrNnlcEnabled",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "key": "NrdrNnlcKpGain",
+                      "widget": "option",
+                      "title": "NNLC KP Gain Scale",
+                      "description": "NNLC proportional feedback gain. 100% gives kp = 1.0.",
+                      "min": 0,
+                      "max": 300,
+                      "step": 5,
+                      "unit": "%",
+                      "enablement": [
+                        {
+                          "type": "param",
+                          "key": "NrdrNnlcEnabled",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "key": "NrdrNnlcKfGain",
+                      "widget": "option",
+                      "title": "NNLC KF Gain Scale",
+                      "description": "NNLC neural-model feedforward gain. 50% gives kf = 0.5.",
+                      "min": 0,
+                      "max": 300,
+                      "step": 5,
+                      "unit": "%",
+                      "enablement": [
+                        {
+                          "type": "param",
+                          "key": "NrdrNnlcEnabled",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "key": "NrdrNnlcKiGain",
+                      "widget": "option",
+                      "title": "NNLC KI Gain Scale",
+                      "description": "NNLC integral feedback gain. 10% gives ki = 0.1.",
+                      "min": 0,
+                      "max": 300,
+                      "step": 5,
+                      "unit": "%",
+                      "enablement": [
+                        {
+                          "type": "param",
+                          "key": "NrdrNnlcEnabled",
+                          "equals": true
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             },
@@ -1565,8 +1606,8 @@
                   "key": "HondaCivicRadarTryout",
                   "widget": "toggle",
                   "title": "Try Honda Bosch Radar (experimental)",
-                  "description": "EXPERIMENTAL \u2014 Honda Bosch radar fed into the longitudinal controller.",
-                  "details": "EXPERIMENTAL \u2014 Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller."
+                  "description": "EXPERIMENTAL \u00e2\u20ac\u201d Honda Bosch radar fed into the longitudinal controller.",
+                  "details": "EXPERIMENTAL \u00e2\u20ac\u201d Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller."
                 },
                 {
                   "key": "HondaStoppingDecelRate",
