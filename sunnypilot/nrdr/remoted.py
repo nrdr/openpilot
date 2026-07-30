@@ -219,9 +219,11 @@ def write_car_tune_info(params, cache: dict) -> None:
         pid_base = f"P {_fmt_vals(pid.kpV)} | I {_fmt_vals(pid.kiV)}"
         pid_ff = (_fmt_vals([float(value) * 1e6 for value in pid.kfV]) + " x10^-6"
                   if len(pid.kfV) else f"{float(pid.kf):g}")
+        pid_base_speeds = "0 / <25 / 25 / 50 mph" if str(CP.carFingerprint) == "HONDA_CLARITY" else "0 / 25 / 50 mph"
       else:
         pid_base = f"{CP.lateralTuning.which().upper()} (no PID base)"
         pid_ff = "n/a"
+        pid_base_speeds = "n/a"
 
       lt = CP.longitudinalTuning
       long_base = f"P {_fmt_vals(lt.kpV)} | I {_fmt_vals(lt.kiV)}"
@@ -272,7 +274,7 @@ def write_car_tune_info(params, cache: dict) -> None:
         rows["NrdrCarControllerInfo"],
         f"NNLC: {rows['NrdrCarNnlcInfo']}",
         "",
-        "LATERAL PID BASE (0 / 25 / 50 mph)",
+        f"LATERAL PID BASE ({pid_base_speeds})",
         pid_base,
         f"F {pid_ff}",
         "",
