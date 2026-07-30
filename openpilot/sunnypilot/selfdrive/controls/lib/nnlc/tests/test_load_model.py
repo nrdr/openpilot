@@ -79,14 +79,21 @@ class TestNNTorqueModel:
       assert isinstance(controller, LatControlClarityHybrid)
       assert isinstance(controller.torque_controller, LatControlTorqueV0)
       assert controller.pid_controller.sr_curve is not None
-      assert len(controller.pid_controller.pid._k_p[0]) == len(controller.pid_controller.pid._k_p[1]) == 3
-      assert len(controller.pid_controller.pid._k_i[0]) == len(controller.pid_controller.pid._k_i[1]) == 3
+      assert len(controller.pid_controller.pid._k_p[0]) == len(controller.pid_controller.pid._k_p[1]) == 4
+      assert len(controller.pid_controller.pid._k_i[0]) == len(controller.pid_controller.pid._k_i[1]) == 4
+      low_max = 25.0 * CV.MPH_TO_MS
       assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_p[0],
-                                                    [0.0, 25.0 * CV.MPH_TO_MS, 50.0 * CV.MPH_TO_MS], strict=True))
-      assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_p[1], [0.036, 0.048, 0.060], strict=True))
+                                                     [0.0, low_max - 1e-3, low_max, 50.0 * CV.MPH_TO_MS], strict=True))
+      assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_p[1],
+                                                     [0.018, 0.024, 0.048, 0.060], strict=True))
       assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_i[0],
-                                                    [0.0, 25.0 * CV.MPH_TO_MS, 50.0 * CV.MPH_TO_MS], strict=True))
-      assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_i[1], [0.012, 0.016, 0.020], strict=True))
+                                                     [0.0, low_max - 1e-3, low_max, 50.0 * CV.MPH_TO_MS], strict=True))
+      assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.pid._k_i[1],
+                                                     [0.006, 0.008, 0.016, 0.020], strict=True))
+      assert all(abs(a - b) < 1e-6 for a, b in zip(controller.pid_controller.kf_bp,
+                                                     [0.0, low_max - 1e-3, low_max, 50.0 * CV.MPH_TO_MS], strict=True))
+      assert all(abs(a - b) < 1e-12 for a, b in zip(controller.pid_controller.kf_v,
+                                                      [2.4e-6, 1.8e-6, 3.6e-6, 6.0e-6], strict=True))
       assert controller.extension.enabled
       assert controller.extension.has_nn_model
       assert abs(controller.extension.activation_speed_mps - 30.0 * CV.MPH_TO_MS) < 1e-6
