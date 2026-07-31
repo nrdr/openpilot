@@ -91,26 +91,26 @@ def lead_brake_gate(aLeadK, aLeadTau, alead_threshold):
 
 def get_jerk_factor(personality=log.LongitudinalPersonality.standard):
   if personality==log.LongitudinalPersonality.econ:
-    return 1.0
+    return 1.5
   elif personality==log.LongitudinalPersonality.relaxed:
     return 1.0
   elif personality==log.LongitudinalPersonality.standard:
-    return 1.5
+    return 1.0
   elif personality==log.LongitudinalPersonality.aggressive:
-    return 2.0
+    return 0.4
   else:
     raise NotImplementedError("Longitudinal personality not supported")
 
 
 def get_T_FOLLOW(personality=log.LongitudinalPersonality.standard):
   if personality==log.LongitudinalPersonality.econ:
-    return 2.00
+    return 2.25
   elif personality==log.LongitudinalPersonality.relaxed:
     return 1.75
   elif personality==log.LongitudinalPersonality.standard:
     return 1.45
   elif personality==log.LongitudinalPersonality.aggressive:
-    return 1.00
+    return 0.75
   else:
     raise NotImplementedError("Longitudinal personality not supported")
 
