@@ -414,6 +414,55 @@ class TestAthenadMethods:
       assert isinstance(resp[k], str), f"{k} is not a string"
       assert len(resp[k]) > 0, f"{k} has no value"
 
+  def test_start_stream_konik_enabled(self, mocker):
+    self.params.put_bool("IsOnroad", False, block=True)
+    self.params.put_bool("LiveViewEnabled", True, block=True)
+    self.params.remove("LiveView")
+
+    mocker.patch.object(athenad.socket, "create_connection", return_value=mocker.MagicMock())
+    response = mocker.Mock(ok=True)
+    response.json.return_value = {"sdp": "answer", "type": "answer"}
+    post = mocker.patch.object(athenad.requests, "post", return_value=response)
+
+    assert dispatcher["startStream"](sdp="offer", enabled=True) == response.json.return_value
+    assert self.params.get_bool("LiveView")
+    post.assert_called_once_with(
+      f"http://localhost:{athenad.WEBRTCD_PORT}/stream",
+      json={
+        "sdp": "offer",
+        "initCamera": "wideRoad",
+        "bridge_services_in": [],
+        "bridge_services_out": ["carState"],
+      },
+      timeout=10,
+    )
+
+  def test_start_stream_konik_disabled(self, mocker):
+    self.params.put_bool("LiveView", True, block=True)
+    post = mocker.patch.object(athenad.requests, "post")
+
+    assert dispatcher["startStream"](enabled=False) == {"success": True}
+    assert not self.params.get_bool("LiveView")
+    post.assert_not_called()
+
+  def test_start_stream_rolls_back_when_webrtcd_does_not_start(self, mocker):
+    self.params.put_bool("IsOnroad", False, block=True)
+    self.params.put_bool("LiveViewEnabled", True, block=True)
+    mocker.patch.object(athenad, "WEBRTCD_START_TIMEOUT_S", 0)
+    mocker.patch.object(athenad.socket, "create_connection", side_effect=OSError)
+
+    with pytest.raises(Exception, match="webrtc took too long to start"):
+      dispatcher["startStream"](sdp="offer", enabled=True)
+    assert not self.params.get_bool("LiveView")
+
+  def test_start_stream_rejects_onroad(self):
+    self.params.put_bool("IsOnroad", True, block=True)
+    self.params.put_bool("LiveViewEnabled", True, block=True)
+
+    with pytest.raises(Exception, match="Live View unavailable while onroad"):
+      dispatcher["startStream"](sdp="offer", enabled=True)
+    assert not self.params.get_bool("LiveView")
+
   def test_jsonrpc_handler(self):
     end_event = threading.Event()
     thread = threading.Thread(target=athenad.jsonrpc_handler, args=(end_event,))

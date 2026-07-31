@@ -25,7 +25,7 @@ def notcar(started: bool, params: Params, CP: car.CarParams) -> bool:
 def live_view_active(started: bool, params: Params, CP: car.CarParams) -> bool:
   # The streamer sets the LiveView param while a session is open (offroad) and clears it on
   # disconnect, so the livestream encoders run only while someone is actually watching -- no idle drain.
-  return params.get_bool("LiveView")
+  return not started and params.get_bool("LiveView")
 
 def iscar(started: bool, params: Params, CP: car.CarParams) -> bool:
   return started and not CP.notCar
@@ -163,7 +163,7 @@ procs = [
 
   # debug procs
   NativeProcess("bridge", "cereal/messaging", ["./bridge"], notcar),
-  PythonProcess("webrtcd", "system.webrtc.webrtcd", notcar),
+  PythonProcess("webrtcd", "system.webrtc.webrtcd", or_(notcar, live_view_active)),
   PythonProcess("webjoystick", "tools.bodyteleop.web", notcar),
   PythonProcess("joystick", "tools.joystick.joystick_control", and_(joystick, iscar)),
 

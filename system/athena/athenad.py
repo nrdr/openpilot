@@ -48,6 +48,8 @@ ATHENA_HOST = os.getenv('ATHENA_HOST', 'wss://athena.konik.ai')  # nrdr: konik d
 HANDLER_THREADS = int(os.getenv('HANDLER_THREADS', "4"))
 LOCAL_PORT_WHITELIST = {22, }  # SSH
 WEBRTCD_PORT = 5001
+WEBRTCD_START_TIMEOUT_S = 10.0
+WEBRTCD_START_POLL_S = 0.1
 
 LOG_ATTR_NAME = 'user.upload'
 LOG_ATTR_VALUE_MAX_UNIX_TIME = int.to_bytes(2147483647, 4, sys.byteorder)
@@ -855,8 +857,34 @@ def getNetworks():
   return HARDWARE.get_networks()
 
 
+def _wait_for_webrtcd() -> None:
+  deadline = time.monotonic() + WEBRTCD_START_TIMEOUT_S
+  while True:
+    try:
+      with socket.create_connection(("127.0.0.1", WEBRTCD_PORT), timeout=WEBRTCD_START_POLL_S):
+        return
+    except OSError as e:
+      if time.monotonic() >= deadline:
+        raise TimeoutError("webrtcd did not start") from e
+      time.sleep(WEBRTCD_START_POLL_S)
+
+
 @dispatcher.add_method
-def startStream(sdp: str) -> dict:
+def startStream(sdp: str | None = None, enabled: bool = True) -> dict:
+  params = Params()
+
+  # Konik sends enabled=false when the viewer disconnects. sdp is optional in that request.
+  if not enabled:
+    params.put_bool("LiveView", False, block=True)
+    return {"success": True}
+
+  if params.get_bool("IsOnroad"):
+    raise Exception("Live View unavailable while onroad")
+  if not params.get_bool("LiveViewEnabled"):
+    raise Exception("Live View disabled")
+  if not isinstance(sdp, str) or not sdp:
+    raise Exception("sdp is required")
+
   from openpilot.system.webrtc.webrtcd import StreamRequestBody
   bridge_services_in = []
 
@@ -868,7 +896,12 @@ def startStream(sdp: str) -> dict:
         bridge_services_in.append("testJoystick")
 
   body = StreamRequestBody(sdp, "wideRoad", bridge_services_in, ["carState"])
+  stream_started = False
+  params.put_bool("LiveView", True, block=True)
   try:
+    # Setting LiveView starts camerad, stream_encoderd, and webrtcd through manager. Wait for the
+    # local service before forwarding the browser's SDP instead of racing process startup.
+    _wait_for_webrtcd()
     resp = requests.post(f"http://localhost:{WEBRTCD_PORT}/stream",
                        json=asdict(body), timeout=10)
     if not resp.ok:
@@ -877,11 +910,18 @@ def startStream(sdp: str) -> dict:
         raise Exception(error_body.get("message", f"webrtcd returned {resp.status_code}"))
       except ValueError:
         resp.raise_for_status()
-    return resp.json()
+    result = resp.json()
+    stream_started = True
+    return result
+  except TimeoutError as e:
+    raise Exception("webrtc took too long to start") from e
   except requests.ConnectTimeout as e:
     raise Exception("webrtc took too long to respond. is it on?") from e
   except requests.ConnectionError as e:
-    raise Exception("webrtc is not running. turn on comma body ignition.") from e
+    raise Exception("webrtc stopped before the stream could start") from e
+  finally:
+    if not stream_started:
+      params.put_bool("LiveView", False, block=True)
 
 
 @dispatcher.add_method
