@@ -24,8 +24,11 @@ class CarSpecificEventsSP:
 
     self.low_speed_alert = False
 
-  def update(self, CS: structs.CarState, events: Events):
+  def update(self, CS: structs.CarState, CS_SP: custom.CarStateSP, events: Events):
     events_sp = EventsSP()
+
+    if self.CP_SP.enableGasInterceptor and CS_SP.gasInterceptorState != 0:
+      events.add(EventName.gasInterceptorFault)
 
     if self.CP.brand == 'chrysler':
       if self.CP.carFingerprint in RAM_DT:

@@ -53,6 +53,7 @@ MonitoringPolicy = log.DriverMonitoringState.MonitoringPolicy
 TurnDirection = custom.ModelDataV2SP.TurnDirection
 
 IGNORED_SAFETY_MODES = (SafetyModel.silent, SafetyModel.noOutput)
+PERSONALITY_PARAM_ACK_TIMEOUT = 5.0
 
 
 class SelfdriveD(CruiseHelper):
@@ -104,7 +105,7 @@ class SelfdriveD(CruiseHelper):
                                    'carOutput', 'driverMonitoringState', 'longitudinalPlan', 'livePose', 'liveDelay',
                                    'managerState', 'liveParameters', 'radarState', 'liveTorqueParameters',
                                    'controlsState', 'carControl', 'driverAssistance', 'alertDebug', 'userBookmark', 'audioFeedback',
-                                   'lateralManeuverPlan', 'modelDataV2SP', 'longitudinalPlanSP'] + \
+                                   'lateralManeuverPlan', 'carStateSP', 'modelDataV2SP', 'longitudinalPlanSP'] + \
                                    self.camera_packets + self.sensor_packets + self.gps_packets,
                                   ignore_alive=ignore, ignore_avg_freq=ignore,
                                   ignore_valid=ignore, frequency=int(1/DT_CTRL))
@@ -138,6 +139,8 @@ class SelfdriveD(CruiseHelper):
     self.logged_comm_issue = None
     self.not_running_prev = None
     self.experimental_mode = False
+    self._personality_lock = threading.Lock()
+    self._personality_pending: tuple[int, float] | None = None
     self.personality = get_sanitize_int_param(
       "LongitudinalPersonality",
       min(log.LongitudinalPersonality.schema.enumerants.values()),
@@ -180,6 +183,30 @@ class SelfdriveD(CruiseHelper):
 
     CruiseHelper.__init__(self, self.CP)
     self.button_state_tracker = ButtonStateTracker()
+
+  def _cycle_personality_from_button(self) -> None:
+    # Params.put is deliberately nonblocking. Protect the new in-memory choice until the
+    # params reader observes that write, otherwise its next 100 ms poll can restore stale data.
+    with self._personality_lock:
+      personality = (self.personality - 1) % len(log.LongitudinalPersonality.schema.enumerants)
+      self._personality_pending = (personality, time.monotonic() + PERSONALITY_PARAM_ACK_TIMEOUT)
+      self.personality = personality
+    self.params.put('LongitudinalPersonality', personality)
+
+  def _refresh_personality_from_params(self) -> None:
+    personality = self.params.get("LongitudinalPersonality", return_default=True)
+    now = time.monotonic()
+    with self._personality_lock:
+      if self._personality_pending is not None:
+        pending_personality, deadline = self._personality_pending
+        if personality == pending_personality:
+          self._personality_pending = None
+        elif now < deadline:
+          return
+        else:
+          # Do not permanently mask a failed write or a later external settings change.
+          self._personality_pending = None
+      self.personality = personality
 
   def update_events(self, CS):
     """Compute onroadEvents from carState"""
@@ -255,7 +282,7 @@ class SelfdriveD(CruiseHelper):
       car_events = self.car_events.update(CS, self.CS_prev, self.sm['carControl']).to_msg()
       self.events.add_from_msg(car_events)
 
-      car_events_sp = self.car_events_sp.update(CS, self.events).to_msg()
+      car_events_sp = self.car_events_sp.update(CS, self.sm['carStateSP'], self.events).to_msg()
       self.events_sp.add_from_msg(car_events_sp)
 
       if self.CP.notCar:
@@ -494,8 +521,7 @@ class SelfdriveD(CruiseHelper):
           # Dynamic HUD: the first press only opens the HUD sub-mode preview; only
           # presses made while it's already open actually change the personality.
           if consume_button_press(self.params):
-            self.personality = (self.personality - 1) % len(log.LongitudinalPersonality.schema.enumerants)
-            self.params.put('LongitudinalPersonality', self.personality)
+            self._cycle_personality_from_button()
             self.events.add(EventName.personalityChanged)
         self.experimental_mode_switched = False
 
@@ -642,7 +668,7 @@ class SelfdriveD(CruiseHelper):
       self.is_ldw_enabled = self.params.get_bool("IsLdwEnabled")
       self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
       self.experimental_mode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
-      self.personality = self.params.get("LongitudinalPersonality", return_default=True)
+      self._refresh_personality_from_params()
 
       self.mads.read_params()
       time.sleep(0.1)

@@ -241,6 +241,13 @@ class Car:
     co_send.carOutput.actuatorsOutput = self.last_actuators_output
     self.pm.send('carOutput', co_send)
 
+    # Publish fork-specific state first so the carState-triggered controls cycle consumes
+    # both halves of the same sample. This is safety-critical for interceptor fault state.
+    cs_sp_send = messaging.new_message('carStateSP')
+    cs_sp_send.valid = CS.canValid
+    cs_sp_send.carStateSP = CS_SP
+    self.pm.send('carStateSP', cs_sp_send)
+
     # kick off controlsd step while we actuate the latest carControl packet
     cs_send = messaging.new_message('carState')
     cs_send.valid = CS.canValid
@@ -261,11 +268,6 @@ class Car:
       cp_sp_send.valid = True
       cp_sp_send.carParamsSP = self.CP_SP_capnp
       self.pm.send('carParamsSP', cp_sp_send)
-
-    cs_sp_send = messaging.new_message('carStateSP')
-    cs_sp_send.valid = CS.canValid
-    cs_sp_send.carStateSP = CS_SP
-    self.pm.send('carStateSP', cs_sp_send)
 
   def controls_update(self, CS: car.CarState, CC: car.CarControl, CC_SP: custom.CarControlSP):
     """control update loop, driven by carControl"""
