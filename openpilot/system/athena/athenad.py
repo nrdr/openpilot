@@ -859,9 +859,27 @@ def getNetworkMetered() -> bool:
 
 
 @dispatcher.add_method
-def startStream(sdp: str, enabled: bool) -> dict:
+def getNetworks():
+  return HARDWARE.get_networks()
+
+
+@dispatcher.add_method
+def startStream(sdp: str | None = None, enabled: bool = True) -> dict:
   from openpilot.system.webrtc.helpers import StreamRequestBody, post_stream_request, wait_for_webrtcd
   params = Params()
+
+  # Konik sends enabled=false when the viewer disconnects. sdp is optional in that request.
+  if not enabled:
+    params.put_bool("IsLiveStreaming", False, block=True)
+    params.put_bool("LiveView", False, block=True)
+    return {"success": True}
+
+  if params.get_bool("IsOnroad"):
+    raise Exception("Live View unavailable while onroad")
+  if not params.get_bool("LiveViewEnabled"):
+    raise Exception("Live View disabled")
+  if not isinstance(sdp, str) or not sdp:
+    raise Exception("sdp is required")
   bridge_services_in = []
 
   # stale car params case taken care of by webrtcd being shut off on ignition
@@ -871,16 +889,27 @@ def startStream(sdp: str, enabled: bool) -> dict:
       if CP.notCar:
         bridge_services_in.append("testJoystick")
   else:
-      raise Exception("failed to get CarParamsPersistent")
+    raise Exception("failed to get CarParamsPersistent")
 
-  if params.get_bool("IsOffroad"):
-    # manager owns camerad/stream_encoderd/webrtcd; flip the param and let it bring them up.
-    # webrtcd clears IsLiveStreaming when the session ends
-    params.put_bool("IsLiveStreaming", True)
-    # wait for webrtcd end points to wake up
+  if not params.get_bool("IsOffroad"):
+    raise Exception("Live View unavailable unless offroad")
+
+  body = StreamRequestBody(sdp, "wideRoad", enabled, bridge_services_in, ["carState", "deviceState"])
+  stream_started = False
+  # Manager owns camerad, stream_encoderd, and webrtcd. Publish the gate before
+  # polling the local endpoint so the request cannot race process startup.
+  params.put_bool("IsLiveStreaming", True, block=True)
+  try:
     wait_for_webrtcd()
-
-  return post_stream_request(StreamRequestBody(sdp, "wideRoad", enabled, bridge_services_in, ["carState", "deviceState"]))
+    result = post_stream_request(body)
+    stream_started = True
+    return result
+  except TimeoutError as e:
+    raise Exception("webrtc took too long to start") from e
+  finally:
+    if not stream_started:
+      params.put_bool("IsLiveStreaming", False, block=True)
+      params.put_bool("LiveView", False, block=True)
 
 
 def get_logs_to_send_sorted(log_attr_name=LOG_ATTR_NAME) -> list[str]:

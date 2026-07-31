@@ -30,6 +30,21 @@ class TestManager:
   def test_duplicate_procs(self):
     assert len(procs) == len(managed_processes), "Duplicate process names"
 
+  def test_webrtcd_live_view_gating(self):
+    params = Params()
+    CP = car.CarParams.new_message()
+    webrtcd = managed_processes["webrtcd"]
+
+    params.put_bool("LiveView", True, block=True)
+    assert webrtcd.should_run(False, params, CP)
+    assert not webrtcd.should_run(True, params, CP)
+
+    params.put_bool("LiveView", False, block=True)
+    assert not webrtcd.should_run(False, params, CP)
+
+    CP.notCar = True
+    assert webrtcd.should_run(True, params, CP)
+
   def test_blacklisted_procs(self):
     # TODO: ensure there are blacklisted procs until we have a dedicated test
     assert len(BLACKLIST_PROCS), "No blacklisted procs to test not_run"

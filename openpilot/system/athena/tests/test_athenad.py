@@ -21,6 +21,7 @@ from openpilot.common.timeout import Timeout
 from openpilot.system.athena import athenad
 from openpilot.system.athena.athenad import MAX_RETRY_COUNT, UPLOAD_SESS, dispatcher
 from openpilot.system.athena.tests.helpers import HTTPRequestHandler, MockWebsocket, MockApi, EchoSocket
+from openpilot.system.webrtc import helpers as webrtc_helpers
 from openpilot.selfdrive.test.helpers import http_server_context
 from openpilot.common.hardware.hw import Paths
 
@@ -415,6 +416,60 @@ class TestAthenadMethods:
     for k in keys:
       assert isinstance(resp[k], str), f"{k} is not a string"
       assert len(resp[k]) > 0, f"{k} has no value"
+
+  def test_start_stream_konik_enabled(self, mocker):
+    self.params.put_bool("IsOnroad", False, block=True)
+    self.params.put_bool("IsOffroad", True, block=True)
+    self.params.put_bool("LiveViewEnabled", True, block=True)
+    self.params.remove("IsLiveStreaming")
+
+    mocker.patch.object(webrtc_helpers, "wait_for_webrtcd")
+    response = mocker.Mock(ok=True)
+    response.json.return_value = {"sdp": "answer", "type": "answer"}
+    post = mocker.patch.object(webrtc_helpers.requests, "post", return_value=response)
+
+    assert dispatcher["startStream"](sdp="offer", enabled=True) == response.json.return_value
+    assert self.params.get_bool("IsLiveStreaming")
+    post.assert_called_once_with(
+      f"http://localhost:{webrtc_helpers.WEBRTCD_PORT}/stream",
+      json={
+        "sdp": "offer",
+        "init_camera": "wideRoad",
+        "enabled": True,
+        "bridge_services_in": [],
+        "bridge_services_out": ["carState", "deviceState"],
+      },
+      timeout=10,
+    )
+
+  def test_start_stream_konik_disabled(self, mocker):
+    self.params.put_bool("IsLiveStreaming", True, block=True)
+    self.params.put_bool("LiveView", True, block=True)
+    post = mocker.patch.object(webrtc_helpers.requests, "post")
+
+    assert dispatcher["startStream"](enabled=False) == {"success": True}
+    assert not self.params.get_bool("IsLiveStreaming")
+    assert not self.params.get_bool("LiveView")
+    post.assert_not_called()
+
+  def test_start_stream_rolls_back_when_webrtcd_does_not_start(self, mocker):
+    self.params.put_bool("IsOnroad", False, block=True)
+    self.params.put_bool("IsOffroad", True, block=True)
+    self.params.put_bool("LiveViewEnabled", True, block=True)
+    mocker.patch.object(webrtc_helpers, "wait_for_webrtcd", side_effect=TimeoutError)
+
+    with pytest.raises(Exception, match="webrtc took too long to start"):
+      dispatcher["startStream"](sdp="offer", enabled=True)
+    assert not self.params.get_bool("IsLiveStreaming")
+    assert not self.params.get_bool("LiveView")
+
+  def test_start_stream_rejects_onroad(self):
+    self.params.put_bool("IsOnroad", True, block=True)
+    self.params.put_bool("LiveViewEnabled", True, block=True)
+
+    with pytest.raises(Exception, match="Live View unavailable while onroad"):
+      dispatcher["startStream"](sdp="offer", enabled=True)
+    assert not self.params.get_bool("LiveView")
 
   def test_jsonrpc_handler(self):
     end_event = threading.Event()
