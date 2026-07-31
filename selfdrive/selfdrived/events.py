@@ -689,6 +689,12 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   EventName.accFaulted: {
   },
 
+  EventName.gasInterceptorFault: {
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("Gas Pedal Interceptor Fault"),
+    ET.PERMANENT: NormalPermanentAlert("Gas Pedal Interceptor Fault", "Check Pedal Interceptor or Harness"),
+    ET.NO_ENTRY: NoEntryAlert("Gas Pedal Interceptor Fault"),
+  },
+
   EventName.espActive: {
   },
 
