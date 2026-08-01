@@ -50,7 +50,9 @@ class CompileError(Exception):
 
 
 def _load_yaml(path: str):
-  with open(path) as f:
+  # YAML is UTF-8 on every target.  Being explicit keeps Windows development
+  # builds byte-for-byte identical to the Linux device build.
+  with open(path, encoding="utf-8") as f:
     return yaml.safe_load(f) or {}
 
 
@@ -279,7 +281,7 @@ def _main() -> int:
     if not os.path.exists(args.out):
       print(f"--check: {args.out} does not exist", file=sys.stderr)
       return 1
-    with open(args.out) as f:
+    with open(args.out, encoding="utf-8") as f:
       current = f.read()
     if current.strip() == rendered.strip():
       print(f"--check: {args.out} matches compiled output")
@@ -290,7 +292,7 @@ def _main() -> int:
       print("(structurally equal; only formatting differs)", file=sys.stderr)
     return 1
 
-  with open(args.out, "w") as f:
+  with open(args.out, "w", encoding="utf-8", newline="\n") as f:
     f.write(rendered)
   print(f"Wrote {args.out}")
   return 0
