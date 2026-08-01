@@ -7,7 +7,6 @@ delay settings that are easy to overlook when copying only PID gains.
 from dataclasses import dataclass
 from typing import Protocol
 
-
 type ParamValue = bool | int | float
 
 
