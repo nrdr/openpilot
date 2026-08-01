@@ -2,6 +2,8 @@
 from collections.abc import Callable
 import pyray as rl
 
+from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
@@ -234,6 +236,20 @@ class PidfGroundLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
+    fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
+    editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
+    for item in (
+      self._starpilot, self._sr_offset,
+      self._lat_p_low, self._lat_i_low, self._lat_f_low,
+      self._lat_p_standard, self._lat_i_standard, self._lat_f_standard,
+      self._lat_p_highway, self._lat_i_highway, self._lat_f_highway,
+      self._rate_damping, self._rate_damping_fade_speed,
+      self._center_scale, self._center_boost_threshold, self._center_boost_min_speed,
+      self._lat_stiction, self._nnlc_enabled, self._nnlc_activation_speed,
+      self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain,
+    ):
+      item.action_item.set_enabled(editable)
+
     nnlc_enabled = self._nnlc_enabled.action_item.get_state()
     self._nnlc_activation_speed.set_visible(nnlc_enabled)
     self._nnlc_kp_gain.set_visible(nnlc_enabled)

@@ -349,20 +349,80 @@
                   "widget": "toggle",
                   "title": "Learn Steer Ratio (Auto)",
                   "description": "When ON (Auto), uses openpilot's live-learned steer ratio; OFF uses the car's static base value.",
-                  "details": "When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance."
+                  "details": "When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrLearnStiffness",
                   "widget": "toggle",
                   "title": "Learn Tire Stiffness (Auto)",
-                  "description": "When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0."
+                  "description": "When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrLearnAngleOffset",
                   "widget": "toggle",
                   "title": "Learn Angle Offset (Auto)",
                   "description": "When ON (Auto), uses the live-learned steering angle offset; OFF uses a static 0.0 offset.",
-                  "details": "When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side."
+                  "details": "When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             }
@@ -378,6 +438,25 @@
               "widget": "toggle",
               "title": "Run Tune Report Scan",
               "description": "Flip ON to scan every drive log into a tune report (the device flips it back OFF on the next start)."
+            },
+            {
+              "key": "NrdrHandcraftedLateralTune",
+              "widget": "toggle",
+              "title": "Handcrafted Lateral Tuning",
+              "description": "Force-load the complete road-tested tune for this exact vehicle fingerprint and lock conflicting controls.",
+              "details": "Loads the versioned Clarity road-test profile, including PID trims, the variable steering-ratio selection, controller helpers, steering filters, and fixed live-delay setting. Disable this only to resume manual tuning.",
+              "visibility": [
+                {
+                  "type": "capability",
+                  "field": "car_fingerprint",
+                  "equals": "HONDA_CLARITY"
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                }
+              ]
             }
           ],
           "sub_panels": [
@@ -396,6 +475,11 @@
                   "key": "NrdrCarControllerInfo",
                   "widget": "info",
                   "title": "Controller"
+                },
+                {
+                  "key": "NrdrCarHandcraftedInfo",
+                  "widget": "info",
+                  "title": "Handcrafted"
                 },
                 {
                   "key": "NrdrCarPidLowInfo",
@@ -454,7 +538,27 @@
                   "widget": "toggle",
                   "title": "StarPilot PID Additions",
                   "description": "Adds the borrowed StarPilot turn-in / unwind / per-direction output scaling, not built for Honda.",
-                  "details": "The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base."
+                  "details": "The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrSteerRatioOffset",
@@ -464,7 +568,27 @@
                   "details": "Shifts the whole measured steer-ratio curve up or down by this amount (higher = gentler / less turn-in everywhere, lower = sharper). Only applies when Learn Steer Ratio (Auto) is off; when on, the live-learned scalar is used instead.",
                   "min": -5.0,
                   "max": 5.0,
-                  "step": 0.01
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "LatPScaleLowSpeed",
@@ -475,7 +599,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "LatIScaleLowSpeed",
@@ -486,7 +630,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "LatFScaleLowSpeed",
@@ -497,7 +661,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "LatPScaleStandard",
@@ -507,7 +691,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "LatIScaleStandard",
@@ -517,7 +721,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "LatFScaleStandard",
@@ -527,7 +751,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "LatPScaleHighway",
@@ -537,7 +781,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "LatIScaleHighway",
@@ -547,7 +811,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "LatFScaleHighway",
@@ -557,7 +841,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrLatRateDamping",
@@ -568,7 +872,27 @@
                   "min": 0,
                   "max": 300,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrLatRateDampingFadeSpeed",
@@ -579,7 +903,27 @@
                   "min": 0,
                   "max": 60,
                   "step": 1,
-                  "unit": "mph"
+                  "unit": "mph",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaCenterScale",
@@ -589,7 +933,27 @@
                   "details": "Extra error correction added while driving straight, as a boost on top of the normal output (0.50 = 50% boost). One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line.",
                   "min": 0.0,
                   "max": 5.0,
-                  "step": 0.01
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaCenterBoostThreshold",
@@ -599,7 +963,27 @@
                   "min": 0.0,
                   "max": 10.0,
                   "step": 0.1,
-                  "unit": "deg"
+                  "unit": "deg",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaCenterBoostMinSpeed",
@@ -610,14 +994,54 @@
                   "min": 0,
                   "max": 80,
                   "step": 1,
-                  "unit": "mph"
+                  "unit": "mph",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrLatStiction",
                   "widget": "toggle",
                   "title": "Lateral Stiction",
                   "description": "Emulated EPS breakaway friction - the wheel holds solid between decisive corrections.",
-                  "details": "Final-stage hold/move state machine emulating the breakaway friction of high-torque EPS units. Holding sends a frozen torque (no dither reaches the EPS); breakaway triggers on real error, plan motion, or accumulated drift. Consider lowering the steering LPF once enabled. Reference - NRDR_LATERAL_STICTION.md."
+                  "details": "Final-stage hold/move state machine emulating the breakaway friction of high-torque EPS units. Holding sends a frozen torque (no dither reaches the EPS); breakaway triggers on real error, plan motion, or accumulated drift. Consider lowering the steering LPF once enabled. Reference - NRDR_LATERAL_STICTION.md.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrNnlcEnabled",
@@ -625,6 +1049,26 @@
                   "title": "Enable Neural Network Lateral Model (NNLC)",
                   "description": "Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is ON.",
                   "details": "OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ],
                   "sub_items": [
                     {
                       "key": "NrdrNnlcActivationSpeed",
@@ -636,6 +1080,24 @@
                       "step": 1,
                       "unit": "mph",
                       "enablement": [
+                        {
+                          "type": "any",
+                          "conditions": [
+                            {
+                              "type": "param",
+                              "key": "NrdrHandcraftedLateralTune",
+                              "equals": false
+                            },
+                            {
+                              "type": "not",
+                              "condition": {
+                                "type": "capability",
+                                "field": "car_fingerprint",
+                                "equals": "HONDA_CLARITY"
+                              }
+                            }
+                          ]
+                        },
                         {
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
@@ -654,6 +1116,24 @@
                       "unit": "%",
                       "enablement": [
                         {
+                          "type": "any",
+                          "conditions": [
+                            {
+                              "type": "param",
+                              "key": "NrdrHandcraftedLateralTune",
+                              "equals": false
+                            },
+                            {
+                              "type": "not",
+                              "condition": {
+                                "type": "capability",
+                                "field": "car_fingerprint",
+                                "equals": "HONDA_CLARITY"
+                              }
+                            }
+                          ]
+                        },
+                        {
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
                           "equals": true
@@ -671,6 +1151,24 @@
                       "unit": "%",
                       "enablement": [
                         {
+                          "type": "any",
+                          "conditions": [
+                            {
+                              "type": "param",
+                              "key": "NrdrHandcraftedLateralTune",
+                              "equals": false
+                            },
+                            {
+                              "type": "not",
+                              "condition": {
+                                "type": "capability",
+                                "field": "car_fingerprint",
+                                "equals": "HONDA_CLARITY"
+                              }
+                            }
+                          ]
+                        },
+                        {
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
                           "equals": true
@@ -687,6 +1185,24 @@
                       "step": 5,
                       "unit": "%",
                       "enablement": [
+                        {
+                          "type": "any",
+                          "conditions": [
+                            {
+                              "type": "param",
+                              "key": "NrdrHandcraftedLateralTune",
+                              "equals": false
+                            },
+                            {
+                              "type": "not",
+                              "condition": {
+                                "type": "capability",
+                                "field": "car_fingerprint",
+                                "equals": "HONDA_CLARITY"
+                              }
+                            }
+                          ]
+                        },
                         {
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
@@ -708,14 +1224,54 @@
                   "widget": "toggle",
                   "title": "Unwind Integrator Freeze",
                   "description": "Freezes the PID integrator while steering returns toward center.",
-                  "details": "Freezes the PID integrator while the steering is returning toward center, so it doesn't hold torque through the unwind."
+                  "details": "Freezes the PID integrator while the steering is returning toward center, so it doesn't hold torque through the unwind.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaUnwindLookahead",
                   "widget": "toggle",
                   "title": "Unwind Lookahead",
                   "description": "Reads the model's planned path to start unwinding earlier.",
-                  "details": "Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops."
+                  "details": "Reads the model's planned path to start unwinding earlier, before the instantaneous desired curvature drops.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaUnwindBoostSeconds",
@@ -726,7 +1282,27 @@
                   "min": 0.0,
                   "max": 3.0,
                   "step": 0.1,
-                  "unit": "s"
+                  "unit": "s",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaUnwindFfMultiplier",
@@ -736,7 +1312,27 @@
                   "details": "Peak feedforward multiplier during an unwind, strongest at a standstill and fading to 1x (no boost) by about 22 mph. Raise for more low-speed return authority if the wheel is lazy coming back to center.",
                   "min": 1.0,
                   "max": 10.0,
-                  "step": 0.1
+                  "step": 0.1,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             },
@@ -750,7 +1346,27 @@
                   "widget": "toggle",
                   "title": "Increase Driver Override Hysteresis",
                   "description": "Reduces false driver override detections on sensitive Honda EPS by doubling the override threshold below.",
-                  "details": "Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below."
+                  "details": "Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrDriverOverrideThreshold",
@@ -760,7 +1376,27 @@
                   "details": "Raw steering torque sensor reading above which you are considered to be steering (driver override). 1200 is Honda's stock threshold; on the few cars with a different stock threshold, your value is applied proportionally so 1200 always means stock.",
                   "min": 100,
                   "max": 5000,
-                  "step": 100
+                  "step": 100,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrOverrideThresholdCenterBoost",
@@ -770,14 +1406,54 @@
                   "details": "When the wheel is within the Center Boost degree band (on a straight), this lower override threshold applies instead of the one above - so you can override easily on straights while curves keep the higher threshold and do not drop torque from a false override. Set equal to Driver Override Threshold to disable.",
                   "min": 100,
                   "max": 5000,
-                  "step": 100
+                  "step": 100,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaDriverAssistDuringOverride",
                   "widget": "toggle",
                   "title": "Pass-through assist torque on override",
                   "description": "Resets the EPS lane-assist state so the final override feels like normal driving after fade completes.",
-                  "details": "When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling."
+                  "details": "When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaOverrideFadeDownSecs",
@@ -787,7 +1463,27 @@
                   "min": 0.0,
                   "max": 10.0,
                   "step": 0.1,
-                  "unit": "second"
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaOverrideFadeUpSecs",
@@ -797,7 +1493,27 @@
                   "min": 0.0,
                   "max": 10.0,
                   "step": 0.1,
-                  "unit": "second"
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaOverrideTorqueScale",
@@ -807,7 +1523,27 @@
                   "min": 0,
                   "max": 100,
                   "step": 1,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             },
@@ -821,7 +1557,27 @@
                   "widget": "toggle",
                   "title": "Low Pass Filter (tau)",
                   "description": "Smooths steering response at the cost of adding lag; tune to the least amount before oscillation.",
-                  "details": "Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations."
+                  "details": "Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaLpfTauLowSpeed",
@@ -832,6 +1588,24 @@
                   "max": 5.0,
                   "step": 0.01,
                   "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    },
                     {
                       "type": "param",
                       "key": "HondaTorqueLowPassFilter",
@@ -849,6 +1623,24 @@
                   "step": 0.01,
                   "enablement": [
                     {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    },
+                    {
                       "type": "param",
                       "key": "HondaTorqueLowPassFilter",
                       "equals": true
@@ -865,6 +1657,24 @@
                   "step": 0.01,
                   "enablement": [
                     {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    },
+                    {
                       "type": "param",
                       "key": "HondaTorqueLowPassFilter",
                       "equals": true
@@ -876,7 +1686,27 @@
                   "widget": "toggle",
                   "title": "Legacy Steer Delta Rate Limiter",
                   "description": "Limits how quickly requested steering torque can rise or fall.",
-                  "details": "Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass filter."
+                  "details": "Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass filter.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
                   "key": "HondaSteerDeltaUp",
@@ -887,6 +1717,24 @@
                   "max": 100.0,
                   "step": 0.1,
                   "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    },
                     {
                       "type": "param",
                       "key": "HondaSteerDeltaLimiter",
@@ -904,6 +1752,24 @@
                   "step": 0.1,
                   "enablement": [
                     {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    },
+                    {
                       "type": "param",
                       "key": "HondaSteerDeltaLimiter",
                       "equals": true
@@ -919,7 +1785,27 @@
                   "min": 0,
                   "max": 45,
                   "step": 1,
-                  "unit": "mph"
+                  "unit": "mph",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "car_fingerprint",
+                            "equals": "HONDA_CLARITY"
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             },
@@ -2701,7 +3587,27 @@
               "key": "LagdToggle",
               "widget": "toggle",
               "title": "Live Learning Steer Delay",
-              "description": "Allow device to learn and adapt car's steering response time"
+              "description": "Allow device to learn and adapt car's steering response time",
+              "enablement": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "param",
+                      "key": "NrdrHandcraftedLateralTune",
+                      "equals": false
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "car_fingerprint",
+                        "equals": "HONDA_CLARITY"
+                      }
+                    }
+                  ]
+                }
+              ]
             },
             {
               "key": "LagdToggleDelay",
@@ -2713,6 +3619,24 @@
               "max": 0.5,
               "step": 0.01,
               "enablement": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "param",
+                      "key": "NrdrHandcraftedLateralTune",
+                      "equals": false
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "car_fingerprint",
+                        "equals": "HONDA_CLARITY"
+                      }
+                    }
+                  ]
+                },
                 {
                   "type": "not",
                   "condition": {

@@ -28,6 +28,7 @@ CAPABILITY_FIELDS = (
   "icbm_available",
   "torque_allowed",
   "brand",
+  "car_fingerprint",
   "pcm_cruise",
   "alpha_long_available",
   "steer_control_type",
@@ -50,6 +51,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "icbm_available": "ICBM available",
   "torque_allowed": "torque steering (not available for angle steering vehicles)",
   "brand": "Vehicle brand",
+  "car_fingerprint": "Vehicle fingerprint",
   "pcm_cruise": "PCM cruise",
   "alpha_long_available": "Alpha Longitudinal available",
   "steer_control_type": "Steer control type",
@@ -68,6 +70,7 @@ CAPABILITY_LABELS: dict[str, str] = {
 # Explicit defaults for non-boolean capability fields
 CAPABILITY_DEFAULTS: dict[str, bool | str | int] = {
   "brand": "",
+  "car_fingerprint": "",
   "steer_control_type": "",
   "device_type": "",
   "protocol_version": PROTOCOL_VERSION,
@@ -146,6 +149,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
     try:
       CP = messaging.log_from_bytes(CP_bytes, car.CarParams)
       caps["alpha_long_available"] = bool(CP.alphaLongitudinalAvailable)
+      caps["car_fingerprint"] = str(CP.carFingerprint)
       if CP.alphaLongitudinalAvailable:
         caps["has_longitudinal_control"] = params.get_bool("AlphaLongitudinalEnabled")
       else:

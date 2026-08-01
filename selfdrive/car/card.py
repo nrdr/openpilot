@@ -22,6 +22,7 @@ from openpilot.selfdrive.car.cruise import VCruiseHelper
 from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_capnp
 
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import apply_handcrafted_lateral_profile
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 
 REPLAY = "REPLAY" in os.environ
@@ -114,6 +115,13 @@ class Car:
       self.RI = interfaces[self.CI.CP.carFingerprint].RadarInterface(self.CI.CP, self.CI.CP_SP)
       self.CP = self.CI.CP
       self.CP_SP = self.CI.CP_SP
+
+      # Fingerprinting is authoritative: restore the complete road-tested
+      # profile before controlsd starts and reads any of its live tuning Params.
+      changed = apply_handcrafted_lateral_profile(self.CP.carFingerprint, self.params, block=True)
+      if changed:
+        cloudlog.warning({"event": "handcrafted lateral profile restored", "carFingerprint": str(self.CP.carFingerprint),
+                          "changedParams": changed})
 
       # continue onto next fingerprinting step in pandad
       self.params.put_bool("FirmwareQueryDone", True, block=True)

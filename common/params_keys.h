@@ -345,6 +345,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrCarTuneInfo", {PERSISTENT, STRING, ""}},                   // Car & Tune Info readout for the Sunnylink info row (written by nrdr_remoted)
     {"NrdrCarTuneDetails", {PERSISTENT, STRING, ""}},                // multiline live data injected into the Sunnylink Profile info modal
     {"NrdrCarControllerInfo", {PERSISTENT, STRING, ""}},             // concise read-only Controller row in Sunnylink Car & Tune Info
+    {"NrdrCarHandcraftedInfo", {PERSISTENT, STRING, ""}},            // active fingerprint-scoped handcrafted profile name/version
     {"NrdrCarPidLowInfo", {PERSISTENT, STRING, ""}},                 // concise read-only low-speed PID scale row
     {"NrdrCarPidMidInfo", {PERSISTENT, STRING, ""}},                 // concise read-only standard-speed PID scale row
     {"NrdrCarPidHighInfo", {PERSISTENT, STRING, ""}},                // concise read-only highway PID scale row
@@ -355,6 +356,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrCarLearningInfo", {PERSISTENT, STRING, ""}},               // concise read-only live-learning settings row
     {"NrdrCarHelpersInfo", {PERSISTENT, STRING, ""}},                // concise read-only stiction/StarPilot row
     {"NrdrStarPilotPid", {PERSISTENT | BACKUP, BOOL, "0"}},          // borrowed StarPilot _pid_output_scale (center boost + turn-in/per-direction scaling); 0 = clean PID/F + D
+    {"NrdrHandcraftedLateralTune", {PERSISTENT | BACKUP, BOOL, "1"}}, // fingerprint-scoped, versioned road-tested lateral profile; unsupported cars ignore it
     {"NrdrNnlcEnabled", {PERSISTENT | BACKUP, BOOL, "1"}},            // Clarity hybrid: allow the NNLC half of the controller (OFF = PID only)
     {"NrdrNnlcActivationSpeed", {PERSISTENT | BACKUP, INT, "30"}},    // mph; center of the smooth PID -> NNLC speed handoff
     {"NrdrNnlcKpGain", {PERSISTENT | BACKUP, INT, "100"}},            // NNLC feedback proportional gain, percent of 1.0

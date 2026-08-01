@@ -18,6 +18,7 @@ from cereal import car
 from opendbc.car.car_helpers import interfaces
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import get_handcrafted_lateral_profile
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget, DialogResult
@@ -28,7 +29,7 @@ from openpilot.system.ui.widgets.list_view import (BUTTON_BORDER_RADIUS, BUTTON_
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.html_render import HtmlModalSP
-from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, simple_button_item_sp
+from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, simple_button_item_sp, toggle_item_sp
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.pidf_ground import PidfGroundLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.unwind_helpers import UnwindHelpersLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.override_tuning import OverrideTuningLayout
@@ -304,6 +305,13 @@ class LateralTuningLayout(Widget):
     gui_app.push_widget(HtmlModalSP(text=self._build_pid_tune_info()))
 
   def _initialize_items(self):
+    self._handcrafted_tune = toggle_item_sp(
+      title=lambda: tr("Handcrafted Lateral Tuning"),
+      description=lambda: tr("Force-load the complete road-tested tune for this exact vehicle fingerprint. While enabled, "
+                             "conflicting PID/F, learning, helper, filter, and live-delay controls are locked."),
+      param="NrdrHandcraftedLateralTune",
+    )
+
     self._tune_report_item = ListItem(
       title=lambda: tr("Tune Report"),
       description=lambda: tr("Analyze the drive logs on this device and report, per speed band and turn direction, how well the lateral tune is tracking. Scanning a full day of logs can take a few minutes. DELETE permanently wipes all dashcam media in /data/media/0."),
@@ -350,6 +358,8 @@ class LateralTuningLayout(Widget):
     )
 
     return [
+      self._handcrafted_tune,
+      LineSeparatorSP(40),
       self._tune_report_item,
       self._pid_tune_info_item,
       LineSeparatorSP(40),
@@ -367,6 +377,9 @@ class LateralTuningLayout(Widget):
   def _update_state(self):
     super()._update_state()
     self._poll_tune_report_scan()
+    fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
+    self._handcrafted_tune.set_visible(get_handcrafted_lateral_profile(fingerprint) is not None)
+    self._handcrafted_tune.action_item.set_enabled(ui_state.is_offroad())
 
   def _render(self, rect):
     if self._current_panel == LateralPanel.PIDF:
