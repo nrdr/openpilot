@@ -1,0 +1,18 @@
+[
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_nrdr_clarity_monotonic_learned_curve_restores_original_tail",
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_nrdr_steer_ratio_curve_is_fingerprint_scoped[HONDA_CIVIC-HONDA_CIVIC]",
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_nrdr_steer_ratio_curve_is_fingerprint_scoped[HONDA_CIVIC_BOSCH-HONDA_CIVIC_BOSCH]",
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_nrdr_steer_ratio_curve_is_fingerprint_scoped[HONDA_CIVIC_BOSCH_DIESEL-None]",
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_nrdr_steer_ratio_curve_is_fingerprint_scoped[HONDA_CLARITY-HONDA_CLARITY]",
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_nrdr_steer_ratio_curve_is_fingerprint_scoped[HONDA_CRV_5G-HONDA_CRV_5G]",
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_nrdr_steer_ratio_curves_are_well_formed",
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_saturation[CHEVROLET_BOLT_EUV-LatControlTorque]",
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_saturation[HONDA_CIVIC-LatControlPID]",
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_saturation[NISSAN_LEAF-LatControlAngle]",
+  "selfdrive/controls/tests/test_latcontrol.py::TestLatControl::test_saturation[TOYOTA_RAV4-LatControlTorque]",
+  "system/athena/tests/test_athenad.py::TestAthenadMethods::test_start_stream_konik_disabled",
+  "system/athena/tests/test_athenad.py::TestAthenadMethods::test_start_stream_konik_enabled",
+  "system/athena/tests/test_athenad.py::TestAthenadMethods::test_start_stream_rejects_onroad",
+  "system/athena/tests/test_athenad.py::TestAthenadMethods::test_start_stream_rolls_back_when_webrtcd_does_not_start",
+  "system/manager/test/test_manager.py::TestManager::test_webrtcd_live_view_gating"
+]
