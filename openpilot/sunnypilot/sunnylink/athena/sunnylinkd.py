@@ -56,6 +56,11 @@ BLOCKED_PARAMS = {
   "OnroadCycleRequested",      # Prevent remote cycle trigger
   "ParamsVersion",         # Device-managed version counter
 }
+ONROAD_BLOCKED_PARAMS = {
+  # selfdrived owns this runtime state onroad. A delayed browser/settings write must
+  # never change following behavior while the car is moving.
+  "LongitudinalPersonality",
+}
 
 
 def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
@@ -233,14 +238,19 @@ def getParams(params_keys: list[str], compression: bool = False) -> str | dict[s
 
 @dispatcher.add_method
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
+  onroad = params.get_bool("IsOnroad")
   for key, value in params_to_update.items():
     # disallow modifications to blocked parameters
     if key in BLOCKED_PARAMS:
       cloudlog.warning(f"sunnylinkd.saveParams.blocked: Attempted to modify blocked parameter '{key}'")
       continue
+    if onroad and key in ONROAD_BLOCKED_PARAMS:
+      cloudlog.warning(f"sunnylinkd.saveParams.onroad_blocked: Attempted to modify onroad parameter '{key}'")
+      continue
 
     try:
       save_param_from_base64_encoded_string(key, value, compression)
+      cloudlog.info({"event": "sunnylinkd.saveParams.saved", "key": key})
     except Exception as e:
       cloudlog.error(f"sunnylinkd.saveParams.exception {e}")
 
