@@ -261,8 +261,8 @@ class TestKnownPanels:
     car_info = next(sp for sp in _iter_all_sub_panels(steering) if sp["id"] == "nrdr_car_info")
     keys = [item["key"] for item in car_info["items"]]
     assert keys == [
-      "NrdrCarTuneInfo", "NrdrCarControllerInfo", "NrdrCarPidLowInfo", "NrdrCarPidMidInfo",
-      "NrdrCarPidHighInfo", "NrdrCarDampingInfo", "NrdrCarCenterInfo", "NrdrCarNnlcInfo",
+      "NrdrCarTuneInfo", "NrdrCarControllerInfo", "NrdrCarHandcraftedInfo", "NrdrCarPidLowInfo",
+      "NrdrCarPidMidInfo", "NrdrCarPidHighInfo", "NrdrCarDampingInfo", "NrdrCarCenterInfo", "NrdrCarNnlcInfo",
       "NrdrCarSteerRatioInfo", "NrdrCarLearningInfo", "NrdrCarHelpersInfo",
     ]
 
