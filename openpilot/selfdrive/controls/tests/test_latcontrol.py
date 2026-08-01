@@ -1,3 +1,5 @@
+import numpy as np
+
 from openpilot.common.parameterized import parameterized
 
 from openpilot.cereal import log
@@ -31,12 +33,22 @@ class TestLatControl:
       assert all(left < right for left, right in zip(breakpoints[:-1], breakpoints[1:], strict=True))
       assert all(left >= right for left, right in zip(values[:-1], values[1:], strict=True))
 
-  def test_nrdr_clarity_center_midpoint_restores_original_tail(self):
-    assert NRDR_CLARITY_SR_CURVE_BP == [0., 6., 12., 20., 24., 26., 28., 30., 32., 34., 36., 38., 40., 48., 70., 100., 140., 200., 300., 450.]
-    assert NRDR_CLARITY_SR_CURVE_V == [
-      18.340, 18.340, 18.290, 18.095, 18.062, 17.993, 17.843, 17.641, 17.418, 17.178,
-      16.978, 16.840, 16.780, 16.720, 16.400, 15.940, 15.400, 14.300, 13.400, 12.740,
+  def test_nrdr_clarity_monotonic_learned_curve_restores_original_tail(self):
+    assert NRDR_CLARITY_SR_CURVE_BP == [
+      0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5,
+      62.5, 67.5, 70., 75., 80., 85., 90., 100., 140., 200., 300., 450.,
     ]
+    assert NRDR_CLARITY_SR_CURVE_V == [
+      19.680, 19.680, 19.680, 19.680, 19.344, 19.344, 19.307, 19.151, 18.406, 18.406,
+      18.406, 18.087, 17.999, 17.999, 17.710, 17.604, 17.222, 16.706, 16.308, 16.093333333333334,
+      15.940, 15.400, 14.300, 13.400, 12.720,
+    ]
+
+    # The 70-90 degree transition must remain monotonic and rejoin the old
+    # 70-100 degree segment at its exact interpolated 90 degree value.
+    assert np.interp(70., NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V) == 17.604
+    assert np.interp(90., NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V) == 16.093333333333334
+    assert np.interp(100., NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V) == 15.940
 
   @parameterized.expand([
     (HONDA.HONDA_CLARITY, "HONDA_CLARITY"),

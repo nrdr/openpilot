@@ -20,13 +20,18 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 # 45 degrees), so it cannot learn a rack's off-center taper. When steer-ratio
 # learning is disabled, these curves replace that scalar for explicitly mapped VGR
 # cars only. Every other car keeps its normal CP.steerRatio behavior.
-# Clarity road-test blend: the original curve was slightly low and the 19.68
-# raw experiment slightly high below 30 degrees, so the center is their exact
-# midpoint. A smoothstep-sampled fade removes that correction from 24-40
-# degrees; at 40 degrees and beyond the original road-proven curve is restored.
-NRDR_CLARITY_SR_CURVE_BP = [0., 6., 12., 20., 24., 26., 28., 30., 32., 34., 36., 38., 40., 48., 70., 100., 140., 200., 300., 450.]  # |wheel angle|, deg
-NRDR_CLARITY_SR_CURVE_V = [18.340, 18.340, 18.290, 18.095, 18.062, 17.993, 17.843, 17.641, 17.418, 17.178,
-                           16.978, 16.840, 16.780, 16.720, 16.400, 15.940, 15.400, 14.300, 13.400, 12.740]
+# Clarity variable-rack blend. The <= 70 degree section is the sample-weighted,
+# non-increasing fit of the measured 5 degree bins. The noisy 5-10 degree rise is
+# capped at the 0-5 degree median, and every later upward violation is pooled with
+# its neighbor(s) instead of being allowed to create an unphysical ratio increase.
+# A smoothstep-sampled 70-90 degree handoff rejoins the previous road-proven curve
+# at exactly its existing 90 degree value; 90 degrees onward is unchanged except
+# for the corrected Honda end-to-end specification of 12.72 at 450 degrees.
+NRDR_CLARITY_SR_CURVE_BP = [0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5,
+                            62.5, 67.5, 70., 75., 80., 85., 90., 100., 140., 200., 300., 450.]  # |wheel angle|, deg
+NRDR_CLARITY_SR_CURVE_V = [19.680, 19.680, 19.680, 19.680, 19.344, 19.344, 19.307, 19.151, 18.406, 18.406,
+                           18.406, 18.087, 17.999, 17.999, 17.710, 17.604, 17.222, 16.706, 16.308, 16.093333333333334,
+                           15.940, 15.400, 14.300, 13.400, 12.720]
 
 NRDR_CRV_5G_SR_CURVE_BP = [0., 50., 100., 150., 175., 200.]
 NRDR_CRV_5G_SR_CURVE_V = [18.10, 17.80, 16.30, 15.30, 14.90, 14.60]
