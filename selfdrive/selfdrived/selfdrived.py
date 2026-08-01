@@ -51,9 +51,6 @@ MonitoringPolicy = log.DriverMonitoringState.MonitoringPolicy
 TurnDirection = custom.ModelDataV2SP.TurnDirection
 
 IGNORED_SAFETY_MODES = (SafetyModel.silent, SafetyModel.noOutput)
-PERSONALITY_PARAM_ACK_TIMEOUT = 5.0
-
-
 class SelfdriveD(CruiseHelper):
   def __init__(self, CP=None, CP_SP=None):
     self.params = Params()
@@ -137,8 +134,6 @@ class SelfdriveD(CruiseHelper):
     self.logged_comm_issue = None
     self.not_running_prev = None
     self.experimental_mode = False
-    self._personality_lock = threading.Lock()
-    self._personality_pending: tuple[int, float] | None = None
     self.personality = get_sanitize_int_param(
       "LongitudinalPersonality",
       min(log.LongitudinalPersonality.schema.enumerants.values()),
@@ -182,28 +177,12 @@ class SelfdriveD(CruiseHelper):
     CruiseHelper.__init__(self, self.CP)
 
   def _cycle_personality_from_button(self) -> None:
-    # Params.put is deliberately nonblocking. Protect the new in-memory choice until the
-    # params reader observes that write, otherwise its next 100 ms poll can restore stale data.
-    with self._personality_lock:
-      personality = (self.personality - 1) % len(log.LongitudinalPersonality.schema.enumerants)
-      self._personality_pending = (personality, time.monotonic() + PERSONALITY_PARAM_ACK_TIMEOUT)
-      self.personality = personality
+    # selfdrived owns the live personality for the entire onroad process lifetime. Persist
+    # button changes for the next drive, but never poll this value back from Params while
+    # onroad: a delayed remote/settings write must not change longitudinal behavior in motion.
+    personality = (self.personality - 1) % len(log.LongitudinalPersonality.schema.enumerants)
+    self.personality = personality
     self.params.put('LongitudinalPersonality', personality)
-
-  def _refresh_personality_from_params(self) -> None:
-    personality = self.params.get("LongitudinalPersonality", return_default=True)
-    now = time.monotonic()
-    with self._personality_lock:
-      if self._personality_pending is not None:
-        pending_personality, deadline = self._personality_pending
-        if personality == pending_personality:
-          self._personality_pending = None
-        elif now < deadline:
-          return
-        else:
-          # Do not permanently mask a failed write or a later external settings change.
-          self._personality_pending = None
-      self.personality = personality
 
   def update_events(self, CS):
     """Compute onroadEvents from carState"""
@@ -658,7 +637,6 @@ class SelfdriveD(CruiseHelper):
       self.is_ldw_enabled = self.params.get_bool("IsLdwEnabled")
       self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
       self.experimental_mode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
-      self._refresh_personality_from_params()
 
       self.mads.read_params()
       time.sleep(0.1)
