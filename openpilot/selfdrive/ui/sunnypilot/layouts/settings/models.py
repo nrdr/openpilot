@@ -11,6 +11,7 @@ import pyray as rl
 
 from openpilot.cereal import custom
 from openpilot.sunnypilot.models.default_model import DEFAULT_MODEL
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
 from openpilot.common.constants import CV
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from openpilot.system.ui.lib.multilang import tr
@@ -238,10 +239,14 @@ class ModelsLayout(Widget):
     turn_desire: bool = ui_state.params.get_bool("LaneTurnDesire")
     live_delay: bool = ui_state.params.get_bool("LagdToggle")
     camera_offset: bool = ui_state.params.get("ModelManager_ActiveBundle") is not None
+    fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
+    delay_editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
 
     self.lane_turn_desire_toggle.action_item.set_state(turn_desire)
     self.lane_turn_value_control.set_visible(turn_desire and advanced_controls)
     self.lagd_toggle.action_item.set_state(live_delay)
+    self.lagd_toggle.action_item.set_enabled(delay_editable)
+    self.delay_control.action_item.set_enabled(delay_editable)
     self.delay_control.set_visible(not live_delay and advanced_controls)
     new_step = int(round(100 / CV.MPH_TO_KPH)) if ui_state.is_metric else 100
     if self.lane_turn_value_control.action_item is not None and self.lane_turn_value_control.action_item.value_change_step != new_step:

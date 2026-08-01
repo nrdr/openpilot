@@ -29,6 +29,11 @@ from opendbc.car.car_helpers import interfaces
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
+  apply_handcrafted_lateral_profile,
+  get_handcrafted_lateral_profile,
+  is_handcrafted_lateral_enabled,
+)
 
 POLL_INTERVAL_S = 2.0
 UPDATER_WAKE_TIMEOUT_S = 15.0
@@ -193,6 +198,10 @@ def write_car_tune_info(params, cache: dict) -> None:
     if not cp_bytes:
       return
     with car.CarParams.from_bytes(cp_bytes) as CP:
+      changed = apply_handcrafted_lateral_profile(CP.carFingerprint, params)
+      if changed:
+        cloudlog.warning({"event": "handcrafted lateral profile restored offroad", "carFingerprint": str(CP.carFingerprint),
+                          "changedParams": changed})
       eps = next((bytes(fw.fwVersion).decode("latin-1", "replace").strip("\x00").strip()
                   for fw in CP.carFw if fw.ecu == "eps"), "") or "n/a"
       interceptor = "n/a"
@@ -248,10 +257,16 @@ def write_car_tune_info(params, cache: dict) -> None:
       controller_info = controller
       if controller == "PID/NNLC":
         controller_info = "PID/NNLC hybrid | PID for lane changes" if nnlc_on == "ON" else "PID only | NNLC disabled"
+      profile = get_handcrafted_lateral_profile(CP.carFingerprint)
+      handcrafted_on = is_handcrafted_lateral_enabled(CP.carFingerprint, params)
+      handcrafted_info = f"{profile.name} (v{profile.version})" if handcrafted_on and profile is not None else "OFF"
+      if handcrafted_on:
+        controller_info = f"Handcrafted v{profile.version} | {controller_info}"
 
       rows = {
         "NrdrCarTuneInfo": info,
         "NrdrCarControllerInfo": controller_info,
+        "NrdrCarHandcraftedInfo": handcrafted_info,
         "NrdrCarPidLowInfo": f"P {p_low}% | I {i_low}% | F {f_low}%",
         "NrdrCarPidMidInfo": f"P {p_mid}% | I {i_mid}% | F {f_mid}%",
         "NrdrCarPidHighInfo": f"P {p_high}% | I {i_high}% | F {f_high}%",
@@ -272,6 +287,7 @@ def write_car_tune_info(params, cache: dict) -> None:
         "",
         "CONTROLLER",
         rows["NrdrCarControllerInfo"],
+        f"Handcrafted profile: {rows['NrdrCarHandcraftedInfo']}",
         f"NNLC: {rows['NrdrCarNnlcInfo']}",
         "",
         f"LATERAL PID BASE ({pid_base_speeds})",

@@ -26,6 +26,15 @@ macros:
   advanced_only:
     - {type: param, key: ShowAdvancedControls, equals: true}
 
+  # Custom lateral controls remain editable on unsupported cars or when the
+  # fingerprint-scoped handcrafted profile is explicitly disabled.
+  handcrafted_lateral_unlocked:
+    - type: any
+      conditions:
+        - {type: param, key: NrdrHandcraftedLateralTune, equals: false}
+        - type: not
+          condition: {type: capability, field: car_fingerprint, equals: HONDA_CLARITY}
+
   # Hide on MICI hardware (no analog HUD support yet).
   hide_on_mici:
     - type: not

@@ -35,6 +35,8 @@ sections:
     widget: toggle
     title: Live Learning Steer Delay
     description: Allow device to learn and adapt car's steering response time
+    enablement:
+    - $ref: '#/macros/handcrafted_lateral_unlocked'
   - key: LagdToggleDelay
     widget: option
     title: Adjust Software Delay
@@ -44,6 +46,7 @@ sections:
     max: 0.5
     step: 0.01
     enablement:
+    - $ref: '#/macros/handcrafted_lateral_unlocked'
     - type: not
       condition:
         type: param

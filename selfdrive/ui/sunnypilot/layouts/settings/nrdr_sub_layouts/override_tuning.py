@@ -5,6 +5,7 @@ from collections.abc import Callable
 import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
@@ -99,13 +100,13 @@ class OverrideTuningLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
-    self._increase_override_tolerance.action_item.set_enabled(True)
-    self._driver_override_threshold.action_item.set_enabled(True)
-    self._driver_override_threshold_cb.action_item.set_enabled(True)
-    self._driver_assist_during_override.action_item.set_enabled(True)
-    self._override_fade_down.action_item.set_enabled(True)
-    self._override_fade_up.action_item.set_enabled(True)
-    self._override_torque_scale.action_item.set_enabled(True)
+    fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
+    editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
+    for item in (
+      self._increase_override_tolerance, self._driver_override_threshold, self._driver_override_threshold_cb,
+      self._driver_assist_during_override, self._override_fade_down, self._override_fade_up, self._override_torque_scale,
+    ):
+      item.action_item.set_enabled(editable)
 
   def _render(self, rect):
     self._back_button.set_position(self._rect.x, self._rect.y + 20)
