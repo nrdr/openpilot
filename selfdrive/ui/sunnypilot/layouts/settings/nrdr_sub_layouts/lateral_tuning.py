@@ -307,7 +307,7 @@ class LateralTuningLayout(Widget):
   def _initialize_items(self):
     self._handcrafted_tune = toggle_item_sp(
       title=lambda: tr("Handcrafted Lateral Tuning"),
-      description=lambda: tr("Force-load the complete road-tested tune for this exact vehicle fingerprint. While enabled, "
+      description=lambda: tr("Force-load the complete road-tested tune for this exact vehicle fingerprint. While enabled, " +
                              "conflicting PID/F, learning, helper, filter, and live-delay controls are locked."),
       param="NrdrHandcraftedLateralTune",
     )

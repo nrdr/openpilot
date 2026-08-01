@@ -5,10 +5,10 @@ set of live Params that shaped a known-good drive, including helpers and model
 delay settings that are easy to overlook when copying only PID gains.
 """
 from dataclasses import dataclass
-from typing import Protocol, TypeAlias
+from typing import Protocol
 
 
-ParamValue: TypeAlias = bool | int | float
+type ParamValue = bool | int | float
 
 
 class ParamsLike(Protocol):
