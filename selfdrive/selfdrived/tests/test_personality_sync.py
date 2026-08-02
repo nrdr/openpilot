@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from cereal import custom
 from openpilot.selfdrive.selfdrived.selfdrived import SelfdriveD
 
 
@@ -48,3 +49,17 @@ def test_onroad_params_thread_does_not_read_personality(monkeypatch):
   monkeypatch.setattr("openpilot.selfdrive.selfdrived.selfdrived.time.sleep", lambda _: None)
 
   selfdrived.params_thread(OneIterationEvent())
+
+
+def test_sla_confirmation_release_stays_reserved_across_planner_race(monkeypatch):
+  times = iter((10.0, 10.1, 10.8))
+  monkeypatch.setattr("openpilot.selfdrive.selfdrived.selfdrived.time.monotonic", lambda: next(times))
+
+  selfdrived = object.__new__(SelfdriveD)
+  selfdrived._sla_confirm_button_reserved_until = 0.0
+  pre_active = custom.LongitudinalPlanSP.SpeedLimit.AssistState.preActive
+  active = custom.LongitudinalPlanSP.SpeedLimit.AssistState.active
+
+  assert selfdrived._sla_reserves_distance_button(pre_active)
+  assert selfdrived._sla_reserves_distance_button(active)
+  assert not selfdrived._sla_reserves_distance_button(active)

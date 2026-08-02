@@ -51,6 +51,9 @@ MonitoringPolicy = log.DriverMonitoringState.MonitoringPolicy
 TurnDirection = custom.ModelDataV2SP.TurnDirection
 
 IGNORED_SAFETY_MODES = (SafetyModel.silent, SafetyModel.noOutput)
+SLA_CONFIRM_BUTTON_RESERVE_S = 0.75
+
+
 class SelfdriveD(CruiseHelper):
   def __init__(self, CP=None, CP_SP=None):
     self.params = Params()
@@ -134,6 +137,7 @@ class SelfdriveD(CruiseHelper):
     self.logged_comm_issue = None
     self.not_running_prev = None
     self.experimental_mode = False
+    self._sla_confirm_button_reserved_until = 0.0
     self.personality = get_sanitize_int_param(
       "LongitudinalPersonality",
       min(log.LongitudinalPersonality.schema.enumerants.values()),
@@ -183,6 +187,18 @@ class SelfdriveD(CruiseHelper):
     personality = (self.personality - 1) % len(log.LongitudinalPersonality.schema.enumerants)
     self.personality = personality
     self.params.put('LongitudinalPersonality', personality)
+
+  def _sla_reserves_distance_button(self, sla_state) -> bool:
+    now = time.monotonic()
+    if sla_state == custom.LongitudinalPlanSP.SpeedLimit.AssistState.preActive:
+      # Keep the button reserved briefly after the planner accepts the proposal.
+      # plannerd and selfdrived consume carState independently, so the active plan
+      # can otherwise win the race and let the same release also cycle personality.
+      self._sla_confirm_button_reserved_until = now + SLA_CONFIRM_BUTTON_RESERVE_S
+    reserved = self._sla_confirm_button_reserved_until > 0.0 and now <= self._sla_confirm_button_reserved_until
+    if not reserved:
+      self._sla_confirm_button_reserved_until = 0.0
+    return reserved
 
   def update_events(self, CS):
     """Compute onroadEvents from carState"""
@@ -480,14 +496,14 @@ class SelfdriveD(CruiseHelper):
     # nrdr: while a Speed Limit Assist proposal is pending (preActive), the distance button
     # is the confirmation input - suppress its normal functions (personality cycling and the
     # experimental-mode long press) so accepting a limit doesn't also trigger them.
-    sla_pre_active = self.sm['longitudinalPlanSP'].speedLimit.assist.state == \
-        custom.LongitudinalPlanSP.SpeedLimit.AssistState.preActive
+    sla_state = self.sm['longitudinalPlanSP'].speedLimit.assist.state
+    sla_confirmation_reserved = self._sla_reserves_distance_button(sla_state)
 
-    if not sla_pre_active:
+    if not sla_confirmation_reserved:
       CruiseHelper.update(self, CS, self.events_sp, self.experimental_mode)
 
     # decrement personality on distance button press
-    if self.CP.openpilotLongitudinalControl and not sla_pre_active:
+    if self.CP.openpilotLongitudinalControl and not sla_confirmation_reserved:
       if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
         if not self.experimental_mode_switched:
           # Dynamic HUD: the first press only opens the HUD sub-mode preview; only

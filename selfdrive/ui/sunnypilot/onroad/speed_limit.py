@@ -6,7 +6,6 @@ See the LICENSE.md file in the root directory for more details.
 """
 
 from dataclasses import dataclass
-from enum import StrEnum
 import pyray as rl
 
 from cereal import custom
@@ -14,7 +13,6 @@ from openpilot.common.constants import CV
 from openpilot.selfdrive.ui.onroad.hud_renderer import UI_CONFIG
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode as SpeedLimitMode
-from openpilot.system.hardware import HARDWARE
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -42,22 +40,8 @@ class Colors:
   MUTCD_LINES = rl.Color(255, 255, 255, 100)
 
 
-class IconSide(StrEnum):
-  left = 'left'
-  right = 'right'
-
-
 class SpeedLimitAlertRenderer:
-  ARROW_SIZE = 90 if HARDWARE.get_device_type() == 'mici' else 200
-
   def __init__(self):
-    self.arrow_up = gui_app.texture("../../sunnypilot/selfdrive/assets/img_plus_arrow_up.png", self.ARROW_SIZE, self.ARROW_SIZE)
-    self.arrow_down = gui_app.texture("../../sunnypilot/selfdrive/assets/img_minus_arrow_down.png", self.ARROW_SIZE, self.ARROW_SIZE)
-
-    blank_image = rl.gen_image_color(self.ARROW_SIZE, self.ARROW_SIZE, rl.Color(0, 0, 0, 0))
-    self.arrow_blank = rl.load_texture_from_image(blank_image)
-    rl.unload_image(blank_image)
-
     self._pre_active_fade = AlertFadeAnimator(gui_app.target_fps, duration_on=0.75, rc=0.05)
 
   def update(self):
@@ -66,28 +50,10 @@ class SpeedLimitAlertRenderer:
 
   def speed_limit_pre_active_icon_helper(self):
     icon_alpha = max(0.0, min(self._pre_active_fade.alpha * 255.0, 255.0))
-    txt_icon = self.arrow_blank
-    icon_margin_x = 10
-    icon_margin_y = 18
-
-    if icon_alpha > 0:
-      speed_conv = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
-      speed_limit_final_last = ui_state.sm['longitudinalPlanSP'].speedLimit.resolver.speedLimitFinalLast
-
-      v_cruise_cluster = ui_state.sm['carState'].vCruiseCluster
-      set_speed = ui_state.sm['controlsState'].deprecated.vCruise if v_cruise_cluster == 0.0 else v_cruise_cluster
-      if not ui_state.is_metric:
-        set_speed *= KM_TO_MILE
-
-      set_speed_round = round(set_speed)
-      speed_limit_round = round(speed_limit_final_last * speed_conv)
-
-      if set_speed_round < speed_limit_round:
-        txt_icon = self.arrow_up
-      elif set_speed_round > speed_limit_round:
-        txt_icon = self.arrow_down
-
-    return IconSide.right, txt_icon, icon_alpha, icon_margin_x, icon_margin_y
+    # Confirmation moved from +/- to the distance button. The old directional
+    # arrows instructed the driver to press buttons that no longer confirm, so
+    # the alert text is now the single authoritative prompt.
+    return None, None, icon_alpha, 0, 0
 
 
 class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
@@ -192,9 +158,7 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
 
     if ui_state.speed_limit_mode != SpeedLimitMode.off:
       self._draw_sign_main(sign_rect, alpha)
-      if self.speed_limit_assist_state == AssistState.preActive:
-        self._draw_pre_active_arrow(sign_rect)
-      else:
+      if self.speed_limit_assist_state != AssistState.preActive:
         self._draw_ahead_info(sign_rect)
 
   def _draw_sign_main(self, rect, alpha=1.0):
@@ -218,16 +182,6 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
       self._render_vienna(rect, limit_str, sub_text, txt_color, has_limit, alpha)
     else:
       self._render_mutcd(rect, limit_str, sub_text, txt_color, has_limit, alpha)
-
-  def _draw_pre_active_arrow(self, sign_rect):
-    _, txt_icon, icon_alpha, _, _ = SpeedLimitAlertRenderer.speed_limit_pre_active_icon_helper(self)
-    if icon_alpha > 0 and txt_icon != self.arrow_blank:
-      sign_margin = 12
-      arrow_spacing = int(sign_margin * 1.4)
-      arrow_x = sign_rect.x + sign_rect.width + arrow_spacing
-      arrow_y = sign_rect.y + (sign_rect.height - txt_icon.height) / 2
-      color = rl.Color(255, 255, 255, int(icon_alpha))
-      rl.draw_texture_ex(txt_icon, rl.Vector2(arrow_x, arrow_y), 0.0, 1.0, color)
 
   def _render_vienna(self, rect, val, sub, color, has_limit, alpha=1.0):
     center = rl.Vector2(rect.x + rect.width / 2, rect.y + rect.height / 2)

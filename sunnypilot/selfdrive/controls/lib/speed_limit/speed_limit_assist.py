@@ -40,8 +40,6 @@ LIMIT_MIN_SPEED = 8.33  # m/s, Minimum speed limit to provide as solution on lim
 LIMIT_SPEED_OFFSET_TH = -1.  # m/s Maximum offset between speed limit and current speed for adapting state.
 V_CRUISE_UNSET = 255.
 
-CRUISE_BUTTONS_PLUS = (ButtonType.accelCruise, ButtonType.resumeCruise)
-CRUISE_BUTTONS_MINUS = (ButtonType.decelCruise, ButtonType.setCruise)
 CRUISE_BUTTON_CONFIRM_HOLD = 0.5  # secs.
 
 
@@ -88,8 +86,7 @@ class SpeedLimitAssist:
     self._state_prev = SpeedLimitAssistState.disabled
     self.pcm_op_long = CP.openpilotLongitudinalControl and CP.pcmCruise
 
-    self._plus_hold = 0.
-    self._minus_hold = 0.
+    self._gap_hold = 0.
     self._last_carstate_ts = 0.
 
     # TODO-SP: SLA's own output_a_target for planner
@@ -153,12 +150,12 @@ class SpeedLimitAssist:
       # nrdr: the distance/gap button is the ONLY confirmation input. +/- never confirms -
       # the driver must always be able to adjust set speed without accepting a pending limit.
       if not b.pressed and b.type == ButtonType.gapAdjustCruise:
-        self._gap_hold = max(getattr(self, "_gap_hold", 0.), now + CRUISE_BUTTON_CONFIRM_HOLD)
+        self._gap_hold = max(self._gap_hold, now + CRUISE_BUTTON_CONFIRM_HOLD)
 
   def _get_confirm_button_release(self) -> bool:
     # consume a recent distance/gap button release (the sole confirmation input)
     now = time.monotonic()
-    hold = getattr(self, "_gap_hold", 0.)
+    hold = self._gap_hold
     self._gap_hold = 0.
     return bool(now <= hold)
 
@@ -302,7 +299,11 @@ class SpeedLimitAssist:
       else:
         # ACTIVE
         if self.state == SpeedLimitAssistState.active:
-          if self.v_cruise_cluster_changed:
+          # Non-PCM SLA applies an accepted limit by writing vCruise itself. That expected
+          # write arrives on the next planner tick and must not be mistaken for a driver's
+          # manual +/- adjustment. Equality is safe to use here because explicit distance-
+          # button consent has already put the state machine in ACTIVE; it is not consent.
+          if self.v_cruise_cluster_changed and not self.target_set_speed_confirmed:
             self.state = SpeedLimitAssistState.inactive
 
           elif self.speed_limit_changed and self.apply_confirm_speed_threshold:

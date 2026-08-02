@@ -7,7 +7,7 @@ See the LICENSE.md file in the root directory for more details.
 
 import pytest
 
-from cereal import custom
+from cereal import car, custom
 from opendbc.car.car_helpers import interfaces
 from opendbc.car.rivian.values import CAR as RIVIAN
 from opendbc.car.tesla.values import CAR as TESLA
@@ -25,6 +25,8 @@ from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.speed_limit_assist 
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 
 SpeedLimitAssistState = custom.LongitudinalPlanSP.SpeedLimit.AssistState
+ButtonEvent = car.CarState.ButtonEvent
+ButtonType = car.CarState.ButtonEvent.Type
 
 ALL_STATES = tuple(SpeedLimitAssistState.schema.enumerants.values())
 
@@ -99,6 +101,10 @@ class TestSpeedLimitAssist:
     self.sla.v_cruise_cluster_prev = initialize_v_cruise
     self.sla.prev_v_cruise_cluster_conv = round(initialize_v_cruise * self.speed_conv)
 
+  def release_button(self, button_type):
+    CS = car.CarState(buttonEvents=[ButtonEvent(type=button_type, pressed=False)])
+    self.sla.update_car_state(CS)
+
   def test_initial_state(self):
     assert self.sla.state == SpeedLimitAssistState.disabled
     assert not self.sla.is_enabled
@@ -139,8 +145,9 @@ class TestSpeedLimitAssist:
     assert self.sla.state == SpeedLimitAssistState.pending
     assert self.sla.is_enabled and not self.sla.is_active
 
-  def test_preactive_to_active_with_max_speed_confirmation(self):
+  def test_preactive_to_active_with_distance_button_confirmation(self):
     self.sla.state = SpeedLimitAssistState.preActive
+    self.release_button(ButtonType.gapAdjustCruise)
     self.sla.update(True, False, SPEED_LIMITS['city'], 0, self.pcm_long_max_set_speed, SPEED_LIMITS['highway'],
                     SPEED_LIMITS['highway'], True, 0, self.events_sp)
     assert self.sla.state == SpeedLimitAssistState.active
@@ -165,6 +172,7 @@ class TestSpeedLimitAssist:
     self.sla.state = SpeedLimitAssistState.pending
     self.sla.v_cruise_cluster_prev = self.pcm_long_max_set_speed
     self.sla.prev_v_cruise_cluster_conv = round(self.pcm_long_max_set_speed * self.speed_conv)
+    self.release_button(ButtonType.gapAdjustCruise)
 
     self.sla.update(True, False, SPEED_LIMITS['highway'], 0, self.pcm_long_max_set_speed,
                     SPEED_LIMITS['highway'], SPEED_LIMITS['highway'], True, 0, self.events_sp)
@@ -174,6 +182,7 @@ class TestSpeedLimitAssist:
     self.sla.state = SpeedLimitAssistState.pending
     self.sla.v_cruise_cluster_prev = self.pcm_long_max_set_speed
     self.sla.prev_v_cruise_cluster_conv = round(self.pcm_long_max_set_speed * self.speed_conv)
+    self.release_button(ButtonType.gapAdjustCruise)
 
     self.sla.update(True, False, SPEED_LIMITS['highway'] + 5, 0, self.pcm_long_max_set_speed,
                     SPEED_LIMITS['highway'], SPEED_LIMITS['highway'], True, 0, self.events_sp)
@@ -204,6 +213,39 @@ class TestSpeedLimitAssist:
     different_cruise = SPEED_LIMITS['highway'] + 5
     self.sla.update(True, False, SPEED_LIMITS['city'], 0, different_cruise, SPEED_LIMITS['city'], SPEED_LIMITS['city'], True, 0, self.events_sp)
     assert self.sla.state == SpeedLimitAssistState.inactive
+
+  def test_plus_minus_release_does_not_confirm(self):
+    self.sla.state = SpeedLimitAssistState.preActive
+    self.release_button(ButtonType.accelCruise)
+
+    self.sla.update(True, False, SPEED_LIMITS['city'], 0, SPEED_LIMITS['highway'], SPEED_LIMITS['city'],
+                    SPEED_LIMITS['city'], True, 0, self.events_sp)
+
+    assert self.sla.state == SpeedLimitAssistState.preActive
+    assert self.sla.is_enabled and not self.sla.is_active
+
+  def test_non_pcm_self_applied_set_speed_stays_active_then_manual_change_deactivates(self):
+    self.sla.pcm_op_long = False
+    self.sla.state = SpeedLimitAssistState.preActive
+    self.release_button(ButtonType.gapAdjustCruise)
+
+    # Explicit consent activates SLA while the old manual set speed is still published.
+    self.sla.update(True, False, SPEED_LIMITS['city'], 0, SPEED_LIMITS['highway'], SPEED_LIMITS['city'],
+                    SPEED_LIMITS['city'], True, 0, self.events_sp)
+    assert self.sla.state == SpeedLimitAssistState.active
+    assert self.sla.is_active
+
+    # card then applies SLA's target to vCruise. This expected write is not a manual override.
+    self.sla.update(True, False, SPEED_LIMITS['city'], 0, SPEED_LIMITS['city'], SPEED_LIMITS['city'],
+                    SPEED_LIMITS['city'], True, 0, self.events_sp)
+    assert self.sla.state == SpeedLimitAssistState.active
+    assert self.sla.is_active
+
+    # A later +/- change away from the accepted target still hands control back to the driver.
+    self.sla.update(True, False, SPEED_LIMITS['city'], 0, SPEED_LIMITS['city'] + 5, SPEED_LIMITS['city'],
+                    SPEED_LIMITS['city'], True, 0, self.events_sp)
+    assert self.sla.state == SpeedLimitAssistState.inactive
+    assert not self.sla.is_active
 
   # TODO-SP: test lower CST cases
   def test_rapid_speed_limit_changes(self):
