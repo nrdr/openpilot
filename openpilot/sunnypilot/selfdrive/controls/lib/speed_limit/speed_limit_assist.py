@@ -41,8 +41,6 @@ LIMIT_MIN_SPEED = 8.33  # m/s, Minimum speed limit to provide as solution on lim
 LIMIT_SPEED_OFFSET_TH = -1.  # m/s Maximum offset between speed limit and current speed for adapting state.
 V_CRUISE_UNSET = 255.
 
-CRUISE_BUTTONS_PLUS = (ButtonType.accelCruise, ButtonType.resumeCruise)
-CRUISE_BUTTONS_MINUS = (ButtonType.decelCruise, ButtonType.setCruise)
 CRUISE_BUTTON_CONFIRM_HOLD = 0.5  # secs.
 
 
@@ -303,7 +301,11 @@ class SpeedLimitAssist:
       else:
         # ACTIVE
         if self.state == SpeedLimitAssistState.active:
-          if self.v_cruise_cluster_changed:
+          # Non-PCM SLA applies an accepted limit by writing vCruise itself. That expected
+          # write arrives on the next planner tick and must not be mistaken for a driver's
+          # manual +/- adjustment. Equality is safe to use here because explicit distance-
+          # button consent has already put the state machine in ACTIVE; it is not consent.
+          if self.v_cruise_cluster_changed and not self.target_set_speed_confirmed:
             self.state = SpeedLimitAssistState.inactive
 
           elif self.speed_limit_changed and self.apply_confirm_speed_threshold:
