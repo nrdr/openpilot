@@ -32,17 +32,18 @@ class HandcraftedLateralProfile:
   values: tuple[tuple[str, ParamValue], ...]
 
 
-# Captured from Brett's Clarity/Comma Four after the successful 2026-08-01
-# road test.  The fixed PID base, VGR curve, and Clarity hybrid wiring are
-# separately regression-tested in test_latcontrol.py and test_load_model.py.
-CLARITY_ROAD_TESTED_2026_08_01 = HandcraftedLateralProfile(
-  name="Clarity Road-Tested 2026-08-01",
+# Captured from Brett's Clarity/Comma Four on 2026-08-07 after the August 5
+# road-test refinements. The fixed PID base, VGR curve, and Clarity hybrid
+# wiring are separately regression-tested in test_latcontrol.py and
+# test_load_model.py.
+CLARITY_ROAD_TESTED_2026_08_07 = HandcraftedLateralProfile(
+  name="Clarity Road-Tested 2026-08-07",
   fingerprint="HONDA_CLARITY",
-  version=1,
+  version=2,
   values=(
     ("NrdrStarPilotPid", False),
     ("NrdrLearnSteerRatio", False),
-    ("NrdrSteerRatioOffset", 0.0),
+    ("NrdrSteerRatioOffset", -1.0),
     ("NrdrLearnStiffness", True),
     ("NrdrLearnAngleOffset", True),
     ("LatPScaleLowSpeed", 100),
@@ -56,10 +57,10 @@ CLARITY_ROAD_TESTED_2026_08_01 = HandcraftedLateralProfile(
     ("LatFScaleHighway", 100),
     ("NrdrLatRateDamping", 0),
     ("NrdrLatRateDampingFadeSpeed", 30),
-    ("HondaCenterScale", 1.0),
+    ("HondaCenterScale", 0.0),
     ("HondaCenterBoostThreshold", 5.0),
     ("HondaCenterBoostMinSpeed", 15),
-    ("NrdrLatStiction", True),
+    ("NrdrLatStiction", False),
     ("NrdrNnlcEnabled", False),
     ("NrdrNnlcActivationSpeed", 15),
     ("NrdrNnlcKpGain", 50),
@@ -82,7 +83,7 @@ CLARITY_ROAD_TESTED_2026_08_01 = HandcraftedLateralProfile(
     ("HondaTorqueLowPassFilter", True),
     ("HondaLpfTauLowSpeed", 0.1),
     ("HondaLpfTauStandard", 0.1),
-    ("HondaLpfTauHighway", 0.1),
+    ("HondaLpfTauHighway", 0.01),
     ("HondaSteerDeltaLimiter", False),
     ("HondaSteerDeltaUp", 3.0),
     ("HondaSteerDeltaDown", 3.0),
@@ -96,7 +97,7 @@ CLARITY_ROAD_TESTED_2026_08_01 = HandcraftedLateralProfile(
 
 
 HANDCRAFTED_LATERAL_PROFILES = {
-  CLARITY_ROAD_TESTED_2026_08_01.fingerprint: CLARITY_ROAD_TESTED_2026_08_01,
+  CLARITY_ROAD_TESTED_2026_08_07.fingerprint: CLARITY_ROAD_TESTED_2026_08_07,
 }
 
 
