@@ -1,5 +1,5 @@
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
-  CLARITY_ROAD_TESTED_2026_08_01,
+  CLARITY_ROAD_TESTED_2026_08_07,
   apply_handcrafted_lateral_profile,
   get_handcrafted_lateral_profile,
   is_handcrafted_lateral_enabled,
@@ -25,9 +25,9 @@ class FakeParams:
 
 def test_clarity_profile_is_versioned_and_fingerprint_scoped():
   profile = get_handcrafted_lateral_profile("HONDA_CLARITY")
-  assert profile is CLARITY_ROAD_TESTED_2026_08_01
-  assert profile.version == 1
-  assert "2026-08-01" in profile.name
+  assert profile is CLARITY_ROAD_TESTED_2026_08_07
+  assert profile.version == 2
+  assert "2026-08-07" in profile.name
   assert get_handcrafted_lateral_profile("HONDA_CIVIC") is None
 
 
@@ -35,7 +35,7 @@ def test_profile_restores_complete_clarity_snapshot():
   params = FakeParams({"NrdrHandcraftedLateralTune": True})
   changed = apply_handcrafted_lateral_profile("HONDA_CLARITY", params)
 
-  expected = dict(CLARITY_ROAD_TESTED_2026_08_01.values)
+  expected = dict(CLARITY_ROAD_TESTED_2026_08_07.values)
   assert changed == list(expected)
   assert all(params.values[key] == value for key, value in expected.items())
   assert apply_handcrafted_lateral_profile("HONDA_CLARITY", params) == []
@@ -53,11 +53,14 @@ def test_profile_can_be_disabled_and_never_affects_other_fingerprints():
   assert unsupported.values["LatPScaleLowSpeed"] == 42
 
 
-def test_profile_preserves_the_road_tested_controller_and_delay_choices():
-  values = dict(CLARITY_ROAD_TESTED_2026_08_01.values)
+def test_profile_preserves_the_current_road_tested_clarity_choices():
+  values = dict(CLARITY_ROAD_TESTED_2026_08_07.values)
+  assert values["NrdrSteerRatioOffset"] == -1.0
+  assert values["HondaCenterScale"] == 0.0
+  assert values["NrdrLatStiction"] is False
+  assert values["HondaLpfTauHighway"] == 0.01
   assert values["NrdrNnlcEnabled"] is False
-  assert values["NrdrLatStiction"] is True
   assert values["HondaTorqueLowPassFilter"] is True
-  assert values["HondaLpfTauLowSpeed"] == values["HondaLpfTauStandard"] == values["HondaLpfTauHighway"] == 0.1
+  assert values["HondaLpfTauLowSpeed"] == values["HondaLpfTauStandard"] == 0.1
   assert values["LagdToggle"] is False
   assert values["LagdToggleDelay"] == 0.5
