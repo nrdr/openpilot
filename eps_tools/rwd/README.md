@@ -15,8 +15,11 @@ python3 check_rwd.py rwd/*.rwd            # all
 ```
 
 ## Flash (see ../README.md and ../eps-update.py)
-Always run a `--danger`-less dry run first (it stops before erase), and flash from
-a persistent copy — the comma updater wipes untracked files from `/data/openpilot`.
+Prefer the guided flasher: `python3 flash.py` (auto-detects bus, offers dry run).
+For the manual path, always run a `--danger`-less dry run first (it stops before
+erase; default bus is **1**), and flash from a persistent copy — the comma updater
+wipes untracked files from `/data/openpilot`. Some cars lock security access after
+a dry run; wait / power-cycle before `--danger`, or use `flash.py`'s skip/retry.
 
 ## Contents
 | model | stock | linear-max |
