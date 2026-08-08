@@ -20,28 +20,21 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 # 45 degrees), so it cannot learn a rack's off-center taper. When steer-ratio
 # learning is disabled, these curves replace that scalar for explicitly mapped VGR
 # cars only. Every other car keeps its normal CP.steerRatio behavior.
-# Clarity variable-rack blend. The <= 70 degree section is the sample-weighted,
-# non-increasing fit of the measured 5 degree bins. The noisy 5-10 degree rise is
-# capped at the 0-5 degree median, and every later upward violation is pooled with
-# its neighbor(s) instead of being allowed to create an unphysical ratio increase.
-# A smoothstep-sampled 70-90 degree handoff rejoins the previous road-proven curve
-# at exactly its existing 90 degree value; 90 degrees onward is unchanged except
-# for the corrected Honda end-to-end specification of 12.72 at 450 degrees.
 NRDR_CLARITY_SR_CURVE_BP = [0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5,
-                            62.5, 67.5, 70., 75., 80., 85., 90., 100., 140., 200., 300., 450.]  # |wheel angle|, deg
-NRDR_CLARITY_SR_CURVE_V = [19.680, 19.680, 19.680, 19.680, 19.344, 19.344, 19.307, 19.151, 18.406, 18.406,
-                           18.406, 18.087, 17.999, 17.999, 17.710, 17.604, 17.222, 16.706, 16.308, 16.093333333333334,
-                           15.940, 15.400, 14.300, 13.400, 12.720]
+                            62.5, 67.5, 72.5, 77.5, 87.5, 112.5, 137.5, 162.5, 187.5, 212.5, 237.5,
+                            262.5, 287.5, 312.5, 337.5, 362.5, 387.5, 412.5, 437.5, 450.]  # |wheel angle|, deg
+NRDR_CLARITY_SR_CURVE_V = [20.114, 20.114, 20.114, 20.052, 19.407, 19.398, 19.398, 19.240, 18.452, 18.250,
+                           18.250, 18.178, 17.940, 17.940, 17.625, 17.543, 17.272, 17.017, 16.217, 15.970,
+                           15.748, 15.639, 15.371, 15.352, 15.352, 15.352, 15.352, 15.352, 15.352, 15.352,
+                           15.352, 15.190, 15.190]
 
 NRDR_CRV_5G_SR_CURVE_BP = [0., 50., 100., 150., 175., 200.]
 NRDR_CRV_5G_SR_CURVE_V = [18.10, 17.80, 16.30, 15.30, 14.90, 14.60]
 
-# Model-corrected effective ratio from Peter's 10th-gen Civic Bosch telemetry.
-# The tail is strongly supported by repeatable left/right, cross-route samples;
-# the near-center anchor is intentionally conservative while paramsd convergence
-# and tire-stiffness-factor coverage are expanded.
-NRDR_CIVIC_BOSCH_SR_CURVE_BP = [0., 25., 50., 75., 100., 125., 150., 175., 200., 225., 250., 275.]
-NRDR_CIVIC_BOSCH_SR_CURVE_V = [15.25, 15.10, 14.60, 14.10, 13.75, 13.50, 13.25, 13.10, 13.00, 12.90, 12.75, 12.65]
+NRDR_CIVIC_BOSCH_SR_CURVE_BP = [0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5,
+                                62.5, 87.5, 112.5, 137.5, 162.5, 187.5, 212.5, 237.5, 275.]
+NRDR_CIVIC_BOSCH_SR_CURVE_V = [19.095, 19.095, 18.276, 16.335, 16.335, 16.335, 16.246, 15.291, 15.291, 14.675,
+                               14.393, 13.596, 13.596, 13.596, 13.596, 13.596, 13.525, 13.525, 13.525, 13.525]
 
 NRDR_SR_CURVE_BY_FP = {
   "HONDA_CLARITY": (NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V),
