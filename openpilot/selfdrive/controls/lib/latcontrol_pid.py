@@ -20,21 +20,22 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 # 45 degrees), so it cannot learn a rack's off-center taper. When steer-ratio
 # learning is disabled, these curves replace that scalar for explicitly mapped VGR
 # cars only. Every other car keeps its normal CP.steerRatio behavior.
+# Preserve the raw Clarity curve through 70 degrees, then use smoothstep-sampled
+# points to reach Honda's published 12.72 ratio at 90 degrees and hold it through lock.
 NRDR_CLARITY_SR_CURVE_BP = [0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5,
-                            62.5, 67.5, 72.5, 77.5, 87.5, 112.5, 137.5, 162.5, 187.5, 212.5, 237.5,
-                            262.5, 287.5, 312.5, 337.5, 362.5, 387.5, 412.5, 437.5, 450.]  # |wheel angle|, deg
+                            62.5, 67.5, 70., 75., 80., 85., 90., 450.]  # |wheel angle|, deg
 NRDR_CLARITY_SR_CURVE_V = [20.114, 20.114, 20.114, 20.052, 19.407, 19.398, 19.398, 19.240, 18.452, 18.250,
-                           18.250, 18.178, 17.940, 17.940, 17.625, 17.543, 17.272, 17.017, 16.217, 15.970,
-                           15.748, 15.639, 15.371, 15.352, 15.352, 15.352, 15.352, 15.352, 15.352, 15.352,
-                           15.352, 15.190, 15.190]
+                           18.250, 18.178, 17.940, 17.940, 17.625, 17.584, 16.824, 15.152, 13.480, 12.720, 12.720]
 
 NRDR_CRV_5G_SR_CURVE_BP = [0., 50., 100., 150., 175., 200.]
 NRDR_CRV_5G_SR_CURVE_V = [18.10, 17.80, 16.30, 15.30, 14.90, 14.60]
 
+# Preserve Peter's raw Civic curve through 70 degrees, then use smoothstep-sampled
+# points to reach Honda's published 10.93 ratio at 90 degrees and hold it through lock.
 NRDR_CIVIC_BOSCH_SR_CURVE_BP = [0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5,
-                                62.5, 87.5, 112.5, 137.5, 162.5, 187.5, 212.5, 237.5, 275.]
+                                62.5, 70., 75., 80., 85., 90., 400.]
 NRDR_CIVIC_BOSCH_SR_CURVE_V = [19.095, 19.095, 18.276, 16.335, 16.335, 16.335, 16.246, 15.291, 15.291, 14.675,
-                               14.393, 13.596, 13.596, 13.596, 13.596, 13.596, 13.525, 13.525, 13.525, 13.525]
+                               14.393, 13.596, 13.596, 13.179438, 12.263, 11.346562, 10.930, 10.930]
 
 NRDR_SR_CURVE_BY_FP = {
   "HONDA_CLARITY": (NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V),
