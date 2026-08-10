@@ -87,36 +87,21 @@ NRDR_CIVIC_BOSCH_SR_CURVE_BP = [0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5
 NRDR_CIVIC_BOSCH_SR_CURVE_V = [19.095, 19.095, 18.276, 16.335, 16.335, 16.335, 16.246, 15.291, 15.291, 14.675,
                                14.393, 13.596, 13.596, 13.179438, 12.263, 11.346562, 10.930, 10.930]
 
-# Civic TBA-A030 / TEG-A010 Nidec EPS firmware tables, re-indexed to the
-# steering-angle coordinate published on CAN. These are instantaneous/local
-# VGR ratios relative to center, not values that can be consumed directly by
-# VehicleModel. 596.023 degrees is the firmware's interpolation guard, not a
-# claimed physical steering lock.
-NRDR_CIVIC_NIDEC_LOCAL_SR_BP = [
+# Civic TBA-A030 / TEG-A010 Nidec EPS position table, re-indexed to the
+# steering-angle coordinate published on CAN. Firmware computes published
+# angle as raw_position / gain(raw_position), so center_gain / gain is already
+# the cumulative/effective SR multiplier; it must not be integrated again.
+# 596.023 degrees is the firmware's interpolation guard, not a claimed lock.
+NRDR_CIVIC_NIDEC_VGR_ANGLE_BP = [
   0.000, 3.125, 6.400, 9.524, 12.698, 15.748, 19.047, 22.222, 25.397, 31.746,
   47.243, 62.017, 76.336, 83.333, 86.363, 88.721, 91.728, 94.028, 97.013, 99.998,
   102.224, 105.187, 107.354, 110.295, 131.387, 152.173, 170.216, 188.812, 208.333, 596.023,
 ]
-NRDR_CIVIC_NIDEC_RELATIVE_LOCAL_SR_V = [
+NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V = [
   1.000, 1.000, 1.024, 1.016, 1.016, 1.008, 1.016, 1.016, 1.016, 1.016,
   1.008, 0.992, 0.977, 0.970, 0.970, 0.962, 0.962, 0.955, 0.955, 0.955,
   0.948, 0.948, 0.941, 0.941, 0.934, 0.928, 0.908, 0.895, 0.889, 0.848,
 ]
-# Densify the controller curve independently of the firmware knots. This does
-# not invent local-ratio data: it evaluates the same piecewise-linear firmware
-# shape closely enough that np.interp does not flatten the long 208-596 degree
-# guard segment into a poor effective-ratio approximation.
-NRDR_CIVIC_NIDEC_VGR_ANGLE_BP = sorted(set(
-  NRDR_CIVIC_NIDEC_LOCAL_SR_BP +
-  [float(angle) for angle in range(0, 211, 5)] +
-  [float(angle) for angle in range(220, 581, 20)]
-))
-NRDR_CIVIC_NIDEC_EFFECTIVE_SR_MULTIPLIER_V = _effective_sr_from_local_curve(
-  NRDR_CIVIC_NIDEC_LOCAL_SR_BP,
-  NRDR_CIVIC_NIDEC_RELATIVE_LOCAL_SR_V,
-  1.0,
-  NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-)
 # Pre-solve the nonlinear inverse. VehicleModel first produces the steering
 # angle it would request with its current scalar ratio (CP or paramsd). Mapping
 # that normalized constant-ratio coordinate back to the real wheel angle avoids
@@ -125,7 +110,7 @@ NRDR_CIVIC_NIDEC_LINEAR_BP = [
   0.0 if angle == 0.0 else angle / multiplier
   for angle, multiplier in zip(
     NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-    NRDR_CIVIC_NIDEC_EFFECTIVE_SR_MULTIPLIER_V,
+    NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V,
     strict=True,
   )
 ]

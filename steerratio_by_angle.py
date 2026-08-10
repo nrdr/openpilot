@@ -15,7 +15,10 @@ There are two different measurements in this report:
 
    That is an effective *dynamic* ratio. Tire slip, compliance, road roll, speed,
    and timing error remain in the result; it is useful for validating the shape of
-   a VGR curve, but it is not a direct measurement of rack-tooth geometry.
+   a VGR curve, but it is not a direct measurement of rack-tooth geometry. The
+   estimator removes the learned average steering-center offset, keeps only
+   quasi-steady steering, reports both steering directions, and stratifies by
+   speed so those dynamic effects are visible instead of silently averaged.
 
 Examples (run from the openpilot checkout on the device):
 
@@ -35,7 +38,7 @@ Connect URLs understood by tools.lib.logreader.LogReader. This tool is read-only
 """
 
 import argparse
-from collections import defaultdict
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import glob
@@ -49,12 +52,61 @@ import numpy as np
 
 
 M_PER_MILE = 1609.344
+MPS_TO_MPH = 2.236936
 ROUTE_TIME_RE = re.compile(r"(\d{4}-\d{2}-\d{2}--\d{2}-\d{2}-\d{2})")
 SEGMENT_DIR_RE = re.compile(r"^(.*)--(\d+)$")
 
 
 def percentile(values: list[float], q: float) -> float:
   return float(np.percentile(np.asarray(values, dtype=float), q))
+
+
+@dataclass(frozen=True)
+class CarStateSample:
+  timestamp: float
+  speed: float
+  steering_angle: float
+  steering_rate: float
+  steering_pressed: bool
+  angle_offset: float
+  angle_offset_valid: bool
+
+
+@dataclass(frozen=True)
+class AngleRatioSample:
+  ratio: float
+  speed: float
+  steering_angle: float
+
+
+def nearest_state_sample(samples: list[CarStateSample] | deque[CarStateSample], target_time: float,
+                         max_age: float) -> CarStateSample | None:
+  """Return the state nearest target_time, provided the pairing is fresh enough."""
+  if not samples:
+    return None
+  sample = min(samples, key=lambda value: abs(value.timestamp - target_time))
+  return sample if abs(sample.timestamp - target_time) <= max_age else None
+
+
+def effective_ratio(steering_angle_deg: float, angle_offset_deg: float, yaw_rate: float,
+                    speed: float, wheelbase: float) -> float | None:
+  """Compute the dynamic steering ratio after removing the learned center offset."""
+  corrected_angle = steering_angle_deg - angle_offset_deg
+  if speed <= 0.0 or wheelbase <= 0.0:
+    return None
+  road_wheel_angle = math.atan(wheelbase * abs(yaw_rate / speed))
+  if road_wheel_angle <= 1e-4:
+    return None
+  ratio = abs(math.radians(corrected_angle)) / road_wheel_angle
+  return ratio if math.isfinite(ratio) else None
+
+
+def angle_bin_start(angle_deg: float, bin_width_deg: float) -> float:
+  return math.floor(abs(angle_deg) / bin_width_deg) * bin_width_deg
+
+
+def format_number(value: float) -> str:
+  return f"{value:g}"
 
 
 def source_time(path: Path) -> datetime | None:
@@ -155,7 +207,10 @@ class CarReportData:
   learned_stds: list[float] = field(default_factory=list)
   learned_valid: int = 0
   learned_total: int = 0
-  angle_bins: defaultdict[int, list[tuple[float, float]]] = field(default_factory=lambda: defaultdict(list))
+  angle_bins: defaultdict[float, list[AngleRatioSample]] = field(default_factory=lambda: defaultdict(list))
+  rejected_samples: Counter[str] = field(default_factory=Counter)
+  accepted_samples: int = 0
+  offset_corrected_samples: int = 0
   distance_m: float = 0.0
   duration_s: float = 0.0
 
@@ -204,6 +259,10 @@ class SteerRatioReport:
       car_control_t: float | None = None
       previous_car_t: float | None = None
       previous_speed = 0.0
+      steering_rate = 0.0
+      angle_offset = 0.0
+      angle_offset_valid = False
+      state_history: deque[CarStateSample] = deque(maxlen=1000)
       calibrator = PoseCalibrator()
 
       try:
@@ -228,6 +287,12 @@ class SteerRatioReport:
           elif which == "liveParameters":
             data = self.car_data(fingerprint)
             lp = event.liveParameters
+            # The average component represents the persistent steering-sensor
+            # center. The fast component in angleOffsetDeg is a dynamic model
+            # correction and would contaminate a rack-geometry estimate.
+            if event.valid and lp.angleOffsetAverageValid and math.isfinite(float(lp.angleOffsetAverageDeg)):
+              angle_offset = float(lp.angleOffsetAverageDeg)
+              angle_offset_valid = True
             value = float(lp.steerRatio)
             std = float(lp.steerRatioStd)
             valid = bool(event.valid and lp.steerRatioValid and math.isfinite(value))
@@ -241,8 +306,11 @@ class SteerRatioReport:
           elif which == "carState":
             speed = float(event.carState.vEgo)
             steering_angle = float(event.carState.steeringAngleDeg)
+            steering_rate = float(event.carState.steeringRateDeg)
             steering_pressed = bool(event.carState.steeringPressed)
             car_state_t = t
+            state_history.append(CarStateSample(t, speed, steering_angle, steering_rate, steering_pressed,
+                                                angle_offset, angle_offset_valid))
 
             if previous_car_t is not None:
               dt = t - previous_car_t
@@ -258,35 +326,58 @@ class SteerRatioReport:
             car_control_t = t
 
           elif which == "livePose" and not self.args.learned_only:
+            data = self.car_data(fingerprint)
             if wheelbase is None or not calibrator.calib_valid:
+              data.rejected_samples["missing car/calibration"] += 1
               continue
-            if car_state_t is None or car_control_t is None:
+            if car_state_t is None or car_control_t is None or not state_history:
+              data.rejected_samples["missing state/control"] += 1
               continue
-            if t - car_state_t > self.args.max_pair_age or t - car_control_t > self.args.max_pair_age:
+            current_state = nearest_state_sample(state_history, t, self.args.max_pair_age)
+            steering_state = nearest_state_sample(state_history, t - self.args.yaw_delay, self.args.max_pair_age)
+            if current_state is None or steering_state is None or t - car_control_t > self.args.max_pair_age:
+              data.rejected_samples["stale state/control"] += 1
               continue
-            if not lat_active or steering_pressed:
+            if not lat_active or current_state.steering_pressed or steering_state.steering_pressed:
+              data.rejected_samples["inactive/driver steering"] += 1
               continue
+            speed = current_state.speed
             if not (self.args.min_speed <= speed <= self.args.max_speed):
+              data.rejected_samples["speed gate"] += 1
               continue
-            if abs(steering_angle) < self.args.min_angle:
+            sample_offset = steering_state.angle_offset if steering_state.angle_offset_valid else 0.0
+            if self.args.require_angle_offset and not steering_state.angle_offset_valid:
+              data.rejected_samples["missing angle offset"] += 1
+              continue
+            corrected_angle = steering_state.steering_angle - sample_offset
+            if abs(corrected_angle) < self.args.min_angle:
+              data.rejected_samples["angle gate"] += 1
+              continue
+            if abs(steering_state.steering_rate) > self.args.max_steering_rate:
+              data.rejected_samples["steering-rate gate"] += 1
               continue
             if not (event.livePose.inputsOK and event.livePose.posenetOK and event.livePose.sensorsOK):
+              data.rejected_samples["invalid pose"] += 1
               continue
 
             pose = calibrator.build_calibrated_pose(Pose.from_live_pose(event.livePose))
             yaw_rate = float(pose.angular_velocity.xyz[2])
             if not math.isfinite(yaw_rate) or abs(yaw_rate) < self.args.min_yaw:
+              data.rejected_samples["yaw gate"] += 1
               continue
 
-            curvature = abs(yaw_rate / speed)
-            road_wheel_angle = math.atan(wheelbase * curvature)
-            if road_wheel_angle <= 1e-4:
+            ratio = effective_ratio(steering_state.steering_angle, sample_offset, yaw_rate, speed, wheelbase)
+            if ratio is None:
+              data.rejected_samples["invalid ratio"] += 1
               continue
 
-            ratio = abs(math.radians(steering_angle)) / road_wheel_angle
             if self.args.min_ratio <= ratio <= self.args.max_ratio:
-              bin_start = int(abs(steering_angle) // self.args.angle_bin) * int(self.args.angle_bin)
-              self.car_data(fingerprint).angle_bins[bin_start].append((ratio, speed))
+              bin_start = angle_bin_start(corrected_angle, self.args.angle_bin)
+              data.angle_bins[bin_start].append(AngleRatioSample(ratio, speed, corrected_angle))
+              data.accepted_samples += 1
+              data.offset_corrected_samples += int(steering_state.angle_offset_valid)
+            else:
+              data.rejected_samples["ratio bounds"] += 1
 
         self.files_read += 1
       except Exception as exc:
@@ -354,17 +445,35 @@ class SteerRatioReport:
       samples = data.angle_bins[bin_start]
       if len(samples) < self.args.min_samples:
         continue
-      ratios = [sample[0] for sample in samples]
-      speeds = [sample[1] for sample in samples]
+      ratios = [sample.ratio for sample in samples]
+      speeds = [sample.speed for sample in samples]
+      negative = [sample.ratio for sample in samples if sample.steering_angle < 0.0]
+      positive = [sample.ratio for sample in samples if sample.steering_angle > 0.0]
       rows.append((
         bin_start,
-        bin_start + int(self.args.angle_bin),
+        bin_start + self.args.angle_bin,
         len(samples),
         percentile(ratios, 50),
         percentile(ratios, 25),
         percentile(ratios, 75),
         percentile(speeds, 50),
+        percentile(speeds, 25),
+        percentile(speeds, 75),
+        len(negative),
+        percentile(negative, 50) if negative else math.nan,
+        len(positive),
+        percentile(positive, 50) if positive else math.nan,
       ))
+
+    print("Angle estimator diagnostics")
+    print(f"  accepted samples:    {data.accepted_samples}")
+    print(f"  offset-corrected:    {data.offset_corrected_samples}/{data.accepted_samples}")
+    print(f"  steering/yaw delay:  {self.args.yaw_delay:.3f} s")
+    print(f"  max steering rate:   {self.args.max_steering_rate:.1f} deg/s")
+    if data.rejected_samples:
+      rejected = ", ".join(f"{reason}={count}" for reason, count in data.rejected_samples.most_common())
+      print(f"  rejected:            {rejected}")
+    print()
 
     if not rows:
       print("Angle-binned effective ratio: no bins met the sample threshold.")
@@ -372,18 +481,58 @@ class SteerRatioReport:
       return
 
     print("Angle-binned effective dynamic ratio")
-    print(f"{'|angle| bin':>13} {'n':>8} {'median SR':>10} {'IQR':>15} {'median mph':>11}")
-    for start, end, count, median, p25, p75, speed in rows:
-      print(f"{start:>3}-{end:<3} deg {count:>8} {median:>10.2f} {p25:>6.2f}-{p75:<6.2f} {speed * 2.236936:>11.1f}")
+    print(f"{'|angle| bin':>17} {'n':>8} {'median SR':>10} {'SR IQR':>15} {'speed mph IQR':>19} {'steer-/+ SR':>17}")
+    for start, end, count, median, p25, p75, _speed, speed_p25, speed_p75, neg_n, neg_sr, pos_n, pos_sr in rows:
+      direction_sr = f"{neg_sr:.2f}/{pos_sr:.2f}" if neg_n and pos_n else "insufficient"
+      line = (
+        f"{format_number(start):>5}-{format_number(end):<5} deg {count:>8} {median:>10.2f} "
+        + f"{p25:>6.2f}-{p75:<6.2f} {speed_p25 * MPS_TO_MPH:>6.1f}-{speed_p75 * MPS_TO_MPH:<6.1f} "
+        + f"{direction_sr:>17}"
+      )
+      print(line)
+
+    if self.args.speed_bin > 0.0:
+      speed_rows = []
+      for angle_start in sorted(data.angle_bins):
+        by_speed: defaultdict[float, list[float]] = defaultdict(list)
+        for sample in data.angle_bins[angle_start]:
+          speed_start = math.floor(sample.speed / self.args.speed_bin) * self.args.speed_bin
+          by_speed[speed_start].append(sample.ratio)
+        for speed_start, ratios in sorted(by_speed.items()):
+          if len(ratios) >= self.args.min_samples:
+            speed_rows.append((angle_start, speed_start, len(ratios), percentile(ratios, 50),
+                               percentile(ratios, 25), percentile(ratios, 75)))
+      if speed_rows:
+        print("\nAngle/speed-stratified ratio (reveals speed-dependent tire/understeer bias)")
+        print(f"{'|angle| bin':>17} {'speed bin':>18} {'n':>8} {'median SR':>10} {'SR IQR':>15}")
+        for angle_start, speed_start, count, median, p25, p75 in speed_rows:
+          angle_end = angle_start + self.args.angle_bin
+          speed_end = speed_start + self.args.speed_bin
+          line = (
+            f"{format_number(angle_start):>5}-{format_number(angle_end):<5} deg "
+            + f"{speed_start * MPS_TO_MPH:>6.1f}-{speed_end * MPS_TO_MPH:<6.1f} mph "
+            + f"{count:>8} {median:>10.2f} {p25:>6.2f}-{p75:<6.2f}"
+          )
+          print(line)
 
     if self.args.csv is not None:
       csv_path = Path(self.args.csv)
       if len(self.cars) > 1:
         csv_path = csv_path.with_name(f"{csv_path.stem}-{fingerprint}{csv_path.suffix}")
       with csv_path.open("w", newline="", encoding="utf-8") as stream:
-        stream.write("angle_start_deg,angle_end_deg,samples,median_ratio,p25_ratio,p75_ratio,median_speed_mps\n")
+        header = (
+          "angle_start_deg,angle_end_deg,samples,median_ratio,p25_ratio,p75_ratio,"
+          + "median_speed_mps,p25_speed_mps,p75_speed_mps,negative_samples,negative_median_ratio,"
+          + "positive_samples,positive_median_ratio\n"
+        )
+        stream.write(header)
         for row in rows:
-          stream.write(f"{row[0]},{row[1]},{row[2]},{row[3]:.6f},{row[4]:.6f},{row[5]:.6f},{row[6]:.6f}\n")
+          line = (
+            f"{row[0]:g},{row[1]:g},{row[2]},{row[3]:.6f},{row[4]:.6f},{row[5]:.6f},"
+            + f"{row[6]:.6f},{row[7]:.6f},{row[8]:.6f},{row[9]},{row[10]:.6f},"
+            + f"{row[11]},{row[12]:.6f}\n"
+          )
+          stream.write(line)
       print(f"\nWrote {csv_path}")
 
 
@@ -396,12 +545,20 @@ def build_parser() -> argparse.ArgumentParser:
   parser.add_argument("--since-days", type=float, help="only scan local logs from approximately the last N days")
   parser.add_argument("--csv", help="write accepted angle-bin rows to this CSV")
   parser.add_argument("--angle-bin", type=float, default=25.0, help="angle-bin width in degrees (default: 25)")
+  parser.add_argument("--speed-bin", type=float, default=5.0,
+                      help="also stratify each angle bin by this speed width in m/s; 0 disables (default: 5)")
   parser.add_argument("--min-samples", type=int, default=30, help="minimum accepted samples per angle bin (default: 30)")
   parser.add_argument("--min-angle", type=float, default=5.0, help="minimum absolute steering angle in degrees")
   parser.add_argument("--min-yaw", type=float, default=0.03, help="minimum absolute calibrated yaw rate in rad/s")
   parser.add_argument("--min-speed", type=float, default=3.0, help="minimum speed in m/s")
   parser.add_argument("--max-speed", type=float, default=25.0, help="maximum speed in m/s; limits dynamic understeer bias")
   parser.add_argument("--max-pair-age", type=float, default=0.25, help="maximum sensor/state pairing age in seconds")
+  parser.add_argument("--yaw-delay", type=float, default=0.0,
+                      help="pair yaw with steering measured this many seconds earlier (default: 0; use only when measured)")
+  parser.add_argument("--max-steering-rate", type=float, default=5.0,
+                      help="keep quasi-steady samples at or below this absolute steering rate in deg/s (default: 5)")
+  parser.add_argument("--require-angle-offset", action="store_true",
+                      help="reject samples until a valid learned steering-angle offset is available")
   parser.add_argument("--min-ratio", type=float, default=5.0, help="minimum sane effective ratio")
   parser.add_argument("--max-ratio", type=float, default=40.0, help="maximum sane effective ratio")
   return parser
@@ -410,8 +567,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
   args = build_parser().parse_args()
 
-  if args.angle_bin <= 0 or args.min_samples <= 0:
-    raise SystemExit("--angle-bin and --min-samples must be positive")
+  if args.angle_bin <= 0 or args.speed_bin < 0 or args.min_samples <= 0:
+    raise SystemExit("--angle-bin and --min-samples must be positive; --speed-bin cannot be negative")
+  if args.yaw_delay < 0 or args.max_pair_age <= 0 or args.max_steering_rate < 0:
+    raise SystemExit("--yaw-delay must be non-negative; pairing age must be positive; steering-rate limit cannot be negative")
   if args.since_days is not None and args.since_days < 0:
     raise SystemExit("--since-days must be non-negative")
 
