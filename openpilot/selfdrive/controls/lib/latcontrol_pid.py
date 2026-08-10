@@ -1,25 +1,75 @@
 import math
-import numpy as np
+from itertools import pairwise
 
+import numpy as np
 from openpilot.cereal import log
 from opendbc.car.honda.carcontroller import get_eps_modified_steering_pressed
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params, UnknownKeyName
 from openpilot.common.pid import PIDController
-from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
+from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.nrdr_lat_stiction import LatStiction
 from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 
+def _effective_sr_from_local_curve(angle_bp, relative_local_sr, center_sr, output_bp=None):
+  """Convert a local VGR ratio shape into the cumulative ratio VehicleModel expects."""
+  if len(angle_bp) != len(relative_local_sr) or len(angle_bp) < 2:
+    raise ValueError("local steer-ratio breakpoints and values must have matching lengths")
+  if angle_bp[0] != 0.0 or center_sr <= 0.0:
+    raise ValueError("local steer-ratio curve must start at zero with a positive center ratio")
+  if not all(left < right for left, right in pairwise(angle_bp)):
+    raise ValueError("local steer-ratio breakpoints must be strictly increasing")
+  if not all(value > 0.0 for value in relative_local_sr):
+    raise ValueError("local steer-ratio values must be positive")
+  if output_bp is None:
+    output_bp = angle_bp
+  if (not output_bp or output_bp[0] != 0.0 or output_bp[-1] > angle_bp[-1] or
+      not all(left < right for left, right in pairwise(output_bp))):
+    raise ValueError("effective steer-ratio output breakpoints must be ordered within the local curve")
+
+  # Road-wheel angle is the integral of steering-wheel travel divided by the
+  # instantaneous/local ratio. The effective ratio at each knot is therefore
+  # wheel angle divided by that accumulated road-wheel angle. Integrate each
+  # piecewise-linear local-ratio segment analytically.
+  effective_sr = []
+  for output_angle in output_bp:
+    if output_angle == 0.0:
+      effective_sr.append(center_sr * relative_local_sr[0])
+      continue
+
+    road_wheel_angle = 0.0
+    for left_angle, right_angle, left_rel, right_rel in zip(
+        angle_bp[:-1], angle_bp[1:], relative_local_sr[:-1], relative_local_sr[1:], strict=True):
+      if output_angle <= left_angle:
+        break
+      segment_right_angle = min(output_angle, right_angle)
+      segment_fraction = (segment_right_angle - left_angle) / (right_angle - left_angle)
+      segment_right_rel = left_rel + segment_fraction * (right_rel - left_rel)
+      left_sr = center_sr * left_rel
+      segment_right_sr = center_sr * segment_right_rel
+      angle_delta = segment_right_angle - left_angle
+      if math.isclose(left_sr, segment_right_sr, rel_tol=0.0, abs_tol=1e-12):
+        road_wheel_angle += angle_delta / left_sr
+      else:
+        road_wheel_angle += angle_delta * math.log(segment_right_sr / left_sr) / (segment_right_sr - left_sr)
+      if output_angle <= right_angle:
+        break
+    effective_sr.append(output_angle / road_wheel_angle)
+
+  return effective_sr
+
+
 # Effective steer-ratio curves, keyed explicitly by fingerprint.
 #
 # paramsd estimates one near-center scalar (it only observes steering angles below
-# 45 degrees), so it cannot learn a rack's off-center taper. When steer-ratio
-# learning is disabled, these curves replace that scalar for explicitly mapped VGR
-# cars only. Every other car keeps its normal CP.steerRatio behavior.
+# 45 degrees), so it cannot learn a rack's off-center taper. Legacy absolute
+# curves replace that scalar when learning is off; firmware-derived inverse maps
+# instead reshape the scalar model output and can follow paramsd as it relearns.
+# Every unmapped car keeps its normal CP.steerRatio behavior.
 # Preserve the raw Clarity curve through 70 degrees, then use smoothstep-sampled
 # points to reach Honda's published 12.72 ratio at 90 degrees and hold it through lock.
 NRDR_CLARITY_SR_CURVE_BP = [0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5,
@@ -37,12 +87,58 @@ NRDR_CIVIC_BOSCH_SR_CURVE_BP = [0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5
 NRDR_CIVIC_BOSCH_SR_CURVE_V = [19.095, 19.095, 18.276, 16.335, 16.335, 16.335, 16.246, 15.291, 15.291, 14.675,
                                14.393, 13.596, 13.596, 13.179438, 12.263, 11.346562, 10.930, 10.930]
 
+# Civic TBA-A030 / TEG-A010 Nidec EPS firmware tables, re-indexed to the
+# steering-angle coordinate published on CAN. These are instantaneous/local
+# VGR ratios relative to center, not values that can be consumed directly by
+# VehicleModel. 596.023 degrees is the firmware's interpolation guard, not a
+# claimed physical steering lock.
+NRDR_CIVIC_NIDEC_LOCAL_SR_BP = [
+  0.000, 3.125, 6.400, 9.524, 12.698, 15.748, 19.047, 22.222, 25.397, 31.746,
+  47.243, 62.017, 76.336, 83.333, 86.363, 88.721, 91.728, 94.028, 97.013, 99.998,
+  102.224, 105.187, 107.354, 110.295, 131.387, 152.173, 170.216, 188.812, 208.333, 596.023,
+]
+NRDR_CIVIC_NIDEC_RELATIVE_LOCAL_SR_V = [
+  1.000, 1.000, 1.024, 1.016, 1.016, 1.008, 1.016, 1.016, 1.016, 1.016,
+  1.008, 0.992, 0.977, 0.970, 0.970, 0.962, 0.962, 0.955, 0.955, 0.955,
+  0.948, 0.948, 0.941, 0.941, 0.934, 0.928, 0.908, 0.895, 0.889, 0.848,
+]
+# Densify the controller curve independently of the firmware knots. This does
+# not invent local-ratio data: it evaluates the same piecewise-linear firmware
+# shape closely enough that np.interp does not flatten the long 208-596 degree
+# guard segment into a poor effective-ratio approximation.
+NRDR_CIVIC_NIDEC_VGR_ANGLE_BP = sorted(set(
+  NRDR_CIVIC_NIDEC_LOCAL_SR_BP +
+  [float(angle) for angle in range(0, 211, 5)] +
+  [float(angle) for angle in range(220, 581, 20)]
+))
+NRDR_CIVIC_NIDEC_EFFECTIVE_SR_MULTIPLIER_V = _effective_sr_from_local_curve(
+  NRDR_CIVIC_NIDEC_LOCAL_SR_BP,
+  NRDR_CIVIC_NIDEC_RELATIVE_LOCAL_SR_V,
+  1.0,
+  NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
+)
+# Pre-solve the nonlinear inverse. VehicleModel first produces the steering
+# angle it would request with its current scalar ratio (CP or paramsd). Mapping
+# that normalized constant-ratio coordinate back to the real wheel angle avoids
+# a measured-angle dependency and automatically follows scalar relearning.
+NRDR_CIVIC_NIDEC_LINEAR_BP = [
+  0.0 if angle == 0.0 else angle / multiplier
+  for angle, multiplier in zip(
+    NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
+    NRDR_CIVIC_NIDEC_EFFECTIVE_SR_MULTIPLIER_V,
+    strict=True,
+  )
+]
+
 NRDR_SR_CURVE_BY_FP = {
   "HONDA_CLARITY": (NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V),
   "HONDA_CRV_5G": (NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V),
   "HONDA_CIVIC_BOSCH": (NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V),
-  # Temporary 10th-gen family fallback until Nidec-specific telemetry is available.
-  "HONDA_CIVIC": (NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V),
+}
+
+# (constant-ratio/model angle breakpoints, real steering-wheel angle values)
+NRDR_VGR_INVERSE_BY_FP = {
+  "HONDA_CIVIC": (NRDR_CIVIC_NIDEC_LINEAR_BP, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP),
 }
 
 
@@ -259,9 +355,10 @@ class LatControlPID(LatControl):
     self.params = Params()
     # 2D online lateral auto-tuner: bounded, gated, per-(speed, angle) learned FF trim. Off by default.
     self.tune_learner = TuneLearner(dt, self.steer_max)
-    # Optional per-fingerprint VGR curve. There is deliberately no global/Clarity
-    # fallback: applying either measured curve to another PID car is unsafe.
+    # Optional per-fingerprint VGR transformations. There is deliberately no
+    # global fallback: applying one rack's shape to another PID car is unsafe.
     self.sr_curve = NRDR_SR_CURVE_BY_FP.get(str(CP.carFingerprint))
+    self.vgr_inverse = NRDR_VGR_INVERSE_BY_FP.get(str(CP.carFingerprint))
     self.sr_offset = 0.0
     self.learn_steer_ratio = False
     self.frame = -1
@@ -303,8 +400,18 @@ class LatControlPID(LatControl):
       if not self.learn_steer_ratio:
         bp, values = self.sr_curve
         VM.sR = float(np.interp(abs(CS.steeringAngleDeg), bp, values)) + self.sr_offset
+    elif self.vgr_inverse is not None and not self.learn_steer_ratio:
+      # Preserve the existing global SR offset for a fixed scalar tune. With
+      # learning enabled, controlsd has already loaded paramsd's scalar into VM.
+      VM.sR += self.sr_offset
 
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+    if self.vgr_inverse is not None:
+      linear_bp, real_angle_v = self.vgr_inverse
+      angle_steers_des_no_offset = math.copysign(
+        float(np.interp(abs(angle_steers_des_no_offset), linear_bp, real_angle_v)),
+        angle_steers_des_no_offset,
+      )
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
     error = angle_steers_des - CS.steeringAngleDeg
 
