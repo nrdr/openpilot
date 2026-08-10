@@ -16,10 +16,8 @@ from openpilot.selfdrive.controls.lib.latcontrol_angle import LatControlAngle
 from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_CIVIC_BOSCH_SR_CURVE_BP,
   NRDR_CIVIC_BOSCH_SR_CURVE_V,
-  NRDR_CIVIC_NIDEC_EFFECTIVE_SR_MULTIPLIER_V,
   NRDR_CIVIC_NIDEC_LINEAR_BP,
-  NRDR_CIVIC_NIDEC_LOCAL_SR_BP,
-  NRDR_CIVIC_NIDEC_RELATIVE_LOCAL_SR_V,
+  NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V,
   NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
   NRDR_CLARITY_SR_CURVE_BP,
   NRDR_CLARITY_SR_CURVE_V,
@@ -67,18 +65,16 @@ class TestLatControl:
       NRDR_CIVIC_BOSCH_SR_CURVE_BP,
       NRDR_CIVIC_BOSCH_SR_CURVE_V,
     )
-    assert NRDR_CIVIC_NIDEC_LOCAL_SR_BP == [
+    assert NRDR_CIVIC_NIDEC_VGR_ANGLE_BP == [
       0.000, 3.125, 6.400, 9.524, 12.698, 15.748, 19.047, 22.222, 25.397, 31.746,
       47.243, 62.017, 76.336, 83.333, 86.363, 88.721, 91.728, 94.028, 97.013, 99.998,
       102.224, 105.187, 107.354, 110.295, 131.387, 152.173, 170.216, 188.812, 208.333, 596.023,
     ]
-    assert NRDR_CIVIC_NIDEC_RELATIVE_LOCAL_SR_V == [
+    assert NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V == [
       1.000, 1.000, 1.024, 1.016, 1.016, 1.008, 1.016, 1.016, 1.016, 1.016,
       1.008, 0.992, 0.977, 0.970, 0.970, 0.962, 0.962, 0.955, 0.955, 0.955,
       0.948, 0.948, 0.941, 0.941, 0.934, 0.928, 0.908, 0.895, 0.889, 0.848,
     ]
-    assert len(NRDR_CIVIC_NIDEC_VGR_ANGLE_BP) > len(NRDR_CIVIC_NIDEC_LOCAL_SR_BP)
-    assert all(bp in NRDR_CIVIC_NIDEC_VGR_ANGLE_BP for bp in NRDR_CIVIC_NIDEC_LOCAL_SR_BP)
     assert "HONDA_CIVIC" not in NRDR_SR_CURVE_BY_FP
     assert NRDR_VGR_INVERSE_BY_FP["HONDA_CIVIC"] == (
       NRDR_CIVIC_NIDEC_LINEAR_BP,
@@ -88,17 +84,24 @@ class TestLatControl:
     assert np.interp(90., NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V) == 10.930
     assert np.interp(400., NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V) == 10.930
 
-    # The firmware contains a small genuine near-center rise; do not flatten it
-    # with a monotonic-decreasing rule. The generated controller curve is the
-    # cumulative/effective ratio, not this instantaneous/local shape.
-    assert max(NRDR_CIVIC_NIDEC_RELATIVE_LOCAL_SR_V) == 1.024
+    # The Nidec A-table is already cumulative/effective and contains a genuine
+    # near-center rise. Do not integrate it or flatten it with a monotonic rule.
+    assert max(NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V) == 1.024
     assert all(left < right for left, right in pairwise(NRDR_CIVIC_NIDEC_LINEAR_BP))
-    assert np.isclose(np.interp(45., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-                                NRDR_CIVIC_NIDEC_EFFECTIVE_SR_MULTIPLIER_V), 1.013279419, atol=5e-10)
-    assert np.isclose(np.interp(90., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-                                NRDR_CIVIC_NIDEC_EFFECTIVE_SR_MULTIPLIER_V), 0.999611772, atol=5e-10)
-    assert np.isclose(np.interp(400., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-                                NRDR_CIVIC_NIDEC_EFFECTIVE_SR_MULTIPLIER_V), 0.916476260, atol=5e-10)
+    np.testing.assert_allclose(
+      NRDR_CIVIC_NIDEC_LINEAR_BP,
+      np.divide(NRDR_CIVIC_NIDEC_VGR_ANGLE_BP, NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V),
+      rtol=0.0,
+      atol=1e-12,
+    )
+    assert np.isclose(np.interp(60., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
+                                NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V), 0.994184, atol=5e-7)
+    assert np.isclose(np.interp(100., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
+                                NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V), 0.954994, atol=5e-7)
+    assert np.isclose(np.interp(160., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
+                                NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V), 0.919324, atol=5e-7)
+    assert np.isclose(np.interp(200., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
+                                NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V), 0.891561, atol=5e-7)
 
     # LINEAR_BP is the pre-solved inverse coordinate: each constant-ratio
     # model angle must map back to the real steering-wheel angle that produced it.
