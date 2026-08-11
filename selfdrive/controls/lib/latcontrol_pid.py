@@ -115,6 +115,41 @@ NRDR_CIVIC_NIDEC_LINEAR_BP = [
   )
 ]
 
+# Insight EPS firmware VGR curve extracted and traced by vote_for_nobody. Unlike
+# the Civic TBA-A030 / TEG-A010 position map above, these are instantaneous/local
+# ratio multipliers. VehicleModel needs the cumulative road-wheel displacement,
+# so integrate the local curve into a constant-ratio/model coordinate before
+# inverting it. This is the same anchor-free solve used by vote_for_nobody for
+# the Clarity: paramsd's scalar remains the centre-ratio anchor and can relearn.
+NRDR_INSIGHT_VGR_SOURCE_ANGLE_BP = [
+  0.000, 3.721, 7.302, 10.972, 14.610, 18.228, 21.864, 25.517, 29.156, 36.296,
+  53.978, 70.999, 87.308, 95.243, 450.000,
+]
+NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL = [
+  1.000000, 1.000000, 1.000000, 1.000000, 1.000000, 0.998445, 0.995081, 0.989922,
+  0.983180, 0.965570, 0.909063, 0.858696, 0.833564, 0.833141, 0.833141,
+]
+# Resample the three widest transition intervals. This keeps the inverse's
+# piecewise-linear chord within 0.04 deg of the integrated firmware curve.
+NRDR_INSIGHT_VGR_ANGLE_BP = sorted([
+  *NRDR_INSIGHT_VGR_SOURCE_ANGLE_BP,
+  45.000, 62.000, 79.000,
+])
+NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V = _effective_sr_from_local_curve(
+  NRDR_INSIGHT_VGR_SOURCE_ANGLE_BP,
+  NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL,
+  1.0,
+  output_bp=NRDR_INSIGHT_VGR_ANGLE_BP,
+)
+NRDR_INSIGHT_VGR_LINEAR_BP = [
+  0.0 if angle == 0.0 else angle / multiplier
+  for angle, multiplier in zip(
+    NRDR_INSIGHT_VGR_ANGLE_BP,
+    NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V,
+    strict=True,
+  )
+]
+
 NRDR_SR_CURVE_BY_FP = {
   "HONDA_CLARITY": (NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V),
   "HONDA_CRV_5G": (NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V),
@@ -124,6 +159,7 @@ NRDR_SR_CURVE_BY_FP = {
 # (constant-ratio/model angle breakpoints, real steering-wheel angle values)
 NRDR_VGR_INVERSE_BY_FP = {
   "HONDA_CIVIC": (NRDR_CIVIC_NIDEC_LINEAR_BP, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP),
+  "HONDA_INSIGHT": (NRDR_INSIGHT_VGR_LINEAR_BP, NRDR_INSIGHT_VGR_ANGLE_BP),
 }
 
 
