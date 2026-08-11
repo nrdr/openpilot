@@ -402,6 +402,14 @@ _LAT_SCALE_STD_MAX = 50.0 * _MPH_TO_MS    # below this -> standard scale, else h
 # so it engages smoothly instead of stepping in the moment the car crosses the threshold.
 CENTER_BOOST_SPEED_FADE_MS = 5.0 * _MPH_TO_MS
 
+# Exact classic torque-controller friction mapping from mvl-staging-05.08.2026.
+# The old controller multiplied its friction tune by latAccelFactor before adding
+# it directly in torque space. PID keeps its own angle feedforward; 3.5 is only
+# the legacy friction conversion scale and does not replace PID feedforward.
+LEGACY_PID_FRICTION_THRESHOLD = 0.3
+LEGACY_PID_FRICTION_LAT_ACCEL_FACTOR = 3.5
+LEGACY_PID_FRICTION_FADE_TAU = 0.25
+
 # Unwind FF boost fades out over this many seconds approaching its time cap, so the boost
 # doesn't drop as a torque step the instant the cap is reached.
 UNWIND_BOOST_FADE_S = 0.3
@@ -426,6 +434,32 @@ def _lat_pid_scale_banded(v_ego: float, low: float, standard: float, highway: fl
   if v_ego < _LAT_SCALE_STD_MAX:
     return standard
   return highway
+
+
+def _apply_legacy_friction_deadzone(error: float, deadzone: float) -> float:
+  if error > deadzone:
+    return error - deadzone
+  if error < -deadzone:
+    return error + deadzone
+  return 0.0
+
+
+def _legacy_pid_friction(friction_input: float, lateral_accel_deadzone: float, friction: float) -> float:
+  """Return the direct torque-space friction term used by the legacy torque controller."""
+  return float(np.interp(
+    _apply_legacy_friction_deadzone(friction_input, lateral_accel_deadzone),
+    [-LEGACY_PID_FRICTION_THRESHOLD, LEGACY_PID_FRICTION_THRESHOLD],
+    [-friction, friction],
+  )) * LEGACY_PID_FRICTION_LAT_ACCEL_FACTOR
+
+
+def _vgr_real_to_linear_angle(real_angle_deg: float, vgr_inverse: tuple[list[float], list[float]] | None) -> float:
+  """Convert measured VGR wheel angle back to VehicleModel's constant-ratio coordinate."""
+  if vgr_inverse is None:
+    return real_angle_deg
+
+  linear_bp, real_angle_v = vgr_inverse
+  return math.copysign(float(np.interp(abs(real_angle_deg), real_angle_v, linear_bp)), real_angle_deg)
 
 
 def _sign(x: float) -> float:
@@ -588,6 +622,8 @@ class LatControlPID(LatControl):
     self.eps_modified_steering_pressed_filter_s = 0.0
     self.eps_modified_steering_pressed_prev = False
     self.center_taper_scale = FirstOrderFilter(1.0, CENTER_TAPER_FADE_TAU, dt)
+    self.legacy_friction_scale = FirstOrderFilter(1.0, LEGACY_PID_FRICTION_FADE_TAU, dt)
+    self.legacy_pid_friction = 0.5
     self.prev_output_torque = 0.0
     self.prev_angle_steers_des_no_offset = 0.0
     self.params = Params()
@@ -669,6 +705,7 @@ class LatControlPID(LatControl):
       self.eps_modified_steering_pressed_filter_s = 0.0
       self.eps_modified_steering_pressed_prev = False
       self.center_taper_scale.x = 1.0
+      self.legacy_friction_scale.x = 1.0
       self.prev_output_torque = 0.0
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
       self.unwind_boost_elapsed = 0.0
@@ -801,6 +838,15 @@ class LatControlPID(LatControl):
           0.0,
           90.0,
         )
+        # Direct torque-space friction magnitude. The legacy controller used a
+        # fixed latAccelFactor of 3.5 for this conversion; 0 keeps the overlay off.
+        self.legacy_pid_friction = get_param_float(
+          self.params,
+          "HondaPidFriction",
+          0.5,
+          0.0,
+          1.0,
+        )
         self.unwind_freeze_enabled = get_param_bool(self.params, "HondaUnwindFreeze")
         self.unwind_lookahead_enabled = get_param_bool(self.params, "HondaUnwindLookahead")
         # Unwind FF boost: peak multiplier + time cap (both FLOAT, stored as real values).
@@ -854,6 +900,19 @@ class LatControlPID(LatControl):
           self.center_boost_min_speed * _MPH_TO_MS,
           self.starpilot_enabled,
         )
+
+        # Legacy torque-controller friction overlay. Keep PID's normal angle
+        # feedback/feedforward intact, then add only the old direct friction term.
+        # Convert a measured VGR wheel angle back to VehicleModel's constant-ratio
+        # coordinate first, otherwise a correct high-angle VGR response would look
+        # like lateral-acceleration error and the overlay would fight the rack map.
+        actual_angle_no_offset = float(CS.steeringAngleDeg) - float(params.angleOffsetDeg)
+        actual_model_angle = _vgr_real_to_linear_angle(actual_angle_no_offset, self.vgr_inverse)
+        actual_curvature = -VM.calc_curvature(math.radians(actual_model_angle), CS.vEgo, params.roll)
+        friction_input = (desired_curvature - actual_curvature) * CS.vEgo ** 2
+        friction_scale = float(self.legacy_friction_scale.update(0.0 if lane_change else 1.0))
+        # PID steering-torque sign is opposite the lateral-acceleration convention.
+        output_torque -= friction_scale * _legacy_pid_friction(friction_input, 0.0, self.legacy_pid_friction)
 
         # Rate damping (the missing "D"): torque opposing how fast the wheel is moving, applied
         # after the output scale so it's a clean physical term. Strongest at low speed (where the
