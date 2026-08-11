@@ -1,6 +1,7 @@
 from itertools import pairwise
 
 import numpy as np
+import pytest
 from openpilot.cereal import log
 from opendbc.car.structs import car
 from opendbc.car.car_helpers import interfaces
@@ -22,6 +23,11 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
   NRDR_CLARITY_SR_CURVE_BP,
   NRDR_CLARITY_SR_CURVE_V,
+  NRDR_INSIGHT_VGR_ANGLE_BP,
+  NRDR_INSIGHT_VGR_LINEAR_BP,
+  NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V,
+  NRDR_INSIGHT_VGR_SOURCE_ANGLE_BP,
+  NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL,
   NRDR_SR_CURVE_BY_FP,
   NRDR_VGR_INVERSE_BY_FP,
   LatControlPID,
@@ -111,11 +117,49 @@ class TestLatControl:
       recovered_angle = np.interp(model_angle, NRDR_CIVIC_NIDEC_LINEAR_BP, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP)
       assert np.isclose(recovered_angle, real_angle, atol=1e-12)
 
+  def test_nrdr_insight_uses_vote_for_nobody_firmware_vgr_curve(self):
+    assert NRDR_INSIGHT_VGR_SOURCE_ANGLE_BP == [
+      0.000, 3.721, 7.302, 10.972, 14.610, 18.228, 21.864, 25.517, 29.156, 36.296,
+      53.978, 70.999, 87.308, 95.243, 450.000,
+    ]
+    assert NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL == [
+      1.000000, 1.000000, 1.000000, 1.000000, 1.000000, 0.998445, 0.995081, 0.989922,
+      0.983180, 0.965570, 0.909063, 0.858696, 0.833564, 0.833141, 0.833141,
+    ]
+    assert NRDR_VGR_INVERSE_BY_FP["HONDA_INSIGHT"] == (
+      NRDR_INSIGHT_VGR_LINEAR_BP,
+      NRDR_INSIGHT_VGR_ANGLE_BP,
+    )
+    assert "HONDA_INSIGHT" not in NRDR_SR_CURVE_BY_FP
+
+    assert len(NRDR_INSIGHT_VGR_ANGLE_BP) == len(NRDR_INSIGHT_VGR_LINEAR_BP)
+    assert len(NRDR_INSIGHT_VGR_ANGLE_BP) == len(NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V)
+    assert all(left < right for left, right in pairwise(NRDR_INSIGHT_VGR_ANGLE_BP))
+    assert all(left < right for left, right in pairwise(NRDR_INSIGHT_VGR_LINEAR_BP))
+    assert all(left >= right for left, right in pairwise(NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL))
+
+    # The local curve is flat through 14.61 degrees, so the inverse is an exact
+    # no-op there. It then gets progressively quicker and holds its local tail.
+    for angle in (0., 3., 7., 10., 14.610):
+      assert np.interp(angle, NRDR_INSIGHT_VGR_LINEAR_BP, NRDR_INSIGHT_VGR_ANGLE_BP) == pytest.approx(angle)
+    assert NRDR_INSIGHT_VGR_LINEAR_BP[NRDR_INSIGHT_VGR_ANGLE_BP.index(95.243)] == pytest.approx(103.506417, abs=1e-6)
+    assert NRDR_INSIGHT_VGR_LINEAR_BP[-1] == pytest.approx(529.313094, abs=1e-6)
+
+    # Guard the local-vs-effective distinction: pointwise division would put
+    # the tail near 540 degrees and repeat the earlier Clarity conversion bug.
+    assert 450. / NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL[-1] > NRDR_INSIGHT_VGR_LINEAR_BP[-1] + 10.
+
+    for real_angle in (0., 15., 45., 70., 90., 200., 400.):
+      model_angle = np.interp(real_angle, NRDR_INSIGHT_VGR_ANGLE_BP, NRDR_INSIGHT_VGR_LINEAR_BP)
+      recovered_angle = np.interp(model_angle, NRDR_INSIGHT_VGR_LINEAR_BP, NRDR_INSIGHT_VGR_ANGLE_BP)
+      assert recovered_angle == pytest.approx(real_angle, abs=1e-12)
+
   @parameterized.expand([
     (HONDA.HONDA_CLARITY, "HONDA_CLARITY", None),
     (HONDA.HONDA_CRV_5G, "HONDA_CRV_5G", None),
     (HONDA.HONDA_CIVIC_BOSCH, "HONDA_CIVIC_BOSCH", None),
     (HONDA.HONDA_CIVIC, None, "HONDA_CIVIC"),
+    (HONDA.HONDA_INSIGHT, None, "HONDA_INSIGHT"),
     (HONDA.HONDA_CIVIC_BOSCH_DIESEL, None, None),
   ])
   def test_nrdr_steer_ratio_curve_is_fingerprint_scoped(self, car_name, expected_curve_fp, expected_inverse_fp):
