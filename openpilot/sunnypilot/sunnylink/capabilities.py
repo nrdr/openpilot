@@ -14,6 +14,7 @@ from opendbc.sunnypilot.car.tesla.values import TeslaFlagsSP
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import get_handcrafted_lateral_profile
 
 
 # Wire-protocol version for the capabilities payload. Bump on breaking changes
@@ -43,6 +44,7 @@ CAPABILITY_FIELDS = (
   "device_type",
   "subaru_has_sng",
   "hyundai_alpha_long_available",
+  "has_handcrafted_lateral_profile",
 )
 
 CAPABILITY_LABELS: dict[str, str] = {
@@ -66,6 +68,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "device_type": "Device type",
   "subaru_has_sng": "Subaru Stop-and-Go available",
   "hyundai_alpha_long_available": "Hyundai Alpha Longitudinal available",
+  "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
 }
 
 # Explicit defaults for non-boolean capability fields
@@ -182,6 +185,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
       cloudlog.exception("capabilities: failed to deserialize CarParamsSPPersistent")
 
   _resolve_brand_capabilities(caps, bundle_platform, CP)
+  caps["has_handcrafted_lateral_profile"] = get_handcrafted_lateral_profile(caps["car_fingerprint"] or bundle_platform) is not None
 
   return caps
 

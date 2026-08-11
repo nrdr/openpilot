@@ -171,11 +171,9 @@ sections:
     widget: toggle
     title: Handcrafted Lateral Tuning
     description: Force-load the complete road-tested tune for this exact vehicle fingerprint and lock conflicting controls.
-    details: Loads the versioned Clarity road-test profile, including PID trims, the variable steering-ratio selection, controller helpers, steering filters, and fixed live-delay setting. Disable this only to resume manual tuning.
+    details: Loads the shared versioned Honda torque-mod road-test profile, including PID trims, fingerprint-safe steering-ratio selection, controller helpers, steering filters, and fixed live-delay setting. Disable this only to resume manual tuning.
     visibility:
-    - type: capability
-      field: car_fingerprint
-      equals: HONDA_CLARITY
+    - {type: capability, field: has_handcrafted_lateral_profile, equals: true}
     enablement:
     - $ref: '#/macros/offroad'
   sub_panels:
