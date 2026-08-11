@@ -17,11 +17,40 @@ from openpilot.selfdrive.controls.lib.latcontrol_angle import LatControlAngle
 from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_CIVIC_BOSCH_SR_CURVE_BP,
   NRDR_CIVIC_BOSCH_SR_CURVE_V,
+  NRDR_CIVIC_BOSCH_CENTER_SR,
+  NRDR_CIVIC_BOSCH_INNER_SR_BP,
+  NRDR_CIVIC_BOSCH_INNER_SR_V,
+  NRDR_CIVIC_BOSCH_VGR_SOURCE_ANGLE_BP,
+  NRDR_CIVIC_BOSCH_VGR_SOURCE_REL_LOCAL,
+  NRDR_CIVIC_BOSCH_VGR_LINEAR_BP,
+  NRDR_CIVIC_FINAL_SR,
+  NRDR_CIVIC_LOCK_ANGLE,
   NRDR_CIVIC_NIDEC_LINEAR_BP,
   NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V,
   NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
+  NRDR_CIVIC_NIDEC_VGR_SOURCE_ANGLE_BP,
+  NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR,
+  NRDR_CLARITY_FINAL_SR,
+  NRDR_CLARITY_CENTER_SR,
+  NRDR_CLARITY_INNER_SR_BP,
+  NRDR_CLARITY_INNER_SR_V,
+  NRDR_CLARITY_LOCK_ANGLE,
   NRDR_CLARITY_SR_CURVE_BP,
   NRDR_CLARITY_SR_CURVE_V,
+  NRDR_CLARITY_VGR_SOURCE_ANGLE_BP,
+  NRDR_CLARITY_VGR_SOURCE_REL_LOCAL,
+  NRDR_CLARITY_VGR_LINEAR_BP,
+  NRDR_CRV_5G_CENTER_SR,
+  NRDR_CRV_5G_FINAL_SR,
+  NRDR_CRV_5G_LOCK_ANGLE,
+  NRDR_CRV_5G_SR_CURVE_BP,
+  NRDR_CRV_5G_SR_CURVE_V,
+  NRDR_CRV_5G_VGR_LINEAR_BP,
+  NRDR_INSIGHT_CENTER_SR,
+  NRDR_INSIGHT_FINAL_SR,
+  NRDR_INSIGHT_LOCK_ANGLE,
+  NRDR_INSIGHT_BASE_ANGLE_BP,
+  NRDR_INSIGHT_BASE_REL_EFFECTIVE_SR,
   NRDR_INSIGHT_VGR_ANGLE_BP,
   NRDR_INSIGHT_VGR_LINEAR_BP,
   NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V,
@@ -39,44 +68,65 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 class TestLatControl:
 
   def test_nrdr_steer_ratio_curves_are_well_formed(self):
-    for breakpoints, values in NRDR_SR_CURVE_BY_FP.values():
+    assert NRDR_SR_CURVE_BY_FP == {}
+    for breakpoints, values in (
+        (NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V),
+        (NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V),
+        (NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V),
+    ):
       assert len(breakpoints) == len(values)
       assert all(left < right for left, right in pairwise(breakpoints))
       assert all(value > 0.0 for value in values)
 
-  def test_nrdr_clarity_raw_curve_fades_to_manufacturer_spec(self):
-    assert NRDR_CLARITY_SR_CURVE_BP == [
+  def test_nrdr_clarity_firmware_tail_reaches_spec_at_physical_lock(self):
+    assert NRDR_CLARITY_INNER_SR_BP == [
       0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5,
-      62.5, 67.5, 70., 75., 80., 85., 90., 450.,
+      62.5, 67.5, 70.,
     ]
-    assert NRDR_CLARITY_SR_CURVE_V == [
+    assert NRDR_CLARITY_INNER_SR_V == [
       20.114, 20.114, 20.114, 20.052, 19.407, 19.398, 19.398, 19.240, 18.452, 18.250,
-      18.250, 18.178, 17.940, 17.940, 17.625, 17.584, 16.824, 15.152, 13.480, 12.720, 12.720,
+      18.250, 18.178, 17.940, 17.940, 17.625, 17.584,
+    ]
+    assert NRDR_CLARITY_VGR_SOURCE_ANGLE_BP == [
+      0.000, 4.052, 8.104, 12.102, 16.201, 20.205, 24.299, 28.299, 32.296, 40.194,
+      59.571, 78.095, 95.805, 104.440, 450.000,
+    ]
+    assert NRDR_CLARITY_VGR_SOURCE_REL_LOCAL == [
+      1.000000, 1.000000, 1.000000, 1.000000, 0.999938, 0.998460, 0.995087, 0.989980,
+      0.983193, 0.965501, 0.909060, 0.858900, 0.834355, 0.833325, 0.833325,
     ]
 
     assert np.interp(70., NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V) == 17.584
-    assert np.interp(90., NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V) == 12.720
-    assert np.interp(450., NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V) == 12.720
+    assert np.interp(90., NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V) > NRDR_CLARITY_FINAL_SR
+    assert np.interp(NRDR_CLARITY_LOCK_ANGLE, NRDR_CLARITY_SR_CURVE_BP,
+                     NRDR_CLARITY_SR_CURVE_V) == pytest.approx(NRDR_CLARITY_FINAL_SR)
+    assert np.interp(450., NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V) == pytest.approx(NRDR_CLARITY_FINAL_SR)
+    clarity_outer = [value for angle, value in zip(NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V, strict=True)
+                     if angle >= 104.440]
+    assert all(left >= right for left, right in pairwise(clarity_outer))
 
   def test_nrdr_civic_families_use_firmware_specific_curves(self):
-    assert NRDR_CIVIC_BOSCH_SR_CURVE_BP == [
+    assert NRDR_CIVIC_BOSCH_INNER_SR_BP == [
       0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5,
-      62.5, 70., 75., 80., 85., 90., 400.,
+      62.5, 70.,
     ]
-    assert NRDR_CIVIC_BOSCH_SR_CURVE_V == [
+    assert NRDR_CIVIC_BOSCH_INNER_SR_V == [
       19.095, 19.095, 18.276, 16.335, 16.335, 16.335, 16.246, 15.291, 15.291, 14.675,
-      14.393, 13.596, 13.596, 13.179438, 12.263, 11.346562, 10.930, 10.930,
+      14.393, 13.596, 13.596,
     ]
-    assert NRDR_SR_CURVE_BY_FP["HONDA_CIVIC_BOSCH"] == (
+    assert NRDR_CIVIC_BOSCH_VGR_SOURCE_ANGLE_BP[-2:] == [111.269, 450.000]
+    assert NRDR_CIVIC_BOSCH_VGR_SOURCE_REL_LOCAL[-2:] == [0.829, 0.829]
+    assert NRDR_VGR_INVERSE_BY_FP["HONDA_CIVIC_BOSCH"] == (
+      NRDR_CIVIC_BOSCH_VGR_LINEAR_BP,
       NRDR_CIVIC_BOSCH_SR_CURVE_BP,
-      NRDR_CIVIC_BOSCH_SR_CURVE_V,
+      NRDR_CIVIC_BOSCH_CENTER_SR,
     )
-    assert NRDR_CIVIC_NIDEC_VGR_ANGLE_BP == [
+    assert NRDR_CIVIC_NIDEC_VGR_SOURCE_ANGLE_BP == [
       0.000, 3.125, 6.400, 9.524, 12.698, 15.748, 19.047, 22.222, 25.397, 31.746,
       47.243, 62.017, 76.336, 83.333, 86.363, 88.721, 91.728, 94.028, 97.013, 99.998,
       102.224, 105.187, 107.354, 110.295, 131.387, 152.173, 170.216, 188.812, 208.333, 596.023,
     ]
-    assert NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V == [
+    assert NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR == [
       1.000, 1.000, 1.024, 1.016, 1.016, 1.008, 1.016, 1.016, 1.016, 1.016,
       1.008, 0.992, 0.977, 0.970, 0.970, 0.962, 0.962, 0.955, 0.955, 0.955,
       0.948, 0.948, 0.941, 0.941, 0.934, 0.928, 0.908, 0.895, 0.889, 0.848,
@@ -85,10 +135,14 @@ class TestLatControl:
     assert NRDR_VGR_INVERSE_BY_FP["HONDA_CIVIC"] == (
       NRDR_CIVIC_NIDEC_LINEAR_BP,
       NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
+      15.38,
     )
     assert np.interp(70., NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V) == 13.596
-    assert np.interp(90., NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V) == 10.930
-    assert np.interp(400., NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V) == 10.930
+    assert np.interp(90., NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V) > NRDR_CIVIC_FINAL_SR
+    assert np.interp(NRDR_CIVIC_LOCK_ANGLE, NRDR_CIVIC_BOSCH_SR_CURVE_BP,
+                     NRDR_CIVIC_BOSCH_SR_CURVE_V) == pytest.approx(NRDR_CIVIC_FINAL_SR)
+    assert np.interp(NRDR_CIVIC_LOCK_ANGLE, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
+                     NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V) * 15.38 == pytest.approx(NRDR_CIVIC_FINAL_SR)
 
     # The Nidec A-table is already cumulative/effective and contains a genuine
     # near-center rise. Do not integrate it or flatten it with a monotonic rule.
@@ -111,7 +165,7 @@ class TestLatControl:
 
     # LINEAR_BP is the pre-solved inverse coordinate: each constant-ratio
     # model angle must map back to the real steering-wheel angle that produced it.
-    for real_angle in (0., 45., 70., 90., 200., 400.):
+    for real_angle in (0., 45., 70., 90., 200., NRDR_CIVIC_LOCK_ANGLE):
       model_angle = np.interp(real_angle, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP, NRDR_CIVIC_NIDEC_LINEAR_BP)
       recovered_angle = np.interp(model_angle, NRDR_CIVIC_NIDEC_LINEAR_BP, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP)
       assert np.isclose(recovered_angle, real_angle, atol=1e-12)
@@ -128,6 +182,7 @@ class TestLatControl:
     assert NRDR_VGR_INVERSE_BY_FP["HONDA_INSIGHT"] == (
       NRDR_INSIGHT_VGR_LINEAR_BP,
       NRDR_INSIGHT_VGR_ANGLE_BP,
+      NRDR_INSIGHT_CENTER_SR,
     )
     assert "HONDA_INSIGHT" not in NRDR_SR_CURVE_BY_FP
 
@@ -142,21 +197,51 @@ class TestLatControl:
     for angle in (0., 3., 7., 10., 14.610):
       assert np.interp(angle, NRDR_INSIGHT_VGR_LINEAR_BP, NRDR_INSIGHT_VGR_ANGLE_BP) == pytest.approx(angle)
     assert NRDR_INSIGHT_VGR_LINEAR_BP[NRDR_INSIGHT_VGR_ANGLE_BP.index(95.243)] == pytest.approx(103.506417, abs=1e-6)
-    assert NRDR_INSIGHT_VGR_LINEAR_BP[-1] == pytest.approx(529.313094, abs=1e-6)
+    assert np.interp(NRDR_INSIGHT_LOCK_ANGLE, NRDR_INSIGHT_VGR_ANGLE_BP,
+                     NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V) * NRDR_INSIGHT_CENTER_SR == pytest.approx(NRDR_INSIGHT_FINAL_SR)
+    assert NRDR_INSIGHT_VGR_LINEAR_BP[-1] == pytest.approx(
+      NRDR_INSIGHT_VGR_ANGLE_BP[-1] / (NRDR_INSIGHT_FINAL_SR / NRDR_INSIGHT_CENTER_SR), abs=1e-6,
+    )
 
     # Guard the local-vs-effective distinction: pointwise division would put
     # the tail near 540 degrees and repeat the earlier Clarity conversion bug.
-    assert 450. / NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL[-1] > NRDR_INSIGHT_VGR_LINEAR_BP[-1] + 10.
+    assert 95.243 / NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL[-2] > 95.243 / np.interp(
+      95.243, NRDR_INSIGHT_BASE_ANGLE_BP, NRDR_INSIGHT_BASE_REL_EFFECTIVE_SR,
+    ) + 10.
 
-    for real_angle in (0., 15., 45., 70., 90., 200., 400.):
+    for real_angle in (0., 15., 45., 70., 90., 200., 400., NRDR_INSIGHT_LOCK_ANGLE):
       model_angle = np.interp(real_angle, NRDR_INSIGHT_VGR_ANGLE_BP, NRDR_INSIGHT_VGR_LINEAR_BP)
       recovered_angle = np.interp(model_angle, NRDR_INSIGHT_VGR_LINEAR_BP, NRDR_INSIGHT_VGR_ANGLE_BP)
       assert recovered_angle == pytest.approx(real_angle, abs=1e-12)
 
+  def test_nrdr_crv_reaches_spec_at_physical_lock(self):
+    assert np.interp(200., NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V) == 14.60
+    assert np.interp(NRDR_CRV_5G_LOCK_ANGLE, NRDR_CRV_5G_SR_CURVE_BP,
+                     NRDR_CRV_5G_SR_CURVE_V) == pytest.approx(NRDR_CRV_5G_FINAL_SR)
+    assert np.interp(450., NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V) == pytest.approx(NRDR_CRV_5G_FINAL_SR)
+    crv_outer = [value for angle, value in zip(NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V, strict=True)
+                 if angle >= 200.]
+    assert all(left >= right for left, right in pairwise(crv_outer))
+
+  def test_nrdr_absolute_curves_use_pre_solved_desired_angle_inverse(self):
+    assert NRDR_VGR_INVERSE_BY_FP["HONDA_CLARITY"] == (
+      NRDR_CLARITY_VGR_LINEAR_BP, NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_CENTER_SR,
+    )
+    assert NRDR_VGR_INVERSE_BY_FP["HONDA_CRV_5G"] == (
+      NRDR_CRV_5G_VGR_LINEAR_BP, NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_CENTER_SR,
+    )
+    for fingerprint in ("HONDA_CLARITY", "HONDA_CRV_5G", "HONDA_CIVIC_BOSCH"):
+      linear_bp, real_angle_v, _ = NRDR_VGR_INVERSE_BY_FP[fingerprint]
+      assert all(left < right for left, right in pairwise(linear_bp))
+      for real_angle in (0., 45., 70., 90., 200.):
+        model_angle = np.interp(real_angle, real_angle_v, linear_bp)
+        recovered_angle = np.interp(model_angle, linear_bp, real_angle_v)
+        assert recovered_angle == pytest.approx(real_angle, abs=1e-12)
+
   @parameterized.expand([
-    (HONDA.HONDA_CLARITY, "HONDA_CLARITY", None),
-    (HONDA.HONDA_CRV_5G, "HONDA_CRV_5G", None),
-    (HONDA.HONDA_CIVIC_BOSCH, "HONDA_CIVIC_BOSCH", None),
+    (HONDA.HONDA_CLARITY, None, "HONDA_CLARITY"),
+    (HONDA.HONDA_CRV_5G, None, "HONDA_CRV_5G"),
+    (HONDA.HONDA_CIVIC_BOSCH, None, "HONDA_CIVIC_BOSCH"),
     (HONDA.HONDA_CIVIC, None, "HONDA_CIVIC"),
     (HONDA.HONDA_INSIGHT, None, "HONDA_INSIGHT"),
     (HONDA.HONDA_CIVIC_BOSCH_DIESEL, None, None),
