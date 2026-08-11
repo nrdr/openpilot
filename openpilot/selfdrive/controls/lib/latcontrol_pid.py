@@ -63,6 +63,96 @@ def _effective_sr_from_local_curve(angle_bp, relative_local_sr, center_sr, outpu
   return effective_sr
 
 
+def _curve_breakpoints(source_bp, lock_angle, guard_angle, sample_step=10.0):
+  """Densify a source curve through physical lock and append an interpolation guard."""
+  if lock_angle <= 0.0 or guard_angle < lock_angle or sample_step <= 0.0:
+    raise ValueError("steer-ratio lock, guard, and sample step must be positive and ordered")
+
+  sample_count = int(math.ceil(lock_angle / sample_step))
+  return sorted(set(
+    [float(angle) for angle in source_bp if angle <= lock_angle] +
+    [min(index * sample_step, lock_angle) for index in range(sample_count + 1)] +
+    [float(lock_angle), float(guard_angle)]
+  ))
+
+
+def _endpoint_constrained_effective_sr_curve(angle_bp, effective_sr, fade_start_angle,
+                                             lock_angle, final_sr, guard_angle, sample_step=10.0):
+  """Preserve the evidenced curve, then smoothly land on the published full-off-center ratio."""
+  if len(angle_bp) != len(effective_sr) or len(angle_bp) < 2:
+    raise ValueError("effective steer-ratio breakpoints and values must have matching lengths")
+  if angle_bp[0] != 0.0 or not all(left < right for left, right in pairwise(angle_bp)):
+    raise ValueError("effective steer-ratio breakpoints must start at zero and be strictly increasing")
+  if not all(value > 0.0 for value in effective_sr):
+    raise ValueError("effective steer-ratio values must be positive")
+  if not 0.0 <= fade_start_angle < lock_angle:
+    raise ValueError("outer steer-ratio fade must start before physical lock")
+
+  output_bp = _curve_breakpoints(angle_bp, lock_angle, guard_angle, sample_step)
+  base_at_lock = float(np.interp(lock_angle, angle_bp, effective_sr))
+  if final_sr <= 0.0 or final_sr > base_at_lock:
+    raise ValueError("published outer ratio must be positive and may only reduce the evidenced curve")
+  endpoint_scale = final_sr / base_at_lock
+
+  output_sr = []
+  for angle in output_bp:
+    base_sr = float(np.interp(min(angle, lock_angle), angle_bp, effective_sr))
+    fade = min(max((angle - fade_start_angle) / (lock_angle - fade_start_angle), 0.0), 1.0)
+    smoothstep = fade * fade * (3.0 - 2.0 * fade)
+    output_sr.append(base_sr * (1.0 + smoothstep * (endpoint_scale - 1.0)))
+
+  # The firmware curve may contain a genuine near-center rise. Only the outer
+  # correction is required to be non-increasing.
+  outer_sr = [value for angle, value in zip(output_bp, output_sr, strict=True) if angle >= fade_start_angle]
+  if not all(left >= right for left, right in pairwise(outer_sr)):
+    raise ValueError("endpoint-constrained steer-ratio tail must not increase")
+  return output_bp, output_sr
+
+
+def _absolute_sr_curve_with_local_firmware_tail(inner_angle_bp, inner_sr, join_angle,
+                                                local_angle_bp, relative_local_sr,
+                                                fade_start_angle, lock_angle, final_sr,
+                                                guard_angle, sample_step=10.0):
+  """Join a road-validated inner curve to a firmware-local VGR shape and physical endpoint."""
+  if not inner_angle_bp or inner_angle_bp[0] != 0.0 or inner_angle_bp[-1] != join_angle:
+    raise ValueError("inner steer-ratio curve must run from zero through the requested join angle")
+  if local_angle_bp[-1] < lock_angle:
+    raise ValueError("firmware-local curve must cover physical steering lock")
+
+  base_bp = _curve_breakpoints(
+    sorted({*inner_angle_bp, *local_angle_bp}), lock_angle, lock_angle, sample_step,
+  )
+  firmware_effective_sr = _effective_sr_from_local_curve(
+    local_angle_bp, relative_local_sr, 1.0, output_bp=base_bp,
+  )
+  firmware_at_join = float(np.interp(join_angle, base_bp, firmware_effective_sr))
+  inner_at_join = float(np.interp(join_angle, inner_angle_bp, inner_sr))
+  base_sr = [
+    float(np.interp(angle, inner_angle_bp, inner_sr)) if angle <= join_angle
+    else inner_at_join * firmware_sr / firmware_at_join
+    for angle, firmware_sr in zip(base_bp, firmware_effective_sr, strict=True)
+  ]
+  return _endpoint_constrained_effective_sr_curve(
+    base_bp, base_sr, fade_start_angle, lock_angle, final_sr, guard_angle, sample_step,
+  )
+
+
+def _inverse_vgr_from_effective_sr_curve(angle_bp, effective_sr):
+  """Pre-solve an effective SR curve into model-angle -> real-angle coordinates."""
+  if len(angle_bp) != len(effective_sr) or not angle_bp or angle_bp[0] != 0.0:
+    raise ValueError("inverse VGR source curve must contain matching values starting at zero")
+  center_sr = effective_sr[0]
+  if center_sr <= 0.0:
+    raise ValueError("inverse VGR source curve must have a positive center ratio")
+  linear_bp = [
+    0.0 if angle == 0.0 else angle / (steer_ratio / center_sr)
+    for angle, steer_ratio in zip(angle_bp, effective_sr, strict=True)
+  ]
+  if not all(left < right for left, right in pairwise(linear_bp)):
+    raise ValueError("inverse VGR model-angle breakpoints must be strictly increasing")
+  return linear_bp
+
+
 # Effective steer-ratio curves, keyed explicitly by fingerprint.
 #
 # paramsd estimates one near-center scalar (it only observes steering angles below
@@ -70,50 +160,141 @@ def _effective_sr_from_local_curve(angle_bp, relative_local_sr, center_sr, outpu
 # curves replace that scalar when learning is off; firmware-derived inverse maps
 # instead reshape the scalar model output and can follow paramsd as it relearns.
 # Every unmapped car keeps its normal CP.steerRatio behavior.
-# Preserve the raw Clarity curve through 70 degrees, then use smoothstep-sampled
-# points to reach Honda's published 12.72 ratio at 90 degrees and hold it through lock.
-NRDR_CLARITY_SR_CURVE_BP = [0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5,
-                            62.5, 67.5, 70., 75., 80., 85., 90., 450.]  # |wheel angle|, deg
-NRDR_CLARITY_SR_CURVE_V = [20.114, 20.114, 20.114, 20.052, 19.407, 19.398, 19.398, 19.240, 18.452, 18.250,
-                           18.250, 18.178, 17.940, 17.940, 17.625, 17.584, 16.824, 15.152, 13.480, 12.720, 12.720]
+# Honda publishes final full-off-center ratios rather than center ratios. Keep
+# each car's road-validated/effective inner calibration and firmware VGR shape,
+# then remove the remaining model compensation gradually so the published ratio
+# is reached at physical lock -- never at an arbitrary 80-90 degree breakpoint.
+NRDR_CIVIC_LOCK_ANGLE = 2.22 * 180.0
+NRDR_CIVIC_FINAL_SR = 10.93
+NRDR_CLARITY_LOCK_ANGLE = 2.41 * 180.0
+NRDR_CLARITY_FINAL_SR = 12.72
+NRDR_CRV_5G_LOCK_ANGLE = 2.30 * 180.0
+NRDR_CRV_5G_FINAL_SR = 12.30
+NRDR_INSIGHT_LOCK_ANGLE = 2.54 * 180.0
+NRDR_INSIGHT_FINAL_SR = 12.58
 
-NRDR_CRV_5G_SR_CURVE_BP = [0., 50., 100., 150., 175., 200.]
-NRDR_CRV_5G_SR_CURVE_V = [18.10, 17.80, 16.30, 15.30, 14.90, 14.60]
+# Clarity B-table: instantaneous/local VGR shape extracted and traced by
+# vote_for_nobody. Preserve the road-validated absolute curve through 70 deg,
+# continue with the firmware shape, then apply the endpoint constraint only
+# after the firmware transition has completed at 104.44 deg.
+NRDR_CLARITY_INNER_SR_BP = [
+  0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5,
+  62.5, 67.5, 70.,
+]
+NRDR_CLARITY_INNER_SR_V = [
+  20.114, 20.114, 20.114, 20.052, 19.407, 19.398, 19.398, 19.240, 18.452, 18.250,
+  18.250, 18.178, 17.940, 17.940, 17.625, 17.584,
+]
+NRDR_CLARITY_VGR_SOURCE_ANGLE_BP = [
+  0.000, 4.052, 8.104, 12.102, 16.201, 20.205, 24.299, 28.299, 32.296, 40.194,
+  59.571, 78.095, 95.805, 104.440, 450.000,
+]
+NRDR_CLARITY_VGR_SOURCE_REL_LOCAL = [
+  1.000000, 1.000000, 1.000000, 1.000000, 0.999938, 0.998460, 0.995087, 0.989980,
+  0.983193, 0.965501, 0.909060, 0.858900, 0.834355, 0.833325, 0.833325,
+]
+NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V = _absolute_sr_curve_with_local_firmware_tail(
+  NRDR_CLARITY_INNER_SR_BP,
+  NRDR_CLARITY_INNER_SR_V,
+  70.0,
+  NRDR_CLARITY_VGR_SOURCE_ANGLE_BP,
+  NRDR_CLARITY_VGR_SOURCE_REL_LOCAL,
+  104.440,
+  NRDR_CLARITY_LOCK_ANGLE,
+  NRDR_CLARITY_FINAL_SR,
+  450.0,
+)
+NRDR_CLARITY_CENTER_SR = NRDR_CLARITY_SR_CURVE_V[0]
 
-# Preserve Peter's raw Civic curve through 70 degrees, then use smoothstep-sampled
-# points to reach Honda's published 10.93 ratio at 90 degrees and hold it through lock.
-NRDR_CIVIC_BOSCH_SR_CURVE_BP = [0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5,
-                                62.5, 70., 75., 80., 85., 90., 400.]
-NRDR_CIVIC_BOSCH_SR_CURVE_V = [19.095, 19.095, 18.276, 16.335, 16.335, 16.335, 16.246, 15.291, 15.291, 14.675,
-                               14.393, 13.596, 13.596, 13.179438, 12.263, 11.346562, 10.930, 10.930]
+# The 5th-gen CR-V curve is evidenced through 200 deg. Hold that base value
+# outside the measured region, then remove the remaining compensation through
+# the published 12.30 ratio at its 2.30-turn physical lock.
+NRDR_CRV_5G_BASE_SR_BP = [0., 50., 100., 150., 175., 200., NRDR_CRV_5G_LOCK_ANGLE]
+NRDR_CRV_5G_BASE_SR_V = [18.10, 17.80, 16.30, 15.30, 14.90, 14.60, 14.60]
+NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V = _endpoint_constrained_effective_sr_curve(
+  NRDR_CRV_5G_BASE_SR_BP,
+  NRDR_CRV_5G_BASE_SR_V,
+  200.0,
+  NRDR_CRV_5G_LOCK_ANGLE,
+  NRDR_CRV_5G_FINAL_SR,
+  450.0,
+)
+NRDR_CRV_5G_CENTER_SR = NRDR_CRV_5G_SR_CURVE_V[0]
+
+# Civic TBA-C020 Bosch B-table from vote_for_nobody. Peter's telemetry remains
+# the absolute truth through 70 deg; the firmware-local shape carries it through
+# the rest of the rack before landing on the non-Sport 10.93 Honda endpoint.
+# Sport/Sport Touring share this fingerprint but publish 11.12; selecting that
+# endpoint requires a verified EPS-firmware-to-trim mapping, not a guess.
+NRDR_CIVIC_BOSCH_INNER_SR_BP = [
+  0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 62.5, 70.,
+]
+NRDR_CIVIC_BOSCH_INNER_SR_V = [
+  19.095, 19.095, 18.276, 16.335, 16.335, 16.335, 16.246, 15.291, 15.291, 14.675,
+  14.393, 13.596, 13.596,
+]
+NRDR_CIVIC_BOSCH_VGR_SOURCE_ANGLE_BP = [
+  0.000, 3.174, 6.357, 9.526, 12.659, 15.874, 18.966, 22.079, 25.220, 31.530,
+  46.992, 62.146, 76.730, 83.840, 86.641, 89.426, 92.125, 94.948, 97.686, 100.413,
+  103.150, 105.874, 108.584, 111.269, 450.000,
+]
+NRDR_CIVIC_BOSCH_VGR_SOURCE_REL_LOCAL = [
+  1.000, 1.000, 1.000, 1.000, 1.000, 1.000, 0.992, 0.992, 0.992, 0.984,
+  0.955, 0.913, 0.881, 0.863, 0.857, 0.852, 0.852, 0.846, 0.840, 0.840,
+  0.835, 0.835, 0.835, 0.829, 0.829,
+]
+NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V = _absolute_sr_curve_with_local_firmware_tail(
+  NRDR_CIVIC_BOSCH_INNER_SR_BP,
+  NRDR_CIVIC_BOSCH_INNER_SR_V,
+  70.0,
+  NRDR_CIVIC_BOSCH_VGR_SOURCE_ANGLE_BP,
+  NRDR_CIVIC_BOSCH_VGR_SOURCE_REL_LOCAL,
+  111.269,
+  NRDR_CIVIC_LOCK_ANGLE,
+  NRDR_CIVIC_FINAL_SR,
+  450.0,
+)
+NRDR_CIVIC_BOSCH_CENTER_SR = NRDR_CIVIC_BOSCH_SR_CURVE_V[0]
 
 # Civic TBA-A030 / TEG-A010 Nidec EPS position table, re-indexed to the
 # steering-angle coordinate published on CAN. Firmware computes published
 # angle as raw_position / gain(raw_position), so center_gain / gain is already
 # the cumulative/effective SR multiplier; it must not be integrated again.
 # 596.023 degrees is the firmware's interpolation guard, not a claimed lock.
-NRDR_CIVIC_NIDEC_VGR_ANGLE_BP = [
+NRDR_CIVIC_NIDEC_VGR_SOURCE_ANGLE_BP = [
   0.000, 3.125, 6.400, 9.524, 12.698, 15.748, 19.047, 22.222, 25.397, 31.746,
   47.243, 62.017, 76.336, 83.333, 86.363, 88.721, 91.728, 94.028, 97.013, 99.998,
   102.224, 105.187, 107.354, 110.295, 131.387, 152.173, 170.216, 188.812, 208.333, 596.023,
 ]
-NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V = [
+NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR = [
   1.000, 1.000, 1.024, 1.016, 1.016, 1.008, 1.016, 1.016, 1.016, 1.016,
   1.008, 0.992, 0.977, 0.970, 0.970, 0.962, 0.962, 0.955, 0.955, 0.955,
   0.948, 0.948, 0.941, 0.941, 0.934, 0.928, 0.908, 0.895, 0.889, 0.848,
+]
+# The position map remains authoritative through its final real knot at
+# 208.333 deg. The 596.023-deg value is only a firmware guard, so use that open
+# interval to land on Honda's 10.93 ratio at the actual 399.6-deg lock.
+NRDR_CIVIC_NIDEC_CENTER_SR = 15.38
+NRDR_CIVIC_NIDEC_VGR_ANGLE_BP, NRDR_CIVIC_NIDEC_EFFECTIVE_SR_V = _endpoint_constrained_effective_sr_curve(
+  NRDR_CIVIC_NIDEC_VGR_SOURCE_ANGLE_BP,
+  [NRDR_CIVIC_NIDEC_CENTER_SR * multiplier for multiplier in NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR],
+  208.333,
+  NRDR_CIVIC_LOCK_ANGLE,
+  NRDR_CIVIC_FINAL_SR,
+  596.023,
+)
+NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V = [
+  effective_sr / NRDR_CIVIC_NIDEC_CENTER_SR
+  for effective_sr in NRDR_CIVIC_NIDEC_EFFECTIVE_SR_V
 ]
 # Pre-solve the nonlinear inverse. VehicleModel first produces the steering
 # angle it would request with its current scalar ratio (CP or paramsd). Mapping
 # that normalized constant-ratio coordinate back to the real wheel angle avoids
 # a measured-angle dependency and automatically follows scalar relearning.
-NRDR_CIVIC_NIDEC_LINEAR_BP = [
-  0.0 if angle == 0.0 else angle / multiplier
-  for angle, multiplier in zip(
-    NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-    NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V,
-    strict=True,
-  )
-]
+NRDR_CIVIC_NIDEC_LINEAR_BP = _inverse_vgr_from_effective_sr_curve(
+  NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
+  NRDR_CIVIC_NIDEC_EFFECTIVE_SR_V,
+)
 
 # Insight EPS firmware VGR curve extracted and traced by vote_for_nobody. Unlike
 # the Civic TBA-A030 / TEG-A010 position map above, these are instantaneous/local
@@ -129,37 +310,73 @@ NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL = [
   1.000000, 1.000000, 1.000000, 1.000000, 1.000000, 0.998445, 0.995081, 0.989922,
   0.983180, 0.965570, 0.909063, 0.858696, 0.833564, 0.833141, 0.833141,
 ]
-# Resample the three widest transition intervals. This keeps the inverse's
-# piecewise-linear chord within 0.04 deg of the integrated firmware curve.
-NRDR_INSIGHT_VGR_ANGLE_BP = sorted([
+# The published 2.54-turn lock is 457.2 deg, just beyond the 450-deg firmware
+# guard. Extend the already-flat local tail by those final 7.2 degrees, then
+# apply the small endpoint correction from the end of the firmware transition.
+NRDR_INSIGHT_VGR_INTEGRATION_ANGLE_BP = [
   *NRDR_INSIGHT_VGR_SOURCE_ANGLE_BP,
-  45.000, 62.000, 79.000,
-])
-NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V = _effective_sr_from_local_curve(
-  NRDR_INSIGHT_VGR_SOURCE_ANGLE_BP,
-  NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL,
-  1.0,
-  output_bp=NRDR_INSIGHT_VGR_ANGLE_BP,
-)
-NRDR_INSIGHT_VGR_LINEAR_BP = [
-  0.0 if angle == 0.0 else angle / multiplier
-  for angle, multiplier in zip(
-    NRDR_INSIGHT_VGR_ANGLE_BP,
-    NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V,
-    strict=True,
-  )
+  NRDR_INSIGHT_LOCK_ANGLE,
 ]
+NRDR_INSIGHT_VGR_INTEGRATION_REL_LOCAL = [
+  *NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL,
+  NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL[-1],
+]
+NRDR_INSIGHT_BASE_ANGLE_BP = _curve_breakpoints(
+  NRDR_INSIGHT_VGR_INTEGRATION_ANGLE_BP,
+  NRDR_INSIGHT_LOCK_ANGLE,
+  NRDR_INSIGHT_LOCK_ANGLE,
+)
+NRDR_INSIGHT_BASE_REL_EFFECTIVE_SR = _effective_sr_from_local_curve(
+  NRDR_INSIGHT_VGR_INTEGRATION_ANGLE_BP,
+  NRDR_INSIGHT_VGR_INTEGRATION_REL_LOCAL,
+  1.0,
+  output_bp=NRDR_INSIGHT_BASE_ANGLE_BP,
+)
+NRDR_INSIGHT_CENTER_SR = 15.0
+NRDR_INSIGHT_VGR_ANGLE_BP, NRDR_INSIGHT_EFFECTIVE_SR_V = _endpoint_constrained_effective_sr_curve(
+  NRDR_INSIGHT_BASE_ANGLE_BP,
+  [NRDR_INSIGHT_CENTER_SR * multiplier for multiplier in NRDR_INSIGHT_BASE_REL_EFFECTIVE_SR],
+  95.243,
+  NRDR_INSIGHT_LOCK_ANGLE,
+  NRDR_INSIGHT_FINAL_SR,
+  500.0,
+)
+NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V = [
+  effective_sr / NRDR_INSIGHT_CENTER_SR
+  for effective_sr in NRDR_INSIGHT_EFFECTIVE_SR_V
+]
+NRDR_INSIGHT_VGR_LINEAR_BP = _inverse_vgr_from_effective_sr_curve(
+  NRDR_INSIGHT_VGR_ANGLE_BP,
+  NRDR_INSIGHT_EFFECTIVE_SR_V,
+)
 
-NRDR_SR_CURVE_BY_FP = {
-  "HONDA_CLARITY": (NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V),
-  "HONDA_CRV_5G": (NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V),
-  "HONDA_CIVIC_BOSCH": (NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V),
-}
+# All current Honda VGR profiles use desired-angle inverse maps. Keep the old
+# measured-angle curve hook available for future/non-Honda experiments, but do
+# not reintroduce its circular measured-angle dependency here.
+NRDR_SR_CURVE_BY_FP = {}
 
-# (constant-ratio/model angle breakpoints, real steering-wheel angle values)
+NRDR_CLARITY_VGR_LINEAR_BP = _inverse_vgr_from_effective_sr_curve(
+  NRDR_CLARITY_SR_CURVE_BP,
+  NRDR_CLARITY_SR_CURVE_V,
+)
+NRDR_CRV_5G_VGR_LINEAR_BP = _inverse_vgr_from_effective_sr_curve(
+  NRDR_CRV_5G_SR_CURVE_BP,
+  NRDR_CRV_5G_SR_CURVE_V,
+)
+NRDR_CIVIC_BOSCH_VGR_LINEAR_BP = _inverse_vgr_from_effective_sr_curve(
+  NRDR_CIVIC_BOSCH_SR_CURVE_BP,
+  NRDR_CIVIC_BOSCH_SR_CURVE_V,
+)
+
+# (constant-ratio/model angle breakpoints, real steering-wheel angle values,
+# fixed effective center ratio used when steer-ratio learning is disabled)
 NRDR_VGR_INVERSE_BY_FP = {
-  "HONDA_CIVIC": (NRDR_CIVIC_NIDEC_LINEAR_BP, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP),
-  "HONDA_INSIGHT": (NRDR_INSIGHT_VGR_LINEAR_BP, NRDR_INSIGHT_VGR_ANGLE_BP),
+  "HONDA_CLARITY": (NRDR_CLARITY_VGR_LINEAR_BP, NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_CENTER_SR),
+  "HONDA_CRV_5G": (NRDR_CRV_5G_VGR_LINEAR_BP, NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_CENTER_SR),
+  "HONDA_CIVIC_BOSCH": (NRDR_CIVIC_BOSCH_VGR_LINEAR_BP, NRDR_CIVIC_BOSCH_SR_CURVE_BP,
+                         NRDR_CIVIC_BOSCH_CENTER_SR),
+  "HONDA_CIVIC": (NRDR_CIVIC_NIDEC_LINEAR_BP, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP, NRDR_CIVIC_NIDEC_CENTER_SR),
+  "HONDA_INSIGHT": (NRDR_INSIGHT_VGR_LINEAR_BP, NRDR_INSIGHT_VGR_ANGLE_BP, NRDR_INSIGHT_CENTER_SR),
 }
 
 
@@ -379,7 +596,13 @@ class LatControlPID(LatControl):
     # Optional per-fingerprint VGR transformations. There is deliberately no
     # global fallback: applying one rack's shape to another PID car is unsafe.
     self.sr_curve = NRDR_SR_CURVE_BY_FP.get(str(CP.carFingerprint))
-    self.vgr_inverse = NRDR_VGR_INVERSE_BY_FP.get(str(CP.carFingerprint))
+    self.vgr_profile = NRDR_VGR_INVERSE_BY_FP.get(str(CP.carFingerprint))
+    if self.vgr_profile is None:
+      self.vgr_inverse = None
+      self.vgr_center_sr = None
+    else:
+      linear_bp, real_angle_v, self.vgr_center_sr = self.vgr_profile
+      self.vgr_inverse = (linear_bp, real_angle_v)
     self.sr_offset = 0.0
     self.learn_steer_ratio = False
     self.frame = -1
@@ -422,9 +645,10 @@ class LatControlPID(LatControl):
         bp, values = self.sr_curve
         VM.sR = float(np.interp(abs(CS.steeringAngleDeg), bp, values)) + self.sr_offset
     elif self.vgr_inverse is not None and not self.learn_steer_ratio:
-      # Preserve the existing global SR offset for a fixed scalar tune. With
-      # learning enabled, controlsd has already loaded paramsd's scalar into VM.
-      VM.sR += self.sr_offset
+      # Use the profile's road-validated effective center anchor. The inverse
+      # then removes that artificial/model compensation toward physical lock.
+      # With learning enabled, controlsd's paramsd scalar remains the anchor.
+      VM.sR = self.vgr_center_sr + self.sr_offset
 
     angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     if self.vgr_inverse is not None:
