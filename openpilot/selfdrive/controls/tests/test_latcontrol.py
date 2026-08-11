@@ -1,4 +1,5 @@
 from itertools import pairwise
+import math
 
 import numpy as np
 import pytest
@@ -59,6 +60,9 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL,
   NRDR_SR_CURVE_BY_FP,
   NRDR_VGR_INVERSE_BY_FP,
+  LEGACY_PID_FRICTION_LAT_ACCEL_FACTOR,
+  _legacy_pid_friction,
+  _vgr_real_to_linear_angle,
   LatControlPID,
 )
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
@@ -67,6 +71,23 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 
 
 class TestLatControl:
+
+  def test_legacy_pid_friction_matches_mvl_controller_mapping(self):
+    assert LEGACY_PID_FRICTION_LAT_ACCEL_FACTOR == 3.5
+    assert _legacy_pid_friction(0.0, 0.0, 0.5) == 0.0
+    assert _legacy_pid_friction(0.15, 0.0, 0.5) == pytest.approx(0.875)
+    assert _legacy_pid_friction(0.30, 0.0, 0.5) == pytest.approx(1.75)
+    assert _legacy_pid_friction(1.00, 0.0, 0.5) == pytest.approx(1.75)
+    assert _legacy_pid_friction(-0.15, 0.0, 0.5) == pytest.approx(-0.875)
+    assert _legacy_pid_friction(0.20, 0.20, 0.5) == 0.0
+
+  def test_legacy_pid_friction_uses_vgr_consistent_measured_angle(self):
+    linear_bp, real_angle_v, _ = NRDR_VGR_INVERSE_BY_FP["HONDA_CIVIC"]
+    inverse = (linear_bp, real_angle_v)
+    for real_angle in (-200., -90., 0., 45., 100., 200.):
+      expected = math.copysign(float(np.interp(abs(real_angle), real_angle_v, linear_bp)), real_angle)
+      assert _vgr_real_to_linear_angle(real_angle, inverse) == pytest.approx(expected)
+    assert _vgr_real_to_linear_angle(-42.0, None) == -42.0
 
   def test_nrdr_steer_ratio_curves_are_well_formed(self):
     assert NRDR_SR_CURVE_BY_FP == {}

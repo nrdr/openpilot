@@ -296,6 +296,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"LongPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
     {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}}, // % scale on final cruise target so actual speed matches set (100.0 = off)
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
+    {"HondaPidFriction", {PERSISTENT | BACKUP, FLOAT, "0.5"}},  // legacy direct torque-space friction overlay for modified-EPS Honda PID
     // DEPRECATED notch-filter keys: all readers removed, but kept REGISTERED so stale bytecode /
     // mid-OTA devices resolve them instead of crash-looping the card on UnknownKeyName. Do NOT
     // delete until the fleet has updated well past this release (see two-phase removal note).

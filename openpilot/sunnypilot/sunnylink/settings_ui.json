@@ -1017,6 +1017,36 @@
                   ]
                 },
                 {
+                  "key": "HondaPidFriction",
+                  "widget": "option",
+                  "title": "Legacy PID Friction Magnitude",
+                  "description": "Adds the classic torque-controller friction response on top of modified-EPS Honda PID; default 0.50 and 0.00 is off.",
+                  "details": "Uses the exact legacy friction mapping with a fixed internal lateral-acceleration factor of 3.5. This factor scales only the added friction torque and does not replace PID feedforward. The term fades out during lane changes. A value of 0.50 reproduces the old friction magnitude.",
+                  "min": 0.0,
+                  "max": 1.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "has_handcrafted_lateral_profile",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
                   "key": "NrdrLatStiction",
                   "widget": "toggle",
                   "title": "Lateral Stiction",
