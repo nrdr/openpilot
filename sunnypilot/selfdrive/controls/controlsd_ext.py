@@ -41,12 +41,6 @@ class ControlsExt(ModelStateBase):
     self.pm_services_ext = ['carControlSP']
 
   def initialize_lateral_control(self, lac, CI, dt):
-    # Fingerprint-selected experimental controllers take precedence over the
-    # generic force-torque toggle; otherwise a stale toggle silently replaces
-    # LatControlYaw after controlsd has selected it.
-    if getattr(lac, "is_yaw_control", False):
-      return lac
-
     if str(self.CP.carFingerprint) == "HONDA_CLARITY" and self.CP.lateralTuning.which() == 'torque':
       return LatControlClarityHybrid(self.CP, self.CP_SP, CI, dt)
 

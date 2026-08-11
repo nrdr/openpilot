@@ -32,7 +32,6 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   LatControlPID,
 )
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
-from openpilot.selfdrive.controls.lib.latcontrol_yaw import LatControlYaw
 from openpilot.selfdrive.locationd.helpers import Pose
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 
@@ -176,7 +175,7 @@ class TestLatControl:
     assert (controller.sr_curve is not None) == (expected_curve_fp is not None)
     assert (controller.vgr_inverse is not None) == (expected_inverse_fp is not None)
 
-  @parameterized.expand([(HONDA.HONDA_CIVIC, LatControlYaw), (TOYOTA.TOYOTA_RAV4, LatControlTorque),
+  @parameterized.expand([(HONDA.HONDA_CIVIC, LatControlPID), (TOYOTA.TOYOTA_RAV4, LatControlTorque),
                          (NISSAN.NISSAN_LEAF, LatControlAngle), (GM.CHEVROLET_BOLT_EUV, LatControlTorque)])
   def test_saturation(self, car_name, controller):
     CarInterface = interfaces[car_name]

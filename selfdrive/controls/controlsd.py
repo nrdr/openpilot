@@ -16,7 +16,6 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.latcontrol_pid import LatControlPID
 from openpilot.selfdrive.controls.lib.latcontrol_angle import LatControlAngle, STEER_ANGLE_SATURATION_THRESHOLD
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
-from openpilot.selfdrive.controls.lib.latcontrol_yaw import LatControlYaw, use_yaw_controller
 from openpilot.selfdrive.controls.lib.longcontrol import LongControl
 from openpilot.selfdrive.modeld.modeld import LAT_SMOOTH_SECONDS
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
@@ -60,8 +59,6 @@ class Controls(ControlsExt):
     self.LaC: LatControl
     if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       self.LaC = LatControlAngle(self.CP, self.CP_SP, self.CI, DT_CTRL)
-    elif use_yaw_controller(self.CP.carFingerprint):
-      self.LaC = LatControlYaw(self.CP, self.CP_SP, self.CI, DT_CTRL)
     elif self.CP.lateralTuning.which() == 'pid':
       self.LaC = LatControlPID(self.CP, self.CP_SP, self.CI, DT_CTRL)
     elif self.CP.lateralTuning.which() == 'torque':
@@ -161,16 +158,9 @@ class Controls(ControlsExt):
     lat_delay = self.sm["liveDelay"].lateralDelay + LAT_SMOOTH_SECONDS
 
     actuators.curvature = self.desired_curvature
-    calibrated_pose = self.calibrated_pose
-    if getattr(self.LaC, "is_yaw_control", False):
-      live_pose = self.sm['livePose']
-      pose_valid = self.sm.valid['livePose'] and live_pose.angularVelocityDevice.valid and \
-                   live_pose.inputsOK and live_pose.sensorsOK and live_pose.posenetOK
-      calibrated_pose = calibrated_pose if pose_valid else None
-
     steer, steeringAngleDeg, lac_log = self.LaC.update(CC.latActive, CS, self.VM, lp,
                                                        self.steer_limited_by_safety, self.desired_curvature,
-                                                       calibrated_pose, curvature_limited, lat_delay)
+                                                       self.calibrated_pose, curvature_limited, lat_delay)
     actuators.torque = float(steer)
     actuators.steeringAngleDeg = float(steeringAngleDeg)
     # Ensure no NaNs/Infs
@@ -247,8 +237,6 @@ class Controls(ControlsExt):
     lat_tuning = self.CP.lateralTuning.which()
     if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       cs.lateralControlState.angleState = lac_log
-    elif getattr(self.LaC, "is_yaw_control", False):
-      cs.lateralControlState.torqueState = lac_log
     elif lat_tuning == 'pid':
       cs.lateralControlState.pidState = lac_log
     elif lat_tuning == 'torque':
