@@ -32,18 +32,23 @@ class HandcraftedLateralProfile:
   values: tuple[tuple[str, ParamValue], ...]
 
 
-# Captured from Brett's Clarity/Comma Four on 2026-08-07 after the August 5
-# road-test refinements. The fixed PID base, VGR curve, and Clarity hybrid
-# wiring are separately regression-tested in test_latcontrol.py and
-# test_load_model.py.
-CLARITY_ROAD_TESTED_2026_08_07 = HandcraftedLateralProfile(
-  name="Clarity Road-Tested 2026-08-07",
-  fingerprint="HONDA_CLARITY",
-  version=2,
-  values=(
+HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS = (
+  "HONDA_ACCORD",
+  "HONDA_CIVIC",
+  "HONDA_CIVIC_BOSCH",
+  "HONDA_CIVIC_BOSCH_DIESEL",
+  "HONDA_CLARITY",
+  "HONDA_CRV_5G",
+  "HONDA_INSIGHT",
+)
+
+
+# Shared road-tested controls for the supported Honda torque-mod platforms.
+# Fixed PID bases and per-rack VGR curves live in interface.py/latcontrol_pid.py;
+# the profile keeps the live fine-tuning controls deterministic.
+HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
     ("NrdrStarPilotPid", False),
     ("NrdrLearnSteerRatio", False),
-    ("NrdrSteerRatioOffset", -1.0),
     ("NrdrLearnStiffness", True),
     ("NrdrLearnAngleOffset", True),
     ("LatPScaleLowSpeed", 100),
@@ -57,9 +62,9 @@ CLARITY_ROAD_TESTED_2026_08_07 = HandcraftedLateralProfile(
     ("LatFScaleHighway", 100),
     ("NrdrLatRateDamping", 0),
     ("NrdrLatRateDampingFadeSpeed", 30),
-    ("HondaCenterScale", 0.0),
-    ("HondaCenterBoostThreshold", 5.0),
-    ("HondaCenterBoostMinSpeed", 15),
+    ("HondaCenterScale", 0.5),
+    ("HondaCenterBoostThreshold", 3.0),
+    ("HondaCenterBoostMinSpeed", 50),
     ("NrdrLatStiction", False),
     ("NrdrNnlcEnabled", False),
     ("NrdrNnlcActivationSpeed", 15),
@@ -70,7 +75,7 @@ CLARITY_ROAD_TESTED_2026_08_07 = HandcraftedLateralProfile(
     ("NrdrTuneLearnerStrength", 0),
     ("NrdrTuneLearnerRate", 10),
     ("HondaUnwindFreeze", False),
-    ("HondaUnwindLookahead", True),
+    ("HondaUnwindLookahead", False),
     ("HondaUnwindBoostSeconds", 1.0),
     ("HondaUnwindFfMultiplier", 2.0),
     ("NrdrIncreaseOverrideTolerance", False),
@@ -78,27 +83,40 @@ CLARITY_ROAD_TESTED_2026_08_07 = HandcraftedLateralProfile(
     ("NrdrOverrideThresholdCenterBoost", 1200),
     ("HondaDriverAssistDuringOverride", False),
     ("HondaOverrideFadeDownSecs", 0.0),
-    ("HondaOverrideFadeUpSecs", 2.5),
+    ("HondaOverrideFadeUpSecs", 1.0),
     ("HondaOverrideTorqueScale", 0),
     ("HondaTorqueLowPassFilter", True),
     ("HondaLpfTauLowSpeed", 0.1),
     ("HondaLpfTauStandard", 0.1),
     ("HondaLpfTauHighway", 0.01),
     ("HondaSteerDeltaLimiter", False),
-    ("HondaSteerDeltaUp", 3.0),
-    ("HondaSteerDeltaDown", 3.0),
+    ("HondaSteerDeltaUp", 4.0),
+    ("HondaSteerDeltaDown", 4.0),
+    ("HondaStoppingDecelRate", 30),
     ("NrdrMinSteerSpeed", 0),
-    # Clarity CP.steerActuatorDelay is 0.1 s, so this fixed software component
-    # produces the road-tested 0.6 s effective lateral delay.
     ("LagdToggle", False),
     ("LagdToggleDelay", 0.5),
-  ),
 )
 
 
+def _honda_torque_mod_profile(fingerprint: str) -> HandcraftedLateralProfile:
+  # The Clarity's road-tested scalar offset is rack-specific. Other supported
+  # cars keep a neutral scalar anchor while using their own VGR/static SR data.
+  sr_offset = -1.0 if fingerprint == "HONDA_CLARITY" else 0.0
+  return HandcraftedLateralProfile(
+    name="Honda Torque-Mod Road-Tested 2026-08-11",
+    fingerprint=fingerprint,
+    version=3,
+    values=(("NrdrSteerRatioOffset", sr_offset),) + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
+  )
+
+
 HANDCRAFTED_LATERAL_PROFILES = {
-  CLARITY_ROAD_TESTED_2026_08_07.fingerprint: CLARITY_ROAD_TESTED_2026_08_07,
+  fingerprint: _honda_torque_mod_profile(fingerprint)
+  for fingerprint in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS
 }
+
+CLARITY_ROAD_TESTED_2026_08_11 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
 
 
 def get_handcrafted_lateral_profile(fingerprint: str) -> HandcraftedLateralProfile | None:

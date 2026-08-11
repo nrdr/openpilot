@@ -33,7 +33,7 @@ macros:
       conditions:
         - {type: param, key: NrdrHandcraftedLateralTune, equals: false}
         - type: not
-          condition: {type: capability, field: car_fingerprint, equals: HONDA_CLARITY}
+          condition: {type: capability, field: has_handcrafted_lateral_profile, equals: true}
 
   # Hide on MICI hardware (no analog HUD support yet).
   hide_on_mici:
