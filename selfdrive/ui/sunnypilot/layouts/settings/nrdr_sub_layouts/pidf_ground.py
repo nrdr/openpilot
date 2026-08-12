@@ -128,7 +128,7 @@ class PidfGroundLayout(Widget):
       min_value=0,
       max_value=500,
       value_change_step=1,
-      description=lambda: tr("Extra error correction added while driving straight, as a percentage boost on top of the normal output. One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line."),
+      description=lambda: tr("Extra proportional (P) error correction near center. It does not multiply integral, feedforward, or damping. Available at every speed above the minimum, including the highway."),
       label_callback=lambda value: f"{value}%",
       use_float_scaling=True,
     )
@@ -150,7 +150,7 @@ class PidfGroundLayout(Widget):
       min_value=0,
       max_value=80,
       value_change_step=1,
-      description=lambda: tr("Below this speed, center boost is disabled. Center boost is meant for straight, higher-speed roads, so gating it off at low speed stops the wheel from oscillating at stops and in parking-lot crawling."),
+      description=lambda: tr("Below this speed center boost is disabled. Above the short ramp it remains fully available with no upper-speed cutoff, including on the highway."),
       label_callback=lambda value: f"{value} mph",
     )
 
@@ -174,14 +174,6 @@ class PidfGroundLayout(Widget):
       label_callback=lambda value: f"{value} mph",
     )
 
-    self._legacy_pid_friction = option_item_sp(
-      param="HondaPidFriction",
-      title=lambda: tr("Legacy PID Friction Magnitude (Default: 0.50)"),
-      min_value=0, max_value=100, value_change_step=1,
-      description=lambda: tr("Adds the exact direct friction response from the legacy torque controller on top of Honda PID. The legacy 3.5 lateral-acceleration factor is fixed internally and only scales this friction term. 0.00 = off; 0.50 reproduces the old friction magnitude."),
-      label_callback=lambda value: f"{value / 100:.2f}",
-      use_float_scaling=True,
-    )
     self._nnlc_kp_gain = option_item_sp(
       param="NrdrNnlcKpGain",
       title=lambda: tr("NNLC KP Gain Scale (Default: 100%)"),
@@ -233,7 +225,6 @@ class PidfGroundLayout(Widget):
       self._center_scale,
       self._center_boost_threshold,
       self._center_boost_min_speed,
-      self._legacy_pid_friction,
       self._lat_stiction,
       LineSeparatorSP(40),
       # Clarity PID/NNLC hybrid
@@ -254,7 +245,6 @@ class PidfGroundLayout(Widget):
       self._lat_p_standard, self._lat_i_standard, self._lat_f_standard,
       self._lat_p_highway, self._lat_i_highway, self._lat_f_highway,
       self._rate_damping, self._rate_damping_fade_speed,
-      self._legacy_pid_friction,
       self._center_scale, self._center_boost_threshold, self._center_boost_min_speed,
       self._lat_stiction, self._nnlc_enabled, self._nnlc_activation_speed,
       self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain,

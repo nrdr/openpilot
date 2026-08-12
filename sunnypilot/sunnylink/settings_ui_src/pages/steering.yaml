@@ -359,8 +359,8 @@ sections:
       enablement:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: Center Boost
-      description: Extra error correction added while driving straight, on top of normal output (0.50 = 50% boost).
-      details: Extra error correction added while driving straight, as a boost on top of the normal output (0.50 = 50% boost). One static value across all speed ranges. Sometimes the perfect lateral tune is too soft for driving in a straight line.
+      description: Extra proportional (P) error correction near center; 0.50 is a 50% P boost.
+      details: Multiplies only the proportional term near center. Integral, feedforward, and damping keep their normal values. Available at every speed above the minimum, including the highway.
       min: 0.0
       max: 5.0
       step: 0.01
@@ -379,22 +379,12 @@ sections:
       enablement:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: Center Boost Minimum Speed
-      description: Below this speed center boost is disabled.
-      details: Below this speed center boost is disabled. Center boost is meant for straight, higher-speed roads; gating it off at low speed stops the wheel from oscillating at stops and in parking-lot crawling.
+      description: Below this speed center boost is disabled; there is no upper-speed cutoff.
+      details: Below this speed center boost is disabled. Above the short ramp it remains fully available, including on the highway.
       min: 0
       max: 80
       step: 1
       unit: mph
-    - key: HondaPidFriction
-      widget: option
-      enablement:
-      - $ref: '#/macros/handcrafted_lateral_unlocked'
-      title: Legacy PID Friction Magnitude
-      description: Adds the classic torque-controller friction response on top of modified-EPS Honda PID; default 0.50 and 0.00 is off.
-      details: Uses the exact legacy friction mapping with a fixed internal lateral-acceleration factor of 3.5. This factor scales only the added friction torque and does not replace PID feedforward. The term fades out during lane changes. A value of 0.50 reproduces the old friction magnitude.
-      min: 0.0
-      max: 1.0
-      step: 0.01
     - key: NrdrLatStiction
       widget: toggle
       enablement:
@@ -466,13 +456,6 @@ sections:
     label: Unwind Helpers
     trigger_key: null
     items:
-    - key: HondaUnwindFreeze
-      widget: toggle
-      enablement:
-      - $ref: '#/macros/handcrafted_lateral_unlocked'
-      title: Unwind Integrator Freeze
-      description: Freezes the PID integrator while steering returns toward center.
-      details: Freezes the PID integrator while the steering is returning toward center, so it doesn't hold torque through the unwind.
     - key: HondaUnwindLookahead
       widget: toggle
       enablement:

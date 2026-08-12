@@ -274,10 +274,32 @@ NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR = [
 # The position map remains authoritative through its final real knot at
 # 208.333 deg. The 596.023-deg value is only a firmware guard, so use that open
 # interval to land on Honda's 10.93 ratio at the actual 399.6-deg lock.
-NRDR_CIVIC_NIDEC_CENTER_SR = 15.38
+NRDR_CIVIC_NIDEC_FIRMWARE_CENTER_SR = 15.38
+# The 2026-08-11 Civic route consistently required more effective ratio close
+# to center: 18.27 in the 2-4 deg bin and 17.46 across the adjacent 4-8 deg
+# bins. Blend back to the original firmware-derived absolute curve at 9.524
+# degrees. Every higher-angle effective-SR value remains bit-for-bit unchanged.
+NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_BP = [0.000, 3.125, 6.400, 9.524]
+NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_V = [
+  18.270,
+  18.270,
+  17.460,
+  NRDR_CIVIC_NIDEC_FIRMWARE_CENTER_SR * 1.016,
+]
+NRDR_CIVIC_NIDEC_CENTER_SR = NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_V[0]
+NRDR_CIVIC_NIDEC_SOURCE_EFFECTIVE_SR_V = [
+  float(np.interp(angle, NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_BP, NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_V))
+  if angle <= NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_BP[-1]
+  else NRDR_CIVIC_NIDEC_FIRMWARE_CENTER_SR * multiplier
+  for angle, multiplier in zip(
+    NRDR_CIVIC_NIDEC_VGR_SOURCE_ANGLE_BP,
+    NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR,
+    strict=True,
+  )
+]
 NRDR_CIVIC_NIDEC_VGR_ANGLE_BP, NRDR_CIVIC_NIDEC_EFFECTIVE_SR_V = _endpoint_constrained_effective_sr_curve(
   NRDR_CIVIC_NIDEC_VGR_SOURCE_ANGLE_BP,
-  [NRDR_CIVIC_NIDEC_CENTER_SR * multiplier for multiplier in NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR],
+  NRDR_CIVIC_NIDEC_SOURCE_EFFECTIVE_SR_V,
   208.333,
   NRDR_CIVIC_LOCK_ANGLE,
   NRDR_CIVIC_FINAL_SR,
@@ -382,11 +404,6 @@ NRDR_VGR_INVERSE_BY_FP = {
 
 CENTER_TAPER_FADE_TAU = 0.25
 
-# Unwind integrator-freeze: when the desired angle is dropping toward center,
-# stop accumulating integrator so it doesn't keep pushing torque through the release.
-UNWIND_FREEZE_PHASE_THRESHOLD = -0.2   # phase below this = unwinding
-UNWIND_FREEZE_ANGLE_NEAR_CENTER = 8.0  # deg; only freeze when heading near center
-
 # Model-trajectory unwind lookahead: read the model's planned lateral-accel profile
 # to anticipate the turn release before the instantaneous desired curvature drops.
 UNWIND_LOOKAHEAD_MIN_IDX = 5            # skip samples inside the actuator delay window
@@ -401,14 +418,6 @@ _LAT_SCALE_STD_MAX = 50.0 * _MPH_TO_MS    # below this -> standard scale, else h
 # Center boost speed gate: boost ramps in over this many mph above the min-speed floor,
 # so it engages smoothly instead of stepping in the moment the car crosses the threshold.
 CENTER_BOOST_SPEED_FADE_MS = 5.0 * _MPH_TO_MS
-
-# Exact classic torque-controller friction mapping from mvl-staging-05.08.2026.
-# The old controller multiplied its friction tune by latAccelFactor before adding
-# it directly in torque space. PID keeps its own angle feedforward; 3.5 is only
-# the legacy friction conversion scale and does not replace PID feedforward.
-LEGACY_PID_FRICTION_THRESHOLD = 0.3
-LEGACY_PID_FRICTION_LAT_ACCEL_FACTOR = 3.5
-LEGACY_PID_FRICTION_FADE_TAU = 0.25
 
 # Unwind FF boost fades out over this many seconds approaching its time cap, so the boost
 # doesn't drop as a torque step the instant the cap is reached.
@@ -436,30 +445,9 @@ def _lat_pid_scale_banded(v_ego: float, low: float, standard: float, highway: fl
   return highway
 
 
-def _apply_legacy_friction_deadzone(error: float, deadzone: float) -> float:
-  if error > deadzone:
-    return error - deadzone
-  if error < -deadzone:
-    return error + deadzone
-  return 0.0
-
-
-def _legacy_pid_friction(friction_input: float, lateral_accel_deadzone: float, friction: float) -> float:
-  """Return the direct torque-space friction term used by the legacy torque controller."""
-  return float(np.interp(
-    _apply_legacy_friction_deadzone(friction_input, lateral_accel_deadzone),
-    [-LEGACY_PID_FRICTION_THRESHOLD, LEGACY_PID_FRICTION_THRESHOLD],
-    [-friction, friction],
-  )) * LEGACY_PID_FRICTION_LAT_ACCEL_FACTOR
-
-
-def _vgr_real_to_linear_angle(real_angle_deg: float, vgr_inverse: tuple[list[float], list[float]] | None) -> float:
-  """Convert measured VGR wheel angle back to VehicleModel's constant-ratio coordinate."""
-  if vgr_inverse is None:
-    return real_angle_deg
-
-  linear_bp, real_angle_v = vgr_inverse
-  return math.copysign(float(np.interp(abs(real_angle_deg), real_angle_v, linear_bp)), real_angle_deg)
+def _freeze_integrator_during_unwind(phase: float, integral: float, error: float) -> bool:
+  """Block integral growth during unwind while always allowing stale I to decay toward zero."""
+  return phase < 0.0 and integral * error > 0.0
 
 
 def _sign(x: float) -> float:
@@ -512,15 +500,31 @@ def get_param_float(params, key, default, min_value=None, max_value=None, scale=
   return ret
 
 
-def _pid_output_scale(
+def _center_boost_scale(
   desired_angle_deg: float,
-  desired_angle_delta_deg: float,
-  steering_rate_deg: float,
   v_ego: float,
   center_taper_scale: float = 1.0,
   center_taper_high: float = 2.0,
   center_boost_threshold_deg: float = 3.0,
   center_boost_min_speed_ms: float = 0.0,
+) -> float:
+  """Return the P-only near-center multiplier; the speed gate has no upper cutoff."""
+  abs_angle = abs(desired_angle_deg)
+  center_fade_deg = 1.0
+  center_weight = min(max((center_boost_threshold_deg + center_fade_deg - abs_angle) / center_fade_deg, 0.0), 1.0)
+  if center_boost_min_speed_ms > 0.0:
+    center_speed_weight = min(max((v_ego - center_boost_min_speed_ms) / CENTER_BOOST_SPEED_FADE_MS, 0.0), 1.0)
+  else:
+    center_speed_weight = 1.0
+  center_taper = center_taper_high * center_taper_scale * center_speed_weight
+  return 1.0 + center_weight * center_taper
+
+
+def _pid_output_scale(
+  desired_angle_deg: float,
+  desired_angle_delta_deg: float,
+  steering_rate_deg: float,
+  v_ego: float,
   starpilot_enabled: bool = True,
 ) -> float:
   abs_angle = abs(desired_angle_deg)
@@ -533,25 +537,8 @@ def _pid_output_scale(
   # At very low speeds, steering angle changes more slowly during unwind,
   # which can delay phase detection and cause late steering release.
   low_speed_unwind_weight = min(max(1.0 - (v_ego / (15.0 * 0.44704)), 0.0), 1.0)
-  unwind_phase_threshold = -0.2 + (0.17 * low_speed_unwind_weight)
   steering_rate_unwind = desired_angle_deg * steering_rate_deg < -1.0
   low_speed_unwind = low_speed_unwind_weight > 0.0 and steering_rate_unwind
-
-  # Center boost: one static value across all speed ranges (the old low-speed
-  # negative taper and 0-50 mph interp are gone). Active only while the desired
-  # angle is within the Center Boost Threshold of dead-center, with a short 1 deg
-  # linear fade past the threshold so the boost doesn't step off abruptly.
-  center_fade_deg = 1.0
-  center_weight = min(max((center_boost_threshold_deg + center_fade_deg - abs_angle) / center_fade_deg, 0.0), 1.0)
-  # Speed gate: no center boost below center_boost_min_speed_ms, with a short ramp just
-  # above it so the boost doesn't step in abruptly. Center boost is meant for straight,
-  # higher-speed roads; gating it off at low speed stops the wheel oscillating at stops
-  # and in parking-lot crawl, where the near-center boost was wildly overtuned.
-  if center_boost_min_speed_ms > 0.0:
-    center_speed_weight = min(max((v_ego - center_boost_min_speed_ms) / CENTER_BOOST_SPEED_FADE_MS, 0.0), 1.0)
-  else:
-    center_speed_weight = 1.0
-  center_taper = center_taper_high * center_taper_scale * center_speed_weight
 
   mid_turn_scale = 0.1200 if is_left else 0.0150
   mid_turn_turn_in_scale = -0.5500 if is_left else -0.0524
@@ -560,10 +547,10 @@ def _pid_output_scale(
   turn_in_scale = -0.0799 if is_left else 0.0888
   unwind_scale = 0.1600 if is_left else 0.2000
 
-  scale = 1.0 + (center_weight * center_taper)
+  scale = 1.0
 
   if not starpilot_enabled:
-    # Center boost (yours) only -- the borrowed StarPilot turn-in/unwind/per-direction scaling is gated off.
+    # The borrowed StarPilot turn-in/unwind/per-direction scaling is gated off.
     return scale
 
   scale += speed_weight * mid_turn_weight * mid_turn_scale
@@ -622,8 +609,6 @@ class LatControlPID(LatControl):
     self.eps_modified_steering_pressed_filter_s = 0.0
     self.eps_modified_steering_pressed_prev = False
     self.center_taper_scale = FirstOrderFilter(1.0, CENTER_TAPER_FADE_TAU, dt)
-    self.legacy_friction_scale = FirstOrderFilter(1.0, LEGACY_PID_FRICTION_FADE_TAU, dt)
-    self.legacy_pid_friction = 0.5
     self.prev_output_torque = 0.0
     self.prev_angle_steers_des_no_offset = 0.0
     self.params = Params()
@@ -652,7 +637,6 @@ class LatControlPID(LatControl):
     self.lat_f_scale_low = 1.0
     self.lat_f_scale_standard = 1.0
     self.lat_f_scale_highway = 1.0
-    self.unwind_freeze_enabled = False
     self.unwind_lookahead_enabled = False
     self.starpilot_enabled = False  # borrowed _pid_output_scale; off by default (param NrdrStarPilotPid)
     self.injection_test_enabled = False  # Party Tricks: x9.99 PID scale stress test
@@ -705,7 +689,6 @@ class LatControlPID(LatControl):
       self.eps_modified_steering_pressed_filter_s = 0.0
       self.eps_modified_steering_pressed_prev = False
       self.center_taper_scale.x = 1.0
-      self.legacy_friction_scale.x = 1.0
       self.prev_output_torque = 0.0
       self.prev_angle_steers_des_no_offset = angle_steers_des_no_offset
       self.unwind_boost_elapsed = 0.0
@@ -741,7 +724,6 @@ class LatControlPID(LatControl):
       # stay zero/False unless the lookahead toggle is on AND the model frame is valid,
       # so default behavior falls back to the backward-difference phase logic above.
       predicted_unwind_weight = 0.0
-      unwind_predicted = False
       if self.unwind_lookahead_enabled and self.model_valid:
         lat_accels = list(self.model_v2.acceleration.y)
         if len(lat_accels) > UNWIND_LOOKAHEAD_MIN_IDX:
@@ -751,7 +733,6 @@ class LatControlPID(LatControl):
           lookahead_la = _lookahead_release(future, current_la)
           if abs(current_la) > UNWIND_LOOKAHEAD_MIN_LAT_ACCEL:
             predicted_unwind_weight = min(max(1.0 - abs(lookahead_la) / abs(current_la), 0.0), 1.0)
-            unwind_predicted = lookahead_la == 0.0 or predicted_unwind_weight > 0.5
 
       ff_unwind_weight = max(ff_unwind_weight, predicted_unwind_weight)
 
@@ -787,15 +768,10 @@ class LatControlPID(LatControl):
       freeze_threshold = 2.0 if self.is_eps_modified else 5.0
       freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < freeze_threshold
 
-      # Unwind integrator-freeze (opt-in): when the desired angle is dropping toward
-      # center, stop the integrator growing so it doesn't push torque through the release.
-      unwind_detected = phase < UNWIND_FREEZE_PHASE_THRESHOLD and abs_angle_des < UNWIND_FREEZE_ANGLE_NEAR_CENTER
-      if self.unwind_freeze_enabled and (unwind_detected or unwind_predicted):
-        freeze_integrator = True
-
-      # Derivative Tuning Experiment: force the integrator off during ANY winddown (phase < 0),
-      # independent of the opt-in freeze above. Pullback is exactly what we want here; I fights it.
-      if phase < 0.0:
+      # During unwind, block only integration that would grow the existing I magnitude.
+      # Opposite-sign error is always allowed to drain stale I toward zero; this avoids
+      # carrying a previous turn's torque into the next small correction.
+      if _freeze_integrator_during_unwind(phase, self.pid.i, error):
         freeze_integrator = True
 
       self.frame += 1
@@ -838,16 +814,6 @@ class LatControlPID(LatControl):
           0.0,
           90.0,
         )
-        # Direct torque-space friction magnitude. The legacy controller used a
-        # fixed latAccelFactor of 3.5 for this conversion; 0 keeps the overlay off.
-        self.legacy_pid_friction = get_param_float(
-          self.params,
-          "HondaPidFriction",
-          0.5,
-          0.0,
-          1.0,
-        )
-        self.unwind_freeze_enabled = get_param_bool(self.params, "HondaUnwindFreeze")
         self.unwind_lookahead_enabled = get_param_bool(self.params, "HondaUnwindLookahead")
         # Unwind FF boost: peak multiplier + time cap (both FLOAT, stored as real values).
         self.unwind_ff_multiplier = get_param_float(self.params, "HondaUnwindFfMultiplier", 2.0, 1.0, 10.0)
@@ -873,11 +839,10 @@ class LatControlPID(LatControl):
       p_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_p_scale_low, self.lat_p_scale_standard, self.lat_p_scale_highway)
       i_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_i_scale_low, self.lat_i_scale_standard, self.lat_i_scale_highway)
       f_scale = _lat_pid_scale_banded(CS.vEgo, self.lat_f_scale_low, self.lat_f_scale_standard, self.lat_f_scale_highway)
-      output_torque = self.pid.p * p_scale + self.pid.i * i_scale + self.pid.d + self.pid.f * f_scale
-
-      # Party Tricks: Injection Test multiplies the PID scale by 999% (diagnostic only).
-      if self.injection_test_enabled:
-        output_torque *= 9.99
+      p_term = self.pid.p * p_scale
+      i_term = self.pid.i * i_scale
+      d_term = self.pid.d
+      f_term = self.pid.f * f_scale
 
       if self.is_eps_modified:
         lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))
@@ -888,31 +853,34 @@ class LatControlPID(LatControl):
         else:
           center_taper_scale = float(self.center_taper_scale.update(1.0))
 
-        # Center boost (kept always) + StarPilot turn-in scaling (gated inside by starpilot_enabled).
-        output_torque *= _pid_output_scale(
+        # Center boost is deliberately P-only. I must remain free to unwind, and F
+        # already represents the planned angle; multiplying either reproduced the
+        # road-test failure where stale I/F committed harder to a bad placement.
+        p_term *= _center_boost_scale(
           angle_steers_des_no_offset,
-          desired_angle_delta,
-          float(CS.steeringRateDeg),
           CS.vEgo,
           center_taper_scale,
           self.center_taper_high,
           self.center_boost_threshold,
           self.center_boost_min_speed * _MPH_TO_MS,
-          self.starpilot_enabled,
         )
 
-        # Legacy torque-controller friction overlay. Keep PID's normal angle
-        # feedback/feedforward intact, then add only the old direct friction term.
-        # Convert a measured VGR wheel angle back to VehicleModel's constant-ratio
-        # coordinate first, otherwise a correct high-angle VGR response would look
-        # like lateral-acceleration error and the overlay would fight the rack map.
-        actual_angle_no_offset = float(CS.steeringAngleDeg) - float(params.angleOffsetDeg)
-        actual_model_angle = _vgr_real_to_linear_angle(actual_angle_no_offset, self.vgr_inverse)
-        actual_curvature = -VM.calc_curvature(math.radians(actual_model_angle), CS.vEgo, params.roll)
-        friction_input = (desired_curvature - actual_curvature) * CS.vEgo ** 2
-        friction_scale = float(self.legacy_friction_scale.update(0.0 if lane_change else 1.0))
-        # PID steering-torque sign is opposite the lateral-acceleration convention.
-        output_torque -= friction_scale * _legacy_pid_friction(friction_input, 0.0, self.legacy_pid_friction)
+      output_torque = p_term + i_term + d_term + f_term
+
+      # Party Tricks: Injection Test multiplies the PID scale by 999% (diagnostic only).
+      if self.injection_test_enabled:
+        output_torque *= 9.99
+
+      if self.is_eps_modified:
+        # Optional borrowed StarPilot turn-in/unwind/per-direction scaling remains
+        # a separate whole-output experiment and is off by default.
+        output_torque *= _pid_output_scale(
+          angle_steers_des_no_offset,
+          desired_angle_delta,
+          float(CS.steeringRateDeg),
+          CS.vEgo,
+          self.starpilot_enabled,
+        )
 
         # Rate damping (the missing "D"): torque opposing how fast the wheel is moving, applied
         # after the output scale so it's a clean physical term. Strongest at low speed (where the

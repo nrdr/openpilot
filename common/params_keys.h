@@ -291,7 +291,9 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"LongPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
     {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}}, // % scale on final cruise target so actual speed matches set (100.0 = off)
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
-    {"HondaPidFriction", {PERSISTENT | BACKUP, FLOAT, "0.5"}},  // legacy direct torque-space friction overlay for modified-EPS Honda PID
+    // DEPRECATED: runtime/UI removed after road testing. Keep registered until stale
+    // Sunnylink schemas have aged out so an old browser write cannot UnknownKeyName-crash.
+    {"HondaPidFriction", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
     // DEPRECATED notch-filter keys: all readers removed, but kept REGISTERED so stale bytecode /
     // mid-OTA devices resolve them instead of crash-looping the card on UnknownKeyName. Do NOT
     // delete until the fleet has updated well past this release (see two-phase removal note).
@@ -304,6 +306,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrSteerRatioMax", {PERSISTENT | BACKUP, FLOAT, "12.74"}},   // DEPRECATED (replaced by NrdrSteerRatioOffset): kept registered
     {"NrdrLearnStiffness", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrLearnAngleOffset", {PERSISTENT | BACKUP, BOOL, "1"}},
+    // DEPRECATED: the user-facing freeze toggle and all runtime reads are gone.
+    // Keep an inert tombstone temporarily so stale Sunnylink clients remain safe.
     {"HondaUnwindFreeze", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaUnwindLookahead", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaStoppingDecelRate", {PERSISTENT | BACKUP, INT, "30"}},
