@@ -1,5 +1,4 @@
 from itertools import pairwise
-import math
 
 import numpy as np
 import pytest
@@ -27,8 +26,14 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_CIVIC_BOSCH_VGR_LINEAR_BP,
   NRDR_CIVIC_FINAL_SR,
   NRDR_CIVIC_LOCK_ANGLE,
+  NRDR_CIVIC_NIDEC_CENTER_SR,
+  NRDR_CIVIC_NIDEC_EFFECTIVE_SR_V,
+  NRDR_CIVIC_NIDEC_FIRMWARE_CENTER_SR,
+  NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_BP,
+  NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_V,
   NRDR_CIVIC_NIDEC_LINEAR_BP,
   NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V,
+  NRDR_CIVIC_NIDEC_SOURCE_EFFECTIVE_SR_V,
   NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
   NRDR_CIVIC_NIDEC_VGR_SOURCE_ANGLE_BP,
   NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR,
@@ -60,9 +65,8 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL,
   NRDR_SR_CURVE_BY_FP,
   NRDR_VGR_INVERSE_BY_FP,
-  LEGACY_PID_FRICTION_LAT_ACCEL_FACTOR,
-  _legacy_pid_friction,
-  _vgr_real_to_linear_angle,
+  _center_boost_scale,
+  _freeze_integrator_during_unwind,
   LatControlPID,
 )
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
@@ -72,22 +76,29 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 
 class TestLatControl:
 
-  def test_legacy_pid_friction_matches_mvl_controller_mapping(self):
-    assert LEGACY_PID_FRICTION_LAT_ACCEL_FACTOR == 3.5
-    assert _legacy_pid_friction(0.0, 0.0, 0.5) == 0.0
-    assert _legacy_pid_friction(0.15, 0.0, 0.5) == pytest.approx(0.875)
-    assert _legacy_pid_friction(0.30, 0.0, 0.5) == pytest.approx(1.75)
-    assert _legacy_pid_friction(1.00, 0.0, 0.5) == pytest.approx(1.75)
-    assert _legacy_pid_friction(-0.15, 0.0, 0.5) == pytest.approx(-0.875)
-    assert _legacy_pid_friction(0.20, 0.20, 0.5) == 0.0
+  def test_unwind_integrator_only_freezes_growth(self):
+    # During unwind, same-sign error would grow the stored I magnitude.
+    assert _freeze_integrator_during_unwind(-0.1, 0.05, 0.2)
+    assert _freeze_integrator_during_unwind(-0.1, -0.05, -0.2)
+    # Opposite-sign error must remain live so stale I can decay through zero.
+    assert not _freeze_integrator_during_unwind(-0.1, 0.05, -0.2)
+    assert not _freeze_integrator_during_unwind(-0.1, -0.05, 0.2)
+    assert not _freeze_integrator_during_unwind(0.1, 0.05, 0.2)
 
-  def test_legacy_pid_friction_uses_vgr_consistent_measured_angle(self):
-    linear_bp, real_angle_v, _ = NRDR_VGR_INVERSE_BY_FP["HONDA_CIVIC"]
-    inverse = (linear_bp, real_angle_v)
-    for real_angle in (-200., -90., 0., 45., 100., 200.):
-      expected = math.copysign(float(np.interp(abs(real_angle), real_angle_v, linear_bp)), real_angle)
-      assert _vgr_real_to_linear_angle(real_angle, inverse) == pytest.approx(expected)
-    assert _vgr_real_to_linear_angle(-42.0, None) == -42.0
+  def test_center_boost_has_highway_support_and_smooth_speed_gate(self):
+    min_speed = 50.0 * 0.44704
+    assert _center_boost_scale(0.0, min_speed - 0.1, center_taper_high=1.0,
+                               center_boost_min_speed_ms=min_speed) == 1.0
+    assert _center_boost_scale(0.0, min_speed + 2.5 * 0.44704, center_taper_high=1.0,
+                               center_boost_min_speed_ms=min_speed) == pytest.approx(1.5)
+    assert _center_boost_scale(0.0, 100.0 * 0.44704, center_taper_high=1.0,
+                               center_boost_min_speed_ms=min_speed) == 2.0
+    assert _center_boost_scale(3.5, 100.0 * 0.44704, center_taper_high=1.0,
+                               center_boost_threshold_deg=3.0,
+                               center_boost_min_speed_ms=min_speed) == pytest.approx(1.5)
+    assert _center_boost_scale(4.0, 100.0 * 0.44704, center_taper_high=1.0,
+                               center_boost_threshold_deg=3.0,
+                               center_boost_min_speed_ms=min_speed) == 1.0
 
   def test_nrdr_steer_ratio_curves_are_well_formed(self):
     assert NRDR_SR_CURVE_BY_FP == {}
@@ -157,18 +168,38 @@ class TestLatControl:
     assert NRDR_VGR_INVERSE_BY_FP["HONDA_CIVIC"] == (
       NRDR_CIVIC_NIDEC_LINEAR_BP,
       NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-      15.38,
+      NRDR_CIVIC_NIDEC_CENTER_SR,
     )
     assert np.interp(70., NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V) == 13.596
     assert np.interp(90., NRDR_CIVIC_BOSCH_SR_CURVE_BP, NRDR_CIVIC_BOSCH_SR_CURVE_V) > NRDR_CIVIC_FINAL_SR
     assert np.interp(NRDR_CIVIC_LOCK_ANGLE, NRDR_CIVIC_BOSCH_SR_CURVE_BP,
                      NRDR_CIVIC_BOSCH_SR_CURVE_V) == pytest.approx(NRDR_CIVIC_FINAL_SR)
     assert np.interp(NRDR_CIVIC_LOCK_ANGLE, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-                     NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V) * 15.38 == pytest.approx(NRDR_CIVIC_FINAL_SR)
+                     NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V) * NRDR_CIVIC_NIDEC_CENTER_SR == pytest.approx(NRDR_CIVIC_FINAL_SR)
 
-    # The Nidec A-table is already cumulative/effective and contains a genuine
-    # near-center rise. Do not integrate it or flatten it with a monotonic rule.
-    assert max(NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V) == 1.024
+    # Only the low-angle overlay changes. The learned road-effective values hand
+    # back to the original firmware-derived absolute curve at 9.524 degrees.
+    assert NRDR_CIVIC_NIDEC_FIRMWARE_CENTER_SR == 15.38
+    assert NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_BP == [0.000, 3.125, 6.400, 9.524]
+    np.testing.assert_allclose(
+      NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_V,
+      [18.270, 18.270, 17.460, 15.62608],
+      rtol=0.0,
+      atol=1e-12,
+    )
+    assert NRDR_CIVIC_NIDEC_CENTER_SR == 18.270
+    np.testing.assert_allclose(
+      NRDR_CIVIC_NIDEC_SOURCE_EFFECTIVE_SR_V[:4],
+      NRDR_CIVIC_NIDEC_LEARNED_LOW_ANGLE_SR_V,
+      rtol=0.0,
+      atol=1e-12,
+    )
+    np.testing.assert_allclose(
+      NRDR_CIVIC_NIDEC_SOURCE_EFFECTIVE_SR_V[4:],
+      np.multiply(NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR[4:], NRDR_CIVIC_NIDEC_FIRMWARE_CENTER_SR),
+      rtol=0.0,
+      atol=1e-12,
+    )
     assert all(left < right for left, right in pairwise(NRDR_CIVIC_NIDEC_LINEAR_BP))
     np.testing.assert_allclose(
       NRDR_CIVIC_NIDEC_LINEAR_BP,
@@ -176,14 +207,14 @@ class TestLatControl:
       rtol=0.0,
       atol=1e-12,
     )
-    assert np.isclose(np.interp(60., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-                                NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V), 0.994184, atol=5e-7)
-    assert np.isclose(np.interp(100., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-                                NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V), 0.954994, atol=5e-7)
-    assert np.isclose(np.interp(160., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-                                NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V), 0.919324, atol=5e-7)
-    assert np.isclose(np.interp(200., NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
-                                NRDR_CIVIC_NIDEC_RELATIVE_EFFECTIVE_SR_V), 0.891561, atol=5e-7)
+    legacy_effective_sr = np.multiply(NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR,
+                                      NRDR_CIVIC_NIDEC_FIRMWARE_CENTER_SR)
+    for angle in (60., 100., 160., 200.):
+      assert np.isclose(
+        np.interp(angle, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP, NRDR_CIVIC_NIDEC_EFFECTIVE_SR_V),
+        np.interp(angle, NRDR_CIVIC_NIDEC_VGR_SOURCE_ANGLE_BP, legacy_effective_sr),
+        atol=5e-7,
+      )
 
     # LINEAR_BP is the pre-solved inverse coordinate: each constant-ratio
     # model angle must map back to the real steering-wheel angle that produced it.

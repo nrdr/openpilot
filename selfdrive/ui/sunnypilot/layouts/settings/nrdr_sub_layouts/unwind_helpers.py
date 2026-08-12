@@ -2,7 +2,7 @@
 nrdr Unwind Helpers sub-panel.
 
 Everything that shapes how the wheel returns toward center after a turn:
-integrator freeze, model lookahead, and the low-speed feedforward boost.
+model lookahead and the low-speed feedforward boost.
 One level under Lateral Tuning.
 """
 from collections.abc import Callable
@@ -27,12 +27,6 @@ class UnwindHelpersLayout(Widget):
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
-    self._unwind_freeze = toggle_item_sp(
-      param="HondaUnwindFreeze",
-      title=lambda: tr("Unwind Integrator Freeze (Default: OFF)"),
-      description=lambda: tr("Freezes the PID integrator while the steering is returning toward center, so it doesn't hold torque through the unwind."),
-    )
-
     self._unwind_lookahead = toggle_item_sp(
       param="HondaUnwindLookahead",
       title=lambda: tr("Unwind Lookahead (Default: ON)"),
@@ -62,7 +56,6 @@ class UnwindHelpersLayout(Widget):
     )
 
     return [
-      self._unwind_freeze,
       self._unwind_lookahead,
       self._unwind_boost_seconds,
       self._unwind_ff_multiplier,
@@ -72,7 +65,7 @@ class UnwindHelpersLayout(Widget):
     super()._update_state()
     fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
     editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
-    for item in (self._unwind_freeze, self._unwind_lookahead, self._unwind_boost_seconds, self._unwind_ff_multiplier):
+    for item in (self._unwind_lookahead, self._unwind_boost_seconds, self._unwind_ff_multiplier):
       item.action_item.set_enabled(editable)
 
   def _render(self, rect):

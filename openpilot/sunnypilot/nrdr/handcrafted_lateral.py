@@ -65,7 +65,6 @@ HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
     ("HondaCenterScale", 0.5),
     ("HondaCenterBoostThreshold", 3.0),
     ("HondaCenterBoostMinSpeed", 50),
-    ("HondaPidFriction", 0.5),
     ("NrdrLatStiction", False),
     ("NrdrNnlcEnabled", False),
     ("NrdrNnlcActivationSpeed", 15),
@@ -75,7 +74,6 @@ HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
     ("NrdrTuneLearner", False),
     ("NrdrTuneLearnerStrength", 0),
     ("NrdrTuneLearnerRate", 10),
-    ("HondaUnwindFreeze", False),
     ("HondaUnwindLookahead", False),
     ("HondaUnwindBoostSeconds", 1.0),
     ("HondaUnwindFfMultiplier", 2.0),
@@ -107,7 +105,7 @@ def _honda_torque_mod_profile(fingerprint: str) -> HandcraftedLateralProfile:
   return HandcraftedLateralProfile(
     name="Honda Torque-Mod Road-Tested 2026-08-11",
     fingerprint=fingerprint,
-    version=4,
+    version=6,
     values=(("NrdrSteerRatioOffset", sr_offset),) + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
   )
 

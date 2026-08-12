@@ -245,7 +245,6 @@ def write_car_tune_info(params, cache: dict) -> None:
       p_mid, i_mid, f_mid = (_param(params, key) for key in ("LatPScaleStandard", "LatIScaleStandard", "LatFScaleStandard"))
       p_high, i_high, f_high = (_param(params, key) for key in ("LatPScaleHighway", "LatIScaleHighway", "LatFScaleHighway"))
       damping, damping_speed = _param(params, "NrdrLatRateDamping"), _param(params, "NrdrLatRateDampingFadeSpeed")
-      pid_friction = float(_param(params, "HondaPidFriction"))
       center = float(_param(params, "HondaCenterScale")) * 100.0
       center_threshold = float(_param(params, "HondaCenterBoostThreshold"))
       center_speed = _param(params, "HondaCenterBoostMinSpeed")
@@ -271,8 +270,8 @@ def write_car_tune_info(params, cache: dict) -> None:
         "NrdrCarPidLowInfo": f"P {p_low}% | I {i_low}% | F {f_low}%",
         "NrdrCarPidMidInfo": f"P {p_mid}% | I {i_mid}% | F {f_mid}%",
         "NrdrCarPidHighInfo": f"P {p_high}% | I {i_high}% | F {f_high}%",
-        "NrdrCarDampingInfo": f"{damping}% | fades by {damping_speed} mph | legacy friction {pid_friction:g}",
-        "NrdrCarCenterInfo": f"{center:g}% | +/-{center_threshold:g} deg | above {center_speed} mph",
+        "NrdrCarDampingInfo": f"{damping}% | fades by {damping_speed} mph",
+        "NrdrCarCenterInfo": f"P-only {center:g}% | +/-{center_threshold:g} deg | above {center_speed} mph",
         "NrdrCarNnlcInfo": f"{nnlc_on} | {nnlc_speed} mph | KP {nnlc_kp:g} | KF {nnlc_kf:g} | KI {nnlc_ki:g}",
         "NrdrCarSteerRatioInfo": f"Auto {_on(params, 'NrdrLearnSteerRatio')} | offset {sr_offset:+.2f}",
         "NrdrCarLearningInfo": f"stiffness {_on(params, 'NrdrLearnStiffness')} | angle {_on(params, 'NrdrLearnAngleOffset')}",
