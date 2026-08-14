@@ -101,14 +101,17 @@ def car_eps_fw():
     (Do not use CarFw.bus — Cap'n Proto UInt8 defaults to 0 when unset.)
     """
     try:
-        from cereal import car
+        from opendbc.car.structs import car
     except Exception:
         if os.path.isdir("/data/openpilot"):
             sys.path.append("/data/openpilot")
         try:
-            from cereal import car
+            from opendbc.car.structs import car
         except Exception:
-            return None
+            try:
+                from cereal import car
+            except Exception:
+                return None
     for p in ("/data/params/d/CarParamsPersistent", "/data/params/d/CarParams"):
         try:
             data = open(p, "rb").read()

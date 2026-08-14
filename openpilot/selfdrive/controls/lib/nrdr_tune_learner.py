@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""
+"""August-layout openpilot package module.
+
 nrdr_tune_learner.py - 2D online lateral tune learner.
 
 Learns a per-(speed, |steering angle|) feedforward TRIM that cancels the car's systematic,

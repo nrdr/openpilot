@@ -1,4 +1,5 @@
-"""
+"""August-layout openpilot package module.
+
 nrdr experimental settings panel.
 """
 from enum import IntEnum

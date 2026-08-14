@@ -1,4 +1,5 @@
-"""
+"""August-layout openpilot package module.
+
 nrdr Ford Lateral Tuning sub-panel.
 
 OEM-style four-signal Ford lateral control (ported from BluePilot), one level under

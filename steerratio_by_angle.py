@@ -165,8 +165,13 @@ def expand_sources(raw_sources: list[str], log_type: str, since: datetime | None
 
 
 def print_cached_params() -> bool:
-  from cereal import car, log
-  import cereal.messaging as messaging
+  try:
+    from openpilot.cereal import log
+    import openpilot.cereal.messaging as messaging
+    from opendbc.car.structs import car
+  except ImportError:
+    from cereal import car, log
+    import cereal.messaging as messaging
   from openpilot.common.params import Params
 
   params = Params()

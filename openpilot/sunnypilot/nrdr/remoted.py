@@ -24,7 +24,8 @@ import os
 import subprocess
 import time
 
-from cereal import car, custom, messaging
+from openpilot.cereal import custom, messaging
+from opendbc.car.structs import car
 from opendbc.car.car_helpers import interfaces
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params

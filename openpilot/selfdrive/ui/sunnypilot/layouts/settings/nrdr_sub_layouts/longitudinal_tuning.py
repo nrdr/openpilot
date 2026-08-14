@@ -1,4 +1,5 @@
-"""
+"""August-layout openpilot package module.
+
 nrdr Longitudinal Tuning sub-panel.
 """
 from collections.abc import Callable

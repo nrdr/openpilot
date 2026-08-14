@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from cereal import custom
+from openpilot.cereal import custom
 from openpilot.selfdrive.selfdrived.selfdrived import SelfdriveD
 
 

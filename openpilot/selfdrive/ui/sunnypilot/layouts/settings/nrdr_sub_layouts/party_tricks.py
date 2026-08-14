@@ -1,4 +1,5 @@
-"""
+"""August-layout openpilot package module.
+
 nrdr "Special" sub-panel (formerly Party Tricks): dashboard designs, the Dynamic
 HUD, diagnostics, and the Show Footage QR flow.
 """

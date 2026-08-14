@@ -1,4 +1,5 @@
-"""
+"""August-layout openpilot package module.
+
 Compact developer UI for the C4 (mici): four metrics down the 60px side strip. The pinned
 confidence ball now lives on the camera feed (top-right), so the whole strip is free. Reuses the
 standard UiElement classes for the data, with hand-set short labels and compact values to fit the

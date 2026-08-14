@@ -1,4 +1,5 @@
-"""
+"""August-layout openpilot package module.
+
 nrdr Show Footage sub-panel.
 
 Pick a drive, get a QR code that points your phone at the copyparty file server

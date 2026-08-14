@@ -1,4 +1,5 @@
-"""
+"""August-layout openpilot package module.
+
 nrdr Unwind Helpers sub-panel.
 
 Everything that shapes how the wheel returns toward center after a turn:

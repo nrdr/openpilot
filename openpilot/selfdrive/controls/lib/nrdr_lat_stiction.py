@@ -1,4 +1,4 @@
-# nrdr lateral stiction - design and measured reference data: NRDR_LATERAL_STICTION.md
+# nrdr lateral stiction - August package layout; design and measured reference data: NRDR_LATERAL_STICTION.md
 
 def _interp(x, xp, fp):
   if x <= xp[0]:

@@ -1,11 +1,12 @@
-"""
+"""August-layout openpilot package module.
+
 nrdr Learned Parameters sub-panel: openpilot's live-learned vehicle params (read-only)
 plus the Auto toggles that decide whether to use them or fall back to static base values.
 """
 from collections.abc import Callable
 import pyray as rl
 
-from cereal import log
+from openpilot.cereal import log
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
 from openpilot.system.ui.lib.multilang import tr

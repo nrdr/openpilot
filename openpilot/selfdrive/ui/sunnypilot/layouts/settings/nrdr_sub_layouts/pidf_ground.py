@@ -1,4 +1,4 @@
-"""nrdr Controller Tuning Dungeon sub-panel."""
+"""nrdr Controller Tuning Dungeon sub-panel in the August package layout."""
 from collections.abc import Callable
 import pyray as rl
 

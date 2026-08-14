@@ -1,4 +1,4 @@
-"""LatStiction unit tests. See NRDR_LATERAL_STICTION.md for design and constants."""
+"""LatStiction unit tests in the August package layout. See NRDR_LATERAL_STICTION.md for design and constants."""
 import math
 import random
 import unittest

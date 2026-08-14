@@ -1,4 +1,5 @@
-"""
+"""August-layout openpilot package module.
+
 nrdr Lateral Tuning hub.
 
 Top of the lateral menu tree: Tune Report + Car & Tune Info, then nav buttons into
@@ -14,8 +15,8 @@ from collections.abc import Callable
 from enum import IntEnum
 import pyray as rl
 
-from cereal import car
 from opendbc.car.car_helpers import interfaces
+from opendbc.car.structs import car
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import get_handcrafted_lateral_profile

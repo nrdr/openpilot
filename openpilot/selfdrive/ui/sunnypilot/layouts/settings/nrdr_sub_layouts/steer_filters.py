@@ -1,4 +1,5 @@
-"""
+"""August-layout openpilot package module.
+
 nrdr Steer Filters sub-panel.
 
 Signal-conditioning on the steering-torque command: low-pass filter (tau bands),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility entry point for the UI's "Register with Konik" action."""
+"""August-layout compatibility entry point for the UI's "Register with Konik" action."""
 
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID, is_registered_device, register
 

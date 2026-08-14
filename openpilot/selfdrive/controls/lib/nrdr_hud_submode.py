@@ -1,4 +1,5 @@
-"""
+"""August-layout openpilot package module.
+
 nrdr Dynamic HUD (Cruise Button Sub-Mode) shared press gate.
 
 When NrdrCruiseButtonSubMode is ON, the first distance / set / resume press only
