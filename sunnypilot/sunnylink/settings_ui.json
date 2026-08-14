@@ -981,6 +981,80 @@
                   ]
                 },
                 {
+                  "key": "NrdrLaneChangeEndpointSteerRatio",
+                  "widget": "toggle",
+                  "title": "Use Endpoint SR for Smoother Lane Changes",
+                  "description": "Uses the Outer Steer Ratio for the complete active lane change. Default ON.",
+                  "details": "The endpoint ratio is selected from pre-lane-change through the starting and finishing states. Normal angle-based steer ratio resumes only after the planner marks the lane change complete. This reacts to the planner state, not blinkers alone.",
+                  "visibility": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "capability",
+                          "field": "car_fingerprint",
+                          "equals": "HONDA_CLARITY"
+                        },
+                        {
+                          "type": "capability",
+                          "field": "car_fingerprint",
+                          "equals": "HONDA_CIVIC"
+                        },
+                        {
+                          "type": "capability",
+                          "field": "car_fingerprint",
+                          "equals": "HONDA_CIVIC_BOSCH"
+                        },
+                        {
+                          "type": "capability",
+                          "field": "car_fingerprint",
+                          "equals": "HONDA_CIVIC_BOSCH_DIESEL"
+                        },
+                        {
+                          "type": "capability",
+                          "field": "car_fingerprint",
+                          "equals": "HONDA_ACCORD"
+                        },
+                        {
+                          "type": "capability",
+                          "field": "car_fingerprint",
+                          "equals": "HONDA_CRV_5G"
+                        },
+                        {
+                          "type": "capability",
+                          "field": "car_fingerprint",
+                          "equals": "HONDA_CRV_HYBRID"
+                        },
+                        {
+                          "type": "capability",
+                          "field": "car_fingerprint",
+                          "equals": "HONDA_INSIGHT"
+                        }
+                      ]
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrHandcraftedLateralTune",
+                          "equals": false
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "has_handcrafted_lateral_profile",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
                   "key": "LatPScaleLowSpeed",
                   "widget": "option",
                   "title": "Low Speed Proportional Scale (Below 25mph)",

@@ -260,7 +260,8 @@ def write_car_tune_info(params, cache: dict) -> None:
       if sr_profile is not None:
         sr_center = float(_param(params, sr_profile.center_param))
         sr_outer = float(_param(params, sr_profile.outer_param))
-        sr_info = f"direct {sr_center:.2f} center -> {sr_outer:.2f} outer"
+        sr_lc = _on(params, "NrdrLaneChangeEndpointSteerRatio")
+        sr_info = f"direct {sr_center:.2f} center -> {sr_outer:.2f} outer | lane-change endpoint {sr_lc}"
       else:
         sr_info = f"Auto {_on(params, 'NrdrLearnSteerRatio')} | base {float(CP.steerRatio):g}"
       nnlc_on = _on(params, "NrdrNnlcEnabled")

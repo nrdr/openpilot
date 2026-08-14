@@ -50,6 +50,7 @@ HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS = (
 # the profile keeps the live fine-tuning controls deterministic.
 HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
     ("NrdrStarPilotPid", False),
+    ("NrdrLaneChangeEndpointSteerRatio", True),
     ("NrdrLearnSteerRatio", False),
     ("NrdrLearnStiffness", True),
     ("NrdrLearnAngleOffset", True),
@@ -107,7 +108,7 @@ def _honda_torque_mod_profile(fingerprint: str) -> HandcraftedLateralProfile:
   return HandcraftedLateralProfile(
     name="Honda Torque-Mod Road-Tested 2026-08-13",
     fingerprint=fingerprint,
-    version=7,
+    version=8,
     values=sr_profile.param_values + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
   )
 

@@ -450,6 +450,31 @@ class TestLatControl:
     controller.update(False, CS, VM, params, False, 0.0, pose, False, 0.2)
     assert VM.sR == pytest.approx(12.00)
 
+    # The lane-change option follows the planner lifecycle, not the blinkers:
+    # pre-change through finishing use the outer endpoint, then `off` restores
+    # the normal measured-angle curve.
+    CS.steeringAngleDeg = 0.0
+    model_v2 = log.ModelDataV2.new_message()
+    controller.update_model_v2(model_v2)
+    for lane_change_state in (
+      log.LaneChangeState.preLaneChange,
+      log.LaneChangeState.laneChangeStarting,
+      log.LaneChangeState.laneChangeFinishing,
+    ):
+      model_v2.meta.laneChangeState = lane_change_state
+      controller.update(False, CS, VM, params, False, 0.0, pose, False, 0.2)
+      assert VM.sR == pytest.approx(12.00)
+
+    model_v2.meta.laneChangeState = log.LaneChangeState.off
+    controller.update(False, CS, VM, params, False, 0.0, pose, False, 0.2)
+    assert VM.sR == pytest.approx(19.50)
+
+    # Turning the option off keeps the normal curve during planner lane changes.
+    controller.lane_change_endpoint_sr = False
+    model_v2.meta.laneChangeState = log.LaneChangeState.laneChangeStarting
+    controller.update(False, CS, VM, params, False, 0.0, pose, False, 0.2)
+    assert VM.sR == pytest.approx(19.50)
+
   @parameterized.expand([(HONDA.HONDA_CIVIC, LatControlPID), (TOYOTA.TOYOTA_RAV4, LatControlTorque),
                          (NISSAN.NISSAN_LEAF, LatControlAngle), (GM.CHEVROLET_BOLT_EUV, LatControlTorque)])
   def test_saturation(self, car_name, controller):
