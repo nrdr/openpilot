@@ -15,6 +15,10 @@ from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.car.helpers import convert_to_capnp
 from openpilot.selfdrive.controls.lib.latcontrol_angle import LatControlAngle
 from openpilot.selfdrive.controls.lib.latcontrol_pid import (
+  NRDR_ACCORD_FINAL_SR,
+  NRDR_ACCORD_LOCK_ANGLE,
+  NRDR_ACCORD_TWO_POINT_SR_BP,
+  NRDR_ACCORD_TWO_POINT_SR_V,
   NRDR_CIVIC_BOSCH_SR_CURVE_BP,
   NRDR_CIVIC_BOSCH_SR_CURVE_V,
   NRDR_CIVIC_BOSCH_CENTER_SR,
@@ -36,6 +40,8 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
   NRDR_CIVIC_NIDEC_VGR_SOURCE_ANGLE_BP,
   NRDR_CIVIC_NIDEC_VGR_SOURCE_REL_EFFECTIVE_SR,
+  NRDR_CIVIC_TWO_POINT_SR_BP,
+  NRDR_CIVIC_TWO_POINT_SR_V,
   NRDR_CLARITY_FINAL_SR,
   NRDR_CLARITY_CENTER_SR,
   NRDR_CLARITY_INNER_SR_BP,
@@ -43,6 +49,8 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_CLARITY_LOCK_ANGLE,
   NRDR_CLARITY_SR_CURVE_BP,
   NRDR_CLARITY_SR_CURVE_V,
+  NRDR_CLARITY_TWO_POINT_SR_BP,
+  NRDR_CLARITY_TWO_POINT_SR_V,
   NRDR_CLARITY_VGR_SOURCE_ANGLE_BP,
   NRDR_CLARITY_VGR_SOURCE_REL_LOCAL,
   NRDR_CLARITY_VGR_LINEAR_BP,
@@ -51,6 +59,8 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_CRV_5G_LOCK_ANGLE,
   NRDR_CRV_5G_SR_CURVE_BP,
   NRDR_CRV_5G_SR_CURVE_V,
+  NRDR_CRV_5G_TWO_POINT_SR_BP,
+  NRDR_CRV_5G_TWO_POINT_SR_V,
   NRDR_CRV_5G_VGR_LINEAR_BP,
   NRDR_INSIGHT_CENTER_SR,
   NRDR_INSIGHT_FINAL_SR,
@@ -62,7 +72,10 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V,
   NRDR_INSIGHT_VGR_SOURCE_ANGLE_BP,
   NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL,
+  NRDR_INSIGHT_TWO_POINT_SR_BP,
+  NRDR_INSIGHT_TWO_POINT_SR_V,
   NRDR_SR_CURVE_BY_FP,
+  NRDR_TWO_POINT_OUTER_FRACTION,
   NRDR_VGR_INVERSE_BY_FP,
   VGR_FIXED_FULL_ANGLE_DEG,
   VGR_LEARNED_FULL_ANGLE_DEG,
@@ -142,7 +155,44 @@ class TestLatControl:
                                center_boost_min_speed_ms=min_speed) == 1.0
 
   def test_nrdr_steer_ratio_curves_are_well_formed(self):
-    assert NRDR_SR_CURVE_BY_FP == {}
+    assert NRDR_SR_CURVE_BY_FP == {
+      "HONDA_CLARITY": (NRDR_CLARITY_TWO_POINT_SR_BP, NRDR_CLARITY_TWO_POINT_SR_V),
+      "HONDA_CIVIC": (NRDR_CIVIC_TWO_POINT_SR_BP, NRDR_CIVIC_TWO_POINT_SR_V),
+      "HONDA_CIVIC_BOSCH": (NRDR_CIVIC_TWO_POINT_SR_BP, NRDR_CIVIC_TWO_POINT_SR_V),
+      "HONDA_CIVIC_BOSCH_DIESEL": (NRDR_CIVIC_TWO_POINT_SR_BP, NRDR_CIVIC_TWO_POINT_SR_V),
+      "HONDA_ACCORD": (NRDR_ACCORD_TWO_POINT_SR_BP, NRDR_ACCORD_TWO_POINT_SR_V),
+      "HONDA_CRV_5G": (NRDR_CRV_5G_TWO_POINT_SR_BP, NRDR_CRV_5G_TWO_POINT_SR_V),
+      "HONDA_CRV_HYBRID": (NRDR_CRV_5G_TWO_POINT_SR_BP, NRDR_CRV_5G_TWO_POINT_SR_V),
+      "HONDA_INSIGHT": (NRDR_INSIGHT_TWO_POINT_SR_BP, NRDR_INSIGHT_TWO_POINT_SR_V),
+    }
+    assert NRDR_CLARITY_TWO_POINT_SR_BP == [0.0, 250.0]
+    assert NRDR_CLARITY_TWO_POINT_SR_V == [18.50, 12.72]
+    assert np.interp(0.0, NRDR_CLARITY_TWO_POINT_SR_BP, NRDR_CLARITY_TWO_POINT_SR_V) == 18.50
+    assert np.interp(125.0, NRDR_CLARITY_TWO_POINT_SR_BP, NRDR_CLARITY_TWO_POINT_SR_V) == pytest.approx(15.61)
+    assert np.interp(250.0, NRDR_CLARITY_TWO_POINT_SR_BP, NRDR_CLARITY_TWO_POINT_SR_V) == 12.72
+    assert np.interp(450.0, NRDR_CLARITY_TWO_POINT_SR_BP, NRDR_CLARITY_TWO_POINT_SR_V) == 12.72
+
+    two_point_profiles = (
+      (NRDR_CIVIC_TWO_POINT_SR_BP, NRDR_CIVIC_TWO_POINT_SR_V,
+       NRDR_CIVIC_LOCK_ANGLE, 17.24, NRDR_CIVIC_FINAL_SR),
+      (NRDR_ACCORD_TWO_POINT_SR_BP, NRDR_ACCORD_TWO_POINT_SR_V,
+       NRDR_ACCORD_LOCK_ANGLE, 18.31, NRDR_ACCORD_FINAL_SR),
+      (NRDR_CRV_5G_TWO_POINT_SR_BP, NRDR_CRV_5G_TWO_POINT_SR_V,
+       NRDR_CRV_5G_LOCK_ANGLE, 17.94, NRDR_CRV_5G_FINAL_SR),
+      (NRDR_INSIGHT_TWO_POINT_SR_BP, NRDR_INSIGHT_TWO_POINT_SR_V,
+       NRDR_INSIGHT_LOCK_ANGLE, 16.82, NRDR_INSIGHT_FINAL_SR),
+    )
+    for breakpoints, values, lock_angle, center_sr, outer_sr in two_point_profiles:
+      assert breakpoints[0] == 0.0
+      assert breakpoints[1] / lock_angle == pytest.approx(NRDR_TWO_POINT_OUTER_FRACTION)
+      assert values == [center_sr, outer_sr]
+      assert np.interp(breakpoints[1], breakpoints, values) == outer_sr
+      assert np.interp(lock_angle, breakpoints, values) == outer_sr
+
+    assert NRDR_CIVIC_TWO_POINT_SR_BP[1] == pytest.approx(230.2904564)
+    assert NRDR_ACCORD_TWO_POINT_SR_BP[1] == pytest.approx(238.5892116)
+    assert NRDR_CRV_5G_TWO_POINT_SR_BP[1] == pytest.approx(238.5892116)
+    assert NRDR_INSIGHT_TWO_POINT_SR_BP[1] == pytest.approx(263.4854772)
     for breakpoints, values in (
         (NRDR_CLARITY_SR_CURVE_BP, NRDR_CLARITY_SR_CURVE_V),
         (NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V),
@@ -205,7 +255,7 @@ class TestLatControl:
       1.008, 0.992, 0.977, 0.970, 0.970, 0.962, 0.962, 0.955, 0.955, 0.955,
       0.948, 0.948, 0.941, 0.941, 0.934, 0.928, 0.908, 0.895, 0.889, 0.848,
     ]
-    assert "HONDA_CIVIC" not in NRDR_SR_CURVE_BY_FP
+    assert NRDR_SR_CURVE_BY_FP["HONDA_CIVIC"] == (NRDR_CIVIC_TWO_POINT_SR_BP, NRDR_CIVIC_TWO_POINT_SR_V)
     assert NRDR_VGR_INVERSE_BY_FP["HONDA_CIVIC"] == (
       NRDR_CIVIC_NIDEC_LINEAR_BP,
       NRDR_CIVIC_NIDEC_VGR_ANGLE_BP,
@@ -278,7 +328,7 @@ class TestLatControl:
       NRDR_INSIGHT_VGR_ANGLE_BP,
       NRDR_INSIGHT_CENTER_SR,
     )
-    assert "HONDA_INSIGHT" not in NRDR_SR_CURVE_BY_FP
+    assert NRDR_SR_CURVE_BY_FP["HONDA_INSIGHT"] == (NRDR_INSIGHT_TWO_POINT_SR_BP, NRDR_INSIGHT_TWO_POINT_SR_V)
 
     assert len(NRDR_INSIGHT_VGR_ANGLE_BP) == len(NRDR_INSIGHT_VGR_LINEAR_BP)
     assert len(NRDR_INSIGHT_VGR_ANGLE_BP) == len(NRDR_INSIGHT_VGR_REL_EFFECTIVE_SR_V)
@@ -333,12 +383,14 @@ class TestLatControl:
         assert recovered_angle == pytest.approx(real_angle, abs=1e-12)
 
   @parameterized.expand([
-    (HONDA.HONDA_CLARITY, None, "HONDA_CLARITY"),
-    (HONDA.HONDA_CRV_5G, None, "HONDA_CRV_5G"),
-    (HONDA.HONDA_CIVIC_BOSCH, None, "HONDA_CIVIC_BOSCH"),
-    (HONDA.HONDA_CIVIC, None, "HONDA_CIVIC"),
-    (HONDA.HONDA_INSIGHT, None, "HONDA_INSIGHT"),
-    (HONDA.HONDA_CIVIC_BOSCH_DIESEL, None, None),
+    (HONDA.HONDA_CLARITY, "HONDA_CLARITY", None),
+    (HONDA.HONDA_CIVIC, "HONDA_CIVIC", None),
+    (HONDA.HONDA_CIVIC_BOSCH, "HONDA_CIVIC_BOSCH", None),
+    (HONDA.HONDA_CIVIC_BOSCH_DIESEL, "HONDA_CIVIC_BOSCH_DIESEL", None),
+    (HONDA.HONDA_ACCORD, "HONDA_ACCORD", None),
+    (HONDA.HONDA_CRV_5G, "HONDA_CRV_5G", None),
+    (HONDA.HONDA_CRV_HYBRID, "HONDA_CRV_HYBRID", None),
+    (HONDA.HONDA_INSIGHT, "HONDA_INSIGHT", None),
   ])
   def test_nrdr_steer_ratio_curve_is_fingerprint_scoped(self, car_name, expected_curve_fp, expected_inverse_fp):
     CarInterface = interfaces[car_name]
@@ -353,6 +405,26 @@ class TestLatControl:
       assert str(CP.carFingerprint) == expected_fp
     assert (controller.sr_curve is not None) == (expected_curve_fp is not None)
     assert (controller.vgr_inverse is not None) == (expected_inverse_fp is not None)
+
+  def test_clarity_two_point_curve_is_authoritative_over_learner(self):
+    CarInterface = interfaces[HONDA.HONDA_CLARITY]
+    CP = CarInterface.get_non_essential_params(HONDA.HONDA_CLARITY)
+    CP_SP = CarInterface.get_non_essential_params_sp(CP, HONDA.HONDA_CLARITY)
+    CI = CarInterface(CP, CP_SP)
+    controller = LatControlPID(CP.as_reader(), convert_to_capnp(CP_SP).as_reader(), CI, DT_CTRL)
+    controller.learn_steer_ratio = True
+
+    VM = VehicleModel(CP)
+    VM.sR = 99.0  # prove the learned/model value is replaced
+    CS = car.CarState.new_message()
+    CS.vEgo = 30.0
+    CS.steeringAngleDeg = 125.0
+    params = log.LiveParametersData.new_message()
+    pose = Pose.from_live_pose(generate_livePose().livePose)
+
+    controller.update(False, CS, VM, params, False, 0.0, pose, False, 0.2)
+    assert controller.vgr_inverse is None
+    assert VM.sR == pytest.approx(15.61)
 
   @parameterized.expand([(HONDA.HONDA_CIVIC, LatControlPID), (TOYOTA.TOYOTA_RAV4, LatControlTorque),
                          (NISSAN.NISSAN_LEAF, LatControlAngle), (GM.CHEVROLET_BOLT_EUV, LatControlTorque)])

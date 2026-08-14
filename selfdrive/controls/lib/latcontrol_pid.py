@@ -168,6 +168,8 @@ def _inverse_vgr_from_effective_sr_curve(angle_bp, effective_sr):
 # is reached at physical lock -- never at an arbitrary 80-90 degree breakpoint.
 NRDR_CIVIC_LOCK_ANGLE = 2.22 * 180.0
 NRDR_CIVIC_FINAL_SR = 10.93
+NRDR_ACCORD_LOCK_ANGLE = 2.30 * 180.0
+NRDR_ACCORD_FINAL_SR = 11.82
 NRDR_CLARITY_LOCK_ANGLE = 2.41 * 180.0
 NRDR_CLARITY_FINAL_SR = 12.72
 NRDR_CRV_5G_LOCK_ANGLE = 2.30 * 180.0
@@ -373,10 +375,41 @@ NRDR_INSIGHT_VGR_LINEAR_BP = _inverse_vgr_from_effective_sr_curve(
   NRDR_INSIGHT_EFFECTIVE_SR_V,
 )
 
-# All current Honda VGR profiles use desired-angle inverse maps. Keep the old
-# measured-angle curve hook available for future/non-Honda experiments, but do
-# not reintroduce its circular measured-angle dependency here.
-NRDR_SR_CURVE_BY_FP = {}
+# Brett's road testing found the original two-point measured-angle behavior
+# uniquely effective on the Clarity. Use that simple profile as the first-pass
+# baseline for the other modified-EPS Hondas too: each car has its own center
+# anchor and Honda-published full-off-center ratio, while its second breakpoint
+# is placed at the same fraction of physical lock as 250 deg is on the Clarity.
+# These direct curves intentionally supersede the more elaborate inverse maps
+# below for the explicitly listed fingerprints; the source maps remain here for
+# reference and future validation.
+NRDR_TWO_POINT_OUTER_FRACTION = 250.0 / NRDR_CLARITY_LOCK_ANGLE
+
+
+def _equivalent_two_point_sr_bp(lock_angle: float) -> list[float]:
+  return [0.0, lock_angle * NRDR_TWO_POINT_OUTER_FRACTION]
+
+
+NRDR_CLARITY_TWO_POINT_SR_BP = [0.0, 250.0]
+NRDR_CLARITY_TWO_POINT_SR_V = [18.50, 12.72]
+NRDR_CIVIC_TWO_POINT_SR_BP = _equivalent_two_point_sr_bp(NRDR_CIVIC_LOCK_ANGLE)
+NRDR_CIVIC_TWO_POINT_SR_V = [17.24, 10.93]
+NRDR_ACCORD_TWO_POINT_SR_BP = _equivalent_two_point_sr_bp(NRDR_ACCORD_LOCK_ANGLE)
+NRDR_ACCORD_TWO_POINT_SR_V = [18.31, 11.82]
+NRDR_CRV_5G_TWO_POINT_SR_BP = _equivalent_two_point_sr_bp(NRDR_CRV_5G_LOCK_ANGLE)
+NRDR_CRV_5G_TWO_POINT_SR_V = [17.94, 12.30]
+NRDR_INSIGHT_TWO_POINT_SR_BP = _equivalent_two_point_sr_bp(NRDR_INSIGHT_LOCK_ANGLE)
+NRDR_INSIGHT_TWO_POINT_SR_V = [16.82, 12.58]
+NRDR_SR_CURVE_BY_FP = {
+  "HONDA_CLARITY": (NRDR_CLARITY_TWO_POINT_SR_BP, NRDR_CLARITY_TWO_POINT_SR_V),
+  "HONDA_CIVIC": (NRDR_CIVIC_TWO_POINT_SR_BP, NRDR_CIVIC_TWO_POINT_SR_V),
+  "HONDA_CIVIC_BOSCH": (NRDR_CIVIC_TWO_POINT_SR_BP, NRDR_CIVIC_TWO_POINT_SR_V),
+  "HONDA_CIVIC_BOSCH_DIESEL": (NRDR_CIVIC_TWO_POINT_SR_BP, NRDR_CIVIC_TWO_POINT_SR_V),
+  "HONDA_ACCORD": (NRDR_ACCORD_TWO_POINT_SR_BP, NRDR_ACCORD_TWO_POINT_SR_V),
+  "HONDA_CRV_5G": (NRDR_CRV_5G_TWO_POINT_SR_BP, NRDR_CRV_5G_TWO_POINT_SR_V),
+  "HONDA_CRV_HYBRID": (NRDR_CRV_5G_TWO_POINT_SR_BP, NRDR_CRV_5G_TWO_POINT_SR_V),
+  "HONDA_INSIGHT": (NRDR_INSIGHT_TWO_POINT_SR_BP, NRDR_INSIGHT_TWO_POINT_SR_V),
+}
 
 NRDR_CLARITY_VGR_LINEAR_BP = _inverse_vgr_from_effective_sr_curve(
   NRDR_CLARITY_SR_CURVE_BP,
@@ -660,7 +693,10 @@ class LatControlPID(LatControl):
     # Optional per-fingerprint VGR transformations. There is deliberately no
     # global fallback: applying one rack's shape to another PID car is unsafe.
     self.sr_curve = NRDR_SR_CURVE_BY_FP.get(str(CP.carFingerprint))
-    self.vgr_profile = NRDR_VGR_INVERSE_BY_FP.get(str(CP.carFingerprint))
+    # A direct measured-angle curve and a desired-angle inverse are mutually
+    # exclusive. The road-test two-point family deliberately uses the former;
+    # applying both would double-correct a variable rack.
+    self.vgr_profile = None if self.sr_curve is not None else NRDR_VGR_INVERSE_BY_FP.get(str(CP.carFingerprint))
     if self.vgr_profile is None:
       self.vgr_inverse = None
       self.vgr_center_sr = None
@@ -670,11 +706,11 @@ class LatControlPID(LatControl):
     # vote_for_nobody's exact EPS position table is the preferred low-angle
     # shape when the firmware is known. Unknown images retain our existing
     # fingerprint-scoped inverse, so this remains a safe behavioral fallback.
-    self.firmware_vgr_inverse = get_honda_vgr_inverse(CP.flags) if CP.brand == "honda" else None
+    self.firmware_vgr_inverse = get_honda_vgr_inverse(CP.flags) if CP.brand == "honda" and self.sr_curve is None else None
     self.learned_vgr_inverse = self.firmware_vgr_inverse or self.vgr_inverse
     # paramsd dewarps only the road-validated Clarity profile. This also tells
     # us whether its learned angle offset belongs before or after the VGR map.
-    self.vgr_offset_is_linear = get_honda_vgr_learning_inverse(CP.flags) is not None if CP.brand == "honda" else False
+    self.vgr_offset_is_linear = get_honda_vgr_learning_inverse(CP.flags) is not None if CP.brand == "honda" and self.sr_curve is None else False
     self.sr_offset = 0.0
     self.learn_steer_ratio = False
     self.frame = -1
@@ -712,9 +748,11 @@ class LatControlPID(LatControl):
     # mapped cars override VehicleModel; all other cars retain normal behavior.
     if self.sr_curve is not None:
       VM.sr_curve = None
-      if not self.learn_steer_ratio:
-        bp, values = self.sr_curve
-        VM.sR = float(np.interp(abs(CS.steeringAngleDeg), bp, values)) + self.sr_offset
+      # Restore the original two-point behavior: measured wheel angle selects
+      # the effective SR before curvature->angle conversion. These handcrafted
+      # profiles are authoritative regardless of the global learner toggle.
+      bp, values = self.sr_curve
+      VM.sR = float(np.interp(abs(CS.steeringAngleDeg), bp, values)) + self.sr_offset
     elif self.vgr_inverse is not None and not self.learn_steer_ratio:
       # Use the profile's road-validated effective center anchor. The inverse
       # then removes that artificial/model compensation toward physical lock.
