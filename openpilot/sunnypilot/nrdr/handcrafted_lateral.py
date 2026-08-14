@@ -7,6 +7,8 @@ delay settings that are easy to overlook when copying only PID gains.
 from dataclasses import dataclass
 from typing import Protocol
 
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoint_profile
+
 type ParamValue = bool | int | float
 
 
@@ -99,14 +101,14 @@ HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
 
 
 def _honda_torque_mod_profile(fingerprint: str) -> HandcraftedLateralProfile:
-  # The Clarity's road-tested scalar offset is rack-specific. Other supported
-  # cars keep a neutral scalar anchor while using their own VGR/static SR data.
-  sr_offset = -1.0 if fingerprint == "HONDA_CLARITY" else 0.0
+  sr_profile = get_steer_ratio_endpoint_profile(fingerprint)
+  if sr_profile is None:
+    raise ValueError(f"missing steer-ratio endpoint profile for {fingerprint}")
   return HandcraftedLateralProfile(
-    name="Honda Torque-Mod Road-Tested 2026-08-11",
+    name="Honda Torque-Mod Road-Tested 2026-08-13",
     fingerprint=fingerprint,
-    version=6,
-    values=(("NrdrSteerRatioOffset", sr_offset),) + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
+    version=7,
+    values=sr_profile.param_values + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
   )
 
 
@@ -115,7 +117,9 @@ HANDCRAFTED_LATERAL_PROFILES = {
   for fingerprint in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS
 }
 
-CLARITY_ROAD_TESTED_2026_08_11 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
+CLARITY_ROAD_TESTED_2026_08_13 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
+# Compatibility alias for downstream imports of the previous snapshot name.
+CLARITY_ROAD_TESTED_2026_08_11 = CLARITY_ROAD_TESTED_2026_08_13
 
 
 def get_handcrafted_lateral_profile(fingerprint: str) -> HandcraftedLateralProfile | None:

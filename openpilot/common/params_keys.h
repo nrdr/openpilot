@@ -306,9 +306,23 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaNotchFreq", {PERSISTENT | BACKUP, FLOAT, "7.5"}},
     {"HondaNotchQ", {PERSISTENT | BACKUP, FLOAT, "1.5"}},
     {"NrdrLearnSteerRatio", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"NrdrSteerRatioOffset", {PERSISTENT | BACKUP, FLOAT, "0.0"}},  // uniform +/-5.0 shift of the measured SR(angle) curve; applied only when NrdrLearnSteerRatio is off
-    {"NrdrSteerRatioMin", {PERSISTENT | BACKUP, FLOAT, "16.84"}},   // DEPRECATED (replaced by NrdrSteerRatioOffset): kept registered so removed readers can't UnknownKeyName-crash
-    {"NrdrSteerRatioMax", {PERSISTENT | BACKUP, FLOAT, "12.74"}},   // DEPRECATED (replaced by NrdrSteerRatioOffset): kept registered
+    // Absolute endpoints for each supported two-point Honda SR curve. These are
+    // fingerprint-scoped so moving one comma between cars preserves both tunes.
+    {"NrdrSteerRatioCenterClarity", {PERSISTENT | BACKUP, FLOAT, "18.50"}},
+    {"NrdrSteerRatioOuterClarity", {PERSISTENT | BACKUP, FLOAT, "12.72"}},
+    {"NrdrSteerRatioCenterCivic", {PERSISTENT | BACKUP, FLOAT, "17.24"}},
+    {"NrdrSteerRatioOuterCivic", {PERSISTENT | BACKUP, FLOAT, "10.93"}},
+    {"NrdrSteerRatioCenterAccord", {PERSISTENT | BACKUP, FLOAT, "18.31"}},
+    {"NrdrSteerRatioOuterAccord", {PERSISTENT | BACKUP, FLOAT, "11.82"}},
+    {"NrdrSteerRatioCenterCrv5g", {PERSISTENT | BACKUP, FLOAT, "17.94"}},
+    {"NrdrSteerRatioOuterCrv5g", {PERSISTENT | BACKUP, FLOAT, "12.30"}},
+    {"NrdrSteerRatioCenterInsight", {PERSISTENT | BACKUP, FLOAT, "16.82"}},
+    {"NrdrSteerRatioOuterInsight", {PERSISTENT | BACKUP, FLOAT, "12.58"}},
+    // DEPRECATED single-offset and global endpoint keys. Keep registered until
+    // stale Sunnylink schemas/builds have aged out to avoid UnknownKeyName crashes.
+    {"NrdrSteerRatioOffset", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
+    {"NrdrSteerRatioMin", {PERSISTENT | BACKUP, FLOAT, "16.84"}},
+    {"NrdrSteerRatioMax", {PERSISTENT | BACKUP, FLOAT, "12.74"}},
     {"NrdrLearnStiffness", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrLearnAngleOffset", {PERSISTENT | BACKUP, BOOL, "1"}},
     // DEPRECATED: the user-facing freeze toggle and all runtime reads are gone.

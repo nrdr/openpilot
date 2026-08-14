@@ -142,8 +142,8 @@ sections:
     - key: NrdrLearnSteerRatio
       widget: toggle
       title: Learn Steer Ratio (Auto)
-      description: When ON (Auto), uses openpilot's live-learned steer ratio; OFF uses the car's static base value.
-      details: When ON (Auto), uses openpilot's live-learned steer ratio. When OFF, uses the car's static base value. Turn OFF if the learned value drifts and hurts performance.
+      description: Uses openpilot's learned scalar on normal cars. Supported two-point Hondas always use their direct endpoint curve.
+      details: When ON, unmapped cars use openpilot's live-learned steer ratio. The supported Clarity, Civic, Accord, CR-V, and Insight two-point profiles keep their direct On-Center and Outer Steer Ratio values authoritative in either position.
       enablement:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
     - key: NrdrLearnStiffness
@@ -229,15 +229,139 @@ sections:
       title: StarPilot PID Additions
       description: Adds the borrowed StarPilot turn-in / unwind / per-direction output scaling, not built for Honda.
       details: The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base.
-    - key: NrdrSteerRatioOffset
+    - key: NrdrSteerRatioCenterClarity
       widget: option
+      visibility:
+      - {type: capability, field: car_fingerprint, equals: HONDA_CLARITY}
       enablement:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
-      title: Steer Ratio Offset
-      description: Shifts the whole measured steer-ratio curve up or down. Only applies when Learn Steer Ratio (Auto) is off.
-      details: Shifts the whole measured steer-ratio curve up or down by this amount (higher = gentler / less turn-in everywhere, lower = sharper). Only applies when Learn Steer Ratio (Auto) is off; when on, the live-learned scalar is used instead.
-      min: -5.0
-      max: 5.0
+      title: On-Center Steer Ratio
+      description: Directly sets the Clarity's steer ratio at zero steering-wheel angle. Default 18.50.
+      details: This is an absolute steer-ratio value, not an offset. The controller blends linearly from this value at center to the Outer Steer Ratio at 250 degrees.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+    - key: NrdrSteerRatioOuterClarity
+      widget: option
+      visibility:
+      - {type: capability, field: car_fingerprint, equals: HONDA_CLARITY}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      title: Outer Steer Ratio
+      description: Directly sets the Clarity's high-angle steer ratio. Default 12.72.
+      details: This is the absolute outer endpoint of the two-point curve. It is reached at 250 degrees and held beyond that angle.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+    - key: NrdrSteerRatioCenterCivic
+      widget: option
+      visibility:
+      - type: any
+        conditions:
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH_DIESEL}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      title: On-Center Steer Ratio
+      description: Directly sets the 10th-gen Civic's steer ratio at zero steering-wheel angle. Default 17.24.
+      details: This is an absolute steer-ratio value, not an offset. The controller blends linearly from this value at center to the Outer Steer Ratio at the Civic's high-angle breakpoint.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+    - key: NrdrSteerRatioOuterCivic
+      widget: option
+      visibility:
+      - type: any
+        conditions:
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH_DIESEL}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      title: Outer Steer Ratio
+      description: Directly sets the 10th-gen Civic's high-angle steer ratio. Default 10.93.
+      details: This is the absolute outer endpoint of the two-point curve. It is reached at the Civic's high-angle breakpoint and held beyond it.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+    - key: NrdrSteerRatioCenterAccord
+      widget: option
+      visibility:
+      - {type: capability, field: car_fingerprint, equals: HONDA_ACCORD}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      title: On-Center Steer Ratio
+      description: Directly sets the 10th-gen Accord's steer ratio at zero steering-wheel angle. Default 18.31.
+      details: This is an absolute steer-ratio value, not an offset. The controller blends linearly from this value at center to the Outer Steer Ratio at the Accord's high-angle breakpoint.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+    - key: NrdrSteerRatioOuterAccord
+      widget: option
+      visibility:
+      - {type: capability, field: car_fingerprint, equals: HONDA_ACCORD}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      title: Outer Steer Ratio
+      description: Directly sets the 10th-gen Accord's high-angle steer ratio. Default 11.82.
+      details: This is the absolute outer endpoint of the two-point curve. It is reached at the Accord's high-angle breakpoint and held beyond it.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+    - key: NrdrSteerRatioCenterCrv5g
+      widget: option
+      visibility:
+      - type: any
+        conditions:
+        - {type: capability, field: car_fingerprint, equals: HONDA_CRV_5G}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CRV_HYBRID}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      title: On-Center Steer Ratio
+      description: Directly sets the 5th-gen CR-V's steer ratio at zero steering-wheel angle. Default 17.94.
+      details: This is an absolute steer-ratio value, not an offset. The controller blends linearly from this value at center to the Outer Steer Ratio at the CR-V's high-angle breakpoint.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+    - key: NrdrSteerRatioOuterCrv5g
+      widget: option
+      visibility:
+      - type: any
+        conditions:
+        - {type: capability, field: car_fingerprint, equals: HONDA_CRV_5G}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CRV_HYBRID}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      title: Outer Steer Ratio
+      description: Directly sets the 5th-gen CR-V's high-angle steer ratio. Default 12.30.
+      details: This is the absolute outer endpoint of the two-point curve. It is reached at the CR-V's high-angle breakpoint and held beyond it.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+    - key: NrdrSteerRatioCenterInsight
+      widget: option
+      visibility:
+      - {type: capability, field: car_fingerprint, equals: HONDA_INSIGHT}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      title: On-Center Steer Ratio
+      description: Directly sets the 3rd-gen Insight's steer ratio at zero steering-wheel angle. Default 16.82.
+      details: This is an absolute steer-ratio value, not an offset. The controller blends linearly from this value at center to the Outer Steer Ratio at the Insight's high-angle breakpoint.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+    - key: NrdrSteerRatioOuterInsight
+      widget: option
+      visibility:
+      - {type: capability, field: car_fingerprint, equals: HONDA_INSIGHT}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      title: Outer Steer Ratio
+      description: Directly sets the 3rd-gen Insight's high-angle steer ratio. Default 12.58.
+      details: This is the absolute outer endpoint of the two-point curve. It is reached at the Insight's high-angle breakpoint and held beyond it.
+      min: 8.0
+      max: 25.0
       step: 0.01
     - key: LatPScaleLowSpeed
       widget: option

@@ -15,6 +15,10 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.nrdr_lat_stiction import LatStiction
 from openpilot.selfdrive.controls.lib.nrdr_tune_learner import TuneLearner
 from openpilot.selfdrive.modeld.constants import ModelConstants
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
+  STEER_RATIO_ENDPOINT_PROFILE_BY_FP,
+  get_steer_ratio_endpoint_profile,
+)
 
 
 def _effective_sr_from_local_curve(angle_bp, relative_local_sr, center_sr, output_bp=None):
@@ -391,15 +395,15 @@ def _equivalent_two_point_sr_bp(lock_angle: float) -> list[float]:
 
 
 NRDR_CLARITY_TWO_POINT_SR_BP = [0.0, 250.0]
-NRDR_CLARITY_TWO_POINT_SR_V = [18.50, 12.72]
+NRDR_CLARITY_TWO_POINT_SR_V = list(STEER_RATIO_ENDPOINT_PROFILE_BY_FP["HONDA_CLARITY"].default_values)
 NRDR_CIVIC_TWO_POINT_SR_BP = _equivalent_two_point_sr_bp(NRDR_CIVIC_LOCK_ANGLE)
-NRDR_CIVIC_TWO_POINT_SR_V = [17.24, 10.93]
+NRDR_CIVIC_TWO_POINT_SR_V = list(STEER_RATIO_ENDPOINT_PROFILE_BY_FP["HONDA_CIVIC"].default_values)
 NRDR_ACCORD_TWO_POINT_SR_BP = _equivalent_two_point_sr_bp(NRDR_ACCORD_LOCK_ANGLE)
-NRDR_ACCORD_TWO_POINT_SR_V = [18.31, 11.82]
+NRDR_ACCORD_TWO_POINT_SR_V = list(STEER_RATIO_ENDPOINT_PROFILE_BY_FP["HONDA_ACCORD"].default_values)
 NRDR_CRV_5G_TWO_POINT_SR_BP = _equivalent_two_point_sr_bp(NRDR_CRV_5G_LOCK_ANGLE)
-NRDR_CRV_5G_TWO_POINT_SR_V = [17.94, 12.30]
+NRDR_CRV_5G_TWO_POINT_SR_V = list(STEER_RATIO_ENDPOINT_PROFILE_BY_FP["HONDA_CRV_5G"].default_values)
 NRDR_INSIGHT_TWO_POINT_SR_BP = _equivalent_two_point_sr_bp(NRDR_INSIGHT_LOCK_ANGLE)
-NRDR_INSIGHT_TWO_POINT_SR_V = [16.82, 12.58]
+NRDR_INSIGHT_TWO_POINT_SR_V = list(STEER_RATIO_ENDPOINT_PROFILE_BY_FP["HONDA_INSIGHT"].default_values)
 NRDR_SR_CURVE_BY_FP = {
   "HONDA_CLARITY": (NRDR_CLARITY_TWO_POINT_SR_BP, NRDR_CLARITY_TWO_POINT_SR_V),
   "HONDA_CIVIC": (NRDR_CIVIC_TWO_POINT_SR_BP, NRDR_CIVIC_TWO_POINT_SR_V),
@@ -693,6 +697,10 @@ class LatControlPID(LatControl):
     # Optional per-fingerprint VGR transformations. There is deliberately no
     # global fallback: applying one rack's shape to another PID car is unsafe.
     self.sr_curve = NRDR_SR_CURVE_BY_FP.get(str(CP.carFingerprint))
+    self.sr_endpoint_profile = get_steer_ratio_endpoint_profile(str(CP.carFingerprint))
+    self.sr_values = list(self.sr_curve[1]) if self.sr_curve is not None else None
+    if (self.sr_curve is None) != (self.sr_endpoint_profile is None):
+      raise ValueError(f"steer-ratio curve/tuning mismatch for {CP.carFingerprint}")
     # A direct measured-angle curve and a desired-angle inverse are mutually
     # exclusive. The road-test two-point family deliberately uses the former;
     # applying both would double-correct a variable rack.
@@ -711,7 +719,6 @@ class LatControlPID(LatControl):
     # paramsd dewarps only the road-validated Clarity profile. This also tells
     # us whether its learned angle offset belongs before or after the VGR map.
     self.vgr_offset_is_linear = get_honda_vgr_learning_inverse(CP.flags) is not None if CP.brand == "honda" and self.sr_curve is None else False
-    self.sr_offset = 0.0
     self.learn_steer_ratio = False
     self.frame = -1
     # Independent speed-banded P / I / F output scales (multiplier units; 1.0 = neutral).
@@ -743,7 +750,7 @@ class LatControlPID(LatControl):
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
 
-    # nrdr: measured SR(|angle|) curve (+ live offset), keyed on measured wheel
+    # nrdr: measured SR(|angle|) curve with live absolute endpoints, keyed on measured wheel
     # angle to avoid a desired-angle circular dependency. Only the explicitly
     # mapped cars override VehicleModel; all other cars retain normal behavior.
     if self.sr_curve is not None:
@@ -751,13 +758,13 @@ class LatControlPID(LatControl):
       # Restore the original two-point behavior: measured wheel angle selects
       # the effective SR before curvature->angle conversion. These handcrafted
       # profiles are authoritative regardless of the global learner toggle.
-      bp, values = self.sr_curve
-      VM.sR = float(np.interp(abs(CS.steeringAngleDeg), bp, values)) + self.sr_offset
+      bp, _ = self.sr_curve
+      VM.sR = float(np.interp(abs(CS.steeringAngleDeg), bp, self.sr_values))
     elif self.vgr_inverse is not None and not self.learn_steer_ratio:
       # Use the profile's road-validated effective center anchor. The inverse
       # then removes that artificial/model compensation toward physical lock.
       # With learning enabled, controlsd's paramsd scalar remains the anchor.
-      VM.sR = self.vgr_center_sr + self.sr_offset
+      VM.sR = self.vgr_center_sr
 
     linear_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     if self.vgr_inverse is not None and self.learn_steer_ratio:
@@ -928,7 +935,21 @@ class LatControlPID(LatControl):
         self.injection_test_enabled = get_param_bool(self.params, "HondaInjectionTest")
         self.starpilot_enabled = get_param_bool(self.params, "NrdrStarPilotPid")
         self.lat_stiction_enabled = get_param_bool(self.params, "NrdrLatStiction")
-        self.sr_offset = get_param_float(self.params, "NrdrSteerRatioOffset", 0.0, -5.0, 5.0)
+        if self.sr_endpoint_profile is not None:
+          self.sr_values[0] = get_param_float(
+            self.params,
+            self.sr_endpoint_profile.center_param,
+            self.sr_endpoint_profile.center_default,
+            8.0,
+            25.0,
+          )
+          self.sr_values[1] = get_param_float(
+            self.params,
+            self.sr_endpoint_profile.outer_param,
+            self.sr_endpoint_profile.outer_default,
+            8.0,
+            25.0,
+          )
         self.learn_steer_ratio = get_param_bool(self.params, "NrdrLearnSteerRatio")
 
       output_torque = self.pid.update(

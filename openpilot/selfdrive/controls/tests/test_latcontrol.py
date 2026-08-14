@@ -89,6 +89,10 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.selfdrive.locationd.helpers import Pose
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
+  STEER_RATIO_ENDPOINT_PROFILES,
+  STEER_RATIO_ENDPOINT_PROFILE_BY_FP,
+)
 
 
 class TestLatControl:
@@ -189,6 +193,14 @@ class TestLatControl:
       assert values == [center_sr, outer_sr]
       assert np.interp(breakpoints[1], breakpoints, values) == outer_sr
       assert np.interp(lock_angle, breakpoints, values) == outer_sr
+
+    assert set(STEER_RATIO_ENDPOINT_PROFILE_BY_FP) == set(NRDR_SR_CURVE_BY_FP)
+    endpoint_params = []
+    for profile in STEER_RATIO_ENDPOINT_PROFILES:
+      endpoint_params.extend((profile.center_param, profile.outer_param))
+      for fingerprint in profile.fingerprints:
+        assert NRDR_SR_CURVE_BY_FP[fingerprint][1] == list(profile.default_values)
+    assert len(endpoint_params) == len(set(endpoint_params))
 
     assert NRDR_CIVIC_TWO_POINT_SR_BP[1] == pytest.approx(230.2904564)
     assert NRDR_ACCORD_TWO_POINT_SR_BP[1] == pytest.approx(238.5892116)
@@ -405,6 +417,7 @@ class TestLatControl:
     if expected_fp is not None:
       assert str(CP.carFingerprint) == expected_fp
     assert (controller.sr_curve is not None) == (expected_curve_fp is not None)
+    assert (controller.sr_endpoint_profile is not None) == (expected_curve_fp is not None)
     assert (controller.vgr_inverse is not None) == (expected_inverse_fp is not None)
 
   def test_clarity_two_point_curve_is_authoritative_over_learner(self):
@@ -426,6 +439,17 @@ class TestLatControl:
     controller.update(False, CS, VM, params, False, 0.0, pose, False, 0.2)
     assert controller.vgr_inverse is None
     assert VM.sR == pytest.approx(15.61)
+
+    # The two controls are absolute endpoint values, not a uniform offset.
+    controller.sr_values[:] = [19.50, 12.00]
+    controller.update(False, CS, VM, params, False, 0.0, pose, False, 0.2)
+    assert VM.sR == pytest.approx(15.75)
+    CS.steeringAngleDeg = 0.0
+    controller.update(False, CS, VM, params, False, 0.0, pose, False, 0.2)
+    assert VM.sR == pytest.approx(19.50)
+    CS.steeringAngleDeg = 250.0
+    controller.update(False, CS, VM, params, False, 0.0, pose, False, 0.2)
+    assert VM.sR == pytest.approx(12.00)
 
   @parameterized.expand([(HONDA.HONDA_CIVIC, LatControlPID), (TOYOTA.TOYOTA_RAV4, LatControlTorque),
                          (NISSAN.NISSAN_LEAF, LatControlAngle), (GM.CHEVROLET_BOLT_EUV, LatControlTorque)])

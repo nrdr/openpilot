@@ -39,7 +39,8 @@ class LearnedParametersLayout(Widget):
     self._learn_steer_ratio = toggle_item_sp(
       param="NrdrLearnSteerRatio",
       title=lambda: tr("Learn Steer Ratio (Auto)"),
-      description=lambda: tr("On uses the learned near-center scalar. Off uses a mapped VGR curve when available, otherwise the car's static ratio."),
+      description=lambda: tr("On uses the learned scalar on normal cars. Supported two-point Hondas always use their direct " +
+                             "On-Center and Outer Steer Ratio values."),
       initial_state=False,
     )
     self._lp_stiffness = ListItemSP(
@@ -60,7 +61,8 @@ class LearnedParametersLayout(Widget):
     self._learn_angle_offset = toggle_item_sp(
       param="NrdrLearnAngleOffset",
       title=lambda: tr("Learn Angle Offset (Auto)"),
-      description=lambda: tr("When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side."),
+      description=lambda: tr("When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. " +
+                             "Turn OFF if a bad learned offset is pulling the car to one side."),
       initial_state=True,
     )
 
