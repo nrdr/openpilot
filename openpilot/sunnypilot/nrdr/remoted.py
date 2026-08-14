@@ -34,6 +34,7 @@ from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
   get_handcrafted_lateral_profile,
   is_handcrafted_lateral_enabled,
 )
+from openpilot.sunnypilot.nrdr.ssh_key_refresh import refresh_github_ssh_keys
 
 POLL_INTERVAL_S = 2.0
 UPDATER_WAKE_TIMEOUT_S = 15.0
@@ -42,6 +43,8 @@ TUNE_SCAN_TIMEOUT_S = 1800
 TUNE_REPORT_PATH = "/data/nrdr_tune_report.txt"
 RLOG_GLOBS = ("/data/media/0/realdata/*/rlog.zst", "/data/media/0/realdata/*/rlog.bz2")
 SUMMARY_MAX_CHARS = 4000
+SSH_KEY_REFRESH_RETRY_S = 60.0
+SSH_KEY_REFRESH_INTERVAL_S = 24 * 60 * 60.0
 
 
 def _set_status(params, text: str) -> None:
@@ -337,9 +340,14 @@ def main():
 
   _set_status(params, "idle")
   info_cache: dict = {}
+  next_ssh_key_refresh = 0.0
 
   while True:
     try:
+      now = time.monotonic()
+      if now >= next_ssh_key_refresh:
+        refreshed = refresh_github_ssh_keys(params)
+        next_ssh_key_refresh = now + (SSH_KEY_REFRESH_INTERVAL_S if refreshed else SSH_KEY_REFRESH_RETRY_S)
       write_car_tune_info(params, info_cache)
       if params.get_bool("NrdrRemoteForceUpdate"):
         params.put_bool("NrdrRemoteForceUpdate", False)
