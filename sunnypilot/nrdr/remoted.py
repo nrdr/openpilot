@@ -35,6 +35,7 @@ from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
   is_handcrafted_lateral_enabled,
 )
 from openpilot.sunnypilot.nrdr.ssh_key_refresh import refresh_github_ssh_keys
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoint_profile
 
 POLL_INTERVAL_S = 2.0
 UPDATER_WAKE_TIMEOUT_S = 15.0
@@ -255,7 +256,13 @@ def write_car_tune_info(params, cache: dict) -> None:
       nnlc_kp = float(_param(params, "NrdrNnlcKpGain")) / 100.0
       nnlc_kf = float(_param(params, "NrdrNnlcKfGain")) / 100.0
       nnlc_ki = float(_param(params, "NrdrNnlcKiGain")) / 100.0
-      sr_offset = float(_param(params, "NrdrSteerRatioOffset"))
+      sr_profile = get_steer_ratio_endpoint_profile(CP.carFingerprint)
+      if sr_profile is not None:
+        sr_center = float(_param(params, sr_profile.center_param))
+        sr_outer = float(_param(params, sr_profile.outer_param))
+        sr_info = f"direct {sr_center:.2f} center -> {sr_outer:.2f} outer"
+      else:
+        sr_info = f"Auto {_on(params, 'NrdrLearnSteerRatio')} | base {float(CP.steerRatio):g}"
       nnlc_on = _on(params, "NrdrNnlcEnabled")
       controller_info = controller
       if controller == "PID/NNLC":
@@ -276,7 +283,7 @@ def write_car_tune_info(params, cache: dict) -> None:
         "NrdrCarDampingInfo": f"{damping}% | fades by {damping_speed} mph",
         "NrdrCarCenterInfo": f"P-only {center:g}% | +/-{center_threshold:g} deg | above {center_speed} mph",
         "NrdrCarNnlcInfo": f"{nnlc_on} | {nnlc_speed} mph | KP {nnlc_kp:g} | KF {nnlc_kf:g} | KI {nnlc_ki:g}",
-        "NrdrCarSteerRatioInfo": f"Auto {_on(params, 'NrdrLearnSteerRatio')} | offset {sr_offset:+.2f}",
+        "NrdrCarSteerRatioInfo": sr_info,
         "NrdrCarLearningInfo": f"stiffness {_on(params, 'NrdrLearnStiffness')} | angle {_on(params, 'NrdrLearnAngleOffset')}",
         "NrdrCarHelpersInfo": f"stiction {_on(params, 'NrdrLatStiction')} | StarPilot {_on(params, 'NrdrStarPilotPid')}",
       }

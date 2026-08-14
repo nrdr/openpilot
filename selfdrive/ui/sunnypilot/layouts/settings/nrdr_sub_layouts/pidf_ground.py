@@ -4,6 +4,10 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
+  STEER_RATIO_ENDPOINT_PROFILES,
+  get_steer_ratio_endpoint_profile,
+)
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
@@ -24,26 +28,42 @@ class PidfGroundLayout(Widget):
     # --- StarPilot PID additions master toggle ---
     self._starpilot = toggle_item_sp(
       title=tr("StarPilot PID Additions"),
-      description=tr("The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base."),
+      description=tr("The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) " +
+                     "not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. " +
+                     "Turn on to A/B it against the raw base."),
       param="NrdrStarPilotPid",
     )
 
-    # --- Steer ratio offset (uniform shift of the measured curve; only when Learn Steer Ratio is off) ---
-    self._sr_offset = option_item_sp(
-      param="NrdrSteerRatioOffset",
-      title=lambda: tr("Steer Ratio Offset (Default: 0.00)"),
-      min_value=-500, max_value=500, value_change_step=1,
-      description=lambda: tr("Mapped VGR cars only: shifts the curve up (gentler) or down (sharper). Disabled while Auto steer ratio is on."),
-      label_callback=lambda value: f"{value / 100:+.2f}",
-      use_float_scaling=True,
-    )
+    # --- Absolute two-point steer-ratio values, persisted per rack family ---
+    self._sr_endpoint_controls = []
+    for profile in STEER_RATIO_ENDPOINT_PROFILES:
+      center = option_item_sp(
+        param=profile.center_param,
+        title=lambda profile=profile: tr(f"On-Center Steer Ratio (Default: {profile.center_default:.2f})"),
+        min_value=800, max_value=2500, value_change_step=1,
+        description=lambda: tr("Directly changes the steer-ratio value at zero steering-wheel angle. " +
+                               "The controller blends linearly from this value to the outer value below."),
+        label_callback=lambda value: f"{value / 100:.2f}",
+        use_float_scaling=True,
+      )
+      outer = option_item_sp(
+        param=profile.outer_param,
+        title=lambda profile=profile: tr(f"Outer Steer Ratio (Default: {profile.outer_default:.2f})"),
+        min_value=800, max_value=2500, value_change_step=1,
+        description=lambda: tr("Directly changes the high-angle endpoint of the two-point steer-ratio curve. " +
+                               "This is the value held after the family's outer breakpoint."),
+        label_callback=lambda value: f"{value / 100:.2f}",
+        use_float_scaling=True,
+      )
+      self._sr_endpoint_controls.append((profile, center, outer))
 
     # --- Independent P / I / F scales per speed band ---
     self._lat_p_low = option_item_sp(
       param="LatPScaleLowSpeed",
       title=lambda: tr("Low Speed Proportional Scale (Below 25mph) (Default: 100%)"),
       min_value=0, max_value=500, value_change_step=5,
-      description=lambda: tr("Scales the proportional (P) term below 25 mph. Higher = more error correction (tighter, can cut corners); lower = looser with wider swings."),
+      description=lambda: tr("Scales the proportional (P) term below 25 mph. Higher = more error correction " +
+                             "(tighter, can cut corners); lower = looser with wider swings."),
       label_callback=lambda value: f"{value}%",
     )
     self._lat_i_low = option_item_sp(
@@ -57,7 +77,8 @@ class PidfGroundLayout(Widget):
       param="LatFScaleLowSpeed",
       title=lambda: tr("Low Speed Feedforward Scale (Below 25mph) (Default: 100%)"),
       min_value=0, max_value=500, value_change_step=5,
-      description=lambda: tr("Scales the feedforward (kf) term below 25 mph. Follows the commanded angle rather than error, so it adds authority without amplifying noise. 100% = tuned value (static)."),
+      description=lambda: tr("Scales the feedforward (kf) term below 25 mph. Follows the commanded angle rather than error, " +
+                             "so it adds authority without amplifying noise. 100% = tuned value (static)."),
       label_callback=lambda value: f"{value}%",
     )
 
@@ -110,14 +131,19 @@ class PidfGroundLayout(Widget):
       param="NrdrLatRateDamping",
       title=lambda: tr("Rate Damping (D) Strength (Default: 30%)"),
       min_value=0, max_value=300, value_change_step=5,
-      description=lambda: tr("The derivative term openpilot normally can't use. Adds torque opposing how fast the wheel is moving, which damps the low-speed oscillation plain P can't (the wheel is torque-commanded, so P alone rings). Relies on a clean steering-rate signal and a low-lag EPS - which this car has. 0 = off. Raise until the low-speed wobble flattens; too high makes turn-in feel heavy."),
+      description=lambda: tr("The derivative term openpilot normally can't use. Adds torque opposing how fast the wheel is moving, " +
+                             "which damps the low-speed oscillation plain P can't (the wheel is torque-commanded, so P alone rings). " +
+                             "Relies on a clean steering-rate signal and a low-lag EPS - which this car has. 0 = off. " +
+                             "Raise until the low-speed wobble flattens; too high makes turn-in feel heavy."),
       label_callback=lambda value: f"{value}%",
     )
     self._rate_damping_fade_speed = option_item_sp(
       param="NrdrLatRateDampingFadeSpeed",
       title=lambda: tr("Rate Damping Fade-Out Speed (Default: 30mph)"),
       min_value=0, max_value=60, value_change_step=1,
-      description=lambda: tr("Speed at which rate damping tapers to zero. Damping is strongest at a standstill and gone by this speed, where tire self-aligning torque resumes damping the steering itself. Keeps the D term out of your highway feel."),
+      description=lambda: tr("Speed at which rate damping tapers to zero. Damping is strongest at a standstill and gone by this speed, " +
+                             "where tire self-aligning torque resumes damping the steering itself. " +
+                             "Keeps the D term out of your highway feel."),
       label_callback=lambda value: f"{value} mph",
     )
 
@@ -128,7 +154,8 @@ class PidfGroundLayout(Widget):
       min_value=0,
       max_value=500,
       value_change_step=1,
-      description=lambda: tr("Extra proportional (P) error correction near center. It does not multiply integral, feedforward, or damping. Available at every speed above the minimum, including the highway."),
+      description=lambda: tr("Extra proportional (P) error correction near center. It does not multiply integral, feedforward, " +
+                             "or damping. Available at every speed above the minimum, including the highway."),
       label_callback=lambda value: f"{value}%",
       use_float_scaling=True,
     )
@@ -150,7 +177,8 @@ class PidfGroundLayout(Widget):
       min_value=0,
       max_value=80,
       value_change_step=1,
-      description=lambda: tr("Below this speed center boost is disabled. Above the short ramp it remains fully available with no upper-speed cutoff, including on the highway."),
+      description=lambda: tr("Below this speed center boost is disabled. Above the short ramp it remains fully available " +
+                             "with no upper-speed cutoff, including on the highway."),
       label_callback=lambda value: f"{value} mph",
     )
 
@@ -163,14 +191,16 @@ class PidfGroundLayout(Widget):
     # --- Clarity PID/NNLC hybrid ---
     self._nnlc_enabled = toggle_item_sp(
       title=tr("Enable Neural Network Lateral Model (NNLC) (Default: ON)"),
-      description=tr("Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. OFF keeps the proven Clarity PID controller active everywhere."),
+      description=tr("Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model " +
+                     "at higher speeds. OFF keeps the proven Clarity PID controller active everywhere."),
       param="NrdrNnlcEnabled",
     )
     self._nnlc_activation_speed = option_item_sp(
       param="NrdrNnlcActivationSpeed",
       title=lambda: tr("Activate NNLC Above (Default: 30mph)"),
       min_value=0, max_value=100, value_change_step=1,
-      description=lambda: tr("Center speed of the smooth 6 mph PID-to-NNLC handoff. At the 30 mph default, PID is full through 27 mph and NNLC is full from 33 mph. Lane changes always select PID immediately."),
+      description=lambda: tr("Center speed of the smooth 6 mph PID-to-NNLC handoff. At the 30 mph default, PID is full through 27 mph " +
+                             "and NNLC is full from 33 mph. Lane changes always select PID immediately."),
       label_callback=lambda value: f"{value} mph",
     )
 
@@ -199,8 +229,9 @@ class PidfGroundLayout(Widget):
     return [
       self._starpilot,
       LineSeparatorSP(40),
-      # Steer ratio offset (uniform shift; only when Learn Steer Ratio is off)
-      self._sr_offset,
+      # Fingerprint-specific absolute steer-ratio endpoints. Only the active
+      # rack family's pair is made visible in _update_state().
+      *(control for _, center, outer in self._sr_endpoint_controls for control in (center, outer)),
       LineSeparatorSP(40),
       # Low speed (below 25mph): P / I / F
       self._lat_p_low,
@@ -239,8 +270,14 @@ class PidfGroundLayout(Widget):
     super()._update_state()
     fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
     editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
+    active_sr_profile = get_steer_ratio_endpoint_profile(fingerprint)
+    sr_controls = [control for _, center, outer in self._sr_endpoint_controls for control in (center, outer)]
+    for profile, center, outer in self._sr_endpoint_controls:
+      visible = profile == active_sr_profile
+      center.set_visible(visible)
+      outer.set_visible(visible)
     for item in (
-      self._starpilot, self._sr_offset,
+      self._starpilot, *sr_controls,
       self._lat_p_low, self._lat_i_low, self._lat_f_low,
       self._lat_p_standard, self._lat_i_standard, self._lat_f_standard,
       self._lat_p_highway, self._lat_i_highway, self._lat_f_highway,
