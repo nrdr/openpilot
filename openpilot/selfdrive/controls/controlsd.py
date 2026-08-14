@@ -216,8 +216,8 @@ class Controls(ControlsExt):
     hudControl.leadDistanceBars = self.sm['selfdriveState'].personality.raw + 1
     # Lead range + absolute speed for dash lead displays (Honda Alternative Dashboard).
     lead_one = self.sm['radarState'].leadOne
-    hudControl.leadDistance = float(lead_one.dRel) if lead_one.status else 0.0
-    hudControl.leadVLead = float(lead_one.vLead) if lead_one.status else 0.0
+    hudControl.leadDistance = float(lead_one.dRel) if lead_one.present else 0.0
+    hudControl.leadVLead = float(lead_one.vLead) if lead_one.present else 0.0
     hudControl.visualAlert = self.sm['selfdriveState'].alertHudVisual
 
     hudControl.rightLaneVisible = True

@@ -116,7 +116,7 @@ def radar_lead(status=True, dRel=40.0, vLead=20.0, vLeadK=None, aLeadK=0.0,
   if vLeadK is None:
     vLeadK = vLead
   return types.SimpleNamespace(
-    status=status, dRel=dRel, vLead=vLead, vLeadK=vLeadK, aLeadK=aLeadK,
+    present=status, dRel=dRel, vLead=vLead, vLeadK=vLeadK, aLeadK=aLeadK,
     aLeadTau=aLeadTau, radar=radar, radarTrackId=radarTrackId,
   )
 
