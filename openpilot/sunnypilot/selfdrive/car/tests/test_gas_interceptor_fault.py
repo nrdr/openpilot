@@ -1,6 +1,7 @@
 import pytest
 
-from openpilot.cereal import car, custom, log
+from openpilot.cereal import custom, log
+from opendbc.car.structs import car
 from openpilot.selfdrive.selfdrived.events import ET, Events
 from openpilot.sunnypilot.selfdrive.car.car_specific import CarSpecificEventsSP
 

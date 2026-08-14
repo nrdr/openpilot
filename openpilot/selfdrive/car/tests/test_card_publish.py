@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from openpilot.cereal import car, custom
+from openpilot.cereal import custom
 from opendbc.car import structs
 from openpilot.selfdrive.car.card import Car
 
@@ -21,7 +21,7 @@ def test_car_state_sp_is_published_before_car_state_trigger():
   card.last_actuators_output = structs.CarControl.Actuators()
   card.can_rcv_cum_timeout_counter = 0
 
-  CS = car.CarState(canValid=True)
+  CS = structs.CarState(canValid=True)
   CS_SP = custom.CarStateSP(gasInterceptorState=5)
   card.state_publish(CS, CS_SP, None)
 

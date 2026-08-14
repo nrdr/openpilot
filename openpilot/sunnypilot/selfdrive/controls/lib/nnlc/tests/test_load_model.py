@@ -1,8 +1,9 @@
 import hashlib
 from pathlib import Path
 
-from openpilot.cereal import car, log
+from openpilot.cereal import log
 from opendbc.car.car_helpers import interfaces
+from opendbc.car.structs import car
 from opendbc.car.honda.values import CAR as HONDA
 from opendbc.car.hyundai.values import CAR as HYUNDAI
 from opendbc.car.toyota.values import CAR as TOYOTA
