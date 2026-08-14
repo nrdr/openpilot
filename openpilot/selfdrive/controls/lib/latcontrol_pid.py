@@ -4,6 +4,8 @@ from itertools import pairwise
 import numpy as np
 from openpilot.cereal import log
 from opendbc.car.honda.carcontroller import get_eps_modified_steering_pressed
+from opendbc.car.honda.steer_ratio import (get_honda_vgr_inverse, get_honda_vgr_learning_inverse,
+                                           vgr_linear_to_physical)
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params, UnknownKeyName
@@ -173,10 +175,11 @@ NRDR_CRV_5G_FINAL_SR = 12.30
 NRDR_INSIGHT_LOCK_ANGLE = 2.54 * 180.0
 NRDR_INSIGHT_FINAL_SR = 12.58
 
-# Clarity B-table: instantaneous/local VGR shape extracted and traced by
-# vote_for_nobody. Preserve the road-validated absolute curve through 70 deg,
-# continue with the firmware shape, then apply the endpoint constraint only
-# after the firmware transition has completed at 104.44 deg.
+# Legacy Clarity fixed path. Its tail was historically shaped from the EPS B
+# table, which vote_for_nobody later proved belongs to the rate path rather than
+# the steering-position conversion. Retain it as Brett's road-tested outer
+# envelope and published-endpoint path; the exact A position table used by the
+# learned inner path now lives in opendbc.car.honda.steer_ratio.
 NRDR_CLARITY_INNER_SR_BP = [
   0., 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5,
   62.5, 67.5, 70.,
@@ -221,9 +224,10 @@ NRDR_CRV_5G_SR_CURVE_BP, NRDR_CRV_5G_SR_CURVE_V = _endpoint_constrained_effectiv
 )
 NRDR_CRV_5G_CENTER_SR = NRDR_CRV_5G_SR_CURVE_V[0]
 
-# Civic TBA-C020 Bosch B-table from vote_for_nobody. Peter's telemetry remains
-# the absolute truth through 70 deg; the firmware-local shape carries it through
-# the rest of the rack before landing on the non-Sport 10.93 Honda endpoint.
+# Legacy Civic Bosch fixed path. Peter's telemetry remains the absolute truth
+# through 70 deg and the existing road-tested tail lands on the non-Sport 10.93
+# Honda endpoint. The B table below is retained only as that fixed tail's
+# historical shape; vote_for_nobody's correct A position map is used separately.
 # Sport/Sport Touring share this fingerprint but publish 11.12; selecting that
 # endpoint requires a verified EPS-firmware-to-trim mapping, not a guess.
 NRDR_CIVIC_BOSCH_INNER_SR_BP = [
@@ -318,12 +322,9 @@ NRDR_CIVIC_NIDEC_LINEAR_BP = _inverse_vgr_from_effective_sr_curve(
   NRDR_CIVIC_NIDEC_EFFECTIVE_SR_V,
 )
 
-# Insight EPS firmware VGR curve extracted and traced by vote_for_nobody. Unlike
-# the Civic TBA-A030 / TEG-A010 position map above, these are instantaneous/local
-# ratio multipliers. VehicleModel needs the cumulative road-wheel displacement,
-# so integrate the local curve into a constant-ratio/model coordinate before
-# inverting it. This is the same anchor-free solve used by vote_for_nobody for
-# the Clarity: paramsd's scalar remains the centre-ratio anchor and can relearn.
+# Legacy Insight fixed outer path, retained to preserve nrdr's previous endpoint
+# behavior. This secondary rate-table shape is not used as the learned physical
+# position map; the exact TXM-A040 A position table lives in steer_ratio.py.
 NRDR_INSIGHT_VGR_SOURCE_ANGLE_BP = [
   0.000, 3.721, 7.302, 10.972, 14.610, 18.228, 21.864, 25.517, 29.156, 36.296,
   53.978, 70.999, 87.308, 95.243, 450.000,
@@ -418,6 +419,13 @@ _LAT_SCALE_STD_MAX = 50.0 * _MPH_TO_MS    # below this -> standard scale, else h
 # Center boost speed gate: boost ramps in over this many mph above the min-speed floor,
 # so it engages smoothly instead of stepping in the moment the car crosses the threshold.
 CENTER_BOOST_SPEED_FADE_MS = 5.0 * _MPH_TO_MS
+
+# A learned scalar is useful close to centre, where paramsd has observations.
+# It must not rescale the entire physical rack: smoothly hand authority back to
+# the fixed, road-tested/published-endpoint curve after the learner's +/-45 deg
+# observation window. The two Clarity paths naturally converge by ~90-100 deg.
+VGR_LEARNED_FULL_ANGLE_DEG = 45.0
+VGR_FIXED_FULL_ANGLE_DEG = 100.0
 
 # Unwind FF boost fades out over this many seconds approaching its time cap, so the boost
 # doesn't drop as a torque step the instant the cap is reached.
@@ -518,6 +526,41 @@ def _center_boost_scale(
     center_speed_weight = 1.0
   center_taper = center_taper_high * center_taper_scale * center_speed_weight
   return 1.0 + center_weight * center_taper
+
+
+def _learned_vgr_weight(physical_angle_deg: float) -> float:
+  """Learned-path authority: 1 through 45 deg, smoothstep to 0 at 100 deg."""
+  fade = min(max((abs(physical_angle_deg) - VGR_LEARNED_FULL_ANGLE_DEG) /
+                 (VGR_FIXED_FULL_ANGLE_DEG - VGR_LEARNED_FULL_ANGLE_DEG), 0.0), 1.0)
+  smoothstep = fade * fade * (3.0 - 2.0 * fade)
+  return 1.0 - smoothstep
+
+
+def _hybrid_vgr_desired_angles(linear_des_no_offset: float, angle_offset_deg: float,
+                               learned_center_sr: float, fixed_center_sr: float,
+                               learned_inverse, fixed_inverse, offset_is_linear: bool) -> tuple[float, float]:
+  """Blend a learned low-angle VGR request into a fixed outer-rack request.
+
+  ``linear_des_no_offset`` was produced with ``learned_center_sr``. Rescaling it
+  reconstructs the model angle the fixed centre anchor would have produced,
+  while each inverse map supplies its corresponding physical steering angle.
+  """
+  safe_learned_sr = learned_center_sr if learned_center_sr > 0.1 else fixed_center_sr
+  fixed_linear_no_offset = linear_des_no_offset * fixed_center_sr / safe_learned_sr
+
+  learned_physical_no_offset = vgr_linear_to_physical(linear_des_no_offset, learned_inverse)
+  fixed_physical_no_offset = vgr_linear_to_physical(fixed_linear_no_offset, fixed_inverse)
+  learned_weight = _learned_vgr_weight(learned_physical_no_offset)
+
+  physical_no_offset = (learned_weight * learned_physical_no_offset +
+                        (1.0 - learned_weight) * fixed_physical_no_offset)
+  if offset_is_linear:
+    learned_physical = vgr_linear_to_physical(linear_des_no_offset + angle_offset_deg, learned_inverse)
+    fixed_physical = vgr_linear_to_physical(fixed_linear_no_offset + angle_offset_deg, fixed_inverse)
+    physical = learned_weight * learned_physical + (1.0 - learned_weight) * fixed_physical
+  else:
+    physical = physical_no_offset + angle_offset_deg
+  return physical_no_offset, physical
 
 
 def _pid_output_scale(
@@ -624,6 +667,14 @@ class LatControlPID(LatControl):
     else:
       linear_bp, real_angle_v, self.vgr_center_sr = self.vgr_profile
       self.vgr_inverse = (linear_bp, real_angle_v)
+    # vote_for_nobody's exact EPS position table is the preferred low-angle
+    # shape when the firmware is known. Unknown images retain our existing
+    # fingerprint-scoped inverse, so this remains a safe behavioral fallback.
+    self.firmware_vgr_inverse = get_honda_vgr_inverse(CP.flags) if CP.brand == "honda" else None
+    self.learned_vgr_inverse = self.firmware_vgr_inverse or self.vgr_inverse
+    # paramsd dewarps only the road-validated Clarity profile. This also tells
+    # us whether its learned angle offset belongs before or after the VGR map.
+    self.vgr_offset_is_linear = get_honda_vgr_learning_inverse(CP.flags) is not None if CP.brand == "honda" else False
     self.sr_offset = 0.0
     self.learn_steer_ratio = False
     self.frame = -1
@@ -670,14 +721,29 @@ class LatControlPID(LatControl):
       # With learning enabled, controlsd's paramsd scalar remains the anchor.
       VM.sR = self.vgr_center_sr + self.sr_offset
 
-    angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
-    if self.vgr_inverse is not None:
-      linear_bp, real_angle_v = self.vgr_inverse
-      angle_steers_des_no_offset = math.copysign(
-        float(np.interp(abs(angle_steers_des_no_offset), linear_bp, real_angle_v)),
-        angle_steers_des_no_offset,
+    linear_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+    if self.vgr_inverse is not None and self.learn_steer_ratio:
+      # paramsd only observes the centre region. Use its scalar and the traced
+      # firmware shape there, fade from 45-100 deg, then pin the request to the
+      # existing road-tested curve and published full-off-centre endpoint.
+      angle_steers_des_no_offset, angle_steers_des = _hybrid_vgr_desired_angles(
+        linear_des_no_offset,
+        params.angleOffsetDeg,
+        VM.sR,
+        self.vgr_center_sr,
+        self.learned_vgr_inverse,
+        self.vgr_inverse,
+        self.vgr_offset_is_linear,
       )
-    angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
+    elif self.vgr_inverse is not None:
+      angle_steers_des_no_offset = vgr_linear_to_physical(linear_des_no_offset, self.vgr_inverse)
+      if self.vgr_offset_is_linear:
+        angle_steers_des = vgr_linear_to_physical(linear_des_no_offset + params.angleOffsetDeg, self.vgr_inverse)
+      else:
+        angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
+    else:
+      angle_steers_des_no_offset = linear_des_no_offset
+      angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
     error = angle_steers_des - CS.steeringAngleDeg
 
     pid_log.steeringAngleDesiredDeg = angle_steers_des

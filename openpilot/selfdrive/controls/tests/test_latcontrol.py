@@ -65,8 +65,12 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import (
   NRDR_INSIGHT_VGR_SOURCE_REL_LOCAL,
   NRDR_SR_CURVE_BY_FP,
   NRDR_VGR_INVERSE_BY_FP,
+  VGR_FIXED_FULL_ANGLE_DEG,
+  VGR_LEARNED_FULL_ANGLE_DEG,
   _center_boost_scale,
   _freeze_integrator_during_unwind,
+  _hybrid_vgr_desired_angles,
+  _learned_vgr_weight,
   LatControlPID,
 )
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
@@ -75,6 +79,44 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 
 
 class TestLatControl:
+
+  def test_learned_vgr_is_limited_to_the_paramsd_observation_region(self):
+    assert VGR_LEARNED_FULL_ANGLE_DEG == 45.0
+    assert VGR_FIXED_FULL_ANGLE_DEG == 100.0
+    assert _learned_vgr_weight(0.0) == 1.0
+    assert _learned_vgr_weight(45.0) == 1.0
+    assert _learned_vgr_weight(72.5) == pytest.approx(0.5)
+    assert _learned_vgr_weight(100.0) == 0.0
+    assert _learned_vgr_weight(450.0) == 0.0
+
+  def test_hybrid_vgr_uses_learned_center_then_fixed_outer_anchor(self):
+    identity_inverse = ([0.0, 600.0], [0.0, 600.0])
+
+    # Inside 45 degrees, the learned path has full authority.
+    no_offset, desired = _hybrid_vgr_desired_angles(
+      30.0, 1.0, 18.0, 20.0, identity_inverse, identity_inverse, False,
+    )
+    assert no_offset == pytest.approx(30.0)
+    assert desired == pytest.approx(31.0)
+
+    # Above 100 degrees, two different learned anchors produce the same fixed
+    # outer request for the same road-wheel demand.
+    outer_requests = []
+    for learned_sr in (17.0, 19.0):
+      linear_des = 8.0 * learned_sr
+      no_offset, _ = _hybrid_vgr_desired_angles(
+        linear_des, 0.0, learned_sr, 20.0, identity_inverse, identity_inverse, False,
+      )
+      outer_requests.append(no_offset)
+    np.testing.assert_allclose(outer_requests, [160.0, 160.0], rtol=0.0, atol=1e-12)
+
+  def test_hybrid_vgr_applies_dewarped_offset_before_the_map(self):
+    quickening_inverse = ([0.0, 100.0, 200.0], [0.0, 90.0, 160.0])
+    no_offset, desired = _hybrid_vgr_desired_angles(
+      30.0, 2.0, 18.0, 18.0, quickening_inverse, quickening_inverse, True,
+    )
+    assert no_offset == pytest.approx(np.interp(30.0, *quickening_inverse))
+    assert desired == pytest.approx(np.interp(32.0, *quickening_inverse))
 
   def test_unwind_integrator_only_freezes_growth(self):
     # During unwind, same-sign error would grow the stored I magnitude.
@@ -223,7 +265,7 @@ class TestLatControl:
       recovered_angle = np.interp(model_angle, NRDR_CIVIC_NIDEC_LINEAR_BP, NRDR_CIVIC_NIDEC_VGR_ANGLE_BP)
       assert np.isclose(recovered_angle, real_angle, atol=1e-12)
 
-  def test_nrdr_insight_uses_vote_for_nobody_firmware_vgr_curve(self):
+  def test_nrdr_insight_preserves_fixed_outer_curve(self):
     assert NRDR_INSIGHT_VGR_SOURCE_ANGLE_BP == [
       0.000, 3.721, 7.302, 10.972, 14.610, 18.228, 21.864, 25.517, 29.156, 36.296,
       53.978, 70.999, 87.308, 95.243, 450.000,
