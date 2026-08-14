@@ -699,6 +699,11 @@ class LatControlPID(LatControl):
     self.sr_curve = NRDR_SR_CURVE_BY_FP.get(str(CP.carFingerprint))
     self.sr_endpoint_profile = get_steer_ratio_endpoint_profile(str(CP.carFingerprint))
     self.sr_values = list(self.sr_curve[1]) if self.sr_curve is not None else None
+    self.lane_change_endpoint_sr = get_param_bool(
+      self.params,
+      "NrdrLaneChangeEndpointSteerRatio",
+      default=True,
+    )
     if (self.sr_curve is None) != (self.sr_endpoint_profile is None):
       raise ValueError(f"steer-ratio curve/tuning mismatch for {CP.carFingerprint}")
     # A direct measured-angle curve and a desired-angle inverse are mutually
@@ -759,7 +764,14 @@ class LatControlPID(LatControl):
       # the effective SR before curvature->angle conversion. These handcrafted
       # profiles are authoritative regardless of the global learner toggle.
       bp, _ = self.sr_curve
-      VM.sR = float(np.interp(abs(CS.steeringAngleDeg), bp, self.sr_values))
+      lane_change_active = self.model_v2 is not None and \
+                           self.model_v2.meta.laneChangeState != log.LaneChangeState.off
+      # A lane change deliberately uses the outer/endpoint ratio for its entire
+      # planner lifecycle (pre-change, starting, and finishing). This softens the
+      # opening command and returns to the measured-angle curve only after the
+      # planner marks the maneuver complete.
+      VM.sR = self.sr_values[-1] if self.lane_change_endpoint_sr and lane_change_active else \
+        float(np.interp(abs(CS.steeringAngleDeg), bp, self.sr_values))
     elif self.vgr_inverse is not None and not self.learn_steer_ratio:
       # Use the profile's road-validated effective center anchor. The inverse
       # then removes that artificial/model compensation toward physical lock.
@@ -949,6 +961,11 @@ class LatControlPID(LatControl):
             self.sr_endpoint_profile.outer_default,
             8.0,
             25.0,
+          )
+          self.lane_change_endpoint_sr = get_param_bool(
+            self.params,
+            "NrdrLaneChangeEndpointSteerRatio",
+            default=True,
           )
         self.learn_steer_ratio = get_param_bool(self.params, "NrdrLearnSteerRatio")
 

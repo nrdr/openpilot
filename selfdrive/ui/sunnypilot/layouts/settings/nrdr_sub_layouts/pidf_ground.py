@@ -57,6 +57,13 @@ class PidfGroundLayout(Widget):
       )
       self._sr_endpoint_controls.append((profile, center, outer))
 
+    self._lane_change_endpoint_sr = toggle_item_sp(
+      title=tr("Use Endpoint SR for Smoother Lane Changes (Default: ON)"),
+      description=tr("While the planner has a lane change active, use this car's Outer Steer Ratio for the entire maneuver. " +
+                     "Normal angle-based steer ratio resumes only after the lane change is complete."),
+      param="NrdrLaneChangeEndpointSteerRatio",
+    )
+
     # --- Independent P / I / F scales per speed band ---
     self._lat_p_low = option_item_sp(
       param="LatPScaleLowSpeed",
@@ -232,6 +239,7 @@ class PidfGroundLayout(Widget):
       # Fingerprint-specific absolute steer-ratio endpoints. Only the active
       # rack family's pair is made visible in _update_state().
       *(control for _, center, outer in self._sr_endpoint_controls for control in (center, outer)),
+      self._lane_change_endpoint_sr,
       LineSeparatorSP(40),
       # Low speed (below 25mph): P / I / F
       self._lat_p_low,
@@ -276,8 +284,9 @@ class PidfGroundLayout(Widget):
       visible = profile == active_sr_profile
       center.set_visible(visible)
       outer.set_visible(visible)
+    self._lane_change_endpoint_sr.set_visible(active_sr_profile is not None)
     for item in (
-      self._starpilot, *sr_controls,
+      self._starpilot, *sr_controls, self._lane_change_endpoint_sr,
       self._lat_p_low, self._lat_i_low, self._lat_f_low,
       self._lat_p_standard, self._lat_i_standard, self._lat_f_standard,
       self._lat_p_highway, self._lat_i_highway, self._lat_f_highway,

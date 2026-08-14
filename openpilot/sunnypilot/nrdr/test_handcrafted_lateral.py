@@ -32,7 +32,7 @@ def test_torque_mod_profiles_are_versioned_and_fingerprint_scoped():
     profile = get_handcrafted_lateral_profile(fingerprint)
     assert profile is HANDCRAFTED_LATERAL_PROFILES[fingerprint]
     assert profile.fingerprint == fingerprint
-    assert profile.version == 7
+    assert profile.version == 8
     assert "2026-08-13" in profile.name
   assert get_handcrafted_lateral_profile("HONDA_CIVIC_2022") is None
 
@@ -65,6 +65,7 @@ def test_profile_preserves_the_current_road_tested_choices():
   clarity_sr = get_steer_ratio_endpoint_profile("HONDA_CLARITY")
   assert values[clarity_sr.center_param] == 18.50
   assert values[clarity_sr.outer_param] == 12.72
+  assert values["NrdrLaneChangeEndpointSteerRatio"] is True
   assert "NrdrSteerRatioOffset" not in values
   assert values["HondaCenterScale"] == 0.5
   assert values["HondaCenterBoostThreshold"] == 3.0

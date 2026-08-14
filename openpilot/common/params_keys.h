@@ -318,6 +318,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrSteerRatioOuterCrv5g", {PERSISTENT | BACKUP, FLOAT, "12.30"}},
     {"NrdrSteerRatioCenterInsight", {PERSISTENT | BACKUP, FLOAT, "16.82"}},
     {"NrdrSteerRatioOuterInsight", {PERSISTENT | BACKUP, FLOAT, "12.58"}},
+    {"NrdrLaneChangeEndpointSteerRatio", {PERSISTENT | BACKUP, BOOL, "1"}},
     // DEPRECATED single-offset and global endpoint keys. Keep registered until
     // stale Sunnylink schemas/builds have aged out to avoid UnknownKeyName crashes.
     {"NrdrSteerRatioOffset", {PERSISTENT | BACKUP, FLOAT, "0.0"}},

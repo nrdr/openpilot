@@ -363,6 +363,24 @@ sections:
       min: 8.0
       max: 25.0
       step: 0.01
+    - key: NrdrLaneChangeEndpointSteerRatio
+      widget: toggle
+      visibility:
+      - type: any
+        conditions:
+        - {type: capability, field: car_fingerprint, equals: HONDA_CLARITY}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH_DIESEL}
+        - {type: capability, field: car_fingerprint, equals: HONDA_ACCORD}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CRV_5G}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CRV_HYBRID}
+        - {type: capability, field: car_fingerprint, equals: HONDA_INSIGHT}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      title: Use Endpoint SR for Smoother Lane Changes
+      description: Uses the Outer Steer Ratio for the complete active lane change. Default ON.
+      details: The endpoint ratio is selected from pre-lane-change through the starting and finishing states. Normal angle-based steer ratio resumes only after the planner marks the lane change complete. This reacts to the planner state, not blinkers alone.
     - key: LatPScaleLowSpeed
       widget: option
       enablement:
