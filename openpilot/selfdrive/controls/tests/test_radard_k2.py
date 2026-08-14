@@ -243,8 +243,8 @@ class TestWiring:
 
   def test_ar_pts_uses_pt_measured_and_radar_fresh(self):
     src = RADARD.read_text(encoding="utf-8")
-    assert "pt.measured and radar_fresh" in src, \
-      "'pt.measured and radar_fresh' not found in ar_pts construction"
+    assert "pt.deprecated.measured and radar_fresh" in src, \
+      "'pt.deprecated.measured and radar_fresh' not found in ar_pts construction"
 
   def test_civic_bosch_fine_gating_references_honda_civic_bosch(self):
     src = RADARD.read_text(encoding="utf-8")

@@ -296,7 +296,7 @@ class RadarD:
       radar_fresh = sm.recv_frame['liveTracks'] != self._last_tracks_frame
       self._last_tracks_frame = sm.recv_frame['liveTracks']
 
-    ar_pts = {pt.trackId: [pt.dRel, pt.yRel, pt.vRel, pt.measured and radar_fresh] for pt in rr.points}
+    ar_pts = {pt.trackId: [pt.dRel, pt.yRel, pt.vRel, pt.deprecated.measured and radar_fresh] for pt in rr.points}
 
     # *** remove missing points from meta data ***
     for ids in list(self.tracks.keys()):
