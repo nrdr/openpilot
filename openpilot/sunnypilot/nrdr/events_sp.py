@@ -1,4 +1,4 @@
-from openpilot.cereal import custom, log
+from openpilot.cereal import car, custom, log
 from openpilot.common.constants import CV
 from openpilot.sunnypilot.selfdrive.selfdrived.events_base import Alert, ET, Priority
 
@@ -11,7 +11,7 @@ def speed_limit_pre_active_alert(CP, CS, sm, metric, soft_disable_time, personal
   return Alert(
     f"Press distance button to accept {speed} {unit} speed limit", "",
     log.SelfdriveState.AlertStatus.normal, log.SelfdriveState.AlertSize.small,
-    Priority.LOW, log.SelfdriveState.VisualAlert.none,
+    Priority.LOW, car.CarControl.HUDControl.VisualAlert.none,
     custom.SelfdriveStateSP.AudibleAlert.promptSingleLow, .1,
   )
 
@@ -19,7 +19,7 @@ def speed_limit_pre_active_alert(CP, CS, sm, metric, soft_disable_time, personal
 def apply_events(events, event_name):
   alert_status = log.SelfdriveState.AlertStatus
   alert_size = log.SelfdriveState.AlertSize
-  visual_alert = log.SelfdriveState.VisualAlert
+  visual_alert = car.CarControl.HUDControl.VisualAlert
   audible_alert = log.SelfdriveState.AudibleAlert
 
   events[event_name.controlsMismatchLateral] = {
