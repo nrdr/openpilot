@@ -23,13 +23,13 @@ class NrdrLongitudinalPlanner:
     self.tune = tune
     self.params = Params()
     self.frame = 0
-    self.v_ego_stopping = CP.vEgoStopping
+    self.v_ego_stopping = CP.deprecated.vEgoStopping
     self.cruise_scale = 1.0
     self.launch_armed = False
 
   def refresh(self) -> None:
     if self.frame % PARAM_REFRESH_FRAMES == 0:
-      self.v_ego_stopping = read_float(self.params, "HondaVEgoStopping", self.CP.vEgoStopping, 0.0, 5.0)
+      self.v_ego_stopping = read_float(self.params, "HondaVEgoStopping", self.CP.deprecated.vEgoStopping, 0.0, 5.0)
       self.cruise_scale = read_float(self.params, "NrdrCruiseMismatchCorrection", 100.0, 95.0, 105.0) / 100.0
     self.frame += 1
 

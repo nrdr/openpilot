@@ -29,10 +29,10 @@ def _state_transition(CP, CP_SP, active, state, should_stop, brake_pressed,
   if state == LongCtrlState.off:
     if not starting:
       return LongCtrlState.stopping
-    return LongCtrlState.starting if CP.startingState else LongCtrlState.pid
+    return LongCtrlState.starting if CP.deprecated.startingState else LongCtrlState.pid
   if state == LongCtrlState.stopping:
     if starting:
-      return LongCtrlState.starting if CP.startingState else LongCtrlState.pid
+      return LongCtrlState.starting if CP.deprecated.startingState else LongCtrlState.pid
     return state
   if should_stop:
     return LongCtrlState.stopping
@@ -58,9 +58,9 @@ class NrdrLongControl:
     self.pid_scale = 1.0
     self.static_feedforward = True
     self.stop_accel = CP.stopAccel
-    self.stopping_decel_rate = CP.stoppingDecelRate
-    self.v_ego_starting = CP.vEgoStarting
-    self.v_ego_stopping = CP.vEgoStopping
+    self.stopping_decel_rate = CP.deprecated.stoppingDecelRate
+    self.v_ego_starting = CP.deprecated.vEgoStarting
+    self.v_ego_stopping = CP.deprecated.vEgoStopping
     self.drel_window = deque(maxlen=DREL_FILTER_FRAMES)
     self.drel_filtered = math.inf
 
@@ -72,10 +72,10 @@ class NrdrLongControl:
     self.static_feedforward = read_bool(self.params, "StaticFeedforwardLong", True)
     self.stop_accel = read_float(self.params, "HondaStopAccel", self.CP.stopAccel, -10.0, 0.0)
     self.stopping_decel_rate = read_float(
-      self.params, "HondaStoppingDecelRateLong", self.CP.stoppingDecelRate, 0.0, 5.0,
+      self.params, "HondaStoppingDecelRateLong", self.CP.deprecated.stoppingDecelRate, 0.0, 5.0,
     )
-    self.v_ego_starting = read_float(self.params, "HondaVEgoStarting", self.CP.vEgoStarting, 0.0, 5.0)
-    self.v_ego_stopping = read_float(self.params, "HondaVEgoStopping", self.CP.vEgoStopping, 0.0, 5.0)
+    self.v_ego_starting = read_float(self.params, "HondaVEgoStarting", self.CP.deprecated.vEgoStarting, 0.0, 5.0)
+    self.v_ego_stopping = read_float(self.params, "HondaVEgoStopping", self.CP.deprecated.vEgoStopping, 0.0, 5.0)
 
   def _filter_drel(self, drel) -> float:
     if drel is None or not math.isfinite(drel):
@@ -146,7 +146,7 @@ class NrdrLongControl:
       output_accel = self._stopping_accel(CS, pitch, drel_filtered)
       self.reset()
     elif self.long_control_state == LongCtrlState.starting:
-      output_accel = self.CP.startAccel
+      output_accel = self.CP.deprecated.startAccel
       self.reset()
     else:
       output_accel = self._pid_accel(CS, a_target)
