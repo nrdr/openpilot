@@ -5,11 +5,11 @@ import numpy as np
 from openpilot.cereal import log
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.common.params import Params
 from openpilot.common.pid import PIDController
 from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
+from openpilot.sunnypilot.nrdr.live_params import get_live_params
 from openpilot.sunnypilot.nrdr.tune_learner import TuneLearner
 from openpilot.sunnypilot.nrdr.params import read_bool, read_float
 from openpilot.sunnypilot.nrdr.phase_detector import phase_with_latch
@@ -23,7 +23,6 @@ CENTER_TAPER_FADE_TAU = 0.25
 CENTER_BOOST_SPEED_FADE = 5.0 * MPH_TO_MS
 RATE_DAMPING_REFERENCE = 0.010
 RATE_DAMPING_UNWIND_ANGLE = 30.0
-SETTINGS_REFRESH_FRAMES = 300
 
 
 def _speed_banded_value(v_ego: float, low: float, standard: float, highway: float) -> float:
@@ -102,7 +101,7 @@ class NrdrLatControlPID(LatControl):
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
     self.is_eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
     self.dt = dt
-    self.params = Params()
+    self.params = get_live_params()
     self.sr_profile = get_steer_ratio_endpoint_profile(str(CP.carFingerprint))
     self.sr_values = list(self.sr_profile.default_values) if self.sr_profile else None
     self.lane_change_endpoint_sr = read_bool(self.params, "NrdrLaneChangeEndpointSteerRatio", True)
@@ -119,7 +118,8 @@ class NrdrLatControlPID(LatControl):
     self.starpilot = False
     self.stiction_enabled = False
     self.stiction = LatStiction(dt, self.steer_max)
-    self.tune_learner = TuneLearner(dt, self.steer_max)
+    self.tune_learner = TuneLearner(dt, self.steer_max, self.params)
+    self.settings_generation = -1
     self.frame = -1
     self.previous_output = 0.0
     self.previous_desired_angle = 0.0
@@ -128,6 +128,7 @@ class NrdrLatControlPID(LatControl):
     self.previous_steering_pressed = False
     self.model_v2 = None
     self.phase_direction = 0.0
+    self._refresh_settings()
 
   def update_model_v2(self, model_v2) -> None:
     self.model_v2 = model_v2
@@ -170,6 +171,7 @@ class NrdrLatControlPID(LatControl):
     return steering_pressed
 
   def _refresh_settings(self) -> None:
+    snapshot = self.params.snapshot
     scale_keys = (
       (self.p_scales, "LatPScale"),
       (self.i_scales, "LatIScale"),
@@ -177,21 +179,22 @@ class NrdrLatControlPID(LatControl):
     )
     for values, prefix in scale_keys:
       values[:] = [
-        read_float(self.params, f"{prefix}LowSpeed", 1.0, 0.0, 5.0, scale=100.0),
-        read_float(self.params, f"{prefix}Standard", 1.0, 0.0, 5.0, scale=100.0),
-        read_float(self.params, f"{prefix}Highway", 1.0, 0.0, 5.0, scale=100.0),
+        read_float(snapshot, f"{prefix}LowSpeed", 1.0, 0.0, 5.0, scale=100.0),
+        read_float(snapshot, f"{prefix}Standard", 1.0, 0.0, 5.0, scale=100.0),
+        read_float(snapshot, f"{prefix}Highway", 1.0, 0.0, 5.0, scale=100.0),
       ]
-    self.center_boost_magnitude = read_float(self.params, "HondaCenterScale", 0.5, 0.0, 5.0)
-    self.center_boost_threshold = read_float(self.params, "HondaCenterBoostThreshold", 3.0, 0.0, 10.0)
-    self.center_boost_min_speed = read_float(self.params, "HondaCenterBoostMinSpeed", 50.0, 0.0, 90.0)
-    self.rate_damping = read_float(self.params, "NrdrLatRateDamping", 0.3, 0.0, 3.0, scale=100.0)
-    self.rate_damping_fade_speed = read_float(self.params, "NrdrLatRateDampingFadeSpeed", 30.0, 0.0, 60.0) * MPH_TO_MS
-    self.injection_test = read_bool(self.params, "HondaInjectionTest")
-    self.starpilot = read_bool(self.params, "NrdrStarPilotPid")
-    self.stiction_enabled = read_bool(self.params, "NrdrLatStiction")
+    self.center_boost_magnitude = read_float(snapshot, "HondaCenterScale", 0.5, 0.0, 5.0)
+    self.center_boost_threshold = read_float(snapshot, "HondaCenterBoostThreshold", 3.0, 0.0, 10.0)
+    self.center_boost_min_speed = read_float(snapshot, "HondaCenterBoostMinSpeed", 50.0, 0.0, 90.0)
+    self.rate_damping = read_float(snapshot, "NrdrLatRateDamping", 0.3, 0.0, 3.0, scale=100.0)
+    self.rate_damping_fade_speed = read_float(snapshot, "NrdrLatRateDampingFadeSpeed", 30.0, 0.0, 60.0) * MPH_TO_MS
+    self.injection_test = read_bool(snapshot, "HondaInjectionTest")
+    self.starpilot = read_bool(snapshot, "NrdrStarPilotPid")
+    self.stiction_enabled = read_bool(snapshot, "NrdrLatStiction")
     if self.sr_profile is not None:
-      self.sr_values[:] = [read_float(self.params, key, default, 8.0, 25.0) for key, default in self.sr_profile.param_values]
-      self.lane_change_endpoint_sr = read_bool(self.params, "NrdrLaneChangeEndpointSteerRatio", True)
+      self.sr_values[:] = [read_float(snapshot, key, default, 8.0, 25.0) for key, default in self.sr_profile.param_values]
+      self.lane_change_endpoint_sr = read_bool(snapshot, "NrdrLaneChangeEndpointSteerRatio", True)
+    self.settings_generation = snapshot.generation
 
   def _scaled_pid_output(self, CS, desired_angle: float, angle_delta: float, phase: float) -> float:
     p_term = self.pid.p * _speed_banded_value(CS.vEgo, *self.p_scales)
@@ -249,7 +252,7 @@ class NrdrLatControlPID(LatControl):
         freeze_integrator = True
 
       self.frame += 1
-      if self.frame % SETTINGS_REFRESH_FRAMES == 0:
+      if self.settings_generation != self.params.generation:
         self._refresh_settings()
       self.pid.update(error, feedforward=feedforward, speed=CS.vEgo, freeze_integrator=freeze_integrator)
       output_torque = self._scaled_pid_output(CS, desired_no_offset, angle_delta, phase)

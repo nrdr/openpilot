@@ -3,9 +3,16 @@ from openpilot.common.params import UnknownKeyName
 
 def read_bool(params, key: str, default: bool = False) -> bool:
   try:
-    return default if params.get(key) is None else params.get_bool(key)
+    value = params.get(key)
   except UnknownKeyName:
     return default
+  if value is None:
+    return default
+  if isinstance(value, bytes):
+    return value.strip().lower() not in (b"", b"0", b"false")
+  if isinstance(value, str):
+    return value.strip().lower() not in ("", "0", "false")
+  return bool(value)
 
 
 def read_float(params, key: str, default: float, min_value: float | None = None,

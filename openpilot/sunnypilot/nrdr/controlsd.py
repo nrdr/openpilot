@@ -1,13 +1,16 @@
+from openpilot.sunnypilot.nrdr.live_params import get_live_params
+
+
 def initialize_live_parameter_settings(controls) -> None:
-  controls.learn_steer_ratio = True
-  controls.learn_stiffness = True
-  controls.learn_angle_offset = True
+  controls.nrdr_live_params = get_live_params()
+  refresh_live_parameter_settings(controls, None)
 
 
-def refresh_live_parameter_settings(controls, params) -> None:
-  controls.learn_steer_ratio = params.get("NrdrLearnSteerRatio") != b"0"
-  controls.learn_stiffness = params.get("NrdrLearnStiffness") != b"0"
-  controls.learn_angle_offset = params.get("NrdrLearnAngleOffset") != b"0"
+def refresh_live_parameter_settings(controls, _params) -> None:
+  snapshot = controls.nrdr_live_params.snapshot
+  controls.learn_steer_ratio = snapshot.get_bool("NrdrLearnSteerRatio")
+  controls.learn_stiffness = snapshot.get_bool("NrdrLearnStiffness")
+  controls.learn_angle_offset = snapshot.get_bool("NrdrLearnAngleOffset")
 
 
 def vehicle_model_params(controls, live_params) -> tuple[float, float, float]:
