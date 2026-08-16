@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from openpilot.common.params import Params, UnknownKeyName
-from openpilot.system.hardware.hw import Paths
+from openpilot.common.hardware.hw import Paths
 
 
 UNREGISTERED = "UnregisteredDevice"
