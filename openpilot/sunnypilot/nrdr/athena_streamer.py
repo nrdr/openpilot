@@ -37,7 +37,7 @@ class Streamer:
     self.ice_send_queue = ice_send_queue
     self.params = Params()
     self.api = Api(self.params.get("DongleId"))
-    self.onroad = self.params.get_bool("IsOnroad")
+    self.onroad = not self.params.get_bool("IsOffroad")
     self.tracks: dict[str, LiveStreamVideoStreamTrack] = {}
     self._init_tracks()
 
@@ -156,7 +156,7 @@ class Streamer:
 
   async def event_loop(self, exit_event) -> None:
     while exit_event is None or not exit_event.is_set():
-      self.onroad = self.params.get_bool("IsOnroad")
+      self.onroad = not self.params.get_bool("IsOffroad")
       try:
         try:
           data = self.sdp_recv_queue.get_nowait()

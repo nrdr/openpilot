@@ -234,7 +234,7 @@ def getParams(params_keys: list[str], compression: bool = False) -> str | dict[s
 
 @dispatcher.add_method
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
-  onroad = params.get_bool("IsOnroad")
+  onroad = not params.get_bool("IsOffroad")
   for key, value in params_to_update.items():
     # disallow modifications to blocked parameters
     if key in BLOCKED_PARAMS:

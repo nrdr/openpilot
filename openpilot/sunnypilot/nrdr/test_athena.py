@@ -12,7 +12,6 @@ from openpilot.system.webrtc import helpers
 def params():
   params = Params()
   params.put("CarParamsPersistent", car.CarParams.new_message().to_bytes(), block=True)
-  params.put_bool("IsOnroad", False, block=True)
   params.put_bool("IsOffroad", True, block=True)
   params.put_bool("LiveViewEnabled", True, block=True)
   return params
@@ -51,6 +50,6 @@ def test_stop_stream(mocker, params):
 
 
 def test_start_stream_rejects_onroad(params):
-  params.put_bool("IsOnroad", True, block=True)
+  params.put_bool("IsOffroad", False, block=True)
   with pytest.raises(Exception, match="unavailable while onroad"):
     athena._start_stream("offer", True)

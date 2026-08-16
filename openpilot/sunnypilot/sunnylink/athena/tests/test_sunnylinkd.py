@@ -16,11 +16,11 @@ class TestSunnylinkdMethods:
     self.original_params = sunnylinkd.params
 
     class FakeParams:
-      onroad = False
+      offroad = True
 
       def get_bool(inner_self, key):
-        assert key == "IsOnroad"
-        return inner_self.onroad
+        assert key == "IsOffroad"
+        return inner_self.offroad
 
       def get(inner_self, key):
         assert key == "ParamsVersion"
@@ -79,7 +79,7 @@ class TestSunnylinkdMethods:
     assert self.saved_params[0][1] == "10"
 
   def test_saveParams_blocks_personality_onroad(self):
-    self.fake_params.onroad = True
+    self.fake_params.offroad = False
 
     sunnylinkd.saveParams({
       "LongitudinalPersonality": "3",

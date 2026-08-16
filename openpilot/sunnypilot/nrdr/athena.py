@@ -218,7 +218,7 @@ def _start_stream(sdp: str | None = None, enabled: bool = True) -> dict:
     params.put_bool("IsLiveStreaming", False, block=True)
     params.put_bool("LiveView", False, block=True)
     return {"success": True}
-  if params.get_bool("IsOnroad"):
+  if not params.get_bool("IsOffroad"):
     raise Exception("Live View unavailable while onroad")
   if not params.get_bool("LiveViewEnabled"):
     raise Exception("Live View disabled")
@@ -232,9 +232,6 @@ def _start_stream(sdp: str | None = None, enabled: bool = True) -> dict:
   with car.CarParams.from_bytes(cp_bytes) as CP:
     if CP.notCar:
       services.append("testJoystick")
-  if not params.get_bool("IsOffroad"):
-    raise Exception("Live View unavailable unless offroad")
-
   body = StreamRequestBody(sdp, "wideRoad", True, services, ["carState", "deviceState"])
   started = False
   params.put_bool("IsLiveStreaming", True, block=True)
