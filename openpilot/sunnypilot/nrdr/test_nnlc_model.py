@@ -127,13 +127,13 @@ class TestNNTorqueModel:
       assert controller.extension.enabled
 
       # PID runs first even while Torque/NNLC is the serialized tuning type, so
-      # its Clarity VGR curve is also used for NNLC's actual-curvature measurement.
+      # its Clarity endpoint curve is also used for NNLC's actual-curvature measurement.
       CS = car.CarState.new_message()
       CS.steeringAngleDeg = 100.0
       VM = VehicleModel(CP)
       live_params = log.LiveParametersData.new_message()
       controller.update(False, CS, VM, live_params, False, 0.0, None, False, 0.2)
-      assert abs(VM.sR - 15.94) < 1e-6
+      assert abs(VM.sR - 16.188) < 1e-6
 
       # Exercise the real PID interpolation while active. The hybrid previously
       # passed this test only because inactive control never called PIDController.update().
