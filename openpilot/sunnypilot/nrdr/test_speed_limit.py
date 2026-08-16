@@ -9,12 +9,12 @@ from openpilot.sunnypilot.nrdr.speed_limit import (
 
 
 class Button:
-  gapAdjustCruise = SimpleNamespace(raw=3)
+  gapAdjustCruise = 3
 
 
 def test_distance_button_is_the_only_confirmation():
   confirmation = SpeedLimitConfirmation(Button)
-  confirmation.update(1 << Button.gapAdjustCruise.raw)
+  confirmation.update(1 << Button.gapAdjustCruise)
   assert confirmation.consume()
   confirmation.update(1 << 1)
   assert not confirmation.consume()

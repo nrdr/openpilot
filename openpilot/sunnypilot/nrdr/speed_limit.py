@@ -41,7 +41,7 @@ def quantize_set_speed(kph: float, is_metric: bool, CP: car.CarParams) -> float:
 
 class SpeedLimitConfirmation:
   def __init__(self, button_type, hold_seconds: float = 0.5):
-    self._button = button_type.gapAdjustCruise.raw
+    self._button = button_type.gapAdjustCruise
     self._hold_seconds = hold_seconds
     self._held_until = 0.0
 
