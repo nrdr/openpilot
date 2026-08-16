@@ -1,6 +1,8 @@
 import hashlib
 from pathlib import Path
 
+import pytest
+
 from openpilot.cereal import log
 from opendbc.car.car_helpers import interfaces
 from opendbc.car.structs import car
@@ -17,11 +19,19 @@ from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 from openpilot.sunnypilot.nrdr.latcontrol_clarity_hybrid import LatControlClarityHybrid, clarity_nnlc_blend_target
+from openpilot.sunnypilot.nrdr.live_params import reset_live_params_for_tests
 from openpilot.sunnypilot.nrdr.nnlc_model import get_forced_nnlc_model
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 
 CLARITY_MODEL_SHA256 = "4f2e92c085c5eeebb7c6714e4733ea7b71c1e69c7de7776a2bff6def12ce0134"
+
+
+@pytest.fixture(autouse=True)
+def reset_live_params():
+  reset_live_params_for_tests()
+  yield
+  reset_live_params_for_tests()
 
 
 class TestNNTorqueModel:
@@ -112,6 +122,7 @@ class TestNNTorqueModel:
       params.put("NrdrNnlcKpGain", 125, block=True)
       params.put("NrdrNnlcKfGain", 60, block=True)
       params.put("NrdrNnlcKiGain", 15, block=True)
+      controller.extension.nrdr.params.refresh_all()
       controller.extension.nrdr.refresh()
       assert abs(controller.extension.activation_speed_mps - 50.0 * CV.MPH_TO_MS) < 1e-6
       assert controller.extension._pid.k_p == 1.25
@@ -119,10 +130,12 @@ class TestNNTorqueModel:
       assert controller.extension._pid.k_i == 0.15
       controller.extension._pid.i = 0.2
       params.put_bool("NrdrNnlcEnabled", False, block=True)
+      controller.extension.nrdr.params.refresh_all()
       controller.extension.nrdr.refresh()
       assert not controller.extension.enabled
       assert controller.extension._pid.i == 0.0
       params.put_bool("NrdrNnlcEnabled", True, block=True)
+      controller.extension.nrdr.params.refresh_all()
       controller.extension.nrdr.refresh()
       assert controller.extension.enabled
 
@@ -138,6 +151,9 @@ class TestNNTorqueModel:
       # Exercise the real PID interpolation while active. The hybrid previously
       # passed this test only because inactive control never called PIDController.update().
       controller.torque_controller.extension.model_valid = False
+      controller.torque_controller.update = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+        AssertionError("disabled NNLC ran the torque controller")
+      )
       CS.vEgo = 10.0 * CV.MPH_TO_MS
       controller.update(True, CS, VM, live_params, False, 0.0, None, False, 0.2)
     finally:

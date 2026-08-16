@@ -89,17 +89,30 @@ class LatControlClarityHybrid(LatControl):
       active, CS, VM, params, steer_limited_by_safety, desired_curvature,
       calibrated_pose, curvature_limited, lat_delay,
     )
+    self.torque_controller.extension.nrdr.update()
+    nnlc_enabled = self.torque_controller.extension._nnlc_enabled
+    lane_change_state = self._lane_change_state()
+    target = clarity_nnlc_blend_target(CS.vEgo, lane_change_state,
+                                       self.torque_controller.extension.activation_speed_mps) if nnlc_enabled else 0.0
+    blend = self._update_blend(active, target, lane_change_state)
+    if not nnlc_enabled and blend <= 1e-3:
+      self.nnlc_blend = 0.0
+      self.torque_controller.extension._pid.i = 0.0
+      torque_log = log.ControlsState.LateralTorqueState.new_message()
+      torque_log.active = pid_log.active
+      torque_log.error = pid_log.angleError
+      torque_log.p = pid_log.p
+      torque_log.i = pid_log.i
+      torque_log.d = pid_log.d
+      torque_log.f = pid_log.f
+      torque_log.output = pid_output
+      torque_log.saturated = pid_log.saturated
+      return float(pid_output), float(pid_angle), torque_log
+
     nnlc_output, _, torque_log = self.torque_controller.update(
       active, CS, VM, params, steer_limited_by_safety, desired_curvature,
       calibrated_pose, curvature_limited, lat_delay,
     )
-
-    lane_change_state = self._lane_change_state()
-    target = clarity_nnlc_blend_target(CS.vEgo, lane_change_state,
-                                       self.torque_controller.extension.activation_speed_mps)
-    if not self.torque_controller.extension._nnlc_enabled:
-      target = 0.0
-    blend = self._update_blend(active, target, lane_change_state)
 
     output = float((1.0 - blend) * float(pid_output) + blend * float(nnlc_output))
     torque_log.output = output
