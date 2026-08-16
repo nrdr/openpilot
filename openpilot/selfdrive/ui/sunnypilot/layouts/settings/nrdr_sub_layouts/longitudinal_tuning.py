@@ -48,6 +48,37 @@ class LongitudinalTuningLayout(Widget):
       ),
     )
 
+    self._full_brake_authority = toggle_item_sp(
+      param="NrdrHondaFullBrakeAuthority",
+      title=lambda: tr("Full Nidec Brake Authority (Default: ON)"),
+      description=lambda: tr(
+        "Allows supported Honda Nidec longitudinal control to use the full normalized brake-command range. " +
+        "Disable to retain the upstream brake-command headroom."
+      ),
+    )
+
+    self._roen_acceleration_limits = toggle_item_sp(
+      param="NrdrRoenAccelerationLimits",
+      title=lambda: tr("Roen Nidec Acceleration Limits (Default: OFF)"),
+      description=lambda: tr(
+        "Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling. " +
+        "This operates independently of Live Learning Gas."
+      ),
+    )
+
+    self._cruise_overspeed_allowance = option_item_sp(
+      param="NrdrCruiseOverspeedAllowance",
+      title=lambda: tr("Set-Speed Overshoot Allowance (Default: 0 mph)"),
+      min_value=0,
+      max_value=10,
+      value_change_step=1,
+      description=lambda: tr(
+        "Allows the cruise target to follow vehicle speed by up to this amount above the set speed when no other speed target is lower. " +
+        "0 mph preserves stock behavior."
+      ),
+      label_callback=lambda value: f"{value} mph",
+    )
+
     self._cruise_mismatch_correction = option_item_sp(
       param="NrdrCruiseMismatchCorrection",
       title=lambda: tr("Cruise Mismatch Correction (Default: 100.0%)"),
@@ -150,6 +181,9 @@ class LongitudinalTuningLayout(Widget):
       self._long_pid_tune_scale,
       self._static_feedforward_long,
       self._ecu_matched_long,
+      self._full_brake_authority,
+      self._roen_acceleration_limits,
+      self._cruise_overspeed_allowance,
       self._cruise_mismatch_correction,
       LineSeparatorSP(40),
       self._live_learning_gas,

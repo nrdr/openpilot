@@ -2654,6 +2654,31 @@
                   "details": "Honda Nidec only. Shapes the longitudinal command to match the factory ECU - rate-limits the acceleration command to the ECU's ramp rates, applies a speed-dependent coasting deadband (wide at low speed, tight on the highway), and briefly coasts through gas/brake transitions to avoid lurch. Calibrated on the 2019 Pilot; other Nidec cars may need tuning. OFF = stock command path."
                 },
                 {
+                  "key": "NrdrHondaFullBrakeAuthority",
+                  "widget": "toggle",
+                  "title": "Full Nidec Brake Authority",
+                  "description": "Allows supported Honda Nidec longitudinal control to use the full normalized brake-command range.",
+                  "details": "Enabled by default. Disable to retain the upstream brake-command headroom. This setting operates independently of Live Learning Gas."
+                },
+                {
+                  "key": "NrdrRoenAccelerationLimits",
+                  "widget": "toggle",
+                  "title": "Roen Nidec Acceleration Limits",
+                  "description": "Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.",
+                  "details": "Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s\u00b2 through 5 m/s, fading to 2.0 m/s\u00b2 at 20 m/s; the controller fades from 4.0 to 3.0 m/s\u00b2, while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas."
+                },
+                {
+                  "key": "NrdrCruiseOverspeedAllowance",
+                  "widget": "option",
+                  "title": "Set-Speed Overshoot Allowance",
+                  "description": "Allows the cruise target to follow vehicle speed by up to this amount above the set speed when no other speed target is lower.",
+                  "details": "0 mph preserves stock behavior.",
+                  "min": 0,
+                  "max": 10,
+                  "step": 1,
+                  "unit": "mph"
+                },
+                {
                   "key": "HondaLiveLearningGas",
                   "widget": "toggle",
                   "title": "Live Learning Gas",

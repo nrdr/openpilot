@@ -209,6 +209,25 @@ class TestSpuriousOffroadGatesDropped:
     assert "offroad_only" not in _flatten_rule_types(item.get("enablement"))
 
 
+class TestNrdrLongitudinalOptions:
+  @pytest.mark.parametrize(("key", "widget"), [
+    ("NrdrHondaFullBrakeAuthority", "toggle"),
+    ("NrdrRoenAccelerationLimits", "toggle"),
+    ("NrdrCruiseOverspeedAllowance", "option"),
+  ])
+  def test_options_are_independent_of_live_learning_gas(self, schema, key, widget):
+    item = _find_item(schema, key)
+    assert item is not None
+    assert item.get("widget") == widget
+    rules = json.dumps((item.get("visibility") or []) + (item.get("enablement") or []))
+    assert "HondaLiveLearningGas" not in rules
+
+  def test_overspeed_allowance_range(self, schema):
+    item = _find_item(schema, "NrdrCruiseOverspeedAllowance")
+    assert item is not None
+    assert (item.get("min"), item.get("max"), item.get("step"), item.get("unit")) == (0, 10, 1, "mph")
+
+
 class TestNotEngagedReplacement:
   @pytest.mark.parametrize("key", [
     "AlphaLongitudinalEnabled",
