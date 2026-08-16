@@ -81,7 +81,7 @@ def apply_defaults(params: Params) -> None:
   _write(params, "NeuralNetworkLateralControl", False, params.put_bool, force=True)
 
   try:
-    from openpilot.system.version import terms_version, terms_version_sp, training_version, sunnylink_consent_version
+    from openpilot.common.version import terms_version, terms_version_sp, training_version, sunnylink_consent_version
     required = {
       "HasAcceptedTerms": terms_version,
       "HasAcceptedTermsSP": terms_version_sp,
