@@ -8,11 +8,11 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
-from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, ListItemSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, LineSeparatorSP, ListItemSP
 
 
-class LearnedParametersLayout(Widget):
-  def __init__(self, back_btn_callback: Callable):
+class VehicleModelLearningLayout(Widget):
+  def __init__(self, back_btn_callback: Callable, leading_items=()):
     super().__init__()
     self._back_button = NavButton(tr("Back"))
     self._back_button.set_click_callback(back_btn_callback)
@@ -24,7 +24,7 @@ class LearnedParametersLayout(Widget):
       "angleOffsetDeg": tr("learning..."),
     }
 
-    items = self._initialize_items()
+    items = [*leading_items, LineSeparatorSP(40), *self._initialize_items()]
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):

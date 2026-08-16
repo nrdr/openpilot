@@ -31,7 +31,7 @@ class OverrideTuningLayout(Widget):
 
     self._driver_override_threshold = option_item_sp(
       param="NrdrDriverOverrideThreshold",
-      title=lambda: tr("Driver Override Threshold (Default: 2400)"),
+      title=lambda: tr("Driver Override Threshold (Default: 1400)"),
       min_value=100,
       max_value=5000,
       value_change_step=100,
@@ -44,7 +44,7 @@ class OverrideTuningLayout(Widget):
 
     self._driver_override_threshold_cb = option_item_sp(
       param="NrdrOverrideThresholdCenterBoost",
-      title=lambda: tr("Override Threshold Center Boost (Default: 1200)"),
+      title=lambda: tr("Override Threshold Center Boost (Default: 1000)"),
       min_value=100,
       max_value=5000,
       value_change_step=100,
@@ -79,7 +79,7 @@ class OverrideTuningLayout(Widget):
 
     self._override_fade_up = option_item_sp(
       param="HondaOverrideFadeUpSecs",
-      title=lambda: tr("Override Torque Fade Up (Default: 1.5)"),
+      title=lambda: tr("Override Torque Fade Up (Default: 0.1)"),
       min_value=0,
       max_value=1000,
       value_change_step=10,

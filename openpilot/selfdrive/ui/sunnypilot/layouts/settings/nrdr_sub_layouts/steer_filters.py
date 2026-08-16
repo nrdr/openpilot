@@ -93,19 +93,6 @@ class SteerFiltersLayout(Widget):
       use_float_scaling=True,
     )
 
-    self._min_steer_speed = option_item_sp(
-      param="NrdrMinSteerSpeed",
-      title=lambda: tr("Minimum Steer Speed (Default: 1mph)"),
-      min_value=0,
-      max_value=45,
-      value_change_step=1,
-      description=lambda: tr(
-        "Below this speed no steering torque is commanded at all. 0 = steer at any speed (stock). For those who don't want the wheel moving " +
-        "at a standstill or parking-lot speeds."
-      ),
-      label_callback=lambda value: f"{value} mph",
-    )
-
     return [
       self._low_pass_filter,
       self._lpf_tau_low,
@@ -115,8 +102,6 @@ class SteerFiltersLayout(Widget):
       self._steer_delta_limiter,
       self._steer_delta_up,
       self._steer_delta_down,
-      LineSeparatorSP(40),
-      self._min_steer_speed,
     ]
 
   def _update_state(self):
@@ -126,7 +111,7 @@ class SteerFiltersLayout(Widget):
     editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
     for item in (
       self._low_pass_filter, self._lpf_tau_low, self._lpf_tau_standard, self._lpf_tau_highway,
-      self._steer_delta_limiter, self._steer_delta_up, self._steer_delta_down, self._min_steer_speed,
+      self._steer_delta_limiter, self._steer_delta_up, self._steer_delta_down,
     ):
       item.action_item.set_enabled(editable)
 

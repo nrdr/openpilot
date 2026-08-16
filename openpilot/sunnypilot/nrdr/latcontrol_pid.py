@@ -8,12 +8,11 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.common.pid import PIDController
 from openpilot.common.realtime import DT_CTRL
-from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
 from openpilot.sunnypilot.nrdr.tune_learner import TuneLearner
-from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.sunnypilot.nrdr.params import read_bool, read_float
+from openpilot.sunnypilot.nrdr.phase_detector import phase_with_latch
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoint_profile
 
 
@@ -22,10 +21,6 @@ LOW_SPEED_MAX = 25.0 * MPH_TO_MS
 STANDARD_SPEED_MAX = 50.0 * MPH_TO_MS
 CENTER_TAPER_FADE_TAU = 0.25
 CENTER_BOOST_SPEED_FADE = 5.0 * MPH_TO_MS
-UNWIND_LOOKAHEAD_MIN_INDEX = 5
-UNWIND_LOOKAHEAD_SECONDS = 1.0
-UNWIND_LOOKAHEAD_MIN_ACCEL = 0.3
-UNWIND_BOOST_FADE = 0.3
 RATE_DAMPING_REFERENCE = 0.010
 RATE_DAMPING_UNWIND_ANGLE = 30.0
 SETTINGS_REFRESH_FRAMES = 300
@@ -37,17 +32,6 @@ def _speed_banded_value(v_ego: float, low: float, standard: float, highway: floa
   if v_ego < STANDARD_SPEED_MAX:
     return standard
   return highway
-
-
-def _sign(value: float) -> float:
-  return 1.0 if value > 0.0 else (-1.0 if value < 0.0 else 0.0)
-
-
-def _lookahead_release(future_values, current_value: float) -> float:
-  if not future_values:
-    return current_value
-  same_direction = [value for value in future_values if _sign(value) == _sign(current_value)]
-  return 0.0 if len(same_direction) < len(future_values) else min(same_direction + [current_value], key=abs)
 
 
 def _eps_modified_steering_pressed(raw_pressed, steering_torque: float, torque_command: float,
@@ -67,7 +51,7 @@ def _center_boost(angle: float, v_ego: float, fade: float, magnitude: float,
   return 1.0 + angle_weight * magnitude * fade * speed_weight
 
 
-def _output_scale(angle: float, angle_delta: float, steering_rate: float, v_ego: float, enabled: bool) -> float:
+def _output_scale(angle: float, phase: float, steering_rate: float, v_ego: float, enabled: bool) -> float:
   if not enabled:
     return 1.0
 
@@ -75,7 +59,6 @@ def _output_scale(angle: float, angle_delta: float, steering_rate: float, v_ego:
   speed_weight = np.clip((v_ego - 4.0) / 10.0, 0.0, 1.0)
   mid_turn_weight = np.clip((abs_angle - 10.0) / 10.0, 0.0, 1.0)
   angle_weight = np.clip((abs_angle - 16.0) / 12.0, 0.0, 1.0)
-  phase = angle * angle_delta
   is_left = angle > 0.0
 
   low_speed_weight = np.clip(1.0 - v_ego / (15.0 * MPH_TO_MS), 0.0, 1.0)
@@ -127,10 +110,6 @@ class NrdrLatControlPID(LatControl):
     self.center_boost_threshold = 3.0
     self.center_boost_min_speed = 50.0
     self.center_taper = FirstOrderFilter(1.0, CENTER_TAPER_FADE_TAU, dt)
-    self.unwind_ff_multiplier = 2.0
-    self.unwind_boost_cap = 1.0
-    self.unwind_boost_elapsed = 0.0
-    self.unwind_lookahead = False
     self.rate_damping = 0.3
     self.rate_damping_fade_speed = 30.0 * MPH_TO_MS
     self.p_scales = [1.0, 1.0, 1.0]
@@ -148,11 +127,10 @@ class NrdrLatControlPID(LatControl):
     self.steering_pressed_duration = 0.0
     self.previous_steering_pressed = False
     self.model_v2 = None
-    self.model_valid = False
+    self.phase_direction = 0.0
 
   def update_model_v2(self, model_v2) -> None:
     self.model_v2 = model_v2
-    self.model_valid = model_v2 is not None and len(model_v2.acceleration.y) >= CONTROL_N
 
   def _lane_change_active(self) -> bool:
     return self.model_v2 is not None and self.model_v2.meta.laneChangeState != log.LaneChangeState.off
@@ -172,35 +150,11 @@ class NrdrLatControlPID(LatControl):
     self.previous_output = 0.0
     self.previous_desired_angle = desired_angle
     self.previous_saturated = False
-    self.unwind_boost_elapsed = 0.0
     self.stiction.reset()
 
-  def _unwind_weight(self, phase: float, desired_angle: float, steering_rate: float) -> float:
-    weight = float(np.clip(-phase / 0.5, 0.0, 1.0))
-    if desired_angle * steering_rate < -1.0 and abs(desired_angle) > 5.0:
-      weight = max(weight, 0.5)
-    if self.unwind_lookahead and self.model_valid:
-      lateral_accels = list(self.model_v2.acceleration.y)
-      if len(lateral_accels) > UNWIND_LOOKAHEAD_MIN_INDEX:
-        current = float(lateral_accels[0])
-        upper = next((i for i, t in enumerate(ModelConstants.T_IDXS) if t > UNWIND_LOOKAHEAD_SECONDS), len(lateral_accels))
-        future = [float(value) for value in lateral_accels[UNWIND_LOOKAHEAD_MIN_INDEX:upper]]
-        lookahead = _lookahead_release(future, current)
-        if abs(current) > UNWIND_LOOKAHEAD_MIN_ACCEL:
-          weight = max(weight, float(np.clip(1.0 - abs(lookahead) / abs(current), 0.0, 1.0)))
-
-    self.unwind_boost_elapsed = self.unwind_boost_elapsed + self.dt if weight > 0.0 else 0.0
-    if self.unwind_boost_cap <= 0.0:
-      return 0.0
-    fade = min(UNWIND_BOOST_FADE, self.unwind_boost_cap)
-    return weight * float(np.clip((self.unwind_boost_cap - self.unwind_boost_elapsed) / fade, 0.0, 1.0))
-
-  def _feedforward(self, CS, desired_angle: float, phase: float) -> float:
+  def _feedforward(self, CS, desired_angle: float) -> float:
     factor = float(np.interp(CS.vEgo, self.kf_bp, self.kf_v)) if self.kf_v else self.ff_factor
-    feedforward = factor * self.get_steer_feedforward(desired_angle, CS.vEgo)
-    unwind_weight = self._unwind_weight(phase, desired_angle, float(CS.steeringRateDeg))
-    unwind_multiplier = float(np.interp(CS.vEgo, [0.0, 10.0], [self.unwind_ff_multiplier, 1.0]))
-    return feedforward * (1.0 + unwind_weight * max(unwind_multiplier - 1.0, 0.0))
+    return factor * self.get_steer_feedforward(desired_angle, CS.vEgo)
 
   def _steering_pressed(self, CS) -> bool:
     steering_pressed = bool(CS.steeringPressed)
@@ -230,9 +184,6 @@ class NrdrLatControlPID(LatControl):
     self.center_boost_magnitude = read_float(self.params, "HondaCenterScale", 0.5, 0.0, 5.0)
     self.center_boost_threshold = read_float(self.params, "HondaCenterBoostThreshold", 3.0, 0.0, 10.0)
     self.center_boost_min_speed = read_float(self.params, "HondaCenterBoostMinSpeed", 50.0, 0.0, 90.0)
-    self.unwind_lookahead = read_bool(self.params, "HondaUnwindLookahead")
-    self.unwind_ff_multiplier = read_float(self.params, "HondaUnwindFfMultiplier", 2.0, 1.0, 10.0)
-    self.unwind_boost_cap = read_float(self.params, "HondaUnwindBoostSeconds", 1.0, 0.0, 3.0)
     self.rate_damping = read_float(self.params, "NrdrLatRateDamping", 0.3, 0.0, 3.0, scale=100.0)
     self.rate_damping_fade_speed = read_float(self.params, "NrdrLatRateDampingFadeSpeed", 30.0, 0.0, 60.0) * MPH_TO_MS
     self.injection_test = read_bool(self.params, "HondaInjectionTest")
@@ -264,7 +215,7 @@ class NrdrLatControlPID(LatControl):
     if self.injection_test:
       output *= 9.99
     if self.is_eps_modified:
-      output *= _output_scale(desired_angle, angle_delta, float(CS.steeringRateDeg), CS.vEgo, self.starpilot)
+      output *= _output_scale(desired_angle, phase, float(CS.steeringRateDeg), CS.vEgo, self.starpilot)
       speed_fade = float(np.clip((self.rate_damping_fade_speed - CS.vEgo) / self.rate_damping_fade_speed, 0.0, 1.0)) \
         if self.rate_damping_fade_speed > 0.0 else 0.0
       unwind_weight = float(np.clip(-phase / 0.5, 0.0, 1.0))
@@ -289,8 +240,8 @@ class NrdrLatControlPID(LatControl):
       self._reset(desired_no_offset)
     else:
       angle_delta = desired_no_offset - self.previous_desired_angle
-      phase = desired_no_offset * angle_delta
-      feedforward = self._feedforward(CS, desired_no_offset, phase)
+      phase, self.phase_direction = phase_with_latch(desired_no_offset, angle_delta, CS.vEgo, self.phase_direction)
+      feedforward = self._feedforward(CS, desired_no_offset)
       steering_pressed = self._steering_pressed(CS)
       freeze_speed = 2.0 if self.is_eps_modified else 5.0
       freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < freeze_speed

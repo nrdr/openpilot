@@ -24,10 +24,9 @@ from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.html_render import HtmlModalSP
 from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, simple_button_item_sp, toggle_item_sp
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.pidf_ground import PidfGroundLayout
-from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.unwind_helpers import UnwindHelpersLayout
+from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.vehicle_model_learning import VehicleModelLearningLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.override_tuning import OverrideTuningLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.steer_filters import SteerFiltersLayout
-from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.ford_lateral_tuning import FordLateralTuningLayout
 
 TUNE_REPORT_PATH = "/data/nrdr_tune_report.txt"
 TUNE_REPORT_TMP = TUNE_REPORT_PATH + ".tmp"
@@ -37,11 +36,10 @@ RLOG_GLOBS = (f"{MEDIA_ROOT}/realdata/*/rlog.zst", f"{MEDIA_ROOT}/realdata/*/rlo
 
 class LateralPanel(IntEnum):
   HUB = 0
-  PIDF = 1
-  UNWIND = 2
+  VEHICLE_MODEL = 1
+  PIDF = 2
   OVERRIDE = 3
   STEER_FILTERS = 4
-  FORD = 5
 
 
 class _TuneReportAction(ItemAction):
@@ -91,11 +89,14 @@ class LateralTuningLayout(Widget):
     self._scan_fh = None
 
     self._current_panel = LateralPanel.HUB
+    vehicle_items = self._initialize_vehicle_items()
+    self._vehicle_model_layout = VehicleModelLearningLayout(
+      lambda: self._set_panel(LateralPanel.HUB),
+      vehicle_items,
+    )
     self._pidf_layout = PidfGroundLayout(lambda: self._set_panel(LateralPanel.HUB))
-    self._unwind_layout = UnwindHelpersLayout(lambda: self._set_panel(LateralPanel.HUB))
     self._override_layout = OverrideTuningLayout(lambda: self._set_panel(LateralPanel.HUB))
     self._steer_filters_layout = SteerFiltersLayout(lambda: self._set_panel(LateralPanel.HUB))
-    self._ford_layout = FordLateralTuningLayout(lambda: self._set_panel(LateralPanel.HUB))
 
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
@@ -282,16 +283,9 @@ class LateralTuningLayout(Widget):
   def _show_pid_tune_info(self):
     gui_app.push_widget(HtmlModalSP(text=self._build_pid_tune_info()))
 
-  def _initialize_items(self):
-    self._handcrafted_tune = toggle_item_sp(
-      title=lambda: tr("Handcrafted Lateral Tuning"),
-      description=lambda: tr("Force-load the complete road-tested tune for this exact vehicle fingerprint. While enabled, " +
-                             "conflicting PID/F, learning, helper, filter, and live-delay controls are locked."),
-      param="NrdrHandcraftedLateralTune",
-    )
-
+  def _initialize_vehicle_items(self):
     self._tune_report_item = ListItem(
-      title=lambda: tr("Tune Report"),
+      title=lambda: tr("Run Tune Report Scan"),
       description=lambda: tr(
         "Analyze the drive logs on this device and report, per speed band and turn direction, how well the lateral tune is tracking. " +
         "Scanning a full day of logs can take a few minutes. DELETE permanently wipes all dashcam media in /data/media/0."
@@ -306,7 +300,7 @@ class LateralTuningLayout(Widget):
     )
 
     self._pid_tune_info_item = button_item(
-      lambda: tr("Car & Tune Info"),
+      lambda: tr("Loaded Vehicle & Tune"),
       lambda: tr("VIEW"),
       lambda: tr(
         "Your car's full profile: fingerprint, EPS firmware, gas interceptor and radar status, plus the lateral/longitudinal " +
@@ -314,16 +308,26 @@ class LateralTuningLayout(Widget):
       ),
       callback=self._show_pid_tune_info,
     )
+    return [self._tune_report_item, self._pid_tune_info_item]
+
+  def _initialize_items(self):
+    self._handcrafted_tune = toggle_item_sp(
+      title=lambda: tr("Handcrafted Lateral Tuning"),
+      description=lambda: tr("Force-load the complete road-tested tune for this exact vehicle fingerprint. While enabled, " +
+                             "conflicting PID/F, learning, helper, filter, and live-delay controls are locked."),
+      param="NrdrHandcraftedLateralTune",
+    )
+
+    self._vehicle_model_button = simple_button_item_sp(
+      button_text=lambda: tr("Vehicle Model & Learning"),
+      button_width=800,
+      callback=lambda: self._set_panel(LateralPanel.VEHICLE_MODEL),
+    )
 
     self._pidf_button = simple_button_item_sp(
       button_text=lambda: tr("Controller Tuning Dungeon"),
       button_width=800,
       callback=lambda: self._set_panel(LateralPanel.PIDF),
-    )
-    self._unwind_button = simple_button_item_sp(
-      button_text=lambda: tr("Unwind Helpers"),
-      button_width=800,
-      callback=lambda: self._set_panel(LateralPanel.UNWIND),
     )
     self._override_button = simple_button_item_sp(
       button_text=lambda: tr("Override Tuning"),
@@ -335,27 +339,16 @@ class LateralTuningLayout(Widget):
       button_width=800,
       callback=lambda: self._set_panel(LateralPanel.STEER_FILTERS),
     )
-    self._ford_lateral_button = simple_button_item_sp(
-      button_text=lambda: tr("Ford Lateral Tuning"),
-      button_width=800,
-      callback=lambda: self._set_panel(LateralPanel.FORD),
-    )
-
     return [
       self._handcrafted_tune,
       LineSeparatorSP(40),
-      self._tune_report_item,
-      self._pid_tune_info_item,
+      self._vehicle_model_button,
       LineSeparatorSP(40),
       self._pidf_button,
-      LineSeparatorSP(40),
-      self._unwind_button,
       LineSeparatorSP(40),
       self._override_button,
       LineSeparatorSP(40),
       self._steer_filters_button,
-      LineSeparatorSP(40),
-      self._ford_lateral_button,
     ]
 
   def _update_state(self):
@@ -366,20 +359,17 @@ class LateralTuningLayout(Widget):
     self._handcrafted_tune.action_item.set_enabled(ui_state.is_offroad())
 
   def _render(self, rect):
+    if self._current_panel == LateralPanel.VEHICLE_MODEL:
+      self._vehicle_model_layout.render(rect)
+      return
     if self._current_panel == LateralPanel.PIDF:
       self._pidf_layout.render(rect)
-      return
-    if self._current_panel == LateralPanel.UNWIND:
-      self._unwind_layout.render(rect)
       return
     if self._current_panel == LateralPanel.OVERRIDE:
       self._override_layout.render(rect)
       return
     if self._current_panel == LateralPanel.STEER_FILTERS:
       self._steer_filters_layout.render(rect)
-      return
-    if self._current_panel == LateralPanel.FORD:
-      self._ford_layout.render(rect)
       return
     self._back_button.set_position(self._rect.x, self._rect.y + 20)
     self._back_button.render()

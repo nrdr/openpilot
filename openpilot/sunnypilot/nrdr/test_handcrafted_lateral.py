@@ -32,7 +32,7 @@ def test_torque_mod_profiles_are_versioned_and_fingerprint_scoped():
     profile = get_handcrafted_lateral_profile(fingerprint)
     assert profile is HANDCRAFTED_LATERAL_PROFILES[fingerprint]
     assert profile.fingerprint == fingerprint
-    assert profile.version == 9
+    assert profile.version == 10
     assert "2026-08-13" in profile.name
   assert get_handcrafted_lateral_profile("HONDA_CIVIC_2022") is None
 
@@ -75,10 +75,11 @@ def test_profile_preserves_the_current_road_tested_choices():
   assert not any(key.startswith("NrdrNnlc") for key in values)
   assert values["HondaTorqueLowPassFilter"] is True
   assert values["HondaLpfTauLowSpeed"] == values["HondaLpfTauStandard"] == 0.1
-  assert values["HondaUnwindLookahead"] is False
-  assert "HondaUnwindFreeze" not in values
   assert "HondaPidFriction" not in values
-  assert values["HondaOverrideFadeUpSecs"] == 1.0
+  assert values["NrdrDriverOverrideThreshold"] == 1400
+  assert values["NrdrOverrideThresholdCenterBoost"] == 1000
+  assert values["HondaOverrideFadeDownSecs"] == values["HondaOverrideFadeUpSecs"] == 0.1
+  assert values["HondaOverrideTorqueScale"] == 0
   assert values["HondaSteerDeltaUp"] == values["HondaSteerDeltaDown"] == 4.0
   assert values["HondaStoppingDecelRate"] == 30
   assert values["LagdToggle"] is False
