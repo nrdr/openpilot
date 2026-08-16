@@ -752,6 +752,12 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("Cruise Fault: Restart the Car"),
   },
 
+  EventName.gasInterceptorFault: {
+    ET.IMMEDIATE_DISABLE: ImmediateDisableAlert("Gas Pedal Interceptor Fault"),
+    ET.PERMANENT: NormalPermanentAlert("Gas Pedal Interceptor Fault", "Check Pedal Interceptor or Harness"),
+    ET.NO_ENTRY: NoEntryAlert("Gas Pedal Interceptor Fault"),
+  },
+
   EventName.espActive: {
     ET.SOFT_DISABLE: soft_disable_alert("Electronic Stability Control Active"),
     ET.NO_ENTRY: NoEntryAlert("Electronic Stability Control Active"),
