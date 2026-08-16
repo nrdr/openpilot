@@ -143,7 +143,7 @@ class TestClamps:
     assert tune.jerk_factors("standard", (1.0, 1.0)) == (0.2, 3.0)
 
   def test_unknown_personality_ignored(self, tmp_path):
-    write_raw(tmp_path, json.dumps({"t_follow_offsets": {"econ": -0.3}}))
+    write_raw(tmp_path, json.dumps({"t_follow_offsets": {"unknown": -0.3}}))
     tune = make_tune(tmp_path)
     force_refresh(tune)
     assert tune.t_follow_offsets == {}
@@ -196,5 +196,4 @@ class TestWriter:
     assert NRDR_LONG_TUNE_PATH == "/data/nrdr_long_tune.json"
 
   def test_personalities_match_branch_enum(self):
-    # this branch's cereal LongitudinalPersonality: aggressive@0, standard@1, relaxed@2 (no econ)
-    assert PERSONALITIES == ("aggressive", "standard", "relaxed")
+    assert PERSONALITIES == ("aggressive", "standard", "relaxed", "econ")

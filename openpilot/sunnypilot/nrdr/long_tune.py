@@ -6,7 +6,7 @@ import os
 
 
 NRDR_LONG_TUNE_PATH = "/data/nrdr_long_tune.json"
-PERSONALITIES = ("aggressive", "standard", "relaxed")
+PERSONALITIES = ("aggressive", "standard", "relaxed", "econ")
 LOW_SPEED_JERK_BP = (2.0, 5.0)
 
 SCALAR_FIELDS = {
