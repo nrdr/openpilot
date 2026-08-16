@@ -260,7 +260,8 @@ def install(dispatcher) -> None:
   dispatcher["setSdpAnswer"] = _set_sdp_answer
   dispatcher["getSdp"] = _get_sdp
   dispatcher["getIce"] = _get_ice
-  dispatcher["getNetworks"] = HARDWARE.get_networks
+  if hasattr(HARDWARE, "get_networks"):
+    dispatcher["getNetworks"] = HARDWARE.get_networks
   dispatcher["startStream"] = _start_stream
 
 
