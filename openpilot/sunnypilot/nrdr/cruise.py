@@ -21,7 +21,7 @@ def _cluster_mph_to_kph(mph: float) -> float:
 
 class NrdrCruise:
   def __init__(self, CP):
-    self.is_honda = CP.carName == "honda"
+    self.is_honda = CP.brand == "honda"
     self.is_metric = True
     self.params = Params()
 
