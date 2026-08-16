@@ -41,7 +41,7 @@ class NrdrLongitudinalPlanner:
     self.v_ego_stopping = CP.deprecated.vEgoStopping
     self.cruise_scale = 1.0
     self.cruise_overspeed_allowance = 0.0
-    self.roen_acceleration_limits = False
+    self.roen_acceleration_limits = True
     self.launch_armed = False
     self._refresh_settings()
 
@@ -54,7 +54,7 @@ class NrdrLongitudinalPlanner:
     self.v_ego_stopping = read_float(snapshot, "HondaVEgoStopping", self.CP.deprecated.vEgoStopping, 0.0, 5.0)
     self.cruise_scale = read_float(snapshot, "NrdrCruiseMismatchCorrection", 100.0, 95.0, 105.0) / 100.0
     self.cruise_overspeed_allowance = read_float(snapshot, "NrdrCruiseOverspeedAllowance", 0.0, 0.0, 10.0) * CV.MPH_TO_MS
-    self.roen_acceleration_limits = read_bool(snapshot, "NrdrRoenAccelerationLimits", False)
+    self.roen_acceleration_limits = read_bool(snapshot, "NrdrRoenAccelerationLimits", True)
     self.settings_generation = snapshot.generation
 
   @property

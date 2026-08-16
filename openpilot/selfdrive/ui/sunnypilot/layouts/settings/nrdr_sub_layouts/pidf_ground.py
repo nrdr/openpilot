@@ -3,6 +3,7 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
+from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
   STEER_RATIO_ENDPOINT_PROFILES,
   get_steer_ratio_endpoint_profile,
@@ -32,14 +33,22 @@ class PidfGroundLayout(Widget):
       param="NrdrStarPilotPid",
     )
 
+    self._legacy_dual_bp_sr = toggle_item_sp(
+      title=tr("Use Legacy Dual-BP Steer Ratio (Default: ON)"),
+      description=tr("Keeps the current road-tested center-to-outer curve. Turn OFF to test the firmware-derived EPS position " +
+                     "map when this car and firmware are recognized. This experimental map covers EPS sensor geometry, not the " +
+                     "complete road-wheel ratio; unsupported firmware falls back to legacy. Clarity uses PID only in this mode."),
+      param="NrdrLegacyDualBpSteerRatio",
+    )
+
     self._sr_endpoint_controls = []
     for profile in STEER_RATIO_ENDPOINT_PROFILES:
       center = option_item_sp(
         param=profile.center_param,
         title=lambda profile=profile: tr(f"On-Center Steer Ratio (Default: {profile.center_default:.2f})"),
         min_value=800, max_value=2500, value_change_step=1,
-        description=lambda: tr("Directly changes the steer-ratio value at zero steering-wheel angle. " +
-                               "The controller blends linearly from this value to the outer value below."),
+        description=lambda: tr("Sets the steer ratio at zero steering-wheel angle. It anchors firmware mode and is the " +
+                               "starting value of the legacy center-to-outer curve."),
         label_callback=lambda value: f"{value / 100:.2f}",
         use_float_scaling=True,
       )
@@ -47,8 +56,8 @@ class PidfGroundLayout(Widget):
         param=profile.outer_param,
         title=lambda profile=profile: tr(f"Outer Steer Ratio (Default: {profile.outer_default:.2f})"),
         min_value=800, max_value=2500, value_change_step=1,
-        description=lambda: tr("Directly changes the high-angle endpoint of the two-point steer-ratio curve. " +
-                               "This is the value held after the family's outer breakpoint."),
+        description=lambda: tr("Sets the high-angle endpoint used by legacy mode, firmware fallback, and the optional " +
+                               "lane-change endpoint behavior."),
         label_callback=lambda value: f"{value / 100:.2f}",
         use_float_scaling=True,
       )
@@ -57,7 +66,7 @@ class PidfGroundLayout(Widget):
     self._lane_change_endpoint_sr = toggle_item_sp(
       title=tr("Use Endpoint SR for Smoother Lane Changes (Default: ON)"),
       description=tr("While the planner has a lane change active, use this car's Outer Steer Ratio for the entire maneuver. " +
-                     "Normal angle-based steer ratio resumes only after the lane change is complete."),
+                     "The selected normal steer-ratio mode resumes only after the lane change is complete."),
       param="NrdrLaneChangeEndpointSteerRatio",
     )
 
@@ -192,7 +201,8 @@ class PidfGroundLayout(Widget):
     self._nnlc_enabled = toggle_item_sp(
       title=tr("Enable Neural Network Lateral Model (NNLC) (Default: OFF)"),
       description=tr("Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model " +
-                     "at higher speeds. OFF keeps the proven Clarity PID controller active everywhere."),
+                     "at higher speeds. OFF keeps the proven Clarity PID controller active everywhere. NNLC is unavailable while " +
+                     "the experimental firmware EPS position map is active."),
       param="NrdrNnlcEnabled",
     )
     self._nnlc_activation_speed = option_item_sp(
@@ -229,6 +239,7 @@ class PidfGroundLayout(Widget):
     return [
       self._starpilot,
       LineSeparatorSP(40),
+      self._legacy_dual_bp_sr,
       *(control for _, center, outer in self._sr_endpoint_controls for control in (center, outer)),
       self._lane_change_endpoint_sr,
       LineSeparatorSP(40),
@@ -264,11 +275,16 @@ class PidfGroundLayout(Widget):
     fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
     editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
     active_sr_profile = get_steer_ratio_endpoint_profile(fingerprint)
+    firmware_vgr_active = bool(
+      ui_state.CP is not None and get_honda_vgr_profile(ui_state.CP) is not None and
+      not self._legacy_dual_bp_sr.action_item.get_state()
+    )
     sr_controls = [control for _, center, outer in self._sr_endpoint_controls for control in (center, outer)]
     for profile, center, outer in self._sr_endpoint_controls:
       visible = profile == active_sr_profile
       center.set_visible(visible)
       outer.set_visible(visible)
+    self._legacy_dual_bp_sr.set_visible(active_sr_profile is not None)
     self._lane_change_endpoint_sr.set_visible(active_sr_profile is not None)
     for item in (
       self._starpilot, *sr_controls, self._lane_change_endpoint_sr,
@@ -281,8 +297,10 @@ class PidfGroundLayout(Widget):
     ):
       item.action_item.set_enabled(editable)
 
+    self._legacy_dual_bp_sr.action_item.set_enabled(editable and not ui_state.engaged)
+
     for item in (self._nnlc_enabled, self._nnlc_activation_speed, self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain):
-      item.action_item.set_enabled(True)
+      item.action_item.set_enabled(not firmware_vgr_active)
 
     nnlc_enabled = self._nnlc_enabled.action_item.get_state()
     self._nnlc_activation_speed.set_visible(nnlc_enabled)

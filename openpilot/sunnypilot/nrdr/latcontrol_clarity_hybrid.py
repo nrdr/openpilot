@@ -49,6 +49,7 @@ class LatControlClarityHybrid(LatControl):
 
     pid_cp = CI.get_non_essential_params(CP.carFingerprint)
     CI.get_non_essential_params_sp(pid_cp, CP.carFingerprint)
+    pid_cp.carFw = CP.carFw
     if pid_cp.lateralTuning.which() != "pid":
       raise RuntimeError(f"Clarity hybrid expected PID defaults, got {pid_cp.lateralTuning.which()}")
 
@@ -83,6 +84,20 @@ class LatControlClarityHybrid(LatControl):
     self.nnlc_blend += float(np.clip(target - self.nnlc_blend, -max_delta, max_delta))
     return self.nnlc_blend
 
+  def _pid_only_result(self, pid_output, pid_angle, pid_log):
+    self.nnlc_blend = 0.0
+    self.torque_controller.extension._pid.i = 0.0
+    torque_log = log.ControlsState.LateralTorqueState.new_message()
+    torque_log.active = pid_log.active
+    torque_log.error = pid_log.angleError
+    torque_log.p = pid_log.p
+    torque_log.i = pid_log.i
+    torque_log.d = 0.0
+    torque_log.f = pid_log.f
+    torque_log.output = float(pid_output)
+    torque_log.saturated = pid_log.saturated
+    return float(pid_output), float(pid_angle), torque_log
+
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
              calibrated_pose, curvature_limited, lat_delay):
     pid_output, pid_angle, pid_log = self.pid_controller.update(
@@ -90,24 +105,17 @@ class LatControlClarityHybrid(LatControl):
       calibrated_pose, curvature_limited, lat_delay,
     )
     self.torque_controller.extension.nrdr.update()
+    pid_extension = self.pid_controller.nrdr_controller
+    if pid_extension is not None and pid_extension.firmware_vgr_selected:
+      return self._pid_only_result(pid_output, pid_angle, pid_log)
+
     nnlc_enabled = self.torque_controller.extension._nnlc_enabled
     lane_change_state = self._lane_change_state()
     target = clarity_nnlc_blend_target(CS.vEgo, lane_change_state,
                                        self.torque_controller.extension.activation_speed_mps) if nnlc_enabled else 0.0
     blend = self._update_blend(active, target, lane_change_state)
     if not nnlc_enabled and blend <= 1e-3:
-      self.nnlc_blend = 0.0
-      self.torque_controller.extension._pid.i = 0.0
-      torque_log = log.ControlsState.LateralTorqueState.new_message()
-      torque_log.active = pid_log.active
-      torque_log.error = pid_log.angleError
-      torque_log.p = pid_log.p
-      torque_log.i = pid_log.i
-      torque_log.d = 0.0
-      torque_log.f = pid_log.f
-      torque_log.output = float(pid_output)
-      torque_log.saturated = pid_log.saturated
-      return float(pid_output), float(pid_angle), torque_log
+      return self._pid_only_result(pid_output, pid_angle, pid_log)
 
     nnlc_output, _, torque_log = self.torque_controller.update(
       active, CS, VM, params, steer_limited_by_safety, desired_curvature,

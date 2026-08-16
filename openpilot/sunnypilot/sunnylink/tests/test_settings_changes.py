@@ -227,6 +227,29 @@ class TestNrdrLongitudinalOptions:
     assert item is not None
     assert (item.get("min"), item.get("max"), item.get("step"), item.get("unit")) == (0, 10, 1, "mph")
 
+  def test_longitudinal_default_descriptions(self, schema):
+    roen = _find_item(schema, "NrdrRoenAccelerationLimits")
+    live_gas = _find_item(schema, "HondaLiveLearningGas")
+    assert "Enabled by default" in roen.get("details", "")
+    assert "default OFF when a gas pedal interceptor is detected" in live_gas.get("details", "")
+    assert "selection is preserved" in live_gas.get("details", "")
+
+
+class TestNrdrSteerRatioMode:
+  def test_legacy_mode_is_explicit_and_fingerprint_scoped(self, schema):
+    item = _find_item(schema, "NrdrLegacyDualBpSteerRatio")
+    assert item is not None
+    assert item.get("widget") == "toggle"
+    visibility = json.dumps(item.get("visibility") or [])
+    assert "HONDA_CLARITY" in visibility
+    assert "HONDA_CIVIC" in visibility
+    assert "HONDA_ACCORD" in visibility
+    assert "HONDA_CRV_5G" in visibility
+    assert "HONDA_INSIGHT" in visibility
+    enablement = json.dumps(item.get("enablement") or [])
+    assert "NrdrHandcraftedLateralTune" in enablement
+    assert "not_engaged" in enablement
+
 
 class TestNotEngagedReplacement:
   @pytest.mark.parametrize("key", [

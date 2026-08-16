@@ -5,7 +5,7 @@ import pytest
 
 from openpilot.cereal import log
 from opendbc.car.car_helpers import interfaces
-from opendbc.car.structs import car
+from opendbc.car.structs import CarParams, car
 from opendbc.car.honda.values import CAR as HONDA
 from opendbc.car.hyundai.values import CAR as HYUNDAI
 from opendbc.car.toyota.values import CAR as TOYOTA
@@ -57,7 +57,8 @@ class TestNNTorqueModel:
   def test_clarity_forces_torque_and_exact_nnlc_model_with_global_toggles_off(self):
     params = Params()
     keys = ("EnforceTorqueControl", "NeuralNetworkLateralControl", "NrdrNnlcEnabled",
-            "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain")
+            "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain",
+            "NrdrLegacyDualBpSteerRatio")
     previous = {key: params.get(key) for key in keys}
     try:
       params.put_bool("EnforceTorqueControl", False, block=True)
@@ -67,9 +68,11 @@ class TestNNTorqueModel:
       params.put("NrdrNnlcKpGain", 100, block=True)
       params.put("NrdrNnlcKfGain", 50, block=True)
       params.put("NrdrNnlcKiGain", 10, block=True)
+      params.put_bool("NrdrLegacyDualBpSteerRatio", True, block=True)
 
       CarInterface = interfaces[HONDA.HONDA_CLARITY]
       CP = CarInterface.get_non_essential_params(HONDA.HONDA_CLARITY)
+      CP.carFw = [CarParams.CarFw(ecu=CarParams.Ecu.eps, fwVersion=b"39990-TRW-A020")]
       CP_SP = CarInterface.get_non_essential_params_sp(CP, HONDA.HONDA_CLARITY)
       CI = CarInterface(CP, CP_SP)
       sunnypilot_interfaces.setup_interfaces(CI, params)
@@ -92,6 +95,8 @@ class TestNNTorqueModel:
       pid_controller = controller.pid_controller.nrdr_controller
       assert pid_controller is not None
       assert pid_controller.sr_profile is not None
+      assert pid_controller.vgr_profile is not None
+      assert pid_controller.vgr_profile.name == "Clarity TRW-A020"
       assert len(pid_controller.pid._k_p[0]) == len(pid_controller.pid._k_p[1]) == 4
       assert len(pid_controller.pid._k_i[0]) == len(pid_controller.pid._k_i[1]) == 4
       low_max = 25.0 * CV.MPH_TO_MS
@@ -156,6 +161,19 @@ class TestNNTorqueModel:
       )
       CS.vEgo = 10.0 * CV.MPH_TO_MS
       controller.update(True, CS, VM, live_params, False, 0.0, None, False, 0.2)
+
+      # Firmware EPS mode is PID-only until NNLC can dewarp both position and rate coordinates.
+      params.put_bool("NrdrLegacyDualBpSteerRatio", False, block=True)
+      pid_controller.params.refresh_all()
+      pid_controller._refresh_settings()
+      assert pid_controller.firmware_vgr_selected
+      controller.nnlc_blend = 1.0
+      controller.extension._pid.i = 0.2
+      VM.sR = 17.123
+      controller.update(True, CS, VM, live_params, False, 0.0, None, False, 0.2)
+      assert controller.nnlc_blend == 0.0
+      assert controller.extension._pid.i == 0.0
+      assert VM.sR == 17.123
     finally:
       for key, value in previous.items():
         if value is None:

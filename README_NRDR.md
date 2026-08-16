@@ -103,5 +103,5 @@ Once your lateral control, stopping, and overrides are perfectly dialed, activat
 | **`HondaSteerDeltaLimiter`** | `OFF` | `ON / OFF` | Jerk-reduction limiter for steering inputs |
 | **`HondaUnwindFreeze`** | `OFF` | `ON / OFF` | Freezes PID integrator on steer unwind |
 | **`HondaUnwindLookahead`** | `OFF` | `ON / OFF` | Looks ahead in model path to start unwind early |
-| **`HondaLiveLearningGas`** | `ON` | `ON / OFF` | Adapts gas/wind compensation factors live |
+| **`HondaLiveLearningGas`** | `OFF with gas interceptor` | `ON / OFF` | Adapts gas/wind compensation factors live; the first detected Honda sets the initial value and later user changes persist |
 | **`HondaCivicRadarTryout`** | `ON` | `ON / OFF` | Fuses Bosch fine-range radar track data |

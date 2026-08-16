@@ -313,7 +313,7 @@ sections:
       widget: toggle
       title: Roen Nidec Acceleration Limits
       description: Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.
-      details: Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas.
+      details: Enabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas.
     - key: NrdrCruiseOverspeedAllowance
       widget: option
       title: Set-Speed Overshoot Allowance
@@ -327,6 +327,7 @@ sections:
       widget: toggle
       title: Live Learning Gas
       description: Allows Honda gas and wind compensation factors to learn live while driving.
+      details: Fresh installs default OFF when a gas pedal interceptor is detected and ON otherwise. Your selection is preserved afterward.
       enablement:
       - $ref: '#/macros/offroad'
     - key: HondaCivicRadarTryout

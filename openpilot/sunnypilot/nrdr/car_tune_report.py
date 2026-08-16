@@ -7,6 +7,7 @@ from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
   get_handcrafted_lateral_profile,
   is_handcrafted_lateral_enabled,
 )
+from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoint_profile
 
 
@@ -81,13 +82,26 @@ class CarTuneReporter:
       return f"Auto {self._state('NrdrLearnSteerRatio')} | base {float(CP.steerRatio):g}"
     center = float(self._value(profile.center_param))
     outer = float(self._value(profile.outer_param))
+    firmware_profile = get_honda_vgr_profile(CP)
+    if self.params.get_bool("NrdrLegacyDualBpSteerRatio"):
+      mode = "legacy dual-BP"
+    elif firmware_profile is not None:
+      mode = f"experimental EPS map {firmware_profile.name}"
+    else:
+      mode = "firmware unavailable -> legacy dual-BP"
     lane_change = self._state("NrdrLaneChangeEndpointSteerRatio")
-    return f"direct {center:.2f} center -> {outer:.2f} outer | lane-change endpoint {lane_change}"
+    if firmware_profile is not None and not self.params.get_bool("NrdrLegacyDualBpSteerRatio"):
+      return f"{mode} | {center:.2f} center anchor | {outer:.2f} fallback/lane-change outer | lane endpoint {lane_change}"
+    return f"{mode} | {center:.2f} center -> {outer:.2f} outer | lane endpoint {lane_change}"
 
   def _controller_info(self, CP, controller: str, handcrafted_enabled: bool, profile) -> str:
     if controller == "PID/NNLC":
-      nnlc = "PID/NNLC hybrid | PID for lane changes" if self._state("NrdrNnlcEnabled") == "ON" \
-        else "PID only | NNLC disabled"
+      firmware_pid_only = not self.params.get_bool("NrdrLegacyDualBpSteerRatio") and get_honda_vgr_profile(CP) is not None
+      if firmware_pid_only:
+        nnlc = "PID only | NNLC unavailable in firmware EPS mode"
+      else:
+        nnlc = "PID/NNLC hybrid | PID for lane changes" if self._state("NrdrNnlcEnabled") == "ON" \
+          else "PID only | NNLC disabled"
     else:
       nnlc = controller
     return f"Handcrafted v{profile.version} | {nnlc}" if handcrafted_enabled else nnlc
@@ -131,6 +145,8 @@ class CarTuneReporter:
       f"KF {float(self._value('NrdrNnlcKfGain')) / 100.0:g} | ",
       f"KI {float(self._value('NrdrNnlcKiGain')) / 100.0:g}",
     ))
+    if not self.params.get_bool("NrdrLegacyDualBpSteerRatio") and get_honda_vgr_profile(CP) is not None:
+      nnlc += " | inactive in firmware EPS mode"
     steer_ratio = self._steer_ratio_info(CP)
     learning = f"stiffness {self._state('NrdrLearnStiffness')} | angle {self._state('NrdrLearnAngleOffset')}"
     helpers = f"stiction {self._state('NrdrLatStiction')} | StarPilot {self._state('NrdrStarPilotPid')}"

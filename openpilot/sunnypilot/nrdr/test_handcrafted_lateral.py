@@ -1,5 +1,5 @@
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
-  CLARITY_ROAD_TESTED_2026_08_13,
+  CLARITY_ROAD_TESTED_2026_08_16,
   HANDCRAFTED_LATERAL_PROFILES,
   HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS,
   apply_handcrafted_lateral_profile,
@@ -32,8 +32,8 @@ def test_torque_mod_profiles_are_versioned_and_fingerprint_scoped():
     profile = get_handcrafted_lateral_profile(fingerprint)
     assert profile is HANDCRAFTED_LATERAL_PROFILES[fingerprint]
     assert profile.fingerprint == fingerprint
-    assert profile.version == 10
-    assert "2026-08-13" in profile.name
+    assert profile.version == 11
+    assert "2026-08-16" in profile.name
   assert get_handcrafted_lateral_profile("HONDA_CIVIC_2022") is None
 
 
@@ -61,10 +61,11 @@ def test_profile_can_be_disabled_and_never_affects_other_fingerprints():
 
 
 def test_profile_preserves_the_current_road_tested_choices():
-  values = dict(CLARITY_ROAD_TESTED_2026_08_13.values)
+  values = dict(CLARITY_ROAD_TESTED_2026_08_16.values)
   clarity_sr = get_steer_ratio_endpoint_profile("HONDA_CLARITY")
   assert values[clarity_sr.center_param] == 18.50
   assert values[clarity_sr.outer_param] == 12.72
+  assert values["NrdrLegacyDualBpSteerRatio"] is True
   assert values["NrdrLaneChangeEndpointSteerRatio"] is True
   assert "NrdrSteerRatioOffset" not in values
   assert values["HondaCenterScale"] == 0.5

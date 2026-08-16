@@ -64,7 +64,7 @@ class NrdrLongControl:
     self.stopping_decel_rate = CP.deprecated.stoppingDecelRate
     self.v_ego_starting = CP.deprecated.vEgoStarting
     self.v_ego_stopping = CP.deprecated.vEgoStopping
-    self.roen_acceleration_limits = False
+    self.roen_acceleration_limits = True
     self.drel_window = deque(maxlen=DREL_FILTER_FRAMES)
     self.drel_filtered = math.inf
     self._refresh_params()
@@ -82,7 +82,7 @@ class NrdrLongControl:
     )
     self.v_ego_starting = read_float(snapshot, "HondaVEgoStarting", self.CP.deprecated.vEgoStarting, 0.0, 5.0)
     self.v_ego_stopping = read_float(snapshot, "HondaVEgoStopping", self.CP.deprecated.vEgoStopping, 0.0, 5.0)
-    self.roen_acceleration_limits = read_bool(snapshot, "NrdrRoenAccelerationLimits", False)
+    self.roen_acceleration_limits = read_bool(snapshot, "NrdrRoenAccelerationLimits", True)
     self.settings_generation = snapshot.generation
 
   def _accel_limits(self, accel_limits, v_ego: float):

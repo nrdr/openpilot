@@ -59,7 +59,7 @@ class LongitudinalTuningLayout(Widget):
 
     self._roen_acceleration_limits = toggle_item_sp(
       param="NrdrRoenAccelerationLimits",
-      title=lambda: tr("Roen Nidec Acceleration Limits (Default: OFF)"),
+      title=lambda: tr("Roen Nidec Acceleration Limits (Default: ON)"),
       description=lambda: tr(
         "Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling. " +
         "This operates independently of Live Learning Gas."
@@ -96,8 +96,11 @@ class LongitudinalTuningLayout(Widget):
 
     self._live_learning_gas = toggle_item_sp(
       param="HondaLiveLearningGas",
-      title=lambda: tr("Live Learning Gas (Default: ON)"),
-      description=lambda: tr("Allows Honda gas and wind compensation factors to learn live while driving."),
+      title=lambda: tr("Live Learning Gas (Default: OFF with Gas Interceptor)"),
+      description=lambda: tr(
+        "Allows Honda gas and wind compensation factors to learn live while driving. Fresh installs default OFF when a gas pedal " +
+        "interceptor is detected and ON otherwise; your selection is preserved afterward."
+      ),
     )
 
     self._stopping_decel_rate = option_item_sp(

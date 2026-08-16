@@ -106,6 +106,11 @@ def test_roen_setting_reaches_control_and_planner_snapshots():
   assert "NrdrRoenAccelerationLimits" in planner_keys
 
 
+def test_steer_ratio_mode_is_cached_with_controller_settings():
+  control_keys = {key for group in CONTROL_GROUPS for key in group.keys}
+  assert "NrdrLegacyDualBpSteerRatio" in control_keys
+
+
 def test_learning_toggles_preserve_typed_boolean_values():
   values = {
     "NrdrLearnSteerRatio": False,

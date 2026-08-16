@@ -192,8 +192,8 @@ sections:
     - key: NrdrLearnSteerRatio
       widget: toggle
       title: Learn Steer Ratio (Auto)
-      description: Uses openpilot's learned scalar on normal cars. Supported two-point Hondas always use their direct endpoint curve.
-      details: When ON, unmapped cars use openpilot's live-learned steer ratio. The supported Clarity, Civic, Accord, CR-V, and Insight two-point profiles keep their direct On-Center and Outer Steer Ratio values authoritative in either position.
+      description: Uses openpilot's learned scalar on normal cars. Supported mapped Hondas use their configured On-Center anchor.
+      details: When ON, unmapped cars use openpilot's live-learned steer ratio. Supported Clarity, Civic, Accord, CR-V, and Insight profiles keep their configured On-Center anchor authoritative in both legacy and firmware-derived modes, avoiding double-counting the rack's variable geometry.
       enablement:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
     - key: NrdrLearnStiffness
@@ -220,6 +220,25 @@ sections:
       title: StarPilot PID Additions
       description: Adds the borrowed StarPilot turn-in / unwind / per-direction output scaling, not built for Honda.
       details: The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base.
+    - key: NrdrLegacyDualBpSteerRatio
+      widget: toggle
+      visibility:
+      - type: any
+        conditions:
+        - {type: capability, field: car_fingerprint, equals: HONDA_CLARITY}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH_DIESEL}
+        - {type: capability, field: car_fingerprint, equals: HONDA_ACCORD}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CRV_5G}
+        - {type: capability, field: car_fingerprint, equals: HONDA_CRV_HYBRID}
+        - {type: capability, field: car_fingerprint, equals: HONDA_INSIGHT}
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
+      - $ref: '#/macros/not_engaged'
+      title: Use Legacy Dual-BP Steer Ratio
+      description: Keeps the current road-tested two-breakpoint steer-ratio curve. Default ON.
+      details: Turn OFF to test the firmware-derived EPS position map when this car and firmware are recognized. This experimental map covers the EPS sensor coordinate geometry, not the complete steering-wheel-to-road-wheel ratio, and does not use the Outer Steer Ratio except for fallback or lane changes. Unknown firmware, including currently unmapped Accord firmware, automatically falls back to legacy. Clarity runs PID only while firmware mode is active because its NNLC rate path requires a separate firmware transform.
     - key: NrdrSteerRatioCenterClarity
       widget: option
       visibility:
@@ -228,7 +247,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: On-Center Steer Ratio
       description: Directly sets the Clarity's steer ratio at zero steering-wheel angle. Default 18.50.
-      details: This is an absolute steer-ratio value, not an offset. The controller blends linearly from this value at center to the Outer Steer Ratio at 250 degrees.
+      details: This absolute value anchors firmware-derived mode and is the starting value of the legacy curve. Legacy mode blends from here to the Outer Steer Ratio at 250 degrees.
       min: 8.0
       max: 25.0
       step: 0.01
@@ -240,7 +259,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: Outer Steer Ratio
       description: Directly sets the Clarity's high-angle steer ratio. Default 12.72.
-      details: This is the absolute outer endpoint of the two-point curve. It is reached at 250 degrees and held beyond that angle.
+      details: This is the legacy/fallback curve's outer endpoint, reached at 250 degrees and held beyond it. It is also used when lane-change endpoint SR is enabled.
       min: 8.0
       max: 25.0
       step: 0.01
@@ -256,7 +275,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: On-Center Steer Ratio
       description: Directly sets the 10th-gen Civic's steer ratio at zero steering-wheel angle. Default 17.24.
-      details: This is an absolute steer-ratio value, not an offset. The controller blends linearly from this value at center to the Outer Steer Ratio at the Civic's high-angle breakpoint.
+      details: This absolute value anchors firmware-derived mode and is the starting value of the legacy curve. Legacy mode blends from here to the Outer Steer Ratio at the Civic's high-angle breakpoint.
       min: 8.0
       max: 25.0
       step: 0.01
@@ -272,7 +291,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: Outer Steer Ratio
       description: Directly sets the 10th-gen Civic's high-angle steer ratio. Default 10.93.
-      details: This is the absolute outer endpoint of the two-point curve. It is reached at the Civic's high-angle breakpoint and held beyond it.
+      details: This is the legacy/fallback curve's outer endpoint, reached at the Civic's high-angle breakpoint and held beyond it. It is also used when lane-change endpoint SR is enabled.
       min: 8.0
       max: 25.0
       step: 0.01
@@ -284,7 +303,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: On-Center Steer Ratio
       description: Directly sets the 10th-gen Accord's steer ratio at zero steering-wheel angle. Default 18.31.
-      details: This is an absolute steer-ratio value, not an offset. The controller blends linearly from this value at center to the Outer Steer Ratio at the Accord's high-angle breakpoint.
+      details: This absolute value is the starting point of the legacy curve and the future firmware-map anchor. Accord firmware currently falls back to legacy mode.
       min: 8.0
       max: 25.0
       step: 0.01
@@ -296,7 +315,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: Outer Steer Ratio
       description: Directly sets the 10th-gen Accord's high-angle steer ratio. Default 11.82.
-      details: This is the absolute outer endpoint of the two-point curve. It is reached at the Accord's high-angle breakpoint and held beyond it.
+      details: This is the legacy/fallback curve's outer endpoint, reached at the Accord's high-angle breakpoint and held beyond it. It is also used when lane-change endpoint SR is enabled.
       min: 8.0
       max: 25.0
       step: 0.01
@@ -311,7 +330,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: On-Center Steer Ratio
       description: Directly sets the 5th-gen CR-V's steer ratio at zero steering-wheel angle. Default 17.94.
-      details: This is an absolute steer-ratio value, not an offset. The controller blends linearly from this value at center to the Outer Steer Ratio at the CR-V's high-angle breakpoint.
+      details: This absolute value anchors firmware-derived mode when exact CR-V firmware is recognized and is the starting value of the legacy curve.
       min: 8.0
       max: 25.0
       step: 0.01
@@ -326,7 +345,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: Outer Steer Ratio
       description: Directly sets the 5th-gen CR-V's high-angle steer ratio. Default 12.30.
-      details: This is the absolute outer endpoint of the two-point curve. It is reached at the CR-V's high-angle breakpoint and held beyond it.
+      details: This is the legacy/fallback curve's outer endpoint, reached at the CR-V's high-angle breakpoint and held beyond it. It is also used when lane-change endpoint SR is enabled.
       min: 8.0
       max: 25.0
       step: 0.01
@@ -338,7 +357,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: On-Center Steer Ratio
       description: Directly sets the 3rd-gen Insight's steer ratio at zero steering-wheel angle. Default 16.82.
-      details: This is an absolute steer-ratio value, not an offset. The controller blends linearly from this value at center to the Outer Steer Ratio at the Insight's high-angle breakpoint.
+      details: This absolute value anchors firmware-derived mode and is the starting value of the legacy curve. Legacy mode blends from here to the Outer Steer Ratio at the Insight's high-angle breakpoint.
       min: 8.0
       max: 25.0
       step: 0.01
@@ -350,7 +369,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: Outer Steer Ratio
       description: Directly sets the 3rd-gen Insight's high-angle steer ratio. Default 12.58.
-      details: This is the absolute outer endpoint of the two-point curve. It is reached at the Insight's high-angle breakpoint and held beyond it.
+      details: This is the legacy/fallback curve's outer endpoint, reached at the Insight's high-angle breakpoint and held beyond it. It is also used when lane-change endpoint SR is enabled.
       min: 8.0
       max: 25.0
       step: 0.01
@@ -371,7 +390,7 @@ sections:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: Use Endpoint SR for Smoother Lane Changes
       description: Uses the Outer Steer Ratio for the complete active lane change. Default ON.
-      details: The endpoint ratio is selected from pre-lane-change through the starting and finishing states. Normal angle-based steer ratio resumes only after the planner marks the lane change complete. This reacts to the planner state, not blinkers alone.
+      details: The endpoint ratio is selected from pre-lane-change through the starting and finishing states. The selected normal steer-ratio mode resumes only after the planner marks the lane change complete. This reacts to the planner state, not blinkers alone.
     - key: LatPScaleLowSpeed
       widget: option
       enablement:
@@ -529,7 +548,7 @@ sections:
       widget: toggle
       title: Enable Neural Network Lateral Model (NNLC)
       description: Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is OFF.
-      details: OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command.
+      details: OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command. NNLC remains configured but is inactive whenever a recognized Clarity is using the experimental firmware EPS position map.
       sub_items:
       - key: NrdrNnlcActivationSpeed
         widget: option
