@@ -1511,28 +1511,8 @@
                   "key": "NrdrNnlcEnabled",
                   "widget": "toggle",
                   "title": "Enable Neural Network Lateral Model (NNLC)",
-                  "description": "Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is ON.",
+                  "description": "Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is OFF.",
                   "details": "OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command.",
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    }
-                  ],
                   "sub_items": [
                     {
                       "key": "NrdrNnlcActivationSpeed",
@@ -1544,24 +1524,6 @@
                       "step": 1,
                       "unit": "mph",
                       "enablement": [
-                        {
-                          "type": "any",
-                          "conditions": [
-                            {
-                              "type": "param",
-                              "key": "NrdrHandcraftedLateralTune",
-                              "equals": false
-                            },
-                            {
-                              "type": "not",
-                              "condition": {
-                                "type": "capability",
-                                "field": "has_handcrafted_lateral_profile",
-                                "equals": true
-                              }
-                            }
-                          ]
-                        },
                         {
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
@@ -1580,24 +1542,6 @@
                       "unit": "%",
                       "enablement": [
                         {
-                          "type": "any",
-                          "conditions": [
-                            {
-                              "type": "param",
-                              "key": "NrdrHandcraftedLateralTune",
-                              "equals": false
-                            },
-                            {
-                              "type": "not",
-                              "condition": {
-                                "type": "capability",
-                                "field": "has_handcrafted_lateral_profile",
-                                "equals": true
-                              }
-                            }
-                          ]
-                        },
-                        {
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
                           "equals": true
@@ -1615,24 +1559,6 @@
                       "unit": "%",
                       "enablement": [
                         {
-                          "type": "any",
-                          "conditions": [
-                            {
-                              "type": "param",
-                              "key": "NrdrHandcraftedLateralTune",
-                              "equals": false
-                            },
-                            {
-                              "type": "not",
-                              "condition": {
-                                "type": "capability",
-                                "field": "has_handcrafted_lateral_profile",
-                                "equals": true
-                              }
-                            }
-                          ]
-                        },
-                        {
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
                           "equals": true
@@ -1649,24 +1575,6 @@
                       "step": 5,
                       "unit": "%",
                       "enablement": [
-                        {
-                          "type": "any",
-                          "conditions": [
-                            {
-                              "type": "param",
-                              "key": "NrdrHandcraftedLateralTune",
-                              "equals": false
-                            },
-                            {
-                              "type": "not",
-                              "condition": {
-                                "type": "capability",
-                                "field": "has_handcrafted_lateral_profile",
-                                "equals": true
-                              }
-                            }
-                          ]
-                        },
                         {
                           "type": "param",
                           "key": "NrdrNnlcEnabled",

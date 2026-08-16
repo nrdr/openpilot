@@ -24,7 +24,7 @@ class NrdrNnlc:
   def refresh(self) -> None:
     controller = self.controller
     was_enabled = controller.enabled
-    controller.enabled = self.base_enabled and read_bool(controller.params, "NrdrNnlcEnabled", True)
+    controller.enabled = self.base_enabled and read_bool(controller.params, "NrdrNnlcEnabled", False)
     if was_enabled and not controller.enabled:
       controller._pid.reset()
     activation_mph = read_float(controller.params, "NrdrNnlcActivationSpeed", self.DEFAULT_ACTIVATION_SPEED, 0.0, 100.0)

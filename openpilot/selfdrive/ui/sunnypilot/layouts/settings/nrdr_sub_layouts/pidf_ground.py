@@ -190,7 +190,7 @@ class PidfGroundLayout(Widget):
     )
 
     self._nnlc_enabled = toggle_item_sp(
-      title=tr("Enable Neural Network Lateral Model (NNLC) (Default: ON)"),
+      title=tr("Enable Neural Network Lateral Model (NNLC) (Default: OFF)"),
       description=tr("Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model " +
                      "at higher speeds. OFF keeps the proven Clarity PID controller active everywhere."),
       param="NrdrNnlcEnabled",
@@ -277,10 +277,12 @@ class PidfGroundLayout(Widget):
       self._lat_p_highway, self._lat_i_highway, self._lat_f_highway,
       self._rate_damping, self._rate_damping_fade_speed,
       self._center_scale, self._center_boost_threshold, self._center_boost_min_speed,
-      self._lat_stiction, self._nnlc_enabled, self._nnlc_activation_speed,
-      self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain,
+      self._lat_stiction,
     ):
       item.action_item.set_enabled(editable)
+
+    for item in (self._nnlc_enabled, self._nnlc_activation_speed, self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain):
+      item.action_item.set_enabled(True)
 
     nnlc_enabled = self._nnlc_enabled.action_item.get_state()
     self._nnlc_activation_speed.set_visible(nnlc_enabled)

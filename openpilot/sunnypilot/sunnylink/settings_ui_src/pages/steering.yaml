@@ -536,10 +536,8 @@ sections:
       details: Final-stage hold/move state machine emulating the breakaway friction of high-torque EPS units. Holding sends a frozen torque (no dither reaches the EPS); breakaway triggers on real error, plan motion, or accumulated drift. Consider lowering the steering LPF once enabled. Reference - NRDR_LATERAL_STICTION.md.
     - key: NrdrNnlcEnabled
       widget: toggle
-      enablement:
-      - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: Enable Neural Network Lateral Model (NNLC)
-      description: Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is ON.
+      description: Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is OFF.
       details: OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command.
       sub_items:
       - key: NrdrNnlcActivationSpeed
@@ -551,7 +549,6 @@ sections:
         step: 1
         unit: mph
         enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         - type: param
           key: NrdrNnlcEnabled
           equals: true
@@ -564,7 +561,6 @@ sections:
         step: 5
         unit: '%'
         enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         - type: param
           key: NrdrNnlcEnabled
           equals: true
@@ -577,7 +573,6 @@ sections:
         step: 5
         unit: '%'
         enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         - type: param
           key: NrdrNnlcEnabled
           equals: true
@@ -590,7 +585,6 @@ sections:
         step: 5
         unit: '%'
         enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         - type: param
           key: NrdrNnlcEnabled
           equals: true

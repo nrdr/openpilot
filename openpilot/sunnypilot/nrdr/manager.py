@@ -18,7 +18,7 @@ BOOL_DEFAULTS = {
   "MadsMainCruiseAllowed": False,
   "HondaTorqueLowPassFilter": True,
   "HondaUnwindLookahead": True,
-  "NrdrNnlcEnabled": True,
+  "NrdrNnlcEnabled": False,
   "RocketFuel": True,
   "BlindSpot": True,
   "TorqueBar": True,
