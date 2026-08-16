@@ -8,7 +8,7 @@ import queue
 import threading
 import time
 
-from openpilot.cereal import car
+from opendbc.car.structs import car
 from openpilot.common.hardware import HARDWARE
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog

@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from openpilot.cereal import car
+from opendbc.car.structs import car
 from openpilot.common.params import Params
 from openpilot.sunnypilot.nrdr import athena
 from openpilot.system.webrtc import helpers
