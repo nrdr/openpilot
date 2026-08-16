@@ -1,4 +1,5 @@
-from openpilot.cereal import car, custom, log
+from openpilot.cereal import custom, log
+from opendbc.car.structs import car
 from openpilot.common.constants import CV
 from openpilot.sunnypilot.selfdrive.selfdrived.events_base import Alert, ET, Priority
 
@@ -20,7 +21,7 @@ def apply_events(events, event_name):
   alert_status = log.SelfdriveState.AlertStatus
   alert_size = log.SelfdriveState.AlertSize
   visual_alert = car.CarControl.HUDControl.VisualAlert
-  audible_alert = log.SelfdriveState.AudibleAlert
+  audible_alert = car.CarControl.HUDControl.AudibleAlert
 
   events[event_name.controlsMismatchLateral] = {
     ET.WARNING: Alert(
