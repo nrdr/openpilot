@@ -1,7 +1,3 @@
-"""August-layout openpilot package module.
-
-nrdr Override Tuning sub-panel.
-"""
 from collections.abc import Callable
 import pyray as rl
 
@@ -27,7 +23,10 @@ class OverrideTuningLayout(Widget):
     self._increase_override_tolerance = toggle_item_sp(
       param="NrdrIncreaseOverrideTolerance",
       title=lambda: tr("Increase Driver Override Hysteresis (Default: OFF)"),
-      description=lambda: tr("Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below."),
+      description=lambda: tr(
+        "Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by " +
+        "doubling the override threshold below."
+      ),
     )
 
     self._driver_override_threshold = option_item_sp(
@@ -36,7 +35,10 @@ class OverrideTuningLayout(Widget):
       min_value=100,
       max_value=5000,
       value_change_step=100,
-      description=lambda: tr("Raw steering torque sensor reading above which you are considered to be steering (driver override). 1200 is Honda's stock threshold; on the few cars with a different stock threshold, your value is applied proportionally so 1200 always means stock."),
+      description=lambda: tr(
+        "Raw steering torque sensor reading above which you are considered to be steering (driver override). 1200 is Honda's stock threshold; " +
+        "on the few cars with a different stock threshold, your value is applied proportionally so 1200 always means stock."
+      ),
       label_callback=lambda value: f"{value}",
     )
 
@@ -46,14 +48,22 @@ class OverrideTuningLayout(Widget):
       min_value=100,
       max_value=5000,
       value_change_step=100,
-      description=lambda: tr("When the wheel is within the Center Boost degree band (on a straight), this lower override threshold applies instead of the one above - so you can override easily on straights while curves keep the higher threshold and don't drop torque from a false override. Set equal to Driver Override Threshold to disable."),
+      description=lambda: tr(
+        "When the wheel is within the Center Boost degree band (on a straight), this lower override threshold applies instead of the one " +
+        "above - so you can override easily on straights while curves keep the higher threshold and don't drop torque from a false override. " +
+        "Set equal to Driver Override Threshold to disable."
+      ),
       label_callback=lambda value: f"{value}",
     )
 
     self._driver_assist_during_override = toggle_item_sp(
       param="HondaDriverAssistDuringOverride",
       title=lambda: tr("Pass-through assist torque on override (Default: ON)"),
-      description=lambda: tr("When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling."),
+      description=lambda: tr(
+        "When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling " +
+        "this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering " +
+        "rack may carry on a more resistive feeling."
+      ),
     )
 
     self._override_fade_down = option_item_sp(

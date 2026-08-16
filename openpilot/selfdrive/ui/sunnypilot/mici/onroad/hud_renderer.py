@@ -8,10 +8,10 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.sunnypilot.onroad.blind_spot_indicators import BlindSpotIndicators
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.sunnypilot.nrdr.mici_hud import NrdrHudRenderer
 
 
-class HudRendererSP(HudRenderer):
+class HudRendererSP(NrdrHudRenderer, HudRenderer):
   def __init__(self):
     super().__init__()
     self.blind_spot_indicators = BlindSpotIndicators()
@@ -25,10 +25,4 @@ class HudRendererSP(HudRenderer):
     self.blind_spot_indicators.render(rect)
 
   def _has_blind_spot_detected(self) -> bool:
-
     return self.blind_spot_indicators.detected
-
-  def _set_speed_is_limit_driven(self) -> bool:
-    # nrdr: green set speed only while Speed Limit Assist is actively driving it,
-    # exactly like the comma three UI - not permanently green.
-    return bool(ui_state.sm['longitudinalPlanSP'].speedLimit.assist.active)

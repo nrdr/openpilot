@@ -1,11 +1,3 @@
-"""August-layout openpilot package module.
-
-nrdr Unwind Helpers sub-panel.
-
-Everything that shapes how the wheel returns toward center after a turn:
-model lookahead and the low-speed feedforward boost.
-One level under Lateral Tuning.
-"""
 from collections.abc import Callable
 import pyray as rl
 
@@ -40,7 +32,10 @@ class UnwindHelpersLayout(Widget):
       min_value=0,
       max_value=300,
       value_change_step=10,
-      description=lambda: tr("How long the extra unwind feedforward is held at the start of each unwind before it fades out. Caps the low-speed return assist so it doesn't keep pushing torque through a long unwind. 0 = off."),
+      description=lambda: tr(
+        "How long the extra unwind feedforward is held at the start of each unwind before it fades out. Caps the low-speed return assist so " +
+        "it doesn't keep pushing torque through a long unwind. 0 = off."
+      ),
       label_callback=lambda value: f"{value / 100:.1f}s",
       use_float_scaling=True,
     )
@@ -51,7 +46,10 @@ class UnwindHelpersLayout(Widget):
       min_value=100,
       max_value=1000,
       value_change_step=10,
-      description=lambda: tr("Peak feedforward multiplier during an unwind, strongest at a standstill and fading to 1x (no boost) by ~22 mph. Raise for more low-speed return authority if the wheel is lazy coming back to center."),
+      description=lambda: tr(
+        "Peak feedforward multiplier during an unwind, strongest at a standstill and fading to 1x (no boost) by ~22 mph. Raise for more " +
+        "low-speed return authority if the wheel is lazy coming back to center."
+      ),
       label_callback=lambda value: f"{value / 100:.1f}x",
       use_float_scaling=True,
     )

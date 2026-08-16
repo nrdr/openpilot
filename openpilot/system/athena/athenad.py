@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import hmac
-import io
 import itertools
 import json
 import os
@@ -17,7 +15,6 @@ import tempfile
 import threading
 import time
 import gzip
-import asyncio
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from functools import partial, total_ordering
@@ -44,9 +41,10 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
 from openpilot.system.athena.rpc import dispatcher, handle, is_call, is_response, loads
+from openpilot.sunnypilot.nrdr import athena as nrdr_athena
 
 
-ATHENA_HOST = os.getenv('ATHENA_HOST', 'wss://athena.konik.ai')  # nrdr: konik default (clean branch reverts via build_prebuilt.sh)
+ATHENA_HOST = os.getenv('ATHENA_HOST', 'wss://athena.konik.ai')
 HANDLER_THREADS = int(os.getenv('HANDLER_THREADS', "4"))
 LOCAL_PORT_WHITELIST = {22, }  # SSH
 
@@ -63,13 +61,6 @@ DEFAULT_UPLOAD_PRIORITY = 99  # higher number = lower priority
 
 SEND_PRIORITY_HIGH = 0
 SEND_PRIORITY_LOW = 1
-
-# Remote-access PIN (opt-in): gates Live View + Remote SSH. With no PIN set, the device is open
-# and verify hands out a token to anyone -- the PIN only bites once an owner sets one.
-REMOTE_PIN_TOKEN_TTL_S = 5 * 60
-REMOTE_PIN_LOCKOUT_S = 30
-REMOTE_PIN_MAX_FAILS = 5
-DEFAULT_REMOTE_PIN = "1234"  # turnkey default so the dashboard's mandatory PIN gate is satisfied out of the box
 
 # https://bytesolutions.com/dscp-tos-cos-precedence-conversion-chart,
 # https://en.wikipedia.org/wiki/Differentiated_services
@@ -143,9 +134,6 @@ recv_queue: Queue[str] = queue.Queue()
 send_queue: Queue[tuple[int, int, str]] = queue.PriorityQueue()
 upload_queue: Queue[UploadItem] = queue.PriorityQueue()
 log_recv_queue: Queue[str] = queue.Queue()
-sdp_recv_queue: Queue[dict] = queue.Queue()
-sdp_send_queue: Queue[str] = queue.Queue()
-ice_send_queue: Queue[str] = queue.Queue()
 cancelled_uploads: set[str] = set()
 
 cur_upload_items: dict[int, UploadItem | None] = {}
@@ -154,13 +142,6 @@ send_seq = itertools.count()
 def send_queue_push(data: str, priority: int) -> None:
   assert priority is not None, "send queue priority must be specified"
   send_queue.put_nowait((priority, next(send_seq), data)) # tie-break with a monotonic counter
-
-# Remote-access PIN runtime state: short-lived verify tokens + a simple fail-count lockout,
-# all guarded by remote_pin_lock. The PIN material itself lives in Params.
-remote_pin_tokens: dict[str, float] = {}
-remote_pin_lock = threading.RLock()
-remote_pin_fails = 0
-remote_pin_lock_until = 0.0
 
 
 # TODO-SP: adapt zst for sunnylink
@@ -196,194 +177,6 @@ class UploadQueueCache:
       cloudlog.exception("athena.UploadQueueCache.cache.exception")
 
 
-# ===== Remote-access PIN (opt-in) =====
-# Answers the dashboard's PIN handshake (remotePin* methods) that gates Live View and Remote SSH.
-# Open by default: with no PIN set, _remote_pin_require_auth is a no-op and remotePinVerify issues
-# a token to anyone. A PIN only takes effect once an owner sets one. PBKDF2-SHA256 hashed; tokens
-# are short-lived; repeated bad guesses trigger a brief lockout.
-def _remote_pin_is_set() -> bool:
-  params = Params()
-  if not params.get_bool("RemoteAccessPinEnabled"):
-    return False
-  salt = params.get("RemoteAccessPinSalt")
-  hsh = params.get("RemoteAccessPinHash")
-  iters = params.get("RemoteAccessPinIterations")
-  return bool(salt) and bool(hsh) and isinstance(iters, int) and iters > 0
-
-
-def _remote_pin_cleanup_tokens_locked(now: float) -> None:
-  for tok, exp in list(remote_pin_tokens.items()):
-    if exp <= now:
-      remote_pin_tokens.pop(tok, None)
-
-
-def _remote_pin_issue_token_locked(now: float) -> tuple[str, int]:
-  token = base64.urlsafe_b64encode(os.urandom(24)).decode("utf-8").rstrip("=")
-  remote_pin_tokens[token] = now + REMOTE_PIN_TOKEN_TTL_S
-  return token, REMOTE_PIN_TOKEN_TTL_S
-
-
-def _remote_pin_require_auth(auth_token: str | None) -> None:
-  if not _remote_pin_is_set():
-    return
-  if not auth_token:
-    raise Exception("PIN required")
-  now = time.monotonic()
-  with remote_pin_lock:
-    _remote_pin_cleanup_tokens_locked(now)
-    exp = remote_pin_tokens.get(auth_token)
-    if exp is None or exp <= now:
-      raise Exception("PIN required")
-
-
-def _remote_pin_hash(pin: str, salt: bytes, iterations: int) -> bytes:
-  return hashlib.pbkdf2_hmac("sha256", pin.encode("utf-8"), salt, iterations, dklen=32)
-
-
-def _remote_pin_clear_locked(params: Params) -> None:
-  params.put_bool("RemoteAccessPinEnabled", False)
-  params.remove("RemoteAccessPinSalt")
-  params.remove("RemoteAccessPinHash")
-  params.put("RemoteAccessPinIterations", 150000)
-
-
-def _remote_pin_set_locked(params: Params, pin: str) -> None:
-  if not isinstance(pin, str) or not pin.isdigit() or not (4 <= len(pin) <= 12):
-    raise Exception("PIN must be 4-12 digits")
-  iterations = 150000
-  salt = os.urandom(16)
-  hsh = _remote_pin_hash(pin, salt, iterations)
-  params.put("RemoteAccessPinSalt", salt)
-  params.put("RemoteAccessPinHash", hsh)
-  params.put("RemoteAccessPinIterations", iterations)
-  params.put_bool("RemoteAccessPinEnabled", True)
-
-
-def _remote_pin_verify_locked(params: Params, pin: str) -> bool:
-  salt = params.get("RemoteAccessPinSalt") or b""
-  expected = params.get("RemoteAccessPinHash") or b""
-  iterations = params.get("RemoteAccessPinIterations") or 0
-  if not salt or not expected or not isinstance(iterations, int) or iterations <= 0:
-    return False
-  actual = _remote_pin_hash(pin, salt, iterations)
-  return hmac.compare_digest(expected, actual)
-
-
-def _remote_pin_ensure_default() -> None:
-  # Turnkey: set a default PIN if none exists so the dashboard's mandatory gate is satisfied out
-  # of the box (users just enter 1234). Owners can change it (remotePinChange) and it sticks.
-  try:
-    if not _remote_pin_is_set():
-      with remote_pin_lock:
-        _remote_pin_set_locked(Params(), DEFAULT_REMOTE_PIN)
-      cloudlog.event("athena.remote_pin.default_set")
-  except Exception:
-    cloudlog.exception("athena.remote_pin.ensure_default.exception")
-
-
-@dispatcher.add_method
-def remotePinStatus() -> dict[str, bool | int]:
-  with remote_pin_lock:
-    now = time.monotonic()
-    lock_remaining_s = max(0, int(remote_pin_lock_until - now))
-  return {
-    "set": _remote_pin_is_set(),
-    "locked": lock_remaining_s > 0,
-    "lockRemainingS": lock_remaining_s,
-  }
-
-
-@dispatcher.add_method
-def remotePinVerify(pin: str) -> dict[str, bool | str | int]:
-  if not _remote_pin_is_set():
-    with remote_pin_lock:
-      token, ttl = _remote_pin_issue_token_locked(time.monotonic())
-    return {"success": True, "token": token, "expiresInS": ttl}
-
-  if not isinstance(pin, str) or not pin.isdigit() or not (4 <= len(pin) <= 12):
-    # Don't count invalid-format attempts towards lockout.
-    return {"success": False, "error": "PIN must be 4-12 digits"}
-
-  params = Params()
-  with remote_pin_lock:
-    global remote_pin_fails, remote_pin_lock_until
-    now = time.monotonic()
-    if now < remote_pin_lock_until:
-      return {"success": False, "error": "Locked", "lockRemainingS": int(remote_pin_lock_until - now)}
-
-    ok = _remote_pin_verify_locked(params, pin)
-    if not ok:
-      remote_pin_fails += 1
-      if remote_pin_fails % REMOTE_PIN_MAX_FAILS == 0:
-        remote_pin_lock_until = now + REMOTE_PIN_LOCKOUT_S
-        return {"success": False, "error": "Locked", "lockRemainingS": REMOTE_PIN_LOCKOUT_S}
-      return {"success": False, "error": "Incorrect PIN"}
-
-    remote_pin_fails = 0
-    remote_pin_lock_until = 0.0
-    token, ttl = _remote_pin_issue_token_locked(now)
-    return {"success": True, "token": token, "expiresInS": ttl}
-
-
-@dispatcher.add_method
-def remotePinSet(pin: str) -> dict[str, bool]:
-  if _remote_pin_is_set():
-    raise Exception("PIN already set")
-  params = Params()
-  with remote_pin_lock:
-    _remote_pin_set_locked(params, pin)
-  return {"success": True}
-
-
-@dispatcher.add_method
-def remotePinChange(oldPin: str, newPin: str) -> dict[str, bool]:
-  if not _remote_pin_is_set():
-    raise Exception("PIN not set")
-  if not isinstance(oldPin, str) or not isinstance(newPin, str):
-    raise Exception("Invalid PIN")
-
-  params = Params()
-  with remote_pin_lock:
-    global remote_pin_fails, remote_pin_lock_until
-    now = time.monotonic()
-    if now < remote_pin_lock_until:
-      raise Exception(f"Locked. Try again in {int(remote_pin_lock_until - now)}s.")
-    if not _remote_pin_verify_locked(params, oldPin):
-      remote_pin_fails += 1
-      if remote_pin_fails % REMOTE_PIN_MAX_FAILS == 0:
-        remote_pin_lock_until = now + REMOTE_PIN_LOCKOUT_S
-        raise Exception(f"Too many attempts. Try again in {REMOTE_PIN_LOCKOUT_S}s.")
-      raise Exception("Incorrect PIN")
-
-    _remote_pin_set_locked(params, newPin)
-    remote_pin_fails = 0
-    remote_pin_lock_until = 0.0
-    return {"success": True}
-
-
-@dispatcher.add_method
-def remotePinClear(force: bool = False, pin: str | None = None) -> dict[str, bool]:
-  params = Params()
-  with remote_pin_lock:
-    global remote_pin_fails, remote_pin_lock_until
-    now = time.monotonic()
-    if not force and _remote_pin_is_set():
-      if now < remote_pin_lock_until:
-        raise Exception(f"Locked. Try again in {int(remote_pin_lock_until - now)}s.")
-      if pin is None or not _remote_pin_verify_locked(params, pin):
-        remote_pin_fails += 1
-        if remote_pin_fails % REMOTE_PIN_MAX_FAILS == 0:
-          remote_pin_lock_until = now + REMOTE_PIN_LOCKOUT_S
-          raise Exception(f"Too many attempts. Try again in {REMOTE_PIN_LOCKOUT_S}s.")
-        raise Exception("Incorrect PIN")
-
-    _remote_pin_clear_locked(params)
-    remote_pin_fails = 0
-    remote_pin_lock_until = 0.0
-    remote_pin_tokens.clear()
-    return {"success": True}
-
-
 def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
   end_event = threading.Event()
 
@@ -415,55 +208,6 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
     for thread in threads:
       cloudlog.debug(f"athena.joining {thread.name}")
       thread.join()
-
-
-def rtc_handler(exit_event: threading.Event | None, sdp_send_queue: queue.Queue, sdp_recv_queue: queue.Queue,
-                ice_send_queue: queue.Queue) -> None:
-  # Live-view WebRTC offerer. Lazy import so an aiortc/streamer hiccup can't take down the rest of
-  # athena (PIN, SSH, uploads keep working) -- this thread just dies on its own if streaming breaks.
-  from openpilot.system.athena.streamer import Streamer
-  loop = asyncio.new_event_loop()
-  asyncio.set_event_loop(loop)
-  try:
-    streamer = Streamer(sdp_send_queue, sdp_recv_queue, ice_send_queue)
-    loop.run_until_complete(streamer.event_loop(exit_event))
-  finally:
-    loop.close()
-
-
-@dispatcher.add_method
-def setSdpAnswer(answer, authToken: str | None = None):
-  _remote_pin_require_auth(authToken)
-  sdp_recv_queue.put_nowait(answer)
-
-
-@dispatcher.add_method
-def getSdp(authToken: str | None = None):
-  _remote_pin_require_auth(authToken)
-  start_time = time.time()  # noqa: TID251
-  timeout = 10
-  while time.time() - start_time < timeout:  # noqa: TID251
-    try:
-      sdp = json.loads(sdp_send_queue.get(timeout=0.1))
-      if sdp:
-        return sdp
-    except queue.Empty:
-      pass
-  return {"error": "timeout"}
-
-
-@dispatcher.add_method
-def getIce(authToken: str | None = None):
-  _remote_pin_require_auth(authToken)
-  candidates = []
-  while not ice_send_queue.empty():
-    try:
-      candidates.append(json.loads(ice_send_queue.get_nowait()))
-    except queue.Empty:
-      break
-  if candidates:
-    return candidates
-  return {"error": True}
 
 
 def jsonrpc_handler(end_event: threading.Event, localProxyHandler = None) -> None:
@@ -859,27 +603,9 @@ def getNetworkMetered() -> bool:
 
 
 @dispatcher.add_method
-def getNetworks():
-  return HARDWARE.get_networks()
-
-
-@dispatcher.add_method
-def startStream(sdp: str | None = None, enabled: bool = True) -> dict:
+def startStream(sdp: str, enabled: bool) -> dict:
   from openpilot.system.webrtc.helpers import StreamRequestBody, post_stream_request, wait_for_webrtcd
   params = Params()
-
-  # Konik sends enabled=false when the viewer disconnects. sdp is optional in that request.
-  if not enabled:
-    params.put_bool("IsLiveStreaming", False, block=True)
-    params.put_bool("LiveView", False, block=True)
-    return {"success": True}
-
-  if params.get_bool("IsOnroad"):
-    raise Exception("Live View unavailable while onroad")
-  if not params.get_bool("LiveViewEnabled"):
-    raise Exception("Live View disabled")
-  if not isinstance(sdp, str) or not sdp:
-    raise Exception("sdp is required")
   bridge_services_in = []
 
   # stale car params case taken care of by webrtcd being shut off on ignition
@@ -889,27 +615,16 @@ def startStream(sdp: str | None = None, enabled: bool = True) -> dict:
       if CP.notCar:
         bridge_services_in.append("testJoystick")
   else:
-    raise Exception("failed to get CarParamsPersistent")
+      raise Exception("failed to get CarParamsPersistent")
 
-  if not params.get_bool("IsOffroad"):
-    raise Exception("Live View unavailable unless offroad")
-
-  body = StreamRequestBody(sdp, "wideRoad", enabled, bridge_services_in, ["carState", "deviceState"])
-  stream_started = False
-  # Manager owns camerad, stream_encoderd, and webrtcd. Publish the gate before
-  # polling the local endpoint so the request cannot race process startup.
-  params.put_bool("IsLiveStreaming", True, block=True)
-  try:
+  if params.get_bool("IsOffroad"):
+    # manager owns camerad/stream_encoderd/webrtcd; flip the param and let it bring them up.
+    # webrtcd clears IsLiveStreaming when the session ends
+    params.put_bool("IsLiveStreaming", True)
+    # wait for webrtcd end points to wake up
     wait_for_webrtcd()
-    result = post_stream_request(body)
-    stream_started = True
-    return result
-  except TimeoutError as e:
-    raise Exception("webrtc took too long to start") from e
-  finally:
-    if not stream_started:
-      params.put_bool("IsLiveStreaming", False, block=True)
-      params.put_bool("LiveView", False, block=True)
+
+  return post_stream_request(StreamRequestBody(sdp, "wideRoad", enabled, bridge_services_in, ["carState", "deviceState"]))
 
 
 def get_logs_to_send_sorted(log_attr_name=LOG_ATTR_NAME) -> list[str]:
@@ -1220,18 +935,7 @@ def main(exit_event: threading.Event | None = None):
 
   conn_start = None
   conn_retries = 0
-
-  # Turnkey: ensure a remote-access PIN exists (the dashboard requires one to be set).
-  _remote_pin_ensure_default()
-
-  # Live-view WebRTC offerer: long-lived daemon fed by the getSdp/setSdpAnswer/getIce methods
-  # via the sdp/ice queues. Independent of websocket reconnects.
-  threading.Thread(
-    target=rtc_handler,
-    args=(exit_event, sdp_send_queue, sdp_recv_queue, ice_send_queue),
-    name='rtc_handler',
-    daemon=True,
-  ).start()
+  nrdr_athena.start(exit_event)
 
   while exit_event is None or not exit_event.is_set():
     try:
@@ -1265,6 +969,9 @@ def main(exit_event: threading.Event | None = None):
       params.remove("LastAthenaPingTime")
 
     time.sleep(backoff(conn_retries))
+
+
+nrdr_athena.install(dispatcher)
 
 
 if __name__ == "__main__":

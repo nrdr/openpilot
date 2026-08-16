@@ -16,8 +16,9 @@ from openpilot.selfdrive.controls.lib.lane_centering import LaneCenteringControl
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
+from openpilot.sunnypilot.nrdr.controlsd import initialize_live_parameter_settings, refresh_live_parameter_settings
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
-from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_clarity_hybrid import LatControlClarityHybrid
+from openpilot.sunnypilot.nrdr.latcontrol_clarity_hybrid import LatControlClarityHybrid
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 
@@ -32,10 +33,7 @@ class ControlsExt(ModelStateBase):
     self.lane_centering = LaneCenteringController()
     self.update_lane_centering_params()
 
-    # Auto/learn toggles for live vehicle params (default ON = use learned value).
-    self.learn_steer_ratio = True
-    self.learn_stiffness = True
-    self.learn_angle_offset = True
+    initialize_live_parameter_settings(self)
 
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
@@ -74,11 +72,7 @@ class ControlsExt(ModelStateBase):
       if self.CP.lateralTuning.which() == 'torque':
         self.lat_delay = get_lat_delay(self.params, sm["liveDelay"].lateralDelay)
 
-      # Auto/learn toggles. getBool() returns False for an UNSET param (it does get()=="1"
-      # with no default fallback), so default to ON (learn) unless explicitly set to "0".
-      self.learn_steer_ratio = self.params.get("NrdrLearnSteerRatio") != b"0"
-      self.learn_stiffness = self.params.get("NrdrLearnStiffness") != b"0"
-      self.learn_angle_offset = self.params.get("NrdrLearnAngleOffset") != b"0"
+      refresh_live_parameter_settings(self, self.params)
 
       self._param_update_time = time.monotonic()
 

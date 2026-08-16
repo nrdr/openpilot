@@ -1,12 +1,3 @@
-"""August-layout openpilot package module.
-
-nrdr Show Footage sub-panel.
-
-Pick a drive, get a QR code that points your phone at the copyparty file server
-for that drive's video files. Built for the roadside "can I see the footage?"
-moment: no laptop, no SSH, no cloud - phone joins the device hotspot, scans the
-code, plays qcamera.ts (or grabs fcamera.hevc for full res, VLC plays it).
-"""
 import datetime
 import os
 import re
@@ -31,8 +22,8 @@ from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, LineSeparatorSP
 
-COPYPARTY_PORT = 8080      # matches -p in process_config copyparty args
-ROUTES_MOUNT = "/routes"   # copyparty -v mount of Paths.log_root()
+COPYPARTY_PORT = 8080
+ROUTES_MOUNT = "/routes"
 MAX_ROUTES = 15
 SEGMENT_RE = re.compile(r"^(.+)--(\d+)$")
 
@@ -214,7 +205,10 @@ class FootageLayout(Widget):
     self._server_toggle = toggle_item_sp(
       param="EnableCopyparty",
       title=lambda: tr("File Server (Default: ON)"),
-      description=lambda: tr("The QR links below are served by the copyparty file server. It must be ON, and it only runs while the car is off (ignition off). Same toggle as in Developer."),
+      description=lambda: tr(
+        "The QR links below are served by the copyparty file server. It must be ON, and it only runs while the car is off "
+        + "(ignition off). Same toggle as in Developer."
+      ),
     )
 
     self._scroller = Scroller([self._server_toggle], line_separator=False, spacing=0)
@@ -239,14 +233,12 @@ class FootageLayout(Widget):
     return items
 
   def show_event(self):
-    # Rebuild the drive list every time the panel is opened.
     self._scroller = Scroller([self._server_toggle, LineSeparatorSP(40), *self._build_route_items()],
                               line_separator=False, spacing=0)
     self._scroller.show_event()
 
   def _update_state(self):
     super()._update_state()
-    # Dim the list while the file server is off and the car is on.
     self._server_toggle.action_item.set_enabled(ui_state.is_offroad())
 
   def _render(self, rect):

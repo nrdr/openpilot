@@ -47,12 +47,16 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
                                                         (1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.steerOverrideProbs or [1])))
 
   def _render(self, _):
+    content_rect = rl.Rectangle(
+      self.rect.x + self.rect.width - SIDE_PANEL_WIDTH,
+      self.rect.y,
+      SIDE_PANEL_WIDTH,
+      self.rect.height,
+    )
+
     status_dot_radius = 24
-    # Pinned (C4): stationary status light (color still conveys confidence), parked at the top-right
-    # of the CAMERA FEED -- just left of the devUI strip, not the screen edge -- so the whole 60px
-    # strip is free for metrics. The +36 clears the top render inset that was clipping it.
-    dot_x = self._rect.x + self._rect.width - SIDE_PANEL_WIDTH - status_dot_radius - 16
-    dot_y = self._rect.y + status_dot_radius + 36
+    dot_height = (1 - self._confidence_filter.x) * (content_rect.height - 2 * status_dot_radius) + status_dot_radius
+    dot_height = self._rect.y + dot_height
 
     # confidence zones
     if ui_state.status == UIStatus.ENGAGED or self._demo:
@@ -77,5 +81,6 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
       top_dot_color = rl.Color(50, 50, 50, 255)
       bottom_dot_color = rl.Color(13, 13, 13, 255)
 
-    draw_circle_gradient(dot_x, dot_y, status_dot_radius,
+    draw_circle_gradient(content_rect.x + content_rect.width - status_dot_radius,
+                         dot_height, status_dot_radius,
                          top_dot_color, bottom_dot_color)

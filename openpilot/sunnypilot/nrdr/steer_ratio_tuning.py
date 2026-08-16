@@ -1,4 +1,3 @@
-"""Fingerprint-scoped live tuning for nrdr's two-point steer-ratio curves."""
 from dataclasses import dataclass
 
 
@@ -10,6 +9,11 @@ class SteerRatioEndpointProfile:
   outer_param: str
   center_default: float
   outer_default: float
+  outer_angle: float
+
+  @property
+  def breakpoints(self) -> tuple[float, float]:
+    return 0.0, self.outer_angle
 
   @property
   def default_values(self) -> tuple[float, float]:
@@ -23,8 +27,6 @@ class SteerRatioEndpointProfile:
     )
 
 
-# Use separate Params for each rack family. The same comma can therefore move
-# between cars without applying one car's absolute SR endpoints to another.
 STEER_RATIO_ENDPOINT_PROFILES = (
   SteerRatioEndpointProfile(
     family="Clarity",
@@ -33,6 +35,7 @@ STEER_RATIO_ENDPOINT_PROFILES = (
     outer_param="NrdrSteerRatioOuterClarity",
     center_default=18.50,
     outer_default=12.72,
+    outer_angle=250.0,
   ),
   SteerRatioEndpointProfile(
     family="10th-gen Civic",
@@ -41,6 +44,7 @@ STEER_RATIO_ENDPOINT_PROFILES = (
     outer_param="NrdrSteerRatioOuterCivic",
     center_default=17.24,
     outer_default=10.93,
+    outer_angle=2.22 * 250.0 / 2.41,
   ),
   SteerRatioEndpointProfile(
     family="10th-gen Accord",
@@ -49,6 +53,7 @@ STEER_RATIO_ENDPOINT_PROFILES = (
     outer_param="NrdrSteerRatioOuterAccord",
     center_default=18.31,
     outer_default=11.82,
+    outer_angle=2.30 * 250.0 / 2.41,
   ),
   SteerRatioEndpointProfile(
     family="5th-gen CR-V",
@@ -57,6 +62,7 @@ STEER_RATIO_ENDPOINT_PROFILES = (
     outer_param="NrdrSteerRatioOuterCrv5g",
     center_default=17.94,
     outer_default=12.30,
+    outer_angle=2.30 * 250.0 / 2.41,
   ),
   SteerRatioEndpointProfile(
     family="3rd-gen Insight",
@@ -65,6 +71,7 @@ STEER_RATIO_ENDPOINT_PROFILES = (
     outer_param="NrdrSteerRatioOuterInsight",
     center_default=16.82,
     outer_default=12.58,
+    outer_angle=2.54 * 250.0 / 2.41,
   ),
 )
 

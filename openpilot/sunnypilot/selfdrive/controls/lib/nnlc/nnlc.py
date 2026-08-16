@@ -11,19 +11,16 @@ import numpy as np
 from opendbc.car.lateral import FRICTION_THRESHOLD, get_friction
 from opendbc.sunnypilot.car.interfaces import LatControlInputs
 from opendbc.sunnypilot.car.lateral_ext import get_friction as get_friction_in_torque_space
-from openpilot.common.constants import CV
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.common.params import Params, UnknownKeyName
+from openpilot.common.params import Params
 from openpilot.selfdrive.modeld.constants import ModelConstants
-from openpilot.common.realtime import DT_CTRL
+from openpilot.sunnypilot.nrdr.nnlc import NrdrNnlc
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext_base import LatControlTorqueExtBase, sign
-from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import MOCK_MODEL_PATH, is_nnlc_forced
+from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import MOCK_MODEL_PATH
 from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.model import NNTorqueModel
 
 LOW_SPEED_X = [0, 10, 20, 30]
 LOW_SPEED_Y = [12, 3, 1, 0]
-NNLC_SETTINGS_REFRESH_FRAMES = 100
-NNLC_DEFAULT_ACTIVATION_SPEED_MPH = 30.0
 
 
 # At a given roll, if pitch magnitude increases, the
@@ -39,11 +36,7 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
   def __init__(self, lac_torque, CP, CP_SP, CI):
     super().__init__(lac_torque, CP, CP_SP, CI)
     self.params = Params()
-    self._base_enabled = self.params.get_bool("NeuralNetworkLateralControl") or is_nnlc_forced(CP)
-    self.enabled = False
-    self.activation_speed_mps = NNLC_DEFAULT_ACTIVATION_SPEED_MPH * CV.MPH_TO_MS
-    self._settings_frame = 0
-    self._refresh_nrdr_settings()
+    self.enabled = self.params.get_bool("NeuralNetworkLateralControl")
     self.has_nn_model = CP_SP.neuralNetworkLateralControl.model.path != MOCK_MODEL_PATH
 
     # NN model takes current v_ego, lateral_accel, lat accel/jerk error, roll, and past/future/planned data
@@ -66,50 +59,7 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
     self.roll_deque = deque(maxlen=history_check_frames[0])
     self.error_deque = deque(maxlen=history_check_frames[0])
     self.past_future_len = len(self.past_times) + len(self.nn_future_times)
-    self._prev_kappa = 0.0  # for curvature-rate feature on the 12-feat C120 model
-
-  def _read_bool(self, key: str, default: bool) -> bool:
-    try:
-      return default if self.params.get(key) is None else self.params.get_bool(key)
-    except UnknownKeyName:
-      return default
-
-  def _read_percent(self, key: str, default: float) -> float:
-    try:
-      value = self.params.get(key)
-    except UnknownKeyName:
-      value = None
-    try:
-      return float(default if value is None else value) / 100.0
-    except (TypeError, ValueError):
-      return default / 100.0
-
-  def _read_activation_speed(self) -> float:
-    try:
-      value = self.params.get("NrdrNnlcActivationSpeed")
-    except UnknownKeyName:
-      value = None
-    try:
-      return float(NNLC_DEFAULT_ACTIVATION_SPEED_MPH if value is None else value)
-    except (TypeError, ValueError):
-      return NNLC_DEFAULT_ACTIVATION_SPEED_MPH
-
-  def _refresh_nrdr_settings(self) -> None:
-    """Refresh remote/device NNLC knobs without reconstructing the controller."""
-    was_enabled = self.enabled
-    self.enabled = self._base_enabled and self._read_bool("NrdrNnlcEnabled", True)
-    if was_enabled and not self.enabled:
-      # Never leave a hidden integral/output charge waiting for a later live re-enable.
-      self._nnlc_pid.reset()
-    activation_mph = float(np.clip(self._read_activation_speed(), 0.0, 100.0))
-    self.activation_speed_mps = activation_mph * CV.MPH_TO_MS
-
-    kp = float(np.clip(self._read_percent("NrdrNnlcKpGain", 100.0), 0.0, 3.0))
-    kf = float(np.clip(self._read_percent("NrdrNnlcKfGain", 50.0), 0.0, 3.0))
-    ki = float(np.clip(self._read_percent("NrdrNnlcKiGain", 10.0), 0.0, 3.0))
-    self._nnlc_pid._k_p = [[0.0], [kp]]
-    self._nnlc_pid.k_f = kf
-    self._nnlc_pid._k_i = [[0.0], [ki]]
+    self.nrdr = NrdrNnlc(self, CP)
 
   @property
   def _nnlc_enabled(self):
@@ -119,7 +69,7 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
     if not self._nnlc_enabled:
       return
 
-    self._nnlc_pid.set_limits(self.lac_torque.steer_max, -self.lac_torque.steer_max)
+    self._pid.set_limits(self.lac_torque.steer_max, -self.lac_torque.steer_max)
 
   def update_lateral_lag(self, lag):
     super().update_lateral_lag(lag)
@@ -138,16 +88,13 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
 
   def update_output_torque(self, CS):
     freeze_integrator = self._steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
-    self._output_torque = self._nnlc_pid.update(self._pid_log.error,
-                                                feedforward=self._ff,
-                                                speed=CS.vEgo,
-                                                freeze_integrator=freeze_integrator)
+    self._output_torque = self._pid.update(self._pid_log.error,
+                                           feedforward=self._ff,
+                                           speed=CS.vEgo,
+                                           freeze_integrator=freeze_integrator)
 
   def update_neural_network_feedforward(self, CS, params, calibrated_pose) -> None:
-    if self._settings_frame % NNLC_SETTINGS_REFRESH_FRAMES == 0:
-      self._refresh_nrdr_settings()
-    self._settings_frame += 1
-
+    self.nrdr.update()
     if not self._nnlc_enabled:
       return
 
@@ -178,60 +125,47 @@ class NeuralNetworkLateralControl(LatControlTorqueExtBase):
     future_planned_lateral_accels = [np.interp(t, ModelConstants.T_IDXS, self.model_v2.acceleration.y) for t in
                                      adjusted_future_times]
 
-    # ===== C120 curvature-grounded plant-inverse FF (12-feature per-car model) =====
-    # Auto-selected by model.input_size. Our per-car model is 12-feature curvature:
-    #   [v_ego, curv, curv_rate, curv*v^2, past_curv(3), future_curv(4), roll]
-    # Stock NNLC models are 18-feature lat-accel and take the unchanged path below, so
-    # stock cars are untouched (the model file itself selects the feature contract).
-    if getattr(self.model, "input_size", 18) == 12:
-      v2 = max(CS.vEgo, 1.0) ** 2
-      kappa_des = self._desired_curvature
-      kappa_act = self._actual_curvature
-      curv_rate = (kappa_des - self._prev_kappa) / DT_CTRL
-      self._prev_kappa = kappa_des
-      # desired past curvature + planner future curvature (lat_accel / v^2), reusing the
-      # lat-accel deques/planner values already computed above
-      past_curv = [la / v2 for la in past_lateral_accels_desired]            # 3
-      future_curv = [la / v2 for la in future_planned_lateral_accels]        # 4
+    if self.nrdr.apply_curvature_model(CS, roll, past_lateral_accels_desired, future_planned_lateral_accels):
+      self.update_output_torque(CS)
+      return
 
-      def _cvec(kappa):
-        return [CS.vEgo, kappa, curv_rate, kappa * v2] + past_curv + future_curv + [roll]
+    # compute NNFF error response
+    nnff_setpoint_input = [CS.vEgo, self._setpoint, self.lateral_jerk_setpoint, roll] \
+                          + [self._setpoint] * self.past_future_len \
+                          + past_rolls + future_rolls
+    # past lateral accel error shouldn't count, so use past desired like the setpoint input
+    nnff_measurement_input = [CS.vEgo, self._measurement, self.lateral_jerk_measurement, roll] \
+                             + [self._measurement] * self.past_future_len \
+                             + past_rolls + future_rolls
+    torque_from_setpoint = self.model.evaluate(nnff_setpoint_input)
+    torque_from_measurement = self.model.evaluate(nnff_measurement_input)
+    self._pid_log.error = torque_from_setpoint - torque_from_measurement  # ty: ignore[invalid-assignment]
 
-      # feedforward = command that achieves the DESIRED curvature (plant-inverse)
-      self._ff = self.model.evaluate(_cvec(kappa_des))
-      # error response in curvature space (desired vs actual current curvature)
-      self._pid_log.error = self._ff - self.model.evaluate(_cvec(kappa_act))
-    else:
-      # ===== stock 18-feature lat-accel NNLC path (UNCHANGED) =====
-      nnff_setpoint_input = [CS.vEgo, self._setpoint, self.lateral_jerk_setpoint, roll] \
-                            + [self._setpoint] * self.past_future_len \
-                            + past_rolls + future_rolls
-      # past lateral accel error shouldn't count, so use past desired like the setpoint input
-      nnff_measurement_input = [CS.vEgo, self._measurement, self.lateral_jerk_measurement, roll] \
-                               + [self._measurement] * self.past_future_len \
-                               + past_rolls + future_rolls
-      torque_from_setpoint = self.model.evaluate(nnff_setpoint_input)
-      torque_from_measurement = self.model.evaluate(nnff_measurement_input)
-      self._pid_log.error = torque_from_setpoint - torque_from_measurement
+    # The "pure" NNLC error response can be too weak for cars whose models were trained
+    # with a lack of high-magnitude lateral acceleration data, for which the NNLC model
+    # torque response flattens out at high lateral accelerations.
+    # This workaround blends in a guaranteed stronger error response only when the
+    # desired lateral acceleration is high enough to warrant it, by using the lateral acceleration
+    # error as the input to the NNLC model. This is not ideal, and potentially degrades the NNLC
+    # accuracy for cars that don't have this issue, but it's necessary until a better NNLC model
+    # structure is used that doesn't create this issue when high-magnitude data is missing.
+    error_blend_factor = float(np.interp(abs(self._desired_lateral_accel), [1.0, 2.0], [0.0, 1.0]))
+    if error_blend_factor > 0.0:  # blend in stronger error response when in high lat accel
+      # NNFF inputs 5+ are optional, and if left out are replaced with 0.0 inside the NNFF class
+      nnff_error_input = [CS.vEgo, self._setpoint - self._measurement, self.lateral_jerk_setpoint - self.lateral_jerk_measurement, 0.0]
+      torque_from_error = self.model.evaluate(nnff_error_input)
+      if sign(self._pid_log.error) == sign(torque_from_error) and abs(self._pid_log.error) < abs(torque_from_error):
+        self._pid_log.error = self._pid_log.error * (1.0 - error_blend_factor) + torque_from_error * error_blend_factor  # ty: ignore[invalid-assignment]
 
-      # The "pure" NNLC error response can be too weak for cars whose models were trained
-      # with a lack of high-magnitude lateral acceleration data, for which the NNLC model
-      # torque response flattens out at high lateral accelerations.
-      error_blend_factor = float(np.interp(abs(self._desired_lateral_accel), [1.0, 2.0], [0.0, 1.0]))
-      if error_blend_factor > 0.0:  # blend in stronger error response when in high lat accel
-        nnff_error_input = [CS.vEgo, self._setpoint - self._measurement, self.lateral_jerk_setpoint - self.lateral_jerk_measurement, 0.0]
-        torque_from_error = self.model.evaluate(nnff_error_input)
-        if sign(self._pid_log.error) == sign(torque_from_error) and abs(self._pid_log.error) < abs(torque_from_error):
-          self._pid_log.error = self._pid_log.error * (1.0 - error_blend_factor) + torque_from_error * error_blend_factor
+    # compute feedforward (same as nn setpoint output)
+    friction_input = self.update_friction_input(self._setpoint, self._measurement)
+    nn_input = [CS.vEgo, self._desired_lateral_accel, friction_input, roll] \
+               + past_lateral_accels_desired + future_planned_lateral_accels \
+               + past_rolls + future_rolls
+    self._ff = self.model.evaluate(nn_input)
 
-      # compute feedforward (same as nn setpoint output)
-      friction_input = self.update_friction_input(self._setpoint, self._measurement)
-      nn_input = [CS.vEgo, self._desired_lateral_accel, friction_input, roll] \
-                 + past_lateral_accels_desired + future_planned_lateral_accels \
-                 + past_rolls + future_rolls
-      self._ff = self.model.evaluate(nn_input)
+    # apply friction override for cars with low NN friction response
+    if self.model.friction_override:
+      self._pid_log.error += get_friction(friction_input, self._lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
 
-      # apply friction override for cars with low NN friction response
-      if self.model.friction_override:
-        self._pid_log.error += get_friction(friction_input, self._lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
     self.update_output_torque(CS)

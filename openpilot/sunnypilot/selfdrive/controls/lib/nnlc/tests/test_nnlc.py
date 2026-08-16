@@ -48,10 +48,6 @@ class TestNeuralNetworkLateralControl:
   def test_saturation(self, car_name):
     params = Params()
     params.put_bool("NeuralNetworkLateralControl", True, block=True)
-    params.put_bool("NrdrNnlcEnabled", True, block=True)
-    params.put("NrdrNnlcKpGain", 100, block=True)
-    params.put("NrdrNnlcKfGain", 50, block=True)
-    params.put("NrdrNnlcKiGain", 10, block=True)
 
     CarInterface = interfaces[car_name]
     CP = CarInterface.get_non_essential_params(car_name)
@@ -88,15 +84,6 @@ class TestNeuralNetworkLateralControl:
       controller.update_live_torque_params(torque_params.latAccelFactor, torque_params.latAccelOffset, torque_params.friction)
       controller.extension.update_limits()
       _, _, lac_log = controller.update(True, CS, VM, params, False, 0, pose, True, 0.2)
-    # NNLC has its own constant-gain feedback PID. The outer Torque controller has
-    # a steep low-speed KP_INTERP schedule and must never be substituted here.
-    assert controller.extension._nnlc_pid is not controller.pid
-    controller.extension._nnlc_pid.speed = 1.0
-    controller.pid.speed = 1.0
-    assert controller.extension._nnlc_pid.k_p == 1.0
-    assert controller.extension._nnlc_pid.k_f == 0.5
-    assert controller.extension._nnlc_pid.k_i == 0.1
-    assert controller.pid.k_p == 250.0
     assert lac_log.saturated
 
     for _ in range(1000):

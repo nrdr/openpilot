@@ -111,12 +111,12 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"RecordAudioFeedback", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"RecordFront", {PERSISTENT | BACKUP, BOOL}},
     {"RecordFrontLock", {PERSISTENT, BOOL}},  // for the internal fleet
-    {"RemoteAccessPinEnabled", {PERSISTENT, BOOL}},  // opt-in PIN gate for Live View + Remote SSH (unset/false = open)
+    {"RemoteAccessPinEnabled", {PERSISTENT, BOOL}},
     {"RemoteAccessPinSalt", {PERSISTENT | DONT_LOG, BYTES}},
     {"RemoteAccessPinHash", {PERSISTENT | DONT_LOG, BYTES}},
     {"RemoteAccessPinIterations", {PERSISTENT, INT, "150000"}},
-    {"LiveViewEnabled", {PERSISTENT | BACKUP, BOOL, "1"}},  // on by default; owner-only (portal requires the user's own login)
-    {"LiveView", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},  // streamer sets this while a session is active
+    {"LiveViewEnabled", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"LiveView", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},
     {"SecOCKey", {PERSISTENT | DONT_LOG | BACKUP, STRING}},
     {"ShowDebugInfo", {PERSISTENT, BOOL}},
     {"RouteCount", {PERSISTENT, INT, "0"}},
@@ -283,31 +283,23 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"SmartCruiseControlMap", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"SmartCruiseControlVision", {PERSISTENT | BACKUP, BOOL, "0"}},
 
-    // nrdr params
-    {"LatPScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},   // lateral P scale (below 25 mph)
-    {"LatPScaleStandard", {PERSISTENT | BACKUP, INT, "100"}},   // lateral P scale (25-50 mph)
-    {"LatPScaleHighway", {PERSISTENT | BACKUP, INT, "100"}},    // lateral P scale (50 mph+)
-    {"LatIScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},   // lateral I scale (below 25 mph)
-    {"LatIScaleStandard", {PERSISTENT | BACKUP, INT, "100"}},   // lateral I scale (25-50 mph)
-    {"LatIScaleHighway", {PERSISTENT | BACKUP, INT, "100"}},    // lateral I scale (50 mph+)
-    {"LatFScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},   // lateral feedforward scale (below 25 mph)
-    {"LatFScaleStandard", {PERSISTENT | BACKUP, INT, "100"}},   // lateral feedforward scale (25-50 mph)
-    {"LatFScaleHighway", {PERSISTENT | BACKUP, INT, "100"}},    // lateral feedforward scale (50 mph+)
+    {"LatPScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},
+    {"LatPScaleStandard", {PERSISTENT | BACKUP, INT, "100"}},
+    {"LatPScaleHighway", {PERSISTENT | BACKUP, INT, "100"}},
+    {"LatIScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},
+    {"LatIScaleStandard", {PERSISTENT | BACKUP, INT, "100"}},
+    {"LatIScaleHighway", {PERSISTENT | BACKUP, INT, "100"}},
+    {"LatFScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},
+    {"LatFScaleStandard", {PERSISTENT | BACKUP, INT, "100"}},
+    {"LatFScaleHighway", {PERSISTENT | BACKUP, INT, "100"}},
     {"LongPidTuneScale", {PERSISTENT | BACKUP, INT, "100"}},
-    {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}}, // % scale on final cruise target so actual speed matches set (100.0 = off)
+    {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}},
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
-    // DEPRECATED: runtime/UI removed after road testing. Keep registered until stale
-    // Sunnylink schemas have aged out so an old browser write cannot UnknownKeyName-crash.
     {"HondaPidFriction", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
-    // DEPRECATED notch-filter keys: all readers removed, but kept REGISTERED so stale bytecode /
-    // mid-OTA devices resolve them instead of crash-looping the card on UnknownKeyName. Do NOT
-    // delete until the fleet has updated well past this release (see two-phase removal note).
     {"HondaNotchEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaNotchFreq", {PERSISTENT | BACKUP, FLOAT, "7.5"}},
     {"HondaNotchQ", {PERSISTENT | BACKUP, FLOAT, "1.5"}},
     {"NrdrLearnSteerRatio", {PERSISTENT | BACKUP, BOOL, "0"}},
-    // Absolute endpoints for each supported two-point Honda SR curve. These are
-    // fingerprint-scoped so moving one comma between cars preserves both tunes.
     {"NrdrSteerRatioCenterClarity", {PERSISTENT | BACKUP, FLOAT, "18.50"}},
     {"NrdrSteerRatioOuterClarity", {PERSISTENT | BACKUP, FLOAT, "12.72"}},
     {"NrdrSteerRatioCenterCivic", {PERSISTENT | BACKUP, FLOAT, "17.24"}},
@@ -319,21 +311,17 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrSteerRatioCenterInsight", {PERSISTENT | BACKUP, FLOAT, "16.82"}},
     {"NrdrSteerRatioOuterInsight", {PERSISTENT | BACKUP, FLOAT, "12.58"}},
     {"NrdrLaneChangeEndpointSteerRatio", {PERSISTENT | BACKUP, BOOL, "1"}},
-    // DEPRECATED single-offset and global endpoint keys. Keep registered until
-    // stale Sunnylink schemas/builds have aged out to avoid UnknownKeyName crashes.
     {"NrdrSteerRatioOffset", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
     {"NrdrSteerRatioMin", {PERSISTENT | BACKUP, FLOAT, "16.84"}},
     {"NrdrSteerRatioMax", {PERSISTENT | BACKUP, FLOAT, "12.74"}},
     {"NrdrLearnStiffness", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrLearnAngleOffset", {PERSISTENT | BACKUP, BOOL, "1"}},
-    // DEPRECATED: the user-facing freeze toggle and all runtime reads are gone.
-    // Keep an inert tombstone temporarily so stale Sunnylink clients remain safe.
     {"HondaUnwindFreeze", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaUnwindLookahead", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaStoppingDecelRate", {PERSISTENT | BACKUP, INT, "30"}},
-    {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "0"}},  // UI label: Increase Driver Override Hysteresis (default OFF)
-    {"NrdrDriverOverrideThreshold", {PERSISTENT | BACKUP, INT, "2400"}},  // steeringPressed threshold; 1200 = stock, proportional on non-1200 cars
-    {"NrdrOverrideThresholdCenterBoost", {PERSISTENT | BACKUP, INT, "1200"}},  // override threshold used when wheel is within the Center Boost degree band (straights); easy override on straights, no false drops on curves
+    {"NrdrIncreaseOverrideTolerance", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrDriverOverrideThreshold", {PERSISTENT | BACKUP, INT, "2400"}},
+    {"NrdrOverrideThresholdCenterBoost", {PERSISTENT | BACKUP, INT, "1200"}},
     {"HondaOverrideFadeDownSecs", {PERSISTENT | BACKUP, FLOAT, "0"}},
     {"HondaOverrideFadeUpSecs", {PERSISTENT | BACKUP, FLOAT, "1.5"}},
     {"HondaOverrideTorqueScale", {PERSISTENT | BACKUP, INT, "0"}},
@@ -345,60 +333,59 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaLpfTauHighway", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
     {"NrdrFirstRunSetupDone", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrAutoSelectModel", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"StaticFeedforwardLong", {PERSISTENT | BACKUP, BOOL, "1"}},     // long PID scale multiplies P+I only; kf stays tuned
-    {"NrdrHondaEcuMatchedLong", {PERSISTENT | BACKUP, BOOL, "0"}},   // Honda Nidec: ECU-matched longitudinal (accel rate-limit + coast deadband + sign-change hold-off); OFF = stock
-    {"NrdrFordOemLateral", {PERSISTENT | BACKUP, BOOL, "0"}},        // Ford: OEM-style 4-signal lateral (curvature_rate + path_angle + human-turn); OFF = stock curvature-only
-    {"NrdrFordHumanTurn", {PERSISTENT | BACKUP, BOOL, "1"}},         // Ford OEM lateral: zero steer during a held manual turn, ramp back on release (anti-"throws me off")
-    {"NrdrFordLanePositioning", {PERSISTENT | BACKUP, BOOL, "1"}},   // Ford OEM lateral: path_angle lane-centering PID (added authority/centering)
-    {"NrdrFordLanePosGain", {PERSISTENT | BACKUP, INT, "100"}},      // Ford OEM lateral: lane-centering strength % (100 = 1.0x)
-    {"NrdrFordMaxLatAccel", {PERSISTENT | BACKUP, FLOAT, "2.4"}},    // Ford OEM lateral: max lateral-accel ceiling m/s^2 (stock ~2.4; raise to fix "runs out of torque")
+    {"StaticFeedforwardLong", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrHondaEcuMatchedLong", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrFordOemLateral", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrFordHumanTurn", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrFordLanePositioning", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrFordLanePosGain", {PERSISTENT | BACKUP, INT, "100"}},
+    {"NrdrFordMaxLatAccel", {PERSISTENT | BACKUP, FLOAT, "2.4"}},
     {"HondaInjectionTest", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"HondaAltDashboardSpeed", {PERSISTENT | BACKUP, INT, "0"}},     // 0 Stock, 1 Lead Speed, 2 GPS Speed, 3 Cluster Speed
-    {"HondaAltDashboardDistance", {PERSISTENT | BACKUP, INT, "0"}},  // 0 Stock, 1 Radar, 2 Velocity
-    {"NrdrHondaDashVariantB", {PERSISTENT | BACKUP, BOOL, "0"}},     // Honda cluster mini-speed rounding variant: OFF = Variant A (3 dashed lanes, default), ON = Variant B (4 dashed lanes). UI placeholder; no backend yet.
-    {"NrdrMinSteerSpeed", {PERSISTENT | BACKUP, INT, "1"}},          // mph; below this speed no steering torque is commanded (0 = stock, steer always)
-    {"NrdrClearDashFaults", {PERSISTENT | BACKUP, BOOL, "1"}},       // zero FCM/icon faults + FCW chime on the cluster; OFF = stock passthrough
-    {"HondaSpoofCameraMessages", {PERSISTENT | BACKUP, BOOL, "0"}},  // dead camera: spoof CAMERA_MESSAGES (0x35E) to stop the Auto High Beam fault
-    {"NrdrCruiseButtonSubMode", {PERSISTENT | BACKUP, BOOL, "0"}},   // Dynamic HUD: distance/set/resume buttons preview before acting (default OFF)
-    {"NrdrCruiseButtonSubModeSecs", {PERSISTENT | BACKUP, INT, "15"}}, // sub-mode window length (5-60s); blink ramp spans the whole window
-    {"NrdrHudSubModeUntil", {CLEAR_ON_MANAGER_START, FLOAT, "0"}},   // monotonic deadline of the active HUD sub-mode window
-    // Sunnylink remote actions (consumed and cleared by nrdr_remoted)
-    {"NrdrRemoteForceUpdate", {CLEAR_ON_MANAGER_START, BOOL, "0"}},  // website "button": run the updater chain
-    {"NrdrRemoteTuneScan", {CLEAR_ON_MANAGER_START, BOOL, "0"}},     // website "button": run tune_report.py
-    {"NrdrRemoteStatus", {CLEAR_ON_MANAGER_START, STRING, "idle"}},  // remote action status line shown on the website
-    {"NrdrTuneReportSummary", {PERSISTENT, STRING, ""}},             // per-speed summary table from the last tune scan
-    {"NrdrCarTuneInfo", {PERSISTENT, STRING, ""}},                   // Car & Tune Info readout for the Sunnylink info row (written by nrdr_remoted)
-    {"NrdrCarTuneDetails", {PERSISTENT, STRING, ""}},                // multiline live data injected into the Sunnylink Profile info modal
-    {"NrdrCarControllerInfo", {PERSISTENT, STRING, ""}},             // concise read-only Controller row in Sunnylink Car & Tune Info
-    {"NrdrCarHandcraftedInfo", {PERSISTENT, STRING, ""}},            // active fingerprint-scoped handcrafted profile name/version
-    {"NrdrCarPidLowInfo", {PERSISTENT, STRING, ""}},                 // concise read-only low-speed PID scale row
-    {"NrdrCarPidMidInfo", {PERSISTENT, STRING, ""}},                 // concise read-only standard-speed PID scale row
-    {"NrdrCarPidHighInfo", {PERSISTENT, STRING, ""}},                // concise read-only highway PID scale row
-    {"NrdrCarDampingInfo", {PERSISTENT, STRING, ""}},                // concise read-only rate-damping row
-    {"NrdrCarCenterInfo", {PERSISTENT, STRING, ""}},                 // concise read-only center-boost row
-    {"NrdrCarNnlcInfo", {PERSISTENT, STRING, ""}},                   // concise read-only NNLC settings row
-    {"NrdrCarSteerRatioInfo", {PERSISTENT, STRING, ""}},             // concise read-only steer-ratio settings row
-    {"NrdrCarLearningInfo", {PERSISTENT, STRING, ""}},               // concise read-only live-learning settings row
-    {"NrdrCarHelpersInfo", {PERSISTENT, STRING, ""}},                // concise read-only stiction/StarPilot row
-    {"NrdrStarPilotPid", {PERSISTENT | BACKUP, BOOL, "0"}},          // borrowed StarPilot _pid_output_scale (center boost + turn-in/per-direction scaling); 0 = clean PID/F + D
-    {"NrdrHandcraftedLateralTune", {PERSISTENT | BACKUP, BOOL, "1"}}, // fingerprint-scoped, versioned road-tested lateral profile; unsupported cars ignore it
-    {"NrdrNnlcEnabled", {PERSISTENT | BACKUP, BOOL, "1"}},            // Clarity hybrid: allow the NNLC half of the controller (OFF = PID only)
-    {"NrdrNnlcActivationSpeed", {PERSISTENT | BACKUP, INT, "30"}},    // mph; center of the smooth PID -> NNLC speed handoff
-    {"NrdrNnlcKpGain", {PERSISTENT | BACKUP, INT, "100"}},            // NNLC feedback proportional gain, percent of 1.0
-    {"NrdrNnlcKfGain", {PERSISTENT | BACKUP, INT, "50"}},             // NNLC neural feedforward gain, percent of 1.0
-    {"NrdrNnlcKiGain", {PERSISTENT | BACKUP, INT, "10"}},             // NNLC feedback integral gain, percent of 1.0
-    {"NrdrTuneLearner", {PERSISTENT | BACKUP, BOOL, "1"}},           // 2D online lateral auto-tuner (learned per-cell FF trim); 0 = off
-    {"NrdrLatStiction", {PERSISTENT | BACKUP, BOOL, "0"}},           // lateral stiction: emulated EPS breakaway hold/move stage (NRDR_LATERAL_STICTION.md)
-    {"NrdrTuneLearnerReset", {PERSISTENT, BOOL, "0"}},               // momentary: device zeroes the learned trim map, then clears this
-    {"NrdrTuneLearnerStrength", {PERSISTENT | BACKUP, INT, "100"}},   // learned-trim authority cap, % of steer_max (0-100 via UI slider)
-    {"NrdrTuneLearnerRate", {PERSISTENT | BACKUP, INT, "50"}},       // learning speed, % of reference rate (0 freezes learning)
-    {"NrdrTuneLearnerMap", {PERSISTENT | BACKUP | DONT_LOG, BYTES}}, // learned trim surface (2 x speed x angle float32 blob)
-    {"HondaCenterBoostThreshold", {PERSISTENT | BACKUP, FLOAT, "3"}},  // deg from center where Center Scale is active
-    {"HondaCenterBoostMinSpeed", {PERSISTENT | BACKUP, INT, "50"}},  // mph; below this speed center boost is disabled (low-speed center-oscillation fix)
-    {"HondaUnwindBoostSeconds", {PERSISTENT | BACKUP, FLOAT, "1"}},  // s; unwind FF boost is held for the first N seconds of each unwind, then fades out
-    {"HondaUnwindFfMultiplier", {PERSISTENT | BACKUP, FLOAT, "2"}},  // peak unwind feedforward multiplier at a standstill (fades to 1x by ~22mph)
-    {"NrdrLatRateDamping", {PERSISTENT | BACKUP, INT, "30"}},          // %; rate-damping (D) strength, 0 = off (torque opposing steering-wheel rate to damp low-speed oscillation)
-    {"NrdrLatRateDampingFadeSpeed", {PERSISTENT | BACKUP, INT, "30"}},  // mph; rate damping fades to zero by this speed, where tire self-aligning torque resumes damping
+    {"HondaAltDashboardSpeed", {PERSISTENT | BACKUP, INT, "0"}},
+    {"HondaAltDashboardDistance", {PERSISTENT | BACKUP, INT, "0"}},
+    {"NrdrHondaDashVariantB", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrMinSteerSpeed", {PERSISTENT | BACKUP, INT, "1"}},
+    {"NrdrClearDashFaults", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"HondaSpoofCameraMessages", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrCruiseButtonSubMode", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrCruiseButtonSubModeSecs", {PERSISTENT | BACKUP, INT, "15"}},
+    {"NrdrHudSubModeUntil", {CLEAR_ON_MANAGER_START, FLOAT, "0"}},
+    {"NrdrRemoteForceUpdate", {CLEAR_ON_MANAGER_START, BOOL, "0"}},
+    {"NrdrRemoteTuneScan", {CLEAR_ON_MANAGER_START, BOOL, "0"}},
+    {"NrdrRemoteStatus", {CLEAR_ON_MANAGER_START, STRING, "idle"}},
+    {"NrdrTuneReportSummary", {PERSISTENT, STRING, ""}},
+    {"NrdrCarTuneInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarTuneDetails", {PERSISTENT, STRING, ""}},
+    {"NrdrCarControllerInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarHandcraftedInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarPidLowInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarPidMidInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarPidHighInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarDampingInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarCenterInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarNnlcInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarSteerRatioInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarLearningInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrCarHelpersInfo", {PERSISTENT, STRING, ""}},
+    {"NrdrStarPilotPid", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrHandcraftedLateralTune", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrNnlcEnabled", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrNnlcActivationSpeed", {PERSISTENT | BACKUP, INT, "30"}},
+    {"NrdrNnlcKpGain", {PERSISTENT | BACKUP, INT, "100"}},
+    {"NrdrNnlcKfGain", {PERSISTENT | BACKUP, INT, "50"}},
+    {"NrdrNnlcKiGain", {PERSISTENT | BACKUP, INT, "10"}},
+    {"NrdrTuneLearner", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrLatStiction", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrTuneLearnerReset", {PERSISTENT, BOOL, "0"}},
+    {"NrdrTuneLearnerStrength", {PERSISTENT | BACKUP, INT, "100"}},
+    {"NrdrTuneLearnerRate", {PERSISTENT | BACKUP, INT, "50"}},
+    {"NrdrTuneLearnerMap", {PERSISTENT | BACKUP | DONT_LOG, BYTES}},
+    {"HondaCenterBoostThreshold", {PERSISTENT | BACKUP, FLOAT, "3"}},
+    {"HondaCenterBoostMinSpeed", {PERSISTENT | BACKUP, INT, "50"}},
+    {"HondaUnwindBoostSeconds", {PERSISTENT | BACKUP, FLOAT, "1"}},
+    {"HondaUnwindFfMultiplier", {PERSISTENT | BACKUP, FLOAT, "2"}},
+    {"NrdrLatRateDamping", {PERSISTENT | BACKUP, INT, "30"}},
+    {"NrdrLatRateDampingFadeSpeed", {PERSISTENT | BACKUP, INT, "30"}},
     {"HondaSteerDeltaLimiter", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaSteerDeltaUp", {PERSISTENT | BACKUP, FLOAT, "3"}},
     {"HondaSteerDeltaDown", {PERSISTENT | BACKUP, FLOAT, "3"}},
@@ -407,7 +394,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaStoppingDecelRateLong", {PERSISTENT | BACKUP, FLOAT, "0.3"}},
     {"HondaVEgoStopping", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
     {"HondaVEgoStarting", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
-    {"HondaCivicRadarTryout", {PERSISTENT | BACKUP, BOOL, "0"}},  // EXPERIMENTAL Bosch radar try-out; opt-in only (Special panel)
+    {"HondaCivicRadarTryout", {PERSISTENT | BACKUP, BOOL, "0"}},
 
     // Torque lateral control custom params
     {"CustomTorqueParams", {PERSISTENT | BACKUP , BOOL}},

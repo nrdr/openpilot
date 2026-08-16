@@ -1,8 +1,3 @@
-"""August-layout openpilot package module.
-
-nrdr Learned Parameters sub-panel: openpilot's live-learned vehicle params (read-only)
-plus the Auto toggles that decide whether to use them or fall back to static base values.
-"""
 from collections.abc import Callable
 import pyray as rl
 
@@ -22,7 +17,6 @@ class LearnedParametersLayout(Widget):
     self._back_button = NavButton(tr("Back"))
     self._back_button.set_click_callback(back_btn_callback)
 
-    # Read-only display of openpilot's learned live parameters.
     self._lp_text = {
       "steerRatio": tr("learning..."),
       "stiffnessFactor": tr("learning..."),

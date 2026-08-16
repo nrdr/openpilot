@@ -66,7 +66,6 @@ def only_offroad(started: bool, params: Params, CP: car.CarParams) -> bool:
   return not started
 
 def livestream(started: bool, params: Params, CP: car.CarParams) -> bool:
-  # Support both the August webrtcd path and nrdr's Konik-compatible streamer.
   return params.get_bool("IsLiveStreaming") or params.get_bool("LiveView")
 
 def use_github_runner(started, params, CP: car.CarParams) -> bool:
@@ -183,7 +182,6 @@ procs += [
   # Backup
   PythonProcess("backup_manager", "openpilot.sunnypilot.sunnylink.backups.manager", and_(only_offroad, sunnylink_ready_shim)),
 
-  # nrdr remote actions (Sunnylink website buttons: Force Update, Tune Scan)
   PythonProcess("nrdr_remoted", "openpilot.sunnypilot.nrdr.remoted", only_offroad),
 
   # mapd

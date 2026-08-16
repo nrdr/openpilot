@@ -6,7 +6,6 @@ import capnp
 import openpilot.cereal.messaging as messaging
 from openpilot.cereal import log
 from opendbc.car.structs import car
-from opendbc.car.honda.steer_ratio import get_honda_vgr_learning_inverse, vgr_physical_to_linear
 from openpilot.common.params import Params
 from openpilot.common.realtime import config_realtime_process, DT_MDL
 from openpilot.selfdrive.locationd.models.car_kf import CarKalman, ObservationKind, States
@@ -28,10 +27,6 @@ LOW_ACTIVE_SPEED = 10.0
 
 class VehicleParamsLearner:
   def __init__(self, CP: car.CarParams, steer_ratio: float, stiffness_factor: float, angle_offset: float, P_initial: np.ndarray | None = None):
-    # A validated firmware position map lets paramsd observe the steering angle
-    # in the centre-equivalent coordinate its constant-ratio EKF actually models.
-    # None is an exact passthrough for every unsupported/unknown EPS image.
-    self.vgr_inverse = get_honda_vgr_learning_inverse(CP.flags) if CP.brand == "honda" else None
     self.kf = CarKalman(GENERATED_DIR)
 
     self.x_initial = CarKalman.initial_x.copy()
@@ -122,9 +117,8 @@ class VehicleParamsLearner:
       self.calibrator.feed_live_calib(msg)
 
     elif which == 'carState':
-      steering_angle = vgr_physical_to_linear(msg.steeringAngleDeg, self.vgr_inverse)
+      steering_angle = msg.steeringAngleDeg
 
-      # Gate in the same centre-equivalent coordinate supplied to the filter.
       in_linear_region = abs(steering_angle) < 45
       self.observed_speed = msg.vEgo
       self.active = self.observed_speed > MIN_ACTIVE_SPEED and in_linear_region

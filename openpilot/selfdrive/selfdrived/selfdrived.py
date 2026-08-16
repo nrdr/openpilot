@@ -11,7 +11,6 @@ from msgq.visionipc import VisionIpcClient, VisionStreamType
 
 
 from openpilot.common.params import Params
-from openpilot.selfdrive.controls.lib.nrdr_hud_submode import consume_button_press
 from openpilot.common.realtime import config_realtime_process, Priority, Ratekeeper, DT_CTRL
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.gps import get_gps_location_service
@@ -28,6 +27,8 @@ from openpilot.common.hardware import HARDWARE
 
 from openpilot.sunnypilot.mads.mads import ModularAssistiveDrivingSystem
 from openpilot.sunnypilot import get_sanitize_int_param
+from openpilot.sunnypilot.nrdr.events import filter_car_events
+from openpilot.sunnypilot.nrdr.selfdrived import NrdrSelfdrive
 from openpilot.sunnypilot.selfdrive.car.car_specific import CarSpecificEventsSP
 from openpilot.sunnypilot.selfdrive.car.cruise_helpers import CruiseHelper
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.controller import IntelligentCruiseButtonManagement
@@ -53,7 +54,6 @@ MonitoringPolicy = log.DriverMonitoringState.MonitoringPolicy
 TurnDirection = custom.ModelDataV2SP.TurnDirection
 
 IGNORED_SAFETY_MODES = (SafetyModel.silent, SafetyModel.noOutput)
-SLA_CONFIRM_BUTTON_RESERVE_S = 0.75
 
 
 class SelfdriveD(CruiseHelper):
@@ -139,7 +139,6 @@ class SelfdriveD(CruiseHelper):
     self.logged_comm_issue = None
     self.not_running_prev = None
     self.experimental_mode = False
-    self._sla_confirm_button_reserved_until = 0.0
     self.personality = get_sanitize_int_param(
       "LongitudinalPersonality",
       min(log.LongitudinalPersonality.schema.enumerants.values()),
@@ -182,26 +181,7 @@ class SelfdriveD(CruiseHelper):
 
     CruiseHelper.__init__(self, self.CP)
     self.button_state_tracker = ButtonStateTracker()
-
-  def _cycle_personality_from_button(self) -> None:
-    # selfdrived owns the live personality for the entire onroad process lifetime. Persist
-    # button changes for the next drive, but never poll this value back from Params while
-    # onroad: a delayed remote/settings write must not change longitudinal behavior in motion.
-    personality = (self.personality - 1) % len(log.LongitudinalPersonality.schema.enumerants)
-    self.personality = personality
-    self.params.put('LongitudinalPersonality', personality)
-
-  def _sla_reserves_distance_button(self, sla_state) -> bool:
-    now = time.monotonic()
-    if sla_state == custom.LongitudinalPlanSP.SpeedLimit.AssistState.preActive:
-      # Keep the button reserved briefly after the planner accepts the proposal.
-      # plannerd and selfdrived consume carState independently, so the active plan
-      # can otherwise win the race and let the same release also cycle personality.
-      self._sla_confirm_button_reserved_until = now + SLA_CONFIRM_BUTTON_RESERVE_S
-    reserved = self._sla_confirm_button_reserved_until > 0.0 and now <= self._sla_confirm_button_reserved_until
-    if not reserved:
-      self._sla_confirm_button_reserved_until = 0.0
-    return reserved
+    self.nrdr = NrdrSelfdrive()
 
   def update_events(self, CS):
     """Compute onroadEvents from carState"""
@@ -274,7 +254,7 @@ class SelfdriveD(CruiseHelper):
 
     # Add car events, ignore if CAN isn't valid
     if CS.canValid:
-      car_events = self.car_events.update(CS, self.CS_prev, self.sm['carControl']).to_msg()
+      car_events = filter_car_events(self.car_events.update(CS, self.CS_prev, self.sm['carControl']).to_msg())
       self.events.add_from_msg(car_events)
 
       car_events_sp = self.car_events_sp.update(CS, self.sm['carStateSP'], self.events).to_msg()
@@ -500,25 +480,14 @@ class SelfdriveD(CruiseHelper):
     if CS.gearShifter == car.CarState.GearShifter.park and self.mads.enabled:
       self.events.remove(EventName.canBusMissing)
 
-    # nrdr: while a Speed Limit Assist proposal is pending (preActive), the distance button
-    # is the confirmation input - suppress its normal functions (personality cycling and the
-    # experimental-mode long press) so accepting a limit doesn't also trigger them.
     sla_state = self.sm['longitudinalPlanSP'].speedLimit.assist.state
-    sla_confirmation_reserved = self._sla_reserves_distance_button(sla_state)
-
-    if not sla_confirmation_reserved:
+    button_reserved = self.nrdr.reserve_distance_button(sla_state)
+    if not button_reserved:
       CruiseHelper.update(self, CS, self.events_sp, self.experimental_mode)
 
     # decrement personality on distance button press
-    if self.CP.openpilotLongitudinalControl and not sla_confirmation_reserved:
-      if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
-        if not self.experimental_mode_switched:
-          # Dynamic HUD: the first press only opens the HUD sub-mode preview; only
-          # presses made while it's already open actually change the personality.
-          if consume_button_press(self.params):
-            self._cycle_personality_from_button()
-            self.events.add(EventName.personalityChanged)
-        self.experimental_mode_switched = False
+    if self.nrdr.update_personality(self, CS, button_reserved):
+      self.events.add(EventName.personalityChanged)
 
     self.icbm.run(CS, self.sm['carControl'], self.sm['longitudinalPlanSP'], self.is_metric)
 
@@ -663,7 +632,6 @@ class SelfdriveD(CruiseHelper):
       self.is_ldw_enabled = self.params.get_bool("IsLdwEnabled")
       self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
       self.experimental_mode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
-
       self.mads.read_params()
       time.sleep(0.1)
 

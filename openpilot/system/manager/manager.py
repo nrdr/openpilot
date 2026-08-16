@@ -22,142 +22,7 @@ from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
 
 from openpilot.sunnypilot.system.params_migration import run_migration
-
-# nrdr fork defaults are applied only when a param is missing, so user-selected
-# values are preserved after first boot.
-NRDR_DEFAULT_BOOL_PARAMS = {
-  # Device
-  "QuietMode": True,
-
-  # Network
-  "GsmMetered": False,
-
-  # Toggles
-  "ExperimentalMode": True,
-  "RecordFront": True,
-  "RecordAudio": True,
-
-  # Models
-  "LaneTurnDesire": True,
-
-  # Cruise
-  "DynamicExperimentalControl": True,
-  "SmartCruiseControlVision": True,
-  "CustomAccIncrementsEnabled": True,  # stored preference; only acts where the car supports custom increments
-
-  # Steering / MADS
-  "MadsMainCruiseAllowed": False,
-
-  # nrdr lateral
-  "HondaTorqueLowPassFilter": True,
-  "HondaUnwindLookahead": True,
-  "NrdrNnlcEnabled": True,
-
-  # Visuals
-  "RocketFuel": True,
-  "BlindSpot": True,
-  "TorqueBar": True,
-  "RainbowMode": False,
-  "StandstillTimer": True,
-  "RoadNameToggle": True,
-  "GreenLightAlert": True,
-  "LeadDepartAlert": True,
-  "TrueVEgoUI": False,
-  "HideVEgoUI": False,
-  "ShowTurnSignals": True,
-
-  # Developer
-  "SshEnabled": True,
-  "ShowAdvancedControls": True,
-  "LagdToggle": True,
-  "EnableCopyparty": True,  # file server; Show Footage QR links depend on it
-}
-
-NRDR_DEFAULT_VALUE_PARAMS = {
-  # Models
-  "LaneTurnValue": 20.0,
-
-  # Steering
-  "AutoLaneChangeTimer": 1,
-  "NrdrNnlcActivationSpeed": 30,
-  "NrdrNnlcKpGain": 100,
-  "NrdrNnlcKfGain": 50,
-  "NrdrNnlcKiGain": 10,
-
-  # Longitudinal
-  "LongitudinalPersonality": 3,  # 0 aggressive, 1 standard, 2 relaxed, 3 econ
-
-  # Cruise
-  "SpeedLimitMode": 3,
-  "SpeedLimitOffsetType": 1,
-  "SpeedLimitValueOffset": 5,
-  "CustomAccShortPressIncrement": 5,
-  "CustomAccLongPressIncrement": 1,
-
-  # nrdr override
-  "HondaOverrideFadeDownSecs": 0.1,
-
-  # Visuals
-  "ChevronInfo": 4,  # 0 Off, 1 Distance, 2 Speed, 3 Time, 4 All
-  "DevUIInfo": 3,
-
-  # Display
-  "OnroadScreenOffBrightness": 1,
-  "InteractivityTimeout": 120,
-}
-
-
-def apply_nrdr_default_params(params: Params) -> None:
-  """Apply nrdr fork defaults without overriding user-selected values.
-
-  Every write is best-effort. A single unregistered/odd params key (e.g. on a
-  Comma 4, whose params handling differs) must never raise out of here and crash
-  manager_init -- that would leave the device stuck on the boot logo. Each write is
-  isolated so one bad key is logged and skipped instead of taking down the boot.
-  """
-  def _default_if_unset(key, value, setter):
-    try:
-      if params.get(key) is None:
-        setter(key, value)
-    except Exception:
-      cloudlog.exception("apply_nrdr_default_params: skipped default %s", key)
-
-  def _force(key, value, setter):
-    try:
-      setter(key, value)
-    except Exception:
-      cloudlog.exception("apply_nrdr_default_params: skipped %s", key)
-
-  # nrdr: the Comma Four ships with sounds ON - quiet mode stays opt-in there.
-  # Other devices keep the fork's quiet-by-default seeding.
-  bool_defaults = dict(NRDR_DEFAULT_BOOL_PARAMS)
-  if HARDWARE.get_device_type() == 'mici':
-    bool_defaults.pop("QuietMode", None)
-
-  for key, value in bool_defaults.items():
-    _default_if_unset(key, value, params.put_bool)
-
-  for key, value in NRDR_DEFAULT_VALUE_PARAMS.items():
-    _default_if_unset(key, value, params.put)
-
-  # Keep the global Torque/NNLC switches off: they are hidden in the nrdr UI.
-  # Fingerprint-scoped controller policies (currently the Clarity) opt in in
-  # sunnypilot/selfdrive/car/interfaces.py without depending on these Params.
-  _force("EnforceTorqueControl", False, params.put_bool)
-  _force("NeuralNetworkLateralControl", False, params.put_bool)
-
-  # Satisfy onboarding here in manager_init (before the UI process starts) so terms /
-  # training / sunnylink prompts never show on a factory-fresh boot. Wrapped so a
-  # device that can't take one of these writes just skips it instead of failing to boot.
-  try:
-    from openpilot.system.version import terms_version, terms_version_sp, training_version, sunnylink_consent_version
-    _force("HasAcceptedTerms", terms_version, params.put)
-    _force("HasAcceptedTermsSP", terms_version_sp, params.put)
-    _force("CompletedTrainingVersion", training_version, params.put)
-    _force("CompletedSunnylinkConsentVersion", sunnylink_consent_version, params.put)
-    _force("SunnylinkEnabled", True, params.put_bool)
-  except Exception:
-    cloudlog.exception("apply_nrdr_default_params: onboarding defaults skipped")
+from openpilot.sunnypilot.nrdr.manager import apply_defaults as apply_nrdr_defaults
 
 
 def manager_init() -> None:
@@ -189,7 +54,7 @@ def manager_init() -> None:
   if not PC:
     run_migration(params)
 
-  apply_nrdr_default_params(params)
+  apply_nrdr_defaults(params)
 
   # set unset params to their default value
   for k in params.all_keys():

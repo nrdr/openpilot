@@ -17,7 +17,7 @@ from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import PCM_LONG_REQUIRED_MAX_SET_SPEED, CONFIRM_SPEED_THRESHOLD
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode
-from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import set_speed_limit_assist_availability
+from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import compare_cluster_target, set_speed_limit_assist_availability
 
 ButtonType = car.CarState.ButtonEvent.Type
 EventNameSP = custom.OnroadEventSP.EventName
@@ -41,6 +41,8 @@ LIMIT_MIN_SPEED = 8.33  # m/s, Minimum speed limit to provide as solution on lim
 LIMIT_SPEED_OFFSET_TH = -1.  # m/s Maximum offset between speed limit and current speed for adapting state.
 V_CRUISE_UNSET = 255.
 
+CRUISE_BUTTONS_PLUS = (ButtonType.accelCruise, ButtonType.resumeCruise)
+CRUISE_BUTTONS_MINUS = (ButtonType.decelCruise, ButtonType.setCruise)
 CRUISE_BUTTON_CONFIRM_HOLD = 0.5  # secs.
 
 
@@ -87,7 +89,8 @@ class SpeedLimitAssist:
     self._state_prev = SpeedLimitAssistState.disabled
     self.pcm_op_long = CP.openpilotLongitudinalControl and CP.pcmCruise
 
-    self._gap_hold = 0.
+    self._plus_hold = 0.
+    self._minus_hold = 0.
     self._release_toggle_prev = 0
 
     # TODO-SP: SLA's own output_a_target for planner
@@ -149,17 +152,26 @@ class SpeedLimitAssist:
     if not released:
       return
     now = time.monotonic()
-    # nrdr: the distance/gap button is the ONLY confirmation input. +/- never confirms;
-    # the driver must always be able to adjust set speed without accepting a pending limit.
-    if released & (1 << ButtonType.gapAdjustCruise.raw):
-      self._gap_hold = max(self._gap_hold, now + CRUISE_BUTTON_CONFIRM_HOLD)
+    if any((released >> b) & 1 for b in CRUISE_BUTTONS_PLUS):
+      self._plus_hold = max(self._plus_hold, now + CRUISE_BUTTON_CONFIRM_HOLD)
+    if any((released >> b) & 1 for b in CRUISE_BUTTONS_MINUS):
+      self._minus_hold = max(self._minus_hold, now + CRUISE_BUTTON_CONFIRM_HOLD)
 
-  def _get_confirm_button_release(self) -> bool:
-    # consume a recent distance/gap button release (the sole confirmation input)
+  def _get_button_release(self, req_plus: bool, req_minus: bool) -> bool:
     now = time.monotonic()
-    hold = self._gap_hold
-    self._gap_hold = 0.
-    return bool(now <= hold)
+    if req_plus and now <= self._plus_hold:
+      self._plus_hold = 0.
+      return True
+    elif req_minus and now <= self._minus_hold:
+      self._minus_hold = 0.
+      return True
+
+    # expired
+    if now > self._plus_hold:
+      self._plus_hold = 0.
+    if now > self._minus_hold:
+      self._minus_hold = 0.
+    return False
 
   def update_calculations(self, v_cruise_cluster: float) -> None:
     speed_conv = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
@@ -211,12 +223,15 @@ class SpeedLimitAssist:
       self.state = SpeedLimitAssistState.pending
 
   def _update_non_pcm_long_confirmed_state(self) -> bool:
-    # nrdr: confirmation comes ONLY from the distance/gap button. Neither +/- presses nor the
-    # set speed happening to land on the target may accept a pending limit (both used to -
-    # a driver adjusting set speed manually could accidentally confirm a bad proposal).
+    if self.target_set_speed_confirmed:
+      return True
+
     if self.state != SpeedLimitAssistState.preActive:
       return False
-    return self._get_confirm_button_release()
+
+    req_plus, req_minus = compare_cluster_target(self.v_cruise_cluster, self._speed_limit_final_last, self.is_metric)
+
+    return self._get_button_release(req_plus, req_minus)
 
   def update_state_machine_pcm_op_long(self):
     self.long_engaged_timer = max(0, self.long_engaged_timer - 1)
@@ -250,7 +265,7 @@ class SpeedLimitAssist:
 
         # PENDING
         elif self.state == SpeedLimitAssistState.pending:
-          if self._get_confirm_button_release():
+          if self.target_set_speed_confirmed:
             self._update_confirmed_state()
           elif self.speed_limit_changed:
             self.state = SpeedLimitAssistState.preActive
@@ -258,7 +273,7 @@ class SpeedLimitAssist:
 
         # PRE_ACTIVE
         elif self.state == SpeedLimitAssistState.preActive:
-          if self._get_confirm_button_release():
+          if self.target_set_speed_confirmed:
             self._update_confirmed_state()
           elif self.pre_active_timer <= 0:
             # Timeout - session ended
@@ -276,7 +291,7 @@ class SpeedLimitAssist:
           self.long_engaged_timer = int(DISABLED_GUARD_PERIOD / DT_MDL)
 
         elif self.long_engaged_timer <= 0:
-          if self._get_confirm_button_release():
+          if self.target_set_speed_confirmed:
             self._update_confirmed_state()
           elif self._has_speed_limit:
             self.state = SpeedLimitAssistState.preActive
@@ -301,11 +316,7 @@ class SpeedLimitAssist:
       else:
         # ACTIVE
         if self.state == SpeedLimitAssistState.active:
-          # Non-PCM SLA applies an accepted limit by writing vCruise itself. That expected
-          # write arrives on the next planner tick and must not be mistaken for a driver's
-          # manual +/- adjustment. Equality is safe to use here because explicit distance-
-          # button consent has already put the state machine in ACTIVE; it is not consent.
-          if self.v_cruise_cluster_changed and not self.target_set_speed_confirmed:
+          if self.v_cruise_cluster_changed:
             self.state = SpeedLimitAssistState.inactive
 
           elif self.speed_limit_changed and self.apply_confirm_speed_threshold:

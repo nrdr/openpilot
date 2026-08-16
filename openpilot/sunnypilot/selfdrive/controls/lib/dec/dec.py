@@ -12,6 +12,7 @@ from numpy import interp
 from openpilot.common.params import Params
 from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot.selfdrive.controls.lib.dec.constants import WMACConstants
+from openpilot.sunnypilot.nrdr.dec import enforce_mode_dwell, slow_down_threshold
 from typing import Literal
 
 # d-e2e, from modeldata.h
@@ -100,13 +101,8 @@ class ModeTransitionManager:
       if m != mode:
         self.mode_confidence[m] = max(0.0, self.mode_confidence[m] - 0.05)
 
-    # Require minimum duration in current mode. An active emergency override holds
-    # ONLY its own mode; an OPPOSING non-emergency request must still respect the
-    # dwell. Otherwise the override is flick-cancelled the moment urgency dips below
-    # the emergency threshold, and the mode chatters acc<->blended at SET_MODE_TIMEOUT
-    # frequency (nrdrbranchdebug DEC flip-flop fix; was: `not self.emergency_override`).
-    override_holds = self.emergency_override and mode == self.current_mode
-    if self.mode_duration < self.min_mode_duration and not override_holds:
+    # Require minimum duration in current mode (unless emergency)
+    if enforce_mode_dwell(self, mode):
       return
 
     # Hysteresis: higher threshold for mode changes
@@ -264,9 +260,7 @@ class DynamicExperimentalController:
 
       self._slow_down_filter.add_data(urgency)
       urgency_filtered = self._slow_down_filter.get_value() or 0.0
-      # enter/exit hysteresis (see valid-trajectory branch below)
-      slow_thr = WMACConstants.SLOW_DOWN_PROB * (0.625 if self._has_slow_down else 1.0)
-      self._has_slow_down = urgency_filtered > slow_thr
+      self._has_slow_down = urgency_filtered > slow_down_threshold(WMACConstants.SLOW_DOWN_PROB, self._has_slow_down, 1.0, 0.625)
       self._urgency = urgency_filtered
       return
 
@@ -305,11 +299,8 @@ class DynamicExperimentalController:
     self._slow_down_filter.add_data(urgency)
     urgency_filtered = self._slow_down_filter.get_value() or 0.0
 
-    # Enter/exit hysteresis: once slowing, require a LOWER level to clear, so urgency
-    # hovering at the threshold can't toggle the mode every frame (DEC flip-flop fix;
-    # mirrors the _has_slowness hysteresis pattern above).
-    slow_thr = WMACConstants.SLOW_DOWN_PROB * (0.5 if self._has_slow_down else 0.8)
-    self._has_slow_down = urgency_filtered > slow_thr
+    # Update state with lower threshold for better stop detection
+    self._has_slow_down = urgency_filtered > slow_down_threshold(WMACConstants.SLOW_DOWN_PROB, self._has_slow_down, 0.8, 0.5)
     self._urgency = urgency_filtered
 
   def _radarless_mode(self) -> None:

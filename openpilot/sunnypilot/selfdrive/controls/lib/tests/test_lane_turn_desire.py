@@ -101,7 +101,6 @@ def set_lane_turn_params():
                  steeringPressed=True, steeringTorque=1), True, 1.0, log.Desire.laneChangeLeft),
   (DummyCarState(vEgo=9, leftBlinker=False, rightBlinker=True, leftBlindspot=False, rightBlindspot=False,
                  steeringPressed=True, steeringTorque=-1), True, 1.0, log.Desire.laneChangeRight),
-  # Old nudge threshold still works even if steeringPressed is raised elsewhere.
   (DummyCarState(vEgo=9, leftBlinker=True, rightBlinker=False, leftBlindspot=False, rightBlindspot=False,
                  steeringPressed=False, steeringTorque=1300), True, 1.0, log.Desire.laneChangeLeft),
   # No desire (inactive)

@@ -1,7 +1,5 @@
 import datetime
-import subprocess
 import time
-from zoneinfo import ZoneInfo
 
 from openpilot.cereal import log
 import pyray as rl
@@ -12,52 +10,7 @@ from openpilot.system.ui.widgets.icon_widget import IconWidget
 from openpilot.system.ui.widgets.label import UnifiedLabel, gui_label
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
 from openpilot.selfdrive.ui.ui_state import ui_state
-
-
-def _local_ip() -> str:
-  # The address you'd SSH to / point a phone at: prefer the hotspot subnet, then any
-  # local (192.168/10/172) address. Skips loopback and the cellular default route.
-  try:
-    out = subprocess.check_output(["ip", "-4", "-o", "addr"], encoding="utf8", timeout=2)
-    addrs = []
-    for line in out.splitlines():
-      parts = line.split()
-      if len(parts) >= 4 and parts[2] == "inet" and parts[1] != "lo":
-        addrs.append((parts[1], parts[3].split("/")[0]))
-    for prefix in ("192.168.43.", "192.168.", "10.", "172."):
-      for _ifname, ip in addrs:
-        if ip.startswith(prefix):
-          return ip
-    if addrs:
-      return addrs[0][1]
-  except Exception:
-    pass
-  return ""
-
-
-try:
-  _NY_TZ: datetime.tzinfo = ZoneInfo("America/New_York")
-except Exception:
-  _NY_TZ = datetime.timezone.utc  # fall back to UTC if tzdata is unavailable
-
-
-def _time_ago(dt) -> str:
-  # "Last updated 2 hours 32 minutes ago" style, from a (naive UTC) datetime or None.
-  if dt is None:
-    return "never updated"
-  if dt.tzinfo is None:
-    dt = dt.replace(tzinfo=datetime.timezone.utc)
-  secs = max(0, int((datetime.datetime.now(datetime.timezone.utc) - dt).total_seconds()))
-  if secs < 60:
-    return "Last updated just now"
-  mins = secs // 60
-  if mins < 60:
-    return f"Last updated {mins} minute{'' if mins == 1 else 's'} ago"
-  hours, mins = divmod(mins, 60)
-  if hours < 24:
-    return f"Last updated {hours} hour{'' if hours == 1 else 's'} {mins} minute{'' if mins == 1 else 's'} ago"
-  days, hours = divmod(hours, 24)
-  return f"Last updated {days} day{'' if days == 1 else 's'} {hours} hour{'' if hours == 1 else 's'} ago"
+from openpilot.common.version import RELEASE_BRANCHES
 
 HEAD_BUTTON_FONT_SIZE = 40
 HOME_PADDING = 8
@@ -184,12 +137,6 @@ class MiciHomeLayout(Widget):
     self._is_pressed_prev = False
 
     self._version_text = self._get_version_text()
-    self._ip_text = _local_ip()
-    self._last_ip_check = time.monotonic()
-    try:
-      self._last_update_dt = ui_state.params.get("LastUpdateTime")
-    except Exception:
-      self._last_update_dt = None
 
     self._experimental_icon = IconWidget("icons_mici/experimental_mode.png", (48, 48))
     self._egpu_icon = IconWidget("icons_mici/egpu.png", (50, 37))
@@ -209,7 +156,7 @@ class MiciHomeLayout(Widget):
       self._mic_icon,
     ], spacing=18)
 
-    self._openpilot_label = UnifiedLabel("nrdr", font_size=96, font_weight=FontWeight.DISPLAY, max_width=480, wrap_text=False)
+    self._openpilot_label = UnifiedLabel("sunnypilot", font_size=96, font_weight=FontWeight.DISPLAY, max_width=480, wrap_text=False)
     self._version_label = UnifiedLabel("", font_size=36, font_weight=FontWeight.ROMAN, max_width=480, wrap_text=False)
     self._large_version_label = UnifiedLabel("", font_size=64, text_color=rl.GRAY, font_weight=FontWeight.ROMAN, max_width=480, wrap_text=False)
     self._date_label = UnifiedLabel("", font_size=36, text_color=rl.GRAY, font_weight=FontWeight.ROMAN, max_width=480, wrap_text=False)
@@ -223,16 +170,6 @@ class MiciHomeLayout(Widget):
       self._mouse_down_t = None
       self._did_long_press = False
     self._is_pressed_prev = self.is_pressed
-
-    # refresh the device IP every few seconds (cheap; never every frame)
-    now = time.monotonic()
-    if now - self._last_ip_check > 5.0:
-      self._last_ip_check = now
-      self._ip_text = _local_ip()
-      try:
-        self._last_update_dt = ui_state.params.get("LastUpdateTime")
-      except Exception:
-        pass
 
     if self._mouse_down_t is not None:
       if time.monotonic() - self._mouse_down_t > 0.5:
@@ -266,8 +203,9 @@ class MiciHomeLayout(Widget):
     version = ui_state.params.get("Version")
     git_branch = ui_state.params.get("GitBranch")
     git_commit = ui_state.params.get("GitCommit")
+    commit = "https://buymeacoffee.com/mvlboston"
 
-    if not all((version, git_branch, git_commit)):
+    if not all((version, git_branch, git_commit, commit)):
       return None
 
     branch = git_branch + " " + git_commit[:7]
@@ -276,11 +214,11 @@ class MiciHomeLayout(Widget):
     try:
       # GitCommitDate format from get_commit_date(): '%ct %ci' e.g. "'1708012345 2024-02-15 ...'"
       unix_ts = int(commit_date_raw.strip("'").split()[0])
-      date_str = datetime.datetime.fromtimestamp(unix_ts, _NY_TZ).strftime("%b %d")
+      date_str = datetime.datetime.fromtimestamp(unix_ts).strftime("%b %d")
     except (ValueError, IndexError, TypeError, AttributeError):
       date_str = ""
 
-    return version, branch, "", date_str
+    return version, branch, commit, date_str
 
   def _render(self, _):
     # TODO: why is there extra space here to get it to be flush?
@@ -289,28 +227,27 @@ class MiciHomeLayout(Widget):
     self._openpilot_label.render()
 
     if self._version_text is not None:
+      # release branch
+      release_branch = self._version_text[1] in RELEASE_BRANCHES
       version_pos = rl.Rectangle(text_pos.x, text_pos.y + self._openpilot_label.font_size + 16, 100, 44)
-      self._version_label.set_text("stable.konik.ai")
+      self._version_label.set_text(self._version_text[0])
       self._version_label.set_position(version_pos.x, version_pos.y)
       self._version_label.render()
 
-      # rolling feed: time since the last update
-      self._branch_label.set_max_width(gui_app.width - self._version_label.text_width - 32)
-      self._branch_label.set_text("   " + _time_ago(self._last_update_dt))
-      self._branch_label.set_position(version_pos.x + self._version_label.text_width + 12, version_pos.y)
+      self._date_label.set_text(" " + self._version_text[3])
+      self._date_label.set_position(version_pos.x + self._version_label.text_width + 10, version_pos.y)
+      self._date_label.render()
+
+      self._branch_label.set_max_width(gui_app.width - self._version_label.text_width - self._date_label.text_width - 32)
+      self._branch_label.set_text(" " + ("release" if release_branch else self._version_text[1]))
+      self._branch_label.set_position(version_pos.x + self._version_label.text_width + self._date_label.text_width + 20, version_pos.y)
       self._branch_label.render()
 
-      # 2nd line: device IP (handy for SSH / pointing a phone at the device)
-      self._version_commit_label.set_text("Device IP: " + (self._ip_text or "obtaining..."))
-      self._version_commit_label.set_position(version_pos.x, version_pos.y + self._version_label.font_size + 7)
-      self._version_commit_label.render()
-
-      # build date (NY time), pinned bottom-right just above the footer bar
-      if self._version_text[3]:
-        self._date_label.set_text(self._version_text[3])
-        self._date_label.set_position(self.rect.x + self.rect.width - self._date_label.text_width - HOME_PADDING,
-                                      self.rect.y + self.rect.height - 48 - self._date_label.font_size - 4)
-        self._date_label.render()
+      if not release_branch:
+        # 2nd line
+        self._version_commit_label.set_text(self._version_text[2])
+        self._version_commit_label.set_position(version_pos.x, version_pos.y + self._date_label.font_size + 7)
+        self._version_commit_label.render()
 
     # ***** Center-aligned bottom section icons *****
     self._experimental_icon.set_visible(ui_state.experimental_mode)

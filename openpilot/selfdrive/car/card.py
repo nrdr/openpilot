@@ -23,7 +23,7 @@ from openpilot.selfdrive.car.cruise import VCruiseHelper
 from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_capnp
 
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import apply_handcrafted_lateral_profile
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import restore_handcrafted_lateral_profile
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 
 REPLAY = "REPLAY" in os.environ
@@ -117,12 +117,7 @@ class Car:
       self.CP = self.CI.CP
       self.CP_SP = self.CI.CP_SP
 
-      # Fingerprinting is authoritative: restore the complete road-tested
-      # profile before controlsd starts and reads any of its live tuning Params.
-      changed = apply_handcrafted_lateral_profile(self.CP.carFingerprint, self.params, block=True)
-      if changed:
-        cloudlog.warning({"event": "handcrafted lateral profile restored", "carFingerprint": str(self.CP.carFingerprint),
-                          "changedParams": changed})
+      restore_handcrafted_lateral_profile(self.CP.carFingerprint, self.params)
 
       # continue onto next fingerprinting step in pandad
       self.params.put_bool("FirmwareQueryDone", True, block=True)
@@ -249,8 +244,6 @@ class Car:
     co_send.carOutput.actuatorsOutput = self.last_actuators_output
     self.pm.send('carOutput', co_send)
 
-    # Publish fork-specific state first so the carState-triggered controls cycle consumes
-    # both halves of the same sample. This is safety-critical for interceptor fault state.
     cs_sp_send = messaging.new_message('carStateSP')
     cs_sp_send.valid = CS.canValid
     cs_sp_send.carStateSP = CS_SP

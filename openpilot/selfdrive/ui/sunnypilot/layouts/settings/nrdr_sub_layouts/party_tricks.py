@@ -1,9 +1,3 @@
-"""August-layout openpilot package module.
-
-nrdr "Special" sub-panel (formerly Party Tricks): dashboard designs, the Dynamic
-HUD, diagnostics, and the Show Footage QR flow.
-"""
-import os
 import subprocess
 from collections.abc import Callable
 import pyray as rl
@@ -39,9 +33,6 @@ class PartyTricksLayout(Widget):
   def _on_reregister(self):
     if self._reregister_proc is not None:
       return
-    # Two-tap guard: this knocks a device offline until it re-registers, and an
-    # already-konik device cannot re-register (konik 403s a device it knows), so
-    # a stray tap on a road trip would strand it. Require an explicit confirm.
     dialog = ConfirmDialog(
       tr("Re-register with konik? Clears the dongle ID and registers fresh. Only if the device won't come online."),
       tr("Re-register"),
@@ -53,14 +44,14 @@ class PartyTricksLayout(Widget):
   def _on_reregister_confirmed(self, result: DialogResult):
     if result != DialogResult.CONFIRM or self._reregister_proc is not None:
       return
-    # Clear the cached dongle so konik.register() does a fresh registration
-    # (it keeps an existing valid dongle otherwise).
     Params().remove("DongleId")
     self._reregister_proc = subprocess.Popen(
-      ["python3", "-m", "openpilot.system.athena.konik"],
+      ["python3", "-m", "openpilot.system.athena.registration"],
       cwd=BASEDIR,
     )
-    gui_app.push_widget(HtmlModalSP(text=tr("Re-registering with konik... this can take up to a minute. Check the connect status on the sidebar when it finishes.")))
+    gui_app.push_widget(HtmlModalSP(text=tr(
+      "Re-registering with konik... this can take up to a minute. Check the connect status on the sidebar when it finishes."
+    )))
 
   def _poll_reregister(self):
     if self._reregister_proc is not None and self._reregister_proc.poll() is not None:
@@ -77,30 +68,41 @@ class PartyTricksLayout(Widget):
     self._show_footage_item = button_item(
       lambda: tr("Show Footage"),
       lambda: tr("OPEN"),
-      lambda: tr("Pick a drive and get a QR code that lets a phone on this device's hotspot (or the same Wi-Fi) watch the recorded video. Made for the roadside \"can I see the footage?\" moment."),
+      lambda: tr(
+        "Pick a drive and get a QR code that lets a phone on this device's hotspot (or the same Wi-Fi) watch the recorded video. " +
+        "Made for the roadside \"can I see the footage?\" moment."
+      ),
       callback=self._open_footage,
     )
 
     self._reregister_item = button_item(
       lambda: tr("Re-register with konik"),
       lambda: tr("RE-REGISTER"),
-      lambda: tr("Forces a fresh konik registration by clearing the cached dongle ID. Use this only if you switched from comma connect and the device won't come online on konik. Existing konik users never need this - your dongle is kept automatically."),
+      lambda: tr(
+        "Forces a fresh konik registration by clearing the cached dongle ID. Use this only if you switched from comma connect and the " +
+        "device won't come online on konik. Existing konik users never need this - your dongle is kept automatically."
+      ),
       callback=self._on_reregister,
     )
 
     self._injection_test = toggle_item_sp(
       param="HondaInjectionTest",
       title=lambda: tr("Injection Test (Caution!) (Default: OFF)"),
-      description=lambda: tr("When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a massive steering command. Use with extreme caution on a safe, empty road."),
+      description=lambda: tr(
+        "When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a " +
+        "massive steering command. Use with extreme caution on a safe, empty road."
+      ),
     )
 
     self._alt_dashboard_speed = multiple_button_item_sp(
       title=lambda: tr("Alternative Dashboard Speed Design (Default: Stock)"),
-      description=lambda: tr("Repurposes the cluster's set-speed slot (requires openpilot longitudinal). "
-                            "Stock: normal set speed. "
-                            "Lead Speed: the lead's speed in mph, always whole numbers (\"Stopped\" below 1 mph, \"--\" when no lead). "
-                            "GPS Speed: the comma's own true speed. "
-                            "Cluster Speed: exactly what the dash cluster reads."),
+      description=lambda: tr(
+        "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). " +
+        "Stock: normal set speed. " +
+        "Lead Speed: the lead's speed in mph, always whole numbers (\"Stopped\" below 1 mph, \"--\" when no lead). " +
+        "GPS Speed: the comma's own true speed. " +
+        "Cluster Speed: exactly what the dash cluster reads."
+      ),
       buttons=[lambda: tr("Stock"), lambda: tr("Lead Speed"), lambda: tr("GPS Speed"), lambda: tr("Cluster Speed")],
       button_width=330,
       param="HondaAltDashboardSpeed",
@@ -108,11 +110,13 @@ class PartyTricksLayout(Widget):
 
     self._alt_dashboard_distance = multiple_button_item_sp(
       title=lambda: tr("Alternative Dashboard Distance Design (Default: Stock)"),
-      description=lambda: tr("Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). "
-                            "Stock: normal personality bars while engaged. "
-                            "Radar: the bars close in as the lead approaches. "
-                            "Velocity: the bars push out under acceleration and pull in under braking. "
-                            "Non-stock designs stay on the cluster permanently, even when not engaged."),
+      description=lambda: tr(
+        "Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). " +
+        "Stock: normal personality bars while engaged. " +
+        "Radar: the bars close in as the lead approaches. " +
+        "Velocity: the bars push out under acceleration and pull in under braking. " +
+        "Non-stock designs stay on the cluster permanently, even when not engaged."
+      ),
       buttons=[lambda: tr("Stock"), lambda: tr("Radar"), lambda: tr("Velocity")],
       button_width=330,
       param="HondaAltDashboardDistance",
@@ -121,22 +125,30 @@ class PartyTricksLayout(Widget):
     self._clear_dash_faults = toggle_item_sp(
       param="NrdrClearDashFaults",
       title=lambda: tr("Clear Dashboard Fault Codes (Default: ON)"),
-      description=lambda: tr("Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active)."),
+      description=lambda: tr(
+        "Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run " +
+        "a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active)."
+      ),
     )
 
     self._spoof_camera_messages = toggle_item_sp(
       param="HondaSpoofCameraMessages",
       title=lambda: tr("Spoof Camera Messages (Default: OFF)"),
-      description=lambda: tr("Dead camera only: keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises \"Auto High Beam System Problem\" - that fault is a message timeout, not a code. Leave OFF if your stock camera works; a live camera already sends this message."),
+      description=lambda: tr(
+        "Dead camera only: keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises \"Auto High Beam System Problem\" - " +
+        "that fault is a message timeout, not a code. Leave OFF if your stock camera works; a live camera already sends this message."
+      ),
     )
 
     self._cruise_button_sub_mode = toggle_item_sp(
       param="NrdrCruiseButtonSubMode",
       title=lambda: tr("Cruise Button Sub-Mode (Default: ON)"),
-      description=lambda: tr("Dynamic HUD: pressing the distance button or set/resume first wakes a 15-second preview on the cluster - "
-                            "the distance bars light up with your CURRENT personality (parked or driving, any design) and the set speed shows if cruise is engaged, all blinking. "
-                            "Only presses made during the preview actually change the personality or set speed. "
-                            "The blink starts lazy and accelerates continuously until it cuts off."),
+      description=lambda: tr(
+        "Dynamic HUD: pressing the distance button or set/resume first wakes a 15-second preview on the cluster - " +
+        "the distance bars light up with your CURRENT personality (parked or driving, any design) and the set speed shows if cruise is " +
+        "engaged, all blinking. Only presses made during the preview actually change the personality or set speed. " +
+        "The blink starts lazy and accelerates continuously until it cuts off."
+      ),
     )
 
     self._cruise_button_sub_mode_secs = option_item_sp(
@@ -145,7 +157,10 @@ class PartyTricksLayout(Widget):
       min_value=5,
       max_value=60,
       value_change_step=1,
-      description=lambda: tr("How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and rapid right before it falls off."),
+      description=lambda: tr(
+        "How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and " +
+        "rapid right before it falls off."
+      ),
       label_callback=lambda value: f"{value}s",
     )
 
@@ -172,7 +187,6 @@ class PartyTricksLayout(Widget):
     self._alt_dashboard_speed.action_item.set_enabled(True)
     self._alt_dashboard_distance.action_item.set_enabled(True)
     self._cruise_button_sub_mode.action_item.set_enabled(True)
-    # Visibility time only matters while the sub-mode itself is enabled.
     self._cruise_button_sub_mode_secs.set_visible(self._cruise_button_sub_mode.action_item.get_state())
 
   def _render(self, rect):

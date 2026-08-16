@@ -1,0 +1,155 @@
+import math
+from collections import deque
+
+import numpy as np
+
+from opendbc.car.structs import car
+from openpilot.common.params import Params
+from openpilot.common.pid import PIDController
+from openpilot.common.realtime import DT_CTRL
+from openpilot.sunnypilot.nrdr.long_tune import LongTune
+from openpilot.sunnypilot.nrdr.longitudinal_stopping import compute_stopping_accel
+from openpilot.sunnypilot.nrdr.params import read_bool, read_float
+
+
+LongCtrlState = car.CarControl.Actuators.LongControlState
+DREL_FILTER_FRAMES = 10
+DREL_FILTER_ALPHA = 0.3
+PARAM_REFRESH_FRAMES = 300
+
+
+def _state_transition(CP, CP_SP, active, state, should_stop, brake_pressed,
+                      cruise_standstill, v_ego, v_ego_starting):
+  cruise_standstill = cruise_standstill and not CP_SP.enableGasInterceptor
+  starting = not should_stop and not cruise_standstill and not brake_pressed
+  started = v_ego > v_ego_starting
+
+  if not active:
+    return LongCtrlState.off
+  if state == LongCtrlState.off:
+    if not starting:
+      return LongCtrlState.stopping
+    return LongCtrlState.starting if CP.startingState else LongCtrlState.pid
+  if state == LongCtrlState.stopping:
+    if starting:
+      return LongCtrlState.starting if CP.startingState else LongCtrlState.pid
+    return state
+  if should_stop:
+    return LongCtrlState.stopping
+  if started:
+    return LongCtrlState.pid
+  return state
+
+
+class NrdrLongControl:
+  def __init__(self, CP, CP_SP):
+    self.CP = CP
+    self.CP_SP = CP_SP
+    self.long_control_state = LongCtrlState.off
+    self.pid = PIDController(
+      (CP.longitudinalTuning.kpBP, CP.longitudinalTuning.kpV),
+      (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV),
+      rate=1 / DT_CTRL,
+    )
+    self.params = Params()
+    self.tune = LongTune()
+    self.last_output_accel = 0.0
+    self.frame = 0
+    self.pid_scale = 1.0
+    self.static_feedforward = True
+    self.stop_accel = CP.stopAccel
+    self.stopping_decel_rate = CP.stoppingDecelRate
+    self.v_ego_starting = CP.vEgoStarting
+    self.v_ego_stopping = CP.vEgoStopping
+    self.drel_window = deque(maxlen=DREL_FILTER_FRAMES)
+    self.drel_filtered = math.inf
+
+  def reset(self) -> None:
+    self.pid.reset()
+
+  def _refresh_params(self) -> None:
+    self.pid_scale = read_float(self.params, "LongPidTuneScale", 1.0, 0.0, 5.0, scale=100.0)
+    self.static_feedforward = read_bool(self.params, "StaticFeedforwardLong", True)
+    self.stop_accel = read_float(self.params, "HondaStopAccel", self.CP.stopAccel, -10.0, 0.0)
+    self.stopping_decel_rate = read_float(
+      self.params, "HondaStoppingDecelRateLong", self.CP.stoppingDecelRate, 0.0, 5.0,
+    )
+    self.v_ego_starting = read_float(self.params, "HondaVEgoStarting", self.CP.vEgoStarting, 0.0, 5.0)
+    self.v_ego_stopping = read_float(self.params, "HondaVEgoStopping", self.CP.vEgoStopping, 0.0, 5.0)
+
+  def _filter_drel(self, drel) -> float:
+    if drel is None or not math.isfinite(drel):
+      self.drel_window.clear()
+      self.drel_filtered = math.inf
+      return self.drel_filtered
+
+    self.drel_window.append(float(drel))
+    rolling_minimum = min(self.drel_window)
+    if not math.isfinite(self.drel_filtered):
+      self.drel_filtered = rolling_minimum
+    else:
+      self.drel_filtered += DREL_FILTER_ALPHA * (rolling_minimum - self.drel_filtered)
+    return self.drel_filtered
+
+  def _stock_stopping_accel(self) -> float:
+    if self.last_output_accel <= self.stop_accel:
+      return self.last_output_accel
+    return min(self.last_output_accel, 0.0) - self.stopping_decel_rate * DT_CTRL
+
+  def _stopping_accel(self, CS, pitch, drel_filtered) -> float:
+    if self.tune.stopping["l2_enable"] < 0.5:
+      return self._stock_stopping_accel()
+    return compute_stopping_accel(
+      self.last_output_accel,
+      self.stop_accel,
+      self.stopping_decel_rate,
+      CS.vEgo,
+      self.v_ego_stopping,
+      self.tune.stopping["hold_accel"],
+      self.tune.stopping["phase_switch_v"],
+      self.tune.stopping["proximity_scale_m"],
+      self.tune.stopping["pitch_margin"],
+      drel_filtered,
+      pitch if pitch is not None else math.nan,
+    )
+
+  def _pid_accel(self, CS, a_target) -> float:
+    output = self.pid.update(a_target - CS.aEgo, speed=CS.vEgo, feedforward=a_target)
+    if self.static_feedforward:
+      return (output - self.pid.f) * self.pid_scale + self.pid.f
+    return output * self.pid_scale
+
+  def update(self, active, CS, a_target, should_stop, accel_limits, pitch=None, drel=None):
+    if self.frame % PARAM_REFRESH_FRAMES == 0:
+      self._refresh_params()
+    self.tune.refresh()
+    self.frame += 1
+
+    self.pid.neg_limit, self.pid.pos_limit = accel_limits
+    self.long_control_state = _state_transition(
+      self.CP,
+      self.CP_SP,
+      active,
+      self.long_control_state,
+      should_stop,
+      CS.brakePressed,
+      CS.cruiseState.standstill,
+      CS.vEgo,
+      self.v_ego_starting,
+    )
+    drel_filtered = self._filter_drel(drel)
+
+    if self.long_control_state == LongCtrlState.off:
+      self.reset()
+      output_accel = 0.0
+    elif self.long_control_state == LongCtrlState.stopping:
+      output_accel = self._stopping_accel(CS, pitch, drel_filtered)
+      self.reset()
+    elif self.long_control_state == LongCtrlState.starting:
+      output_accel = self.CP.startAccel
+      self.reset()
+    else:
+      output_accel = self._pid_accel(CS, a_target)
+
+    self.last_output_accel = float(np.clip(output_accel, *accel_limits))
+    return self.last_output_accel

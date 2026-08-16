@@ -15,12 +15,11 @@ from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD, get_sanitize_int_param
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import LIMIT_MAX_MAP_DATA_AGE, LIMIT_ADAPT_ACC
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Policy, OffsetType
+from openpilot.sunnypilot.nrdr.speed_limit import apply_map_limit
 
 SpeedLimitSource = custom.LongitudinalPlanSP.SpeedLimit.Source
 
 ALL_SOURCES = tuple(SpeedLimitSource.schema.enumerants.values())
-
-LIMIT_AHEAD_PREEMPTIVE_DISTANCE = 1000.  # m
 
 
 class SpeedLimitResolver:
@@ -40,8 +39,8 @@ class SpeedLimitResolver:
     self.frame = -1
 
     self._gps_location_service = get_gps_location_service(self.params)
-    self.limit_solutions = {}
-    self.distance_solutions = {}
+    self.limit_solutions = {}  # Store for speed limit solutions from different sources
+    self.distance_solutions = {}  # Store for distance to current speed limit start for different sources
 
     self.policy = self.params.get("SpeedLimitPolicy", return_default=True)
     self.policy = get_sanitize_int_param(
@@ -135,24 +134,25 @@ class SpeedLimitResolver:
     self._calculate_map_data_limits(sm, speed_limit, next_speed_limit)
 
   def _calculate_map_data_limits(self, sm: messaging.SubMaster, speed_limit: float, next_speed_limit: float) -> None:
+    gps_data = sm[self._gps_location_service]
     map_data = sm['liveMapDataSP']
+    if apply_map_limit(self, map_data, speed_limit, next_speed_limit, SpeedLimitSource.map):
+      return
 
-    # FIX: the old distance_since_fix correction subtracted the GPS *unix* timestamp (~1.78e9 s) from
-    # time.monotonic() (seconds since boot, ~1e4) -- a ~1.78e9 mismatch that made distance_since_fix
-    # hugely negative and distance_to_speed_limit_ahead ~2e10 m, so the preemptive swap below (<= 1000 m)
-    # could NEVER fire and the limit only ever changed AT the sign. mapd already publishes
-    # speedLimitAheadDistance from the current GPS fix, so use it directly.
-    distance_to_speed_limit_ahead = max(0., map_data.speedLimitAheadDistance)
+    distance_since_fix = self.v_ego * (time.monotonic() - gps_data.unixTimestampMillis * 1e-3)
+    distance_to_speed_limit_ahead = max(0., map_data.speedLimitAheadDistance - distance_since_fix)
 
     self.limit_solutions[SpeedLimitSource.map] = speed_limit
     self.distance_solutions[SpeedLimitSource.map] = 0.
 
-    # Preemptively resolve lower upcoming map limits before the sign so speed
-    # limit assist can begin adapting early when map markers are slightly late
-    # or when the vehicle needs distance to settle near the new limit.
-    if 0. < next_speed_limit < speed_limit and distance_to_speed_limit_ahead <= LIMIT_AHEAD_PREEMPTIVE_DISTANCE:
-      self.limit_solutions[SpeedLimitSource.map] = next_speed_limit
-      self.distance_solutions[SpeedLimitSource.map] = distance_to_speed_limit_ahead
+    # FIXME-SP: this is not working as expected
+    if 0. < next_speed_limit < self.v_ego:
+      adapt_time = (next_speed_limit - self.v_ego) / LIMIT_ADAPT_ACC
+      adapt_distance = self.v_ego * adapt_time + 0.5 * LIMIT_ADAPT_ACC * adapt_time ** 2
+
+      if distance_to_speed_limit_ahead <= adapt_distance:
+        self.limit_solutions[SpeedLimitSource.map] = next_speed_limit
+        self.distance_solutions[SpeedLimitSource.map] = distance_to_speed_limit_ahead
 
   def _get_source_solution_according_to_policy(self) -> custom.LongitudinalPlanSP.SpeedLimit.Source:
     sources_for_policy = self._policy_to_sources_map[Policy(self.policy)]

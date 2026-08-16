@@ -1,5 +1,6 @@
 from openpilot.cereal import log, custom
 from openpilot.common.constants import CV
+from openpilot.sunnypilot.nrdr.lane_change import driver_nudging
 from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot.selfdrive.controls.lib.auto_lane_change import AutoLaneChangeController, AutoLaneChangeMode
 from openpilot.sunnypilot.selfdrive.controls.lib.lane_turn_desire import LaneTurnController
@@ -11,7 +12,6 @@ TurnDirection = custom.ModelDataV2SP.TurnDirection
 LANE_CHANGE_SPEED_MIN = 20 * CV.MPH_TO_MS
 LANE_CHANGE_TIME_MAX = 10.
 LANE_CHANGE_START_TIME = 0.5
-LANE_CHANGE_NUDGE_TORQUE_THRESHOLD = 1200
 
 TURN_DESIRES = {
   TurnDirection.none: log.Desire.none,
@@ -61,12 +61,7 @@ class DesireHelper:
         # Update lane change direction
         self.lane_change_direction = self.get_lane_change_direction(carstate)
 
-        # Keep lane-change nudge sensitivity aligned with the old driver-torque threshold,
-        # even if the platform raises steeringPressed elsewhere for override filtering.
-        torque_nudged = carstate.steeringPressed or abs(carstate.steeringTorque) > LANE_CHANGE_NUDGE_TORQUE_THRESHOLD
-        torque_applied = torque_nudged and \
-                         ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
-                          (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right))
+        torque_applied = driver_nudging(carstate, self.lane_change_direction)
 
         blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
                               (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))

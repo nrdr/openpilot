@@ -12,6 +12,7 @@ from openpilot.selfdrive.ui.sunnypilot.layouts.settings.cruise_sub_layouts.speed
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode as SpeedLimitMode
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import OffsetType as SpeedLimitOffsetType
+from openpilot.sunnypilot.nrdr.settings import apply_speed_limit_preferences
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.widgets import get_highlighted_description
 from openpilot.system.ui.sunnypilot.widgets.list_view import multiple_button_item_sp, option_item_sp, simple_button_item_sp, LineSeparatorSP
@@ -123,8 +124,7 @@ class SpeedLimitSettingsLayout(Widget):
   def _update_state(self):
     super()._update_state()
 
-    sla_disallow_in_release = False
-    sla_always_disallow = False
+    speed_limit_mode_param = ui_state.params.get("SpeedLimitMode", return_default=True)
     if ui_state.CP is not None and ui_state.CP_SP is not None:
       brand = ui_state.CP.brand
       has_long = ui_state.has_longitudinal_control
@@ -140,25 +140,22 @@ class SpeedLimitSettingsLayout(Widget):
       sla_always_disallow = brand == "rivian"
       sla_available = (has_long or has_icbm) and not sla_disallow_in_release and not sla_always_disallow
 
-      # Do NOT downgrade a stored Assist preference to Warning when the car isn't
-      # detected yet. It stays Assist (pending) and activates once the car supports it.
+      if not sla_available and speed_limit_mode_param == int(SpeedLimitMode.assist):
+        ui_state.params.put("SpeedLimitMode", int(SpeedLimitMode.warning))
 
     else:
       sla_available = False
 
     if not sla_available:
-      enabled_buttons = {
+      self._speed_limit_mode.action_item.set_enabled_buttons({
         int(SpeedLimitMode.off),
         int(SpeedLimitMode.information),
         int(SpeedLimitMode.warning),
-      }
-      # Let the user pick Assist offroad as a pending preference (it activates once
-      # the car is detected with longitudinal control). Brand bans still apply.
-      if ui_state.is_offroad() and not sla_always_disallow and not sla_disallow_in_release:
-        enabled_buttons.add(int(SpeedLimitMode.assist))
-      self._speed_limit_mode.action_item.set_enabled_buttons(enabled_buttons)
+      })
     else:
       self._speed_limit_mode.action_item.set_enabled_buttons(None)
+
+    apply_speed_limit_preferences(self._speed_limit_mode, ui_state, speed_limit_mode_param, sla_available)
 
     offset_type = ui_state.params.get("SpeedLimitOffsetType", return_default=True)
     self._speed_limit_value_offset.set_visible(offset_type != int(SpeedLimitOffsetType.off))

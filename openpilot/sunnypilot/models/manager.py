@@ -18,6 +18,7 @@ from openpilot.common.hardware.hw import Paths
 from openpilot.cereal import messaging, custom
 from openpilot.sunnypilot.models.fetcher import ModelFetcher
 from openpilot.sunnypilot.models.helpers import get_active_bundle, validate_active_bundle, verify_file
+from openpilot.sunnypilot.nrdr.model_manager import select_default_model
 
 
 class ModelManagerSP:
@@ -245,12 +246,6 @@ class ModelManagerSP:
     """Main entry point for downloading a model bundle"""
     asyncio.run(self._download_bundle(model_bundle, destination_path))
 
-  def _find_default_model_bundle(self):
-    """Find the newest available bundle whose display name looks like Pop V2 (or None)."""
-    candidates = [b for b in self.available_models
-                  if "pop" in b.displayName.lower() and "v2" in b.displayName.lower()]
-    return max(candidates, key=lambda b: b.index) if candidates else None
-
   def main_thread(self) -> None:
     """Main thread for model management"""
     rk = Ratekeeper(1, print_delay_threshold=None)
@@ -260,13 +255,7 @@ class ModelManagerSP:
         self.available_models = self.model_fetcher.get_available_bundles()
         validate_active_bundle(self.params, self.available_models)
         self.active_bundle = get_active_bundle(self.params)
-
-        # nrdr first-run: auto-select the recommended Pop V2 model once requested by the
-        # home-screen setup popup. Retries each loop until the bundle list is available.
-        if self.params.get_bool("NrdrAutoSelectModel") and self.params.get("ModelManager_DownloadIndex") is None:
-          if (default_bundle := self._find_default_model_bundle()) is not None:
-            self.params.put("ModelManager_DownloadIndex", default_bundle.index)
-            self.params.remove("NrdrAutoSelectModel")
+        select_default_model(self.params, self.available_models)
 
         if (index_to_download := self.params.get("ModelManager_DownloadIndex")) is not None:
           if model_to_download := next((model for model in self.available_models if model.index == index_to_download), None):

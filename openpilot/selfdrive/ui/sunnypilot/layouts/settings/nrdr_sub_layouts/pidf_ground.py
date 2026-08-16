@@ -1,4 +1,3 @@
-"""nrdr Controller Tuning Dungeon sub-panel in the August package layout."""
 from collections.abc import Callable
 import pyray as rl
 
@@ -25,7 +24,6 @@ class PidfGroundLayout(Widget):
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
-    # --- StarPilot PID additions master toggle ---
     self._starpilot = toggle_item_sp(
       title=tr("StarPilot PID Additions"),
       description=tr("The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) " +
@@ -34,7 +32,6 @@ class PidfGroundLayout(Widget):
       param="NrdrStarPilotPid",
     )
 
-    # --- Absolute two-point steer-ratio values, persisted per rack family ---
     self._sr_endpoint_controls = []
     for profile in STEER_RATIO_ENDPOINT_PROFILES:
       center = option_item_sp(
@@ -64,7 +61,6 @@ class PidfGroundLayout(Widget):
       param="NrdrLaneChangeEndpointSteerRatio",
     )
 
-    # --- Independent P / I / F scales per speed band ---
     self._lat_p_low = option_item_sp(
       param="LatPScaleLowSpeed",
       title=lambda: tr("Low Speed Proportional Scale (Below 25mph) (Default: 100%)"),
@@ -133,7 +129,6 @@ class PidfGroundLayout(Widget):
       label_callback=lambda value: f"{value}%",
     )
 
-    # --- Rate damping (D) ---
     self._rate_damping = option_item_sp(
       param="NrdrLatRateDamping",
       title=lambda: tr("Rate Damping (D) Strength (Default: 30%)"),
@@ -154,7 +149,6 @@ class PidfGroundLayout(Widget):
       label_callback=lambda value: f"{value} mph",
     )
 
-    # --- Center boost ---
     self._center_scale = option_item_sp(
       param="HondaCenterScale",
       title=lambda: tr("Center Boost (Default: 50%)"),
@@ -195,7 +189,6 @@ class PidfGroundLayout(Widget):
       param="NrdrLatStiction",
     )
 
-    # --- Clarity PID/NNLC hybrid ---
     self._nnlc_enabled = toggle_item_sp(
       title=tr("Enable Neural Network Lateral Model (NNLC) (Default: ON)"),
       description=tr("Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model " +
@@ -236,37 +229,29 @@ class PidfGroundLayout(Widget):
     return [
       self._starpilot,
       LineSeparatorSP(40),
-      # Fingerprint-specific absolute steer-ratio endpoints. Only the active
-      # rack family's pair is made visible in _update_state().
       *(control for _, center, outer in self._sr_endpoint_controls for control in (center, outer)),
       self._lane_change_endpoint_sr,
       LineSeparatorSP(40),
-      # Low speed (below 25mph): P / I / F
       self._lat_p_low,
       self._lat_i_low,
       self._lat_f_low,
       LineSeparatorSP(40),
-      # Standard speed (25-50mph): P / I / F
       self._lat_p_standard,
       self._lat_i_standard,
       self._lat_f_standard,
       LineSeparatorSP(40),
-      # Highway (50mph+): P / I / F
       self._lat_p_highway,
       self._lat_i_highway,
       self._lat_f_highway,
       LineSeparatorSP(40),
-      # Rate damping (D)
       self._rate_damping,
       self._rate_damping_fade_speed,
       LineSeparatorSP(40),
-      # Center boost
       self._center_scale,
       self._center_boost_threshold,
       self._center_boost_min_speed,
       self._lat_stiction,
       LineSeparatorSP(40),
-      # Clarity PID/NNLC hybrid
       self._nnlc_enabled,
       self._nnlc_activation_speed,
       self._nnlc_kp_gain,

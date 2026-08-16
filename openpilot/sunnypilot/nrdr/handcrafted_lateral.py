@@ -1,13 +1,8 @@
-"""Fingerprint-scoped, road-tested lateral tuning profiles.
-
-These profiles are deliberately versioned snapshots.  They preserve the full
-set of live Params that shaped a known-good drive, including helpers and model
-delay settings that are easy to overlook when copying only PID gains.
-"""
 from dataclasses import dataclass
 from typing import Protocol
 
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoint_profile
+
 
 type ParamValue = bool | int | float
 
@@ -17,13 +12,6 @@ class ParamsLike(Protocol):
   def get(self, key: str, *, return_default: bool = False): ...
   def put_bool(self, key: str, value: bool, *, block: bool = False): ...
   def put(self, key: str, value: ParamValue, *, block: bool = False): ...
-
-
-def _params_or_default(params: ParamsLike | None) -> ParamsLike:
-  if params is not None:
-    return params
-  from openpilot.common.params import Params
-  return Params()
 
 
 @dataclass(frozen=True)
@@ -44,83 +32,84 @@ HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS = (
   "HONDA_INSIGHT",
 )
 
-
-# Shared road-tested controls for the supported Honda torque-mod platforms.
-# Fixed PID bases and per-rack VGR curves live in interface.py/latcontrol_pid.py;
-# the profile keeps the live fine-tuning controls deterministic.
 HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
-    ("NrdrStarPilotPid", False),
-    ("NrdrLaneChangeEndpointSteerRatio", True),
-    ("NrdrLearnSteerRatio", False),
-    ("NrdrLearnStiffness", True),
-    ("NrdrLearnAngleOffset", True),
-    ("LatPScaleLowSpeed", 100),
-    ("LatIScaleLowSpeed", 100),
-    ("LatFScaleLowSpeed", 100),
-    ("LatPScaleStandard", 100),
-    ("LatIScaleStandard", 100),
-    ("LatFScaleStandard", 100),
-    ("LatPScaleHighway", 100),
-    ("LatIScaleHighway", 100),
-    ("LatFScaleHighway", 100),
-    ("NrdrLatRateDamping", 0),
-    ("NrdrLatRateDampingFadeSpeed", 30),
-    ("HondaCenterScale", 0.5),
-    ("HondaCenterBoostThreshold", 3.0),
-    ("HondaCenterBoostMinSpeed", 50),
-    ("NrdrLatStiction", False),
-    ("NrdrNnlcEnabled", False),
-    ("NrdrNnlcActivationSpeed", 15),
-    ("NrdrNnlcKpGain", 50),
-    ("NrdrNnlcKfGain", 20),
-    ("NrdrNnlcKiGain", 10),
-    ("NrdrTuneLearner", False),
-    ("NrdrTuneLearnerStrength", 0),
-    ("NrdrTuneLearnerRate", 10),
-    ("HondaUnwindLookahead", False),
-    ("HondaUnwindBoostSeconds", 1.0),
-    ("HondaUnwindFfMultiplier", 2.0),
-    ("NrdrIncreaseOverrideTolerance", False),
-    ("NrdrDriverOverrideThreshold", 2000),
-    ("NrdrOverrideThresholdCenterBoost", 1200),
-    ("HondaDriverAssistDuringOverride", False),
-    ("HondaOverrideFadeDownSecs", 0.0),
-    ("HondaOverrideFadeUpSecs", 1.0),
-    ("HondaOverrideTorqueScale", 0),
-    ("HondaTorqueLowPassFilter", True),
-    ("HondaLpfTauLowSpeed", 0.1),
-    ("HondaLpfTauStandard", 0.1),
-    ("HondaLpfTauHighway", 0.01),
-    ("HondaSteerDeltaLimiter", False),
-    ("HondaSteerDeltaUp", 4.0),
-    ("HondaSteerDeltaDown", 4.0),
-    ("HondaStoppingDecelRate", 30),
-    ("NrdrMinSteerSpeed", 0),
-    ("LagdToggle", False),
-    ("LagdToggleDelay", 0.5),
+  ("NrdrStarPilotPid", False),
+  ("NrdrLaneChangeEndpointSteerRatio", True),
+  ("NrdrLearnSteerRatio", False),
+  ("NrdrLearnStiffness", True),
+  ("NrdrLearnAngleOffset", True),
+  ("LatPScaleLowSpeed", 100),
+  ("LatIScaleLowSpeed", 100),
+  ("LatFScaleLowSpeed", 100),
+  ("LatPScaleStandard", 100),
+  ("LatIScaleStandard", 100),
+  ("LatFScaleStandard", 100),
+  ("LatPScaleHighway", 100),
+  ("LatIScaleHighway", 100),
+  ("LatFScaleHighway", 100),
+  ("NrdrLatRateDamping", 0),
+  ("NrdrLatRateDampingFadeSpeed", 30),
+  ("HondaCenterScale", 0.5),
+  ("HondaCenterBoostThreshold", 3.0),
+  ("HondaCenterBoostMinSpeed", 50),
+  ("NrdrLatStiction", False),
+  ("NrdrNnlcEnabled", False),
+  ("NrdrNnlcActivationSpeed", 15),
+  ("NrdrNnlcKpGain", 50),
+  ("NrdrNnlcKfGain", 20),
+  ("NrdrNnlcKiGain", 10),
+  ("NrdrTuneLearner", False),
+  ("NrdrTuneLearnerStrength", 0),
+  ("NrdrTuneLearnerRate", 10),
+  ("HondaUnwindLookahead", False),
+  ("HondaUnwindBoostSeconds", 1.0),
+  ("HondaUnwindFfMultiplier", 2.0),
+  ("NrdrIncreaseOverrideTolerance", False),
+  ("NrdrDriverOverrideThreshold", 2000),
+  ("NrdrOverrideThresholdCenterBoost", 1200),
+  ("HondaDriverAssistDuringOverride", False),
+  ("HondaOverrideFadeDownSecs", 0.0),
+  ("HondaOverrideFadeUpSecs", 1.0),
+  ("HondaOverrideTorqueScale", 0),
+  ("HondaTorqueLowPassFilter", True),
+  ("HondaLpfTauLowSpeed", 0.1),
+  ("HondaLpfTauStandard", 0.1),
+  ("HondaLpfTauHighway", 0.01),
+  ("HondaSteerDeltaLimiter", False),
+  ("HondaSteerDeltaUp", 4.0),
+  ("HondaSteerDeltaDown", 4.0),
+  ("HondaStoppingDecelRate", 30),
+  ("NrdrMinSteerSpeed", 0),
+  ("LagdToggle", False),
+  ("LagdToggleDelay", 0.5),
 )
 
 
-def _honda_torque_mod_profile(fingerprint: str) -> HandcraftedLateralProfile:
-  sr_profile = get_steer_ratio_endpoint_profile(fingerprint)
-  if sr_profile is None:
-    raise ValueError(f"missing steer-ratio endpoint profile for {fingerprint}")
+def _build_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
+  steer_ratio = get_steer_ratio_endpoint_profile(fingerprint)
+  if steer_ratio is None:
+    raise ValueError(f"missing steer-ratio profile for {fingerprint}")
   return HandcraftedLateralProfile(
     name="Honda Torque-Mod Road-Tested 2026-08-13",
     fingerprint=fingerprint,
     version=8,
-    values=sr_profile.param_values + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
+    values=steer_ratio.param_values + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
   )
 
 
 HANDCRAFTED_LATERAL_PROFILES = {
-  fingerprint: _honda_torque_mod_profile(fingerprint)
+  fingerprint: _build_honda_profile(fingerprint)
   for fingerprint in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS
 }
 
 CLARITY_ROAD_TESTED_2026_08_13 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
-# Compatibility alias for downstream imports of the previous snapshot name.
-CLARITY_ROAD_TESTED_2026_08_11 = CLARITY_ROAD_TESTED_2026_08_13
+
+
+def _params_or_default(params: ParamsLike | None) -> ParamsLike:
+  if params is not None:
+    return params
+  from openpilot.common.params import Params
+  return Params()
 
 
 def get_handcrafted_lateral_profile(fingerprint: str) -> HandcraftedLateralProfile | None:
@@ -128,18 +117,17 @@ def get_handcrafted_lateral_profile(fingerprint: str) -> HandcraftedLateralProfi
 
 
 def is_handcrafted_lateral_enabled(fingerprint: str, params: ParamsLike | None = None) -> bool:
-  profile = get_handcrafted_lateral_profile(fingerprint)
-  return profile is not None and _params_or_default(params).get_bool("NrdrHandcraftedLateralTune")
+  return get_handcrafted_lateral_profile(fingerprint) is not None and \
+    _params_or_default(params).get_bool("NrdrHandcraftedLateralTune")
 
 
 def apply_handcrafted_lateral_profile(fingerprint: str, params: ParamsLike | None = None, *, block: bool = False) -> list[str]:
-  """Restore the selected fingerprint's profile, returning changed Param keys."""
   params = _params_or_default(params)
   profile = get_handcrafted_lateral_profile(fingerprint)
   if profile is None or not params.get_bool("NrdrHandcraftedLateralTune"):
     return []
 
-  changed: list[str] = []
+  changed = []
   for key, value in profile.values:
     if params.get(key, return_default=True) == value:
       continue
@@ -149,3 +137,11 @@ def apply_handcrafted_lateral_profile(fingerprint: str, params: ParamsLike | Non
       params.put(key, value, block=block)
     changed.append(key)
   return changed
+
+
+def restore_handcrafted_lateral_profile(fingerprint: str, params: ParamsLike | None = None) -> None:
+  changed = apply_handcrafted_lateral_profile(fingerprint, params, block=True)
+  if changed:
+    from openpilot.common.swaglog import cloudlog
+    cloudlog.warning({"event": "handcrafted lateral profile restored", "carFingerprint": str(fingerprint),
+                      "changedParams": changed})

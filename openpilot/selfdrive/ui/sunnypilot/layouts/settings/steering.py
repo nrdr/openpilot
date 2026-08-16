@@ -4,6 +4,7 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
+from opendbc.car.structs import car
 from enum import IntEnum
 
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -14,6 +15,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.lane_change_settings import LaneChangeSettingsLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.mads_settings import MadsSettingsLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.torque_settings import TorqueSettingsLayout
+from openpilot.sunnypilot.nrdr.settings import hide_global_controller_settings
 
 
 class PanelType(IntEnum):
@@ -105,10 +107,13 @@ class SteeringLayout(Widget):
       self._blinker_control_toggle,
       self._blinker_control_options,
       self._blinker_reengage_delay,
-      # Global Torque + NNLC controls remain hidden. Fingerprint-scoped controller
-      # policies can opt in without exposing switches that affect every platform.
+      LineSeparatorSP(40),
+      self._torque_control_toggle,
+      self._torque_customization_button,
+      LineSeparatorSP(40),
+      self._nnlc_toggle,
     ]
-    return items
+    return hide_global_controller_settings(items)
 
   def _set_current_panel(self, panel: PanelType):
     self._current_panel = panel
@@ -116,6 +121,7 @@ class SteeringLayout(Widget):
   def _update_state(self):
     super()._update_state()
 
+    torque_allowed = ui_state.CP is not None and ui_state.CP.steerControlType != car.CarParams.SteerControlType.angle
     if ui_state.CP is not None:
       mads_main_desc = self._mads_limited_desc if self._mads_settings_layout._mads_limited_settings() else self._mads_full_desc
       self._mads_toggle.set_description(f"<b>{mads_main_desc}</b><br><br>{self._mads_base_desc}")
@@ -126,7 +132,17 @@ class SteeringLayout(Widget):
     self._mads_settings_button.action_item.set_enabled(ui_state.is_offroad() and self._mads_toggle.action_item.get_state())
     self._blinker_control_options.set_visible(self._blinker_control_toggle.action_item.get_state())
     self._blinker_reengage_delay.set_visible(self._blinker_control_toggle.action_item.get_state())
-    # Torque/NNLC controls are hidden (PID-only); no enable/disable handling needed here.
+
+    enforce_torque_enabled = self._torque_control_toggle.action_item.get_state()
+    nnlc_enabled = self._nnlc_toggle.action_item.get_state()
+    if enforce_torque_enabled and nnlc_enabled:
+      self._torque_control_toggle.action_item.set_state(False)
+      self._nnlc_toggle.action_item.set_state(False)
+      enforce_torque_enabled = False
+      nnlc_enabled = False
+    self._nnlc_toggle.action_item.set_enabled(ui_state.is_offroad() and torque_allowed and not enforce_torque_enabled)
+    self._torque_control_toggle.action_item.set_enabled(ui_state.is_offroad() and torque_allowed and not nnlc_enabled)
+    self._torque_customization_button.action_item.set_enabled(self._torque_control_toggle.action_item.get_state())
 
   def _render(self, rect):
     if self._current_panel == PanelType.LANE_CHANGE:

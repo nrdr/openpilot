@@ -68,7 +68,6 @@ class TestSpeedLimitAssist:
     self.sla.pre_active_timer = int(PRE_ACTIVE_GUARD_PERIOD[self.sla.pcm_op_long] / DT_MDL)
     self.pcm_long_max_set_speed = PCM_LONG_REQUIRED_MAX_SET_SPEED[self.sla.is_metric][1]  # use 80 MPH for now
     self.speed_conv = CV.MS_TO_KPH if self.sla.is_metric else CV.MS_TO_MPH
-    self.release_toggle = 0
 
   def teardown_method(self, method):
     self.reset_state()
@@ -106,10 +105,6 @@ class TestSpeedLimitAssist:
     self.sla.v_cruise_cluster = initialize_v_cruise
     self.sla.v_cruise_cluster_prev = initialize_v_cruise
     self.sla.prev_v_cruise_cluster_conv = round(initialize_v_cruise * self.speed_conv)
-
-  def release_button(self, button_type):
-    self.release_toggle ^= 1 << button_type.raw
-    self.sla.update_buttons(self.release_toggle)
 
   def test_initial_state(self):
     assert self.sla.state == SpeedLimitAssistState.disabled
@@ -151,9 +146,8 @@ class TestSpeedLimitAssist:
     assert self.sla.state == SpeedLimitAssistState.pending
     assert self.sla.is_enabled and not self.sla.is_active
 
-  def test_preactive_to_active_with_distance_button_confirmation(self):
+  def test_preactive_to_active_with_max_speed_confirmation(self):
     self.sla.state = SpeedLimitAssistState.preActive
-    self.release_button(ButtonType.gapAdjustCruise)
     self.sla.update(True, False, SPEED_LIMITS['city'], 0, self.pcm_long_max_set_speed, SPEED_LIMITS['highway'],
                     SPEED_LIMITS['highway'], True, 0, self.events_sp)
     assert self.sla.state == SpeedLimitAssistState.active
@@ -178,7 +172,6 @@ class TestSpeedLimitAssist:
     self.sla.state = SpeedLimitAssistState.pending
     self.sla.v_cruise_cluster_prev = self.pcm_long_max_set_speed
     self.sla.prev_v_cruise_cluster_conv = round(self.pcm_long_max_set_speed * self.speed_conv)
-    self.release_button(ButtonType.gapAdjustCruise)
 
     self.sla.update(True, False, SPEED_LIMITS['highway'], 0, self.pcm_long_max_set_speed,
                     SPEED_LIMITS['highway'], SPEED_LIMITS['highway'], True, 0, self.events_sp)
@@ -188,7 +181,6 @@ class TestSpeedLimitAssist:
     self.sla.state = SpeedLimitAssistState.pending
     self.sla.v_cruise_cluster_prev = self.pcm_long_max_set_speed
     self.sla.prev_v_cruise_cluster_conv = round(self.pcm_long_max_set_speed * self.speed_conv)
-    self.release_button(ButtonType.gapAdjustCruise)
 
     self.sla.update(True, False, SPEED_LIMITS['highway'] + 5, 0, self.pcm_long_max_set_speed,
                     SPEED_LIMITS['highway'], SPEED_LIMITS['highway'], True, 0, self.events_sp)
@@ -219,39 +211,6 @@ class TestSpeedLimitAssist:
     different_cruise = SPEED_LIMITS['highway'] + 5
     self.sla.update(True, False, SPEED_LIMITS['city'], 0, different_cruise, SPEED_LIMITS['city'], SPEED_LIMITS['city'], True, 0, self.events_sp)
     assert self.sla.state == SpeedLimitAssistState.inactive
-
-  def test_plus_minus_release_does_not_confirm(self):
-    self.sla.state = SpeedLimitAssistState.preActive
-    self.release_button(ButtonType.accelCruise)
-
-    self.sla.update(True, False, SPEED_LIMITS['city'], 0, SPEED_LIMITS['highway'], SPEED_LIMITS['city'],
-                    SPEED_LIMITS['city'], True, 0, self.events_sp)
-
-    assert self.sla.state == SpeedLimitAssistState.preActive
-    assert self.sla.is_enabled and not self.sla.is_active
-
-  def test_non_pcm_self_applied_set_speed_stays_active_then_manual_change_deactivates(self):
-    self.sla.pcm_op_long = False
-    self.sla.state = SpeedLimitAssistState.preActive
-    self.release_button(ButtonType.gapAdjustCruise)
-
-    # Explicit consent activates SLA while the old manual set speed is still published.
-    self.sla.update(True, False, SPEED_LIMITS['city'], 0, SPEED_LIMITS['highway'], SPEED_LIMITS['city'],
-                    SPEED_LIMITS['city'], True, 0, self.events_sp)
-    assert self.sla.state == SpeedLimitAssistState.active
-    assert self.sla.is_active
-
-    # card then applies SLA's target to vCruise. This expected write is not a manual override.
-    self.sla.update(True, False, SPEED_LIMITS['city'], 0, SPEED_LIMITS['city'], SPEED_LIMITS['city'],
-                    SPEED_LIMITS['city'], True, 0, self.events_sp)
-    assert self.sla.state == SpeedLimitAssistState.active
-    assert self.sla.is_active
-
-    # A later +/- change away from the accepted target still hands control back to the driver.
-    self.sla.update(True, False, SPEED_LIMITS['city'], 0, SPEED_LIMITS['city'] + 5, SPEED_LIMITS['city'],
-                    SPEED_LIMITS['city'], True, 0, self.events_sp)
-    assert self.sla.state == SpeedLimitAssistState.inactive
-    assert not self.sla.is_active
 
   # TODO-SP: test lower CST cases
   def test_rapid_speed_limit_changes(self):
@@ -352,31 +311,31 @@ class TestButtonStateTrackerSLAIntegration:
     for cs in frames:
       self.tracker.update(cs)
 
-  def test_distance_button_confirm_via_tracker(self) -> None:
+  def test_button_confirm_via_tracker(self) -> None:
     self._run_ctrl_frames([
-      self._make_cs([ButtonEvent(type=ButtonType.gapAdjustCruise, pressed=True)]),
+      self._make_cs([ButtonEvent(type=ButtonType.accelCruise, pressed=True)]),
       self._make_cs(),
-      self._make_cs([ButtonEvent(type=ButtonType.gapAdjustCruise, pressed=False)]),
+      self._make_cs([ButtonEvent(type=ButtonType.accelCruise, pressed=False)]),
       self._make_cs(),
       self._make_cs(),
     ])
     self.sla.update_buttons(self.tracker.release_toggle)
-    assert self.sla._get_confirm_button_release()
+    assert self.sla._get_button_release(req_plus=True, req_minus=False)
 
-  def test_rapid_distance_press_release_between_polls(self) -> None:
+  def test_rapid_press_release_between_polls(self) -> None:
     self.sla.update_buttons(self.tracker.release_toggle)
 
     self._run_ctrl_frames([
-      self._make_cs([ButtonEvent(type=ButtonType.gapAdjustCruise, pressed=True)]),
-      self._make_cs([ButtonEvent(type=ButtonType.gapAdjustCruise, pressed=False)]),
+      self._make_cs([ButtonEvent(type=ButtonType.decelCruise, pressed=True)]),
+      self._make_cs([ButtonEvent(type=ButtonType.decelCruise, pressed=False)]),
       self._make_cs(),
       self._make_cs(),
       self._make_cs(),
     ])
     self.sla.update_buttons(self.tracker.release_toggle)
-    assert self.sla._get_confirm_button_release()
+    assert self.sla._get_button_release(req_plus=False, req_minus=True)
 
-  def test_plus_minus_releases_never_confirm(self) -> None:
+  def test_multiple_releases_between_polls(self) -> None:
     self.sla.update_buttons(self.tracker.release_toggle)
 
     self._run_ctrl_frames([
@@ -390,18 +349,20 @@ class TestButtonStateTrackerSLAIntegration:
       ]),
     ])
     self.sla.update_buttons(self.tracker.release_toggle)
-    assert not self.sla._get_confirm_button_release()
+    assert self.sla._get_button_release(req_plus=True, req_minus=False)
+    assert self.sla._get_button_release(req_plus=False, req_minus=True)
 
   def test_no_false_positive_same_toggle(self) -> None:
     self.sla.update_buttons(self.tracker.release_toggle)
     self.sla.update_buttons(self.tracker.release_toggle)
-    assert not self.sla._get_confirm_button_release()
+    assert not self.sla._get_button_release(req_plus=True, req_minus=False)
+    assert not self.sla._get_button_release(req_plus=False, req_minus=True)
 
   def test_button_confirm_expires(self) -> None:
     self._run_ctrl_frames([
-      self._make_cs([ButtonEvent(type=ButtonType.gapAdjustCruise, pressed=True)]),
-      self._make_cs([ButtonEvent(type=ButtonType.gapAdjustCruise, pressed=False)]),
+      self._make_cs([ButtonEvent(type=ButtonType.accelCruise, pressed=True)]),
+      self._make_cs([ButtonEvent(type=ButtonType.accelCruise, pressed=False)]),
     ])
     self.sla.update_buttons(self.tracker.release_toggle)
     time.sleep(CRUISE_BUTTON_CONFIRM_HOLD + 0.1)
-    assert not self.sla._get_confirm_button_release()
+    assert not self.sla._get_button_release(req_plus=True, req_minus=False)

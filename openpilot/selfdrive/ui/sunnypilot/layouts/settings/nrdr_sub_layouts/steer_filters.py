@@ -1,11 +1,3 @@
-"""August-layout openpilot package module.
-
-nrdr Steer Filters sub-panel.
-
-Signal-conditioning on the steering-torque command: low-pass filter (tau bands),
-the legacy steer-delta rate limiter, and the minimum steer speed.
-One level under Lateral Tuning.
-"""
 from collections.abc import Callable
 import pyray as rl
 
@@ -31,7 +23,10 @@ class SteerFiltersLayout(Widget):
     self._low_pass_filter = toggle_item_sp(
       param="HondaTorqueLowPassFilter",
       title=lambda: tr("Low Pass Filter (tau) (Default: ON)"),
-      description=lambda: tr("Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations."),
+      description=lambda: tr(
+        "Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. " +
+        "Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations."
+      ),
     )
 
     self._lpf_tau_low = option_item_sp(
@@ -70,7 +65,10 @@ class SteerFiltersLayout(Widget):
     self._steer_delta_limiter = toggle_item_sp(
       param="HondaSteerDeltaLimiter",
       title=lambda: tr("Legacy Steer Delta Rate Limiter (Default: OFF)"),
-      description=lambda: tr("Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass filter."),
+      description=lambda: tr(
+        "Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful " +
+        "compared to the low pass filter."
+      ),
     )
 
     self._steer_delta_up = option_item_sp(
@@ -101,7 +99,10 @@ class SteerFiltersLayout(Widget):
       min_value=0,
       max_value=45,
       value_change_step=1,
-      description=lambda: tr("Below this speed no steering torque is commanded at all. 0 = steer at any speed (stock). For those who don't want the wheel moving at a standstill or parking-lot speeds."),
+      description=lambda: tr(
+        "Below this speed no steering torque is commanded at all. 0 = steer at any speed (stock). For those who don't want the wheel moving " +
+        "at a standstill or parking-lot speeds."
+      ),
       label_callback=lambda value: f"{value} mph",
     )
 

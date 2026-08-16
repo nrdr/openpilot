@@ -23,6 +23,7 @@ from openpilot.selfdrive.modeld.modeld import LAT_SMOOTH_SECONDS
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
 
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
+from openpilot.sunnypilot.nrdr.controlsd import apply_hud_lead, stopping_inputs, vehicle_model_params
 
 State = log.SelfdriveState.OpenpilotState
 LaneChangeState = log.LaneChangeState
@@ -45,7 +46,7 @@ class Controls(ControlsExt):
 
     self.sm = messaging.SubMaster(['liveDelay', 'liveParameters', 'liveTorqueParameters', 'modelV2', 'selfdriveState',
                                    'liveCalibration', 'livePose', 'longitudinalPlan', 'lateralManeuverPlan', 'carState', 'carOutput',
-                                   'driverMonitoringState', 'onroadEvents', 'driverAssistance', 'radarState', 'liveDelay'] + self.sm_services_ext,
+                                   'driverMonitoringState', 'onroadEvents', 'driverAssistance', 'liveDelay'] + self.sm_services_ext,
                                   poll='selfdriveState')
     self.pm = messaging.PubMaster(['carControl', 'controlsState'] + self.pm_services_ext)
 
@@ -81,14 +82,9 @@ class Controls(ControlsExt):
   def state_control(self):
     CS = self.sm['carState']
 
-    # Update VehicleModel. Each learned value can be turned off (Auto -> static base):
-    #   stiffness -> 1.0, steerRatio -> CP.steerRatio, angleOffset -> 0.0
+    # Update VehicleModel
     lp = self.sm['liveParameters']
-    stiffness = lp.stiffnessFactor if self.learn_stiffness else 1.0
-    steer_ratio = lp.steerRatio if self.learn_steer_ratio else self.CP.steerRatio
-    angle_offset = lp.angleOffsetDeg if self.learn_angle_offset else 0.0
-    x = max(stiffness, 0.1)
-    sr = max(steer_ratio, 0.1)
+    x, sr, angle_offset = vehicle_model_params(self, lp)
     self.VM.update_params(x, sr)
 
     steer_angle_without_offset = math.radians(CS.steeringAngleDeg - angle_offset)
@@ -108,7 +104,6 @@ class Controls(ControlsExt):
       self.LaC.extension.update_lateral_lag(self.lat_delay)
 
     elif self.CP.lateralTuning.which() == 'pid':
-      # Feed the planned trajectory to the PID controller for unwind lookahead.
       self.LaC.update_model_v2(self.sm['modelV2'])
 
     long_plan = self.sm['longitudinalPlan']
@@ -144,12 +139,7 @@ class Controls(ControlsExt):
 
     # accel PID loop
     pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, self.CP_SP, CS.vEgo, CS.vCruise * CV.KPH_TO_MS)
-    # Bundle D / L2 plumbing: pitch from the calibrated pose (same source as CC.orientationNED[1],
-    # which is only set later in publish()), and current lead distance from the longitudinal plan
-    # (leadTrajectoryX0[0] == lead_xv_0[:,0][0], slot leadOne). Both are optional and isfinite-gated
-    # downstream; None => stock stopping behavior. No new SubMaster service, no capnp change.
-    long_pitch = float(self.calibrated_pose.orientation.xyz[1]) if self.calibrated_pose is not None else None
-    long_drel = float(long_plan.leadTrajectoryX0[0]) if (long_plan.hasLead and len(long_plan.leadTrajectoryX0) > 0) else None
+    long_pitch, long_drel = stopping_inputs(self.calibrated_pose, long_plan)
     actuators.accel = float(self.LoC.update(CC.longActive, CS, long_plan.aTarget, long_plan.shouldStop, pid_accel_limits,
                                             pitch=long_pitch, drel=long_drel))
 
@@ -214,10 +204,7 @@ class Controls(ControlsExt):
     hudControl.lanesVisible = CC.enabled
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
     hudControl.leadDistanceBars = self.sm['selfdriveState'].personality.raw + 1
-    # Lead range + absolute speed for dash lead displays (Honda Alternative Dashboard).
-    lead_one = self.sm['radarState'].leadOne
-    hudControl.leadDistance = float(lead_one.dRel) if lead_one.present else 0.0
-    hudControl.leadVLead = float(lead_one.vLead) if lead_one.present else 0.0
+    apply_hud_lead(hudControl, self.sm['radarState'].leadOne)
     hudControl.visualAlert = self.sm['selfdriveState'].alertHudVisual
 
     hudControl.rightLaneVisible = True

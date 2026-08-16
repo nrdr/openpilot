@@ -1,7 +1,3 @@
-"""August-layout openpilot package module.
-
-nrdr Longitudinal Tuning sub-panel.
-"""
 from collections.abc import Callable
 import pyray as rl
 
@@ -36,24 +32,33 @@ class LongitudinalTuningLayout(Widget):
     self._static_feedforward_long = toggle_item_sp(
       param="StaticFeedforwardLong",
       title=lambda: tr("Keep Feedforward Static (Default: ON)"),
-      description=lambda: tr("When ON, the longitudinal PID scale above multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle in Lateral Tuning."),
+      description=lambda: tr(
+        "When ON, the longitudinal PID scale above multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value " +
+        "instead of being scaled along with it. The lateral PID scales have their own toggle in Lateral Tuning."
+      ),
     )
 
     self._ecu_matched_long = toggle_item_sp(
       param="NrdrHondaEcuMatchedLong",
       title=lambda: tr("Nidec ECU-Matched Long (Default: OFF)"),
-      description=lambda: tr("Honda Nidec only. Shapes the longitudinal command to match the factory ECU: rate-limits the acceleration command to the ECU's ramp rates, applies a speed-dependent coasting deadband (wide at low speed, tight on the highway), and briefly coasts through gas/brake transitions to avoid lurch. Calibrated on the 2019 Pilot; other Nidec cars may need tuning. OFF = stock command path."),
+      description=lambda: tr(
+        "Honda Nidec only. Shapes the longitudinal command to match the factory ECU: rate-limits the acceleration command to the ECU's " +
+        "ramp rates, applies a speed-dependent coasting deadband (wide at low speed, tight on the highway), and briefly coasts through " +
+        "gas/brake transitions to avoid lurch. Calibrated on the 2019 Pilot; other Nidec cars may need tuning. OFF = stock command path."
+      ),
     )
 
-    # use_float_scaling stores param = slider/100, so slider 9500-10500 -> 95.0-105.0 percent,
-    # step 10 -> 0.1% increments. The longitudinal planner reads that percent and divides by 100.
     self._cruise_mismatch_correction = option_item_sp(
       param="NrdrCruiseMismatchCorrection",
       title=lambda: tr("Cruise Mismatch Correction (Default: 100.0%)"),
       min_value=9500,
       max_value=10500,
       value_change_step=10,
-      description=lambda: tr("Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem."),
+      description=lambda: tr(
+        "Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, " +
+        "and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, " +
+        "lower this until correct on a flat road, or vice versa for the opposite problem."
+      ),
       label_callback=lambda value: f"{value / 100:.1f}%",
       use_float_scaling=True,
     )
@@ -121,13 +126,24 @@ class LongitudinalTuningLayout(Widget):
     self._radar_tryout = toggle_item_sp(
       param="HondaCivicRadarTryout",
       title=lambda: tr("Try Honda Bosch Radar (Default: OFF)"),
-      description=lambda: tr("EXPERIMENTAL - Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and treats this car like a fingerprint-matched radar car (radarUnavailable=False + the custom honda_civic_bosch_radar DBC). If you ALSO enable openpilot experimental/alpha longitudinal, this radar WILL feed openpilot's lead tracking and command braking/acceleration - exactly like a matched car. With openpilot longitudinal OFF (stock ACC) it is perception only. The 0x280 decode is reverse-engineered and cross-car validated (~0.99) but NOT verified on your specific car: before enabling openpilot longitudinal, VALIDATE that lead distance and closing-rate match reality. Honda Civic Bosch only. Leave OFF if unsure."),
+      description=lambda: tr(
+        "EXPERIMENTAL - Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and treats this car " +
+        "like a fingerprint-matched radar car (radarUnavailable=False + the custom honda_civic_bosch_radar DBC). If you ALSO enable openpilot " +
+        "experimental/alpha longitudinal, this radar WILL feed openpilot's lead tracking and command braking/acceleration - exactly like a " +
+        "matched car. With openpilot longitudinal OFF (stock ACC) it is perception only. The 0x280 decode is reverse-engineered and cross-car " +
+        "validated (~0.99) but NOT verified on your specific car: before enabling openpilot longitudinal, VALIDATE that lead distance and " +
+        "closing-rate match reality. Honda Civic Bosch only. Leave OFF if unsure."
+      ),
     )
 
     self._dashboard_variant = toggle_item_sp(
       param="NrdrHondaDashVariantB",
       title=lambda: tr("Honda Dashboard Variant B (Default: OFF)"),
-      description=lambda: tr("Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is Variant B. Placeholder for now - has no effect until the rounding correction is built."),
+      description=lambda: tr(
+        "Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and " +
+        "Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is " +
+        "Variant B. Placeholder for now - has no effect until the rounding correction is built."
+      ),
     )
 
     return [
@@ -151,7 +167,6 @@ class LongitudinalTuningLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
-    # Live Learning Gas may only be changed offroad.
     self._live_learning_gas.action_item.set_enabled(ui_state.is_offroad())
 
   def _render(self, rect):

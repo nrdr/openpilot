@@ -1,12 +1,10 @@
 import base64
 import binascii
+import logging
 import re
+from typing import Protocol
 
 import requests
-
-from openpilot.common.params import Params
-from openpilot.common.swaglog import cloudlog
-
 
 GITHUB_KEYS_URL = "https://github.com/{username}.keys"
 HTTP_TIMEOUT_S = 15
@@ -20,6 +18,13 @@ SUPPORTED_KEY_TYPES = {
   "sk-ecdsa-sha2-nistp256@openssh.com",
   "sk-ssh-ed25519@openssh.com",
 }
+
+
+class ParamStore(Protocol):
+  def get(self, key: str): ...
+  def get_bool(self, key: str) -> bool: ...
+  def put(self, key: str, value, block: bool = False): ...
+  def put_bool(self, key: str, value: bool, block: bool = False): ...
 
 
 def _validated_keys(text: str) -> str:
@@ -38,16 +43,11 @@ def _validated_keys(text: str) -> str:
   return "\n".join(keys)
 
 
-def refresh_github_ssh_keys(params: Params, request_get=requests.get) -> bool:
-  """Refresh cached SSH keys using the device's existing GitHub identity.
-
-  GithubUsername remains the trust anchor: this never accepts a remotely supplied
-  username or key. Existing keys are retained if GitHub cannot be reached or
-  returns no valid OpenSSH public keys.
-  """
+def refresh_github_ssh_keys(params: ParamStore, request_get=requests.get, logger=None) -> bool:
+  logger = logger or logging.getLogger(__name__)
   username = (params.get("GithubUsername") or "").strip()
   if not GITHUB_USERNAME_RE.fullmatch(username):
-    cloudlog.warning("nrdr ssh key refresh skipped: missing/invalid GithubUsername")
+    logger.warning("nrdr ssh key refresh skipped: missing/invalid GithubUsername")
     return False
 
   try:
@@ -55,16 +55,15 @@ def refresh_github_ssh_keys(params: Params, request_get=requests.get) -> bool:
     response.raise_for_status()
     keys = _validated_keys(response.text)
     if not keys:
-      cloudlog.warning("nrdr ssh key refresh skipped: GitHub returned no valid keys")
+      logger.warning("nrdr ssh key refresh skipped: GitHub returned no valid keys")
       return False
 
     if params.get("GithubSshKeys") != keys:
       params.put("GithubSshKeys", keys, block=True)
-      cloudlog.info(f"nrdr ssh keys refreshed for GitHub user {username}")
+      logger.info(f"nrdr ssh keys refreshed for GitHub user {username}")
     if not params.get_bool("SshEnabled"):
       params.put_bool("SshEnabled", True, block=True)
     return True
   except Exception:
-    # Never clear working cached keys because of a transient network/GitHub error.
-    cloudlog.exception("nrdr ssh key refresh failed")
+    logger.exception("nrdr ssh key refresh failed")
     return False

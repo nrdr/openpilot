@@ -43,7 +43,7 @@ def clip_curvature(v_ego, prev_curvature, new_curvature, roll) -> tuple[float, b
   return float(new_curvature), limited_accel or limited_max_curv
 
 
-def get_accel_from_plan(speeds, accels, t_idxs, action_t=DT_MDL, vEgoStopping=0.25):
+def get_accel_from_plan(speeds, accels, t_idxs, action_t=DT_MDL, v_ego_stopping=0.25):
   if len(speeds) == len(t_idxs):
     v_now = speeds[0]
     a_now = accels[0]
@@ -56,7 +56,7 @@ def get_accel_from_plan(speeds, accels, t_idxs, action_t=DT_MDL, vEgoStopping=0.
     v_now = 0.0
     v_target = 0.0
     a_target = 0.0
-  return a_target, bool(v_now < vEgoStopping and a_target < 0.1)
+  return a_target, bool(v_now < v_ego_stopping and a_target < 0.1)
 
 def curv_from_psis(psi_target, psi_rate, vego, action_t):
   vego = np.clip(vego, MIN_SPEED, np.inf)

@@ -1,11 +1,3 @@
-"""August-layout openpilot package module.
-
-nrdr Lateral Tuning hub.
-
-Top of the lateral menu tree: Tune Report + Car & Tune Info, then nav buttons into
-the lateral sub-panels (Controller Tuning Dungeon, Unwind Helpers, Override Tuning,
-Steer Filters, Ford Lateral Tuning).
-"""
 import datetime
 import glob
 import os
@@ -53,8 +45,6 @@ class LateralPanel(IntEnum):
 
 
 class _TuneReportAction(ItemAction):
-  """Three compact buttons (SCAN / VIEW / DELETE) on the right side of a single list item."""
-
   def __init__(self, scan_text: Callable[[], str], scan_enabled: Callable[[], bool],
                scan_callback: Callable[[], None], view_callback: Callable[[], None],
                delete_callback: Callable[[], None]):
@@ -100,7 +90,6 @@ class LateralTuningLayout(Widget):
     self._scan_proc: subprocess.Popen | None = None
     self._scan_fh = None
 
-    # Nested sub-panels (each opens one level below this hub and returns here).
     self._current_panel = LateralPanel.HUB
     self._pidf_layout = PidfGroundLayout(lambda: self._set_panel(LateralPanel.HUB))
     self._unwind_layout = UnwindHelpersLayout(lambda: self._set_panel(LateralPanel.HUB))
@@ -113,8 +102,6 @@ class LateralTuningLayout(Widget):
 
   def _set_panel(self, panel: LateralPanel):
     self._current_panel = panel
-
-  # --- Tune Report ---
 
   def _scanning(self) -> bool:
     return self._scan_proc is not None
@@ -154,7 +141,6 @@ class LateralTuningLayout(Widget):
       self._scan_fh = None
     self._scan_proc = None
 
-    # Keep the output either way: on failure it contains the traceback, which is useful.
     try:
       os.replace(TUNE_REPORT_TMP, TUNE_REPORT_PATH)
     except OSError:
@@ -202,8 +188,6 @@ class LateralTuningLayout(Widget):
         pass
     gui_app.push_widget(HtmlModalSP(text=tr("Dashcam media in /data/media/0 has been deleted.")))
 
-  # --- PID Tune Information ---
-
   @staticmethod
   def _fmt_vals(vals) -> str:
     return ", ".join(f"{float(v):g}" for v in vals)
@@ -221,7 +205,6 @@ class LateralTuningLayout(Widget):
       return tr("No car fingerprinted yet. Drive the car once so it can identify itself, then check back here.")
 
     try:
-      # pycapnp >= 2.x: from_bytes returns a context manager, not the message itself
       with car.CarParams.from_bytes(cp_bytes) as CP:
         return self._format_pid_tune_lines(CP)
     except Exception as e:
@@ -230,7 +213,6 @@ class LateralTuningLayout(Widget):
   def _format_pid_tune_lines(self, CP) -> str:
     lines = [f"<b>{CP.carFingerprint}</b>", ""]
 
-    # Car hardware / config (what the tune is built around)
     lines.append("<b>" + tr("CAR") + "</b>")
     try:
       eps_fw = next((bytes(fw.fwVersion).decode("latin-1", "replace").strip("\x00").strip()
@@ -246,9 +228,6 @@ class LateralTuningLayout(Widget):
     lines.append(f"radar messages used: {str(not CP.radarUnavailable).lower()}")
     lines.append("")
 
-    # Lateral tuning (interface.py values, as actually loaded for this car). The
-    # Clarity serializes Torque at runtime for NNLC, so reconstruct the unmodified
-    # per-car PID profile exactly as the hybrid controller does.
     try:
       pid_source = CP
       hybrid_base = False
@@ -276,7 +255,6 @@ class LateralTuningLayout(Widget):
       lines.append(tr("Lateral tuning: unavailable"))
     lines.append("")
 
-    # Longitudinal tuning
     try:
       lt = CP.longitudinalTuning
       lines.append("<b>" + tr("LONGITUDINAL PID") + "</b>")
@@ -290,7 +268,6 @@ class LateralTuningLayout(Widget):
       lines.append(tr("Longitudinal tuning: unavailable"))
     lines.append("")
 
-    # Related interface.py geometry/actuator values that shape the same tune
     try:
       lines.append("<b>" + tr("RELATED") + "</b>")
       lines.append(f"steerRatio: {float(CP.steerRatio):g}")
@@ -315,7 +292,10 @@ class LateralTuningLayout(Widget):
 
     self._tune_report_item = ListItem(
       title=lambda: tr("Tune Report"),
-      description=lambda: tr("Analyze the drive logs on this device and report, per speed band and turn direction, how well the lateral tune is tracking. Scanning a full day of logs can take a few minutes. DELETE permanently wipes all dashcam media in /data/media/0."),
+      description=lambda: tr(
+        "Analyze the drive logs on this device and report, per speed band and turn direction, how well the lateral tune is tracking. " +
+        "Scanning a full day of logs can take a few minutes. DELETE permanently wipes all dashcam media in /data/media/0."
+      ),
       action_item=_TuneReportAction(
         scan_text=lambda: tr("SCANNING") if self._scanning() else tr("SCAN"),
         scan_enabled=lambda: not self._scanning(),
@@ -328,7 +308,10 @@ class LateralTuningLayout(Widget):
     self._pid_tune_info_item = button_item(
       lambda: tr("Car & Tune Info"),
       lambda: tr("VIEW"),
-      lambda: tr("Your car's full profile: fingerprint, EPS firmware, gas interceptor and radar status, plus the lateral/longitudinal kp/ki/kf and geometry currently loaded for it."),
+      lambda: tr(
+        "Your car's full profile: fingerprint, EPS firmware, gas interceptor and radar status, plus the lateral/longitudinal " +
+        "kp/ki/kf and geometry currently loaded for it."
+      ),
       callback=self._show_pid_tune_info,
     )
 

@@ -177,11 +177,11 @@ class HudRenderer(Widget):
     if self.is_cruise_set:
       self._draw_set_speed(rect)
 
-    # Persistent top-left cluster: real speed (white) + set speed (green). Drawn after _draw_set_speed
-    # so it can read the change-transient alpha and hide the real speed while a change is on screen.
-    self._draw_persistent_speed(rect)
-
+    self._draw_additional_speed(rect)
     self._draw_steering_wheel(rect)
+
+  def _draw_additional_speed(self, rect: rl.Rectangle) -> None:
+    pass
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     wheel_txt = self._txt_wheel_critical if self._show_wheel_critical else self._txt_wheel
@@ -227,14 +227,6 @@ class HudRenderer(Widget):
       exclamation_pos_y = pos_y - self._txt_exclamation_point.height / 2
       rl.draw_texture_ex(self._txt_exclamation_point, rl.Vector2(exclamation_pos_x, exclamation_pos_y), 0.0, 1.0, rl.WHITE)
 
-  def _set_speed_is_limit_driven(self) -> bool:
-    """Whether the set speed is currently driven by a speed-limit source.
-
-    Base C4 spec keeps the set speed permanently green; the sunnypilot override
-    gates this on Speed Limit Assist actually being active (comma three parity).
-    """
-    return True
-
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     """Draw the MAX speed indicator box."""
     alpha = self._set_speed_alpha_filter.update(0 < rl.get_time() - self._set_speed_changed_time < SET_SPEED_PERSISTENCE and
@@ -250,14 +242,7 @@ class HudRenderer(Widget):
     rl.draw_circle_gradient(rl.Vector2(x + circle_radius, y + circle_radius), circle_radius,
                             rl.Color(0, 0, 0, int(255 / 2 * alpha)), rl.BLANK)
 
-    # Green only while the set speed is limit-driven (_set_speed_is_limit_driven);
-    # white otherwise, matching the comma three semantics.
-    if self._set_speed_is_limit_driven():
-      set_speed_color = rl.Color(0, 255, 70, int(255 * 0.9 * alpha))
-      max_color = rl.Color(0, 255, 70, int(255 * 0.9 * alpha))
-    else:
-      set_speed_color = rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
-      max_color = rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
+    set_speed_color = max_color = self._set_speed_color(alpha)
 
     set_speed = self.set_speed
     if self.is_cruise_set and not ui_state.is_metric:
@@ -283,43 +268,8 @@ class HudRenderer(Widget):
       max_color,
     )
 
-  def _draw_persistent_speed(self, rect: rl.Rectangle) -> None:
-    """Persistent top-left cluster: big white real speed + 'mph', with a smaller green set speed
-    beside it. Hidden while the set-speed-change transient is on screen, so a change shows the set
-    speed alone (per spec). Positions/sizes are first-draft knobs -- tune to taste on the C4."""
-    # Never draw the speed while an alert (or the calibration banner) is on screen -- alerts own the view.
-    if not self._can_draw_top_icons:
-      return
-    # Hide the real speed while a set-speed change is on screen -- mirror the transient's exact
-    # window (engaged + within persistence + top icons allowed) so the two never both show.
-    changing = (self._engaged and self._can_draw_top_icons and
-                0 < rl.get_time() - self._set_speed_changed_time < SET_SPEED_PERSISTENCE)
-    if changing:
-      return
-
-    cluster_x = int(rect.x + 16)             # nudged toward the top-left corner
-    cluster_y = int(rect.y + 12)
-    real_size = 100                          # ~10% smaller than the old set-speed size (112)
-    set_size = 54                            # set speed, ~10% smaller, superscript-style
-    set_color = rl.Color(0, 255, 70, 255) if self._set_speed_is_limit_driven() else rl.Color(255, 255, 255, 255)
-
-    # Real speed (white)
-    speed_text = str(round(self.speed))
-    speed_size = measure_text_cached(self._font_bold, speed_text, real_size)
-    rl.draw_text_ex(self._font_bold, speed_text, rl.Vector2(cluster_x, cluster_y), real_size, 0, COLORS.WHITE)
-
-    # Unit ('mph') ~50% smaller; position is relative to the cluster, so it follows the new corner
-    unit_text = tr("km/h") if ui_state.is_metric else tr("mph")
-    rl.draw_text_ex(self._font_medium, unit_text, rl.Vector2(cluster_x + 6, cluster_y + speed_size.y - 26),
-                    FONT_SIZES.speed_unit // 2, 0, COLORS.WHITE_TRANSLUCENT)
-
-    # Set speed, superscript -- only when cruise control is actually engaged
-    # (green when limit-driven, white otherwise)
-    if self.is_cruise_set and self._engaged:
-      set_speed = self.set_speed * KM_TO_MILE if not ui_state.is_metric else self.set_speed
-      set_text = str(round(set_speed))
-      rl.draw_text_ex(self._font_display, set_text, rl.Vector2(cluster_x + speed_size.x + 14, cluster_y + 6),
-                      set_size, 0, set_color)
+  def _set_speed_color(self, alpha: float) -> rl.Color:
+    return rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
 
   def _draw_current_speed(self, rect: rl.Rectangle) -> None:
     """Draw the current vehicle speed and unit."""

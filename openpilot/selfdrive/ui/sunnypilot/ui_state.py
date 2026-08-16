@@ -10,6 +10,7 @@ from openpilot.cereal import messaging, log, custom
 from opendbc.car.structs import car
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.display import OnroadBrightness
+from openpilot.sunnypilot.nrdr.settings import UI_CONSTRAINT_PARAMS, restore_params, snapshot_params
 from openpilot.sunnypilot.sunnylink.sunnylink_state import SunnylinkState
 from openpilot.system.ui.lib.application import gui_app
 
@@ -176,12 +177,11 @@ class UIStateSP:
       self.reset_onroad_sleep_timer()
 
   def _enforce_constraints(self) -> None:
+    pending_preferences = snapshot_params(self.params, UI_CONSTRAINT_PARAMS)
     has_long = self.has_longitudinal_control
     CP = self.CP
 
     if CP is not None:
-      # Global toggles stay disabled. Fingerprint-scoped forced controllers do not
-      # use these Params and therefore cannot be undone by this UI constraint.
       if self.params.get_bool("EnforceTorqueControl") and self.params.get_bool("NeuralNetworkLateralControl"):
         self.params.put_bool("EnforceTorqueControl", False, block=True)
         self.params.put_bool("NeuralNetworkLateralControl", False, block=True)
@@ -204,12 +204,10 @@ class UIStateSP:
       self.params.remove("NeuralNetworkLateralControl")
       self.params.remove("AlphaLongitudinalEnabled")
 
-    # NOTE: This used to remove ExperimentalMode and DynamicExperimentalControl
-    # whenever long control was absent. That wiped the user's stored preferences on
-    # the couch and during the boot race (has_long is briefly False before
-    # CarParamsPersistent loads), which is what made Experimental Mode "turn itself
-    # back off". We now keep the stored values; the longitudinal planner / DEC only
-    # act on them when the car actually has openpilot longitudinal control.
+    # No longitudinal control: no experimental mode or DEC
+    if not has_long:
+      self.params.remove("ExperimentalMode")
+      self.params.remove("DynamicExperimentalControl")
 
     # ICBM: clear if not available or if full longitudinal control is active
     if self.CP_SP is not None:
@@ -220,10 +218,13 @@ class UIStateSP:
       self.params.remove("IntelligentCruiseButtonManagement")
       self.has_icbm = False
 
-    # NOTE: This used to remove CustomAccIncrementsEnabled / SmartCruiseControlVision /
-    # SmartCruiseControlMap when neither long nor ICBM was present, wiping couch-set
-    # preferences. They are kept now as pending preferences; the cruise / SCC
-    # controllers ignore them until the car actually supports the feature.
+    # Cruise features requiring longitudinal or ICBM
+    if not (has_long or self.has_icbm):
+      self.params.remove("CustomAccIncrementsEnabled")
+      self.params.remove("SmartCruiseControlVision")
+      self.params.remove("SmartCruiseControlMap")
+
+    restore_params(self.params, pending_preferences)
 
 
 class DeviceSP:

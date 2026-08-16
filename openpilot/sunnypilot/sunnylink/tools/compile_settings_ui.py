@@ -50,8 +50,6 @@ class CompileError(Exception):
 
 
 def _load_yaml(path: str):
-  # YAML is UTF-8 on every target.  Being explicit keeps Windows development
-  # builds byte-for-byte identical to the Linux device build.
   with open(path, encoding="utf-8") as f:
     return yaml.safe_load(f) or {}
 
