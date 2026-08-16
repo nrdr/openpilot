@@ -103,7 +103,7 @@ class LatControlClarityHybrid(LatControl):
       torque_log.error = pid_log.angleError
       torque_log.p = pid_log.p
       torque_log.i = pid_log.i
-      torque_log.d = pid_log.d
+      torque_log.d = 0.0
       torque_log.f = pid_log.f
       torque_log.output = pid_output
       torque_log.saturated = pid_log.saturated
