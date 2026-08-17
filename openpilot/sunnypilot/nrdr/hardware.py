@@ -10,6 +10,7 @@ def initialize_onboarding(params) -> None:
 
 
 def apply_startup_policy(startup_conditions: dict[str, bool]) -> None:
+  startup_conditions["up_to_date"] = True
   startup_conditions["accepted_terms"] = True
   startup_conditions["accepted_terms_sp"] = True
   startup_conditions["completed_training"] = True
