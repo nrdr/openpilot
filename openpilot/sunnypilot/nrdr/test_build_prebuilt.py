@@ -117,6 +117,9 @@ def run_builder(script: Path, *, source: Path, build: Path, **extra_env: str) ->
   env.update({
     "BUILD_DIR": bash_path(build),
     "SOURCE_DIR": bash_path(source),
+    # Behavioral tests never compile, but preflight intentionally verifies the
+    # configured build tool before it permits any filesystem mutation.
+    "SCONS_BIN": bash_path(Path(BASH)),
     "PUSH": "0",
     "CLEANUP": "0",
     "RESTORE_SOURCE_NAME": "0",
@@ -186,6 +189,26 @@ def test_preflight_only_is_non_mutating_and_uses_canonical_nested_manifest(tmp_p
   assert result.returncode == 0, result_details(result)
   assert not build.exists()
   assert (source / "nested" / "one two" / "kept file.txt").is_file()
+  assert_repo_unchanged(source, original_head)
+
+
+def test_preflight_rejects_missing_scons_before_build_mutation(tmp_path: Path) -> None:
+  entries = ["root.txt"]
+  source = make_source(tmp_path, entries, entries)
+  build = tmp_path / "prebuilt-build"
+  original_head = init_repo(source)
+
+  result = run_builder(
+    source / "release" / BUILD_SCRIPT.name,
+    source=source,
+    build=build,
+    PREBUILT_PREFLIGHT_ONLY="1",
+    SCONS_BIN="definitely-missing-scons-for-prebuilt-test",
+  )
+
+  assert result.returncode != 0, result_details(result)
+  assert "SCons is unavailable" in result.stderr
+  assert not build.exists()
   assert_repo_unchanged(source, original_head)
 
 

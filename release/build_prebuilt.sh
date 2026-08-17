@@ -23,6 +23,7 @@ BUILD_DIR="${BUILD_DIR:-/data/openpilot-prebuilt-build}"
 : "${REBOOT_WHEN_DONE:=0}"
 : "${PREBUILT_PREFLIGHT_ONLY:=0}"
 : "${CLEAN_OVERLAY_ONLY:=0}"
+: "${SCONS_BIN:=}"
 
 RELEASE_FILES_SCRIPT="$SOURCE_DIR/tools/release/release_files.py"
 CLEAN_OVERLAY_DIR="$SOURCE_DIR/release/clean_overlay"
@@ -37,6 +38,33 @@ die() {
 
 resolve_path() {
   realpath -m -- "$1"
+}
+
+configure_build_environment() {
+  local detected_scons
+
+  # comma's boot environment gets the bundled compiler and Python tools from
+  # /etc/profile. A normal interactive SSH shell does not, so recreate that
+  # environment here instead of requiring callers to remember a PATH prefix.
+  if [ -f /AGNOS ] && [ -r /etc/profile ]; then
+    set +x
+    set +u
+    # shellcheck disable=SC1091
+    . /etc/profile
+    set -u
+    set -x
+  fi
+
+  if [ -n "$SCONS_BIN" ]; then
+    detected_scons="$(command -v "$SCONS_BIN" 2>/dev/null || true)"
+  else
+    detected_scons="$(command -v scons 2>/dev/null || true)"
+  fi
+  [ -n "$detected_scons" ] || \
+    die "SCons is unavailable; install the project build environment or set SCONS_BIN"
+  [ -x "$detected_scons" ] || die "SCons is not executable: $detected_scons"
+  SCONS_BIN="$detected_scons"
+  echo "[-] Build tool: $SCONS_BIN"
 }
 
 validate_layout() {
@@ -226,6 +254,10 @@ finish() {
 
 validate_source_tree
 
+if [ "$CLEAN_OVERLAY_ONLY" != "1" ]; then
+  configure_build_environment
+fi
+
 if [ "$PREBUILT_PREFLIGHT_ONLY" = "1" ]; then
   echo "[-] PREBUILT_PREFLIGHT_ONLY=1: no files changed"
   exit 0
@@ -286,8 +318,8 @@ git commit -m "openpilot v$VERSION prebuilt"
 
 echo "[-] Building T=$SECONDS"
 export PYTHONPATH="$BUILD_DIR"
-scons -j"$(nproc)" --minimal
-scons -j"$(nproc)" panda/
+"$SCONS_BIN" -j"$(nproc)" --minimal
+"$SCONS_BIN" -j"$(nproc)" panda/
 
 echo "[-] Ensuring no submodules in release"
 if test "$(git submodule status --recursive | wc -l)" -gt 0; then
