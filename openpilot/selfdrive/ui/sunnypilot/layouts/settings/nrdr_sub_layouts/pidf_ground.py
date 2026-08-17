@@ -305,7 +305,7 @@ class PidfGroundLayout(Widget):
       item.action_item.set_enabled(editable and not ui_state.engaged)
 
     for item in (self._nnlc_enabled, self._nnlc_activation_speed, self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain):
-      item.action_item.set_enabled(not firmware_vgr_active)
+      item.action_item.set_enabled(editable and not firmware_vgr_active)
 
     nnlc_enabled = self._nnlc_enabled.action_item.get_state()
     self._nnlc_activation_speed.set_visible(nnlc_enabled)

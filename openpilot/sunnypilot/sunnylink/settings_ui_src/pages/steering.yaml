@@ -137,8 +137,8 @@ sections:
   - key: NrdrHandcraftedLateralTune
     widget: toggle
     title: Handcrafted Lateral Tuning
-    description: Force-load the complete road-tested tune for this exact vehicle fingerprint and lock conflicting controls.
-    details: Loads the shared versioned Honda torque-mod road-test profile, including PID trims, fingerprint-safe steering-ratio selection, controller helpers, steering filters, and fixed live-delay setting. Disable this only to resume manual tuning.
+    description: Force-load the Clarity-derived, road-tested PID profile with this vehicle's own steering geometry and lock conflicting controls.
+    details: Loads the shared versioned Honda profile with exact firmware-derived steering through 70 degrees, a smooth handoff to dual-BP by 90 degrees, predictive stiction, NNLC disabled for PID-only control, fingerprint-specific steering geometry, controller helpers, steering filters, and fixed live delay. Cars without an exact firmware map safely use their legacy dual-BP curve. Disable this only to resume manual tuning.
     visibility:
     - {type: capability, field: has_handcrafted_lateral_profile, equals: true}
     enablement:
@@ -556,6 +556,8 @@ sections:
       details: PID remains the normal throw. A predictive capture stage can only reduce torque as the wheel closes on a stable target, then freezes the captured output until error, relative motion, drift, or a decisive corrective torque reversal requires reacquisition. It operates at every speed and immediately bypasses for driver input, lane changes, steering faults, or control limits. Default is OFF.
     - key: NrdrNnlcEnabled
       widget: toggle
+      enablement:
+      - $ref: '#/macros/handcrafted_lateral_unlocked'
       title: Enable Neural Network Lateral Model (NNLC)
       description: Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is OFF.
       details: OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command. NNLC remains configured but is inactive whenever a recognized Clarity is using the experimental firmware EPS position map.

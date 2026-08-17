@@ -34,7 +34,7 @@ HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS = (
 
 HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
   ("NrdrStarPilotPid", False),
-  ("NrdrLegacyDualBpSteerRatio", True),
+  ("NrdrLegacyDualBpSteerRatio", False),
   ("NrdrLaneChangeEndpointSteerRatio", True),
   ("NrdrLearnSteerRatio", False),
   ("NrdrLearnStiffness", True),
@@ -50,19 +50,20 @@ HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
   ("LatFScaleHighway", 100),
   ("NrdrLatRateDamping", 0),
   ("NrdrLatRateDampingFadeSpeed", 30),
-  ("HondaCenterScale", 0.5),
+  ("HondaCenterScale", 1.0),
   ("HondaCenterBoostThreshold", 3.0),
   ("HondaCenterBoostMinSpeed", 50),
-  ("NrdrLatStiction", False),
+  ("NrdrLatStiction", True),
+  ("NrdrNnlcEnabled", False),
   ("NrdrTuneLearner", False),
   ("NrdrTuneLearnerStrength", 0),
   ("NrdrTuneLearnerRate", 10),
   ("NrdrIncreaseOverrideTolerance", False),
-  ("NrdrDriverOverrideThreshold", 1400),
-  ("NrdrOverrideThresholdCenterBoost", 1000),
+  ("NrdrDriverOverrideThreshold", 2000),
+  ("NrdrOverrideThresholdCenterBoost", 1200),
   ("HondaDriverAssistDuringOverride", False),
-  ("HondaOverrideFadeDownSecs", 0.1),
-  ("HondaOverrideFadeUpSecs", 0.1),
+  ("HondaOverrideFadeDownSecs", 0.0),
+  ("HondaOverrideFadeUpSecs", 1.0),
   ("HondaOverrideTorqueScale", 0),
   ("HondaTorqueLowPassFilter", True),
   ("HondaLpfTauLowSpeed", 0.1),
@@ -71,7 +72,6 @@ HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
   ("HondaSteerDeltaLimiter", False),
   ("HondaSteerDeltaUp", 4.0),
   ("HondaSteerDeltaDown", 4.0),
-  ("HondaStoppingDecelRate", 30),
   ("LagdToggle", False),
   ("LagdToggleDelay", 0.5),
 )
@@ -82,9 +82,9 @@ def _build_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
   if steer_ratio is None:
     raise ValueError(f"missing steer-ratio profile for {fingerprint}")
   return HandcraftedLateralProfile(
-    name="Honda Torque-Mod Road-Tested 2026-08-16",
+    name="Honda Clarity-Derived Road-Tested 2026-08-17",
     fingerprint=fingerprint,
-    version=11,
+    version=12,
     values=steer_ratio.param_values + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
   )
 
@@ -94,7 +94,7 @@ HANDCRAFTED_LATERAL_PROFILES = {
   for fingerprint in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS
 }
 
-CLARITY_ROAD_TESTED_2026_08_16 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
+CLARITY_ROAD_TESTED_2026_08_17 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
 
 
 def _params_or_default(params: ParamsLike | None) -> ParamsLike:

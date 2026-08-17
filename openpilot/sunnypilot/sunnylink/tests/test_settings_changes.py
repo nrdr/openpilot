@@ -309,6 +309,45 @@ class TestNrdrLongitudinalOptions:
 
 
 class TestNrdrSteerRatioMode:
+  HANDCRAFTED_LOCKED_KEYS = (
+    "NrdrLegacyDualBpSteerRatio",
+    "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
+    "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
+    "NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord",
+    "NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g",
+    "NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight",
+    "NrdrLatStiction",
+    "HondaCenterScale",
+    "NrdrDriverOverrideThreshold",
+    "NrdrOverrideThresholdCenterBoost",
+    "HondaOverrideFadeDownSecs",
+    "HondaOverrideFadeUpSecs",
+    "NrdrNnlcEnabled",
+  )
+
+  def test_handcrafted_profile_is_first_and_documents_winning_behavior(self, schema):
+    section = _find_section(schema, "steering", "nrdr")
+    assert section is not None
+    assert section["items"][0]["key"] == "NrdrHandcraftedLateralTune"
+
+    item = section["items"][0]
+    assert item.get("widget") == "toggle"
+    assert "offroad_only" in _flatten_rule_types(item.get("enablement"))
+    description = f"{item.get('description', '')} {item.get('details', '')}".lower()
+    assert "clarity-derived" in description
+    assert "firmware-derived" in description
+    assert "70 degrees" in description and "90 degrees" in description
+    assert "predictive stiction" in description
+    assert "nnlc disabled" in description
+    assert "pid-only" in description
+    assert "vehicle's own steering geometry" in description
+
+  @pytest.mark.parametrize("key", HANDCRAFTED_LOCKED_KEYS)
+  def test_winning_profile_controls_are_locked_while_handcrafted_is_on(self, schema, key):
+    item = _find_item(schema, key)
+    assert item is not None
+    assert "NrdrHandcraftedLateralTune" in json.dumps(item.get("enablement") or [])
+
   def test_legacy_mode_is_explicit_and_fingerprint_scoped(self, schema):
     item = _find_item(schema, "NrdrLegacyDualBpSteerRatio")
     assert item is not None
