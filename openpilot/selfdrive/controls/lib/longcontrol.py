@@ -50,14 +50,17 @@ class LongControl:
                              rate=1 / DT_CTRL)
     self.last_output_accel = 0.0
     self.nrdr_controller = NrdrLongControl(CP, CP_SP)
+    self.pid = self.nrdr_controller.pid
 
   def reset(self):
-    self.pid.reset()
-    self.nrdr_controller.reset()
-
-  def update(self, active, CS, a_target, should_stop, accel_limits, pitch=None, drel=None):
     if self.nrdr_controller is not None:
-      output_accel = self.nrdr_controller.update(active, CS, a_target, should_stop, accel_limits, pitch, drel)
+      self.nrdr_controller.reset()
+    else:
+      self.pid.reset()
+
+  def update(self, active, CS, a_target, should_stop, accel_limits, pitch=None, drel=None, personality=None):
+    if self.nrdr_controller is not None:
+      output_accel = self.nrdr_controller.update(active, CS, a_target, should_stop, accel_limits, pitch, drel, personality)
       self.long_control_state = self.nrdr_controller.long_control_state
       self.last_output_accel = output_accel
       return output_accel

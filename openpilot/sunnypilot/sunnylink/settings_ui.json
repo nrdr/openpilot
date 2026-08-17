@@ -2696,32 +2696,23 @@
               "trigger_key": null,
               "items": [
                 {
-                  "key": "LongPidTuneScale",
-                  "widget": "option",
-                  "title": "Longitudinal PID Tune Scale",
-                  "description": "Scales longitudinal PID controller values from their configured base tune.",
-                  "min": 0,
-                  "max": 500,
-                  "step": 5,
-                  "unit": "%"
-                },
-                {
-                  "key": "NrdrCruiseMismatchCorrection",
-                  "widget": "option",
-                  "title": "Cruise Mismatch Correction",
-                  "description": "Correct slight variances in final cruising target speed to better match the current and set speeds.",
-                  "details": "Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.",
-                  "min": 95.0,
-                  "max": 105.0,
-                  "step": 0.1,
-                  "unit": "%"
+                  "key": "HondaLiveLearningGas",
+                  "widget": "toggle",
+                  "title": "Live Learning Gas",
+                  "description": "Allows Honda gas and wind compensation factors to learn live while driving.",
+                  "details": "Fresh installs default OFF when a gas pedal interceptor is detected and ON otherwise. Your selection is preserved afterward. While ON, all longitudinal PID personality scales are held at 100%.",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
                 },
                 {
                   "key": "StaticFeedforwardLong",
                   "widget": "toggle",
                   "title": "Keep Feedforward Static",
-                  "description": "When ON, the longitudinal PID scale multiplies only the feedback (P+I) terms; feedforward (kf) stays tuned.",
-                  "details": "When ON, the longitudinal PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle."
+                  "description": "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; feedforward (kf) stays tuned.",
+                  "details": "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle."
                 },
                 {
                   "key": "NrdrHondaEcuMatchedLong",
@@ -2745,6 +2736,64 @@
                   "details": "Enabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s\u00b2 through 5 m/s, fading to 2.0 m/s\u00b2 at 20 m/s; the controller fades from 4.0 to 3.0 m/s\u00b2, while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas."
                 },
                 {
+                  "key": "HondaCivicRadarTryout",
+                  "widget": "toggle",
+                  "title": "Try Honda Bosch Radar (experimental)",
+                  "description": "EXPERIMENTAL \u2014 Honda Bosch radar fed into the longitudinal controller.",
+                  "details": "EXPERIMENTAL \u2014 Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller."
+                },
+                {
+                  "key": "NrdrHondaDashVariantB",
+                  "widget": "toggle",
+                  "title": "Honda Dashboard Variant B",
+                  "description": "Turn ON if your cluster is Variant B (4 dashed lane lines). Placeholder for now - has no effect yet.",
+                  "details": "Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is Variant B. Placeholder for now - has no effect until the rounding correction is built."
+                },
+                {
+                  "key": "LongPidTuneScaleAggressive",
+                  "widget": "option",
+                  "title": "Distance 1 / Aggressive PID Scale",
+                  "description": "Scales the longitudinal PID controller for the Aggressive personality (distance setting 1).",
+                  "details": "Defaults to 200%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LongPidTuneScaleStandard",
+                  "widget": "option",
+                  "title": "Distance 2 / Standard PID Scale",
+                  "description": "Scales the longitudinal PID controller for the Standard personality (distance setting 2).",
+                  "details": "Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LongPidTuneScaleRelaxed",
+                  "widget": "option",
+                  "title": "Distance 3 / Relaxed PID Scale",
+                  "description": "Scales the longitudinal PID controller for the Relaxed personality (distance setting 3).",
+                  "details": "Defaults to 80%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LongPidTuneScaleEcon",
+                  "widget": "option",
+                  "title": "Distance 4 / Econ PID Scale",
+                  "description": "Scales the longitudinal PID controller for the Econ personality (distance setting 4).",
+                  "details": "Defaults to 50%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
                   "key": "NrdrCruiseOverspeedAllowance",
                   "widget": "option",
                   "title": "Set-Speed Overshoot Allowance",
@@ -2756,23 +2805,15 @@
                   "unit": "mph"
                 },
                 {
-                  "key": "HondaLiveLearningGas",
-                  "widget": "toggle",
-                  "title": "Live Learning Gas",
-                  "description": "Allows Honda gas and wind compensation factors to learn live while driving.",
-                  "details": "Fresh installs default OFF when a gas pedal interceptor is detected and ON otherwise. Your selection is preserved afterward.",
-                  "enablement": [
-                    {
-                      "type": "offroad_only"
-                    }
-                  ]
-                },
-                {
-                  "key": "HondaCivicRadarTryout",
-                  "widget": "toggle",
-                  "title": "Try Honda Bosch Radar (experimental)",
-                  "description": "EXPERIMENTAL \u2014 Honda Bosch radar fed into the longitudinal controller.",
-                  "details": "EXPERIMENTAL \u2014 Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller."
+                  "key": "NrdrCruiseMismatchCorrection",
+                  "widget": "option",
+                  "title": "Cruise Mismatch Correction",
+                  "description": "Correct slight variances in final cruising target speed to better match the current and set speeds.",
+                  "details": "Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.",
+                  "min": 95.0,
+                  "max": 105.0,
+                  "step": 0.1,
+                  "unit": "%"
                 },
                 {
                   "key": "HondaStoppingDecelRate",
@@ -2818,13 +2859,6 @@
                   "min": 0.0,
                   "max": 3.0,
                   "step": 0.01
-                },
-                {
-                  "key": "NrdrHondaDashVariantB",
-                  "widget": "toggle",
-                  "title": "Honda Dashboard Variant B",
-                  "description": "Turn ON if your cluster is Variant B (4 dashed lane lines). Placeholder for now - has no effect yet.",
-                  "details": "Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is Variant B. Placeholder for now - has no effect until the rounding correction is built."
                 }
               ]
             }

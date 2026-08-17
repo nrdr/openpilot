@@ -141,7 +141,8 @@ class Controls(ControlsExt):
     pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, self.CP_SP, CS.vEgo, CS.vCruise * CV.KPH_TO_MS)
     long_pitch, long_drel = stopping_inputs(self.calibrated_pose, long_plan)
     actuators.accel = float(self.LoC.update(CC.longActive, CS, long_plan.aTarget, long_plan.shouldStop, pid_accel_limits,
-                                            pitch=long_pitch, drel=long_drel))
+                                            pitch=long_pitch, drel=long_drel,
+                                            personality=self.sm['selfdriveState'].personality))
 
     # Steering PID loop and lateral MPC
     # Reset desired curvature to current to avoid violating the limits on engage

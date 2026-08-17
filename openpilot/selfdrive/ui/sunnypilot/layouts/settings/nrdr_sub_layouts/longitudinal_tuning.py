@@ -19,13 +19,55 @@ class LongitudinalTuningLayout(Widget):
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
-    self._long_pid_tune_scale = option_item_sp(
-      param="LongPidTuneScale",
-      title=lambda: tr("Longitudinal PID Tune Scale (Default: 100%)"),
+    self._long_pid_tune_scale_aggressive = option_item_sp(
+      param="LongPidTuneScaleAggressive",
+      title=lambda: tr("Distance 1 / Aggressive PID Scale (Default: 200%)"),
       min_value=0,
       max_value=500,
       value_change_step=5,
-      description=lambda: tr("Scales longitudinal PID controller values from their configured base tune."),
+      description=lambda: tr(
+        "Used with the Aggressive personality (distance setting 1). Effective only with a gas pedal interceptor and Live Learning Gas OFF; " +
+        "otherwise longitudinal PID scaling is fixed at 100%."
+      ),
+      label_callback=lambda value: f"{value}%",
+    )
+
+    self._long_pid_tune_scale_standard = option_item_sp(
+      param="LongPidTuneScaleStandard",
+      title=lambda: tr("Distance 2 / Standard PID Scale (Default: 100%)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=5,
+      description=lambda: tr(
+        "Used with the Standard personality (distance setting 2). Effective only with a gas pedal interceptor and Live Learning Gas OFF; " +
+        "otherwise longitudinal PID scaling is fixed at 100%."
+      ),
+      label_callback=lambda value: f"{value}%",
+    )
+
+    self._long_pid_tune_scale_relaxed = option_item_sp(
+      param="LongPidTuneScaleRelaxed",
+      title=lambda: tr("Distance 3 / Relaxed PID Scale (Default: 80%)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=5,
+      description=lambda: tr(
+        "Used with the Relaxed personality (distance setting 3). Effective only with a gas pedal interceptor and Live Learning Gas OFF; " +
+        "otherwise longitudinal PID scaling is fixed at 100%."
+      ),
+      label_callback=lambda value: f"{value}%",
+    )
+
+    self._long_pid_tune_scale_econ = option_item_sp(
+      param="LongPidTuneScaleEcon",
+      title=lambda: tr("Distance 4 / Econ PID Scale (Default: 50%)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=5,
+      description=lambda: tr(
+        "Used with the Econ personality (distance setting 4). Effective only with a gas pedal interceptor and Live Learning Gas OFF; " +
+        "otherwise longitudinal PID scaling is fixed at 100%."
+      ),
       label_callback=lambda value: f"{value}%",
     )
 
@@ -33,7 +75,7 @@ class LongitudinalTuningLayout(Widget):
       param="StaticFeedforwardLong",
       title=lambda: tr("Keep Feedforward Static (Default: ON)"),
       description=lambda: tr(
-        "When ON, the longitudinal PID scale above multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value " +
+        "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value " +
         "instead of being scaled along with it. The lateral PID scales have their own toggle in Lateral Tuning."
       ),
     )
@@ -99,7 +141,8 @@ class LongitudinalTuningLayout(Widget):
       title=lambda: tr("Live Learning Gas (Default: OFF with Gas Interceptor)"),
       description=lambda: tr(
         "Allows Honda gas and wind compensation factors to learn live while driving. Fresh installs default OFF when a gas pedal " +
-        "interceptor is detected and ON otherwise; your selection is preserved afterward."
+        "interceptor is detected and ON otherwise; your selection is preserved afterward. While ON, all longitudinal PID personality " +
+        "scales are held at 100%."
       ),
     )
 
@@ -181,25 +224,26 @@ class LongitudinalTuningLayout(Widget):
     )
 
     return [
-      self._long_pid_tune_scale,
+      self._live_learning_gas,
+      LineSeparatorSP(40),
       self._static_feedforward_long,
       self._ecu_matched_long,
       self._full_brake_authority,
       self._roen_acceleration_limits,
+      self._radar_tryout,
+      self._dashboard_variant,
+      LineSeparatorSP(40),
+      self._long_pid_tune_scale_aggressive,
+      self._long_pid_tune_scale_standard,
+      self._long_pid_tune_scale_relaxed,
+      self._long_pid_tune_scale_econ,
       self._cruise_overspeed_allowance,
       self._cruise_mismatch_correction,
-      LineSeparatorSP(40),
-      self._live_learning_gas,
-      LineSeparatorSP(40),
       self._stopping_decel_rate,
       self._stop_accel,
       self._stopping_decel_rate_long,
       self._v_ego_stopping,
       self._v_ego_starting,
-      LineSeparatorSP(40),
-      self._radar_tryout,
-      LineSeparatorSP(40),
-      self._dashboard_variant,
     ]
 
   def _update_state(self):

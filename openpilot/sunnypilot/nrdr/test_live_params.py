@@ -106,6 +106,20 @@ def test_roen_setting_reaches_control_and_planner_snapshots():
   assert "NrdrRoenAccelerationLimits" in planner_keys
 
 
+def test_personality_pid_scales_and_learning_gate_publish_atomically():
+  scale_keys = {
+    "LongPidTuneScaleAggressive",
+    "LongPidTuneScaleStandard",
+    "LongPidTuneScaleRelaxed",
+    "LongPidTuneScaleEcon",
+  }
+  matching_groups = [group for group in CONTROL_GROUPS if scale_keys.intersection(group.keys)]
+
+  assert len(matching_groups) == 1
+  assert scale_keys.issubset(matching_groups[0].keys)
+  assert "HondaLiveLearningGas" in matching_groups[0].keys
+
+
 def test_steer_ratio_mode_is_cached_with_controller_settings():
   control_keys = {key for group in CONTROL_GROUPS for key in group.keys}
   assert "NrdrLegacyDualBpSteerRatio" in control_keys

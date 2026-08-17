@@ -13,9 +13,42 @@ from __future__ import annotations
 
 import json
 import os
+import sys
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
+
+
+# Schema generation only needs capability field declarations. Avoid loading the
+# Linux-only hardware/IPC extensions when these source regressions run on Windows.
+if sys.platform == "win32":
+  hardware_module = ModuleType("openpilot.common.hardware")
+  hardware_module.PC = True
+  hardware_module.HARDWARE = SimpleNamespace(get_device_type=lambda: "pc")
+  sys.modules.setdefault("openpilot.common.hardware", hardware_module)
+  hardware_hw_module = ModuleType("openpilot.common.hardware.hw")
+  hardware_hw_module.Paths = SimpleNamespace(persist_root=lambda: "")
+  sys.modules.setdefault("openpilot.common.hardware.hw", hardware_hw_module)
+
+  params_module = ModuleType("openpilot.common.params")
+  params_module.Params = type("Params", (), {
+    "get": lambda _self, _key, **_kwargs: None,
+    "get_bool": lambda _self, _key: False,
+  })
+  params_module.UnknownKeyName = type("UnknownKeyName", (Exception,), {})
+  sys.modules.setdefault("openpilot.common.params", params_module)
+
+  swaglog_module = ModuleType("openpilot.common.swaglog")
+  swaglog_module.cloudlog = SimpleNamespace(
+    exception=lambda *_args, **_kwargs: None,
+    warning=lambda *_args, **_kwargs: None,
+  )
+  sys.modules.setdefault("openpilot.common.swaglog", swaglog_module)
+
+  messaging_module = ModuleType("openpilot.cereal.messaging")
+  messaging_module.SubMaster = object
+  sys.modules.setdefault("openpilot.cereal.messaging", messaging_module)
 
 from openpilot.sunnypilot.sunnylink.tools.generate_settings_schema import (
   DEFINITION_PATH,
@@ -210,6 +243,13 @@ class TestSpuriousOffroadGatesDropped:
 
 
 class TestNrdrLongitudinalOptions:
+  PERSONALITY_SCALE_KEYS = (
+    "LongPidTuneScaleAggressive",
+    "LongPidTuneScaleStandard",
+    "LongPidTuneScaleRelaxed",
+    "LongPidTuneScaleEcon",
+  )
+
   @pytest.mark.parametrize(("key", "widget"), [
     ("NrdrHondaFullBrakeAuthority", "toggle"),
     ("NrdrRoenAccelerationLimits", "toggle"),
@@ -233,6 +273,39 @@ class TestNrdrLongitudinalOptions:
     assert "Enabled by default" in roen.get("details", "")
     assert "default OFF when a gas pedal interceptor is detected" in live_gas.get("details", "")
     assert "selection is preserved" in live_gas.get("details", "")
+
+  @pytest.mark.parametrize("key", PERSONALITY_SCALE_KEYS)
+  def test_personality_pid_scale_range(self, schema, key):
+    item = _find_item(schema, key)
+    assert item is not None
+    assert item.get("widget") == "option"
+    assert (item.get("min"), item.get("max"), item.get("step"), item.get("unit")) == (0, 500, 5, "%")
+
+  def test_longitudinal_panel_follows_toggle_then_option_order(self, schema):
+    section = _find_section(schema, "cruise", "nrdr")
+    assert section is not None
+    panel = next(sub_panel for sub_panel in section.get("sub_panels", []) if sub_panel.get("id") == "nrdr_longitudinal")
+    items = panel.get("items", [])
+    keys = [item["key"] for item in items]
+    widgets = [item["widget"] for item in items]
+    toggle_indices = [i for i, widget in enumerate(widgets) if widget == "toggle"]
+    option_indices = [i for i, widget in enumerate(widgets) if widget == "option"]
+    scale_indices = [keys.index(key) for key in self.PERSONALITY_SCALE_KEYS]
+
+    assert keys[0] == "HondaLiveLearningGas"
+    assert set(widgets) == {"toggle", "option"}
+    assert max(toggle_indices) < min(option_indices)
+    assert scale_indices == list(range(scale_indices[0], scale_indices[0] + len(self.PERSONALITY_SCALE_KEYS)))
+    assert [keys[index] for index in scale_indices] == list(self.PERSONALITY_SCALE_KEYS)
+
+  @pytest.mark.parametrize(
+    ("key", "default"),
+    tuple(zip(PERSONALITY_SCALE_KEYS, (200, 100, 80, 50), strict=True)),
+  )
+  def test_personality_pid_scale_describes_default(self, schema, key, default):
+    item = _find_item(schema, key)
+    assert item is not None
+    assert f"Defaults to {default}%" in item.get("details", "")
 
 
 class TestNrdrSteerRatioMode:

@@ -71,7 +71,9 @@ reference (clamps, defaults, semantics). Summary:
    on a normal drive. Watch: steady highway following (no gap hunting), smooth final stop
    (no head-bob), no phantom brake on overpasses/parked cars.
 2. **Option A stopping params (bead 78z):** UI params `HondaVEgoStopping=0.30`,
-   `HondaStoppingDecelRate=0.18`, `HondaStoppingDecelRateLong=0.20`, `LongPidTuneScale=90`.
+   `HondaStoppingDecelRate=0.18`, `HondaStoppingDecelRateLong=0.20`, and set the PID scale for the active personality
+   to 90% (for example, `LongPidTuneScaleStandard=90`). The scale applies only with a gas pedal interceptor and Live
+   Learning Gas OFF; otherwise it is intentionally held at 100%.
 3. **Gap/jerk session:** `comfort_brake` 2.5→2.3→2.2 (tighter highway gap), M5 jerk values
    (`jerk_factors.relaxed.a_change=1.4 j_ego=1.5`, `aggressive 0.6/0.5`, `low_speed_jerk_scale=1.3`).
 4. **M2+M3 JOINT session (never separately — they pull braking earlier off the same signal):**

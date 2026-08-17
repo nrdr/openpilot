@@ -82,7 +82,7 @@ The short version — if you only read one part, read this. Full per-setting det
 - **Low Pass Filter (tau):** Reduces stutter, adds lag. Adds even more lag if tuned above defaults.
 - **Notch Filter (+ Notch Q):** Aims to remove stutter with no additional lag. Targets the specific frequencies stutter occurs at, but may not be useful if the exact frequency is unknown. Lower Notch Q to expand the removal to nearby neighbors; raise it to be more strict.
 - **Lateral P / I / F Scales:** Raise if the car is permanently too lazy in that band; lower if it's twitchy. P sharpens reaction to error, I pulls harder out of persistent error, F pre-applies curvature torque. To mimic the old single PID scale, raise P and I together and leave F at 100%. [Watch this](https://youtu.be/4Y7zG48uHRo)
-- **Longitudinal PID Tune Scale:** Raise if the car is permanently too lazy on both gas and brake; lower if the opposite is true. Scales the whole longitudinal output evenly.
+- **Longitudinal PID Personality Scales:** Each distance/personality has its own longitudinal PID scale. These scales are active only with a gas pedal interceptor and Live Learning Gas OFF; all other cases stay at 100%.
 - **Center Boost:** Created because Comma's models love to be lazy. Boosts the lateral tune (gives it a multiplier) for rock-solid straight-line performance, but only when the car is within the limits of Center Boost Threshold (deg).
 - **Increase Driver Override Hysteresis:** Adds some time before a detected override is applied to prevent false positives, but might cause grinding.
 - **Driver Override Threshold:** Start with 1200 as a baseline and raise to a max of 2400 until huge torque drops no longer happen.
@@ -121,7 +121,7 @@ The lateral controller is a PID: **P** reacts to the current path error, **I** a
 - **Integral Scale** — multiplier on the I term. Higher = harder pull out of persistent error (holds a corner, but can wind up and weave); lower lets small steady errors stand.
 - **Feedforward Scale** — multiplier on kf, the pre-applied curvature torque. Higher shoves the car into curves earlier (can over-corner); **100% leaves it at the tuned value.** Holding F at 100% while you raise P/I is the new equivalent of the old "Keep Feedforward Static" — you gain correction authority without inflating the feedforward.
 
-100% = the base tune on every term. The defaults reproduce the prior single-scale tune (Standard 135%, Highway 200% on P and I; feedforward static at 100%). *(Longitudinal still uses one combined scale plus its own Keep Feedforward Static toggle — see Longitudinal Tuning.)*
+100% = the base tune on every term. The defaults reproduce the prior single-scale tune (Standard 135%, Highway 200% on P and I; feedforward static at 100%). *(Longitudinal uses four personality-specific combined scales plus its own Keep Feedforward Static toggle — see Longitudinal Tuning.)*
 
 ### 3/4 — center boost & unwind
 
@@ -168,9 +168,9 @@ OEM-style four-signal Ford lateral control, ported from BluePilot, one level und
 
 ## Longitudinal Tuning
 
-- **Longitudinal PID Tune Scale (%)** — one multiplier on the whole longitudinal PID (gas + brake) from its base tune. Raise if the car is consistently lazy on both gas and brake, lower if it's jerky or over-eager. 100% = base.
-- **Keep Feedforward Static** — the scale multiplies only the feedback (P+I) terms, leaving the longitudinal feedforward (kf) at its tuned value. Use it when you want more correction authority without also inflating the feedforward.
-- **Live Learning Gas** — Honda gas response and wind-resistance compensation differ car to car, so this learns them live while you drive. Samples are lag-aligned (~0.5s, to match pedal-to-response delay) and only taken in quasi-steady conditions, the result is clamped to a safe band around nominal, and it's persisted across drives. Offroad toggle.
+- **Distance 1–4 / Personality PID Scales (%)** — separate multipliers for Aggressive, Standard, Relaxed, and Econ, defaulting to 200%, 100%, 80%, and 50%. They apply only on a gas-interceptor car while Live Learning Gas is OFF. PCM-controlled cars and Live Learning Gas always use 100%.
+- **Keep Feedforward Static** — the active personality scale multiplies only the feedback (P+I) terms, leaving the longitudinal feedforward (kf) at its tuned value. Use it when you want more correction authority without also inflating the feedforward.
+- **Live Learning Gas** — Honda gas response and wind-resistance compensation differ car to car, so this learns them live while you drive. Samples are lag-aligned (~0.5s, to match pedal-to-response delay) and only taken in quasi-steady conditions, the result is clamped to a safe band around nominal, and it's persisted across drives. While enabled, every longitudinal PID personality scale is held at 100%. Offroad toggle.
 - **Try Honda Bosch Radar (experimental)** — reads the factory Bosch radar's fine-range objects (CAN 0x280) and feeds them to the longitudinal controller. Honda Bosch only, and the decode is reverse-engineered (cross-validated across Civic Bosch radars, but still) — confirm the lead distance/closing rate look right before trusting it for following.
 - **Stopping Decel Rate** — brake-rate limiter used as the car settles into a stop (carcontroller side).
 - **Stop Accel** — the target acceleration once fully stopped (holds brake pressure so you don't creep).
