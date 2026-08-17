@@ -1545,9 +1545,9 @@
                 {
                   "key": "NrdrLatStiction",
                   "widget": "toggle",
-                  "title": "Lateral Stiction",
-                  "description": "Emulated EPS breakaway friction - the wheel holds solid between decisive corrections.",
-                  "details": "Final-stage hold/move state machine emulating the breakaway friction of high-torque EPS units. Holding sends a frozen torque (no dither reaches the EPS); breakaway triggers on real error, plan motion, or accumulated drift. Consider lowering the steering LPF once enabled. Reference - NRDR_LATERAL_STICTION.md.",
+                  "title": "Predictive Lateral Stiction",
+                  "description": "Tapers torque before a stable steering target, then holds it until another correction is needed.",
+                  "details": "PID remains the normal throw. A predictive capture stage can only reduce torque as the wheel closes on a stable target, then freezes the captured output until error, relative motion, drift, or a decisive corrective torque reversal requires reacquisition. It operates at every speed and immediately bypasses for driver input, lane changes, steering faults, or control limits. Default is OFF.",
                   "enablement": [
                     {
                       "type": "any",

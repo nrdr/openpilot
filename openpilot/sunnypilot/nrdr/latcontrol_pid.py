@@ -267,7 +267,8 @@ class NrdrLatControlPID(LatControl):
       feedforward = self._feedforward(CS, desired_no_offset)
       steering_pressed = self._steering_pressed(CS)
       freeze_speed = 2.0 if self.is_eps_modified else 5.0
-      freeze_integrator = steer_limited_by_safety or steering_pressed or CS.vEgo < freeze_speed
+      freeze_integrator = (steer_limited_by_safety or steering_pressed or CS.vEgo < freeze_speed
+                           or (self.stiction_enabled and self.stiction.freeze_integrator))
       if phase < 0.0 and self.pid.i * error > 0.0:
         freeze_integrator = True
 
@@ -276,15 +277,20 @@ class NrdrLatControlPID(LatControl):
         self._refresh_settings()
       self.pid.update(error, feedforward=feedforward, speed=CS.vEgo, freeze_integrator=freeze_integrator)
       output_torque = self._scaled_pid_output(CS, desired_no_offset, angle_delta, phase)
+      params_valid = False
       if self.is_eps_modified:
         output_torque += self.tune_learner.apply(CS.vEgo, desired_angle, error)
         output_torque = float(np.clip(output_torque, -self.steer_max, self.steer_max))
         params_valid = bool(params.valid and params.angleOffsetValid and params.steerRatioValid and params.stiffnessFactorValid)
-        self.tune_learner.learn(
-          CS.vEgo, desired_angle, error, float(CS.steeringRateDeg), steering_pressed, params_valid, self.frame,
-        )
 
-      lane_change = bool(getattr(CS, "leftBlinker", False) or getattr(CS, "rightBlinker", False))
+      lane_change = self._lane_change_active()
+      stiction_limited = bool(
+        curvature_limited
+        or self.previous_saturated
+        or abs(output_torque) >= self.steer_max - 1e-3
+        or getattr(CS, "steerFaultTemporary", False)
+        or getattr(CS, "steerFaultPermanent", False)
+      )
       if self.stiction_enabled:
         output_torque = float(self.stiction.update(
           active,
@@ -295,10 +301,17 @@ class NrdrLatControlPID(LatControl):
           output_torque,
           steering_pressed,
           lane_change,
-          self.previous_saturated,
+          stiction_limited,
         ))
       else:
         self.stiction.reset()
+
+      if self.is_eps_modified:
+        learner_allowed = params_valid and not lane_change and not stiction_limited \
+          and not (self.stiction_enabled and self.stiction.freeze_integrator)
+        self.tune_learner.learn(
+          CS.vEgo, desired_angle, error, float(CS.steeringRateDeg), steering_pressed, learner_allowed, self.frame,
+        )
 
       pid_log.active = True
       pid_log.p = float(self.pid.p)

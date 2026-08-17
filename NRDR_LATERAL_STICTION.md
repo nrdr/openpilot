@@ -1,54 +1,44 @@
-# Lateral Stiction
+# Predictive Lateral Stiction
 
-Final-stage torque state machine emulating the breakaway friction of high-torque
-EPS units (Toyota, Lexus, HKG). Param `NrdrLatStiction`, default off.
-Implementation: `selfdrive/controls/lib/nrdr_lat_stiction.py`.
+`NrdrLatStiction` is a default-off final-stage steering overlay implemented in
+`openpilot/sunnypilot/nrdr/lat_stiction.py`. Normal PID output provides the
+throw; the overlay only removes torque while the wheel closes on a stable
+target, freezes the captured output briefly, and returns smoothly to PID when
+another correction is required.
 
-## Why
+## States
 
-Those platforms hold precise lines in every controller era because the EPS blocks
-noise in the amplitude domain: commands below the breakaway threshold move nothing,
-the wheel parks solid between corrections, and only persistently integrated error
-produces motion. A low-pass filter pays lag on everything; a threshold pays lag on
-nothing that matters. The Honda EPS (particularly with modified firmware) is a
-near-transparent pass-through, so every noise sample becomes wheel motion. This
-stage rebuilds the threshold in software.
+- `TRACK`: exact PID passthrough.
+- `CAPTURE`: predicts the target crossing from steering-angle error and relative
+  wheel/target rate. Torque that is still driving the closing motion is tapered
+  over 80 ms. Capture never increases or reverses torque.
+- `HOLD`: freezes the settled capture output.
+- `REACQUIRE`: blends back to current PID output over 80 ms.
 
-## Operation
+Capture and hold use relative motion, so a slowly moving intersection target can
+produce the intended move-pause-move response. There is no minimum-speed
+bypass. Driver input, a real model lane change, steering faults, curvature
+limiting, and controller saturation immediately restore normal control. The
+base PID integrator and tune learner are frozen while capture, hold, or
+reacquisition owns the output.
 
-HOLD: output frozen at a captured hold torque; a slow integrator (KI_HOLD) winds
-against standing error. Zero dither reaches the EPS.
-MOVE: live PID+FF output passes through unmodified.
+## Initial prototype limits
 
-Breakaway (HOLD to MOVE): |error| > E_HI, or |desired-angle rate| > DES_RATE_MOVE
-(feedforward-led; never waits for error), or accumulated drift > DRIFT_BUDGET_DEGS.
-Park (MOVE to HOLD): |error| < E_LO with plan and wheel quiet, sustained DWELL_S.
-Transitions crossfade over XFADE_S; minimum state times prevent chatter.
-Exact passthrough when disengaged, overridden, lane changing, saturated, or below
-MIN_SPEED.
+The prototype is one-sided: it can reduce a throw but cannot add boost or apply
+counter-torque. It targets dynamic angle overshoot, not an incorrect steady
+steer-ratio map. Calibrated yaw is intentionally not allowed to command torque
+in this version; a later yaw-authoritative mode requires delay validation and a
+latched physical-angle target first.
 
-## Constants
-
-| Constant | Value | Basis |
-|---|---|---|
-| E_HI | 0.9 to 0.4 deg over 8 to 30 m/s | ES350 hold span p75-p90 (city); highway end estimated |
-| E_LO | 0.35 to 0.20 deg | ES350 holds begin with 0.3-0.5 deg wander |
-| DES_RATE_MOVE / QUIET | 2.0 / 0.8 deg/s | plan-led breakaway; quiet gate for parking |
-| DRIFT_BUDGET_DEGS | 0.35 deg*s | escapes sub-threshold creep in 1-2 s |
-| DWELL_S / MIN_MOVE_S / MIN_HOLD_S | 0.15 / 0.25 / 0.20 s | ES350 moves p50 0.33 s; holds from 0.4 s |
-| XFADE_S | 0.08 s | bumpless transitions |
-| KI_HOLD | 0.10 torque/(deg*s) | stiction winding rate |
-| MIN_SPEED | 3.0 m/s | parking bypass |
-
-## Measured reference - Lexus ES350, city 8-15 m/s, 63 s engaged, hands-off
-
-Hold fraction 53% of drive time. Hold durations p50 0.76 s. Wheel span within a
-hold p50 0.51 / p90 1.16 deg. Move durations p50 0.33 s; step amplitude p50 0.54 /
-p75 1.78 deg; peak move rate p50 6.5 deg/s. Commanded curvature flat to four
-decimals during holds. Highway (25+ m/s) remains uncalibrated pending logs.
-
-## Notes
-
-With standing dither removed, the in-MOVE low-pass filter can be reduced (target
-0.05-0.10). The auto-tuner is compatible: held error is persistent error. Visible
-move-pause-move stepping is the intended behavior.
+| Setting | Value |
+|---|---:|
+| Prediction horizon | 0.12 s |
+| Relative-rate filter | 0.05 s |
+| Capture damping | 0.008 normalized torque/(deg/s) |
+| Maximum torque removal | 0.25 |
+| Capture authority ramp | 0.08 s |
+| Hold direction-change release | 0.03 normalized torque |
+| Hold entry error | 0.35° low speed to 0.20° high speed |
+| Hold release error | 0.90° low speed to 0.40° high speed |
+| Hold dwell | 0.15 s |
+| Reacquisition blend | 0.08 s |

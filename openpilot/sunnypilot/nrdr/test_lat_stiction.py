@@ -1,134 +1,262 @@
-"""LatStiction unit tests in the August package layout. See NRDR_LATERAL_STICTION.md for design and constants."""
 import math
-import random
 import unittest
 
-from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
+from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction, LatStictionState
+
 
 DT = 0.01
 STEER_MAX = 1.0
-V = 25.0
+V_EGO = 25.0
 
 
 def make():
   return LatStiction(DT, STEER_MAX)
 
 
-def settle_into_hold(mh, torque=0.30, n=120):
-  """Feed quiet settled frames until the stage parks; returns last output."""
-  out = 0.0
-  for _ in range(n):
-    out = mh.update(True, V, 0.0, 0.0, 0.0, torque, False, False, False)
-  return out
+def settle_into_hold(stage, torque=0.30):
+  error = 1.5
+  output = torque
+  for _ in range(200):
+    output = stage.update(True, V_EGO, error, 0.0, 5.0, torque, False, False, False)
+    error = max(error - 5.0 * DT, 0.05)
+  for _ in range(100):
+    output = stage.update(True, V_EGO, 0.05, 0.0, 0.0, torque, False, False, False)
+    if stage.holding:
+      break
+  return output
+
+
+def sign_for_test(value):
+  return 1.0 if value >= 0.0 else -1.0
 
 
 class TestLatStiction(unittest.TestCase):
+  def test_track_is_exact_passthrough(self):
+    stage = make()
+    for i in range(100):
+      live = 0.4 + 0.1 * math.sin(i * 0.1)
+      output = stage.update(True, V_EGO, 4.0, 0.0, 2.0, live, False, False, False)
+      self.assertEqual(output, live)
+      self.assertEqual(stage.state, LatStictionState.TRACK)
+      self.assertFalse(stage.freeze_integrator)
 
-  def test_enters_hold_and_kills_dither(self):
-    mh = make()
-    settle_into_hold(mh)
-    self.assertTrue(mh.holding)
-    rng = random.Random(0)
-    outs = []
-    for _ in range(500):  # noisy live torque + noisy tiny error, all sub-threshold
-      live = 0.30 + rng.gauss(0.0, 0.05)
-      e = rng.gauss(0.0, 0.05)
-      outs.append(mh.update(True, V, e, 0.0, 0.0, live, False, False, False))
-    self.assertTrue(mh.holding)
-    span = max(outs) - min(outs)
-    self.assertLess(span, 0.01, f"held output must be dead flat, span={span:.4f}")
-
-  def test_breakaway_on_error(self):
-    mh = make()
-    settle_into_hold(mh)
-    e_hi = mh.E_HI_V[-1]  # at 25+ m/s within interp of (0.9, 0.4) band
-    for i in range(200):
-      e = min(i * 0.02, 2.0)  # error ramps up
-      mh.update(True, V, e, 0.0, 0.0, 0.5, False, False, False)
-      if not mh.holding:
+  def test_predictive_capture_starts_before_crossing(self):
+    stage = make()
+    error = 2.0
+    first_capture_error = None
+    for _ in range(100):
+      output = stage.update(True, V_EGO, error, 0.0, 5.0, 0.35, False, False, False)
+      if stage.state is LatStictionState.CAPTURE:
+        first_capture_error = error
+        self.assertEqual(output, 0.35)
+        output = stage.update(True, V_EGO, error - 5.0 * DT, 0.0, 5.0, 0.35,
+                              False, False, False)
+        self.assertLess(output, 0.35)
         break
-    self.assertFalse(mh.holding, "must break away when error exceeds threshold")
-    self.assertLess(e, 3.0 * e_hi, "breakaway should not wait far past the threshold")
+      error -= 5.0 * DT
+    self.assertIsNotNone(first_capture_error)
+    self.assertGreater(first_capture_error, 0.0)
+    self.assertTrue(stage.freeze_integrator)
+    self.assertEqual(stage.reason, "predictive_capture")
 
-  def test_never_holds_while_plan_turns(self):
-    mh = make()
-    for _ in range(300):  # zero error but the plan is actively steering
-      mh.update(True, V, 0.0, 5.0, 2.0, 0.4, False, False, False)
-    self.assertFalse(mh.holding, "FF-led motion: never park the wheel mid-plan")
+  def test_capture_only_removes_torque_that_drives_relative_motion(self):
+    stage = make()
+    stage._enter(LatStictionState.CAPTURE, 0.4)
+    stage._state_s = stage.CAPTURE_RAMP_S
+    stage.relative_motion = 20.0
 
-  def test_drift_budget_escapes_slow_creep(self):
-    mh = make()
-    settle_into_hold(mh)
-    e = 0.25  # persistent sub-threshold error
-    t = 0.0
-    for _ in range(1000):
-      mh.update(True, V, e, 0.0, 0.0, 0.4, False, False, False)
-      t += DT
-      if not mh.holding:
+    aligned = stage.update(True, V_EGO, 0.3, 0.0, 20.0, 0.40, False, False, False)
+    opposed = stage.update(True, V_EGO, -0.1, 0.0, 20.0, -0.35, False, False, False)
+
+    self.assertAlmostEqual(aligned, 0.24)
+    self.assertEqual(opposed, -0.35)
+    self.assertLessEqual(abs(aligned), 0.40)
+    self.assertLessEqual(abs(opposed), 0.35)
+
+  def test_capture_never_reverses_or_amplifies_torque(self):
+    for torque in (-0.9, -0.2, 0.0, 0.2, 0.9):
+      for rate in (-100.0, -10.0, 0.0, 10.0, 100.0):
+        stage = make()
+        stage._enter(LatStictionState.CAPTURE, torque)
+        output = stage.update(True, V_EGO, sign_for_test(rate), 0.0, rate, torque,
+                              False, False, False)
+        self.assertLessEqual(abs(output), abs(torque) + 1e-12)
+        self.assertGreaterEqual(output * torque, 0.0)
+
+  def test_crossing_does_not_restore_wrong_direction_torque(self):
+    stage = make()
+    stage._enter(LatStictionState.CAPTURE, 0.4)
+    stage._state_s = stage.CAPTURE_RAMP_S
+    stage.relative_motion = 12.0
+    before = stage.update(True, V_EGO, 0.1, 0.0, 12.0, 0.4, False, False, False)
+    after = stage.update(True, V_EGO, -0.1, 0.0, 12.0, 0.4, False, False, False)
+
+    self.assertEqual(stage.state, LatStictionState.CAPTURE)
+    self.assertAlmostEqual(before, after)
+    self.assertLess(after, 0.4)
+
+  def test_settled_capture_holds_equilibrium_output(self):
+    stage = make()
+    held_output = settle_into_hold(stage)
+
+    self.assertEqual(stage.state, LatStictionState.HOLD)
+    self.assertTrue(stage.freeze_integrator)
+    self.assertAlmostEqual(held_output, stage.hold_torque)
+    for i in range(100):
+      live = 0.3 + 0.08 * math.sin(i * 0.2)
+      self.assertEqual(stage.update(True, V_EGO, 0.05, 0.0, 0.0, live,
+                                    False, False, False), held_output)
+
+  def test_hold_breakaway_reacquires_without_step(self):
+    stage = make()
+    held_output = settle_into_hold(stage)
+    for _ in range(round(stage.MIN_HOLD_S / DT) + 1):
+      held_output = stage.update(True, V_EGO, 0.05, 0.0, 0.0, held_output,
+                                 False, False, False)
+    outputs = [stage.update(True, V_EGO, 0.7, 0.0, 0.0, 0.65, False, False, False)]
+    self.assertEqual(stage.state, LatStictionState.REACQUIRE)
+    self.assertTrue(stage.freeze_integrator)
+    self.assertAlmostEqual(outputs[0], held_output)
+
+    for _ in range(round(stage.XFADE_S / DT) + 2):
+      outputs.append(stage.update(True, V_EGO, 0.7, 0.0, 0.0, 0.65, False, False, False))
+    self.assertEqual(stage.state, LatStictionState.TRACK)
+    self.assertFalse(stage.freeze_integrator)
+    self.assertAlmostEqual(outputs[-1], 0.65)
+    max_step = abs(0.65 - held_output) * DT / stage.XFADE_S
+    self.assertLessEqual(max(abs(b - a) for a, b in zip(outputs, outputs[1:], strict=False)),
+                         max_step + 1e-12)
+
+  def test_reacquire_never_preserves_torque_against_live_correction(self):
+    stage = make()
+    stage._enter(LatStictionState.REACQUIRE, 0.10, "outer_error")
+
+    output = stage.update(True, V_EGO, -1.0, 0.0, 0.0, -0.35,
+                          False, False, False)
+
+    self.assertEqual(output, -0.35)
+    self.assertEqual(stage.state, LatStictionState.TRACK)
+    self.assertEqual(stage.reason, "direction_change")
+
+  def test_target_discontinuity_restores_live_torque_immediately(self):
+    stage = make()
+    stage._enter(LatStictionState.HOLD, 0.25, "capture_settled")
+
+    output = stage.update(True, V_EGO, -4.0, -200.0, 0.0, -0.40,
+                          False, False, False)
+
+    self.assertEqual(output, -0.40)
+    self.assertEqual(stage.state, LatStictionState.TRACK)
+    self.assertEqual(stage.reason, "target_discontinuity")
+
+  def test_hold_releases_for_decisive_opposite_direction_torque(self):
+    stage = make()
+    stage._enter(LatStictionState.HOLD, 0.20, "capture_settled")
+
+    dither = stage.update(True, V_EGO, -0.1, 0.0, 0.0, -0.02,
+                          False, False, False)
+    correction = stage.update(True, V_EGO, -0.1, 0.0, 0.0, -0.10,
+                              False, False, False)
+
+    self.assertEqual(dither, 0.20)
+    self.assertEqual(correction, -0.10)
+    self.assertEqual(stage.state, LatStictionState.TRACK)
+    self.assertEqual(stage.reason, "direction_change")
+
+  def test_safety_bypasses_are_immediate_exact_passthrough(self):
+    cases = (
+      {"active": False},
+      {"pressed": True},
+      {"lane": True},
+      {"saturated": True},
+    )
+    for case in cases:
+      stage = make()
+      settle_into_hold(stage)
+      output = stage.update(case.get("active", True), V_EGO, 0.0, 0.0, 0.0, 0.73,
+                            case.get("pressed", False), case.get("lane", False),
+                            case.get("saturated", False))
+      self.assertEqual(output, 0.73, case)
+      self.assertEqual(stage.state, LatStictionState.TRACK, case)
+      self.assertFalse(stage.freeze_integrator, case)
+
+  def test_zero_speed_is_not_a_bypass(self):
+    stage = make()
+    output = stage.update(True, 0.0, 0.4, 0.0, 10.0, 0.5, False, False, False)
+    self.assertEqual(stage.state, LatStictionState.CAPTURE)
+    self.assertEqual(output, 0.5)
+    output = stage.update(True, 0.0, 0.3, 0.0, 10.0, 0.5, False, False, False)
+    self.assertLess(output, 0.5)
+
+  def test_moving_target_can_capture_and_hold_relative_position(self):
+    stage = make()
+    error = 1.0
+    for _ in range(80):
+      stage.update(True, V_EGO, error, 20.0, 25.0, 0.4, False, False, False)
+      error = max(error - 5.0 * DT, 0.05)
+      if stage.state is LatStictionState.CAPTURE:
         break
-    self.assertFalse(mh.holding)
-    self.assertLess(t, 2.5, f"drift budget must fire ~budget/error s, took {t:.2f}s")
+    self.assertEqual(stage.state, LatStictionState.CAPTURE)
 
-  def test_micro_integrator_winds_toward_error(self):
-    mh = make()
-    settle_into_hold(mh, torque=0.30)
-    h0 = mh.hold_torque
-    for _ in range(50):  # 0.5 s of +0.2 deg held error
-      mh.update(True, V, 0.2, 0.0, 0.0, 0.30, False, False, False)
-    self.assertGreater(mh.hold_torque, h0)
-    self.assertAlmostEqual(mh.hold_torque - h0, mh.KI_HOLD * 0.2 * 0.5, delta=0.002)
+    for _ in range(100):
+      stage.update(True, V_EGO, 0.05, 20.0, 20.0, 0.4, False, False, False)
+      if stage.state is LatStictionState.HOLD:
+        break
+    self.assertEqual(stage.state, LatStictionState.HOLD)
 
-  def test_transitions_are_bumpless(self):
-    mh = make()
-    outs = []
-    rng = random.Random(1)
-    for i in range(3000):  # hold -> breakaway -> move -> re-settle, five full cycles
-      c = i % 600
-      tri = c / 300.0 if c < 300 else (600 - c) / 300.0  # continuous 0 -> 1 -> 0
-      e = 1.5 * tri
-      live = 0.30 + 0.25 * tri + rng.gauss(0.0, 0.01)
-      outs.append(mh.update(True, V, e, 0.0, 0.0, live, False, False, False))
-    max_step = max(abs(b - a) for a, b in zip(outs, outs[1:], strict=False))
-    # worst legal step: hold->live gap crossed over XFADE_S plus live noise
-    self.assertLess(max_step, 0.30 / (mh.XFADE_S / DT) + 0.05, f"step {max_step:.3f}")
+  def test_target_discontinuity_does_not_capture(self):
+    stage = make()
+    for _ in range(100):
+      output = stage.update(True, V_EGO, 0.2, 150.0, 155.0, 0.4, False, False, False)
+      self.assertEqual(output, 0.4)
+      self.assertEqual(stage.state, LatStictionState.TRACK)
 
-  def test_no_chatter_on_borderline_error(self):
-    mh = make()
-    settle_into_hold(mh)
-    e_hi = 0.4
-    transitions = 0
-    prev = mh.holding
-    for i in range(2000):  # 20 s hovering right at the threshold
-      e = e_hi + 0.05 * math.sin(i * DT * 8.0)
-      mh.update(True, V, e, 0.0, 0.0, 0.4, False, False, False)
-      if mh.holding != prev:
-        transitions += 1
-        prev = mh.holding
-    self.assertLess(transitions, 12, f"{transitions} transitions in 20s = chatter")
+  def test_receding_error_does_not_capture(self):
+    stage = make()
+    for _ in range(100):
+      output = stage.update(True, V_EGO, 0.5, 0.0, -8.0, 0.4, False, False, False)
+      self.assertEqual(output, 0.4)
+      self.assertEqual(stage.state, LatStictionState.TRACK)
 
-  def test_bypasses_are_exact_passthrough(self):
-    for kwargs in ({"pressed": True}, {"lane": True}, {"sat": True}, {"v": 2.0}, {"act": False}):
-      mh = make()
-      settle_into_hold(mh)
-      outs = []
-      for i in range(60):
-        live = 0.5 + 0.1 * math.sin(i * 0.3)
-        outs.append(mh.update(kwargs.get("act", True), kwargs.get("v", V), 0.0, 0.0, 0.0,
-                              live, kwargs.get("pressed", False), kwargs.get("lane", False),
-                              kwargs.get("sat", False)))
-      # after the crossfade the output must equal live exactly
-      live_last = 0.5 + 0.1 * math.sin(59 * 0.3)
-      self.assertAlmostEqual(outs[-1], live_last, places=9, msg=str(kwargs))
-      self.assertFalse(mh.holding, str(kwargs))
+  def test_capture_entry_is_bumpless(self):
+    stage = make()
+    error = 1.0
+    previous = 0.4
+    for _ in range(100):
+      output = stage.update(True, V_EGO, error, 0.0, 20.0, 0.4, False, False, False)
+      if stage.state is LatStictionState.CAPTURE:
+        self.assertEqual(output, previous)
+        next_output = stage.update(True, V_EGO, error - 20.0 * DT, 0.0, 20.0, 0.4,
+                                   False, False, False)
+        self.assertLessEqual(previous - next_output, stage.MAX_TORQUE_REMOVAL * DT / stage.CAPTURE_RAMP_S)
+        break
+      previous = output
+      error -= 20.0 * DT
+    else:
+      self.fail("capture never started")
 
-  def test_hold_torque_clamped(self):
-    mh = make()
-    settle_into_hold(mh, torque=0.95)
-    for _ in range(5000):  # wind hard for 50 s
-      mh.update(True, V, 0.3, 0.0, 0.0, 0.95, False, False, False)
-      if not mh.holding:
-        settle_into_hold(mh, torque=0.95)
-    self.assertLessEqual(abs(mh.hold_torque), STEER_MAX + 1e-9)
+  def test_left_right_symmetry(self):
+    left = make()
+    right = make()
+    for i in range(100):
+      error = 1.5 - 0.03 * i
+      desired_rate = 10.0
+      wheel_rate = 15.0
+      live = 0.35
+      left_output = left.update(True, V_EGO, error, desired_rate, wheel_rate, live,
+                                False, False, False)
+      right_output = right.update(True, V_EGO, -error, -desired_rate, -wheel_rate, -live,
+                                  False, False, False)
+      self.assertEqual(left.state, right.state)
+      self.assertAlmostEqual(left_output, -right_output)
+
+  def test_capture_torque_removal_is_capped(self):
+    stage = make()
+    stage._enter(LatStictionState.CAPTURE, 1.0)
+    stage._state_s = stage.CAPTURE_RAMP_S
+    stage.relative_motion = 100.0
+    output = stage.update(True, V_EGO, 0.2, 0.0, 100.0, 1.0, False, False, False)
+    self.assertAlmostEqual(output, 1.0 - stage.MAX_TORQUE_REMOVAL)
 
 
 if __name__ == "__main__":

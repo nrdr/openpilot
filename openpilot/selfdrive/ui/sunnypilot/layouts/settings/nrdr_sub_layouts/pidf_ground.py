@@ -193,8 +193,10 @@ class PidfGroundLayout(Widget):
     )
 
     self._lat_stiction = toggle_item_sp(
-      title=tr("Lateral Stiction"),
-      description=tr("Emulates EPS breakaway friction so the wheel holds steady between decisive corrections."),
+      title=tr("Predictive Lateral Stiction"),
+      description=tr("Lets PID move the wheel normally, then tapers torque before the wheel reaches a stable target and holds it " +
+                     "until another correction is needed. Available at every speed; driver input, lane changes, faults, and " +
+                     "steering limits bypass it immediately."),
       param="NrdrLatStiction",
     )
 
