@@ -14,7 +14,7 @@ from openpilot.sunnypilot.nrdr.live_params import get_live_params
 from openpilot.sunnypilot.nrdr.tune_learner import TuneLearner
 from openpilot.sunnypilot.nrdr.params import read_bool, read_float
 from openpilot.sunnypilot.nrdr.phase_detector import phase_with_latch
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoint_profile
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import FirmwareLegacySteerRatioCurve, get_steer_ratio_endpoint_profile
 
 
 MPH_TO_MS = 0.44704
@@ -106,6 +106,7 @@ class NrdrLatControlPID(LatControl):
     self.sr_profile = get_steer_ratio_endpoint_profile(str(CP.carFingerprint))
     self.vgr_profile = get_honda_vgr_profile(CP)
     self.sr_values = list(self.sr_profile.default_values) if self.sr_profile else None
+    self.firmware_legacy_sr_curve = None
     self.legacy_dual_bp_sr = read_bool(self.params, "NrdrLegacyDualBpSteerRatio", True)
     self.lane_change_endpoint_sr = read_bool(self.params, "NrdrLaneChangeEndpointSteerRatio", True)
     self.center_boost_magnitude = 0.5
@@ -153,7 +154,9 @@ class NrdrLatControlPID(LatControl):
         linear_angle = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
       finally:
         VM.sR = previous_ratio
-      angle_no_offset = self.vgr_profile.linear_to_physical(linear_angle)
+      # Keep the firmware/dual-BP handoff deterministic; measured steering is feedback, not a curve lookup input.
+      angle_no_offset = self.firmware_legacy_sr_curve.desired_angle(linear_angle) \
+        if self.firmware_legacy_sr_curve is not None else self.vgr_profile.linear_to_physical(linear_angle)
       return angle_no_offset, angle_no_offset + params.angleOffsetDeg
 
     if self.sr_profile is not None:
@@ -214,6 +217,10 @@ class NrdrLatControlPID(LatControl):
       self.sr_values[:] = [read_float(snapshot, key, default, 8.0, 25.0) for key, default in self.sr_profile.param_values]
       self.legacy_dual_bp_sr = read_bool(snapshot, "NrdrLegacyDualBpSteerRatio", True)
       self.lane_change_endpoint_sr = read_bool(snapshot, "NrdrLaneChangeEndpointSteerRatio", True)
+      if self.vgr_profile is not None:
+        self.firmware_legacy_sr_curve = FirmwareLegacySteerRatioCurve(
+          self.vgr_profile, self.sr_values[0], self.sr_values[-1], self.sr_profile.outer_angle,
+        )
     self.settings_generation = snapshot.generation
 
   def _scaled_pid_output(self, CS, desired_angle: float, angle_delta: float, phase: float) -> float:

@@ -46,6 +46,20 @@ class HondaVgrProfile:
     physical = raw * Q14 / (divisor * RAW_UNITS_PER_DEGREE)
     return math.copysign(physical, angle_deg)
 
+  def linear_to_physical_slope(self, angle_deg: float) -> float:
+    """Return d(physical angle) / d(linear angle) for the active table segment."""
+    raw = abs(angle_deg) * self.center_divisor * RAW_UNITS_PER_DEGREE / Q14
+    if raw >= self.position_x[-1]:
+      return self.tail_scale
+
+    index = min(bisect_right(self.position_x, raw) - 1, len(self.position_x) - 2)
+    x0, x1 = self.position_x[index:index + 2]
+    y0, y1 = self.position_y[index:index + 2]
+    divisor_slope = (y1 - y0) / (x1 - x0)
+    divisor = y0 + divisor_slope * (raw - x0)
+    divisor_intercept = y0 - divisor_slope * x0
+    return self.center_divisor * divisor_intercept / divisor ** 2
+
   def physical_to_linear(self, angle_deg: float) -> float:
     physical = abs(angle_deg)
     if physical == 0.0:

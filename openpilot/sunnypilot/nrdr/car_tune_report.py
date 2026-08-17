@@ -8,7 +8,7 @@ from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
   is_handcrafted_lateral_enabled,
 )
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoint_profile
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import FirmwareLegacySteerRatioCurve, get_steer_ratio_endpoint_profile
 
 
 def _format_values(values) -> str:
@@ -83,15 +83,20 @@ class CarTuneReporter:
     center = float(self._value(profile.center_param))
     outer = float(self._value(profile.outer_param))
     firmware_profile = get_honda_vgr_profile(CP)
+    firmware_curve = FirmwareLegacySteerRatioCurve(firmware_profile, center, outer, profile.outer_angle) \
+      if firmware_profile is not None else None
     if self.params.get_bool("NrdrLegacyDualBpSteerRatio"):
       mode = "legacy dual-BP"
+    elif firmware_curve is not None and firmware_curve.valid:
+      mode = f"EPS map -> dual-BP at 70-90 deg ({firmware_profile.name})"
     elif firmware_profile is not None:
-      mode = f"experimental EPS map {firmware_profile.name}"
+      mode = f"invalid handoff -> raw EPS map ({firmware_profile.name})"
     else:
       mode = "firmware unavailable -> legacy dual-BP"
     lane_change = self._state("NrdrLaneChangeEndpointSteerRatio")
     if firmware_profile is not None and not self.params.get_bool("NrdrLegacyDualBpSteerRatio"):
-      return f"{mode} | {center:.2f} center anchor | {outer:.2f} fallback/lane-change outer | lane endpoint {lane_change}"
+      outer_role = "high-angle/lane-change outer" if firmware_curve.valid else "lane-change-only outer"
+      return f"{mode} | {center:.2f} center anchor | {outer:.2f} {outer_role} | lane endpoint {lane_change}"
     return f"{mode} | {center:.2f} center -> {outer:.2f} outer | lane endpoint {lane_change}"
 
   def _controller_info(self, CP, controller: str, handcrafted_enabled: bool, profile) -> str:

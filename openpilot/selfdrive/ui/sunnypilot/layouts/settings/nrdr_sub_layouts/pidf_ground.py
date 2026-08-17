@@ -36,8 +36,9 @@ class PidfGroundLayout(Widget):
     self._legacy_dual_bp_sr = toggle_item_sp(
       title=tr("Use Legacy Dual-BP Steer Ratio (Default: ON)"),
       description=tr("Keeps the current road-tested center-to-outer curve. Turn OFF to test the firmware-derived EPS position " +
-                     "map when this car and firmware are recognized. This experimental map covers EPS sensor geometry, not the " +
-                     "complete road-wheel ratio; unsupported firmware falls back to legacy. Clarity uses PID only in this mode."),
+                     "map when this car and firmware are recognized. Firmware mode keeps that map exact through 70°, hands off " +
+                     "smoothly to the same dual-BP curve from 70–90°, then follows the dual-BP curve at higher angles. " +
+                     "Unsupported firmware falls back to legacy. Clarity uses PID only in this mode."),
       param="NrdrLegacyDualBpSteerRatio",
     )
 
@@ -48,7 +49,7 @@ class PidfGroundLayout(Widget):
         title=lambda profile=profile: tr(f"On-Center Steer Ratio (Default: {profile.center_default:.2f})"),
         min_value=800, max_value=2500, value_change_step=1,
         description=lambda: tr("Sets the steer ratio at zero steering-wheel angle. It anchors firmware mode and is the " +
-                               "starting value of the legacy center-to-outer curve."),
+                               "starting value of the legacy center-to-outer curve and its high-angle firmware-mode handoff."),
         label_callback=lambda value: f"{value / 100:.2f}",
         use_float_scaling=True,
       )
@@ -56,8 +57,8 @@ class PidfGroundLayout(Widget):
         param=profile.outer_param,
         title=lambda profile=profile: tr(f"Outer Steer Ratio (Default: {profile.outer_default:.2f})"),
         min_value=800, max_value=2500, value_change_step=1,
-        description=lambda: tr("Sets the high-angle endpoint used by legacy mode, firmware fallback, and the optional " +
-                               "lane-change endpoint behavior."),
+        description=lambda: tr("Sets the high-angle endpoint used by legacy mode, the firmware-mode curve after its 70–90° " +
+                               "handoff, firmware fallback, and the optional lane-change endpoint behavior."),
         label_callback=lambda value: f"{value / 100:.2f}",
         use_float_scaling=True,
       )
@@ -300,6 +301,8 @@ class PidfGroundLayout(Widget):
       item.action_item.set_enabled(editable)
 
     self._legacy_dual_bp_sr.action_item.set_enabled(editable and not ui_state.engaged)
+    for item in sr_controls:
+      item.action_item.set_enabled(editable and not ui_state.engaged)
 
     for item in (self._nnlc_enabled, self._nnlc_activation_speed, self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain):
       item.action_item.set_enabled(not firmware_vgr_active)

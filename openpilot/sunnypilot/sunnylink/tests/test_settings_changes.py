@@ -323,6 +323,25 @@ class TestNrdrSteerRatioMode:
     assert "NrdrHandcraftedLateralTune" in enablement
     assert "not_engaged" in enablement
 
+  @pytest.mark.parametrize("key", [
+    "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
+    "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
+    "NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord",
+    "NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g",
+    "NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight",
+  ])
+  def test_steer_ratio_endpoints_cannot_change_while_engaged(self, schema, key):
+    item = _find_item(schema, key)
+    assert item is not None
+    assert "not_engaged" in json.dumps(item.get("enablement") or [])
+
+  def test_firmware_mode_documents_exact_handoff(self, schema):
+    item = _find_item(schema, "NrdrLegacyDualBpSteerRatio")
+    details = item.get("details", "")
+    assert "exactly through 70 degrees" in details
+    assert "70 to 90 degrees" in details
+    assert "above 90 degrees" in details
+
 
 class TestNotEngagedReplacement:
   @pytest.mark.parametrize("key", [
