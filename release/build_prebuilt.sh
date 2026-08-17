@@ -2,135 +2,287 @@
 set -euo pipefail
 set -x
 
-BUILD_DIR=/data/openpilot
-SRC_DIR=/data/openpilot-src
-GITHUB_USER="${GITHUB_USER:=nrdr}"
-GITHUB_REPO="${GITHUB_REPO:=openpilot}"
+GITHUB_USER="${GITHUB_USER:-nrdr}"
+GITHUB_REPO="${GITHUB_REPO:-openpilot}"
 
-# Daily defaults
-# Branch date follows your local (Eastern) calendar day, not the device's UTC clock,
-# so an evening build doesn't roll over to tomorrow's date.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)"
+SOURCE_DIR="${SOURCE_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+# Never build over the running checkout. Keeping the generated tree beside it avoids
+# breaking hardwared/manager while the release is being assembled.
+BUILD_DIR="${BUILD_DIR:-/data/openpilot-prebuilt-build}"
+
+# Daily defaults. The branch date follows Eastern time, even when the C4 clock is UTC.
 : "${RELEASE_BRANCH:=nrdr-staging-$(TZ='America/New_York' date +%m.%d.%Y)}"
+: "${CLEAN_BRANCH:=nrdr-clean}"
+: "${NIGHTLY_BRANCH:=nrdr-nightly}"
 : "${PUSH:=1}"
-: "${CLEANUP:=0}"
-: "${RESTORE_SOURCE_NAME:=0}"
+: "${CLEANUP:=1}"
 : "${DELETE_BUILD_DIR_WHEN_DONE:=1}"
-# Unattended auth: drop your PAT here during your daily SSH bootstrap (chmod 600).
-# Env GITHUB_TOKEN still wins; this file is just so the build never stops to prompt.
 : "${GITHUB_TOKEN_FILE:=/data/gh_token}"
-# Strip the baked-in driving model from the release (smaller, relies on model download).
-# Set STRIP_ONNX=0 to keep a model floor so a fresh device is driveable without a download.
 : "${STRIP_ONNX:=1}"
-# Reboot after a successful run. The build moves/deletes/restores /data/openpilot
-# underneath the running openpilot processes, leaving a corrupted "ghost build" in
-# memory until the device restarts. Set REBOOT_WHEN_DONE=0 to skip.
-: "${REBOOT_WHEN_DONE:=1}"
+: "${REBOOT_WHEN_DONE:=0}"
+: "${PREBUILT_PREFLIGHT_ONLY:=0}"
+: "${CLEAN_OVERLAY_ONLY:=0}"
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)"
-SOURCE_DIR="$(cd "$DIR/.." && pwd)"
+RELEASE_FILES_SCRIPT="$SOURCE_DIR/tools/release/release_files.py"
+CLEAN_OVERLAY_DIR="$SOURCE_DIR/release/clean_overlay"
+BUILD_READY=0
+BUILD_DIR_OWNED=0
+declare -a RELEASE_FILES=()
 
-restore_source_name() {
-  status=$?
+die() {
+  echo "[!] ERROR: $*" >&2
+  return 1
+}
 
+resolve_path() {
+  realpath -m -- "$1"
+}
+
+validate_layout() {
+  local source_resolved build_resolved
+  source_resolved="$(resolve_path "$SOURCE_DIR")"
+  build_resolved="$(resolve_path "$BUILD_DIR")"
+
+  [ -d "$source_resolved" ] || die "source directory does not exist: $source_resolved"
+  [ "$build_resolved" != "/" ] || die "refusing to use / as BUILD_DIR"
+  [ "$build_resolved" != "/data" ] || die "refusing to use /data as BUILD_DIR"
+  [ "$build_resolved" != "$source_resolved" ] || die "BUILD_DIR must not be the source/runtime checkout"
+  case "$build_resolved/" in
+    "$source_resolved/"*) die "BUILD_DIR must not be inside SOURCE_DIR" ;;
+  esac
+  case "$source_resolved/" in
+    "$build_resolved/"*) die "SOURCE_DIR must not be inside BUILD_DIR" ;;
+  esac
+
+  SOURCE_DIR="$source_resolved"
+  BUILD_DIR="$build_resolved"
+  RELEASE_FILES_SCRIPT="$SOURCE_DIR/tools/release/release_files.py"
+  CLEAN_OVERLAY_DIR="$SOURCE_DIR/release/clean_overlay"
+}
+
+validate_source_tree() {
+  local item manifest_output validation_error="" has_version=0 has_helper=0
+  validate_layout
+
+  [ -f "$RELEASE_FILES_SCRIPT" ] || die "missing canonical release manifest: $RELEASE_FILES_SCRIPT"
+  [ -f "$SOURCE_DIR/openpilot/sunnypilot/common/version.h" ] || die "missing nested version file"
+  [ -d "$SOURCE_DIR/openpilot/third_party" ] || die "missing nested third_party tree"
+  [ -d "$SOURCE_DIR/openpilot/selfdrive/modeld/models" ] || die "missing nested model tree"
+
+  for item in events.py events_sp.py driver_monitoring.py mads.py; do
+    [ -f "$CLEAN_OVERLAY_DIR/$item" ] || die "missing clean overlay file: $CLEAN_OVERLAY_DIR/$item"
+  done
+
+  set +x
+  manifest_output="$(cd "$SOURCE_DIR" && python3 "$RELEASE_FILES_SCRIPT" | sed -e 's/\r$//' -e 's#\\#/#g')"
+  mapfile -t RELEASE_FILES <<< "$manifest_output"
+  for item in "${RELEASE_FILES[@]}"; do
+    if [ -z "$item" ]; then
+      validation_error="release manifest contains an empty path"
+      break
+    fi
+    case "$item" in
+      /*|../*|*/../*|*/..) validation_error="unsafe release manifest path: $item"; break ;;
+    esac
+    if [ ! -e "$SOURCE_DIR/$item" ] && [ ! -L "$SOURCE_DIR/$item" ]; then
+      validation_error="release manifest path is missing: $item"
+      break
+    fi
+    [ "$item" = "openpilot/sunnypilot/common/version.h" ] && has_version=1
+    [ "$item" = "tools/release/release_files.py" ] && has_helper=1
+  done
+  set -x
+
+  [ "${#RELEASE_FILES[@]}" -gt 0 ] || die "release manifest returned no files"
+  [ -z "$validation_error" ] || die "$validation_error"
+  [ "$has_version" = "1" ] || die "release manifest omits the version file"
+  [ "$has_helper" = "1" ] || die "release manifest omits its canonical helper"
+
+  git check-ref-format --branch "$RELEASE_BRANCH" >/dev/null
+  git check-ref-format --branch "$NIGHTLY_BRANCH" >/dev/null
+  git check-ref-format --branch "$CLEAN_BRANCH" >/dev/null
+  [ "$RELEASE_BRANCH" != "$NIGHTLY_BRANCH" ] || die "release and nightly branch names must differ"
+  [ "$RELEASE_BRANCH" != "$CLEAN_BRANCH" ] || die "release and clean branch names must differ"
+  [ "$NIGHTLY_BRANCH" != "$CLEAN_BRANCH" ] || die "nightly and clean branch names must differ"
+  echo "[-] Preflight passed: ${#RELEASE_FILES[@]} release files"
+}
+
+validate_source_git_state() {
+  local source_status submodule_status
+  git -C "$SOURCE_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "source is not a Git worktree"
+  source_status="$(git -C "$SOURCE_DIR" status --porcelain --untracked-files=all)" || die "could not inspect source worktree"
+  [ -z "$source_status" ] || \
+    die "source worktree is not clean; commit or remove local changes before publishing"
+  submodule_status="$(git -C "$SOURCE_DIR" submodule status --recursive)" || die "could not inspect source submodules"
+  if printf '%s\n' "$submodule_status" | grep -Eq '^[-+U]'; then
+    die "source submodules do not match the recorded commits"
+  fi
+}
+
+replace_once() {
+  local file="$1" old="$2" new="$3"
+  grep -Fq -- "$old" "$file" || die "clean overlay expected text not found in $file: $old"
+  python3 - "$file" "$old" "$new" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+old, new = sys.argv[2], sys.argv[3]
+text = path.read_text()
+if text.count(old) != 1:
+  raise SystemExit(f"expected exactly one occurrence in {path}, found {text.count(old)}")
+path.write_text(text.replace(old, new))
+PY
+}
+
+apply_clean_overlay() {
+  local target="$BUILD_DIR/openpilot/sunnypilot/nrdr" item
+  [ -d "$BUILD_DIR/.git" ] || die "clean overlay target is not a Git tree: $BUILD_DIR"
+  [ -d "$target" ] || die "clean overlay target is missing: $target"
+
+  for item in events.py events_sp.py driver_monitoring.py mads.py; do
+    cp -p -- "$CLEAN_OVERLAY_DIR/$item" "$target/$item"
+  done
+
+  # Route registration and uploads to comma on the clean branch.
+  sed -i '/^export API_HOST=https:\/\/api\.konik\.ai$/d; /^export ATHENA_HOST=wss:\/\/athena\.konik\.ai$/d' \
+    "$BUILD_DIR/launch_env.sh" "$BUILD_DIR/launch_openpilot.sh"
+  replace_once "$BUILD_DIR/openpilot/common/api/comma_connect.py" \
+    "os.getenv('API_HOST', 'https://api.konik.ai')" \
+    "os.getenv('API_HOST', 'https://api.commadotai.com')"
+  replace_once "$BUILD_DIR/openpilot/system/athena/athenad.py" \
+    "os.getenv('ATHENA_HOST', 'wss://athena.konik.ai')" \
+    "os.getenv('ATHENA_HOST', 'wss://athena.comma.ai')"
+  replace_once "$BUILD_DIR/openpilot/sunnypilot/nrdr/home.py" \
+    "Your drives will upload to stable.konik.ai." \
+    "Your drives will upload to connect.comma.ai."
+  replace_once "$BUILD_DIR/openpilot/sunnypilot/nrdr/mici_home.py" \
+    'home._version_label.set_text("stable.konik.ai")' \
+    'home._version_label.set_text("connect.comma.ai")'
+  replace_once "$BUILD_DIR/openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/party_tricks.py" \
+    '      self._reregister_item,' \
+    ''
+
+  ! grep -Eq '^export (API_HOST|ATHENA_HOST)=.*konik\.ai' "$BUILD_DIR/launch_env.sh" "$BUILD_DIR/launch_openpilot.sh" || \
+    die "clean launch files still select the konik backend"
+  grep -Fq "https://api.commadotai.com" "$BUILD_DIR/openpilot/common/api/comma_connect.py"
+  grep -Fq "wss://athena.comma.ai" "$BUILD_DIR/openpilot/system/athena/athenad.py"
+  grep -Fq "connect.comma.ai" "$BUILD_DIR/openpilot/sunnypilot/nrdr/home.py"
+  grep -Fq "connect.comma.ai" "$BUILD_DIR/openpilot/sunnypilot/nrdr/mici_home.py"
+  python3 -m py_compile \
+    "$target/events.py" \
+    "$target/events_sp.py" \
+    "$target/driver_monitoring.py" \
+    "$target/mads.py"
+  find "$target" -name '__pycache__' -type d -prune -exec rm -rf -- '{}' +
+}
+
+safe_remove_build_dir() {
+  local resolved
+  resolved="$(resolve_path "$BUILD_DIR")"
+  if [ "$resolved" != "$BUILD_DIR" ]; then
+    die "BUILD_DIR resolution changed unexpectedly"
+    return 1
+  fi
+  if [ "$resolved" = "/" ] || [ "$resolved" = "/data" ] || [ "$resolved" = "$SOURCE_DIR" ]; then
+    die "refusing to remove unsafe BUILD_DIR: $resolved"
+    return 1
+  fi
+  rm -rf -- "$resolved"
+}
+
+finish() {
+  local status=$?
   set +e
-  cd /data || true
 
   if [ -d "$BUILD_DIR/.git" ]; then
     git -C "$BUILD_DIR" remote set-url origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git" 2>/dev/null || true
     git -C "$BUILD_DIR" remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git" 2>/dev/null || true
   fi
 
-  # Only delete the built tree on a FULLY SUCCESSFUL run. On any failure (e.g. a
-  # push 408) the build is expensive (20-40 min) and must be preserved so the push
-  # can be retried without rebuilding. This is the guard that was missing.
-  if [ "$status" = "0" ] && [ "${RESTORE_SOURCE_NAME:-0}" = "1" ] && [ "${DELETE_BUILD_DIR_WHEN_DONE:-1}" = "1" ] && [ -d "$BUILD_DIR" ] && [ "$BUILD_DIR" != "$SRC_DIR" ]; then
-    echo "[-] Removing runtime build tree $BUILD_DIR"
-    rm -rf "$BUILD_DIR" || true
-  elif [ "$status" != "0" ] && [ -d "$BUILD_DIR/.git" ]; then
-    echo "[!] Run failed (status $status) - PRESERVING built tree at $BUILD_DIR (source parked at $SRC_DIR)."
-    echo "[!] Retry the push without rebuilding:"
-    echo "[!]   cd $BUILD_DIR && git remote set-url origin git@github.com:${GITHUB_USER}/${GITHUB_REPO}.git"
-    echo "[!]   git push -f origin ${RELEASE_BRANCH}:${RELEASE_BRANCH} && git push -f origin ${RELEASE_BRANCH}:${NIGHTLY_BRANCH:-nrdr-nightly}"
-    echo "[!] When done: rm -rf $BUILD_DIR && mv $SRC_DIR $BUILD_DIR && sudo reboot"
+  if [ "$status" = "0" ]; then
+    if [ "$PUSH" = "1" ] && [ "$DELETE_BUILD_DIR_WHEN_DONE" = "1" ] && [ "$BUILD_DIR_OWNED" = "1" ]; then
+      echo "[-] Removing completed temporary build tree $BUILD_DIR"
+      safe_remove_build_dir || true
+    fi
+  elif [ "$BUILD_READY" = "1" ] && [ -d "$BUILD_DIR/.git" ]; then
+    echo "[!] Run failed after a complete prebuilt was committed; preserving $BUILD_DIR for a push retry."
+    echo "[!] Retry all three refs atomically from that tree after fixing connectivity/auth:"
+    echo "[!]   git remote set-url origin git@github.com:${GITHUB_USER}/${GITHUB_REPO}.git"
+    echo "[!]   git push --atomic -f origin ${RELEASE_BRANCH}:${RELEASE_BRANCH} ${RELEASE_BRANCH}:${NIGHTLY_BRANCH} ${CLEAN_BRANCH}:${CLEAN_BRANCH}"
+  elif [ "$BUILD_DIR_OWNED" = "1" ] && [ -e "$BUILD_DIR" ]; then
+    echo "[!] Run failed before a publishable prebuilt existed; removing the incomplete temporary tree."
+    safe_remove_build_dir || true
   fi
 
-  if [ "${RESTORE_SOURCE_NAME:-0}" = "1" ] && [ -d "$SRC_DIR" ] && [ ! -e "$BUILD_DIR" ]; then
-    echo "[-] Restoring source repo $SRC_DIR -> $BUILD_DIR"
-    mv "$SRC_DIR" "$BUILD_DIR" || true
-  fi
-
-  # Reboot only after a fully successful device run, and only after the restore
-  # above is done - the running processes are still on the deleted build tree
-  # (the "ghost build") until the device comes back up on the restored repo.
-  if [ "$status" = "0" ] && [ "${REBOOT_WHEN_DONE:-1}" = "1" ] && [ "${RESTORE_SOURCE_NAME:-0}" = "1" ]; then
-    echo "[-] Rebooting to leave the ghost build behind (REBOOT_WHEN_DONE=0 to skip)"
+  if [ "$status" = "0" ] && [ "$REBOOT_WHEN_DONE" = "1" ]; then
+    echo "[-] Reboot requested explicitly (REBOOT_WHEN_DONE=1)"
     sync
     sudo reboot
   fi
-
   exit "$status"
 }
 
-trap restore_source_name EXIT INT TERM
+validate_source_tree
 
-# If source repo is currently /data/openpilot, move it to /data/openpilot-src,
-# then restart this script from the new location.
-if [ "$SOURCE_DIR" = "$BUILD_DIR" ]; then
-  if [ -e "$SRC_DIR" ]; then
-    echo "ERROR: $SRC_DIR already exists; refusing to overwrite it"
-    exit 1
-  fi
-
-  # Arm the restore BEFORE the move, so a failure between here and the re-exec
-  # can't leave you with the source stranded at $SRC_DIR.
-  export RESTORE_SOURCE_NAME=1
-
-  echo "[-] Moving source repo $BUILD_DIR -> $SRC_DIR"
-  cd /data
-  mv "$BUILD_DIR" "$SRC_DIR"
-
-  exec bash "$SRC_DIR/release/build_prebuilt.sh" "$@"
+if [ "$PREBUILT_PREFLIGHT_ONLY" = "1" ]; then
+  echo "[-] PREBUILT_PREFLIGHT_ONLY=1: no files changed"
+  exit 0
 fi
 
-SOURCE_DIR="$SRC_DIR"
-DIR="$SOURCE_DIR/release"
+if [ "$CLEAN_OVERLAY_ONLY" = "1" ]; then
+  apply_clean_overlay
+  echo "[-] CLEAN_OVERLAY_ONLY=1: overlay applied to $BUILD_DIR"
+  exit 0
+fi
 
-cd "$DIR"
+validate_source_git_state
+trap finish EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 echo "[-] Release branch: $RELEASE_BRANCH"
 echo "[-] Source dir: $SOURCE_DIR"
-echo "[-] Build dir: $BUILD_DIR"
+echo "[-] Temporary build dir: $BUILD_DIR"
 
-echo "[-] Setting up runtime tree T=$SECONDS"
-if [ "$CLEANUP" = "1" ]; then
-  rm -rf "$BUILD_DIR"
-else
-  echo "[-] CLEANUP=0: leaving existing $BUILD_DIR in place if present"
+if [ -e "$BUILD_DIR" ]; then
+  if [ "$CLEANUP" != "1" ]; then
+    die "$BUILD_DIR already exists; set CLEANUP=1 to replace this dedicated temporary build tree"
+  fi
+  echo "[-] Removing previous temporary build tree $BUILD_DIR"
+  safe_remove_build_dir
 fi
 
 mkdir -p "$BUILD_DIR"
+BUILD_DIR_OWNED=1
 cd "$BUILD_DIR"
 
 git init
-git remote remove origin 2>/dev/null || true
 git remote add origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
 git remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
 git checkout --orphan "$RELEASE_BRANCH"
 
 echo "[-] Copying release files T=$SECONDS"
 cd "$SOURCE_DIR"
-cp -pR --parents $(./release/release_files.py) "$BUILD_DIR/"
+cp -pR --parents -- "${RELEASE_FILES[@]}" "$BUILD_DIR/"
 
 cd "$BUILD_DIR"
+# The source checkout normally gets these links from setup. Recreate them in the
+# standalone tree so the build never depends on host-checkout symlink behavior.
+ln -sfn msgq_repo/msgq msgq
+ln -sfn opendbc_repo/opendbc opendbc
+ln -sfn rednose_repo/rednose rednose
+ln -sfn teleoprtc_repo/teleoprtc teleoprtc
+ln -sfn tinygrad_repo/tinygrad tinygrad
+rm -f panda/board/obj/panda.bin.signed panda/board/obj/panda_h7.bin.signed || true
 
-rm -f panda/board/obj/panda.bin.signed || true
-rm -f panda/board/obj/panda_h7.bin.signed || true
-
-VERSION="$(cat sunnypilot/common/version.h | awk -F[\"-] '{print $2}')"
-echo "[-] committing version $VERSION T=$SECONDS"
+VERSION="$(awk -F'["-]' 'NR == 1 {print $2}' openpilot/sunnypilot/common/version.h)"
+[ -n "$VERSION" ] || die "could not read release version"
+echo "[-] Committing version $VERSION T=$SECONDS"
 
 git add -f .
-git commit -a -m "openpilot v$VERSION prebuilt"
+git commit -m "openpilot v$VERSION prebuilt"
 
 echo "[-] Building T=$SECONDS"
 export PYTHONPATH="$BUILD_DIR"
@@ -138,108 +290,60 @@ scons -j"$(nproc)" --minimal
 scons -j"$(nproc)" panda/
 
 echo "[-] Ensuring no submodules in release"
-if test "$(git submodule status --recursive | wc -l)" -gt "0"; then
+if test "$(git submodule status --recursive | wc -l)" -gt 0; then
   git submodule status --recursive
   exit 1
 fi
 
-echo "[-] Cleanup build junk"
+echo "[-] Cleaning build junk"
 find . -name '*.a' -delete
 find . -name '*.o' -delete
 find . -name '*.os' -delete
 find . -name '*.pyc' -delete
 find . -name 'moc_*' -delete
-find . -name '__pycache__' -delete
-rm -rf .sconsign.dblite Jenkinsfile release/ || true
+find . -name '__pycache__' -type d -prune -exec rm -rf -- '{}' +
+rm -rf -- .sconsign.dblite Jenkinsfile release/ tools/release/ || true
 
-# big_driving_vision.onnx is ~282 MB. The release branch commits models RAW (no LFS) so a
-# device can clone-and-run, but GitHub hard-rejects any single file >100 MB at the pre-receive
-# hook (this is what was killing the push). So this one ALWAYS comes out, independent of
-# STRIP_ONNX. The device's on-UI model downloader (a fresh install is prompted for model
-# download right after setup) fetches it; the smaller driving_vision.onnx stays baked in for
-# out-of-box drivability until the big model is pulled.
-echo "[-] Stripping oversized vision model (>100 MB GitHub limit): big_driving_vision.onnx"
-rm -f selfdrive/modeld/models/big_driving_vision.onnx || true
+echo "[-] Stripping oversized driving model (>100 MB GitHub limit)"
+rm -f openpilot/selfdrive/modeld/models/big_driving_supercombo.onnx || true
 
 if [ "$STRIP_ONNX" = "1" ]; then
-  echo "[-] Stripping baked-in driving model (STRIP_ONNX=1)"
-  rm -f selfdrive/modeld/models/driving_vision.onnx || true
-  rm -f selfdrive/modeld/models/driving_policy.onnx || true
-  rm -f sunnypilot/modeld*/models/supercombo.onnx || true
+  echo "[-] Stripping baked-in driving models (STRIP_ONNX=1)"
+  rm -f openpilot/selfdrive/modeld/models/driving_supercombo.onnx || true
+  rm -f openpilot/sunnypilot/modeld*/models/supercombo.onnx || true
 else
-  echo "[-] STRIP_ONNX=0: keeping baked-in model so a fresh device is driveable without a download"
+  echo "[-] STRIP_ONNX=0: retaining the standard model floor"
 fi
 
-git checkout -- third_party/ || true
-
+git checkout -- openpilot/third_party/ || true
 touch prebuilt
 
-git add -f .
+git add -A -f .
 git commit --amend -m "openpilot v$VERSION prebuilt"
 
-# Safety net: GitHub rejects any file >100 MB at push time, AFTER a full upload. Fail fast here
-# with a clear list instead of a confusing 'pre-receive hook declined' after a ~450 MB push.
 oversized="$(find . -type f -size +100M -not -path './.git/*' 2>/dev/null)"
 if [ -n "$oversized" ]; then
-  echo "[!] ERROR: files over GitHub's 100 MB limit remain - push WILL be rejected:"
+  echo "[!] ERROR: files over GitHub's 100 MB limit remain:"
   echo "$oversized" | sed 's#^#[!]   #'
-  echo "[!] Strip them (like big_driving_vision.onnx above) or host externally, then re-run."
   exit 1
 fi
 
-echo "[-] Optional onroad test skipped"
-# RELEASE=1 pytest -n0 -s selfdrive/test/test_onroad.py
+RELEASE_COMMIT="$(git rev-parse HEAD)"
 
-# Changes that must never appear in nrdr-clean. Static reverse-patches are shipped
-# in release/clean_excludes/ (181c61ee quality-of-life + bf4d05369b DM nerf) because a
-# fresh device install is shallow/prebuilt and does NOT have those commits in its
-# local history (that is why 'git show <sha>' failed here on 06.11). The patches are
-# reverse-applied to the prebuilt tree BEFORE the clean branch's single commit is
-# created, so the published history never contains the excluded changes.
-CLEAN_BRANCH="${CLEAN_BRANCH:=nrdr-clean}"
-NIGHTLY_BRANCH="${NIGHTLY_BRANCH:=nrdr-nightly}"
-CLEAN_EXCLUDES_DIR="$SOURCE_DIR/release/clean_excludes"
-
-build_clean_tree() {
-  # Reverse-apply the excluded patches onto the current prebuilt working tree.
-  # Returns nonzero (without dying, caller checks) if any patch doesn't apply.
-  local p found=0
-  for p in "$CLEAN_EXCLUDES_DIR"/*.patch; do
-    if [ ! -f "$p" ]; then
-      echo "[!] WARNING: no patches found in $CLEAN_EXCLUDES_DIR"
-      return 1
-    fi
-    found=1
-    if ! git apply -R --whitespace=nowarn "$p"; then
-      echo "[!] WARNING: could not reverse-apply $(basename "$p") onto the prebuilt tree"
-      return 1
-    fi
-  done
-  [ "$found" = "1" ] || return 1
-
-  # nrdr-clean must not contain the konik integration at all. konik.py is *created* (not edited)
-  # by its source commit, so a static reverse-patch rots the moment the file changes - just delete
-  # it. Nothing imports it at module load (party_tricks only runs it as a subprocess), so removal
-  # is safe; the host reverts below repoint registration/upload at comma instead.
-  rm -f system/athena/konik.py || true
-
-  # nrdr-clean must not ship the konik API/Athena host exports.
-  sed -i '/^export API_HOST=.*konik\.ai/d; /^export ATHENA_HOST=.*konik\.ai/d' launch_openpilot.sh launch_env.sh
-
-  # nrdr-clean must register/upload to comma, not konik: revert the Python host defaults.
-  sed -i "s|os.getenv('API_HOST', 'https://api.konik.ai')|os.getenv('API_HOST', 'https://api.commadotai.com')|" common/api/comma_connect.py
-  sed -i "s|os.getenv('ATHENA_HOST', 'wss://athena.konik.ai')|os.getenv('ATHENA_HOST', 'wss://athena.comma.ai')|" system/athena/athenad.py
-
-  # nrdr-clean uploads to comma, so the home screen must say so.
-  sed -i 's|Your drives will upload to stable\.konik\.ai\.|Your drives will upload to connect.comma.ai.|' selfdrive/ui/layouts/home.py
-  return 0
-}
+echo "[-] Building mandatory $CLEAN_BRANCH tree T=$SECONDS"
+apply_clean_overlay
+git branch -D "$CLEAN_BRANCH" 2>/dev/null || true
+git checkout --orphan "$CLEAN_BRANCH"
+git add -A -f .
+git commit -m "openpilot v$VERSION prebuilt"
+CLEAN_COMMIT="$(git rev-parse HEAD)"
+[ "$(git rev-parse "$CLEAN_COMMIT^{tree}")" != "$(git rev-parse "$RELEASE_COMMIT^{tree}")" ] || \
+  die "clean branch tree is unexpectedly identical to the full release"
+BUILD_READY=1
 
 if [ "$PUSH" = "1" ]; then
   echo "[-] PUSH T=$SECONDS"
-
   set +x
-  # Token precedence: env GITHUB_TOKEN -> $GITHUB_TOKEN_FILE -> interactive prompt.
   if [ -z "${GITHUB_TOKEN:-}" ] && [ -f "$GITHUB_TOKEN_FILE" ]; then
     echo "[-] Using GitHub token from $GITHUB_TOKEN_FILE"
     GITHUB_TOKEN="$(tr -d '[:space:]' < "$GITHUB_TOKEN_FILE")"
@@ -255,53 +359,37 @@ if [ "$PUSH" = "1" ]; then
   git remote set-url --push origin "$AUTH_REMOTE"
   set -x
 
-  # Harden the push. HTTP/2 multiplexing chokes on the ~450 MiB prebuilt pack and
-  # GitHub returns HTTP 408; HTTP/1.1 + a large buffer + a patient low-speed window
-  # is far more reliable over a slow uplink.
   git config http.version HTTP/1.1
   git config http.postBuffer 524288000
   git config http.lowSpeedLimit 1000
   git config http.lowSpeedTime 600
 
-  push_with_retry() {
-    local refspec="$1" tries=0
+  push_all_with_retry() {
+    local tries=0
     while :; do
-      if git push -f origin "$refspec"; then return 0; fi
+      if git push --atomic -f origin \
+        "$RELEASE_BRANCH:$RELEASE_BRANCH" \
+        "$RELEASE_BRANCH:$NIGHTLY_BRANCH" \
+        "$CLEAN_BRANCH:$CLEAN_BRANCH"; then
+        return 0
+      fi
       tries=$((tries + 1))
       [ "$tries" -ge 3 ] && return 1
-      echo "[!] push '$refspec' failed (try $tries/3); retrying in 15s..."
+      echo "[!] Atomic release push failed (try $tries/3); retrying in 15s..."
       sleep 15
     done
   }
 
-  # 1) Dated staging branch (kept), 2) nightly (overwritten every run).
-  # If either fails after retries, bail with status 1 so the trap PRESERVES the
-  # built tree (Fix above) instead of nuking it.
-  if ! push_with_retry "$RELEASE_BRANCH:$RELEASE_BRANCH"; then exit 1; fi
-  if ! push_with_retry "$RELEASE_BRANCH:$NIGHTLY_BRANCH"; then exit 1; fi
-
-  # 3) nrdr-clean (overwritten every run): a fresh single commit whose tree never
-  # contained the excluded changes. Failure here must not fail the whole build,
-  # staging and nightly are already published.
-  echo "[-] Building $CLEAN_BRANCH tree T=$SECONDS"
-  if build_clean_tree; then
-    git branch -D "$CLEAN_BRANCH" 2>/dev/null || true  # stale local branch from a CLEANUP=0 rerun
-    git checkout --orphan "$CLEAN_BRANCH"
-    git add -f .
-    git commit -m "openpilot v$VERSION prebuilt"
-    push_with_retry "$CLEAN_BRANCH:$CLEAN_BRANCH" || echo "[!] WARNING: $CLEAN_BRANCH push failed; staging/nightly are already up. Retry from $BUILD_DIR."
-  else
-    echo "[!] WARNING: skipping $CLEAN_BRANCH this run (see above); staging/nightly were pushed"
-  fi
+  # All three refs move together, or none do. This prevents a stale clean branch.
+  push_all_with_retry || exit 1
 
   set +x
   git remote set-url origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
   git remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
-  unset AUTH_REMOTE
-  unset GITHUB_TOKEN
+  unset AUTH_REMOTE GITHUB_TOKEN
   set -x
 else
-  echo "[-] PUSH=0: skipping git push. Prebuilt tree is local at $BUILD_DIR"
+  echo "[-] PUSH=0: release and clean trees are committed locally at $BUILD_DIR"
 fi
 
-echo "[-] done T=$SECONDS"
+echo "[-] Done T=$SECONDS"
