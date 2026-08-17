@@ -24,6 +24,10 @@ BUILD_DIR="${BUILD_DIR:-/data/openpilot-prebuilt-build}"
 : "${PREBUILT_PREFLIGHT_ONLY:=0}"
 : "${CLEAN_OVERLAY_ONLY:=0}"
 : "${SCONS_BIN:=}"
+: "${SCONS_JOBS:=4}"
+: "${AGNOS_MARKER:=/AGNOS}"
+: "${AGNOS_VENV:=/usr/local/venv}"
+: "${AGNOS_SHIMS:=/usr/comma/shims}"
 
 RELEASE_FILES_SCRIPT="$SOURCE_DIR/tools/release/release_files.py"
 CLEAN_OVERLAY_DIR="$SOURCE_DIR/release/clean_overlay"
@@ -41,18 +45,16 @@ resolve_path() {
 }
 
 configure_build_environment() {
-  local detected_scons
+  local detected_scons python_bin
 
-  # comma's boot environment gets the bundled compiler and Python tools from
-  # /etc/profile. A normal interactive SSH shell does not, so recreate that
-  # environment here instead of requiring callers to remember a PATH prefix.
-  if [ -f /AGNOS ] && [ -r /etc/profile ]; then
-    set +x
-    set +u
-    # shellcheck disable=SC1091
-    . /etc/profile
-    set -u
-    set -x
+  # Manager inherits these immutable AGNOS tool paths from /etc/profile, while
+  # a standalone SSH command does not. Export only the required environment;
+  # do not source a user/system profile or create a project virtualenv.
+  if [ -f "$AGNOS_MARKER" ]; then
+    [ -d "$AGNOS_VENV/bin" ] || die "missing AGNOS build environment: $AGNOS_VENV/bin"
+    export VIRTUAL_ENV="$AGNOS_VENV"
+    export PATH="$AGNOS_SHIMS:$AGNOS_VENV/bin:$PATH"
+    [ -n "$SCONS_BIN" ] || SCONS_BIN="$AGNOS_VENV/bin/scons"
   fi
 
   if [ -n "$SCONS_BIN" ]; then
@@ -64,7 +66,24 @@ configure_build_environment() {
     die "SCons is unavailable; install the project build environment or set SCONS_BIN"
   [ -x "$detected_scons" ] || die "SCons is not executable: $detected_scons"
   SCONS_BIN="$detected_scons"
+  "$SCONS_BIN" --version >/dev/null 2>&1 || die "SCons failed its version check: $SCONS_BIN"
+
+  if [ -f "$AGNOS_MARKER" ]; then
+    python_bin="$(command -v python3 2>/dev/null || true)"
+    [ -n "$python_bin" ] || die "python3 is unavailable in the AGNOS build environment"
+    "$python_bin" -c 'import SCons' >/dev/null 2>&1 || \
+      die "AGNOS python3 cannot import SCons: $python_bin"
+  fi
   echo "[-] Build tool: $SCONS_BIN"
+}
+
+run_scons() {
+  if "$SCONS_BIN" -j"$SCONS_JOBS" "$@"; then
+    return 0
+  fi
+  [ "$SCONS_JOBS" != "1" ] || return 1
+  echo "[!] Parallel build failed; retrying serially"
+  "$SCONS_BIN" -j1 "$@"
 }
 
 validate_layout() {
@@ -318,8 +337,8 @@ git commit -m "openpilot v$VERSION prebuilt"
 
 echo "[-] Building T=$SECONDS"
 export PYTHONPATH="$BUILD_DIR"
-"$SCONS_BIN" -j"$(nproc)" --minimal
-"$SCONS_BIN" -j"$(nproc)" panda/
+run_scons --minimal
+run_scons panda/
 
 echo "[-] Ensuring no submodules in release"
 if test "$(git submodule status --recursive | wc -l)" -gt 0; then

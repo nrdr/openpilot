@@ -39,6 +39,12 @@ def bash_path(path: Path) -> str:
   return result.stdout.strip()
 
 
+def bash_environment_path() -> str:
+  assert BASH is not None
+  result = subprocess.run([BASH, "-c", 'printf "%s" "$PATH"'], check=True, capture_output=True, text=True)
+  return result.stdout
+
+
 def git(*args: str, cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
   return subprocess.run(["git", *args], cwd=cwd, check=check, capture_output=True, text=True)
 
@@ -55,6 +61,36 @@ def init_repo(path: Path) -> str:
 
 def make_executable(path: Path) -> None:
   path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def shell_quote(value: str) -> str:
+  return "'" + value.replace("'", "'\"'\"'") + "'"
+
+
+def write_probe_executable(path: Path, log_path: Path) -> None:
+  path.parent.mkdir(parents=True, exist_ok=True)
+  contents = "\n".join((
+    "#!/usr/bin/env bash",
+    f"printf '%s\\t%s\\n' \"$*\" \"${{VIRTUAL_ENV:-}}\" >> {shell_quote(bash_path(log_path))}",
+    "exit 0",
+    "",
+  ))
+  path.write_text(contents, encoding="utf-8")
+  make_executable(path)
+
+
+def make_startup_probes(tmp_path: Path) -> tuple[Path, Path, Path]:
+  home = tmp_path / "fake-home"
+  home.mkdir()
+  profile_log = tmp_path / "profile-sourced.log"
+  profile_command = f"printf '%s\\n' sourced >> {shell_quote(bash_path(profile_log))}\n"
+  for name in (".profile", ".bash_profile", ".bashrc"):
+    (home / name).write_text(profile_command, encoding="utf-8")
+
+  shims = tmp_path / "agnos-shims"
+  uv_log = tmp_path / "uv-invoked.log"
+  write_probe_executable(shims / "uv", uv_log)
+  return home, shims, profile_log
 
 
 def write_manifest(source: Path, entries: list[str]) -> None:
@@ -208,6 +244,118 @@ def test_preflight_rejects_missing_scons_before_build_mutation(tmp_path: Path) -
 
   assert result.returncode != 0, result_details(result)
   assert "SCons is unavailable" in result.stderr
+  assert not build.exists()
+  assert_repo_unchanged(source, original_head)
+
+
+def test_agnos_preflight_uses_explicit_venv_without_profiles_or_uv(tmp_path: Path) -> None:
+  entries = ["root.txt"]
+  source = make_source(tmp_path, entries, entries)
+  build = tmp_path / "prebuilt-build"
+  original_head = init_repo(source)
+  marker = tmp_path / "AGNOS"
+  marker.touch()
+  venv = tmp_path / "agnos-venv"
+  scons_log = tmp_path / "agnos-scons.log"
+  python_log = tmp_path / "agnos-python.log"
+  write_probe_executable(venv / "bin" / "scons", scons_log)
+  write_probe_executable(venv / "bin" / "python3", python_log)
+  home, shims, profile_log = make_startup_probes(tmp_path)
+  uv_log = tmp_path / "uv-invoked.log"
+
+  result = run_builder(
+    source / "release" / BUILD_SCRIPT.name,
+    source=source,
+    build=build,
+    PREBUILT_PREFLIGHT_ONLY="1",
+    SCONS_BIN="",
+    AGNOS_MARKER=bash_path(marker),
+    AGNOS_VENV=bash_path(venv),
+    AGNOS_SHIMS=bash_path(shims),
+    HOME=bash_path(home),
+    PATH=bash_environment_path(),
+  )
+
+  assert result.returncode == 0, result_details(result)
+  assert scons_log.read_text(encoding="utf-8").splitlines() == [f"--version\t{bash_path(venv)}"]
+  assert python_log.read_text(encoding="utf-8").splitlines() == [f"-c import SCons\t{bash_path(venv)}"]
+  assert not profile_log.exists()
+  assert not uv_log.exists()
+  build_script = BUILD_SCRIPT.read_text(encoding="utf-8")
+  assert ". /etc/profile" not in build_script
+  assert "source /etc/profile" not in build_script
+  assert not build.exists()
+  assert_repo_unchanged(source, original_head)
+
+
+def test_agnos_preflight_honors_explicit_scons_override(tmp_path: Path) -> None:
+  entries = ["root.txt"]
+  source = make_source(tmp_path, entries, entries)
+  build = tmp_path / "prebuilt-build"
+  original_head = init_repo(source)
+  marker = tmp_path / "AGNOS"
+  marker.touch()
+  venv = tmp_path / "agnos-venv"
+  default_scons_log = tmp_path / "default-scons.log"
+  python_log = tmp_path / "agnos-python.log"
+  write_probe_executable(venv / "bin" / "scons", default_scons_log)
+  write_probe_executable(venv / "bin" / "python3", python_log)
+  override_scons = tmp_path / "explicit-tools" / "scons"
+  override_scons_log = tmp_path / "override-scons.log"
+  write_probe_executable(override_scons, override_scons_log)
+  home, shims, profile_log = make_startup_probes(tmp_path)
+
+  result = run_builder(
+    source / "release" / BUILD_SCRIPT.name,
+    source=source,
+    build=build,
+    PREBUILT_PREFLIGHT_ONLY="1",
+    SCONS_BIN=bash_path(override_scons),
+    AGNOS_MARKER=bash_path(marker),
+    AGNOS_VENV=bash_path(venv),
+    AGNOS_SHIMS=bash_path(shims),
+    HOME=bash_path(home),
+    PATH=bash_environment_path(),
+  )
+
+  assert result.returncode == 0, result_details(result)
+  assert override_scons_log.read_text(encoding="utf-8").splitlines() == [f"--version\t{bash_path(venv)}"]
+  assert not default_scons_log.exists()
+  assert python_log.is_file()
+  assert not profile_log.exists()
+  assert not (tmp_path / "uv-invoked.log").exists()
+  assert not build.exists()
+  assert_repo_unchanged(source, original_head)
+
+
+def test_non_agnos_preflight_resolves_scons_from_path_without_startup_side_effects(tmp_path: Path) -> None:
+  entries = ["root.txt"]
+  source = make_source(tmp_path, entries, entries)
+  build = tmp_path / "prebuilt-build"
+  original_head = init_repo(source)
+  tools_dir = tmp_path / "path-tools"
+  scons_log = tmp_path / "path-scons.log"
+  write_probe_executable(tools_dir / "scons", scons_log)
+  home, shims, profile_log = make_startup_probes(tmp_path)
+  baseline_path = bash_environment_path()
+
+  result = run_builder(
+    source / "release" / BUILD_SCRIPT.name,
+    source=source,
+    build=build,
+    PREBUILT_PREFLIGHT_ONLY="1",
+    SCONS_BIN="",
+    AGNOS_MARKER=bash_path(tmp_path / "not-agnos"),
+    AGNOS_VENV=bash_path(tmp_path / "unused-venv"),
+    AGNOS_SHIMS=bash_path(shims),
+    HOME=bash_path(home),
+    PATH=f"{bash_path(tools_dir)}:{bash_path(shims)}:{baseline_path}",
+  )
+
+  assert result.returncode == 0, result_details(result)
+  assert scons_log.read_text(encoding="utf-8").splitlines() == ["--version\t"]
+  assert not profile_log.exists()
+  assert not (tmp_path / "uv-invoked.log").exists()
   assert not build.exists()
   assert_repo_unchanged(source, original_head)
 
