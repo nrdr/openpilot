@@ -76,7 +76,7 @@ class Controls:
     # Update VehicleModel
     lp = self.sm['vehicleParameters']
     x = max(lp.stiffnessFactor, 0.1)
-    sr = max(lp.steerRatio, 0.1)
+    sr = max(self.CP.steerRatio if getattr(self.LaC, "tuned", False) else lp.steerRatio, 0.1)
     self.VM.update_params(x, sr)
 
     steer_angle_without_offset = math.radians(CS.steeringAngleDeg - lp.angleOffsetDeg)
@@ -91,6 +91,8 @@ class Controls:
 
     long_plan = self.sm['longitudinalPlan']
     model_v2 = self.sm['modelV2']
+    if isinstance(self.LaC, LatControlPID):
+      self.LaC.lane_changing = model_v2.meta.laneChangeState != LaneChangeState.off
 
     CC = car.CarControl.new_message()
     CC.enabled = self.sm['selfdriveState'].enabled
