@@ -434,6 +434,7 @@ def test_non_agnos_preflight_resolves_scons_from_path_without_startup_side_effec
     AGNOS_SHIMS=bash_path(shims),
     HOME=bash_path(home),
     PATH=f"{bash_path(tools_dir)}:{bash_path(shims)}:{baseline_path}",
+    VIRTUAL_ENV="",
   )
 
   assert result.returncode == 0, result_details(result)
