@@ -1,0 +1,30 @@
+# Page: software
+# Edit this file. Run compile_settings_ui.py to emit settings_ui.json.
+id: software
+label: Software
+icon: software
+order: 7
+remote_configurable: true
+description: Software update preferences
+sections:
+- id: updates
+  title: Updates
+  description: Control software updates
+  items:
+  - key: DisableUpdates
+    widget: toggle
+    title: Disable Updates
+    description: When enabled, software updates will be off (requires a reboot to take effect).
+    enablement:
+    - $ref: '#/macros/offroad'
+    - $ref: '#/macros/advanced_only'
+- id: nrdr
+  title: nrdr Force Update
+  description: Trigger a remote device update.
+  items:
+  - key: NrdrRemoteForceUpdate
+    widget: toggle
+    title: Force Update
+    description: Flip ON to run the full updater chain (check, download, install, reboot). Only works while the car is off.
+    details: Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status below for progress.
+  sub_panels: []
