@@ -9,6 +9,7 @@ from openpilot.cereal import log, custom
 from openpilot.selfdrive.selfdrived.events import ET
 from openpilot.selfdrive.selfdrived.state import SOFT_DISABLE_TIME
 from openpilot.common.realtime import DT_CTRL
+from openpilot.sunnypilot.nrdr.events import keep_lateral_active
 
 State = custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState
 EventName = log.OnroadEvent.EventName
@@ -37,10 +38,13 @@ class StateMachine:
       self.ss_state_machine.current_alert_types.append(alert_type)
 
   def check_contains(self, event_type: str) -> bool:
-    return bool(self._events.contains(event_type) or self._events_sp.contains(event_type))
+    base_event = any(not keep_lateral_active(event_name) and event_type in self._events.get_events_mapping().get(event_name, {})
+                     for event_name in self._events.names)
+    return bool(base_event or self._events_sp.contains(event_type))
 
   def check_contains_in_list(self) -> bool:
-    return bool(self._events.contains_in_list(GEARS_ALLOW_PAUSED) or self._events_sp.contains_in_list(GEARS_ALLOW_PAUSED_SILENT))
+    base_event = any(event_name in GEARS_ALLOW_PAUSED and not keep_lateral_active(event_name) for event_name in self._events.names)
+    return bool(base_event or self._events_sp.contains_in_list(GEARS_ALLOW_PAUSED_SILENT))
 
   def update(self):
     # soft disable timer and current alert types are from the state machine of openpilot

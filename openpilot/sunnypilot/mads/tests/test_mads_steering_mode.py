@@ -186,6 +186,53 @@ class TestRemainActiveMode:
     assert mads.state_machine.state == State.enabled
 
 
+class TestNrdrLateralOnlyEvents:
+  @pytest.mark.parametrize("event_name", [
+    EventName.doorOpen,
+    EventName.seatbeltNotLatched,
+    EventName.wrongGear,
+    EventName.brakeHold,
+  ])
+  def test_event_remains_visible_without_pausing_lateral(self, mocker, event_name):
+    mads, sd = make_mads(mocker, MadsSteeringModeOnBrake.REMAIN_ACTIVE)
+    mads.state_machine.state = State.enabled
+    mads.enabled = True
+    mads.active = True
+    sd.enabled = False
+    sd.events.add(event_name)
+
+    cs = make_car_state(standstill=True)
+    cs.gearShifter = structs.CarState.GearShifter.park
+    mads.update_events(cs)
+    mads.state_machine.update()
+
+    assert sd.events.has(event_name)
+    assert mads.state_machine.state == State.enabled
+
+  def test_reverse_pauses_lateral_and_recovers_after_exit(self, mocker):
+    mads, sd = make_mads(mocker, MadsSteeringModeOnBrake.REMAIN_ACTIVE)
+    mads.state_machine.state = State.enabled
+    mads.enabled = True
+    mads.active = True
+    sd.enabled = False
+    sd.events.add(EventName.wrongGear)
+    sd.events.add(EventName.reverseGear)
+
+    cs = make_car_state(standstill=True)
+    cs.gearShifter = structs.CarState.GearShifter.reverse
+    mads.update_events(cs)
+    mads.state_machine.update()
+    assert mads.state_machine.state == State.paused
+    assert sd.events_sp.has(EventNameSP.silentReverseGear)
+
+    sd.events.clear()
+    sd.events_sp.clear()
+    cs.gearShifter = structs.CarState.GearShifter.park
+    mads.update_events(cs)
+    mads.state_machine.update()
+    assert mads.state_machine.state == State.enabled
+
+
 # lateral mismatch counter
 
 class TestLateralMismatchCounter:

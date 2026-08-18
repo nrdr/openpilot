@@ -12,6 +12,7 @@ from opendbc.car.hyundai.values import HyundaiFlags
 from openpilot.common.params import Params
 from openpilot.sunnypilot.mads.helpers import MadsSteeringModeOnBrake, read_steering_mode_param, MADS_NO_ACC_MAIN_BUTTON
 from openpilot.sunnypilot.mads.state import StateMachine, GEARS_ALLOW_PAUSED_SILENT
+from openpilot.sunnypilot.nrdr.events import keep_lateral_active
 from openpilot.sunnypilot.nrdr.mads import AutoLkas
 
 State = custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState
@@ -121,22 +122,23 @@ class ModularAssistiveDrivingSystem:
   def update_events(self, CS: structs.CarState):
     if not self.selfdrive.enabled and self.enabled:
       if CS.standstill:
-        if self.events.has(EventName.doorOpen):
+        if self.events.has(EventName.doorOpen) and not keep_lateral_active(EventName.doorOpen):
           self.replace_event(EventName.doorOpen, EventNameSP.silentDoorOpen)
           self.transition_paused_state()
-        if self.events.has(EventName.seatbeltNotLatched):
+        if self.events.has(EventName.seatbeltNotLatched) and not keep_lateral_active(EventName.seatbeltNotLatched):
           self.replace_event(EventName.seatbeltNotLatched, EventNameSP.silentSeatbeltNotLatched)
           self.transition_paused_state()
-      if self.events.has(EventName.wrongGear) and (CS.vEgo < 2.5 or CS.gearShifter == GearShifter.reverse):
+      if self.events.has(EventName.wrongGear) and not keep_lateral_active(EventName.wrongGear) and \
+          (CS.vEgo < 2.5 or CS.gearShifter == GearShifter.reverse):
         self.replace_event(EventName.wrongGear, EventNameSP.silentWrongGear)
         self.transition_paused_state()
       if self.events.has(EventName.reverseGear):
         self.replace_event(EventName.reverseGear, EventNameSP.silentReverseGear)
         self.transition_paused_state()
-      if self.events.has(EventName.brakeHold):
+      if self.events.has(EventName.brakeHold) and not keep_lateral_active(EventName.brakeHold):
         self.replace_event(EventName.brakeHold, EventNameSP.silentBrakeHold)
         self.transition_paused_state()
-      if self.events.has(EventName.parkBrake):
+      if self.events.has(EventName.parkBrake) and not keep_lateral_active(EventName.parkBrake):
         self.replace_event(EventName.parkBrake, EventNameSP.silentParkBrake)
         self.transition_paused_state()
 
