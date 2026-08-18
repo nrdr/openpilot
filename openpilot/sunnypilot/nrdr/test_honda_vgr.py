@@ -82,6 +82,53 @@ def test_wrong_fingerprint_or_unknown_firmware_does_not_select_profile(CP):
   assert get_honda_vgr_profile(CP) is None
 
 
+@requires_controller
+def test_civic_teg_center_boost_fade_is_exactly_scoped():
+  from openpilot.sunnypilot.nrdr.latcontrol_pid import _center_boost_angle_fade
+
+  assert _center_boost_angle_fade(_car_params("HONDA_CIVIC", b"39990-TEG-A010")) == 2.0
+  for CP in (
+    _car_params("HONDA_CIVIC", b"39990-TBA-A030"),
+    _car_params("HONDA_CIVIC_BOSCH", b"39990-TBA-C120"),
+    _car_params("HONDA_CIVIC_BOSCH", b"39990-TBA-C020"),
+    _car_params("HONDA_CIVIC", b"39990-TEG-UNKNOWN"),
+    _car_params("HONDA_CLARITY", b"39990-TRW-A020"),
+  ):
+    assert _center_boost_angle_fade(CP) == 1.0
+
+
+@requires_controller
+def test_civic_teg_center_boost_smooths_only_the_ten_to_twelve_degree_handoff():
+  from openpilot.sunnypilot.nrdr.latcontrol_pid import _center_boost
+
+  values = {
+    angle: _center_boost(angle, v_ego=0.0, fade=1.0, magnitude=1.0,
+                         threshold=10.0, minimum_speed=0.0, angle_fade=2.0)
+    for angle in (0.0, 10.0, 11.0, 12.0, 20.0, 70.0, 90.0, -12.0, -70.0, -90.0)
+  }
+  assert values == {
+    0.0: 2.0, 10.0: 2.0, 11.0: 1.5, 12.0: 1.0, 20.0: 1.0, 70.0: 1.0, 90.0: 1.0,
+    -12.0: 1.0, -70.0: 1.0, -90.0: 1.0,
+  }
+  assert _center_boost(-11.0, 0.0, 1.0, 1.0, 10.0, 0.0, 2.0) == values[11.0]
+  assert _center_boost(4.0, 0.0, 1.0, 1.0, 3.0, 0.0, 2.0) == 1.5
+  assert _center_boost(5.0, 0.0, 1.0, 1.0, 3.0, 0.0, 2.0) == 1.0
+
+  samples = np.linspace(10.0, 12.0, 101)
+  factors = np.array([_center_boost(angle, 0.0, 1.0, 1.0, 10.0, 0.0, 2.0) for angle in samples])
+  assert np.all(np.diff(factors) <= 0.0)
+  assert np.all((1.0 <= factors) & (factors <= 2.0))
+
+
+@requires_controller
+def test_non_teg_center_boost_retains_the_existing_one_degree_fade():
+  from openpilot.sunnypilot.nrdr.latcontrol_pid import _center_boost
+
+  for angle in (0.0, 9.9, 10.0, 10.25, 10.5, 10.999, 11.0, 12.0, 70.0):
+    expected = 1.0 + np.clip(11.0 - abs(angle), 0.0, 1.0)
+    assert _center_boost(angle, 0.0, 1.0, 1.0, 10.0, 0.0) == expected
+
+
 @pytest.mark.parametrize("profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
 def test_forward_map_matches_firmware_formula_inside_segment(profile):
   index = len(profile.position_x) // 2

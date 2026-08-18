@@ -8,7 +8,7 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.pid import PIDController
 from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
-from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
+from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile, normalize_honda_eps_firmware
 from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
 from openpilot.sunnypilot.nrdr.live_params import get_live_params
 from openpilot.sunnypilot.nrdr.tune_learner import TuneLearner
@@ -22,6 +22,7 @@ LOW_SPEED_MAX = 25.0 * MPH_TO_MS
 STANDARD_SPEED_MAX = 50.0 * MPH_TO_MS
 CENTER_TAPER_FADE_TAU = 0.25
 CENTER_BOOST_SPEED_FADE = 5.0 * MPH_TO_MS
+CIVIC_TEG_CENTER_BOOST_FADE_DEG = 2.0
 RATE_DAMPING_REFERENCE = 0.010
 RATE_DAMPING_UNWIND_ANGLE = 30.0
 
@@ -45,10 +46,22 @@ def _eps_modified_steering_pressed(raw_pressed, steering_torque: float, torque_c
 
 
 def _center_boost(angle: float, v_ego: float, fade: float, magnitude: float,
-                  threshold: float, minimum_speed: float) -> float:
-  angle_weight = np.clip(threshold + 1.0 - abs(angle), 0.0, 1.0)
+                  threshold: float, minimum_speed: float, angle_fade: float = 1.0) -> float:
+  if angle_fade <= 1.0:
+    angle_weight = np.clip(threshold + 1.0 - abs(angle), 0.0, 1.0)
+  else:
+    angle_weight = np.clip((threshold + angle_fade - abs(angle)) / angle_fade, 0.0, 1.0)
+    angle_weight = angle_weight * angle_weight * (3.0 - 2.0 * angle_weight)
   speed_weight = np.clip((v_ego - minimum_speed) / CENTER_BOOST_SPEED_FADE, 0.0, 1.0) if minimum_speed > 0.0 else 1.0
   return 1.0 + angle_weight * magnitude * fade * speed_weight
+
+
+def _center_boost_angle_fade(CP) -> float:
+  if str(CP.carFingerprint) != "HONDA_CIVIC":
+    return 1.0
+  teg_a010 = any(firmware.ecu == "eps" and normalize_honda_eps_firmware(firmware.fwVersion) == "39990-TEG-A010"
+                 for firmware in CP.carFw)
+  return CIVIC_TEG_CENTER_BOOST_FADE_DEG if teg_a010 else 1.0
 
 
 def _output_scale(angle: float, phase: float, steering_rate: float, v_ego: float, enabled: bool) -> float:
@@ -112,6 +125,7 @@ class NrdrLatControlPID(LatControl):
     self.center_boost_magnitude = 0.5
     self.center_boost_threshold = 3.0
     self.center_boost_min_speed = 50.0
+    self.center_boost_angle_fade = _center_boost_angle_fade(CP)
     self.center_taper = FirstOrderFilter(1.0, CENTER_TAPER_FADE_TAU, dt)
     self.rate_damping = 0.3
     self.rate_damping_fade_speed = 30.0 * MPH_TO_MS
@@ -240,6 +254,7 @@ class NrdrLatControlPID(LatControl):
         self.center_boost_magnitude,
         self.center_boost_threshold,
         self.center_boost_min_speed * MPH_TO_MS,
+        self.center_boost_angle_fade,
       )
     output = p_term + i_term + self.pid.d + f_term
     if self.injection_test:
