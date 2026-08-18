@@ -9,6 +9,7 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.common.pid import PIDController
 from openpilot.sunnypilot.nrdr.lane_change import torque_controller_active, torque_from_lateral_accel
+from openpilot.sunnypilot.livedelay.helpers import LAT_DELAY_BUFFER_SECONDS
 
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext import LatControlTorqueExt
 
@@ -32,7 +33,7 @@ KP_INTERP = [250, 120, 65, 30, 11.5, 5.5, 3.5, 2.0, KP]
 LP_FILTER_CUTOFF_HZ = 1.2
 JERK_LOOKAHEAD_SECONDS = 0.19
 JERK_GAIN = 0.3
-LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
+LAT_ACCEL_REQUEST_BUFFER_SECONDS = LAT_DELAY_BUFFER_SECONDS
 VERSION = 1
 
 class LatControlTorque(LatControl):

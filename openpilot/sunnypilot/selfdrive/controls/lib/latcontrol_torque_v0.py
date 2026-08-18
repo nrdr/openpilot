@@ -8,6 +8,7 @@ from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.common.pid import PIDController
+from openpilot.sunnypilot.livedelay.helpers import LAT_DELAY_BUFFER_SECONDS
 
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext import LatControlTorqueExt
 
@@ -29,7 +30,7 @@ INTERP_SPEEDS = [1, 1.5, 2.0, 3.0, 5, 7.5, 10, 15, 30]
 KP_INTERP = [250, 120, 65, 30, 11.5, 5.5, 3.5, 2.0, KP]
 
 LP_FILTER_CUTOFF_HZ = 1.2
-LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
+LAT_ACCEL_REQUEST_BUFFER_SECONDS = LAT_DELAY_BUFFER_SECONDS
 FRICTION_THRESHOLD = 0.3
 VERSION = 0
 

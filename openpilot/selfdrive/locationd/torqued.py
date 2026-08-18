@@ -105,6 +105,7 @@ class TorqueEstimator(ParameterEstimator, TorqueEstimatorExt):
     # try to restore cached params
     params = Params()
     self.params = params
+    self.lag = get_lat_delay(params, 0.0, CP.steerActuatorDelay)
     params_cache = params.get("CarParamsPrevRoute")
     torque_cache = params.get("LiveTorqueParameters")
     if params_cache is not None and torque_cache is not None:
@@ -187,7 +188,7 @@ class TorqueEstimator(ParameterEstimator, TorqueEstimatorExt):
     elif which == "liveCalibration":
       self.calibrator.feed_live_calib(msg)
     elif which == "liveDelay":
-      self.lag = get_lat_delay(self.params, msg.lateralDelay)
+      self.lag = get_lat_delay(self.params, msg.lateralDelay, self.CP.steerActuatorDelay)
     # calculate lateral accel from past steering torque
     elif which == "livePose":
       is_valid = msg.angularVelocityDevice.valid and msg.orientationNED.valid and msg.inputsOK and msg.sensorsOK and msg.posenetOK

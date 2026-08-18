@@ -416,11 +416,9 @@ def main():
     if sm.frame % 5 == 0:
       lag_learner.update_estimate()
       lag_msg = lag_learner.get_msg(sm.all_checks(), DEBUG)
+      lagd_toggle.update(lag_msg, cache=sm.frame % 60 == 0)
       lag_msg_dat = lag_msg.to_bytes()
       pm.send('liveDelay', lag_msg_dat)
 
       if sm.frame % 1200 == 0: # cache every 60 seconds
         params.put("LiveDelay", lag_msg_dat)
-
-      if sm.frame % 60 == 0:  # read from and write to params every 3 seconds
-        lagd_toggle.update(lag_msg)

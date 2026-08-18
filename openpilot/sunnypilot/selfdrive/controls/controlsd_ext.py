@@ -27,6 +27,7 @@ class ControlsExt(ModelStateBase):
     ModelStateBase.__init__(self)
     self.CP = CP
     self.params = params
+    self.lat_delay = get_lat_delay(params, self.lat_delay, CP.steerActuatorDelay)
     self._param_update_time: float = 0.0
     self.blinker_pause_lateral = BlinkerPauseLateral()
 
@@ -69,8 +70,7 @@ class ControlsExt(ModelStateBase):
       self.blinker_pause_lateral.get_params()
       self.update_lane_centering_params()
 
-      if self.CP.lateralTuning.which() == 'torque':
-        self.lat_delay = get_lat_delay(self.params, sm["liveDelay"].lateralDelay)
+      self.lat_delay = get_lat_delay(self.params, sm["liveDelay"].lateralDelay, self.CP.steerActuatorDelay)
 
       refresh_live_parameter_settings(self, self.params)
 

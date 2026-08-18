@@ -88,8 +88,9 @@ class ModelsLayout(Widget):
                                                      "This prevents situations (like at red lights) where the car might plan the wrong turn direction."),
                                                   param="LaneTurnDesire")
 
-    self.delay_control = option_item_sp(tr("Adjust Software Delay"), "LagdToggleDelay", 5, 50,
-                                        tr("Adjust the software delay when Live Learning Steer Delay is toggled off. The default software delay value is 0.2"),
+    self.delay_control = option_item_sp(tr("Adjust Software Delay"), "LagdToggleDelay", 5, 100,
+                                        tr("Additional delay applied on top of the vehicle's actuator delay when Live Learning Steer Delay is off. " +
+                                           "Default is 0.2 s. Higher values increase prediction lead and may cause early or oscillatory steering."),
                                         1, None, True, "", style.BUTTON_ACTION_WIDTH, None, True, lambda v: f"{v / 100:.2f}s")
 
     self.lagd_toggle = toggle_item_sp(tr("Live Learning Steer Delay"), "", param="LagdToggle")

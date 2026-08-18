@@ -40,10 +40,10 @@ sections:
   - key: LagdToggleDelay
     widget: option
     title: Adjust Software Delay
-    description: Adjust the software delay when Live Learning Steer Delay is toggled off (default is 0.2).
-    details: Adjust the software delay when Live Learning Steer Delay is toggled off. The default software delay value is 0.2
+    description: Add software delay on top of the vehicle's actuator delay when Live Learning Steer Delay is off.
+    details: This additional delay is combined with the vehicle's actuator delay. The default additional value is 0.2 seconds. Higher values increase prediction lead and may cause early or oscillatory steering.
     min: 0.05
-    max: 0.5
+    max: 1.0
     step: 0.01
     enablement:
     - $ref: '#/macros/handcrafted_lateral_unlocked'

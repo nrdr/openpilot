@@ -22,6 +22,7 @@ from openpilot.selfdrive.controls.lib.longcontrol import LongControl
 from openpilot.selfdrive.modeld.modeld import LAT_SMOOTH_SECONDS
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
 
+from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 from openpilot.sunnypilot.nrdr.controlsd import apply_hud_lead, stopping_inputs, vehicle_model_params
 from openpilot.sunnypilot.nrdr.events import allow_longitudinal
@@ -82,6 +83,8 @@ class Controls(ControlsExt):
 
   def state_control(self):
     CS = self.sm['carState']
+    if self.sm.updated["liveDelay"]:
+      self.lat_delay = get_lat_delay(self.params, self.sm["liveDelay"].lateralDelay, self.CP.steerActuatorDelay)
 
     # Update VehicleModel
     lp = self.sm['liveParameters']
@@ -164,7 +167,7 @@ class Controls(ControlsExt):
       bool(CS.leftBlinker or CS.rightBlinker))
 
     self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll)
-    lat_delay = self.sm["liveDelay"].lateralDelay + LAT_SMOOTH_SECONDS
+    lat_delay = self.lat_delay + LAT_SMOOTH_SECONDS
 
     actuators.curvature = self.desired_curvature
     steer, lateral_output, lac_log = self.LaC.update(CC.latActive, CS, self.VM, lp,
