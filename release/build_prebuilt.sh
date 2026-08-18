@@ -23,7 +23,9 @@ BUILD_DIR="${BUILD_DIR:-/data/openpilot-prebuilt-build}"
 : "${REBOOT_WHEN_DONE:=0}"
 : "${PREBUILT_PREFLIGHT_ONLY:=0}"
 : "${CLEAN_OVERLAY_ONLY:=0}"
+: "${PREBUILT_RUNTIME_CHECK_ONLY:=0}"
 : "${SCONS_BIN:=}"
+: "${READELF_BIN:=}"
 : "${SCONS_JOBS:=4}"
 : "${AGNOS_MARKER:=/AGNOS}"
 : "${AGNOS_VENV:=/usr/local/venv}"
@@ -84,6 +86,46 @@ run_scons() {
   [ "$SCONS_JOBS" != "1" ] || return 1
   echo "[!] Parallel build failed; retrying serially"
   "$SCONS_BIN" -j1 "$@"
+}
+
+validate_runtime_linkage() {
+  local locationd="$BUILD_DIR/openpilot/sunnypilot/selfdrive/locationd/locationd"
+  local liblive="$BUILD_DIR/openpilot/sunnypilot/selfdrive/locationd/models/generated/liblive.so"
+  local readelf_bin artifact dynamic_section relative
+
+  [ -f "$locationd" ] || die "missing Sunny locationd: $locationd"
+  [ -f "$liblive" ] || die "missing Sunny locationd runtime library: $liblive"
+
+  if [ -n "$READELF_BIN" ]; then
+    readelf_bin="$(command -v "$READELF_BIN" 2>/dev/null || true)"
+  else
+    readelf_bin="$(command -v readelf 2>/dev/null || true)"
+  fi
+  [ -n "$readelf_bin" ] || die "readelf is required to validate release runtime linkage"
+  [ -x "$readelf_bin" ] || die "readelf is not executable: $readelf_bin"
+
+  dynamic_section="$("$readelf_bin" -d "$locationd" 2>/dev/null)" || \
+    die "could not inspect Sunny locationd dynamic linkage"
+  grep -Fq 'liblive.so' <<< "$dynamic_section" || \
+    die "Sunny locationd does not declare its liblive.so dependency"
+  grep -Fq '$ORIGIN/models/generated' <<< "$dynamic_section" || \
+    die "Sunny locationd does not use a relocatable \$ORIGIN runtime path"
+  if grep -Fq "$BUILD_DIR" <<< "$dynamic_section"; then
+    die "Sunny locationd runtime path embeds the temporary build directory"
+    return 1
+  fi
+
+  while IFS= read -r -d '' artifact; do
+    dynamic_section="$("$readelf_bin" -d "$artifact" 2>/dev/null || true)"
+    if grep -Fq "$BUILD_DIR" <<< "$dynamic_section"; then
+      relative="${artifact#"$BUILD_DIR"/}"
+      die "runtime ELF embeds the temporary build directory: $relative"
+      return 1
+    fi
+  done < <(find "$BUILD_DIR" -path "$BUILD_DIR/.git" -prune -o \
+    -type f \( -perm /111 -o -name '*.so' -o -name '*.so.*' \) -print0)
+
+  echo "[-] Runtime linkage is relocatable"
 }
 
 validate_layout() {
@@ -273,12 +315,18 @@ finish() {
 
 validate_source_tree
 
-if [ "$CLEAN_OVERLAY_ONLY" != "1" ]; then
+if [ "$CLEAN_OVERLAY_ONLY" != "1" ] && [ "$PREBUILT_RUNTIME_CHECK_ONLY" != "1" ]; then
   configure_build_environment
 fi
 
 if [ "$PREBUILT_PREFLIGHT_ONLY" = "1" ]; then
   echo "[-] PREBUILT_PREFLIGHT_ONLY=1: no files changed"
+  exit 0
+fi
+
+if [ "$PREBUILT_RUNTIME_CHECK_ONLY" = "1" ]; then
+  validate_runtime_linkage
+  echo "[-] PREBUILT_RUNTIME_CHECK_ONLY=1: no files changed"
   exit 0
 fi
 
@@ -368,6 +416,8 @@ fi
 
 git checkout -- openpilot/third_party/ || true
 touch prebuilt
+
+validate_runtime_linkage
 
 git add -A -f .
 git commit --amend -m "openpilot v$VERSION prebuilt"

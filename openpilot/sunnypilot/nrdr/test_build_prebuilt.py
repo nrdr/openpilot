@@ -79,6 +79,39 @@ def write_probe_executable(path: Path, log_path: Path) -> None:
   make_executable(path)
 
 
+def write_fake_readelf(path: Path, log_path: Path, locationd_runpath: str) -> None:
+  path.parent.mkdir(parents=True, exist_ok=True)
+  contents = "\n".join((
+    "#!/usr/bin/env bash",
+    f"printf '%s\\n' \"$*\" >> {shell_quote(bash_path(log_path))}",
+    'artifact="${@: -1}"',
+    'if [[ "$1" == "-h" || "$1" == "--file-header" ]]; then',
+    "  printf '%s\\n' 'ELF Header:' '  Class:                             ELF64'",
+    'elif [[ "$artifact" == */locationd ]]; then',
+    "  printf '%s\\n' 'Dynamic section at offset 0x0 contains 2 entries:'",
+    "  printf '%s\\n' ' 0x0000000000000001 (NEEDED)             Shared library: [liblive.so]'",
+    f"  printf '%s\\n' {shell_quote(f' 0x000000000000001d (RUNPATH)            Library runpath: [{locationd_runpath}]')}",
+    "else",
+    "  printf '%s\\n' 'Dynamic section at offset 0x0 contains 1 entry:'",
+    "  printf '%s\\n' ' 0x000000000000000e (SONAME)             Library soname: [liblive.so]'",
+    "fi",
+    "exit 0",
+    "",
+  ))
+  path.write_text(contents, encoding="utf-8")
+  make_executable(path)
+
+
+def make_runtime_linkage_fixture(build: Path) -> tuple[Path, Path]:
+  locationd = build / "openpilot" / "sunnypilot" / "selfdrive" / "locationd" / "locationd"
+  liblive = locationd.parent / "models" / "generated" / "liblive.so"
+  for artifact in (locationd, liblive):
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(b"\x7fELF fake test artifact\n")
+    make_executable(artifact)
+  return locationd, liblive
+
+
 def make_startup_probes(tmp_path: Path) -> tuple[Path, Path, Path]:
   home = tmp_path / "fake-home"
   home.mkdir()
@@ -183,6 +216,57 @@ def assert_repo_unchanged(source: Path, original_head: str) -> None:
   assert git("branch", "--show-current", cwd=source).stdout.strip() == "main"
   assert git("remote", "get-url", "origin", cwd=source).stdout.strip() == "https://example.invalid/original.git"
   assert git("status", "--porcelain", cwd=source).stdout == ""
+
+
+def test_runtime_linkage_check_rejects_locationd_runpath_into_temporary_build_tree(tmp_path: Path) -> None:
+  source = make_source(tmp_path, [], [])
+  original_head = init_repo(source)
+  build = tmp_path / "prebuilt-build"
+  locationd, liblive = make_runtime_linkage_fixture(build)
+  artifact_bytes = {artifact: artifact.read_bytes() for artifact in (locationd, liblive)}
+  readelf = tmp_path / "tools" / "readelf"
+  readelf_log = tmp_path / "readelf.log"
+  absolute_runpath = f"{bash_path(build)}/openpilot/sunnypilot/selfdrive/locationd/models/generated"
+  write_fake_readelf(readelf, readelf_log, f"$ORIGIN/models/generated:{absolute_runpath}")
+
+  result = run_builder(
+    source / "release" / BUILD_SCRIPT.name,
+    source=source,
+    build=build,
+    PREBUILT_RUNTIME_CHECK_ONLY="1",
+    READELF_BIN=bash_path(readelf),
+  )
+
+  assert result.returncode != 0, result_details(result)
+  assert "temporary build directory" in f"{result.stdout}\n{result.stderr}"
+  assert all(artifact.read_bytes() == contents for artifact, contents in artifact_bytes.items())
+  assert_repo_unchanged(source, original_head)
+
+
+def test_runtime_linkage_check_accepts_relocatable_locationd_runpath(tmp_path: Path) -> None:
+  source = make_source(tmp_path, [], [])
+  original_head = init_repo(source)
+  build = tmp_path / "prebuilt-build"
+  locationd, liblive = make_runtime_linkage_fixture(build)
+  artifact_bytes = {artifact: artifact.read_bytes() for artifact in (locationd, liblive)}
+  readelf = tmp_path / "tools" / "readelf"
+  readelf_log = tmp_path / "readelf.log"
+  write_fake_readelf(readelf, readelf_log, "$ORIGIN/models/generated")
+
+  result = run_builder(
+    source / "release" / BUILD_SCRIPT.name,
+    source=source,
+    build=build,
+    PREBUILT_RUNTIME_CHECK_ONLY="1",
+    READELF_BIN=bash_path(readelf),
+  )
+
+  assert result.returncode == 0, result_details(result)
+  readelf_invocations = readelf_log.read_text(encoding="utf-8").splitlines()
+  assert any(str(PurePosixPath(*locationd.relative_to(build).parts)) in line for line in readelf_invocations)
+  assert any(str(PurePosixPath(*liblive.relative_to(build).parts)) in line for line in readelf_invocations)
+  assert all(artifact.read_bytes() == contents for artifact, contents in artifact_bytes.items())
+  assert_repo_unchanged(source, original_head)
 
 
 @pytest.mark.parametrize("build_relation", ["same", "inside-source", "contains-source"])
