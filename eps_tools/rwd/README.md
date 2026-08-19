@@ -4,9 +4,9 @@ Honda/Acura EPS firmware files for use with `eps-update.py` (in the repo root).
 All files here were checksum-validated with `check_rwd.py` (file checksum +
 decrypted firmware checksums all PASS).
 
-Each model is kept as a **stock + linear-max pair** — `stock` is the factory
-recovery image (flash this back if a flash fails), `linear-max` is the
-max-torque-table mod.
+Each model is kept as a **stock + modified pair** — `stock` is the factory
+recovery image (flash this back if a flash fails), and the modified image is the
+matching stabilized torque-table tune.
 
 ## Validate
 ```bash
@@ -22,11 +22,12 @@ wipes untracked files from `/data/openpilot`. Some cars lock security access aft
 a dry run; wait / power-cycle before `--danger`, or use `flash.py`'s skip/retry.
 
 ## Contents
-| model | stock | linear-max |
+| model | stock | modified |
 |-------|-------|-----------|
 | Honda CR-V 5G (39990-TLA-A040) | `39990-TLA-A040-stock.rwd` | `39990-TLA-A040-linear-max.rwd` |
 | Honda Civic (39990-TBA-C120) | `39990-TBA-C120-stock.rwd` | `39990-TBA-C120-linear-max.rwd` |
 | Honda Insight (39990-TXM-A040) | `39990-TXM-A040-stock.rwd` | `39990-TXM-A040-linear-max.rwd` |
+| Honda Pilot (39990-TG7-A060) | `39990-TG7-A060_STOCK.rwd` | `39990-TG7-A060_2X.rwd` |
 
 ## Upstreaming guidelines
 

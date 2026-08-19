@@ -10,6 +10,10 @@ FIRMWARE_CHECKSUMS = {
     0x6c000: [(0, 0x6bf80, "sum"), (1, 0x6bffe, "negative-sum")],
     0x4c000: [(0, 0x4bf80, "sum"), (1, 0x4bffe, "negative-sum")],
 }
+PILOT_APP_ID = b'39990-TG7-A060\x00\x00'
+PILOT_KEYS = b'\x01\x02\x03'
+PILOT_FLASH_START = 0x10000
+PILOT_CHECKSUM_ENDS = (0xa000, 0x1d000, 0x4ff00)
 
 
 def check(path):
@@ -40,11 +44,15 @@ def check(path):
         return False
 
     idx = 3
+    headers = []
     for _ in range(6):
         cnt = raw[idx]; idx += 1
+        values = []
         for _ in range(cnt):
             length = raw[idx]; idx += 1
+            values.append(raw[idx:idx+length])
             idx += length
+        headers.append(values)
 
     fw_start = struct.unpack('!I', raw[idx:idx+4])[0]; idx += 4
     fw_len   = struct.unpack('!I', raw[idx:idx+4])[0]; idx += 4
@@ -53,16 +61,36 @@ def check(path):
 
     # 3. Decrypt
     enc = raw[idx:idx+fw_len]
-    try:
-        dec = bytes(DECRYPT_LOOKUP[b] for b in enc)
-    except KeyError as e:
-        print(f"\n  ERROR: encrypted byte 0x{e.args[0]:02x} not in lookup table")
-        return False
+    pilot_v850 = fw_len == 0x50000
+    if pilot_v850:
+        if (headers[3] != [PILOT_APP_ID] or headers[5] != [PILOT_KEYS] or
+                fw_start != PILOT_FLASH_START or idx + fw_len != len(raw) - 4):
+            print("\n  ERROR: unexpected 0x50000 firmware identity, layout, or encryption keys")
+            return False
+        k0, k1, k2 = PILOT_KEYS
+        dec = bytes(((((b + k0) ^ k1) - k2) & 0xff) for b in enc)
+    else:
+        try:
+            dec = bytes(DECRYPT_LOOKUP[b] for b in enc)
+        except KeyError as e:
+            print(f"\n  ERROR: encrypted byte 0x{e.args[0]:02x} not in lookup table")
+            return False
 
     # 4. Firmware checksums
     print(f"\n  [3] Firmware checksums")
     cs_defs = FIRMWARE_CHECKSUMS.get(fw_len)
-    if cs_defs is None:
+    if pilot_v850:
+        all_fw_ok = True
+        checksum = 0
+        start = 0
+        for off in PILOT_CHECKSUM_ENDS:
+            words = (struct.unpack('<I', dec[i:i+4])[0] for i in range(start, off, 4))
+            checksum = (checksum + sum(words)) & 0xffffffff
+            ok = checksum == 0
+            all_fw_ok = all_fw_ok and ok
+            print(f"      0x{off:05x}  cumulative LE32  0x{checksum:08x}  {'PASS ✓' if ok else 'FAIL ✗'}")
+            start = off
+    elif cs_defs is None:
         print(f"      WARNING: unknown firmware length 0x{fw_len:x} — checksums not verified")
         all_fw_ok = None
     else:
@@ -102,3 +130,5 @@ if __name__ == '__main__':
         print(f"{'─'*60}")
         for path, ok in results:
             print(f"  {'PASS ✓' if ok else 'FAIL ✗'}  {path}")
+
+    sys.exit(0 if all(ok for _, ok in results) else 1)

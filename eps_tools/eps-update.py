@@ -37,6 +37,10 @@ FIRMWARE_CHECKSUM_OFFSETS = {
   0x6c000: [(0, 0x6bf80, "sum"), (1, 0x6bffe, "negative-sum")],  # CR-V TLA, Insight TXM (524288 byte bin)
   0x4c000: [(0, 0x4bf80, "sum"), (1, 0x4bffe, "negative-sum")],  # Civic TBA/TEA/TGG/TGN, Clarity TRW (393216 byte bin)
 }
+PILOT_APP_ID = b'39990-TG7-A060\x00\x00'
+PILOT_KEYS = b'\x01\x02\x03'
+PILOT_FLASH_START = 0x10000
+PILOT_CHECKSUM_ENDS = (0xa000, 0x1d000, 0x4ff00)
 
 def auto_int(i):
   return int(i, 0)
@@ -60,24 +64,40 @@ def validate_fw(fw_encrypted):
   print(f"\n  [1] Firmware checksums")
   print(f"      Firmware length: 0x{fw_len:x} ({fw_len} bytes)")
 
+  pilot_v850 = fw_len == 0x50000
   cs_defs = FIRMWARE_CHECKSUM_OFFSETS.get(fw_len)
-  if cs_defs is None:
+  if pilot_v850:
+    app_ids = [value.value for value in fw_encrypted.file_headers[3].values]
+    flash_start = fw_encrypted.firmware_blocks[0]["start"]
+    assert app_ids == [PILOT_APP_ID] and bytes(fw_encrypted.keys) == PILOT_KEYS and flash_start == PILOT_FLASH_START, \
+      "Unexpected 0x50000 firmware identity, layout, or encryption keys"
+    k0, k1, k2 = PILOT_KEYS
+    decrypted = bytes(((((b + k0) ^ k1) - k2) & 0xff) for b in fw_encrypted.firmware_encrypted[0])
+    checksum = 0
+    start = 0
+    all_passed = True
+    for off in PILOT_CHECKSUM_ENDS:
+      checksum = (checksum + sum(struct.unpack('<I', decrypted[i:i+4])[0] for i in range(start, off, 4))) & 0xffffffff
+      ok = checksum == 0
+      all_passed = all_passed and ok
+      print(f"      0x{off:05x}  cumulative LE32  0x{checksum:08x}  {'PASS ✓' if ok else 'FAIL ✗'}")
+      start = off
+  elif cs_defs is None:
     print(f"      WARNING: unknown firmware length 0x{fw_len:x} — checksums not verified")
     return
-
-  decrypted = bytes(DECRYPT_LOOKUP[b] for b in fw_encrypted.firmware_encrypted[0])
-
-  all_passed = True
-  for func_idx, off, label in cs_defs:
-    stored = struct.unpack('!H', decrypted[off:off+2])[0]
-    if func_idx == 0:
-      calc = sum(struct.unpack('!H', decrypted[i:i+2])[0] for i in range(0, off, 2)) & 0xFFFF
-    else:
-      calc = sum(-struct.unpack('!H', decrypted[i:i+2])[0] for i in range(0, off, 2)) & 0xFFFF
-    ok = stored == calc
-    all_passed = all_passed and ok
-    status = 'PASS ✓' if ok else f'FAIL ✗  (expected 0x{calc:04x})'
-    print(f"      0x{off:05x}  {label:<14}  stored: 0x{stored:04x}  {status}")
+  else:
+    decrypted = bytes(DECRYPT_LOOKUP[b] for b in fw_encrypted.firmware_encrypted[0])
+    all_passed = True
+    for func_idx, off, label in cs_defs:
+      stored = struct.unpack('!H', decrypted[off:off+2])[0]
+      if func_idx == 0:
+        calc = sum(struct.unpack('!H', decrypted[i:i+2])[0] for i in range(0, off, 2)) & 0xFFFF
+      else:
+        calc = sum(-struct.unpack('!H', decrypted[i:i+2])[0] for i in range(0, off, 2)) & 0xFFFF
+      ok = stored == calc
+      all_passed = all_passed and ok
+      status = 'PASS ✓' if ok else f'FAIL ✗  (expected 0x{calc:04x})'
+      print(f"      0x{off:05x}  {label:<14}  stored: 0x{stored:04x}  {status}")
 
   print(f"\n  {'='*40}")
   print(f"  Firmware checksum: {'PASS ✓' if all_passed else 'FAIL ✗'}")
