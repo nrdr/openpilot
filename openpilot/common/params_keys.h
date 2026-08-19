@@ -368,7 +368,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrCarLearningInfo", {PERSISTENT, STRING, ""}},
     {"NrdrCarHelpersInfo", {PERSISTENT, STRING, ""}},
     {"NrdrStarPilotPid", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"NrdrHandcraftedLateralTune", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrHandcraftedLateralTune", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrNnlcEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrNnlcActivationSpeed", {PERSISTENT | BACKUP, INT, "30"}},
     {"NrdrNnlcKpGain", {PERSISTENT | BACKUP, INT, "100"}},

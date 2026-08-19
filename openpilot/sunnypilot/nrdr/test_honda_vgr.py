@@ -23,6 +23,14 @@ from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
 
 requires_controller = pytest.mark.skipif(sys.platform == "win32", reason="latcontrol_pid requires openpilot's Linux runtime")
 
+FIRMWARE_CENTER_RATIOS = {
+  "Clarity TRW-A020": 16.50,
+  "Civic C120/A030/TEG": 15.38,
+  "Civic C020/TGG-A120": 15.38,
+  "CR-V TLA-A040": 16.00,
+  "Insight TXM-A040": 15.00,
+}
+
 
 def _car_params(fingerprint: str, firmware, *, brand: str = "honda", ecu: str = "eps"):
   car_fw = [SimpleNamespace(ecu=ecu, fwVersion=firmware)]
@@ -76,10 +84,36 @@ def test_exact_firmware_and_fingerprint_select_profile(fingerprint, firmware, pr
     _car_params("HONDA_CLARITY", b"39990-TRW-UNKNOWN"),
     _car_params("HONDA_CLARITY", b"39990-TRW-A020", ecu="engine"),
     _car_params("HONDA_CLARITY", b"39990-TRW-A020", brand="toyota"),
+    _car_params("HONDA_ACCORD", b"39990-TVA-A040"),
+    _car_params("HONDA_CIVIC_BOSCH_DIESEL", b"39990-TGG-A120"),
+    _car_params("HONDA_CRV_HYBRID", b"39990-TMA-A030"),
   ),
 )
 def test_wrong_fingerprint_or_unknown_firmware_does_not_select_profile(CP):
   assert get_honda_vgr_profile(CP) is None
+
+
+@requires_controller
+def test_tune_report_distinguishes_platform_and_dual_bp_centers():
+  from openpilot.sunnypilot.nrdr.car_tune_report import CarTuneReporter
+
+  values = {
+    "NrdrLegacyDualBpSteerRatio": False,
+    "NrdrLaneChangeEndpointSteerRatio": True,
+    "NrdrSteerRatioCenterClarity": 18.50,
+    "NrdrSteerRatioOuterClarity": 12.72,
+  }
+  params = SimpleNamespace(
+    get=lambda key, return_default=False: values[key],
+    get_bool=lambda key: bool(values[key]),
+  )
+  CP = _car_params("HONDA_CLARITY", b"39990-TRW-A020")
+  CP.steerRatio = 16.50
+  report = CarTuneReporter(params)._steer_ratio_info(CP)
+
+  assert "16.50 firmware center" in report
+  assert "18.50 dual-BP center" in report
+  assert "EPS map -> dual-BP at 70-90 deg" in report
 
 
 @requires_controller
@@ -174,7 +208,11 @@ def _endpoint_profile(vgr_profile):
 def _firmware_legacy_curve(vgr_profile):
   endpoint = _endpoint_profile(vgr_profile)
   return FirmwareLegacySteerRatioCurve(
-    vgr_profile, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle,
+    vgr_profile,
+    center_ratio=endpoint.center_default,
+    outer_ratio=endpoint.outer_default,
+    outer_angle=endpoint.outer_angle,
+    firmware_center_ratio=FIRMWARE_CENTER_RATIOS[vgr_profile.name],
   )
 
 
@@ -184,7 +222,7 @@ def test_firmware_legacy_curve_is_valid_symmetric_and_monotonic(vgr_profile):
   endpoint = _endpoint_profile(vgr_profile)
   assert curve.valid
 
-  final_linear = endpoint.center_default * (endpoint.outer_angle + 50.0) / endpoint.outer_default
+  final_linear = curve.firmware_center_ratio * (endpoint.outer_angle + 50.0) / endpoint.outer_default
   linear_samples = np.linspace(0.0, final_linear, 4001)
   desired = np.array([curve.desired_angle(value) for value in linear_samples])
   assert np.all(np.diff(desired) > 0.0)
@@ -202,16 +240,81 @@ def test_firmware_curve_is_exact_through_70_degrees(vgr_profile):
 
 
 @pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
+def test_dual_bp_endpoint_changes_cannot_leak_below_70_degrees(vgr_profile):
+  endpoint = _endpoint_profile(vgr_profile)
+  curves = (
+    _firmware_legacy_curve(vgr_profile),
+    FirmwareLegacySteerRatioCurve(
+      vgr_profile,
+      center_ratio=20.0,
+      outer_ratio=10.0,
+      outer_angle=endpoint.outer_angle,
+      firmware_center_ratio=FIRMWARE_CENTER_RATIOS[vgr_profile.name],
+    ),
+  )
+  for physical_angle in (0.0, 35.0, FIRMWARE_LEGACY_BLEND_START_DEG):
+    linear_angle = vgr_profile.physical_to_linear(physical_angle)
+    expected = vgr_profile.linear_to_physical(linear_angle)
+    assert all(curve.desired_angle(linear_angle) == expected for curve in curves)
+
+
+@pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
+def test_firmware_curve_uses_uninflated_platform_center_ratio(vgr_profile):
+  curve = _firmware_legacy_curve(vgr_profile)
+  road_angle = 1e-5
+  desired = curve.desired_angle(road_angle * curve.firmware_center_ratio)
+
+  assert curve.firmware_center_ratio == FIRMWARE_CENTER_RATIOS[vgr_profile.name]
+  assert desired / road_angle == pytest.approx(curve.firmware_center_ratio, rel=1e-5)
+
+
+@pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
 def test_presolved_legacy_curve_is_exact_from_90_degrees(vgr_profile):
   curve = _firmware_legacy_curve(vgr_profile)
   endpoint = _endpoint_profile(vgr_profile)
   for desired_angle in (FIRMWARE_LEGACY_BLEND_END_DEG, 120.0, endpoint.outer_angle, endpoint.outer_angle + 50.0):
     ratio = dual_bp_ratio(desired_angle, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle)
-    linear_angle = endpoint.center_default * desired_angle / ratio
+    linear_angle = curve.firmware_center_ratio * desired_angle / ratio
     assert curve.desired_angle(linear_angle) == pytest.approx(desired_angle, abs=1e-10)
     assert dual_bp_desired_angle(
       linear_angle, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle,
+      curve.firmware_center_ratio,
     ) == pytest.approx(desired_angle, abs=1e-10)
+
+
+@pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
+def test_uninflated_center_preserves_previous_high_angle_curve(vgr_profile):
+  endpoint = _endpoint_profile(vgr_profile)
+  previous = FirmwareLegacySteerRatioCurve(
+    vgr_profile, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle,
+  )
+  current = _firmware_legacy_curve(vgr_profile)
+
+  for desired_angle in (90.0, 120.0, endpoint.outer_angle, endpoint.outer_angle + 50.0):
+    ratio = dual_bp_ratio(desired_angle, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle)
+    road_angle = desired_angle / ratio
+    assert current.desired_angle(road_angle * current.firmware_center_ratio) == pytest.approx(desired_angle, abs=1e-10)
+    assert previous.desired_angle(road_angle * endpoint.center_default) == pytest.approx(desired_angle, abs=1e-10)
+
+
+@pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
+def test_firmware_center_change_cannot_leak_above_90_degrees(vgr_profile):
+  endpoint = _endpoint_profile(vgr_profile)
+  platform_center = FIRMWARE_CENTER_RATIOS[vgr_profile.name]
+  curves = tuple(FirmwareLegacySteerRatioCurve(
+    vgr_profile,
+    center_ratio=endpoint.center_default,
+    outer_ratio=endpoint.outer_default,
+    outer_angle=endpoint.outer_angle,
+    firmware_center_ratio=firmware_center,
+  ) for firmware_center in (0.95 * platform_center, platform_center, 1.05 * platform_center))
+
+  assert all(curve.valid for curve in curves)
+  for desired_angle in (90.0, 120.0, endpoint.outer_angle, endpoint.outer_angle + 50.0):
+    ratio = dual_bp_ratio(desired_angle, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle)
+    road_angle = desired_angle / ratio
+    outputs = [curve.desired_angle(road_angle * curve.firmware_center_ratio) for curve in curves]
+    assert outputs == pytest.approx([desired_angle] * len(curves), abs=1e-10)
 
 
 @pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
@@ -233,13 +336,34 @@ def test_invalid_or_nonmonotonic_handoff_falls_back_to_raw_firmware():
     assert curve.desired_angle(linear_angle) == pytest.approx(vgr_profile.linear_to_physical(linear_angle))
 
 
+def test_default_dual_bp_solver_preserves_original_float_arithmetic():
+  center_ratio, outer_ratio, outer_angle = 18.5, 12.72, 250.0
+  for linear_angle in (0.0, 10.0, 90.0, 250.0, 500.0, -90.0):
+    magnitude = abs(linear_angle)
+    road_angle_factor = magnitude / center_ratio
+    outer_candidate = road_angle_factor * outer_ratio
+    if outer_candidate >= outer_angle:
+      expected = outer_candidate
+    else:
+      denominator = 1.0 - road_angle_factor * (outer_ratio - center_ratio) / outer_angle
+      expected = magnitude / denominator
+    expected = np.copysign(expected, linear_angle)
+    assert dual_bp_desired_angle(linear_angle, center_ratio, outer_ratio, outer_angle).hex() == float(expected).hex()
+
+
 @pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
 @pytest.mark.parametrize(("center_ratio", "outer_ratio"), (
   (8.0, 8.0), (18.5, 8.0), (18.5, 18.5), (25.0, 12.0), (8.0, 25.0), (25.0, 25.0),
 ))
 def test_configured_endpoint_range_is_monotonic_or_uses_exact_fallback(vgr_profile, center_ratio, outer_ratio):
   endpoint = _endpoint_profile(vgr_profile)
-  curve = FirmwareLegacySteerRatioCurve(vgr_profile, center_ratio, outer_ratio, endpoint.outer_angle)
+  curve = FirmwareLegacySteerRatioCurve(
+    vgr_profile,
+    center_ratio=center_ratio,
+    outer_ratio=outer_ratio,
+    outer_angle=endpoint.outer_angle,
+    firmware_center_ratio=FIRMWARE_CENTER_RATIOS[vgr_profile.name],
+  )
   linear_samples = np.linspace(0.0, 500.0, 1001)
   desired = np.array([curve.desired_angle(value) for value in linear_samples])
   if curve.valid:
@@ -264,8 +388,13 @@ def _pid_controller(*, legacy: bool, lane_change: bool = False):
   controller.sr_profile = get_steer_ratio_endpoint_profile("HONDA_CLARITY")
   controller.sr_values = list(controller.sr_profile.default_values)
   controller.vgr_profile = next(profile for profile in HONDA_VGR_PROFILES if profile.name == "Clarity TRW-A020")
+  controller.firmware_center_ratio = 16.50
   controller.firmware_legacy_sr_curve = FirmwareLegacySteerRatioCurve(
-    controller.vgr_profile, controller.sr_values[0], controller.sr_values[-1], controller.sr_profile.outer_angle,
+    controller.vgr_profile,
+    center_ratio=controller.sr_values[0],
+    outer_ratio=controller.sr_values[-1],
+    outer_angle=controller.sr_profile.outer_angle,
+    firmware_center_ratio=controller.firmware_center_ratio,
   )
   controller.legacy_dual_bp_sr = legacy
   controller.lane_change_endpoint_sr = True
@@ -289,13 +418,27 @@ def test_firmware_desired_angle_does_not_depend_on_measured_steering(measured_an
 
 
 @requires_controller
+def test_firmware_desired_angle_restores_vehicle_model_ratio():
+  controller = _pid_controller(legacy=False)
+  VM = _VehicleModel()
+  VM.sR = 14.25
+  controller._desired_angles(
+    VM,
+    SimpleNamespace(steeringAngleDeg=0.0, vEgo=20.0),
+    SimpleNamespace(roll=0.0, angleOffsetDeg=0.0),
+    desired_curvature=0.01,
+  )
+  assert VM.sR == 14.25
+
+
+@requires_controller
 def test_firmware_controller_uses_presolved_legacy_curve_above_handoff():
   controller = _pid_controller(legacy=False)
   endpoint = controller.sr_profile
   expected_angle = 120.0
   ratio = dual_bp_ratio(expected_angle, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle)
-  linear_angle = endpoint.center_default * expected_angle / ratio
-  desired_curvature = -np.radians(linear_angle) / endpoint.center_default
+  road_angle = expected_angle / ratio
+  desired_curvature = -np.radians(road_angle)
 
   desired_no_offset, desired_with_offset = controller._desired_angles(
     _VehicleModel(),
@@ -319,6 +462,22 @@ def test_legacy_desired_angle_retains_measured_angle_ratio_lookup():
     _VehicleModel(), SimpleNamespace(steeringAngleDeg=250.0, vEgo=20.0), params, desired_curvature=0.01,
   )
   assert centered != pytest.approx(off_center)
+  assert centered[0] == pytest.approx(np.degrees(-0.01 * controller.sr_values[0]))
+  assert off_center[0] == pytest.approx(np.degrees(-0.01 * controller.sr_values[-1]))
+
+
+@requires_controller
+@pytest.mark.parametrize("invalid_center", (0.0, -1.0, float("nan"), float("inf")))
+def test_invalid_platform_center_bypasses_firmware_mode(invalid_center):
+  controller = _pid_controller(legacy=False)
+  controller.firmware_center_ratio = invalid_center
+  assert not controller.firmware_vgr_selected
+
+  params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
+  CS = SimpleNamespace(steeringAngleDeg=175.0, vEgo=20.0)
+  fallback = controller._desired_angles(_VehicleModel(), CS, params, desired_curvature=0.01)
+  reference = _pid_controller(legacy=True)._desired_angles(_VehicleModel(), CS, params, desired_curvature=0.01)
+  assert fallback == reference
 
 
 @requires_controller
@@ -379,7 +538,8 @@ def test_clarity_hybrid_preserves_trw_firmware_and_enters_firmware_mode():
     CS = SimpleNamespace(steeringAngleDeg=175.0, vEgo=20.0)
     live = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
     desired_no_offset, _ = controller._desired_angles(VM, CS, live, desired_curvature=0.01)
-    linear_angle = np.degrees(-0.01 * controller.sr_values[0])
+    linear_angle = np.degrees(-0.01 * CP.steerRatio)
+    assert controller.firmware_center_ratio == pytest.approx(16.50)
     assert desired_no_offset == pytest.approx(controller.vgr_profile.linear_to_physical(linear_angle))
   finally:
     for key, value in previous.items():

@@ -313,8 +313,8 @@ class LateralTuningLayout(Widget):
   def _initialize_items(self):
     self._handcrafted_tune = toggle_item_sp(
       title=lambda: tr("Handcrafted Lateral Tuning"),
-      description=lambda: tr("Force-load the Clarity-derived, road-tested PID profile with this vehicle's own steering geometry: " +
-                             "exact firmware steering through 70°, a smooth handoff to dual-BP by 90°, predictive stiction, and " +
+      description=lambda: tr("Off by default. Enable this to load the Clarity-derived, road-tested PID profile with this vehicle's own steering geometry: " +
+                             "stock on-center firmware steering through 70°, a smooth handoff to dual-BP by 90°, predictive stiction, and " +
                              "NNLC off. Cars without an exact firmware map safely use dual-BP. Conflicting tuning controls are " +
                              "locked while enabled."),
       param="NrdrHandcraftedLateralTune",

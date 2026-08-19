@@ -120,6 +120,7 @@ class TestParams:
     assert isinstance(self.params.get("LongitudinalPersonality", return_default=True), int)
     assert self.params.get("LiveParametersV2") is None
     assert self.params.get("LiveParametersV2", return_default=True) is None
+    assert self.params.get_default_value("NrdrHandcraftedLateralTune") is False
 
   def test_params_get_type(self):
     # json

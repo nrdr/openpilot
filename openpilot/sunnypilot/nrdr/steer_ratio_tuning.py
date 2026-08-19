@@ -45,26 +45,29 @@ def dual_bp_ratio(angle_deg: float, center_ratio: float, outer_ratio: float, out
 
 
 def dual_bp_desired_angle(linear_angle_deg: float, center_ratio: float,
-                          outer_ratio: float, outer_angle: float) -> float:
-  """Solve y = (linear / center) * dual_bp_ratio(y) without measured-angle feedback."""
+                          outer_ratio: float, outer_angle: float,
+                          linear_ratio: float | None = None) -> float:
+  """Solve y = road_angle * dual_bp_ratio(y) without measured-angle feedback."""
   magnitude = abs(linear_angle_deg)
-  road_angle_factor = magnitude / center_ratio
+  road_angle_factor = magnitude / center_ratio if linear_ratio is None else magnitude / linear_ratio
   outer_candidate = road_angle_factor * outer_ratio
   if outer_candidate >= outer_angle:
     desired = outer_candidate
   else:
     denominator = 1.0 - road_angle_factor * (outer_ratio - center_ratio) / outer_angle
-    desired = magnitude / denominator
+    # Preserve the original arithmetic for callers whose input is already expressed at the dual-BP center ratio.
+    desired = magnitude / denominator if linear_ratio is None else road_angle_factor * center_ratio / denominator
   return math.copysign(desired, linear_angle_deg)
 
 
 def _dual_bp_desired_slope(linear_angle_deg: float, center_ratio: float,
-                           outer_ratio: float, outer_angle: float) -> float:
-  road_angle_factor = abs(linear_angle_deg) / center_ratio
+                           outer_ratio: float, outer_angle: float,
+                           linear_ratio: float | None = None) -> float:
+  road_angle_factor = abs(linear_angle_deg) / center_ratio if linear_ratio is None else abs(linear_angle_deg) / linear_ratio
   if road_angle_factor * outer_ratio >= outer_angle:
-    return outer_ratio / center_ratio
+    return outer_ratio / center_ratio if linear_ratio is None else outer_ratio / linear_ratio
   denominator = 1.0 - road_angle_factor * (outer_ratio - center_ratio) / outer_angle
-  return 1.0 / denominator ** 2
+  return 1.0 / denominator ** 2 if linear_ratio is None else center_ratio / linear_ratio / denominator ** 2
 
 
 def _hermite_value(x: float, x0: float, x1: float, y0: float, y1: float,
@@ -100,6 +103,7 @@ class FirmwareLegacySteerRatioCurve:
   center_ratio: float
   outer_ratio: float
   outer_angle: float
+  firmware_center_ratio: float | None = None
   transition_start_linear: float = field(init=False, default=0.0)
   transition_end_linear: float = field(init=False, default=0.0)
   firmware_slope: float = field(init=False, default=0.0)
@@ -107,7 +111,8 @@ class FirmwareLegacySteerRatioCurve:
   valid: bool = field(init=False, default=False)
 
   def __post_init__(self) -> None:
-    values = (self.center_ratio, self.outer_ratio, self.outer_angle)
+    firmware_center_ratio = self.center_ratio if self.firmware_center_ratio is None else self.firmware_center_ratio
+    values = (self.center_ratio, self.outer_ratio, self.outer_angle, firmware_center_ratio)
     if not all(math.isfinite(value) and value > 0.0 for value in values):
       return
     if self.outer_angle <= FIRMWARE_LEGACY_BLEND_END_DEG:
@@ -116,10 +121,12 @@ class FirmwareLegacySteerRatioCurve:
     start_linear = abs(self.vgr.physical_to_linear(FIRMWARE_LEGACY_BLEND_START_DEG))
     end_ratio = dual_bp_ratio(FIRMWARE_LEGACY_BLEND_END_DEG, self.center_ratio,
                               self.outer_ratio, self.outer_angle)
-    end_linear = self.center_ratio * FIRMWARE_LEGACY_BLEND_END_DEG / end_ratio
+    end_linear = firmware_center_ratio * FIRMWARE_LEGACY_BLEND_END_DEG / end_ratio
     firmware_slope = self.vgr.linear_to_physical_slope(start_linear)
-    legacy_slope = _dual_bp_desired_slope(end_linear, self.center_ratio,
-                                          self.outer_ratio, self.outer_angle)
+    legacy_slope = _dual_bp_desired_slope(
+      end_linear, self.center_ratio, self.outer_ratio, self.outer_angle,
+      None if firmware_center_ratio == self.center_ratio else firmware_center_ratio,
+    )
     derived = (start_linear, end_linear, firmware_slope, legacy_slope)
     if not all(math.isfinite(value) and value > 0.0 for value in derived) or end_linear <= start_linear:
       return
@@ -136,6 +143,7 @@ class FirmwareLegacySteerRatioCurve:
     object.__setattr__(self, "transition_end_linear", end_linear)
     object.__setattr__(self, "firmware_slope", firmware_slope)
     object.__setattr__(self, "legacy_slope", legacy_slope)
+    object.__setattr__(self, "firmware_center_ratio", firmware_center_ratio)
     object.__setattr__(self, "valid", True)
 
   def desired_angle(self, linear_angle_deg: float) -> float:
@@ -147,7 +155,8 @@ class FirmwareLegacySteerRatioCurve:
       return self.vgr.linear_to_physical(linear_angle_deg)
     if magnitude >= self.transition_end_linear:
       return dual_bp_desired_angle(linear_angle_deg, self.center_ratio,
-                                   self.outer_ratio, self.outer_angle)
+                                   self.outer_ratio, self.outer_angle,
+                                   None if self.firmware_center_ratio == self.center_ratio else self.firmware_center_ratio)
 
     desired = _hermite_value(
       magnitude, self.transition_start_linear, self.transition_end_linear,

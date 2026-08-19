@@ -36,9 +36,11 @@ class PidfGroundLayout(Widget):
     self._legacy_dual_bp_sr = toggle_item_sp(
       title=tr("Use Legacy Dual-BP Steer Ratio (Default: ON)"),
       description=tr("Keeps the current road-tested center-to-outer curve. Turn OFF to test the firmware-derived EPS position " +
-                     "map when this car and firmware are recognized. Firmware mode keeps that map exact through 70°, hands off " +
-                     "smoothly to the same dual-BP curve from 70–90°, then follows the dual-BP curve at higher angles. " +
-                     "Unsupported firmware falls back to legacy. Clarity uses PID only in this mode."),
+                     "map when this car and firmware are recognized. Firmware mode uses the car's stock on-center ratio and keeps " +
+                     "that map exact through 70°, hands off smoothly to the same dual-BP curve from 70–90°, then follows it " +
+                     "unchanged at higher angles. " +
+                     "Unmapped Accord, Civic Diesel, CR-V Hybrid, and unknown firmware fall back to legacy. Clarity uses PID " +
+                     "only in this mode."),
       param="NrdrLegacyDualBpSteerRatio",
     )
 
@@ -46,10 +48,10 @@ class PidfGroundLayout(Widget):
     for profile in STEER_RATIO_ENDPOINT_PROFILES:
       center = option_item_sp(
         param=profile.center_param,
-        title=lambda profile=profile: tr(f"On-Center Steer Ratio (Default: {profile.center_default:.2f})"),
+        title=lambda profile=profile: tr(f"Dual-BP Center Ratio (Default: {profile.center_default:.2f})"),
         min_value=800, max_value=2500, value_change_step=1,
-        description=lambda: tr("Sets the steer ratio at zero steering-wheel angle. It anchors firmware mode and is the " +
-                               "starting value of the legacy center-to-outer curve and its high-angle firmware-mode handoff."),
+        description=lambda: tr("Sets the center endpoint of the legacy dual-BP curve. Recognized firmware mode uses the car's " +
+                               "stock on-center ratio through 70°, then hands off to the curve shaped by this value by 90°."),
         label_callback=lambda value: f"{value / 100:.2f}",
         use_float_scaling=True,
       )

@@ -334,8 +334,11 @@ class TestNrdrSteerRatioMode:
     assert item.get("widget") == "toggle"
     assert "offroad_only" in _flatten_rule_types(item.get("enablement"))
     description = f"{item.get('description', '')} {item.get('details', '')}".lower()
+    assert "off by default" in description
+    assert "enable this" in description
+    assert "leave this off" in description
     assert "clarity-derived" in description
-    assert "firmware-derived" in description
+    assert "stock on-center" in description
     assert "70 degrees" in description and "90 degrees" in description
     assert "predictive stiction" in description
     assert "nnlc disabled" in description
@@ -377,9 +380,31 @@ class TestNrdrSteerRatioMode:
   def test_firmware_mode_documents_exact_handoff(self, schema):
     item = _find_item(schema, "NrdrLegacyDualBpSteerRatio")
     details = item.get("details", "")
+    assert "stock on-center ratio" in details
     assert "exactly through 70 degrees" in details
     assert "70 to 90 degrees" in details
     assert "above 90 degrees" in details
+
+  @pytest.mark.parametrize(("key", "stock_ratio"), [
+    ("NrdrSteerRatioCenterClarity", "16.50"),
+    ("NrdrSteerRatioCenterCivic", "15.38"),
+    ("NrdrSteerRatioCenterCrv5g", "16.00"),
+    ("NrdrSteerRatioCenterInsight", "15.00"),
+  ])
+  def test_mapped_center_controls_are_dual_bp_only(self, schema, key, stock_ratio):
+    item = _find_item(schema, key)
+    copy = f"{item.get('description', '')} {item.get('details', '')}".lower()
+    assert item.get("title") == "Dual-BP Center Ratio"
+    assert "high-angle dual-bp curve" in copy
+    assert f"stock {stock_ratio}" in copy
+    assert "anchors firmware-derived mode" not in copy
+
+  def test_accord_center_control_documents_unmapped_fallback(self, schema):
+    item = _find_item(schema, "NrdrSteerRatioCenterAccord")
+    copy = f"{item.get('description', '')} {item.get('details', '')}".lower()
+    assert item.get("title") == "Dual-BP Center Ratio"
+    assert "currently unmapped" in copy
+    assert "legacy curve's center" in copy
 
 
 class TestNotEngagedReplacement:
