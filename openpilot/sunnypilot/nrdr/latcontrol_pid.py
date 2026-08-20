@@ -118,7 +118,6 @@ class NrdrLatControlPID(LatControl):
     self.params = get_live_params()
     self.sr_profile = get_steer_ratio_endpoint_profile(str(CP.carFingerprint))
     self.vgr_profile = get_honda_vgr_profile(CP)
-    self.firmware_center_ratio = float(CP.steerRatio)
     self.sr_values = list(self.sr_profile.default_values) if self.sr_profile else None
     self.firmware_legacy_sr_curve = None
     self.legacy_dual_bp_sr = read_bool(self.params, "NrdrLegacyDualBpSteerRatio", True)
@@ -157,15 +156,15 @@ class NrdrLatControlPID(LatControl):
 
   @property
   def firmware_vgr_selected(self) -> bool:
-    return self.sr_profile is not None and self.vgr_profile is not None and not self.legacy_dual_bp_sr \
-      and math.isfinite(self.firmware_center_ratio) and self.firmware_center_ratio > 0.0
+    return self.sr_profile is not None and self.vgr_profile is not None and not self.legacy_dual_bp_sr
 
   def _desired_angles(self, VM, CS, params, desired_curvature):
     lane_change_endpoint = self.sr_profile is not None and self.lane_change_endpoint_sr and self._lane_change_active()
     if self.firmware_vgr_selected and not lane_change_endpoint:
+      center_ratio = self.sr_values[0]
       previous_ratio = VM.sR
       try:
-        VM.sR = self.firmware_center_ratio
+        VM.sR = center_ratio
         linear_angle = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
       finally:
         VM.sR = previous_ratio
@@ -234,11 +233,7 @@ class NrdrLatControlPID(LatControl):
       self.lane_change_endpoint_sr = read_bool(snapshot, "NrdrLaneChangeEndpointSteerRatio", True)
       if self.vgr_profile is not None:
         self.firmware_legacy_sr_curve = FirmwareLegacySteerRatioCurve(
-          self.vgr_profile,
-          center_ratio=self.sr_values[0],
-          outer_ratio=self.sr_values[-1],
-          outer_angle=self.sr_profile.outer_angle,
-          firmware_center_ratio=self.firmware_center_ratio,
+          self.vgr_profile, self.sr_values[0], self.sr_values[-1], self.sr_profile.outer_angle,
         )
     self.settings_generation = snapshot.generation
 

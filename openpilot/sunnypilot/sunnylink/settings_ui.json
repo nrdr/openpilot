@@ -343,7 +343,7 @@
               "widget": "toggle",
               "title": "Handcrafted Lateral Tuning",
               "description": "Off by default. Enable this to load the Clarity-derived, road-tested PID profile with this vehicle's own steering geometry and lock conflicting controls.",
-              "details": "Loads the shared versioned Honda profile with each mapped car's stock on-center firmware steering through 70 degrees, a smooth handoff to dual-BP by 90 degrees, predictive stiction, NNLC disabled for PID-only control, fingerprint-specific steering geometry, controller helpers, steering filters, and fixed live delay. Cars without an exact firmware map safely use their legacy dual-BP curve. Leave this off to keep manual tuning.",
+              "details": "Loads the shared versioned Honda profile with exact firmware-derived steering through 70 degrees, a smooth handoff to dual-BP by 90 degrees, predictive stiction, NNLC disabled for PID-only control, fingerprint-specific steering geometry, controller helpers, steering filters, and fixed live delay. Cars without an exact firmware map safely use their legacy dual-BP curve. Leave this off for manual tuning.",
               "visibility": [
                 {
                   "type": "capability",
@@ -435,8 +435,8 @@
                   "key": "NrdrLearnSteerRatio",
                   "widget": "toggle",
                   "title": "Learn Steer Ratio (Auto)",
-                  "description": "Uses openpilot's learned scalar on normal cars. Mapped Hondas use their stock platform center in firmware mode.",
-                  "details": "When ON, unmapped cars use openpilot's live-learned steer ratio. Recognized firmware mode keeps each car's stock platform ratio authoritative through 70 degrees, while legacy mode uses the configured dual-BP curve.",
+                  "description": "Uses openpilot's learned scalar on normal cars. Supported mapped Hondas use their configured On-Center anchor.",
+                  "details": "When ON, unmapped cars use openpilot's live-learned steer ratio. Supported Clarity, Civic, Accord, CR-V, and Insight profiles keep their configured On-Center anchor authoritative in both legacy and firmware-derived modes, avoiding double-counting the rack's variable geometry.",
                   "enablement": [
                     {
                       "type": "any",
@@ -550,7 +550,7 @@
                   "widget": "toggle",
                   "title": "Use Legacy Dual-BP Steer Ratio",
                   "description": "Keeps the current road-tested two-breakpoint steer-ratio curve. Default ON.",
-                  "details": "Turn OFF to use the firmware-derived EPS position map when this car and firmware are recognized. Firmware mode uses the car's stock on-center ratio and preserves that map exactly through 70 degrees, makes a smooth deterministic handoff to the configured dual-BP curve from 70 to 90 degrees, and follows that curve unchanged above 90 degrees. Unmapped Accord, Civic Diesel, CR-V Hybrid, and unknown firmware automatically fall back to legacy. Clarity runs PID only while firmware mode is active because its NNLC rate path requires a separate firmware transform.",
+                  "details": "Turn OFF to use the firmware-derived EPS position map when this car and firmware are recognized. Firmware mode preserves that map exactly through 70 degrees, makes a smooth deterministic handoff to this car's dual-BP curve from 70 to 90 degrees, and follows the dual-BP curve above 90 degrees. Unknown firmware, including currently unmapped Accord firmware, automatically falls back to legacy. Clarity runs PID only while firmware mode is active because its NNLC rate path requires a separate firmware transform.",
                   "visibility": [
                     {
                       "type": "any",
@@ -625,9 +625,9 @@
                 {
                   "key": "NrdrSteerRatioCenterClarity",
                   "widget": "option",
-                  "title": "Dual-BP Center Ratio",
-                  "description": "Sets the center of the Clarity's high-angle dual-BP curve. Default 18.50.",
-                  "details": "Recognized firmware mode uses the Clarity's stock 16.50 on-center ratio through 70 degrees, hands off to the curve shaped by this value by 90 degrees, and then continues toward the Outer Steer Ratio at 250 degrees.",
+                  "title": "On-Center Steer Ratio",
+                  "description": "Directly sets the Clarity's steer ratio at zero steering-wheel angle. Default 18.50.",
+                  "details": "This value anchors firmware-derived mode and starts the legacy curve. Firmware mode keeps the extracted map exact through 70 degrees, hands off to this curve by 90 degrees, and then continues toward the Outer Steer Ratio at 250 degrees.",
                   "min": 8.0,
                   "max": 25.0,
                   "step": 0.01,
@@ -705,9 +705,9 @@
                 {
                   "key": "NrdrSteerRatioCenterCivic",
                   "widget": "option",
-                  "title": "Dual-BP Center Ratio",
-                  "description": "Sets the center of the 10th-gen Civic's high-angle dual-BP curve. Default 17.24.",
-                  "details": "Recognized firmware mode uses the Civic's stock 15.38 on-center ratio through 70 degrees, hands off to the curve shaped by this value by 90 degrees, and then continues toward the Civic's Outer Steer Ratio.",
+                  "title": "On-Center Steer Ratio",
+                  "description": "Directly sets the 10th-gen Civic's steer ratio at zero steering-wheel angle. Default 17.24.",
+                  "details": "This value anchors firmware-derived mode and starts the legacy curve. Firmware mode keeps the extracted map exact through 70 degrees, hands off to this curve by 90 degrees, and then continues toward the Civic's Outer Steer Ratio.",
                   "min": 8.0,
                   "max": 25.0,
                   "step": 0.01,
@@ -815,9 +815,9 @@
                 {
                   "key": "NrdrSteerRatioCenterAccord",
                   "widget": "option",
-                  "title": "Dual-BP Center Ratio",
-                  "description": "Sets the center of the 10th-gen Accord's dual-BP curve. Default 18.31.",
-                  "details": "Accord firmware is currently unmapped, so this value remains the legacy curve's center. A future recognized firmware map will use the Accord's stock platform ratio below the handoff instead.",
+                  "title": "On-Center Steer Ratio",
+                  "description": "Directly sets the 10th-gen Accord's steer ratio at zero steering-wheel angle. Default 18.31.",
+                  "details": "This absolute value is the starting point of the legacy curve and the future firmware-map anchor. Accord firmware currently falls back to legacy mode.",
                   "min": 8.0,
                   "max": 25.0,
                   "step": 0.01,
@@ -895,9 +895,9 @@
                 {
                   "key": "NrdrSteerRatioCenterCrv5g",
                   "widget": "option",
-                  "title": "Dual-BP Center Ratio",
-                  "description": "Sets the center of the 5th-gen CR-V's high-angle dual-BP curve. Default 17.94.",
-                  "details": "Recognized firmware mode uses the CR-V's stock 16.00 on-center ratio through 70 degrees, hands off to the curve shaped by this value by 90 degrees, and then continues toward the CR-V's Outer Steer Ratio.",
+                  "title": "On-Center Steer Ratio",
+                  "description": "Directly sets the 5th-gen CR-V's steer ratio at zero steering-wheel angle. Default 17.94.",
+                  "details": "This value anchors firmware-derived mode when exact CR-V firmware is recognized and starts the legacy curve. Firmware mode keeps the extracted map exact through 70 degrees, hands off to this curve by 90 degrees, and then continues toward the CR-V's Outer Steer Ratio.",
                   "min": 8.0,
                   "max": 25.0,
                   "step": 0.01,
@@ -995,9 +995,9 @@
                 {
                   "key": "NrdrSteerRatioCenterInsight",
                   "widget": "option",
-                  "title": "Dual-BP Center Ratio",
-                  "description": "Sets the center of the 3rd-gen Insight's high-angle dual-BP curve. Default 16.82.",
-                  "details": "Recognized firmware mode uses the Insight's stock 15.00 on-center ratio through 70 degrees, hands off to the curve shaped by this value by 90 degrees, and then continues toward the Insight's Outer Steer Ratio.",
+                  "title": "On-Center Steer Ratio",
+                  "description": "Directly sets the 3rd-gen Insight's steer ratio at zero steering-wheel angle. Default 16.82.",
+                  "details": "This value anchors firmware-derived mode and starts the legacy curve. Firmware mode keeps the extracted map exact through 70 degrees, hands off to this curve by 90 degrees, and then continues toward the Insight's Outer Steer Ratio.",
                   "min": 8.0,
                   "max": 25.0,
                   "step": 0.01,

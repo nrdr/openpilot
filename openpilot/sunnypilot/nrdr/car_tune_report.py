@@ -1,5 +1,3 @@
-import math
-
 from openpilot.cereal import custom, messaging
 from opendbc.car.structs import car
 from opendbc.car.car_helpers import interfaces
@@ -85,19 +83,10 @@ class CarTuneReporter:
     center = float(self._value(profile.center_param))
     outer = float(self._value(profile.outer_param))
     firmware_profile = get_honda_vgr_profile(CP)
-    firmware_center = float(CP.steerRatio)
-    firmware_center_valid = math.isfinite(firmware_center) and firmware_center > 0.0
-    firmware_curve = FirmwareLegacySteerRatioCurve(
-      firmware_profile,
-      center_ratio=center,
-      outer_ratio=outer,
-      outer_angle=profile.outer_angle,
-      firmware_center_ratio=firmware_center,
-    ) if firmware_profile is not None else None
+    firmware_curve = FirmwareLegacySteerRatioCurve(firmware_profile, center, outer, profile.outer_angle) \
+      if firmware_profile is not None else None
     if self.params.get_bool("NrdrLegacyDualBpSteerRatio"):
       mode = "legacy dual-BP"
-    elif firmware_profile is not None and not firmware_center_valid:
-      mode = "invalid platform center -> legacy dual-BP"
     elif firmware_curve is not None and firmware_curve.valid:
       mode = f"EPS map -> dual-BP at 70-90 deg ({firmware_profile.name})"
     elif firmware_profile is not None:
@@ -105,17 +94,14 @@ class CarTuneReporter:
     else:
       mode = "firmware unavailable -> legacy dual-BP"
     lane_change = self._state("NrdrLaneChangeEndpointSteerRatio")
-    if firmware_profile is not None and firmware_center_valid and not self.params.get_bool("NrdrLegacyDualBpSteerRatio"):
+    if firmware_profile is not None and not self.params.get_bool("NrdrLegacyDualBpSteerRatio"):
       outer_role = "high-angle/lane-change outer" if firmware_curve.valid else "lane-change-only outer"
-      return f"{mode} | {firmware_center:.2f} firmware center | {center:.2f} dual-BP center | " + \
-             f"{outer:.2f} {outer_role} | lane endpoint {lane_change}"
+      return f"{mode} | {center:.2f} center anchor | {outer:.2f} {outer_role} | lane endpoint {lane_change}"
     return f"{mode} | {center:.2f} center -> {outer:.2f} outer | lane endpoint {lane_change}"
 
   def _controller_info(self, CP, controller: str, handcrafted_enabled: bool, profile) -> str:
     if controller == "PID/NNLC":
-      firmware_center = float(CP.steerRatio)
-      firmware_pid_only = not self.params.get_bool("NrdrLegacyDualBpSteerRatio") \
-        and get_honda_vgr_profile(CP) is not None and math.isfinite(firmware_center) and firmware_center > 0.0
+      firmware_pid_only = not self.params.get_bool("NrdrLegacyDualBpSteerRatio") and get_honda_vgr_profile(CP) is not None
       if firmware_pid_only:
         nnlc = "PID only | NNLC unavailable in firmware EPS mode"
       else:
@@ -164,9 +150,7 @@ class CarTuneReporter:
       f"KF {float(self._value('NrdrNnlcKfGain')) / 100.0:g} | ",
       f"KI {float(self._value('NrdrNnlcKiGain')) / 100.0:g}",
     ))
-    firmware_center = float(CP.steerRatio)
-    if not self.params.get_bool("NrdrLegacyDualBpSteerRatio") and get_honda_vgr_profile(CP) is not None \
-        and math.isfinite(firmware_center) and firmware_center > 0.0:
+    if not self.params.get_bool("NrdrLegacyDualBpSteerRatio") and get_honda_vgr_profile(CP) is not None:
       nnlc += " | inactive in firmware EPS mode"
     steer_ratio = self._steer_ratio_info(CP)
     learning = f"stiffness {self._state('NrdrLearnStiffness')} | angle {self._state('NrdrLearnAngleOffset')}"
