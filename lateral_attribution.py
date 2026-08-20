@@ -325,7 +325,11 @@ def extract_controller_reading(lateral_state, fingerprint: str, actual_angle_deg
 
   logged_error = finite(state.error)
   expected_error = desired_angle_deg - actual_angle_deg
-  error_matches_angle = math.isfinite(expected_error) and math.isfinite(logged_error) and abs(logged_error - expected_error) <= max(0.5, 0.15 * abs(expected_error))
+  error_matches_angle = (
+    math.isfinite(expected_error)
+    and math.isfinite(logged_error)
+    and abs(logged_error - expected_error) <= max(0.5, 0.15 * abs(expected_error))
+  )
   if not error_matches_angle or (nnlc_enabled is True and not firmware_vgr_pid_only):
     return None
   return ControllerReading(
@@ -963,23 +967,33 @@ def print_report(report: dict) -> None:
   controller = report["controller"]
   overall = controller["summary"]
   print("\nLateral attribution (read-only, observational)")
-  print(f"  files read/failed: {input_data['files_read']}/{input_data['files_failed']} | routes: {len(input_data['routes'])} | cohorts: {len(input_data['cohorts'])}")
+  file_summary = f"{input_data['files_read']}/{input_data['files_failed']}"
+  print(f"  files read/failed: {file_summary} | routes: {len(input_data['routes'])} | cohorts: {len(input_data['cohorts'])}")
   if not input_data["complete"]:
     print(f"  INCOMPLETE: missing required services or usable controller samples: {input_data['incomplete_sources']}")
   print(f"  controller samples: {controller['active_hands_off_samples']} active hands-off, {controller['non_saturated_samples']} non-saturated")
 
   delay = report["live_delay"]
   print("\nLive delay seen by controls")
-  print(f"  effective: {_fmt(delay['effective_median_s'], 3, ' s')} median "
-        f"({_fmt(delay['effective_min_s'], 3)}-{_fmt(delay['effective_max_s'], 3)} s) | estimator: {_fmt(delay['estimate_median_s'], 3, ' s')}")
+  print(
+    f"  effective: {_fmt(delay['effective_median_s'], 3, ' s')} median "
+    + f"({_fmt(delay['effective_min_s'], 3)}-{_fmt(delay['effective_max_s'], 3)} s) | "
+    + f"estimator: {_fmt(delay['estimate_median_s'], 3, ' s')}"
+  )
 
   print("\nController tracking and logged term contribution")
-  print(f"  fused yaw / desired curvature: {_fmt(overall.get('yaw_to_desired_median'))} median "
-        f"(p10-p90 {_fmt(overall.get('yaw_to_desired_p10'))}-{_fmt(overall.get('yaw_to_desired_p90'))})")
-  print(f"  actual / desired angle:       {_fmt(overall.get('actual_to_desired_angle_median'))} | "
-        f"aligned angle error {_fmt(overall.get('angle_error_aligned_median_deg'), 2, ' deg')}")
-  print(f"  raw P / I / feedforward:      {_fmt(overall.get('p_abs_share'), 2)} / {_fmt(overall.get('i_abs_share'), 2)} / "
-        f"{_fmt(overall.get('feedforward_abs_share'), 2)}")
+  print(
+    f"  fused yaw / desired curvature: {_fmt(overall.get('yaw_to_desired_median'))} median "
+    + f"(p10-p90 {_fmt(overall.get('yaw_to_desired_p10'))}-{_fmt(overall.get('yaw_to_desired_p90'))})"
+  )
+  print(
+    f"  actual / desired angle:       {_fmt(overall.get('actual_to_desired_angle_median'))} | "
+    + f"aligned angle error {_fmt(overall.get('angle_error_aligned_median_deg'), 2, ' deg')}"
+  )
+  print(
+    f"  raw P / I / feedforward:      {_fmt(overall.get('p_abs_share'), 2)} / {_fmt(overall.get('i_abs_share'), 2)} / "
+    + f"{_fmt(overall.get('feedforward_abs_share'), 2)}"
+  )
   print(f"  final output - raw P/I/F:     {_fmt(overall.get('output_minus_raw_p_i_f_aligned_median'))} aligned median")
   print("  note: raw PID terms precede NRDR scaling, center boost, damping, stiction, and learner overlays.")
   print(f"  fused yaw / vehicle model:    {_fmt(overall.get('vehicle_model_to_yaw_median'))} | yaw sign: {overall.get('yaw_sign_handling', 'n/a')}")
@@ -989,9 +1003,11 @@ def print_report(report: dict) -> None:
   for row in report["lane_placement"]:
     inside_fraction = row["inside_fraction"]
     inside_text = "n/a" if inside_fraction is None else f"{100.0 * inside_fraction:.0f}%"
-    print(f"{row['lookahead_m']:>5.0f} m {row['accepted_frames']:>5}/{row['attempted_frames']:<5} "
-          f"{_fmt(row['inside_offset_median_m'], 3, ' m'):>10} "
-          f"{(_fmt(row['inside_offset_p10_m'], 3) + ' to ' + _fmt(row['inside_offset_p90_m'], 3)):>17} {inside_text:>9}")
+    print(
+      f"{row['lookahead_m']:>5.0f} m {row['accepted_frames']:>5}/{row['attempted_frames']:<5} "
+      + f"{_fmt(row['inside_offset_median_m'], 3, ' m'):>10} "
+      + f"{(_fmt(row['inside_offset_p10_m'], 3) + ' to ' + _fmt(row['inside_offset_p90_m'], 3)):>17} {inside_text:>9}"
+    )
 
   bins = controller["speed_angle_phase_bins"]
   if bins:
@@ -1001,8 +1017,10 @@ def print_report(report: dict) -> None:
       speed = f"{row['speed_mph'][0]:g}-{row['speed_mph'][1]:g}"
       angle = f"{row['angle_deg'][0]:g}-{row['angle_deg'][1]:g}"
       shares = f"{_fmt(row['p_abs_share'], 2)}/{_fmt(row['i_abs_share'], 2)}/{_fmt(row['feedforward_abs_share'], 2)}"
-      print(f"{speed:>9} {angle:>11} {row['direction']:>5} {row['phase']:>8} {row['samples']:>6} {_fmt(row['yaw_to_desired_median']):>8} "
-            f"{_fmt(row['angle_error_aligned_median_deg'], 2):>8} {shares:>15}")
+      print(
+        f"{speed:>9} {angle:>11} {row['direction']:>5} {row['phase']:>8} {row['samples']:>6} "
+        + f"{_fmt(row['yaw_to_desired_median']):>8} {_fmt(row['angle_error_aligned_median_deg'], 2):>8} {shares:>15}"
+      )
 
   verdict = report["verdict"]
   print("\nVerdict")
