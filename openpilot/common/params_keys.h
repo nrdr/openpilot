@@ -334,7 +334,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaTorqueLowPassFilter", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaLpfTauLowSpeed", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
     {"HondaLpfTauStandard", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
-    {"HondaLpfTauHighway", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
+    {"HondaLpfTauHighway", {PERSISTENT | BACKUP, FLOAT, "0.05"}},
     {"NrdrFirstRunSetupDone", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrAutoSelectModel", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"StaticFeedforwardLong", {PERSISTENT | BACKUP, BOOL, "1"}},

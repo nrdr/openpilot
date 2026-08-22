@@ -9,12 +9,14 @@ from openpilot.cereal import log, custom
 from opendbc.car import structs
 
 from opendbc.car.chrysler.values import RAM_DT
-from openpilot.selfdrive.selfdrived.events import Events
+from openpilot.common.realtime import DT_CTRL
+from openpilot.selfdrive.selfdrived.events import ET, Events
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 
 EventName = log.OnroadEvent.EventName
 EventNameSP = custom.OnroadEventSP.EventName
 GearShifter = structs.CarState.GearShifter
+GAS_INTERCEPTOR_STARTUP_GRACE_FRAMES = int(10. / DT_CTRL)
 
 
 class CarSpecificEventsSP:
@@ -23,12 +25,25 @@ class CarSpecificEventsSP:
     self.CP_SP = CP_SP
 
     self.low_speed_alert = False
+    self.gas_interceptor_healthy = False
+    self.gas_interceptor_bootstrap_frames = 0
 
   def update(self, CS: structs.CarState, CS_SP: custom.CarStateSP, events: Events):
     events_sp = EventsSP()
 
-    if self.CP_SP.enableGasInterceptor and CS_SP.gasInterceptorState != 0:
-      events.add(EventName.gasInterceptorFault)
+    if self.CP_SP.enableGasInterceptor:
+      interceptor_state = CS_SP.gasInterceptorState
+      if self.gas_interceptor_healthy:
+        if interceptor_state != 0:
+          events.add(EventName.gasInterceptorFault)
+      elif interceptor_state == 0:
+        self.gas_interceptor_healthy = CS.canValid
+      elif interceptor_state in (4, 5):
+        self.gas_interceptor_bootstrap_frames += 1
+        if events.contains(ET.ENABLE) or self.gas_interceptor_bootstrap_frames > GAS_INTERCEPTOR_STARTUP_GRACE_FRAMES:
+          events.add(EventName.gasInterceptorFault)
+      else:
+        events.add(EventName.gasInterceptorFault)
 
     if self.CP.brand == 'chrysler':
       if self.CP.carFingerprint in RAM_DT:

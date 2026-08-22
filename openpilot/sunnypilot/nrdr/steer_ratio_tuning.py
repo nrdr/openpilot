@@ -5,6 +5,7 @@ from typing import Protocol
 
 FIRMWARE_LEGACY_BLEND_START_DEG = 70.0
 FIRMWARE_LEGACY_BLEND_END_DEG = 90.0
+LANE_CHANGE_SR_FADE_SECONDS = 1.5
 
 
 class FirmwareVgrMap(Protocol):
@@ -37,6 +38,29 @@ class SteerRatioEndpointProfile:
       (self.center_param, self.center_default),
       (self.outer_param, self.outer_default),
     )
+
+
+@dataclass
+class LaneChangeSteerRatioFade:
+  dt: float
+  duration: float = LANE_CHANGE_SR_FADE_SECONDS
+  _was_starting: bool = field(init=False, default=False)
+  _elapsed: float = field(init=False)
+
+  def __post_init__(self) -> None:
+    self.reset()
+
+  def reset(self) -> None:
+    self._was_starting = False
+    self._elapsed = self.duration
+
+  def update(self, starting: bool) -> float:
+    if starting and not self._was_starting:
+      self._elapsed = 0.0
+    weight = max(1.0 - self._elapsed / self.duration, 0.0)
+    self._elapsed = min(self._elapsed + self.dt, self.duration)
+    self._was_starting = starting
+    return weight
 
 
 def dual_bp_ratio(angle_deg: float, center_ratio: float, outer_ratio: float, outer_angle: float) -> float:

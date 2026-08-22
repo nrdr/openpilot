@@ -53,11 +53,11 @@ class SteerFiltersLayout(Widget):
 
     self._lpf_tau_highway = option_item_sp(
       param="HondaLpfTauHighway",
-      title=lambda: tr("Highway Tau (50mph+) (Default: 0.1)"),
+      title=lambda: tr("Highway Tau (50mph+) (Default: 0.05)"),
       min_value=0,
       max_value=500,
       value_change_step=1,
-      description=lambda: tr("Low-pass filter time constant (seconds) above 50 mph."),
+      description=lambda: tr("Low-pass filter time constant (seconds) at or above 50 mph."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )

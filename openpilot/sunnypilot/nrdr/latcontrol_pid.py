@@ -14,7 +14,11 @@ from openpilot.sunnypilot.nrdr.live_params import get_live_params
 from openpilot.sunnypilot.nrdr.tune_learner import TuneLearner
 from openpilot.sunnypilot.nrdr.params import read_bool, read_float
 from openpilot.sunnypilot.nrdr.phase_detector import phase_with_latch
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import FirmwareLegacySteerRatioCurve, get_steer_ratio_endpoint_profile
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
+  FirmwareLegacySteerRatioCurve,
+  LaneChangeSteerRatioFade,
+  get_steer_ratio_endpoint_profile,
+)
 
 
 MPH_TO_MS = 0.44704
@@ -122,6 +126,7 @@ class NrdrLatControlPID(LatControl):
     self.firmware_legacy_sr_curve = None
     self.legacy_dual_bp_sr = read_bool(self.params, "NrdrLegacyDualBpSteerRatio", True)
     self.lane_change_endpoint_sr = read_bool(self.params, "NrdrLaneChangeEndpointSteerRatio", True)
+    self.lane_change_sr_fade = LaneChangeSteerRatioFade(dt)
     self.center_boost_magnitude = 0.5
     self.center_boost_threshold = 3.0
     self.center_boost_min_speed = 50.0
@@ -154,13 +159,20 @@ class NrdrLatControlPID(LatControl):
   def _lane_change_active(self) -> bool:
     return self.model_v2 is not None and self.model_v2.meta.laneChangeState != log.LaneChangeState.off
 
+  def _lane_change_starting(self) -> bool:
+    return self.model_v2 is not None and self.model_v2.meta.laneChangeState == log.LaneChangeState.laneChangeStarting
+
   @property
   def firmware_vgr_selected(self) -> bool:
     return self.sr_profile is not None and self.vgr_profile is not None and not self.legacy_dual_bp_sr
 
   def _desired_angles(self, VM, CS, params, desired_curvature):
-    lane_change_endpoint = self.sr_profile is not None and self.lane_change_endpoint_sr and self._lane_change_active()
-    if self.firmware_vgr_selected and not lane_change_endpoint:
+    lane_change_endpoint_enabled = self.sr_profile is not None and self.lane_change_endpoint_sr
+    if not lane_change_endpoint_enabled:
+      self.lane_change_sr_fade.reset()
+    lane_change_weight = self.lane_change_sr_fade.update(self._lane_change_starting()) if lane_change_endpoint_enabled else 0.0
+
+    if self.firmware_vgr_selected:
       center_ratio = self.sr_values[0]
       previous_ratio = VM.sR
       try:
@@ -171,13 +183,18 @@ class NrdrLatControlPID(LatControl):
       # Keep the firmware/dual-BP handoff deterministic; measured steering is feedback, not a curve lookup input.
       angle_no_offset = self.firmware_legacy_sr_curve.desired_angle(linear_angle) \
         if self.firmware_legacy_sr_curve is not None else self.vgr_profile.linear_to_physical(linear_angle)
-      return angle_no_offset, angle_no_offset + params.angleOffsetDeg
-
-    if self.sr_profile is not None:
-      VM.sR = self.sr_values[-1] if lane_change_endpoint else float(
-        np.interp(abs(CS.steeringAngleDeg), self.sr_profile.breakpoints, self.sr_values)
-      )
-    angle_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+      if lane_change_weight > 0.0:
+        try:
+          VM.sR = self.sr_values[-1]
+          endpoint_angle = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+        finally:
+          VM.sR = previous_ratio
+        angle_no_offset += lane_change_weight * (endpoint_angle - angle_no_offset)
+    else:
+      if self.sr_profile is not None:
+        normal_ratio = float(np.interp(abs(CS.steeringAngleDeg), self.sr_profile.breakpoints, self.sr_values))
+        VM.sR = normal_ratio + lane_change_weight * (self.sr_values[-1] - normal_ratio)
+      angle_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     return angle_no_offset, angle_no_offset + params.angleOffsetDeg
 
   def _reset(self, desired_angle: float) -> None:
@@ -187,6 +204,7 @@ class NrdrLatControlPID(LatControl):
     self.previous_output = 0.0
     self.previous_desired_angle = desired_angle
     self.previous_saturated = False
+    self.lane_change_sr_fade.reset()
     self.stiction.reset()
 
   def _feedforward(self, CS, desired_angle: float) -> float:

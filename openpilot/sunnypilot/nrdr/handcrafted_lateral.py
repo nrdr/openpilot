@@ -68,7 +68,7 @@ HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
   ("HondaTorqueLowPassFilter", True),
   ("HondaLpfTauLowSpeed", 0.1),
   ("HondaLpfTauStandard", 0.1),
-  ("HondaLpfTauHighway", 0.01),
+  ("HondaLpfTauHighway", 0.05),
   ("HondaSteerDeltaLimiter", False),
   ("HondaSteerDeltaUp", 4.0),
   ("HondaSteerDeltaDown", 4.0),
@@ -82,9 +82,9 @@ def _build_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
   if steer_ratio is None:
     raise ValueError(f"missing steer-ratio profile for {fingerprint}")
   return HandcraftedLateralProfile(
-    name="Honda Clarity-Derived Road-Tested 2026-08-17",
+    name="Honda Clarity-Derived Road-Tested 2026-08-21",
     fingerprint=fingerprint,
-    version=12,
+    version=13,
     values=steer_ratio.param_values + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
   )
 
@@ -94,7 +94,7 @@ HANDCRAFTED_LATERAL_PROFILES = {
   for fingerprint in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS
 }
 
-CLARITY_ROAD_TESTED_2026_08_17 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
+CLARITY_ROAD_TESTED_2026_08_21 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
 
 
 def _params_or_default(params: ParamsLike | None) -> ParamsLike:

@@ -15,6 +15,7 @@ from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
   FIRMWARE_LEGACY_BLEND_END_DEG,
   FIRMWARE_LEGACY_BLEND_START_DEG,
   FirmwareLegacySteerRatioCurve,
+  LaneChangeSteerRatioFade,
   dual_bp_desired_angle,
   dual_bp_ratio,
   get_steer_ratio_endpoint_profile,
@@ -269,7 +270,10 @@ def _pid_controller(*, legacy: bool, lane_change: bool = False):
   )
   controller.legacy_dual_bp_sr = legacy
   controller.lane_change_endpoint_sr = True
+  controller.lane_change_sr_fade = LaneChangeSteerRatioFade(dt=0.5)
   controller._lane_change_active = lambda: lane_change
+  controller._lane_change_starting_for_test = lane_change
+  controller._lane_change_starting = lambda: controller._lane_change_starting_for_test
   return controller
 
 
@@ -391,12 +395,86 @@ def test_clarity_hybrid_preserves_trw_firmware_and_enters_firmware_mode():
 
 
 @requires_controller
-def test_lane_change_endpoint_bypasses_firmware_map():
+def test_lane_change_endpoint_starts_at_outer_then_fades_to_firmware_map():
   controller = _pid_controller(legacy=False, lane_change=True)
   VM = _VehicleModel()
   CS = SimpleNamespace(steeringAngleDeg=80.0, vEgo=20.0)
   params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
-  desired_no_offset, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
+  endpoint_angle, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
+  first_fade_angle, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
+  second_fade_angle, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
+  normal_angle, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
 
-  assert VM.sR == controller.sr_values[-1]
-  assert desired_no_offset == pytest.approx(np.degrees(-0.01 * controller.sr_values[-1]))
+  normal_controller = _pid_controller(legacy=False)
+  expected_normal, _ = normal_controller._desired_angles(
+    _VehicleModel(), CS, params, desired_curvature=0.01,
+  )
+  expected_endpoint = np.degrees(-0.01 * controller.sr_values[-1])
+
+  assert endpoint_angle == pytest.approx(expected_endpoint)
+  assert first_fade_angle == pytest.approx(expected_normal + (2.0 / 3.0) * (expected_endpoint - expected_normal))
+  assert second_fade_angle == pytest.approx(expected_normal + (1.0 / 3.0) * (expected_endpoint - expected_normal))
+  assert normal_angle == pytest.approx(expected_normal)
+
+
+@requires_controller
+def test_lane_change_fade_continues_through_finishing_and_rearms_only_for_a_new_start():
+  controller = _pid_controller(legacy=False, lane_change=True)
+  CS = SimpleNamespace(steeringAngleDeg=80.0, vEgo=20.0)
+  params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
+  expected_endpoint = np.degrees(-0.01 * controller.sr_values[-1])
+
+  first, _ = controller._desired_angles(_VehicleModel(), CS, params, desired_curvature=0.01)
+  controller._lane_change_starting_for_test = False
+  finishing, _ = controller._desired_angles(_VehicleModel(), CS, params, desired_curvature=0.01)
+  after_finish, _ = controller._desired_angles(_VehicleModel(), CS, params, desired_curvature=0.01)
+  controller._lane_change_starting_for_test = True
+  retriggered, _ = controller._desired_angles(_VehicleModel(), CS, params, desired_curvature=0.01)
+
+  normal_controller = _pid_controller(legacy=False)
+  expected_normal, _ = normal_controller._desired_angles(
+    _VehicleModel(), CS, params, desired_curvature=0.01,
+  )
+  assert first == pytest.approx(expected_endpoint)
+  assert finishing == pytest.approx(expected_normal + (2.0 / 3.0) * (expected_endpoint - expected_normal))
+  assert after_finish == pytest.approx(expected_normal + (1.0 / 3.0) * (expected_endpoint - expected_normal))
+  assert retriggered == pytest.approx(expected_endpoint)
+
+
+@requires_controller
+def test_lane_change_fade_preserves_legacy_dual_bp_normal_ratio():
+  controller = _pid_controller(legacy=True, lane_change=True)
+  VM = _VehicleModel()
+  CS = SimpleNamespace(steeringAngleDeg=80.0, vEgo=20.0)
+  params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
+  normal_ratio = float(np.interp(abs(CS.steeringAngleDeg), controller.sr_profile.breakpoints, controller.sr_values))
+
+  endpoint, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
+  fading, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
+  controller._desired_angles(VM, CS, params, desired_curvature=0.01)
+  normal, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
+
+  assert endpoint == pytest.approx(np.degrees(-0.01 * controller.sr_values[-1]))
+  assert fading == pytest.approx(np.degrees(-0.01 * (normal_ratio + (2.0 / 3.0) * (controller.sr_values[-1] - normal_ratio))))
+  assert normal == pytest.approx(np.degrees(-0.01 * normal_ratio))
+  assert VM.sR == pytest.approx(normal_ratio)
+
+
+@requires_controller
+def test_lane_change_endpoint_disabled_and_unknown_profile_are_noops():
+  CS = SimpleNamespace(steeringAngleDeg=80.0, vEgo=20.0)
+  params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
+
+  disabled = _pid_controller(legacy=True, lane_change=True)
+  disabled.lane_change_endpoint_sr = False
+  disabled_vm = _VehicleModel()
+  disabled_angle, _ = disabled._desired_angles(disabled_vm, CS, params, desired_curvature=0.01)
+  normal_ratio = float(np.interp(abs(CS.steeringAngleDeg), disabled.sr_profile.breakpoints, disabled.sr_values))
+  assert disabled_angle == pytest.approx(np.degrees(-0.01 * normal_ratio))
+
+  unknown = _pid_controller(legacy=True, lane_change=True)
+  unknown.sr_profile = None
+  unknown_vm = _VehicleModel()
+  unknown_vm.sR = 14.0
+  unknown_angle, _ = unknown._desired_angles(unknown_vm, CS, params, desired_curvature=0.01)
+  assert unknown_angle == pytest.approx(np.degrees(-0.01 * 14.0))

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -383,6 +384,20 @@ class TestNrdrSteerRatioMode:
     assert "exactly through 70 degrees" in details
     assert "70 to 90 degrees" in details
     assert "above 90 degrees" in details
+
+  def test_lane_change_outer_sr_copy_matches_timed_fade_behavior(self, schema):
+    item = _find_item(schema, "NrdrLaneChangeEndpointSteerRatio")
+    sunnylink_copy = f"{item.get('title', '')} {item.get('description', '')} {item.get('details', '')}".lower()
+    repo_root = Path(__file__).parents[4]
+    native_copy = (repo_root / "openpilot" / "selfdrive" / "ui" / "sunnypilot" / "layouts" / "settings" /
+                   "nrdr_sub_layouts" / "pidf_ground.py").read_text(encoding="utf-8").lower()
+
+    for phrase in ("outer steer ratio", "1.5 seconds", "pre-lane-change waiting does not consume"):
+      assert phrase in sunnylink_copy
+      assert phrase in native_copy
+    for stale_phrase in ("complete active lane change", "entire maneuver", "resumes only after"):
+      assert stale_phrase not in sunnylink_copy
+      assert stale_phrase not in native_copy
 
 
 class TestNotEngagedReplacement:

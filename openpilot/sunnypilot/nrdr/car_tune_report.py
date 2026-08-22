@@ -95,9 +95,9 @@ class CarTuneReporter:
       mode = "firmware unavailable -> legacy dual-BP"
     lane_change = self._state("NrdrLaneChangeEndpointSteerRatio")
     if firmware_profile is not None and not self.params.get_bool("NrdrLegacyDualBpSteerRatio"):
-      outer_role = "high-angle/lane-change outer" if firmware_curve.valid else "lane-change-only outer"
-      return f"{mode} | {center:.2f} center anchor | {outer:.2f} {outer_role} | lane endpoint {lane_change}"
-    return f"{mode} | {center:.2f} center -> {outer:.2f} outer | lane endpoint {lane_change}"
+      outer_role = "high-angle/lane-fade anchor" if firmware_curve.valid else "lane-fade-only anchor"
+      return f"{mode} | {center:.2f} center anchor | {outer:.2f} {outer_role} | 1.5s lane fade {lane_change}"
+    return f"{mode} | {center:.2f} center -> {outer:.2f} outer | 1.5s lane fade {lane_change}"
 
   def _controller_info(self, CP, controller: str, handcrafted_enabled: bool, profile) -> str:
     if controller == "PID/NNLC":

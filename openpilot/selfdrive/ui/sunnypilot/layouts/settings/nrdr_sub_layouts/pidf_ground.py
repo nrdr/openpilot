@@ -58,16 +58,16 @@ class PidfGroundLayout(Widget):
         title=lambda profile=profile: tr(f"Outer Steer Ratio (Default: {profile.outer_default:.2f})"),
         min_value=800, max_value=2500, value_change_step=1,
         description=lambda: tr("Sets the high-angle endpoint used by legacy mode, the firmware-mode curve after its 70–90° " +
-                               "handoff, firmware fallback, and the optional lane-change endpoint behavior."),
+                               "handoff, firmware fallback, and the start of the optional 1.5-second lane-change fade."),
         label_callback=lambda value: f"{value / 100:.2f}",
         use_float_scaling=True,
       )
       self._sr_endpoint_controls.append((profile, center, outer))
 
     self._lane_change_endpoint_sr = toggle_item_sp(
-      title=tr("Use Endpoint SR for Smoother Lane Changes (Default: ON)"),
-      description=tr("While the planner has a lane change active, use this car's Outer Steer Ratio for the entire maneuver. " +
-                     "The selected normal steer-ratio mode resumes only after the lane change is complete."),
+      title=tr("Start Lane Changes at Outer SR (Default: ON)"),
+      description=tr("When the planner starts a lane change, begin at this car's Outer Steer Ratio, then fade continuously " +
+                     "to the selected normal steer-ratio mode over 1.5 seconds. Pre-lane-change waiting does not consume the fade."),
       param="NrdrLaneChangeEndpointSteerRatio",
     )
 
