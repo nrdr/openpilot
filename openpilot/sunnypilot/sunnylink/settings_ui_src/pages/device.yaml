@@ -30,13 +30,26 @@ sections:
   - key: OnroadUploads
     widget: toggle
     title: Onroad Uploads
+  - key: DisablePowerDown
+    widget: toggle
+    title: Prevent Automatic Shutdown
+    description: Prevents openpilot's automatic offroad shutdowns after the vehicle is turned off.
+    details: When enabled, this bypasses the Max Time Offroad timer and its low-voltage and estimated-battery safeguards, and can drain the vehicle battery. When disabled, those safeguards resume after a 60-second grace period. Manual Power Off still works.
+    enablement:
+    - $ref: '#/macros/offroad'
   - key: MaxTimeOffroad
     widget: option
     title: Max Time Offroad
-    description: Device will automatically shutdown after the set time once the engine is turned off (30h is the default).
+    description: Sets the automatic shutdown timer after the vehicle is turned off.
+    details: This applies only when Prevent Automatic Shutdown is disabled; battery safeguards may shut the device down sooner. The default is 30 hours.
+    enablement:
+    - $ref: '#/macros/offroad'
+    - type: param
+      key: DisablePowerDown
+      equals: false
     options:
     - value: 0
-      label: Always On
+      label: No Time Limit
     - value: 5
       label: 5m
     - value: 10

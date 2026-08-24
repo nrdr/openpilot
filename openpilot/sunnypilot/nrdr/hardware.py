@@ -14,7 +14,3 @@ def apply_startup_policy(startup_conditions: dict[str, bool]) -> None:
   startup_conditions["accepted_terms"] = True
   startup_conditions["accepted_terms_sp"] = True
   startup_conditions["completed_training"] = True
-
-
-def disable_automatic_power_down() -> bool:
-  return True

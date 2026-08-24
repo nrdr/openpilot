@@ -243,6 +243,62 @@ class TestSpuriousOffroadGatesDropped:
     assert "offroad_only" not in _flatten_rule_types(item.get("enablement"))
 
 
+class TestDevicePowerPolicy:
+  def test_prevent_shutdown_is_offroad_only_and_precedes_timer(self, schema):
+    section = _find_section(schema, "device", "general")
+    assert section is not None
+    keys = [item["key"] for item in section["items"]]
+    prevent_index = keys.index("DisablePowerDown")
+    assert keys[prevent_index + 1] == "MaxTimeOffroad"
+
+    prevent = section["items"][prevent_index]
+    assert prevent["widget"] == "toggle"
+    assert prevent["title"] == "Prevent Automatic Shutdown"
+    assert "offroad_only" in _flatten_rule_types(prevent.get("enablement"))
+
+  def test_power_policy_copy_matches_native_ui(self, schema):
+    prevent = _find_item(schema, "DisablePowerDown")
+    assert prevent is not None
+    sunnylink_copy = f"{prevent.get('title', '')} {prevent.get('description', '')} {prevent.get('details', '')}".lower()
+    repo_root = Path(__file__).parents[4]
+    native_copy = (repo_root / "openpilot" / "selfdrive" / "ui" / "sunnypilot" / "layouts" / "settings" /
+                   "device.py").read_text(encoding="utf-8").lower()
+
+    for phrase in (
+      "prevent automatic shutdown",
+      "automatic offroad shutdowns",
+      "max time offroad timer",
+      "low-voltage and estimated-battery safeguards",
+      "drain the vehicle battery",
+      "60-second grace period",
+      "manual power off still works",
+    ):
+      assert phrase in sunnylink_copy
+      assert phrase in native_copy
+
+    assert 'enabled=lambda: ui_state.is_offroad() and not ui_state.params.get_bool("disablepowerdown")' in native_copy
+    assert 'tr("no time limit")' in native_copy
+
+    mici_copy = (repo_root / "openpilot" / "selfdrive" / "ui" / "sunnypilot" / "mici" / "layouts" /
+                 "device.py").read_text(encoding="utf-8").lower()
+    assert "disablepowerdown" in mici_copy
+    assert "prevent automatic\\nshutdown" in mici_copy
+    assert "battery drain risk" in mici_copy
+    assert "ui_state.is_offroad" in mici_copy
+
+  def test_offroad_timer_is_subordinate_and_not_mislabeled(self, schema):
+    timer = _find_item(schema, "MaxTimeOffroad")
+    assert timer is not None
+    assert timer["options"][0] == {"value": 0, "label": "No Time Limit"}
+    assert "Always On" not in json.dumps(timer)
+    assert "offroad_only" in _flatten_rule_types(timer.get("enablement"))
+    assert {"type": "param", "key": "DisablePowerDown", "equals": False} in timer["enablement"]
+
+    timer_copy = f"{timer.get('description', '')} {timer.get('details', '')}".lower()
+    assert "applies only when prevent automatic shutdown is disabled" in timer_copy
+    assert "battery safeguards may shut the device down sooner" in timer_copy
+
+
 class TestNrdrLongitudinalOptions:
   PERSONALITY_SCALE_KEYS = (
     "LongPidTuneScaleAggressive",
