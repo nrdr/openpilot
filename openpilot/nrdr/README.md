@@ -58,7 +58,8 @@ forwarders so external users are not broken while production call sites move.
   scale controls now have one declarative owner with output-parity tests.
 - In progress: implementation relocation. The steer-ratio correction analysis
   library is the first canonical `tools` module; its legacy import remains a
-  forwarding facade.
+  forwarding facade. The pure lateral phase detector is the first driving-path
+  helper under `features/lateral`, also with an identity-preserving facade.
 - Compatibility only: the old defaults, handcrafted-profile, and live-snapshot
   modules under `openpilot.sunnypilot.nrdr`.
 - Pending: the remaining UI metadata, feature algorithms, hook implementations,
