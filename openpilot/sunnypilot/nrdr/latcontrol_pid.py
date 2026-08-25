@@ -7,17 +7,15 @@ from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.pid import PIDController
 from openpilot.common.realtime import DT_CTRL
+from openpilot.nrdr.params import NrdrParamKey, get_live_params, get_steer_ratio_endpoint_profile, read_bool, read_float
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile, normalize_honda_eps_firmware
 from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
-from openpilot.sunnypilot.nrdr.live_params import get_live_params
 from openpilot.sunnypilot.nrdr.tune_learner import TuneLearner
-from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
 from openpilot.sunnypilot.nrdr.phase_detector import phase_with_latch
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
   FirmwareLegacySteerRatioCurve,
   LaneChangeSteerRatioFade,
-  get_steer_ratio_endpoint_profile,
 )
 
 

@@ -2,12 +2,12 @@ from collections.abc import Callable
 import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
-from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
+from openpilot.nrdr.params import (
   STEER_RATIO_ENDPOINT_PROFILES,
   get_steer_ratio_endpoint_profile,
+  is_handcrafted_lateral_enabled,
 )
+from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton

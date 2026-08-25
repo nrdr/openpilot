@@ -2,13 +2,14 @@ from openpilot.cereal import custom, messaging
 from opendbc.car.structs import car
 from opendbc.car.car_helpers import interfaces
 from openpilot.common.swaglog import cloudlog
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
+from openpilot.nrdr.params import (
   apply_handcrafted_lateral_profile,
   get_handcrafted_lateral_profile,
+  get_steer_ratio_endpoint_profile,
   is_handcrafted_lateral_enabled,
 )
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import FirmwareLegacySteerRatioCurve, get_steer_ratio_endpoint_profile
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import FirmwareLegacySteerRatioCurve
 
 
 def _format_values(values) -> str:

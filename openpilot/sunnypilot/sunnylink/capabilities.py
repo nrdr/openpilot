@@ -14,7 +14,7 @@ from opendbc.sunnypilot.car.tesla.values import TeslaFlagsSP
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import get_handcrafted_lateral_profile
+from openpilot.nrdr.params import get_handcrafted_lateral_profile
 
 
 # Wire-protocol version for the capabilities payload. Bump on breaking changes

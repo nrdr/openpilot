@@ -3,7 +3,7 @@ import pyray as rl
 
 from openpilot.cereal import log
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
+from openpilot.nrdr.params import is_handcrafted_lateral_enabled
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton

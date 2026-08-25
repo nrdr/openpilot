@@ -73,7 +73,7 @@ def apply_chevron_preference(control, state, value):
 
 
 def apply_handcrafted_delay_controls(layout, state):
-  from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
+  from openpilot.nrdr.params import is_handcrafted_lateral_enabled
 
   fingerprint = str(state.CP.carFingerprint) if state.CP is not None else ""
   enabled = not is_handcrafted_lateral_enabled(fingerprint, state.params)

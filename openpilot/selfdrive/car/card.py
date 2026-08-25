@@ -23,7 +23,7 @@ from openpilot.selfdrive.car.cruise import VCruiseHelper
 from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_capnp
 
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import restore_handcrafted_lateral_profile
+from openpilot.nrdr.params import restore_handcrafted_lateral_profile
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 
 REPLAY = "REPLAY" in os.environ

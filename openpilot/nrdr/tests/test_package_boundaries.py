@@ -15,6 +15,25 @@ MIGRATED_CONSUMERS = (
   "tune_learner.py",
 )
 
+PHASE_TWO_CONSUMERS = (
+  "openpilot/selfdrive/car/card.py",
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/lateral_tuning.py",
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/override_tuning.py",
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/pidf_ground.py",
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/steer_filters.py",
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/vehicle_model_learning.py",
+  "openpilot/sunnypilot/nrdr/car_tune_report.py",
+  "openpilot/sunnypilot/nrdr/controlsd.py",
+  "openpilot/sunnypilot/nrdr/latcontrol_pid.py",
+  "openpilot/sunnypilot/nrdr/longcontrol.py",
+  "openpilot/sunnypilot/nrdr/longitudinal_planner.py",
+  "openpilot/sunnypilot/nrdr/nnlc.py",
+  "openpilot/sunnypilot/nrdr/settings.py",
+  "openpilot/sunnypilot/nrdr/tune_learner.py",
+  "openpilot/sunnypilot/sunnylink/capabilities.py",
+  "openpilot/system/manager/manager.py",
+)
+
 
 class TestPackageBoundaries(unittest.TestCase):
   def test_package_is_first_class_under_openpilot(self):
@@ -56,3 +75,24 @@ class TestPackageBoundaries(unittest.TestCase):
         if isinstance(key, ast.Constant) and isinstance(key.value, str):
           failures.append(f"{filename}:{node.lineno}: {key.value}")
     self.assertEqual(failures, [], "static parameter keys must use NrdrParamKey")
+
+  def test_phase_two_consumers_use_the_public_facade(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    forbidden = (
+      "from openpilot.nrdr.params.defaults import",
+      "from openpilot.nrdr.params.profiles import",
+      "from openpilot.nrdr.params.snapshots import",
+      "from openpilot.sunnypilot.nrdr.handcrafted_lateral import",
+      "from openpilot.sunnypilot.nrdr.live_params import",
+      "from openpilot.sunnypilot.nrdr.manager import",
+    )
+    for relative_path in PHASE_TWO_CONSUMERS:
+      with self.subTest(path=relative_path):
+        source = (repository_root / relative_path).read_text()
+        self.assertIn("from openpilot.nrdr.params import", source)
+        self.assertFalse(any(import_line in source for import_line in forbidden))
+
+  def test_public_parameter_exports_are_lazy_and_complete(self):
+    params_package = import_module("openpilot.nrdr.params")
+    self.assertEqual(set(params_package.__all__), set(params_package._EXPORT_MODULES))
+    self.assertEqual(len(params_package.__all__), len(set(params_package.__all__)))

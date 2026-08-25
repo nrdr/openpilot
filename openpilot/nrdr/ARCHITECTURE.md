@@ -57,10 +57,18 @@ injection, and import-time feature initialization are intentionally avoided.
 
 ## Migration sequence
 
+Current status on `nrdr-architecture-development`:
+
+- Step 1 is complete.
+- Step 2 is complete for NRDR-owned defaults, profiles, and snapshots. There is
+  no NRDR-specific versioned migration to relocate yet. SunnyPilot-wide
+  migrations remain with SunnyPilot rather than being relabeled as NRDR code.
+- Steps 3 through 6 remain pending.
+
 1. Add the first-class package, typed parameter catalog, generated registry
    artifacts, tests, and compatibility forwarding with no behavior change.
-2. Move parameter defaults, profiles, snapshots, and versioned migrations into
-   `params`; retain temporary forwarding imports.
+2. Move NRDR-owned parameter defaults, profiles, snapshots, and versioned
+   migrations into `params`; retain temporary forwarding imports.
 3. Make native UI and Sunnylink consume shared parameter metadata while keeping
    custom layouts handwritten.
 4. Move existing NRDR implementations into domain folders under `features` and

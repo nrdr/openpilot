@@ -1,4 +1,4 @@
-from openpilot.sunnypilot.nrdr.live_params import get_live_params
+from openpilot.nrdr.params import get_live_params
 
 
 def initialize_live_parameter_settings(controls) -> None:

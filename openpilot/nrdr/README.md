@@ -13,7 +13,7 @@ component, and gives contributors one obvious place to start.
 
 ```text
 openpilot/nrdr/
-├── params/    parameter contracts and typed, read-only access
+├── params/    contracts, startup policy, profiles, snapshots, and typed access
 ├── features/  self-contained NRDR behavior
 ├── hooks/     small adapters called by openpilot processes
 ├── ui/        NRDR-owned presentation and settings integration
@@ -22,14 +22,15 @@ openpilot/nrdr/
 
 The separation is intentional:
 
-- `params` owns names, types, defaults, validation, profiles, and migrations.
+- `params` owns names, types, startup defaults, validation, profiles, snapshots,
+  and future NRDR-specific migrations.
 - `features` owns algorithms.  Parameter mechanics do not belong here.
 - `hooks` translates openpilot state into calls to NRDR features.  Hooks should
   remain small and contain no tuning algorithm.
 - `ui` owns NRDR presentation.  Shared parameter metadata may be consumed here,
   while custom screen layout remains explicit.
 
-The stable parameter-reader API is:
+The package exposes a lazy public API. Common readers use:
 
 ```python
 from openpilot.nrdr.params import NrdrParamKey, ParamReader, read_bool, read_float
@@ -42,8 +43,22 @@ the original NRDR helpers. `NrdrParamKey` gives consumers generated, typed key
 names while remaining compatible with APIs that accept strings.
 
 Existing modules under `openpilot/sunnypilot/nrdr` remain in place during the
-incremental migration.  The old parameter-helper module forwards to this API,
-so external users are not broken while production call sites move.
+incremental migration. Parameter defaults, handcrafted profiles, and live
+snapshots now have canonical owners here; their old modules are explicit
+forwarders so external users are not broken while production call sites move.
+
+## Current migration status
+
+- Complete: parameter catalog/generation, typed keys, startup defaults,
+  handcrafted parameter profiles, and openpilot-process live snapshots.
+- Compatibility only: the old defaults, handcrafted-profile, and live-snapshot
+  modules under `openpilot.sunnypilot.nrdr`.
+- Pending: feature algorithms, hook implementations, UI ownership, shared UI
+  metadata, and the typed opendbc configuration boundary.
+
+SunnyPilot-wide migrations (including display and non-NRDR vehicle migrations)
+remain owned by SunnyPilot. No NRDR-specific versioned migration exists yet;
+the first one belongs here when it is introduced.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for dependency rules and the migration
 sequence.
