@@ -7,10 +7,9 @@ from opendbc.car.honda.values import HondaFlags
 from opendbc.car.structs import car
 from openpilot.common.pid import PIDController
 from openpilot.common.realtime import DT_CTRL
-from openpilot.sunnypilot.nrdr.live_params import get_live_params
+from openpilot.nrdr.params import NrdrParamKey, get_live_params, read_bool, read_float
 from openpilot.sunnypilot.nrdr.long_tune import LongTune
 from openpilot.sunnypilot.nrdr.longitudinal_stopping import compute_stopping_accel
-from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
 
 
 LongCtrlState = car.CarControl.Actuators.LongControlState

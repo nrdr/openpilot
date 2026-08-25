@@ -6,8 +6,7 @@ from openpilot.common.constants import CV
 from openpilot.selfdrive.car.cruise import V_CRUISE_MAX
 from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan
 from openpilot.selfdrive.modeld.constants import ModelConstants
-from openpilot.sunnypilot.nrdr.live_params import get_live_params
-from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
+from openpilot.nrdr.params import NrdrParamKey, get_live_params, read_bool, read_float
 
 
 LAUNCH_DISARM_SPEED = 2.0

@@ -1,8 +1,7 @@
 from openpilot.common.constants import CV
 from openpilot.common.realtime import DT_CTRL
-from openpilot.sunnypilot.nrdr.live_params import get_live_params
+from openpilot.nrdr.params import NrdrParamKey, get_live_params, read_bool, read_float
 from openpilot.sunnypilot.nrdr.nnlc_model import is_nnlc_forced
-from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
 from openpilot.sunnypilot.nrdr.pid import FeedforwardPIDController
 
 

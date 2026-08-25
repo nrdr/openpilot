@@ -2,8 +2,7 @@
 import numpy as np
 
 from openpilot.common.params import Params
-from openpilot.sunnypilot.nrdr.live_params import get_live_params
-from openpilot.nrdr.params import NrdrParamKey, read_float
+from openpilot.nrdr.params import NrdrParamKey, get_live_params, read_float
 
 
 MS_TO_MPH = 2.23694

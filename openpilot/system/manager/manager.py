@@ -22,7 +22,7 @@ from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
 
 from openpilot.sunnypilot.system.params_migration import run_migration
-from openpilot.sunnypilot.nrdr.manager import apply_defaults as apply_nrdr_defaults
+from openpilot.nrdr.params import apply_defaults as apply_nrdr_defaults
 
 
 def manager_init() -> None:
