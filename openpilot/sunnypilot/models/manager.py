@@ -18,6 +18,7 @@ from openpilot.common.hardware.hw import Paths
 from openpilot.cereal import messaging, custom
 from openpilot.sunnypilot.models.fetcher import ModelFetcher
 from openpilot.sunnypilot.models.helpers import get_active_bundle, validate_active_bundle, verify_file
+from openpilot.sunnypilot.nrdr.model_manager import select_default_model
 
 # (connect, read) seconds. read is per-request inactivity, not a total cap
 DOWNLOAD_TIMEOUT = (30, 30)
@@ -265,6 +266,7 @@ class ModelManagerSP:
         self.available_models = self.model_fetcher.get_available_bundles()
         validate_active_bundle(self.params, self.available_models)
         self.active_bundle = get_active_bundle(self.params)
+        select_default_model(self.params, self.available_models)
 
         if (index_to_download := self.params.get("ModelManager_DownloadIndex")) is not None:
           if self.active_bundle and self.active_bundle.index == index_to_download:

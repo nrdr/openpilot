@@ -8,6 +8,7 @@ from enum import IntEnum
 
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.cruise_sub_layouts.speed_limit_settings import SpeedLimitSettingsLayout
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.sunnypilot.nrdr.settings import CRUISE_PARAMS, apply_cruise_preferences, snapshot_params
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, simple_button_item_sp
 from openpilot.system.ui.widgets import Widget
@@ -118,6 +119,7 @@ class CruiseLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
+    pending_preferences = snapshot_params(ui_state.params, CRUISE_PARAMS)
 
     if ui_state.CP is not None and ui_state.CP_SP is not None:
       has_icbm = ui_state.has_icbm
@@ -185,6 +187,7 @@ class CruiseLayout(Widget):
         self.custom_acc_toggle.show_description(True)
 
     self._on_custom_acc_toggle(self.custom_acc_toggle.action_item.get_state())
+    apply_cruise_preferences(self, ui_state, pending_preferences, has_long, has_icbm)
 
   def _on_custom_acc_toggle(self, state):
     self.custom_acc_short_increment.set_visible(state)

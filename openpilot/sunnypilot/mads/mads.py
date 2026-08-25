@@ -12,6 +12,8 @@ from opendbc.car.hyundai.values import HyundaiFlags
 from openpilot.common.params import Params
 from openpilot.sunnypilot.mads.helpers import MadsSteeringModeOnBrake, read_steering_mode_param, MADS_NO_ACC_MAIN_BUTTON
 from openpilot.sunnypilot.mads.state import StateMachine, GEARS_ALLOW_PAUSED_SILENT
+from openpilot.sunnypilot.nrdr.events import keep_lateral_active
+from openpilot.sunnypilot.nrdr.mads import AutoLkas
 
 State = custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState
 ButtonType = structs.CarState.ButtonEvent.Type
@@ -42,6 +44,7 @@ class ModularAssistiveDrivingSystem:
     self.events = self.selfdrive.events
     self.events_sp = self.selfdrive.events_sp
     self.disengage_on_accelerator = Params().get_bool("DisengageOnAccelerator")
+    self.nrdr_auto_lkas = AutoLkas()
     if self.CP.brand == "hyundai":
       if self.CP.flags & (HyundaiFlags.HAS_LDA_BUTTON | HyundaiFlags.CANFD):
         self.allow_always = True
@@ -119,22 +122,23 @@ class ModularAssistiveDrivingSystem:
   def update_events(self, CS: structs.CarState):
     if not self.selfdrive.enabled and self.enabled:
       if CS.standstill:
-        if self.events.has(EventName.doorOpen):
+        if self.events.has(EventName.doorOpen) and not keep_lateral_active(EventName.doorOpen):
           self.replace_event(EventName.doorOpen, EventNameSP.silentDoorOpen)
           self.transition_paused_state()
-        if self.events.has(EventName.seatbeltNotLatched):
+        if self.events.has(EventName.seatbeltNotLatched) and not keep_lateral_active(EventName.seatbeltNotLatched):
           self.replace_event(EventName.seatbeltNotLatched, EventNameSP.silentSeatbeltNotLatched)
           self.transition_paused_state()
-      if self.events.has(EventName.wrongGear) and (CS.vEgo < 2.5 or CS.gearShifter == GearShifter.reverse):
+      if self.events.has(EventName.wrongGear) and not keep_lateral_active(EventName.wrongGear) and \
+          (CS.vEgo < 2.5 or CS.gearShifter == GearShifter.reverse):
         self.replace_event(EventName.wrongGear, EventNameSP.silentWrongGear)
         self.transition_paused_state()
       if self.events.has(EventName.reverseGear):
         self.replace_event(EventName.reverseGear, EventNameSP.silentReverseGear)
         self.transition_paused_state()
-      if self.events.has(EventName.brakeHold):
+      if self.events.has(EventName.brakeHold) and not keep_lateral_active(EventName.brakeHold):
         self.replace_event(EventName.brakeHold, EventNameSP.silentBrakeHold)
         self.transition_paused_state()
-      if self.events.has(EventName.parkBrake):
+      if self.events.has(EventName.parkBrake) and not keep_lateral_active(EventName.parkBrake):
         self.replace_event(EventName.parkBrake, EventNameSP.silentParkBrake)
         self.transition_paused_state()
 
@@ -154,6 +158,7 @@ class ModularAssistiveDrivingSystem:
 
     # wrongCarMode alert only or actively block control
     self.get_wrong_car_mode(selfdrive_enable_events or set_speed_btns_enable)
+    self.nrdr_auto_lkas.request(CS, self.main_enabled_toggle, self.events_sp, EventNameSP)
 
     if selfdrive_enable_events:
       if self.pedal_pressed_non_gas_pressed(CS):
@@ -217,6 +222,7 @@ class ModularAssistiveDrivingSystem:
 
     if not self.CP.passive and self.selfdrive.initialized:
       self.enabled, self.active = self.state_machine.update()
+      self.nrdr_auto_lkas.update(self.enabled)
 
     # Copy of previous SelfdriveD states for MADS events handling
     self.selfdrive.enabled_prev = self.selfdrive.enabled

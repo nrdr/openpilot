@@ -16,6 +16,7 @@ from openpilot.common.simple_kalman import KF1D
 from opendbc.car import structs
 from opendbc.car.hyundai.values import HyundaiFlags
 from opendbc.sunnypilot.car.hyundai.values import HyundaiFlagsSP
+from openpilot.sunnypilot.nrdr.radar import NrdrRadar
 
 
 # Default lead acceleration decay set to 50% at 1s
@@ -198,7 +199,8 @@ class RadarD:
 
     self.current_time = 0.0
     self.tracks: dict[int, Track] = {}
-    self.kalman_params = KalmanParams(DT_MDL)
+    self.nrdr = NrdrRadar(CP)
+    self.kalman_params = self.nrdr.kalman_params(KalmanParams)
     self.lead_prob_filters = [FirstOrderFilter(0.0, 0.2, DT_MDL) for _ in range(2)]
 
     self.v_ego = 0.0
@@ -218,7 +220,7 @@ class RadarD:
       self.v_ego_hist.append(self.v_ego)
       self.last_v_ego_frame = sm.recv_frame['carState']
 
-    ar_pts = {pt.trackId: [pt.dRel, pt.yRel, pt.vRel] for pt in rr.points}
+    ar_pts = self.nrdr.points(sm, rr)
 
     # *** remove missing points from meta data ***
     for ids in list(self.tracks.keys()):
@@ -234,8 +236,8 @@ class RadarD:
 
       # create the track if it doesn't exist or it's a new track
       if ids not in self.tracks:
-        self.tracks[ids] = Track(ids, v_lead, self.kalman_params)
-      self.tracks[ids].update(rpt[0], rpt[1], rpt[2], v_lead)
+        self.tracks[ids] = self.nrdr.create_track(Track, self, sm, ids, rpt, v_lead)
+      self.nrdr.update_track(self.tracks[ids], rpt, v_lead, self.v_ego_hist[0])
 
     # *** publish radarState ***
     self.radar_state_valid = sm.all_checks()

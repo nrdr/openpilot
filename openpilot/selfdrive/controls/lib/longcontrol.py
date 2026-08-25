@@ -4,6 +4,7 @@ from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.modeld.constants import ModelConstants
+from openpilot.sunnypilot.nrdr.longcontrol import NrdrLongControl
 
 CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 
@@ -47,11 +48,22 @@ class LongControl:
     self.pid = PIDController(0.0, (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV),
                              rate=1 / DT_CTRL)
     self.last_output_accel = 0.0
+    self.nrdr_controller = NrdrLongControl(CP, CP_SP)
+    self.pid = self.nrdr_controller.pid
 
   def reset(self):
-    self.pid.reset()
+    if self.nrdr_controller is not None:
+      self.nrdr_controller.reset()
+    else:
+      self.pid.reset()
 
-  def update(self, active, CS, a_target, should_stop, accel_limits):
+  def update(self, active, CS, a_target, should_stop, accel_limits, pitch=None, drel=None, personality=None):
+    if self.nrdr_controller is not None:
+      output_accel = self.nrdr_controller.update(active, CS, a_target, should_stop, accel_limits, pitch, drel, personality)
+      self.long_control_state = self.nrdr_controller.long_control_state
+      self.last_output_accel = output_accel
+      return output_accel
+
     """Update longitudinal control. This updates the state machine and runs a PID loop"""
     self.pid.neg_limit = accel_limits[0]
     self.pid.pos_limit = accel_limits[1]

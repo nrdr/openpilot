@@ -48,9 +48,10 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
 from openpilot.system.athena.rpc import dispatcher, handle, is_call, is_response, loads
+from openpilot.sunnypilot.nrdr import athena as nrdr_athena
 
 
-ATHENA_HOST = os.getenv('ATHENA_HOST', 'wss://athena.comma.ai')
+ATHENA_HOST = os.getenv('ATHENA_HOST', 'wss://athena.konik.ai')
 HANDLER_THREADS = int(os.getenv('HANDLER_THREADS', "4"))
 LOCAL_PORT_WHITELIST = {22, }  # SSH
 
@@ -1156,6 +1157,8 @@ def main(exit_event: threading.Event | None = None):
 
   conn_start = None
   conn_retries = 0
+  nrdr_athena.start(exit_event)
+
   while exit_event is None or not exit_event.is_set():
     try:
       if conn_start is None:
@@ -1188,6 +1191,9 @@ def main(exit_event: threading.Event | None = None):
       params.remove("LastAthenaPingTime")
 
     time.sleep(backoff(conn_retries))
+
+
+nrdr_athena.install(dispatcher)
 
 
 if __name__ == "__main__":

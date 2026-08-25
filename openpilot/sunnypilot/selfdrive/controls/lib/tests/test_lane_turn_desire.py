@@ -101,6 +101,8 @@ class TestDesireHelperIntegration(OpenpilotTestCase):
                    steeringPressed=True, steeringTorque=1), True, 1.0, log.Desire.laneChangeLeft),
     (DummyCarState(vEgo=9, leftBlinker=False, rightBlinker=True, leftBlindspot=False, rightBlindspot=False,
                    steeringPressed=True, steeringTorque=-1), True, 1.0, log.Desire.laneChangeRight),
+    (DummyCarState(vEgo=9, leftBlinker=True, rightBlinker=False, leftBlindspot=False, rightBlindspot=False,
+                   steeringPressed=False, steeringTorque=1300), True, 1.0, log.Desire.laneChangeLeft),
     # No desire (inactive)
     (DummyCarState(vEgo=9, leftBlinker=False, rightBlinker=False), False, 1.0, log.Desire.none),
     (DummyCarState(vEgo=4, leftBlinker=False, rightBlinker=False), True, 1.0, log.Desire.none),  # No blinkers? no desire!

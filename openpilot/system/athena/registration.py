@@ -13,9 +13,11 @@ from openpilot.selfdrive.selfdrived.alertmanager import set_offroad_alert
 from openpilot.common.hardware import HARDWARE, PC
 from openpilot.common.hardware.hw import Paths
 from openpilot.common.swaglog import cloudlog
+from openpilot.sunnypilot.nrdr import registration as nrdr_registration
 
 
 UNREGISTERED_DONGLE_ID = "UnregisteredDevice"
+
 
 def is_registered_device() -> bool:
   dongle = Params().get("DongleId")
@@ -34,8 +36,10 @@ def register(show_spinner=False) -> str | None:
   """
   params = Params()
 
-  dongle_id: str | None = params.get("DongleId")
-  if dongle_id is None and Path(Paths.persist_root()+"/comma/dongle_id").is_file():
+  konik_backend = nrdr_registration.is_enabled()
+  params_dongle_id: str | None = params.get("DongleId")
+  dongle_id = nrdr_registration.resolve(params_dongle_id) if konik_backend else params_dongle_id
+  if not konik_backend and dongle_id is None and Path(Paths.persist_root()+"/comma/dongle_id").is_file():
     # not all devices will have this; added early in comma 3X production (2/28/24)
     with open(Paths.persist_root()+"/comma/dongle_id") as f:
       dongle_id = f.read().strip()
@@ -101,6 +105,8 @@ def register(show_spinner=False) -> str | None:
   if dongle_id:
     params.put("DongleId", dongle_id, block=True)
     set_offroad_alert("Offroad_UnregisteredHardware", (dongle_id == UNREGISTERED_DONGLE_ID) and not PC)
+    nrdr_registration.commit(dongle_id, konik_backend)
+
   return dongle_id
 
 

@@ -14,9 +14,8 @@ sections:
   - key: LaneTurnDesire
     widget: toggle
     title: Use Lane Turn Desires
-    description: If you are driving at 20 mph (32 km/h) or below and have your blinker on, the car will plan a turn in that
-      direction at the nearest drivable path. This prevents situations (like at red lights) where the car might plan the wrong
-      turn direction.
+    description: At 20 mph (32 km/h) or below with your blinker on, the car plans a turn that way at the nearest drivable path.
+    details: If you are driving at 20 mph (32 km/h) or below and have your blinker on, the car will plan a turn in that direction at the nearest drivable path. This prevents situations (like at red lights) where the car might plan the wrong turn direction.
   - key: LaneTurnValue
     widget: option
     title: Adjust Lane Turn Speed
@@ -36,15 +35,18 @@ sections:
     widget: toggle
     title: Live Learning Steer Delay
     description: Allow device to learn and adapt car's steering response time
+    enablement:
+    - $ref: '#/macros/handcrafted_lateral_unlocked'
   - key: LagdToggleDelay
     widget: option
     title: Adjust Software Delay
-    description: Adjust the software delay when Live Learning Steer Delay is toggled off. The default software delay value
-      is 0.2
+    description: Add software delay on top of the vehicle's actuator delay when Live Learning Steer Delay is off.
+    details: This additional delay is combined with the vehicle's actuator delay. The default additional value is 0.2 seconds. Higher values increase prediction lead and may cause early or oscillatory steering.
     min: 0.05
-    max: 0.5
+    max: 1.0
     step: 0.01
     enablement:
+    - $ref: '#/macros/handcrafted_lateral_unlocked'
     - type: not
       condition:
         type: param

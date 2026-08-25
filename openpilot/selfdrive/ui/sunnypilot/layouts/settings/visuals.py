@@ -6,6 +6,7 @@ See the LICENSE.md file in the root directory for more details.
 """
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.sunnypilot.nrdr.settings import apply_chevron_preference
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, multiple_button_item_sp
 from openpilot.system.ui.widgets.scroller_tici import Scroller
@@ -129,6 +130,7 @@ class VisualsLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
+    chevron_info = ui_state.params.get("ChevronInfo", return_default=True)
 
     for param in self._toggle_defs:
       self._toggles[param].action_item.set_state(self._params.get_bool(param))
@@ -143,6 +145,8 @@ class VisualsLayout(Widget):
       self._chevron_info.set_description(tr(CHEVRON_INFO_DESCRIPTION["disabled"]))
       self._chevron_info.action_item.set_enabled(False)
       ui_state.params.put("ChevronInfo", 0)
+
+    apply_chevron_preference(self._chevron_info, ui_state, chevron_info)
 
   def _render(self, rect):
     self._scroller.render(rect)

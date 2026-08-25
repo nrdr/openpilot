@@ -41,7 +41,7 @@ class TogglesLayoutMici(NavScroller):
   def __init__(self):
     super().__init__()
 
-    self._personality_toggle = BigMultiParamToggle("driving personality", "LongitudinalPersonality", ["aggressive", "standard", "relaxed"])
+    self._personality_toggle = BigMultiParamToggle("driving personality", "LongitudinalPersonality", ["aggressive", "standard", "relaxed", "econ"])
     self._experimental_btn = BigToggle("experimental mode", initial_state=ui_state.params.get_bool("ExperimentalMode"),
                                        toggle_callback=self._on_experimental_mode)
     is_metric_toggle = BigParamControl("use metric units", "IsMetric")

@@ -1,0 +1,10 @@
+def apply_driver_monitoring_policy(settings) -> None:
+  settings._WHEELTOUCH_POLICY_ALERT_1_TIMEOUT = 86400.0 - 15.0
+  settings._WHEELTOUCH_POLICY_ALERT_2_TIMEOUT = 86400.0 - 6.0
+  settings._WHEELTOUCH_POLICY_ALERT_3_TIMEOUT = 86400.0
+  settings._VISION_POLICY_ALERT_1_TIMEOUT = 86400.0 - 8.0
+  settings._VISION_POLICY_ALERT_2_TIMEOUT = 86400.0 - 6.0
+  settings._VISION_POLICY_ALERT_3_TIMEOUT = 86400.0
+  settings._NO_RESPONSE_TIMEOUT = 86400.0
+  settings._MAX_ALERT_3 = 86400
+  settings._MAX_NO_RESPONSE = 86400

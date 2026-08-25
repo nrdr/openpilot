@@ -11,6 +11,7 @@ import pyray as rl
 
 from openpilot.cereal import custom
 from openpilot.sunnypilot.models.default_model import get_default_model
+from openpilot.sunnypilot.nrdr.settings import apply_handcrafted_delay_controls
 from openpilot.common.constants import CV
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from openpilot.system.ui.lib.multilang import tr
@@ -82,8 +83,9 @@ class ModelsLayout(Widget):
                                                      "This prevents situations (like at red lights) where the car might plan the wrong turn direction."),
                                                   param="LaneTurnDesire")
 
-    self.delay_control = option_item_sp(tr("Adjust Software Delay"), "LagdToggleDelay", 5, 50,
-                                        tr("Adjust the software delay when Live Learning Steer Delay is toggled off. The default software delay value is 0.2"),
+    self.delay_control = option_item_sp(tr("Adjust Software Delay"), "LagdToggleDelay", 5, 100,
+                                        tr("Additional delay applied on top of the vehicle's actuator delay when Live Learning Steer Delay is off. " +
+                                           "Default is 0.2 s. Higher values increase prediction lead and may cause early or oscillatory steering."),
                                         1, None, True, "", style.BUTTON_ACTION_WIDTH, None, True, lambda v: f"{v / 100:.2f}s")
 
     self.lagd_toggle = toggle_item_sp(tr("Live Learning Steer Delay"), "", param="LagdToggle")
@@ -229,6 +231,7 @@ class ModelsLayout(Widget):
     self.lane_turn_value_control.set_visible(turn_desire and advanced_controls)
     self.lagd_toggle.action_item.set_state(live_delay)
     self.delay_control.set_visible(not live_delay and advanced_controls)
+    apply_handcrafted_delay_controls(self, ui_state)
     new_step = int(round(100 / CV.MPH_TO_KPH)) if ui_state.is_metric else 100
     if self.lane_turn_value_control.action_item is not None and self.lane_turn_value_control.action_item.value_change_step != new_step:
       self.lane_turn_value_control.action_item.value_change_step = new_step

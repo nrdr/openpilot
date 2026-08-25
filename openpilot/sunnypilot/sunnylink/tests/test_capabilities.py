@@ -63,6 +63,12 @@ class TestProtocolVersion(OpenpilotTestCase):
 
 
 class TestOpaquePerBrandFlags(OpenpilotTestCase):
+  def test_handcrafted_lateral_profile_field_present(self):
+    assert "has_handcrafted_lateral_profile" in CAPABILITY_FIELDS
+
+  def test_handcrafted_lateral_profile_default_false(self, caps):
+    assert caps["has_handcrafted_lateral_profile"] is False
+
   def test_subaru_has_sng_field_present(self):
     assert "subaru_has_sng" in CAPABILITY_FIELDS
 

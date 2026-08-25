@@ -2,7 +2,8 @@ from openpilot.common.parameterized import parameterized
 from openpilot.common.test import OpenpilotTestCase
 from openpilot.common.params import Params
 from openpilot.system.hardware.power_monitoring import PowerMonitoring, CAR_BATTERY_CAPACITY_uWh, \
-  CAR_CHARGING_RATE_W, VBATT_PAUSE_CHARGING, DELAY_SHUTDOWN_TIME_S, MAX_TIME_OFFROAD_S
+  CAR_CHARGING_RATE_W, VBATT_PAUSE_CHARGING, DELAY_SHUTDOWN_TIME_S, MAX_TIME_OFFROAD_S, \
+  AUTOMATIC_POWER_DOWN_GRACE_S
 
 # Create fake time
 ssb = 0.
@@ -26,10 +27,22 @@ def pm_patch(mocker, name, value, constant=False):
     mocker.patch(f"openpilot.system.hardware.power_monitoring.{name}", return_value=value)
 
 
+def monotonic_clock(mocker):
+  clock = mocker.Mock(return_value=10_000.)
+  mocker.patch("openpilot.system.hardware.power_monitoring.time.monotonic", clock)
+  return clock
+
+
 class TestPowerMonitoring(OpenpilotTestCase):
   def setup_method(self):
     self._fixture("mocker").patch("time.monotonic", mock_time_monotonic)
     self.params = Params()
+    self.params.remove("DisablePowerDown")
+    self.params.remove("ForcePowerDown")
+
+  def teardown_method(self):
+    self.params.remove("DisablePowerDown")
+    self.params.remove("ForcePowerDown")
 
   # Test to see that it doesn't do anything when pandaState is None
   def test_panda_state_present(self):
@@ -134,20 +147,69 @@ class TestPowerMonitoring(OpenpilotTestCase):
                             (ssb - start_time) > DELAY_SHUTDOWN_TIME_S)
     assert pm.should_shutdown(ignition, True, start_time, True)
 
-  # Test to check policy of not stopping charging when DisablePowerDown is set
-  def test_disable_power_down(self, mocker):
-    POWER_DRAW = 0 # To stop shutting down for other reasons
-    TEST_TIME = 100
+  def test_disable_power_down_grace_blocks_before_60_seconds(self, monotonic_clock):
     self.params.put_bool("DisablePowerDown", True, block=True)
-    pm_patch(mocker, "HARDWARE.get_current_power_draw", POWER_DRAW)
     pm = PowerMonitoring()
-    pm.car_battery_capacity_uWh = CAR_BATTERY_CAPACITY_uWh
-    ignition = False
-    for i in range(TEST_TIME):
-      pm.calculate(VOLTAGE_BELOW_PAUSE_CHARGING, ignition)
-      if i % 10 == 0:
-        assert not pm.should_shutdown(ignition, True, ssb, False)
-    assert not pm.should_shutdown(ignition, True, ssb, False)
+    pm.car_battery_capacity_uWh = 0
+    offroad_timestamp = monotonic_clock.return_value - DELAY_SHUTDOWN_TIME_S - 1
+
+    self.params.put_bool("DisablePowerDown", False, block=True)
+    assert not pm.should_shutdown(False, True, offroad_timestamp, True)
+
+    monotonic_clock.return_value += AUTOMATIC_POWER_DOWN_GRACE_S - 0.001
+    assert not pm.should_shutdown(False, True, offroad_timestamp, True)
+
+  def test_disable_power_down_grace_expires_at_60_seconds(self, monotonic_clock):
+    self.params.put_bool("DisablePowerDown", True, block=True)
+    pm = PowerMonitoring()
+    pm.car_battery_capacity_uWh = 0
+    offroad_timestamp = monotonic_clock.return_value - DELAY_SHUTDOWN_TIME_S - 1
+
+    self.params.put_bool("DisablePowerDown", False, block=True)
+    assert not pm.should_shutdown(False, True, offroad_timestamp, True)
+
+    monotonic_clock.return_value += AUTOMATIC_POWER_DOWN_GRACE_S
+    assert pm.should_shutdown(False, True, offroad_timestamp, True)
+
+  def test_disable_power_down_true_cancels_grace(self, monotonic_clock):
+    self.params.put_bool("DisablePowerDown", True, block=True)
+    pm = PowerMonitoring()
+    pm.car_battery_capacity_uWh = 0
+    offroad_timestamp = monotonic_clock.return_value - DELAY_SHUTDOWN_TIME_S - 1
+
+    self.params.put_bool("DisablePowerDown", False, block=True)
+    assert not pm.should_shutdown(False, True, offroad_timestamp, True)
+
+    monotonic_clock.return_value += AUTOMATIC_POWER_DOWN_GRACE_S / 2
+    self.params.put_bool("DisablePowerDown", True, block=True)
+    assert not pm.should_shutdown(False, True, offroad_timestamp, True)
+
+    monotonic_clock.return_value += AUTOMATIC_POWER_DOWN_GRACE_S / 2
+    self.params.put_bool("DisablePowerDown", False, block=True)
+    assert not pm.should_shutdown(False, True, offroad_timestamp, True)
+
+    monotonic_clock.return_value += AUTOMATIC_POWER_DOWN_GRACE_S
+    assert pm.should_shutdown(False, True, offroad_timestamp, True)
+
+  def test_disable_power_down_false_at_boot_retains_stock_behavior(self, monotonic_clock):
+    self.params.put_bool("DisablePowerDown", False, block=True)
+    pm = PowerMonitoring()
+    pm.car_battery_capacity_uWh = 0
+    offroad_timestamp = monotonic_clock.return_value - DELAY_SHUTDOWN_TIME_S - 1
+
+    assert pm.should_shutdown(False, True, offroad_timestamp, True)
+
+  def test_force_power_down_bypasses_automatic_power_down_grace(self, monotonic_clock):
+    self.params.put_bool("DisablePowerDown", True, block=True)
+    pm = PowerMonitoring()
+    pm.car_battery_capacity_uWh = 0
+    offroad_timestamp = monotonic_clock.return_value - DELAY_SHUTDOWN_TIME_S - 1
+
+    self.params.put_bool("DisablePowerDown", False, block=True)
+    assert not pm.should_shutdown(False, True, offroad_timestamp, True)
+
+    self.params.put_bool("ForcePowerDown", True, block=True)
+    assert pm.should_shutdown(False, True, offroad_timestamp, True)
 
   # Test to check policy of not stopping charging when ignition
   def test_ignition(self, mocker):

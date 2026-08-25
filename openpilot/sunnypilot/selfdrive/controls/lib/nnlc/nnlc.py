@@ -14,6 +14,7 @@ from opendbc.sunnypilot.car.lateral_ext import get_friction as get_friction_in_t
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.selfdrive.modeld.constants import ModelConstants
+from openpilot.sunnypilot.nrdr.nnlc import NrdrNnlc
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext_base import sign
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_jerk_aware import LatControlTorqueJerkAware
 from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import MOCK_MODEL_PATH
@@ -60,6 +61,7 @@ class NeuralNetworkLateralControl(LatControlTorqueJerkAware):
     self.roll_deque = deque(maxlen=history_check_frames[0])
     self.error_deque = deque(maxlen=history_check_frames[0])
     self.past_future_len = len(self.past_times) + len(self.nn_future_times)
+    self.nrdr = NrdrNnlc(self, CP)
 
   @property
   def _nnlc_enabled(self):
@@ -88,6 +90,7 @@ class NeuralNetworkLateralControl(LatControlTorqueJerkAware):
                                              FRICTION_THRESHOLD, self.torque_params)
 
   def update_neural_network_feedforward(self, CS, params, calibrated_pose) -> None:
+    self.nrdr.update()
     if not self._nnlc_enabled:
       return
 
@@ -117,6 +120,10 @@ class NeuralNetworkLateralControl(LatControlTorqueJerkAware):
                                    for i in self.history_frame_offsets]
     future_planned_lateral_accels = [np.interp(t, ModelConstants.T_IDXS, self.model_v2.acceleration.y) for t in
                                      adjusted_future_times]
+
+    if self.nrdr.apply_curvature_model(CS, roll, past_lateral_accels_desired, future_planned_lateral_accels):
+      self.update_output_torque(CS)
+      return
 
     # compute NNFF error response
     nnff_setpoint_input = [CS.vEgo, self._setpoint, self.lateral_jerk_setpoint, roll] \

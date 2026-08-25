@@ -1,10 +1,12 @@
 import itertools
+import pytest
+
 from openpilot.common.test import OpenpilotTestCase
 from openpilot.common.parameterized import parameterized_class
 
 from openpilot.cereal import log
 
-from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import get_safe_obstacle_distance, get_stopped_equivalence_factor, get_T_FOLLOW
+from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.long_mpc import get_jerk_factor, get_safe_obstacle_distance, get_stopped_equivalence_factor, get_T_FOLLOW
 from openpilot.selfdrive.test.longitudinal_maneuvers.maneuver import Maneuver
 
 
@@ -28,6 +30,17 @@ def run_following_distance_simulation(v_lead, t_end=100.0, e2e=False, personalit
   valid, output = man.evaluate()
   assert valid
   return output[-1,2] - output[-1,1]
+
+
+@pytest.mark.parametrize(("personality", "t_follow", "jerk_factor"), (
+  (log.LongitudinalPersonality.aggressive, 1.25, 0.5),
+  (log.LongitudinalPersonality.standard, 1.45, 1.0),
+  (log.LongitudinalPersonality.relaxed, 1.75, 1.0),
+  (log.LongitudinalPersonality.econ, 2.25, 1.5),
+))
+def test_personality_parameters(personality, t_follow, jerk_factor):
+  assert get_T_FOLLOW(personality) == t_follow
+  assert get_jerk_factor(personality) == jerk_factor
 
 
 @parameterized_class(("e2e", "personality", "speed"), itertools.product(

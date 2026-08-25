@@ -6,7 +6,8 @@ See the LICENSE.md file in the root directory for more details.
 """
 
 
-from openpilot.cereal import custom
+from openpilot.cereal import custom, log
+from openpilot.common.parameterized import parameterized
 from openpilot.common.realtime import DT_CTRL
 from openpilot.sunnypilot.mads.state import StateMachine, SOFT_DISABLE_TIME
 from openpilot.selfdrive.selfdrived.events import ET, NormalPermanentAlert, Events
@@ -15,6 +16,7 @@ from openpilot.common.test import OpenpilotTestCase
 
 State = custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState
 EventNameSP = custom.OnroadEventSP.EventName
+EventName = log.OnroadEvent.EventName
 
 # The event types that maintain the current state
 MAINTAIN_STATES = {State.enabled: (None,), State.disabled: (None,), State.softDisabling: (ET.SOFT_DISABLE,),
@@ -141,3 +143,30 @@ class TestMADSStateMachine(OpenpilotTestCase):
         self.state_machine.update()
         assert self.state_machine.state == state
         self.clear_events()
+
+  @parameterized.expand([
+    EventName.doorOpen,
+    EventName.seatbeltNotLatched,
+    EventName.wrongGear,
+    EventName.brakeHold,
+    EventName.belowEngageSpeed,
+  ], names=["event_name"])
+  def test_nrdr_lateral_only_events_do_not_change_mads_state(self, event_name):
+    self.state_machine.state = State.enabled
+    self.events.add(event_name)
+    self.state_machine.update()
+    assert self.state_machine.state == State.enabled
+    assert self.events.has(event_name)
+
+  @parameterized.expand([EventName.reverseGear, EventName.parkBrake], names=["event_name"])
+  def test_reverse_and_parking_brake_still_disable_mads(self, event_name):
+    self.state_machine.state = State.enabled
+    self.events.add(event_name)
+    self.state_machine.update()
+    assert self.state_machine.state == State.disabled
+
+  def test_brake_hold_allows_fresh_lateral_enable(self):
+    self.events.add(EventName.belowEngageSpeed)
+    self.events.add(EventName.buttonEnable)
+    self.state_machine.update()
+    assert self.state_machine.state == State.enabled

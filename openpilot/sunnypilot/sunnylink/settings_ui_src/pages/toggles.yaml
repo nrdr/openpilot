@@ -15,15 +15,15 @@ sections:
     widget: toggle
     needs_onroad_cycle: true
     title: Enable sunnypilot
-    description: Use the sunnypilot system for adaptive cruise control and lane keep driver assistance. Your attention is
-      required at all times to use this feature.
+    description: Use sunnypilot for adaptive cruise control and lane keep driver assistance.
+    details: Use the sunnypilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature.
     enablement:
     - $ref: '#/macros/offroad'
   - key: IsLdwEnabled
     widget: toggle
     title: Enable Lane Departure Warnings
-    description: Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line without a turn
-      signal activated while driving over 31 mph (50 km/h).
+    description: Receive alerts to steer back when you drift over a lane line without a turn signal above 31 mph (50 km/h).
+    details: Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line without a turn signal activated while driving over 31 mph (50 km/h).
   - key: AlwaysOnDM
     widget: toggle
     title: Always-On Driver Monitoring
@@ -45,5 +45,5 @@ sections:
     widget: toggle
     needs_onroad_cycle: true
     title: Record and Upload Microphone Audio
-    description: Record and store microphone audio while driving. The audio will be included in the dashcam video in comma
-      connect.
+    description: Record and store microphone audio while driving.
+    details: Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect.

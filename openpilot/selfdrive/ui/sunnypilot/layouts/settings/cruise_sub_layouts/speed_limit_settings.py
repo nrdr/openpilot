@@ -12,6 +12,7 @@ from openpilot.selfdrive.ui.sunnypilot.layouts.settings.cruise_sub_layouts.speed
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode as SpeedLimitMode
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import OffsetType as SpeedLimitOffsetType
+from openpilot.sunnypilot.nrdr.settings import apply_speed_limit_preferences
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.widgets import get_highlighted_description
 from openpilot.system.ui.sunnypilot.widgets.list_view import multiple_button_item_sp, option_item_sp, simple_button_item_sp, LineSeparatorSP
@@ -153,6 +154,8 @@ class SpeedLimitSettingsLayout(Widget):
       })
     else:
       self._speed_limit_mode.action_item.set_enabled_buttons(None)
+
+    apply_speed_limit_preferences(self._speed_limit_mode, ui_state, speed_limit_mode_param, sla_available)
 
     offset_type = ui_state.params.get("SpeedLimitOffsetType", return_default=True)
     self._speed_limit_value_offset.set_visible(offset_type != int(SpeedLimitOffsetType.off))

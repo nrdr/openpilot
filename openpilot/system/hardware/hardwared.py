@@ -28,6 +28,7 @@ from openpilot.sunnypilot.system.statsd import statlog
 from openpilot.system.hardware.power_monitoring import PowerMonitoring
 from openpilot.system.hardware.fan_controller import FanController
 from openpilot.common.version import terms_version, training_version, get_build_metadata, terms_version_sp, CHESTNUT_BRANCHES
+from openpilot.sunnypilot.nrdr.hardware import apply_startup_policy, initialize_onboarding
 
 
 ThermalStatus = log.DeviceState.ThermalStatus
@@ -229,6 +230,7 @@ def hardware_thread(end_event, hw_queue) -> None:
 
   params = Params()
   power_monitor = PowerMonitoring()
+  initialize_onboarding(params)
 
   uptime_offroad: float = params.get("UptimeOffroad", return_default=True)
   uptime_onroad: float = params.get("UptimeOnroad", return_default=True)
@@ -346,6 +348,7 @@ def hardware_thread(end_event, hw_queue) -> None:
     # with 2% left, we killall, otherwise the phone will take a long time to boot
     startup_conditions["free_space"] = msg.deviceState.freeSpacePercent > 2
     startup_conditions["completed_training"] = params.get("CompletedTrainingVersion") == training_version
+    apply_startup_policy(startup_conditions)
     startup_conditions["not_driver_view"] = not params.get_bool("IsDriverViewEnabled")
 
     # must be at an engageable thermal band to go onroad

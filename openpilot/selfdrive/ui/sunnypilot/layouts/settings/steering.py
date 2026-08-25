@@ -15,6 +15,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.lane_change_settings import LaneChangeSettingsLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.mads_settings import MadsSettingsLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.torque_settings import TorqueSettingsLayout
+from openpilot.sunnypilot.nrdr.settings import hide_global_controller_settings
 
 
 class PanelType(IntEnum):
@@ -112,7 +113,7 @@ class SteeringLayout(Widget):
       LineSeparatorSP(40),
       self._nnlc_toggle,
     ]
-    return items
+    return hide_global_controller_settings(items)
 
   def _set_current_panel(self, panel: PanelType):
     self._current_panel = panel

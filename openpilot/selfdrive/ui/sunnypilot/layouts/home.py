@@ -6,6 +6,7 @@ See the LICENSE.md file in the root directory for more details.
 """
 import pyray as rl
 from openpilot.selfdrive.ui.layouts.home import HomeLayout, HomeLayoutState, HEAD_BUTTON_FONT_SIZE, SPACING
+from openpilot.sunnypilot.nrdr.home import NrdrHomeLayout
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.multilang import tr, trn
@@ -15,7 +16,7 @@ BRAND_FONT_SIZE = 48
 BRAND_DESC_SPACING = 12
 
 
-class HomeLayoutSP(HomeLayout):
+class HomeLayoutSP(NrdrHomeLayout, HomeLayout):
   def _render_header(self):
     font = gui_app.font(FontWeight.MEDIUM)
 
@@ -51,7 +52,7 @@ class HomeLayoutSP(HomeLayout):
     version_right = self.header_rect.x + self.header_rect.width
     version_left = version_right - version_text_width
 
-    brand = "sunnypilot"
+    brand = "nrdr"
     description = self.params.get("UpdaterCurrentDescription") or ""
 
     desc_width = 0

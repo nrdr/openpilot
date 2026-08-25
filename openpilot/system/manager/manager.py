@@ -22,6 +22,7 @@ from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
 
 from openpilot.sunnypilot.system.params_migration import run_migration
+from openpilot.sunnypilot.nrdr.manager import apply_defaults as apply_nrdr_defaults
 
 
 def manager_init() -> None:
@@ -52,6 +53,8 @@ def manager_init() -> None:
 
   if not PC:
     run_migration(params)
+
+  apply_nrdr_defaults(params)
 
   # set unset params to their default value
   for k in params.all_keys():

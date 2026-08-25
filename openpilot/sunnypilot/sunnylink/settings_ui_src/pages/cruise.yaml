@@ -31,9 +31,8 @@ sections:
   - key: LongitudinalPersonality
     widget: multiple_button
     title: Driving Personality
-    description: Standard is recommended. In aggressive mode, sunnypilot will follow lead cars closer and be more aggressive
-      with the gas and brake. In relaxed mode sunnypilot will stay further away from lead cars. On supported cars, you can
-      cycle through these personalities with your steering wheel distance button.
+    description: Standard is recommended; sets how closely sunnypilot follows lead cars and how it uses the gas and brake.
+    details: Standard is recommended. In aggressive mode, sunnypilot will follow lead cars closer and be more aggressive with the gas and brake. In relaxed mode sunnypilot will stay further away from lead cars. In econ mode sunnypilot keeps the longest following distance for smooth, efficient driving. On supported cars, you can cycle through these personalities with your steering wheel distance button.
     options:
     - value: 0
       label: Aggressive
@@ -41,6 +40,8 @@ sections:
       label: Standard
     - value: 2
       label: Relaxed
+    - value: 3
+      label: Econ
     enablement:
     - $ref: '#/macros/longitudinal'
   - key: IntelligentCruiseButtonManagement
@@ -267,3 +268,138 @@ sections:
       - type: capability
         field: has_icbm
         equals: true
+- id: nrdr
+  title: nrdr Longitudinal Tuning
+  description: Longitudinal tuning specific to the nrdr fork.
+  items: []
+  sub_panels:
+  - id: nrdr_longitudinal
+    label: Longitudinal Tuning
+    trigger_key: null
+    items:
+    - key: HondaLiveLearningGas
+      widget: toggle
+      title: Live Learning Gas
+      description: Allows Honda gas and wind compensation factors to learn live while driving.
+      details: Fresh installs default OFF when a gas pedal interceptor is detected and ON otherwise. Your selection is preserved afterward. While ON, all longitudinal PID personality scales are held at 100%.
+      enablement:
+      - $ref: '#/macros/offroad'
+    - key: StaticFeedforwardLong
+      widget: toggle
+      title: Keep Feedforward Static
+      description: When ON, the active personality PID scale multiplies only the feedback (P+I) terms; feedforward (kf) stays tuned.
+      details: When ON, the active personality PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle.
+    - key: NrdrHondaEcuMatchedLong
+      widget: toggle
+      title: 'Honda Nidec: ECU-matched longitudinal improvements'
+      description: Honda Nidec only. Shapes the longitudinal command to match the factory ECU; OFF = stock command path.
+      details: Honda Nidec only. Shapes the longitudinal command to match the factory ECU - rate-limits the acceleration command to the ECU's ramp rates, applies a speed-dependent coasting deadband (wide at low speed, tight on the highway), and briefly coasts through gas/brake transitions to avoid lurch. Calibrated on the 2019 Pilot; other Nidec cars may need tuning. OFF = stock command path.
+    - key: NrdrHondaFullBrakeAuthority
+      widget: toggle
+      title: Full Nidec Brake Authority
+      description: Allows supported Honda Nidec longitudinal control to use the full normalized brake-command range.
+      details: Enabled by default. Disable to retain the upstream brake-command headroom. This setting operates independently of Live Learning Gas.
+    - key: NrdrRoenAccelerationLimits
+      widget: toggle
+      title: Roen Nidec Acceleration Limits
+      description: Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.
+      details: Enabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas.
+    - key: HondaCivicRadarTryout
+      widget: toggle
+      title: Try Honda Bosch Radar (experimental)
+      description: EXPERIMENTAL — Honda Bosch radar fed into the longitudinal controller.
+      details: EXPERIMENTAL — Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller.
+    - key: NrdrHondaDashVariantB
+      widget: toggle
+      title: Honda Dashboard Variant B
+      description: Turn ON if your cluster is Variant B (4 dashed lane lines). Placeholder for now - has no effect yet.
+      details: Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is Variant B. Placeholder for now - has no effect until the rounding correction is built.
+    - key: LongPidTuneScaleAggressive
+      widget: option
+      title: Distance 1 / Aggressive PID Scale
+      description: Scales the longitudinal PID controller for the Aggressive personality (distance setting 1).
+      details: Defaults to 200%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LongPidTuneScaleStandard
+      widget: option
+      title: Distance 2 / Standard PID Scale
+      description: Scales the longitudinal PID controller for the Standard personality (distance setting 2).
+      details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LongPidTuneScaleRelaxed
+      widget: option
+      title: Distance 3 / Relaxed PID Scale
+      description: Scales the longitudinal PID controller for the Relaxed personality (distance setting 3).
+      details: Defaults to 80%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: LongPidTuneScaleEcon
+      widget: option
+      title: Distance 4 / Econ PID Scale
+      description: Scales the longitudinal PID controller for the Econ personality (distance setting 4).
+      details: Defaults to 50%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+      min: 0
+      max: 500
+      step: 5
+      unit: '%'
+    - key: NrdrCruiseOverspeedAllowance
+      widget: option
+      title: Set-Speed Overshoot Allowance
+      description: Allows the cruise target to follow vehicle speed by up to this amount above the set speed when no other speed target is lower.
+      details: 0 mph preserves stock behavior.
+      min: 0
+      max: 10
+      step: 1
+      unit: mph
+    - key: NrdrCruiseMismatchCorrection
+      widget: option
+      title: Cruise Mismatch Correction
+      description: Correct slight variances in final cruising target speed to better match the current and set speeds.
+      details: Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.
+      min: 95.0
+      max: 105.0
+      step: 0.1
+      unit: '%'
+    - key: HondaStoppingDecelRate
+      widget: option
+      title: Stopping Decel Rate
+      description: Brake-rate limiter used while coming to a stop (carcontroller).
+      min: 0
+      max: 100
+      step: 1
+    - key: HondaStopAccel
+      widget: option
+      title: Stop Accel
+      description: Target acceleration once stopped (holds the brake).
+      min: -4.0
+      max: 0.0
+      step: 0.01
+    - key: HondaStoppingDecelRateLong
+      widget: option
+      title: Planner Stopping Rate
+      description: How quickly commanded deceleration ramps down while coming to a stop.
+      min: 0.0
+      max: 5.0
+      step: 0.01
+    - key: HondaVEgoStopping
+      widget: option
+      title: vEgo Stopping
+      description: Speed (m/s) below which the planner treats the car as stopping.
+      min: 0.0
+      max: 3.0
+      step: 0.01
+    - key: HondaVEgoStarting
+      widget: option
+      title: vEgo Starting
+      description: Speed (m/s) above which the car is considered moving again.
+      min: 0.0
+      max: 3.0
+      step: 0.01

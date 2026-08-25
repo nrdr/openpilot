@@ -28,6 +28,8 @@ from openpilot.common.hardware import HARDWARE
 
 from openpilot.sunnypilot.mads.mads import ModularAssistiveDrivingSystem
 from openpilot.sunnypilot import get_sanitize_int_param
+from openpilot.sunnypilot.nrdr.events import filter_car_events
+from openpilot.sunnypilot.nrdr.selfdrived import NrdrSelfdrive
 from openpilot.sunnypilot.selfdrive.car.car_specific import CarSpecificEventsSP
 from openpilot.sunnypilot.selfdrive.car.cruise_helpers import CruiseHelper
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.controller import IntelligentCruiseButtonManagement
@@ -107,8 +109,8 @@ class SelfdriveD(CruiseHelper):
     self.sm = messaging.SubMaster(['deviceState', 'pandaStates', 'peripheralState', 'modelV2', 'extrinsicsCalibration',
                                    'carOutput', 'driverMonitoringState', 'longitudinalPlan', 'deviceMotion', 'lateralDelay',
                                    'managerState', 'vehicleParameters', 'radarState', 'lateralTorqueParameters',
-                                   'controlsState', 'carControl', 'driverAssistance', 'alertDebug', 'userBookmark',
-                                   'lateralManeuverPlan', 'modelDataV2SP', 'longitudinalPlanSP'] + \
+                                   'controlsState', 'carControl', 'driverAssistance', 'alertDebug', 'userBookmark', 'audioFeedback',
+                                   'lateralManeuverPlan', 'carStateSP', 'modelDataV2SP', 'longitudinalPlanSP'] + \
                                    self.camera_packets + self.sensor_packets + self.gps_packets,
                                   ignore_alive=ignore, ignore_avg_freq=ignore,
                                   ignore_valid=ignore, frequency=int(1/DT_CTRL))
@@ -184,6 +186,7 @@ class SelfdriveD(CruiseHelper):
 
     CruiseHelper.__init__(self, self.CP)
     self.button_state_tracker = ButtonStateTracker()
+    self.nrdr = NrdrSelfdrive()
 
   def update_events(self, CS):
     """Compute onroadEvents from carState"""
@@ -274,10 +277,10 @@ class SelfdriveD(CruiseHelper):
 
     # Add car events, ignore if CAN isn't valid
     if CS.canValid:
-      car_events = self.car_events.update(CS, self.CS_prev, self.sm['carControl']).to_msg()
+      car_events = filter_car_events(self.car_events.update(CS, self.CS_prev, self.sm['carControl']).to_msg())
       self.events.add_from_msg(car_events)
 
-      car_events_sp = self.car_events_sp.update(CS, self.events).to_msg()
+      car_events_sp = self.car_events_sp.update(CS, self.sm['carStateSP'], self.events).to_msg()
       self.events_sp.add_from_msg(car_events_sp)
 
       if self.CP.notCar:
@@ -511,16 +514,14 @@ class SelfdriveD(CruiseHelper):
     if CS.gearShifter == car.CarState.GearShifter.park and self.mads.enabled:
       self.events.remove(EventName.canBusMissing)
 
-    CruiseHelper.update(self, CS, self.events_sp, self.experimental_mode)
+    sla_state = self.sm['longitudinalPlanSP'].speedLimit.assist.state
+    button_reserved = self.nrdr.reserve_distance_button(sla_state)
+    if not button_reserved:
+      CruiseHelper.update(self, CS, self.events_sp, self.experimental_mode)
 
     # decrement personality on distance button press
-    if self.CP.openpilotLongitudinalControl:
-      if any(not be.pressed and be.type == ButtonType.gapAdjustCruise for be in CS.buttonEvents):
-        if not self.experimental_mode_switched:
-          self.personality = (self.personality - 1) % 3
-          self.params.put('LongitudinalPersonality', self.personality)
-          self.events.add(EventName.personalityChanged)
-        self.experimental_mode_switched = False
+    if self.nrdr.update_personality(self, CS, button_reserved):
+      self.events.add(EventName.personalityChanged)
 
     self.icbm.run(CS, self.sm['carControl'], self.sm['longitudinalPlanSP'], self.is_metric)
 
@@ -665,8 +666,6 @@ class SelfdriveD(CruiseHelper):
       self.is_ldw_enabled = self.params.get_bool("IsLdwEnabled")
       self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
       self.experimental_mode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
-      self.personality = self.params.get("LongitudinalPersonality", return_default=True)
-
       self.mads.read_params()
       time.sleep(0.1)
 

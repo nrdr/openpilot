@@ -13,9 +13,45 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
+import sys
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
+import pytest
+
 from openpilot.common.parameterized import parameterized
+
+
+# Schema generation only needs capability field declarations. Avoid loading the
+# Linux-only hardware/IPC extensions when these source regressions run on Windows.
+if sys.platform == "win32":
+  hardware_module = ModuleType("openpilot.common.hardware")
+  hardware_module.PC = True
+  hardware_module.HARDWARE = SimpleNamespace(get_device_type=lambda: "pc")
+  sys.modules.setdefault("openpilot.common.hardware", hardware_module)
+  hardware_hw_module = ModuleType("openpilot.common.hardware.hw")
+  hardware_hw_module.Paths = SimpleNamespace(persist_root=lambda: "")
+  sys.modules.setdefault("openpilot.common.hardware.hw", hardware_hw_module)
+
+  params_module = ModuleType("openpilot.common.params")
+  params_module.Params = type("Params", (), {
+    "get": lambda _self, _key, **_kwargs: None,
+    "get_bool": lambda _self, _key: False,
+  })
+  params_module.UnknownKeyName = type("UnknownKeyName", (Exception,), {})
+  sys.modules.setdefault("openpilot.common.params", params_module)
+
+  swaglog_module = ModuleType("openpilot.common.swaglog")
+  swaglog_module.cloudlog = SimpleNamespace(
+    exception=lambda *_args, **_kwargs: None,
+    warning=lambda *_args, **_kwargs: None,
+  )
+  sys.modules.setdefault("openpilot.common.swaglog", swaglog_module)
+
+  messaging_module = ModuleType("openpilot.cereal.messaging")
+  messaging_module.SubMaster = object
+  sys.modules.setdefault("openpilot.cereal.messaging", messaging_module)
 
 from openpilot.sunnypilot.sunnylink.tools.generate_settings_schema import (
   DEFINITION_PATH,
@@ -173,7 +209,12 @@ class TestTorqueOptionGeneration(OpenpilotTestCase):
     assert versions, "latcontrol_torque_versions.json must have at least one version"
     expected = _build_torque_options(versions)
     item = _find_item(schema, "TorqueControlTune")
-    assert item is not None, "TorqueControlTune item must be present"
+    if item is None:
+      # nrdr intentionally hides the global Torque/NNLC controls. The Clarity
+      # uses its fingerprint-scoped PID/NNLC hybrid and exposes only its safe knobs.
+      assert _find_item(schema, "EnforceTorqueControl") is None
+      assert _find_item(schema, "NrdrNnlcEnabled") is not None
+      return
     assert item.get("options") == expected
 
   def test_torque_versions_path_resolves(self):
@@ -205,6 +246,219 @@ class TestSpuriousOffroadGatesDropped(OpenpilotTestCase):
     item = _find_item(schema, "DynamicExperimentalControl")
     assert item is not None
     assert "offroad_only" not in _flatten_rule_types(item.get("enablement"))
+
+
+class TestDevicePowerPolicy:
+  def test_prevent_shutdown_is_offroad_only_and_precedes_timer(self, schema):
+    section = _find_section(schema, "device", "general")
+    assert section is not None
+    keys = [item["key"] for item in section["items"]]
+    prevent_index = keys.index("DisablePowerDown")
+    assert keys[prevent_index + 1] == "MaxTimeOffroad"
+
+    prevent = section["items"][prevent_index]
+    assert prevent["widget"] == "toggle"
+    assert prevent["title"] == "Prevent Automatic Shutdown"
+    assert "offroad_only" in _flatten_rule_types(prevent.get("enablement"))
+
+  def test_power_policy_copy_matches_native_ui(self, schema):
+    prevent = _find_item(schema, "DisablePowerDown")
+    assert prevent is not None
+    sunnylink_copy = f"{prevent.get('title', '')} {prevent.get('description', '')} {prevent.get('details', '')}".lower()
+    repo_root = Path(__file__).parents[4]
+    native_copy = (repo_root / "openpilot" / "selfdrive" / "ui" / "sunnypilot" / "layouts" / "settings" /
+                   "device.py").read_text(encoding="utf-8").lower()
+
+    for phrase in (
+      "prevent automatic shutdown",
+      "automatic offroad shutdowns",
+      "max time offroad timer",
+      "low-voltage and estimated-battery safeguards",
+      "drain the vehicle battery",
+      "60-second grace period",
+      "manual power off still works",
+    ):
+      assert phrase in sunnylink_copy
+      assert phrase in native_copy
+
+    assert 'enabled=lambda: ui_state.is_offroad() and not ui_state.params.get_bool("disablepowerdown")' in native_copy
+    assert 'tr("no time limit")' in native_copy
+
+    mici_copy = (repo_root / "openpilot" / "selfdrive" / "ui" / "sunnypilot" / "mici" / "layouts" /
+                 "device.py").read_text(encoding="utf-8").lower()
+    assert "disablepowerdown" in mici_copy
+    assert "prevent automatic\\nshutdown" in mici_copy
+    assert "battery drain risk" in mici_copy
+    assert "ui_state.is_offroad" in mici_copy
+
+  def test_offroad_timer_is_subordinate_and_not_mislabeled(self, schema):
+    timer = _find_item(schema, "MaxTimeOffroad")
+    assert timer is not None
+    assert timer["options"][0] == {"value": 0, "label": "No Time Limit"}
+    assert "Always On" not in json.dumps(timer)
+    assert "offroad_only" in _flatten_rule_types(timer.get("enablement"))
+    assert {"type": "param", "key": "DisablePowerDown", "equals": False} in timer["enablement"]
+
+    timer_copy = f"{timer.get('description', '')} {timer.get('details', '')}".lower()
+    assert "applies only when prevent automatic shutdown is disabled" in timer_copy
+    assert "battery safeguards may shut the device down sooner" in timer_copy
+
+
+class TestNrdrLongitudinalOptions:
+  PERSONALITY_SCALE_KEYS = (
+    "LongPidTuneScaleAggressive",
+    "LongPidTuneScaleStandard",
+    "LongPidTuneScaleRelaxed",
+    "LongPidTuneScaleEcon",
+  )
+
+  @pytest.mark.parametrize(("key", "widget"), [
+    ("NrdrHondaFullBrakeAuthority", "toggle"),
+    ("NrdrRoenAccelerationLimits", "toggle"),
+    ("NrdrCruiseOverspeedAllowance", "option"),
+  ])
+  def test_options_are_independent_of_live_learning_gas(self, schema, key, widget):
+    item = _find_item(schema, key)
+    assert item is not None
+    assert item.get("widget") == widget
+    rules = json.dumps((item.get("visibility") or []) + (item.get("enablement") or []))
+    assert "HondaLiveLearningGas" not in rules
+
+  def test_overspeed_allowance_range(self, schema):
+    item = _find_item(schema, "NrdrCruiseOverspeedAllowance")
+    assert item is not None
+    assert (item.get("min"), item.get("max"), item.get("step"), item.get("unit")) == (0, 10, 1, "mph")
+
+  def test_longitudinal_default_descriptions(self, schema):
+    roen = _find_item(schema, "NrdrRoenAccelerationLimits")
+    live_gas = _find_item(schema, "HondaLiveLearningGas")
+    assert "Enabled by default" in roen.get("details", "")
+    assert "default OFF when a gas pedal interceptor is detected" in live_gas.get("details", "")
+    assert "selection is preserved" in live_gas.get("details", "")
+
+  @pytest.mark.parametrize("key", PERSONALITY_SCALE_KEYS)
+  def test_personality_pid_scale_range(self, schema, key):
+    item = _find_item(schema, key)
+    assert item is not None
+    assert item.get("widget") == "option"
+    assert (item.get("min"), item.get("max"), item.get("step"), item.get("unit")) == (0, 500, 5, "%")
+
+  def test_longitudinal_panel_follows_toggle_then_option_order(self, schema):
+    section = _find_section(schema, "cruise", "nrdr")
+    assert section is not None
+    panel = next(sub_panel for sub_panel in section.get("sub_panels", []) if sub_panel.get("id") == "nrdr_longitudinal")
+    items = panel.get("items", [])
+    keys = [item["key"] for item in items]
+    widgets = [item["widget"] for item in items]
+    toggle_indices = [i for i, widget in enumerate(widgets) if widget == "toggle"]
+    option_indices = [i for i, widget in enumerate(widgets) if widget == "option"]
+    scale_indices = [keys.index(key) for key in self.PERSONALITY_SCALE_KEYS]
+
+    assert keys[0] == "HondaLiveLearningGas"
+    assert set(widgets) == {"toggle", "option"}
+    assert max(toggle_indices) < min(option_indices)
+    assert scale_indices == list(range(scale_indices[0], scale_indices[0] + len(self.PERSONALITY_SCALE_KEYS)))
+    assert [keys[index] for index in scale_indices] == list(self.PERSONALITY_SCALE_KEYS)
+
+  @pytest.mark.parametrize(
+    ("key", "default"),
+    tuple(zip(PERSONALITY_SCALE_KEYS, (200, 100, 80, 50), strict=True)),
+  )
+  def test_personality_pid_scale_describes_default(self, schema, key, default):
+    item = _find_item(schema, key)
+    assert item is not None
+    assert f"Defaults to {default}%" in item.get("details", "")
+
+
+class TestNrdrSteerRatioMode:
+  HANDCRAFTED_LOCKED_KEYS = (
+    "NrdrLegacyDualBpSteerRatio",
+    "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
+    "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
+    "NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord",
+    "NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g",
+    "NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight",
+    "NrdrLatStiction",
+    "HondaCenterScale",
+    "NrdrDriverOverrideThreshold",
+    "NrdrOverrideThresholdCenterBoost",
+    "HondaOverrideFadeDownSecs",
+    "HondaOverrideFadeUpSecs",
+    "NrdrNnlcEnabled",
+  )
+
+  def test_handcrafted_profile_is_first_and_documents_winning_behavior(self, schema):
+    section = _find_section(schema, "steering", "nrdr")
+    assert section is not None
+    assert section["items"][0]["key"] == "NrdrHandcraftedLateralTune"
+
+    item = section["items"][0]
+    assert item.get("widget") == "toggle"
+    assert "offroad_only" in _flatten_rule_types(item.get("enablement"))
+    description = f"{item.get('description', '')} {item.get('details', '')}".lower()
+    assert "off by default" in description
+    assert "enable this" in description
+    assert "leave this off" in description
+    assert "clarity-derived" in description
+    assert "firmware-derived" in description
+    assert "70 degrees" in description and "90 degrees" in description
+    assert "predictive stiction" in description
+    assert "nnlc disabled" in description
+    assert "pid-only" in description
+    assert "vehicle's own steering geometry" in description
+
+  @pytest.mark.parametrize("key", HANDCRAFTED_LOCKED_KEYS)
+  def test_winning_profile_controls_are_locked_while_handcrafted_is_on(self, schema, key):
+    item = _find_item(schema, key)
+    assert item is not None
+    assert "NrdrHandcraftedLateralTune" in json.dumps(item.get("enablement") or [])
+
+  def test_legacy_mode_is_explicit_and_fingerprint_scoped(self, schema):
+    item = _find_item(schema, "NrdrLegacyDualBpSteerRatio")
+    assert item is not None
+    assert item.get("widget") == "toggle"
+    visibility = json.dumps(item.get("visibility") or [])
+    assert "HONDA_CLARITY" in visibility
+    assert "HONDA_CIVIC" in visibility
+    assert "HONDA_ACCORD" in visibility
+    assert "HONDA_CRV_5G" in visibility
+    assert "HONDA_INSIGHT" in visibility
+    enablement = json.dumps(item.get("enablement") or [])
+    assert "NrdrHandcraftedLateralTune" in enablement
+    assert "not_engaged" in enablement
+
+  @pytest.mark.parametrize("key", [
+    "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
+    "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
+    "NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord",
+    "NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g",
+    "NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight",
+  ])
+  def test_steer_ratio_endpoints_cannot_change_while_engaged(self, schema, key):
+    item = _find_item(schema, key)
+    assert item is not None
+    assert "not_engaged" in json.dumps(item.get("enablement") or [])
+
+  def test_firmware_mode_documents_exact_handoff(self, schema):
+    item = _find_item(schema, "NrdrLegacyDualBpSteerRatio")
+    details = item.get("details", "")
+    assert "exactly through 70 degrees" in details
+    assert "70 to 90 degrees" in details
+    assert "above 90 degrees" in details
+
+  def test_lane_change_outer_sr_copy_matches_timed_fade_behavior(self, schema):
+    item = _find_item(schema, "NrdrLaneChangeEndpointSteerRatio")
+    sunnylink_copy = f"{item.get('title', '')} {item.get('description', '')} {item.get('details', '')}".lower()
+    repo_root = Path(__file__).parents[4]
+    native_copy = (repo_root / "openpilot" / "selfdrive" / "ui" / "sunnypilot" / "layouts" / "settings" /
+                   "nrdr_sub_layouts" / "pidf_ground.py").read_text(encoding="utf-8").lower()
+
+    for phrase in ("outer steer ratio", "1.5 seconds", "pre-lane-change waiting does not consume"):
+      assert phrase in sunnylink_copy
+      assert phrase in native_copy
+    for stale_phrase in ("complete active lane change", "entire maneuver", "resumes only after"):
+      assert stale_phrase not in sunnylink_copy
+      assert stale_phrase not in native_copy
 
 
 class TestNotEngagedReplacement(OpenpilotTestCase):

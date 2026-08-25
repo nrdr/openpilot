@@ -10,8 +10,8 @@ MAX_CURVATURE = 0.2
 MIN_STABLE_DELAY = 0.3
 
 # EU guidelines
-MAX_LATERAL_JERK = 5.0  # m/s^3
-MAX_LATERAL_ACCEL_NO_ROLL = 3.0  # m/s^2
+MAX_LATERAL_JERK = 10.0  # m/s^3
+MAX_LATERAL_ACCEL_NO_ROLL = 10.0  # m/s^2
 
 
 def should_stop(v_ego: float, a_target: float) -> bool:
@@ -42,7 +42,7 @@ def clip_curvature(v_ego, prev_curvature, new_curvature, roll) -> tuple[float, b
   return float(new_curvature), limited_accel or limited_max_curv
 
 
-def get_accel_from_plan(speeds, accels, t_idxs, action_t=DT_MDL):
+def get_accel_from_plan(speeds, accels, t_idxs, action_t=DT_MDL, v_ego_stopping=0.25):
   if len(speeds) == len(t_idxs):
     v_now = speeds[0]
     a_now = accels[0]
