@@ -92,7 +92,7 @@ RELEVANT_PARAMS = (
   "NrdrTuneLearnerRate",
   "NrdrTuneLearnerMap",
 )
-REQUIRED_SERVICES = frozenset(("carState", "carControl", "controlsState", "livePose", "modelV2", "lateralDelay", "vehicleParameters"))
+REQUIRED_SERVICES = frozenset(("carState", "carControl", "controlsState", "deviceMotion", "modelV2", "lateralDelay", "vehicleParameters"))
 
 
 def finite(value, default: float = math.nan) -> float:
@@ -495,8 +495,8 @@ def collect(sources: Sequence[str], log_kind: str = "auto", min_speed_mph: float
             finite(delay.lateralDelayEstimateStd), str(delay.status),
           ))
 
-        elif which == "livePose":
-          pose = msg.livePose
+        elif which == "deviceMotion":
+          pose = msg.deviceMotion
           pose_t = timestamp
           yaw_rate = finite(pose.angularVelocityDevice.z)
           pose_valid = bool(msg.valid and pose.inputsOK and pose.posenetOK and pose.sensorsOK and pose.angularVelocityDevice.valid)

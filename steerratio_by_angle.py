@@ -286,8 +286,8 @@ class SteerRatioReport:
             self.current_wheelbase = wheelbase
             self.car_data(fingerprint).wheelbases.add(round(wheelbase, 6))
 
-          elif which == "liveCalibration":
-            calibrator.feed_live_calib(event.liveCalibration)
+          elif which == "extrinsicsCalibration":
+            calibrator.feed_extrinsics_calibration(event.extrinsicsCalibration)
 
           elif which == "vehicleParameters":
             data = self.car_data(fingerprint)
@@ -330,7 +330,7 @@ class SteerRatioReport:
             lat_active = bool(event.carControl.latActive)
             car_control_t = t
 
-          elif which == "livePose" and not self.args.learned_only:
+          elif which == "deviceMotion" and not self.args.learned_only:
             data = self.car_data(fingerprint)
             if wheelbase is None or not calibrator.calib_valid:
               data.rejected_samples["missing car/calibration"] += 1
@@ -361,11 +361,11 @@ class SteerRatioReport:
             if abs(steering_state.steering_rate) > self.args.max_steering_rate:
               data.rejected_samples["steering-rate gate"] += 1
               continue
-            if not (event.livePose.inputsOK and event.livePose.posenetOK and event.livePose.sensorsOK):
+            if not (event.deviceMotion.inputsOK and event.deviceMotion.posenetOK and event.deviceMotion.sensorsOK):
               data.rejected_samples["invalid pose"] += 1
               continue
 
-            pose = calibrator.build_calibrated_pose(Pose.from_live_pose(event.livePose))
+            pose = calibrator.build_calibrated_pose(Pose.from_device_motion(event.deviceMotion))
             yaw_rate = float(pose.angular_velocity.xyz[2])
             if not math.isfinite(yaw_rate) or abs(yaw_rate) < self.args.min_yaw:
               data.rejected_samples["yaw gate"] += 1
