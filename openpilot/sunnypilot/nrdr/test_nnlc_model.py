@@ -1,5 +1,7 @@
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -35,6 +37,62 @@ def reset_live_params():
 
 
 class TestNNTorqueModel:
+
+  def test_controlsd_updates_clarity_hybrid_torque_parameters(self):
+    from openpilot.selfdrive.controls.controlsd import Controls
+
+    class EndControlsdPath(Exception):
+      pass
+
+    torque_params = SimpleNamespace(
+      useParams=True,
+      latAccelFactorFiltered=2.5,
+      latAccelOffsetFiltered=-0.125,
+      frictionCoefficientFiltered=0.2,
+    )
+    model_v2 = object()
+
+    class SubMasterStub:
+      updated = {"lateralDelay": False}
+
+      def __getitem__(self, service):
+        if service == "carState":
+          return SimpleNamespace(steeringAngleDeg=0.0, vEgo=20.0)
+        if service == "vehicleParameters":
+          return SimpleNamespace(roll=0.0)
+        if service == "lateralTorqueParameters":
+          return torque_params
+        if service == "modelV2":
+          return model_v2
+        if service == "longitudinalPlan":
+          raise EndControlsdPath
+        raise AssertionError(f"Unexpected service access: {service}")
+
+      def all_checks(self, services):
+        assert services == ["lateralTorqueParameters"]
+        return True
+
+    torque_controller = Mock(spec_set=["update_torque_parameters"])
+    hybrid = LatControlClarityHybrid.__new__(LatControlClarityHybrid)
+    hybrid.torque_controller = torque_controller
+    hybrid.extension = Mock()
+
+    controls = Controls.__new__(Controls)
+    controls.sm = SubMasterStub()
+    controls.CP = SimpleNamespace(lateralTuning=SimpleNamespace(which=lambda: "torque"))
+    controls.LaC = hybrid
+    controls.VM = Mock()
+    controls.VM.calc_curvature.return_value = 0.0
+    controls.lat_delay = 0.2
+
+    with patch("openpilot.selfdrive.controls.controlsd.vehicle_model_params", return_value=(0.0, 15.0, 0.0)), \
+         pytest.raises(EndControlsdPath):
+      controls.state_control()
+
+    torque_controller.update_torque_parameters.assert_called_once_with(2.5, -0.125, 0.2)
+    hybrid.extension.update_limits.assert_called_once_with()
+    hybrid.extension.update_model_v2.assert_called_once_with(model_v2)
+    hybrid.extension.update_lateral_lag.assert_called_once_with(0.2)
 
   @parameterized.expand([HONDA.HONDA_CIVIC, TOYOTA.TOYOTA_RAV4, HYUNDAI.HYUNDAI_SANTA_CRUZ_1ST_GEN])
   def test_load_model(self, car_name):

@@ -63,8 +63,8 @@ class LatControlClarityHybrid(LatControl):
     self.pid_controller.reset()
     self.torque_controller.reset()
 
-  def update_live_torque_params(self, latAccelFactor, latAccelOffset, friction):
-    self.torque_controller.update_live_torque_params(latAccelFactor, latAccelOffset, friction)
+  def update_torque_parameters(self, latAccelFactor, latAccelOffset, friction):
+    self.torque_controller.update_torque_parameters(latAccelFactor, latAccelOffset, friction)
 
   def _lane_change_state(self):
     model_v2 = self.torque_controller.extension.model_v2
