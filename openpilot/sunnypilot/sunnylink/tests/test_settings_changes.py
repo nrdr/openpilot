@@ -248,7 +248,7 @@ class TestSpuriousOffroadGatesDropped(OpenpilotTestCase):
     assert "offroad_only" not in _flatten_rule_types(item.get("enablement"))
 
 
-class TestDevicePowerPolicy:
+class TestDevicePowerPolicy(OpenpilotTestCase):
   def test_prevent_shutdown_is_offroad_only_and_precedes_timer(self, schema):
     section = _find_section(schema, "device", "general")
     assert section is not None
@@ -304,7 +304,7 @@ class TestDevicePowerPolicy:
     assert "battery safeguards may shut the device down sooner" in timer_copy
 
 
-class TestNrdrLongitudinalOptions:
+class TestNrdrLongitudinalOptions(OpenpilotTestCase):
   PERSONALITY_SCALE_KEYS = (
     "LongPidTuneScaleAggressive",
     "LongPidTuneScaleStandard",
@@ -378,7 +378,7 @@ class TestNrdrLongitudinalOptions:
     assert f"Defaults to {default}%" in item.get("details", "")
 
 
-class TestNrdrSteerRatioMode:
+class TestNrdrSteerRatioMode(OpenpilotTestCase):
   HANDCRAFTED_LOCKED_KEYS = (
     "NrdrLegacyDualBpSteerRatio",
     "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
