@@ -1,4 +1,4 @@
-from openpilot.sunnypilot.nrdr.params import read_bool, read_float
+from openpilot.nrdr.params import read_bool, read_float
 
 
 class FakeParams:

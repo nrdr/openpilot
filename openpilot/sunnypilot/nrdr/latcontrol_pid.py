@@ -12,7 +12,7 @@ from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile, normalize
 from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
 from openpilot.sunnypilot.nrdr.live_params import get_live_params
 from openpilot.sunnypilot.nrdr.tune_learner import TuneLearner
-from openpilot.sunnypilot.nrdr.params import read_bool, read_float
+from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
 from openpilot.sunnypilot.nrdr.phase_detector import phase_with_latch
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
   FirmwareLegacySteerRatioCurve,
@@ -124,8 +124,8 @@ class NrdrLatControlPID(LatControl):
     self.vgr_profile = get_honda_vgr_profile(CP)
     self.sr_values = list(self.sr_profile.default_values) if self.sr_profile else None
     self.firmware_legacy_sr_curve = None
-    self.legacy_dual_bp_sr = read_bool(self.params, "NrdrLegacyDualBpSteerRatio", True)
-    self.lane_change_endpoint_sr = read_bool(self.params, "NrdrLaneChangeEndpointSteerRatio", True)
+    self.legacy_dual_bp_sr = read_bool(self.params, NrdrParamKey.NRDR_LEGACY_DUAL_BP_STEER_RATIO, True)
+    self.lane_change_endpoint_sr = read_bool(self.params, NrdrParamKey.NRDR_LANE_CHANGE_ENDPOINT_STEER_RATIO, True)
     self.lane_change_sr_fade = LaneChangeSteerRatioFade(dt)
     self.center_boost_magnitude = 0.5
     self.center_boost_threshold = 3.0
@@ -237,18 +237,18 @@ class NrdrLatControlPID(LatControl):
         read_float(snapshot, f"{prefix}Standard", 1.0, 0.0, 5.0, scale=100.0),
         read_float(snapshot, f"{prefix}Highway", 1.0, 0.0, 5.0, scale=100.0),
       ]
-    self.center_boost_magnitude = read_float(snapshot, "HondaCenterScale", 0.5, 0.0, 5.0)
-    self.center_boost_threshold = read_float(snapshot, "HondaCenterBoostThreshold", 3.0, 0.0, 10.0)
-    self.center_boost_min_speed = read_float(snapshot, "HondaCenterBoostMinSpeed", 50.0, 0.0, 90.0)
-    self.rate_damping = read_float(snapshot, "NrdrLatRateDamping", 0.3, 0.0, 3.0, scale=100.0)
-    self.rate_damping_fade_speed = read_float(snapshot, "NrdrLatRateDampingFadeSpeed", 30.0, 0.0, 60.0) * MPH_TO_MS
-    self.injection_test = read_bool(snapshot, "HondaInjectionTest")
-    self.starpilot = read_bool(snapshot, "NrdrStarPilotPid")
-    self.stiction_enabled = read_bool(snapshot, "NrdrLatStiction")
+    self.center_boost_magnitude = read_float(snapshot, NrdrParamKey.HONDA_CENTER_SCALE, 0.5, 0.0, 5.0)
+    self.center_boost_threshold = read_float(snapshot, NrdrParamKey.HONDA_CENTER_BOOST_THRESHOLD, 3.0, 0.0, 10.0)
+    self.center_boost_min_speed = read_float(snapshot, NrdrParamKey.HONDA_CENTER_BOOST_MIN_SPEED, 50.0, 0.0, 90.0)
+    self.rate_damping = read_float(snapshot, NrdrParamKey.NRDR_LAT_RATE_DAMPING, 0.3, 0.0, 3.0, scale=100.0)
+    self.rate_damping_fade_speed = read_float(snapshot, NrdrParamKey.NRDR_LAT_RATE_DAMPING_FADE_SPEED, 30.0, 0.0, 60.0) * MPH_TO_MS
+    self.injection_test = read_bool(snapshot, NrdrParamKey.HONDA_INJECTION_TEST)
+    self.starpilot = read_bool(snapshot, NrdrParamKey.NRDR_STAR_PILOT_PID)
+    self.stiction_enabled = read_bool(snapshot, NrdrParamKey.NRDR_LAT_STICTION)
     if self.sr_profile is not None:
       self.sr_values[:] = [read_float(snapshot, key, default, 8.0, 25.0) for key, default in self.sr_profile.param_values]
-      self.legacy_dual_bp_sr = read_bool(snapshot, "NrdrLegacyDualBpSteerRatio", True)
-      self.lane_change_endpoint_sr = read_bool(snapshot, "NrdrLaneChangeEndpointSteerRatio", True)
+      self.legacy_dual_bp_sr = read_bool(snapshot, NrdrParamKey.NRDR_LEGACY_DUAL_BP_STEER_RATIO, True)
+      self.lane_change_endpoint_sr = read_bool(snapshot, NrdrParamKey.NRDR_LANE_CHANGE_ENDPOINT_STEER_RATIO, True)
       if self.vgr_profile is not None:
         self.firmware_legacy_sr_curve = FirmwareLegacySteerRatioCurve(
           self.vgr_profile, self.sr_values[0], self.sr_values[-1], self.sr_profile.outer_angle,

@@ -2,7 +2,7 @@ from openpilot.common.constants import CV
 from openpilot.common.realtime import DT_CTRL
 from openpilot.sunnypilot.nrdr.live_params import get_live_params
 from openpilot.sunnypilot.nrdr.nnlc_model import is_nnlc_forced
-from openpilot.sunnypilot.nrdr.params import read_bool, read_float
+from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
 from openpilot.sunnypilot.nrdr.pid import FeedforwardPIDController
 
 
@@ -26,14 +26,14 @@ class NrdrNnlc:
     snapshot = self.params.snapshot
     controller = self.controller
     was_enabled = controller.enabled
-    controller.enabled = self.base_enabled and read_bool(snapshot, "NrdrNnlcEnabled", False)
+    controller.enabled = self.base_enabled and read_bool(snapshot, NrdrParamKey.NRDR_NNLC_ENABLED, False)
     if was_enabled and not controller.enabled:
       controller._pid.reset()
-    activation_mph = read_float(snapshot, "NrdrNnlcActivationSpeed", self.DEFAULT_ACTIVATION_SPEED, 0.0, 100.0)
+    activation_mph = read_float(snapshot, NrdrParamKey.NRDR_NNLC_ACTIVATION_SPEED, self.DEFAULT_ACTIVATION_SPEED, 0.0, 100.0)
     controller.activation_speed_mps = activation_mph * CV.MPH_TO_MS
-    controller._pid._k_p = [[0.0], [read_float(snapshot, "NrdrNnlcKpGain", 1.0, 0.0, 3.0, scale=100.0)]]
-    controller._pid.k_f = read_float(snapshot, "NrdrNnlcKfGain", 0.5, 0.0, 3.0, scale=100.0)
-    controller._pid._k_i = [[0.0], [read_float(snapshot, "NrdrNnlcKiGain", 0.1, 0.0, 3.0, scale=100.0)]]
+    controller._pid._k_p = [[0.0], [read_float(snapshot, NrdrParamKey.NRDR_NNLC_KP_GAIN, 1.0, 0.0, 3.0, scale=100.0)]]
+    controller._pid.k_f = read_float(snapshot, NrdrParamKey.NRDR_NNLC_KF_GAIN, 0.5, 0.0, 3.0, scale=100.0)
+    controller._pid._k_i = [[0.0], [read_float(snapshot, NrdrParamKey.NRDR_NNLC_KI_GAIN, 0.1, 0.0, 3.0, scale=100.0)]]
     self.settings_generation = snapshot.generation
 
   def refresh(self) -> None:

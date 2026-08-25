@@ -3,7 +3,7 @@ import numpy as np
 
 from openpilot.common.params import Params
 from openpilot.sunnypilot.nrdr.live_params import get_live_params
-from openpilot.sunnypilot.nrdr.params import read_float
+from openpilot.nrdr.params import NrdrParamKey, read_float
 
 
 MS_TO_MPH = 2.23694
@@ -123,9 +123,9 @@ class TuneLearner:
   def _refresh_params(self) -> None:
     snapshot = self.settings.snapshot
     self.enabled = snapshot.get_bool("NrdrTuneLearner")
-    strength = read_float(snapshot, "NrdrTuneLearnerStrength", 0.10, 0.0, TRIM_HARD_FRAC, scale=100.0)
+    strength = read_float(snapshot, NrdrParamKey.NRDR_TUNE_LEARNER_STRENGTH, 0.10, 0.0, TRIM_HARD_FRAC, scale=100.0)
     self.max_trim = strength * self.steer_max
-    self.rate = read_float(snapshot, "NrdrTuneLearnerRate", 0.30, 0.0, 1.0, scale=100.0)
+    self.rate = read_float(snapshot, NrdrParamKey.NRDR_TUNE_LEARNER_RATE, 0.30, 0.0, 1.0, scale=100.0)
     reset_requested = snapshot.get_bool("NrdrTuneLearnerReset")
     if not reset_requested:
       self.reset_consumed = False

@@ -10,7 +10,7 @@ from openpilot.common.realtime import DT_CTRL
 from openpilot.sunnypilot.nrdr.live_params import get_live_params
 from openpilot.sunnypilot.nrdr.long_tune import LongTune
 from openpilot.sunnypilot.nrdr.longitudinal_stopping import compute_stopping_accel
-from openpilot.sunnypilot.nrdr.params import read_bool, read_float
+from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
 
 
 LongCtrlState = car.CarControl.Actuators.LongControlState
@@ -19,10 +19,10 @@ DREL_FILTER_ALPHA = 0.3
 ROEN_ACCEL_BP = (0.0, 5.0, 20.0)
 ROEN_NIDEC_ACCEL_MAX = (4.0, 4.0, 3.0)
 LONG_PID_SCALE_KEYS = (
-  "LongPidTuneScaleAggressive",
-  "LongPidTuneScaleStandard",
-  "LongPidTuneScaleRelaxed",
-  "LongPidTuneScaleEcon",
+  NrdrParamKey.LONG_PID_TUNE_SCALE_AGGRESSIVE,
+  NrdrParamKey.LONG_PID_TUNE_SCALE_STANDARD,
+  NrdrParamKey.LONG_PID_TUNE_SCALE_RELAXED,
+  NrdrParamKey.LONG_PID_TUNE_SCALE_ECON,
 )
 LONG_PID_SCALE_DEFAULTS = (2.0, 1.0, 0.8, 0.5)
 LONG_PID_SCALE_SLEW_PER_SECOND = 2.0
@@ -134,15 +134,15 @@ class NrdrLongControl:
       read_float(snapshot, key, default, 0.0, 5.0, scale=100.0)
       for key, default in zip(LONG_PID_SCALE_KEYS, LONG_PID_SCALE_DEFAULTS, strict=True)
     )
-    self.live_learning_gas = read_bool(snapshot, "HondaLiveLearningGas", not self.CP_SP.enableGasInterceptor)
-    self.static_feedforward = read_bool(snapshot, "StaticFeedforwardLong", True)
-    self.stop_accel = read_float(snapshot, "HondaStopAccel", self.CP.stopAccel, -10.0, 0.0)
+    self.live_learning_gas = read_bool(snapshot, NrdrParamKey.HONDA_LIVE_LEARNING_GAS, not self.CP_SP.enableGasInterceptor)
+    self.static_feedforward = read_bool(snapshot, NrdrParamKey.STATIC_FEEDFORWARD_LONG, True)
+    self.stop_accel = read_float(snapshot, NrdrParamKey.HONDA_STOP_ACCEL, self.CP.stopAccel, -10.0, 0.0)
     self.stopping_decel_rate = read_float(
-      snapshot, "HondaStoppingDecelRateLong", self.CP.deprecated.stoppingDecelRate, 0.0, 5.0,
+      snapshot, NrdrParamKey.HONDA_STOPPING_DECEL_RATE_LONG, self.CP.deprecated.stoppingDecelRate, 0.0, 5.0,
     )
-    self.v_ego_starting = read_float(snapshot, "HondaVEgoStarting", self.CP.deprecated.vEgoStarting, 0.0, 5.0)
-    self.v_ego_stopping = read_float(snapshot, "HondaVEgoStopping", self.CP.deprecated.vEgoStopping, 0.0, 5.0)
-    self.roen_acceleration_limits = read_bool(snapshot, "NrdrRoenAccelerationLimits", True)
+    self.v_ego_starting = read_float(snapshot, NrdrParamKey.HONDA_V_EGO_STARTING, self.CP.deprecated.vEgoStarting, 0.0, 5.0)
+    self.v_ego_stopping = read_float(snapshot, NrdrParamKey.HONDA_V_EGO_STOPPING, self.CP.deprecated.vEgoStopping, 0.0, 5.0)
+    self.roen_acceleration_limits = read_bool(snapshot, NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS, True)
     self.settings_generation = snapshot.generation
 
   def _accel_limits(self, accel_limits, v_ego: float):
