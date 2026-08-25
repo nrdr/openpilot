@@ -12,6 +12,7 @@ import openpilot.system.manager.manager as manager
 from openpilot.system.manager.process import ensure_running
 from openpilot.system.manager.process_config import managed_processes, procs
 from openpilot.common.hardware import HARDWARE
+from openpilot.sunnypilot.nrdr.manager import BOOL_DEFAULTS, VALUE_DEFAULTS
 
 os.environ['FAKEUPLOAD'] = "1"
 
@@ -43,10 +44,14 @@ class TestManager(OpenpilotTestCase):
 
     os.environ['PREPAREONLY'] = '1'
     manager.main()
+    nrdr_defaults = {**BOOL_DEFAULTS, **VALUE_DEFAULTS}
+    if HARDWARE.get_device_type() == "mici":
+      nrdr_defaults.pop("QuietMode", None)
     for k in params.all_keys():
       default_value = params.get_default_value(k)
-      if default_value is not None:
-        assert params.get(k) == default_value
+      expected_value = nrdr_defaults.get(k.decode("utf-8"), default_value)
+      if expected_value is not None:
+        assert params.get(k) == expected_value
     assert params.get("OpenpilotEnabledToggle")
     assert params.get("RouteCount") == 0
 
