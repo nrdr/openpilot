@@ -70,6 +70,14 @@ def scaled_pid_limits(neg_limit: float, pos_limit: float, feedforward: float,
   return neg_limit / scale, pos_limit / scale
 
 
+def longitudinal_pid_gains(CP):
+  tuning = CP.longitudinalTuning
+  return (
+    (tuning.deprecated.kpBP, tuning.deprecated.kpV),
+    (tuning.kiBP, tuning.kiV),
+  )
+
+
 def _state_transition(CP, CP_SP, active, state, should_stop, brake_pressed,
                       cruise_standstill, v_ego, v_ego_starting):
   cruise_standstill = cruise_standstill and not CP_SP.enableGasInterceptor
@@ -98,11 +106,7 @@ class NrdrLongControl:
     self.CP = CP
     self.CP_SP = CP_SP
     self.long_control_state = LongCtrlState.off
-    self.pid = PIDController(
-      (CP.longitudinalTuning.kpBP, CP.longitudinalTuning.kpV),
-      (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV),
-      rate=1 / DT_CTRL,
-    )
+    self.pid = PIDController(*longitudinal_pid_gains(CP), rate=1 / DT_CTRL)
     self.params = get_live_params()
     self.settings_generation = -1
     self.tune = LongTune()

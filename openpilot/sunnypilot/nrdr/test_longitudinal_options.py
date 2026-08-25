@@ -45,6 +45,7 @@ from openpilot.sunnypilot.nrdr.longcontrol import (
   LongCtrlState,
   NrdrLongControl,
   effective_long_pid_scale,
+  longitudinal_pid_gains,
   scaled_pid_limits,
 )
 from openpilot.sunnypilot.nrdr.longitudinal_planner import NrdrLongitudinalPlanner, apply_cruise_overspeed_allowance
@@ -56,6 +57,16 @@ def _long_control(*, enabled: bool, nidec: bool = True, gas_interceptor: bool = 
   control.CP = SimpleNamespace(brand=brand, flags=HondaFlags.NIDEC if nidec else 0)
   control.CP_SP = SimpleNamespace(enableGasInterceptor=gas_interceptor)
   return control
+
+
+def test_longitudinal_pid_gains_use_current_compatibility_group():
+  cp = SimpleNamespace(longitudinalTuning=SimpleNamespace(
+    deprecated=SimpleNamespace(kpBP=[0.0], kpV=[0.0]),
+    kiBP=[0.0, 5.0],
+    kiV=[1.2, 0.8],
+  ))
+
+  assert longitudinal_pid_gains(cp) == (([0.0], [0.0]), ([0.0, 5.0], [1.2, 0.8]))
 
 
 def test_roen_limits_raise_only_nidec_pedal_ceiling():

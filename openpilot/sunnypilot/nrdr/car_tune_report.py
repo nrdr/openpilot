@@ -131,9 +131,9 @@ class CarTuneReporter:
 
     pid_base, pid_feedforward, pid_speeds = self._pid_info(CP)
     longitudinal = CP.longitudinalTuning
-    long_base = f"P {_format_values(longitudinal.kpV)} | I {_format_values(longitudinal.kiV)}"
-    if hasattr(longitudinal, "kf"):
-      long_base += f" | F {float(longitudinal.kf):g}"
+    long_deprecated = longitudinal.deprecated
+    long_base = f"P {_format_values(long_deprecated.kpV)} | I {_format_values(longitudinal.kiV)}"
+    long_base += f" | F {float(long_deprecated.kf):g}"
 
     pid_low = f"P {self._value('LatPScaleLowSpeed')}% | I {self._value('LatIScaleLowSpeed')}% | F {self._value('LatFScaleLowSpeed')}%"
     pid_mid = f"P {self._value('LatPScaleStandard')}% | I {self._value('LatIScaleStandard')}% | F {self._value('LatFScaleStandard')}%"

@@ -258,13 +258,11 @@ class LateralTuningLayout(Widget):
 
     try:
       lt = CP.longitudinalTuning
+      lt_deprecated = lt.deprecated
       lines.append("<b>" + tr("LONGITUDINAL PID") + "</b>")
-      lines.append(f"kp: [{self._fmt_vals(lt.kpV)}] @ [{self._fmt_bp_mph(lt.kpBP)}] mph")
+      lines.append(f"kp: [{self._fmt_vals(lt_deprecated.kpV)}] @ [{self._fmt_bp_mph(lt_deprecated.kpBP)}] mph")
       lines.append(f"ki: [{self._fmt_vals(lt.kiV)}] @ [{self._fmt_bp_mph(lt.kiBP)}] mph")
-      try:
-        lines.append(f"kf: {float(lt.kf):g}")
-      except Exception:
-        pass
+      lines.append(f"kf: {float(lt_deprecated.kf):g}")
     except Exception:
       lines.append(tr("Longitudinal tuning: unavailable"))
     lines.append("")
