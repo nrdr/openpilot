@@ -42,6 +42,7 @@ class TestPackageBoundaries(unittest.TestCase):
     self.assertEqual(package_path.parent.name, "openpilot")
     self.assertIsNotNone(import_module("openpilot.nrdr.features"))
     self.assertIsNotNone(import_module("openpilot.nrdr.hooks"))
+    self.assertIsNotNone(import_module("openpilot.nrdr.tools"))
     self.assertIsNotNone(import_module("openpilot.nrdr.ui"))
 
   def test_legacy_parameter_module_forwards_public_objects(self):
@@ -116,3 +117,33 @@ class TestPackageBoundaries(unittest.TestCase):
       elif isinstance(node, ast.ImportFrom) and node.module is not None:
         imported.append(node.module)
     self.assertFalse(any(name.startswith(forbidden_prefixes) for name in imported), imported)
+
+  def test_legacy_steer_ratio_analysis_preserves_all_public_object_identities(self):
+    canonical = import_module("openpilot.nrdr.tools.sr_correction_analysis")
+    legacy = import_module("openpilot.sunnypilot.nrdr.sr_correction_analysis")
+    canonical_path = Path(canonical.__file__).resolve()
+    tree = ast.parse(canonical_path.read_text(), filename=canonical_path.name)
+    module_defined: set[str] = set()
+    for node in tree.body:
+      if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+        if not node.name.startswith("_"):
+          module_defined.add(node.name)
+      elif isinstance(node, ast.Assign):
+        for target in node.targets:
+          if isinstance(target, ast.Name) and not target.id.startswith("_"):
+            module_defined.add(target.id)
+      elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and not node.target.id.startswith("_"):
+        module_defined.add(node.target.id)
+
+    self.assertIn("T", module_defined)
+    self.assertEqual(set(legacy.__all__), module_defined)
+    self.assertEqual(len(legacy.__all__), len(module_defined))
+    for name in legacy.__all__:
+      with self.subTest(name=name):
+        self.assertIs(getattr(legacy, name), getattr(canonical, name))
+
+  def test_root_steer_ratio_cli_imports_the_canonical_analysis_module(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    source = (repository_root / "steerratio_correction.py").read_text()
+    self.assertIn("from openpilot.nrdr.tools.sr_correction_analysis import", source)
+    self.assertNotIn("from openpilot.sunnypilot.nrdr.sr_correction_analysis import", source)

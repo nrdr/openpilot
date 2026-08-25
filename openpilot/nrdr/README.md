@@ -16,6 +16,7 @@ openpilot/nrdr/
 ├── params/    contracts, startup policy, profiles, snapshots, and typed access
 ├── features/  self-contained NRDR behavior
 ├── hooks/     small adapters called by openpilot processes
+├── tools/     offline NRDR analysis helpers
 ├── ui/        NRDR-owned presentation and settings integration
 └── tests/     package and boundary tests
 ```
@@ -27,6 +28,8 @@ The separation is intentional:
 - `features` owns algorithms.  Parameter mechanics do not belong here.
 - `hooks` translates openpilot state into calls to NRDR features.  Hooks should
   remain small and contain no tuning algorithm.
+- `tools` owns offline analysis libraries. Compatibility modules may retain old
+  import paths while scripts move to this canonical package.
 - `ui` owns NRDR presentation.  Shared parameter metadata may be consumed here,
   while custom screen layout remains explicit.
 
@@ -53,6 +56,9 @@ forwarders so external users are not broken while production call sites move.
   handcrafted parameter profiles, and openpilot-process live snapshots.
 - In progress: shared native/Sunnylink UI metadata. The first six lateral P/I
   scale controls now have one declarative owner with output-parity tests.
+- In progress: implementation relocation. The steer-ratio correction analysis
+  library is the first canonical `tools` module; its legacy import remains a
+  forwarding facade.
 - Compatibility only: the old defaults, handcrafted-profile, and live-snapshot
   modules under `openpilot.sunnypilot.nrdr`.
 - Pending: the remaining UI metadata, feature algorithms, hook implementations,

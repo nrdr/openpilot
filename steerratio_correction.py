@@ -19,7 +19,7 @@ from statistics import median
 import sys
 import time
 
-from openpilot.sunnypilot.nrdr.sr_correction_analysis import (
+from openpilot.nrdr.tools.sr_correction_analysis import (
   BinKey,
   CommandSample,
   CenterBiasEstimate,
