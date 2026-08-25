@@ -109,7 +109,7 @@ class SelfdriveD(CruiseHelper):
     self.sm = messaging.SubMaster(['deviceState', 'pandaStates', 'peripheralState', 'modelV2', 'extrinsicsCalibration',
                                    'carOutput', 'driverMonitoringState', 'longitudinalPlan', 'deviceMotion', 'lateralDelay',
                                    'managerState', 'vehicleParameters', 'radarState', 'lateralTorqueParameters',
-                                   'controlsState', 'carControl', 'driverAssistance', 'alertDebug', 'userBookmark', 'audioFeedback',
+                                   'controlsState', 'carControl', 'driverAssistance', 'alertDebug', 'userBookmark',
                                    'lateralManeuverPlan', 'carStateSP', 'modelDataV2SP', 'longitudinalPlanSP'] + \
                                    self.camera_packets + self.sensor_packets + self.gps_packets,
                                   ignore_alive=ignore, ignore_avg_freq=ignore,
