@@ -338,9 +338,9 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     radar = _find_item(schema, "HondaBoschARadar")
     assert radar is not None
     copy = f"{radar.get('description', '')} {radar.get('details', '')}".lower()
-    assert "stock honda longitudinal control" in copy
-    assert "openpilot longitudinal control is enabled" in copy
-    assert "radar ecu is silenced" in copy
+    assert "stock longitudinal or openpilot alpha long" in copy
+    assert "feed openpilot's lead tracking" in copy
+    assert "factory honda aeb/cmbs remains unavailable" in copy
 
   @parameterized.expand(PERSONALITY_SCALE_KEYS, names=["key"])
   def test_personality_pid_scale_range(self, schema, key):

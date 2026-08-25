@@ -204,9 +204,10 @@ class LongitudinalTuningLayout(Widget):
       param="HondaBoschARadar",
       title=lambda: tr("Honda Bosch-A Radar (Default: ON)"),
       description=lambda: tr(
-        "EXPERIMENTAL - Decodes the factory radar on supported Honda Bosch-A vehicles while stock Honda longitudinal control is active. " +
+        "EXPERIMENTAL - Decodes the factory radar on supported Honda Bosch-A vehicles with stock longitudinal or openpilot Alpha Long. " +
         "The reverse-engineered object format has not been road-validated on every supported model, so disable this setting if radar tracks " +
-        "look incorrect. When openpilot longitudinal control is enabled, Honda's radar ECU is silenced and this decoder remains unavailable."
+        "look incorrect. With Alpha Long, these tracks feed openpilot's lead tracking and longitudinal commands; factory Honda AEB/CMBS " +
+        "remains unavailable."
       ),
     )
 

@@ -3,11 +3,11 @@
 NRDR includes an experimental decoder for the factory radar used by supported plain Honda
 Bosch-A platforms. The feature is controlled by `HondaBoschARadar` and is enabled by default.
 
-The decoder is active only while the vehicle retains stock Honda longitudinal control. When
-openpilot longitudinal control is enabled, the normal Honda initialization path silences the
-radar ECU, reports radar unavailable, and does not construct this decoder. This feature must
-not be presented as an openpilot-longitudinal radar source or as preserving factory AEB while
-openpilot longitudinal control is active.
+The receive-only decoder remains active with either stock Honda longitudinal control or openpilot
+Alpha Long. With stock longitudinal, the decoded objects are perception only. With Alpha Long,
+they feed openpilot's lead tracking and therefore its braking and acceleration decisions. Honda's
+normal Alpha Long initialization still silences the factory ACC command path and disables factory
+AEB/CMBS; the camera-side Bosch-A object stream remains available to this decoder.
 
 The radar object format is reverse-engineered. Its range, relative speed, azimuth, slot
 assembly, validity, and stale-track behavior are covered by offline tests, but every supported
