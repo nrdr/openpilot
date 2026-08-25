@@ -67,7 +67,11 @@ Current status on `nrdr-architecture-development`:
   low/standard/high-speed lateral P/I scale controls. Their native and
   Sunnylink adapters now consume one definition while preserving the existing
   layouts, generated schema, translations, and edit rules.
-- The remaining Step 3 controls and Steps 4 through 6 remain pending.
+- Step 4 has started with the standard-library steer-ratio analysis helpers,
+  now owned by `openpilot.nrdr.tools`; the former SunnyPilot module remains an
+  explicit compatibility facade.
+- The remaining Step 3 controls, driving features/hooks, and Steps 5 through 6
+  remain pending.
 
 1. Add the first-class package, typed parameter catalog, generated registry
    artifacts, tests, and compatibility forwarding with no behavior change.
@@ -75,8 +79,9 @@ Current status on `nrdr-architecture-development`:
    migrations into `params`; retain temporary forwarding imports.
 3. Make native UI and Sunnylink consume shared parameter metadata while keeping
    custom layouts handwritten.
-4. Move existing NRDR implementations into domain folders under `features` and
-   reduce their openpilot call sites to hooks.
+4. Move existing NRDR implementations into domain folders under `features`,
+   offline utilities under `tools`, and reduce their openpilot call sites to
+   hooks.
 5. Replace direct opendbc Params reads with typed configuration passed across
    the car-interface boundary.
 6. Remove compatibility modules only after downstream imports and deployed
