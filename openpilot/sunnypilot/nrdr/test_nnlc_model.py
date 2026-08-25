@@ -149,8 +149,8 @@ class TestNNTorqueModel:
       CS = car.CarState.new_message()
       CS.steeringAngleDeg = 100.0
       VM = VehicleModel(CP)
-      live_params = log.LiveParametersData.new_message()
-      controller.update(False, CS, VM, live_params, False, 0.0, None, False, 0.2)
+      vehicle_params = log.VehicleParameters.new_message()
+      controller.update(False, CS, VM, vehicle_params, False, 0.0, None, False, 0.2)
       assert abs(VM.sR - 16.188) < 1e-6
 
       # Exercise the real PID interpolation while active. The hybrid previously
@@ -160,7 +160,7 @@ class TestNNTorqueModel:
         AssertionError("disabled NNLC ran the torque controller")
       )
       CS.vEgo = 10.0 * CV.MPH_TO_MS
-      controller.update(True, CS, VM, live_params, False, 0.0, None, False, 0.2)
+      controller.update(True, CS, VM, vehicle_params, False, 0.0, None, False, 0.2)
 
       # Firmware EPS mode is PID-only until NNLC can dewarp both position and rate coordinates.
       params.put_bool("NrdrLegacyDualBpSteerRatio", False, block=True)
@@ -170,7 +170,7 @@ class TestNNTorqueModel:
       controller.nnlc_blend = 1.0
       controller.extension._pid.i = 0.2
       VM.sR = 17.123
-      controller.update(True, CS, VM, live_params, False, 0.0, None, False, 0.2)
+      controller.update(True, CS, VM, vehicle_params, False, 0.0, None, False, 0.2)
       assert controller.nnlc_blend == 0.0
       assert controller.extension._pid.i == 0.0
       assert VM.sR == 17.123
