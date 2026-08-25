@@ -336,6 +336,14 @@ class TestNrdrLongitudinalOptions:
     assert "default OFF when a gas pedal interceptor is detected" in live_gas.get("details", "")
     assert "selection is preserved" in live_gas.get("details", "")
 
+  def test_honda_bosch_a_radar_scope_is_explicit(self, schema):
+    radar = _find_item(schema, "HondaBoschARadar")
+    assert radar is not None
+    copy = f"{radar.get('description', '')} {radar.get('details', '')}".lower()
+    assert "stock honda longitudinal control" in copy
+    assert "openpilot longitudinal control is enabled" in copy
+    assert "radar ecu is silenced" in copy
+
   @pytest.mark.parametrize("key", PERSONALITY_SCALE_KEYS)
   def test_personality_pid_scale_range(self, schema, key):
     item = _find_item(schema, key)
