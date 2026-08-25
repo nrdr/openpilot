@@ -85,8 +85,8 @@ These settings eliminate steering wheel vibrations, optimize steering wheel retu
 Once your lateral control, stopping, and overrides are perfectly dialed, activate the radar:
 
 * **`HondaBoschARadar` (Default: `ON`)**
-   - **What it does**: Decodes the factory object tracks on supported Honda Bosch-A vehicles while stock Honda longitudinal control is active.
-   - **Important**: The decoder is reverse-engineered and has not been road-validated on every supported model. With openpilot longitudinal control enabled, Honda's radar ECU is silenced and this decoder remains unavailable.
+   - **What it does**: Decodes the factory object tracks on supported Honda Bosch-A vehicles with either stock Honda longitudinal or openpilot Alpha Long.
+   - **Important**: With Alpha Long, the tracks feed openpilot's lead tracking and longitudinal commands, while factory Honda AEB/CMBS remains unavailable. The decoder is reverse-engineered and has not been road-validated on every supported model.
 
 ---
 
@@ -104,4 +104,4 @@ Once your lateral control, stopping, and overrides are perfectly dialed, activat
 | **`HondaUnwindFreeze`** | `OFF` | `ON / OFF` | Freezes PID integrator on steer unwind |
 | **`HondaUnwindLookahead`** | `OFF` | `ON / OFF` | Looks ahead in model path to start unwind early |
 | **`HondaLiveLearningGas`** | `OFF with gas interceptor` | `ON / OFF` | Adapts gas/wind compensation factors live; the first detected Honda sets the initial value and later user changes persist |
-| **`HondaBoschARadar`** | `ON` | `ON / OFF` | Decodes supported Honda Bosch-A factory radar tracks in stock-longitudinal mode |
+| **`HondaBoschARadar`** | `ON` | `ON / OFF` | Decodes supported Honda Bosch-A factory radar tracks with stock longitudinal or Alpha Long |

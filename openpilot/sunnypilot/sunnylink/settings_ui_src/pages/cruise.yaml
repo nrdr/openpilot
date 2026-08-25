@@ -307,8 +307,8 @@ sections:
     - key: HondaBoschARadar
       widget: toggle
       title: Honda Bosch-A Radar (experimental)
-      description: Decodes the factory radar on supported Honda Bosch-A vehicles while stock Honda longitudinal control is active.
-      details: EXPERIMENTAL — The reverse-engineered object format has not been road-validated on every supported model. Disable this setting if radar tracks look incorrect. When openpilot longitudinal control is enabled, Honda's radar ECU is silenced and this decoder remains unavailable.
+      description: Decodes the factory radar on supported Honda Bosch-A vehicles with stock longitudinal or openpilot Alpha Long.
+      details: EXPERIMENTAL — The reverse-engineered object format has not been road-validated on every supported model. Disable this setting if radar tracks look incorrect. With Alpha Long, these tracks feed openpilot's lead tracking and longitudinal commands; factory Honda AEB/CMBS remains unavailable.
     - key: NrdrHondaDashVariantB
       widget: toggle
       title: Honda Dashboard Variant B
