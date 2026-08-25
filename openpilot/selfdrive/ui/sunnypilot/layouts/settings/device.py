@@ -11,7 +11,7 @@ from openpilot.common.hardware import HARDWARE
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp, multiple_button_item_sp, button_item_sp, \
-  dual_button_item_sp, Spacer
+  dual_button_item_sp, toggle_item_sp, Spacer
 from openpilot.system.ui.widgets import DialogResult
 from openpilot.system.ui.widgets.button import ButtonStyle
 from openpilot.system.ui.widgets.confirm_dialog import alert_dialog, ConfirmDialog
@@ -53,13 +53,13 @@ class DeviceLayoutSP(DeviceLayout):
 
     self._max_time_offroad = option_item_sp(
       title=lambda: tr("Max Time Offroad"),
-      description=lambda: tr("Device will automatically shutdown after set time once the engine is turned off.\n(30h is the default)"),
+      description=lambda: tr("Sets the automatic shutdown timer after the vehicle is turned off. This applies only when Prevent Automatic Shutdown is disabled; battery safeguards may shut the device down sooner.\n(30h is the default)"),  # noqa: E501
       param="MaxTimeOffroad",
       min_value=0,
       max_value=11,
       value_change_step=1,
       on_value_changed=None,
-      enabled=True,
+      enabled=lambda: ui_state.is_offroad() and not ui_state.params.get_bool("DisablePowerDown"),
       icon="",
       value_map=offroad_time_options,
       label_width=360,
@@ -76,6 +76,13 @@ class DeviceLayoutSP(DeviceLayout):
       button_width=364,
       callback=None,
       inline=True,
+    )
+
+    self._disable_power_down = toggle_item_sp(
+      title=lambda: tr("Prevent Automatic Shutdown"),
+      description=lambda: tr("Prevents openpilot's automatic offroad shutdowns after the vehicle is turned off. This bypasses the Max Time Offroad timer and its low-voltage and estimated-battery safeguards, and can drain the vehicle battery. When disabled, those safeguards resume after a 60-second grace period. Manual Power Off still works."),  # noqa: E501
+      param="DisablePowerDown",
+      enabled=ui_state.is_offroad,
     )
 
     self._quiet_mode_and_dcam = dual_button_item_sp(
@@ -120,6 +127,8 @@ class DeviceLayoutSP(DeviceLayout):
       button_item_sp(lambda: tr("Change Language"), lambda: tr("CHANGE"), callback=self._show_language_dialog),
       LineSeparator(),
       self._device_wake_mode,
+      LineSeparator(),
+      self._disable_power_down,
       LineSeparator(),
       self._max_time_offroad,
       LineSeparator(height=10),
@@ -182,7 +191,7 @@ class DeviceLayoutSP(DeviceLayout):
 
   @staticmethod
   def _update_max_time_offroad_label(value: int) -> str:
-    label = tr("Always On") if value == 0 else f"{value}" + tr("m") if value < 60 else f"{value // 60}" + tr("h")
+    label = tr("No Time Limit") if value == 0 else f"{value}" + tr("m") if value < 60 else f"{value // 60}" + tr("h")
     label += tr(" (Default)") if value == 1800 else ""
     return label
 

@@ -4,6 +4,12 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source "$DIR/launch_env.sh"
 
+# Recreate local developer helpers after branch switches, reinstalls, or factory resets.
+# This is the actual boot entry on the August base; launch_openpilot.sh only delegates here.
+if [[ -f "${DIR}/scripts/setup_dev_helpers.sh" ]]; then
+  bash "${DIR}/scripts/setup_dev_helpers.sh" || true
+fi
+
 function agnos_init {
   # TODO: move this to agnos
   sudo rm -f /data/etc/NetworkManager/system-connections/*.nmmeta

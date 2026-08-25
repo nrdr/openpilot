@@ -64,6 +64,8 @@ dev = [
 
 testing = [
   "coverage",
+  "pytest",
+  "pytest-mock",
   "ty",
   "ruff",
   "codespell",

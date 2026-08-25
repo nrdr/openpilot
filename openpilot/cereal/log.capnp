@@ -88,6 +88,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     stockAeb @52;
     stockLkas @98;
     lateralManeuver @99;
+    gasInterceptorFault @104;
     ldw @53;
     carUnrecognized @54;
     invalidLkasSetting @55;
@@ -145,6 +146,7 @@ enum LongitudinalPersonality {
   aggressive @0;
   standard @1;
   relaxed @2;
+  econ @3;
 }
 
 struct InitData {
@@ -1238,6 +1240,12 @@ struct LongitudinalPlan @0xe00b5b3eba12876c {
 
 
   solverExecutionTime @35 :Float32;
+
+  # lead trajectories the MPC solved against (13 points at T_IDXS)
+  leadTrajectoryX0 @40 :List(Float32);
+  leadTrajectoryV0 @41 :List(Float32);
+  leadTrajectoryX1 @42 :List(Float32);
+  leadTrajectoryV1 @43 :List(Float32);
 
   enum LongitudinalPlanSource {
     cruise @0;

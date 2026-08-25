@@ -3,6 +3,7 @@ import math
 from openpilot.cereal import log
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.common.pid import PIDController
+from openpilot.sunnypilot.nrdr.latcontrol_pid import NrdrLatControlPID
 
 
 class LatControlPID(LatControl):
@@ -13,8 +14,18 @@ class LatControlPID(LatControl):
                              pos_limit=self.steer_max, neg_limit=-self.steer_max)
     self.ff_factor = CP.lateralTuning.pid.kf
     self.get_steer_feedforward = CI.get_steer_feedforward_function()
+    self.nrdr_controller = NrdrLatControlPID(CP, CP_SP, CI, dt) if NrdrLatControlPID.supports(CP, CP_SP) else None
+
+  def update_model_v2(self, model_v2):
+    if self.nrdr_controller is not None:
+      self.nrdr_controller.update_model_v2(model_v2)
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, calibrated_pose, curvature_limited, lat_delay):
+    if self.nrdr_controller is not None:
+      return self.nrdr_controller.update(
+        active, CS, VM, params, steer_limited_by_safety, desired_curvature, calibrated_pose, curvature_limited, lat_delay,
+      )
+
     pid_log = log.ControlsState.LateralPIDState.new_message()
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)

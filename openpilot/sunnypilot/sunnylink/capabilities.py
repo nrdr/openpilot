@@ -14,6 +14,7 @@ from opendbc.sunnypilot.car.tesla.values import TeslaFlagsSP
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import get_handcrafted_lateral_profile
 
 
 # Wire-protocol version for the capabilities payload. Bump on breaking changes
@@ -29,6 +30,7 @@ CAPABILITY_FIELDS = (
   "icbm_available",
   "torque_allowed",
   "brand",
+  "car_fingerprint",
   "pcm_cruise",
   "alpha_long_available",
   "steer_control_type",
@@ -42,6 +44,7 @@ CAPABILITY_FIELDS = (
   "device_type",
   "subaru_has_sng",
   "hyundai_alpha_long_available",
+  "has_handcrafted_lateral_profile",
 )
 
 CAPABILITY_LABELS: dict[str, str] = {
@@ -51,6 +54,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "icbm_available": "ICBM available",
   "torque_allowed": "torque steering (not available for angle steering vehicles)",
   "brand": "Vehicle brand",
+  "car_fingerprint": "Vehicle fingerprint",
   "pcm_cruise": "PCM cruise",
   "alpha_long_available": "Alpha Longitudinal available",
   "steer_control_type": "Steer control type",
@@ -64,11 +68,13 @@ CAPABILITY_LABELS: dict[str, str] = {
   "device_type": "Device type",
   "subaru_has_sng": "Subaru Stop-and-Go available",
   "hyundai_alpha_long_available": "Hyundai Alpha Longitudinal available",
+  "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
 }
 
 # Explicit defaults for non-boolean capability fields
 CAPABILITY_DEFAULTS: dict[str, bool | str | int] = {
   "brand": "",
+  "car_fingerprint": "",
   "steer_control_type": "",
   "device_type": "",
   "protocol_version": PROTOCOL_VERSION,
@@ -147,6 +153,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
     try:
       CP = messaging.log_from_bytes(CP_bytes, car.CarParams)
       caps["alpha_long_available"] = bool(CP.alphaLongitudinalAvailable)
+      caps["car_fingerprint"] = str(CP.carFingerprint)
       if CP.alphaLongitudinalAvailable:
         caps["has_longitudinal_control"] = params.get_bool("AlphaLongitudinalEnabled")
       else:
@@ -178,6 +185,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
       cloudlog.exception("capabilities: failed to deserialize CarParamsSPPersistent")
 
   _resolve_brand_capabilities(caps, bundle_platform, CP)
+  caps["has_handcrafted_lateral_profile"] = get_handcrafted_lateral_profile(caps["car_fingerprint"] or bundle_platform) is not None
 
   return caps
 

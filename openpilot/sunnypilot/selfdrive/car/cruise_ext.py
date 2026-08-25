@@ -13,7 +13,7 @@ from openpilot.common.constants import CV
 from openpilot.common.params import Params
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import get_minimum_set_speed
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.speed_limit_assist import ACTIVE_STATES as SLA_ACTIVE_STATES
-from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import compare_cluster_target
+from openpilot.sunnypilot.nrdr.speed_limit import compare_cluster_target, quantize_set_speed
 
 ButtonType = car.CarState.ButtonEvent.Type
 SpeedLimitAssistState = custom.LongitudinalPlanSP.SpeedLimit.AssistState
@@ -22,8 +22,8 @@ CRUISE_BUTTON_TIMER = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0,
                        ButtonType.setCruise: 0, ButtonType.resumeCruise: 0,
                        ButtonType.cancel: 0, ButtonType.mainCruise: 0}
 
-V_CRUISE_MIN = 8
-V_CRUISE_MAX = 145
+V_CRUISE_MIN = 0
+V_CRUISE_MAX = 169
 V_CRUISE_UNSET = 255
 
 
@@ -54,6 +54,8 @@ class VCruiseHelperSP:
     self.long_increment = self.params.get("CustomAccLongPressIncrement", return_default=True)
 
     self.enable_button_timers = CRUISE_BUTTON_TIMER
+
+    self.is_metric = True
 
     # Speed Limit Assist
     self.sla_state = SpeedLimitAssistState.disabled
@@ -109,13 +111,20 @@ class VCruiseHelperSP:
     return enabled
 
   def update_speed_limit_assist(self, is_metric, LP_SP: custom.LongitudinalPlanSP) -> None:
+    self.is_metric = is_metric
+
     resolver = LP_SP.speedLimit.resolver
     self.has_speed_limit = resolver.speedLimitValid or resolver.speedLimitLastValid
     self.speed_limit_final_last = LP_SP.speedLimit.resolver.speedLimitFinalLast
     self.speed_limit_final_last_kph = self.speed_limit_final_last * CV.MS_TO_KPH
     self.sla_state = LP_SP.speedLimit.assist.state
-    self.req_plus, self.req_minus = compare_cluster_target(self.v_cruise_cluster_kph * CV.KPH_TO_MS,
-                                                           self.speed_limit_final_last, is_metric)
+
+    self.req_plus, self.req_minus = compare_cluster_target(
+      self.v_cruise_cluster_kph * CV.KPH_TO_MS,
+      self.speed_limit_final_last,
+      is_metric,
+      self.CP,
+    )
 
   @property
   def update_speed_limit_final_last_changed(self) -> bool:
@@ -133,7 +142,8 @@ class VCruiseHelperSP:
   def update_speed_limit_assist_v_cruise_non_pcm(self) -> None:
     if self.sla_state in SLA_ACTIVE_STATES and (self.prev_sla_state not in SLA_ACTIVE_STATES or
                                                 self.update_speed_limit_final_last_changed):
-      self.v_cruise_kph = np.clip(round(self.speed_limit_final_last_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
+      target_kph = quantize_set_speed(self.speed_limit_final_last_kph, self.is_metric, self.CP)
+      self.v_cruise_kph = np.clip(target_kph, self.v_cruise_min, V_CRUISE_MAX)
 
     self.prev_sla_state = self.sla_state
     self.prev_speed_limit_final_last_kph = self.speed_limit_final_last_kph

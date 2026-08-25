@@ -14,6 +14,7 @@ from openpilot.common.constants import CV
 from openpilot.selfdrive.ui.onroad.hud_renderer import UI_CONFIG
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode as SpeedLimitMode
+from openpilot.sunnypilot.nrdr.speed_limit import pre_active_icon
 from openpilot.common.hardware import HARDWARE
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
@@ -66,6 +67,8 @@ class SpeedLimitAlertRenderer:
 
   def speed_limit_pre_active_icon_helper(self):
     icon_alpha = max(0.0, min(self._pre_active_fade.alpha * 255.0, 255.0))
+    if icon := pre_active_icon(icon_alpha):
+      return icon
     txt_icon = self.arrow_blank
     icon_margin_x = 10
     icon_margin_y = 18
@@ -221,6 +224,8 @@ class SpeedLimitRenderer(Widget, SpeedLimitAlertRenderer):
 
   def _draw_pre_active_arrow(self, sign_rect):
     _, txt_icon, icon_alpha, _, _ = SpeedLimitAlertRenderer.speed_limit_pre_active_icon_helper(self)
+    if txt_icon is None:
+      return
     if icon_alpha > 0 and txt_icon != self.arrow_blank:
       sign_margin = 12
       arrow_spacing = int(sign_margin * 1.4)

@@ -12,6 +12,7 @@ from numpy import interp
 from openpilot.common.params import Params
 from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot.selfdrive.controls.lib.dec.constants import WMACConstants
+from openpilot.sunnypilot.nrdr.dec import enforce_mode_dwell, slow_down_threshold
 from typing import Literal
 
 # d-e2e, from modeldata.h
@@ -101,7 +102,7 @@ class ModeTransitionManager:
         self.mode_confidence[m] = max(0.0, self.mode_confidence[m] - 0.05)
 
     # Require minimum duration in current mode (unless emergency)
-    if self.mode_duration < self.min_mode_duration and not self.emergency_override:
+    if enforce_mode_dwell(self, mode):
       return
 
     # Hysteresis: higher threshold for mode changes
@@ -259,7 +260,7 @@ class DynamicExperimentalController:
 
       self._slow_down_filter.add_data(urgency)
       urgency_filtered = self._slow_down_filter.get_value() or 0.0
-      self._has_slow_down = urgency_filtered > WMACConstants.SLOW_DOWN_PROB
+      self._has_slow_down = urgency_filtered > slow_down_threshold(WMACConstants.SLOW_DOWN_PROB, self._has_slow_down, 1.0, 0.625)
       self._urgency = urgency_filtered
       return
 
@@ -299,7 +300,7 @@ class DynamicExperimentalController:
     urgency_filtered = self._slow_down_filter.get_value() or 0.0
 
     # Update state with lower threshold for better stop detection
-    self._has_slow_down = urgency_filtered > (WMACConstants.SLOW_DOWN_PROB * 0.8)
+    self._has_slow_down = urgency_filtered > slow_down_threshold(WMACConstants.SLOW_DOWN_PROB, self._has_slow_down, 0.8, 0.5)
     self._urgency = urgency_filtered
 
   def _radarless_mode(self) -> None:

@@ -254,9 +254,19 @@ class TestKnownPanels(OpenpilotTestCase):
     sub_ids = {sp["id"] for sp in _iter_all_sub_panels(steering)}
     assert "mads_settings" in sub_ids
 
+  def test_nrdr_car_info_contains_screenshot_summary(self, schema):
+    steering = next(p for p in schema["panels"] if p["id"] == "steering")
+    car_info = next(sp for sp in _iter_all_sub_panels(steering) if sp["id"] == "nrdr_car_info")
+    keys = [item["key"] for item in car_info["items"]]
+    assert keys == [
+      "NrdrCarTuneInfo", "NrdrCarControllerInfo", "NrdrCarHandcraftedInfo", "NrdrCarPidLowInfo",
+      "NrdrCarPidMidInfo", "NrdrCarPidHighInfo", "NrdrCarDampingInfo", "NrdrCarCenterInfo", "NrdrCarNnlcInfo",
+      "NrdrCarSteerRatioInfo", "NrdrCarLearningInfo", "NrdrCarHelpersInfo",
+    ]
+
   def test_mutual_exclusion_torque_nnlc(self, schema):
-    """EnforceTorqueControl, EnhancedLatAccel, and NNLC must reference each other in enablement."""
-    torque = nnlc = enhanced = None
+    """MVL's global controllers and nrdr's scoped NNLC control must all remain available."""
+    torque = nnlc = enhanced = nrdr_nnlc = None
     for panel in schema["panels"]:
       for item in _iter_panel_items(panel):
         if item["key"] == "EnforceTorqueControl":
@@ -265,9 +275,12 @@ class TestKnownPanels(OpenpilotTestCase):
           nnlc = item
         elif item["key"] == "LateralJerkTorqueController":
           enhanced = item
+        elif item["key"] == "NrdrNnlcEnabled":
+          nrdr_nnlc = item
     assert torque is not None, "EnforceTorqueControl item missing"
     assert nnlc is not None, "NeuralNetworkLateralControl item missing"
     assert enhanced is not None, "LateralJerkTorqueController item missing"
+    assert nrdr_nnlc is not None, "nrdr's scoped NNLC toggle is missing"
     torque_enable_keys = {r.get("key") for r in torque.get("enablement", []) if r.get("type") == "param"}
     assert "NeuralNetworkLateralControl" in torque_enable_keys
     nnlc_enable_keys = {r.get("key") for r in nnlc.get("enablement", []) if r.get("type") == "param"}
@@ -349,9 +362,10 @@ class TestItemCompleteness(OpenpilotTestCase):
           f"{item['key']}: min ({item['min']}) must be < max ({item['max']})"
 
   def test_known_param_has_options(self, schema):
-    """LongitudinalPersonality should have 3 options."""
+    """nrdr adds Econ to the three upstream longitudinal personalities."""
     cruise = next(p for p in schema["panels"] if p["id"] == "cruise")
     lp = next((i for i in _iter_panel_items(cruise) if i["key"] == "LongitudinalPersonality"), None)
     assert lp is not None
     assert "options" in lp
-    assert len(lp["options"]) == 3
+    assert [option["value"] for option in lp["options"]] == [0, 1, 2, 3]
+    assert lp["options"][-1]["label"] == "Econ"

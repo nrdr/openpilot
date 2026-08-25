@@ -12,6 +12,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiState
 from openpilot.system.ui.lib.application import gui_app, FontWeight, FONT_SCALE
 from openpilot.system.ui.lib.text_measure import measure_text_cached
+from openpilot.sunnypilot.nrdr.circular_alerts import StandstillLatch
 
 
 class CircularAlertsRenderer:
@@ -25,6 +26,7 @@ class CircularAlertsRenderer:
     self._lead_depart_alert = False
     self._standstill_elapsed_time = 0.0
     self._is_standstill = False
+    self.nrdr_standstill = StandstillLatch()
     self._alert_text = ""
     self._alert_img = None
     self._allow_e2e_alerts = False
@@ -35,7 +37,7 @@ class CircularAlertsRenderer:
     car_state = sm['carState']
     self._green_light_alert = lp_sp.e2eAlerts.greenLightAlert
     self._lead_depart_alert = lp_sp.e2eAlerts.leadDepartAlert
-    self._is_standstill = car_state.standstill
+    self._is_standstill = self.nrdr_standstill.update(car_state.standstill, ui_state.started, gui_app.target_fps)
 
     if not ui_state.started:
       self._standstill_elapsed_time = 0.0

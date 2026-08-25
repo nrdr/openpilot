@@ -10,18 +10,21 @@ from difflib import SequenceMatcher
 
 from opendbc.car import structs
 from openpilot.common.basedir import BASEDIR
+from openpilot.sunnypilot.nrdr.nnlc_model import get_forced_nnlc_model
 
 TORQUE_NN_MODEL_PATH = os.path.join(BASEDIR, "openpilot", "sunnypilot", "neural_network_data", "neural_network_lateral_control")
 TORQUE_NN_MODEL_SUBSTITUTE_PATH = os.path.join(BASEDIR, "opendbc_repo", "opendbc", "car", "torque_data/substitute.toml")
 MOCK_MODEL_PATH = os.path.join(TORQUE_NN_MODEL_PATH, "MOCK.json")
-
-
 def similarity(s1: str, s2: str) -> float:
   return SequenceMatcher(None, s1, s2).ratio()
 
 
 def get_nn_model_path(CP: structs.CarParams) -> tuple[str, str, bool]:
   car_fingerprint = CP.carFingerprint
+  forced_model_path = get_forced_nnlc_model(CP)
+  if forced_model_path is not None:
+    return forced_model_path, os.path.splitext(os.path.basename(forced_model_path))[0], True
+
   eps_fw = str(next((fw.fwVersion for fw in CP.carFw if fw.ecu == "eps"), ""))
 
   def check_nn_path(_nn_candidate):

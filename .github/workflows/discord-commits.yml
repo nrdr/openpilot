@@ -1,0 +1,235 @@
+name: Discord repository notifications
+
+on:
+  push:
+    # Every branch, including branches containing slashes.
+    branches:
+      - '**'
+
+  # PR notifications are the bonus round.
+  # pull_request_target lets notifications work for forked PRs too.
+  # This workflow does NOT check out or execute PR code.
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+      - closed
+
+permissions:
+  contents: read
+
+jobs:
+  notify-discord:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Post commits and pull requests
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+
+
+          WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
+          EVENT_NAME = os.environ["GITHUB_EVENT_NAME"]
+          EVENT_PATH = os.environ["GITHUB_EVENT_PATH"]
+
+
+          def clip(value, maximum):
+              value = str(value or "")
+              if len(value) <= maximum:
+                  return value
+              return value[: maximum - 1] + "…"
+
+
+          def inline_code(value):
+              return clip(str(value or "").replace("`", "'"), 100)
+
+
+          def send_to_discord(message):
+              """Send a Discord webhook message and handle rate limiting."""
+              encoded = json.dumps(message).encode("utf-8")
+
+              for attempt in range(6):
+                  request = urllib.request.Request(
+                      WEBHOOK_URL,
+                      data=encoded,
+                      headers={
+                          "Content-Type": "application/json",
+                          "User-Agent": "GitHub-Actions-Discord-Notifier",
+                      },
+                      method="POST",
+                  )
+
+                  try:
+                      with urllib.request.urlopen(request, timeout=30):
+                          return
+
+                  except urllib.error.HTTPError as error:
+                      response_body = error.read().decode("utf-8", errors="replace")
+
+                      if error.code == 429:
+                          try:
+                              retry_after = float(
+                                  json.loads(response_body).get("retry_after", 1)
+                              )
+                          except (ValueError, TypeError, json.JSONDecodeError):
+                              retry_after = 1
+
+                          time.sleep(retry_after + 0.25)
+                          continue
+
+                      raise RuntimeError(
+                          f"Discord returned HTTP {error.code}: {response_body}"
+                      ) from error
+
+              raise RuntimeError("Discord continued rate-limiting the webhook.")
+
+
+          with open(EVENT_PATH, encoding="utf-8") as event_file:
+              event = json.load(event_file)
+
+
+          if EVENT_NAME == "push":
+              repository = event["repository"]["full_name"]
+              repository_url = event["repository"]["html_url"]
+              branch = event.get("ref", "").removeprefix("refs/heads/")
+
+              # GitHub supplies every commit included in this push here.
+              for commit in event.get("commits", []):
+                  sha = commit.get("id", "")[:7]
+                  commit_url = commit.get("url", repository_url)
+
+                  full_message = (
+                      commit.get("message") or "(No commit message)"
+                  ).strip()
+
+                  title, separator, description = full_message.partition("\n")
+                  author = commit.get("author") or {}
+                  author_name = (
+                      author.get("username")
+                      or author.get("name")
+                      or "Unknown author"
+                  )
+
+                  files_changed = sum(
+                      len(commit.get(category, []))
+                      for category in ("added", "modified", "removed")
+                  )
+
+                  embed = {
+                      "title": clip(title, 256),
+                      "url": commit_url,
+                      "color": 0x57F287,
+                      "fields": [
+                          {
+                              "name": "Commit",
+                              "value": f"[`{sha}`]({commit_url})",
+                              "inline": True,
+                          },
+                          {
+                              "name": "Branch",
+                              "value": f"`{inline_code(branch)}`",
+                              "inline": True,
+                          },
+                          {
+                              "name": "Author",
+                              "value": clip(author_name, 100),
+                              "inline": True,
+                          },
+                          {
+                              "name": "Files changed",
+                              "value": str(files_changed),
+                              "inline": True,
+                          },
+                          {
+                              "name": "Repository",
+                              "value": f"[{repository}]({repository_url})",
+                              "inline": True,
+                          },
+                      ],
+                      "footer": {
+                          "text": "New commit pushed"
+                      },
+                  }
+
+                  if separator and description.strip():
+                      embed["description"] = clip(description.strip(), 1500)
+
+                  if commit.get("timestamp"):
+                      embed["timestamp"] = commit["timestamp"]
+
+                  send_to_discord({
+                      "embeds": [embed],
+                      # Prevent commit messages from pinging @everyone or roles.
+                      "allowed_mentions": {
+                          "parse": []
+                      },
+                  })
+
+                  # Gentle spacing for pushes containing many commits.
+                  time.sleep(0.4)
+
+
+          elif EVENT_NAME == "pull_request_target":
+              pull_request = event["pull_request"]
+              action = event["action"]
+              number = event["number"]
+
+              if action == "closed":
+                  status = "merged" if pull_request.get("merged") else "closed"
+              else:
+                  status = action.replace("_", " ")
+
+              colors = {
+                  "opened": 0x57F287,
+                  "reopened": 0x57F287,
+                  "ready for review": 0xFEE75C,
+                  "merged": 0x9B59B6,
+                  "closed": 0xED4245,
+              }
+
+              embed = {
+                  "title": clip(
+                      f"PR #{number} {status}: {pull_request['title']}",
+                      256,
+                  ),
+                  "url": pull_request["html_url"],
+                  "color": colors.get(status, 0x5865F2),
+                  "fields": [
+                      {
+                          "name": "Author",
+                          "value": clip(pull_request["user"]["login"], 100),
+                          "inline": True,
+                      },
+                      {
+                          "name": "From",
+                          "value": f"`{inline_code(pull_request['head']['label'])}`",
+                          "inline": True,
+                      },
+                      {
+                          "name": "Into",
+                          "value": f"`{inline_code(pull_request['base']['label'])}`",
+                          "inline": True,
+                      },
+                  ],
+                  "footer": {
+                      "text": event["repository"]["full_name"]
+                  },
+                  "timestamp": pull_request["updated_at"],
+              }
+
+              send_to_discord({
+                  "embeds": [embed],
+                  "allowed_mentions": {
+                      "parse": []
+                  },
+              })
+          PY

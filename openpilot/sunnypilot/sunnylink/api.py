@@ -10,6 +10,7 @@ from openpilot.common.api.base import BaseApi
 from openpilot.common.params import Params
 from openpilot.common.hardware import HARDWARE
 from openpilot.common.hardware.hw import Paths
+from openpilot.sunnypilot.nrdr.sunnylink import persist_dongle_id, restore_dongle_id
 
 API_HOST = os.getenv('SUNNYLINK_API_HOST', 'https://stg.api.sunnypilot.ai')
 UNREGISTERED_SUNNYLINK_DONGLE_ID = "UnregisteredDevice"
@@ -43,6 +44,7 @@ class SunnylinkApi(BaseApi):
 
   def _resolve_dongle_ids(self):
     sunnylink_dongle_id = self.params.get("SunnylinkDongleId")
+    sunnylink_dongle_id = restore_dongle_id(self.params, sunnylink_dongle_id)
     comma_dongle_id = self.dongle_id or self.params.get("DongleId")
     return sunnylink_dongle_id, comma_dongle_id
 
@@ -138,6 +140,7 @@ class SunnylinkApi(BaseApi):
           break
 
     self.params.put("SunnylinkDongleId", sunnylink_dongle_id or UNREGISTERED_SUNNYLINK_DONGLE_ID, block=True)
+    persist_dongle_id(sunnylink_dongle_id)
 
     # Set the last ping time to the current time since we were just talking to the API
     last_ping = int((time.monotonic() if successful_registration else start_time) * 1e9)

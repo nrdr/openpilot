@@ -3,16 +3,17 @@ import numpy as np
 
 from opendbc.car.structs import car
 from openpilot.common.constants import CV
+from openpilot.sunnypilot.nrdr.cruise import NrdrCruise
 from openpilot.sunnypilot.selfdrive.car.cruise_ext import VCruiseHelperSP
 
 
 # WARNING: this value was determined based on the model's training distribution,
 #          model predictions above this speed can be unpredictable
 # V_CRUISE's are in kph
-V_CRUISE_MIN = 8
-V_CRUISE_MAX = 145
+V_CRUISE_MIN = 0
+V_CRUISE_MAX = 169
 V_CRUISE_UNSET = 255
-V_CRUISE_INITIAL = 40
+V_CRUISE_INITIAL = 0
 V_CRUISE_INITIAL_EXPERIMENTAL_MODE = 105
 IMPERIAL_INCREMENT = round(CV.MPH_TO_KPH, 1)  # round here to avoid rounding errors incrementing set speed
 
@@ -38,12 +39,14 @@ class VCruiseHelper(VCruiseHelperSP):
     self.v_cruise_kph_last = 0
     self.button_timers = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0}
     self.button_change_states = {btn: {"standstill": False, "enabled": False} for btn in self.button_timers}
+    self.nrdr = NrdrCruise(CP)
 
   @property
   def v_cruise_initialized(self):
     return self.v_cruise_kph != V_CRUISE_UNSET
 
   def update_v_cruise(self, CS, enabled, is_metric):
+    self.nrdr.begin_update(is_metric)
     self.v_cruise_kph_last = self.v_cruise_kph
 
     self.get_minimum_set_speed(is_metric)
@@ -108,10 +111,13 @@ class VCruiseHelper(VCruiseHelperSP):
     if not self.button_change_states[button_type]["enabled"]:
       return
 
-    # Speed Limit Assist for Non PCM long cars.
-    # True: Disallow set speed changes when user confirmed the target set speed during preActive state
-    # False: Allow set speed changes as SLA is not requesting user confirmation
-    if self.update_speed_limit_assist_pre_active_confirmed(button_type):
+    if not self.nrdr.allow_speed_change():
+      return
+
+    honda_speed = self.nrdr.update_honda_imperial(self, CS, button_type, long_press, V_CRUISE_MAX)
+    if honda_speed is not None:
+      self.v_cruise_kph = honda_speed
+      self.v_cruise_cluster_kph = honda_speed
       return
 
     long_press, v_cruise_delta = VCruiseHelperSP.update_v_cruise_delta(self, long_press, v_cruise_delta)
@@ -149,6 +155,7 @@ class VCruiseHelper(VCruiseHelperSP):
     if any(b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) for b in CS.buttonEvents) and self.v_cruise_initialized:
       self.v_cruise_kph = self.v_cruise_kph_last
     else:
-      self.v_cruise_kph = int(round(np.clip(CS.vEgo * CV.MS_TO_KPH, initial, V_CRUISE_MAX)))
+      initial_speed = np.clip(CS.vEgo * CV.MS_TO_KPH, initial, V_CRUISE_MAX)
+      self.v_cruise_kph = self.nrdr.initial_speed(initial_speed)
 
     self.v_cruise_cluster_kph = self.v_cruise_kph

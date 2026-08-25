@@ -194,6 +194,7 @@ class HudRenderer(Widget):
     if ui_state.usbgpu and ui_state.usbgpu_compiled:
       self._draw_model_source(rect)
 
+    self._draw_additional_speed(rect)
     self._draw_steering_wheel(rect)
 
   def _draw_model_source(self, rect: rl.Rectangle) -> None:
@@ -230,6 +231,8 @@ class HudRenderer(Widget):
     pos = rl.Vector2(rect.x + rect.width - 10 - icon.width,
                      rect.y + rect.height - 14 - (self._txt_wheel.height + icon.height) / 2)
     rl.draw_texture_ex(icon, pos, 0.0, 1.0, rl.Color(255, 255, 255, int(255 * opacity * alpha)))
+  def _draw_additional_speed(self, rect: rl.Rectangle) -> None:
+    pass
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     wheel_txt = self._txt_wheel_critical if self._show_wheel_critical else self._txt_wheel
@@ -290,8 +293,7 @@ class HudRenderer(Widget):
     rl.draw_circle_gradient(rl.Vector2(x + circle_radius, y + circle_radius), circle_radius,
                             rl.Color(0, 0, 0, int(255 / 2 * alpha)), rl.BLANK)
 
-    set_speed_color = rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
-    max_color = rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
+    set_speed_color = max_color = self._set_speed_color(alpha)
 
     set_speed = self.set_speed
     if self.is_cruise_set and not ui_state.is_metric:
@@ -316,6 +318,9 @@ class HudRenderer(Widget):
       0,
       max_color,
     )
+
+  def _set_speed_color(self, alpha: float) -> rl.Color:
+    return rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
 
   def _draw_current_speed(self, rect: rl.Rectangle) -> None:
     """Draw the current vehicle speed and unit."""

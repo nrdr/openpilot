@@ -8,9 +8,10 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.sunnypilot.onroad.blind_spot_indicators import BlindSpotIndicators
+from openpilot.sunnypilot.nrdr.mici_hud import NrdrHudRenderer
 
 
-class HudRendererSP(HudRenderer):
+class HudRendererSP(NrdrHudRenderer, HudRenderer):
   def __init__(self):
     super().__init__()
     self.blind_spot_indicators = BlindSpotIndicators()
@@ -24,5 +25,4 @@ class HudRendererSP(HudRenderer):
     self.blind_spot_indicators.render(rect)
 
   def _has_blind_spot_detected(self) -> bool:
-
     return self.blind_spot_indicators.detected

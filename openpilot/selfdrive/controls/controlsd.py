@@ -22,7 +22,10 @@ from openpilot.selfdrive.controls.lib.longcontrol import LongControl
 from openpilot.selfdrive.modeld.modeld import LAT_SMOOTH_SECONDS
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
 
+from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
+from openpilot.sunnypilot.nrdr.controlsd import apply_hud_lead, stopping_inputs, vehicle_model_params
+from openpilot.sunnypilot.nrdr.events import allow_longitudinal
 
 State = log.SelfdriveState.OpenpilotState
 LaneChangeState = log.LaneChangeState
@@ -80,14 +83,15 @@ class Controls(ControlsExt):
 
   def state_control(self):
     CS = self.sm['carState']
+    if self.sm.updated["lateralDelay"]:
+      self.lat_delay = get_lat_delay(self.params, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay)
 
     # Update VehicleModel
     lp = self.sm['vehicleParameters']
-    x = max(lp.stiffnessFactor, 0.1)
-    sr = max(lp.steerRatio, 0.1)
+    x, sr, angle_offset = vehicle_model_params(self, lp)
     self.VM.update_params(x, sr)
 
-    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - lp.angleOffsetDeg)
+    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - angle_offset)
     self.curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
 
     # Update Torque Params
@@ -103,6 +107,9 @@ class Controls(ControlsExt):
 
       self.LaC.extension.update_lateral_lag(self.lat_delay)
 
+    elif self.CP.lateralTuning.which() == 'pid':
+      self.LaC.update_model_v2(self.sm['modelV2'])
+
     long_plan = self.sm['longitudinalPlan']
     model_v2 = self.sm['modelV2']
 
@@ -117,7 +124,8 @@ class Controls(ControlsExt):
 
     CC.latActive = _lat_active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
                    (not standstill or self.CP.steerAtStandstill)
-    CC.longActive = CC.enabled and not any(e.overrideLongitudinal for e in self.sm['onroadEvents']) and \
+    CC.longActive = CC.enabled and allow_longitudinal(CS, self.CI.DRIVABLE_GEARS, self.CP.brand) and \
+                    not any(e.overrideLongitudinal for e in self.sm['onroadEvents']) and \
                     (self.CP.openpilotLongitudinalControl or not self.CP_SP.pcmCruiseSpeed)
 
     actuators = CC.actuators
@@ -136,7 +144,10 @@ class Controls(ControlsExt):
 
     # accel PID loop
     pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, self.CP_SP, CS.vEgo, CS.vCruise * CV.KPH_TO_MS)
-    actuators.accel = float(self.LoC.update(CC.longActive, CS, long_plan.aTarget, long_plan.shouldStop, pid_accel_limits))
+    long_pitch, long_drel = stopping_inputs(self.calibrated_pose, long_plan)
+    actuators.accel = float(self.LoC.update(CC.longActive, CS, long_plan.aTarget, long_plan.shouldStop, pid_accel_limits,
+                                            pitch=long_pitch, drel=long_drel,
+                                            personality=self.sm['selfdriveState'].personality))
 
     # Steering PID loop and lateral MPC
     # Reset desired curvature to current to avoid violating the limits on engage
@@ -156,7 +167,7 @@ class Controls(ControlsExt):
       bool(CS.leftBlinker or CS.rightBlinker))
 
     self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll)
-    lat_delay = self.sm["lateralDelay"].lateralDelay + LAT_SMOOTH_SECONDS
+    lat_delay = self.lat_delay + LAT_SMOOTH_SECONDS
 
     actuators.curvature = self.desired_curvature
     steer, lateral_output, lac_log = self.LaC.update(CC.latActive, CS, self.VM, lp,
@@ -181,6 +192,7 @@ class Controls(ControlsExt):
 
   def publish(self, CC, lac_log):
     CS = self.sm['carState']
+    longitudinal_allowed = allow_longitudinal(CS, self.CI.DRIVABLE_GEARS, self.CP.brand)
 
     # Orientation and angle rates can be useful for carcontroller
     # Only calibrated (car) frame is relevant for the carcontroller
@@ -190,8 +202,9 @@ class Controls(ControlsExt):
       CC.angularVelocity = self.calibrated_pose.angular_velocity.xyz.tolist()
 
     CC.cruiseControl.override = CC.enabled and not CC.longActive and (self.CP.openpilotLongitudinalControl or not self.CP_SP.pcmCruiseSpeed)
-    CC.cruiseControl.cancel = CS.cruiseState.enabled and (not CC.enabled or not self.CP.pcmCruise)
-    CC.cruiseControl.resume = CC.enabled and CS.cruiseState.standstill and not self.sm['longitudinalPlan'].shouldStop
+    CC.cruiseControl.cancel = CS.cruiseState.enabled and (not longitudinal_allowed or not CC.enabled or not self.CP.pcmCruise)
+    CC.cruiseControl.resume = longitudinal_allowed and CC.enabled and CS.cruiseState.standstill and \
+                              not self.sm['longitudinalPlan'].shouldStop
 
     hudControl = CC.hudControl
     hudControl.setSpeed = float(CS.vCruiseCluster * CV.KPH_TO_MS)
@@ -199,6 +212,7 @@ class Controls(ControlsExt):
     hudControl.lanesVisible = CC.enabled
     hudControl.leadVisible = self.sm['longitudinalPlan'].hasLead
     hudControl.leadDistanceBars = self.sm['selfdriveState'].personality.raw + 1
+    apply_hud_lead(hudControl, self.sm['radarState'].leadOne)
     hudControl.visualAlert = self.sm['selfdriveState'].alertHudVisual
 
     hudControl.rightLaneVisible = True

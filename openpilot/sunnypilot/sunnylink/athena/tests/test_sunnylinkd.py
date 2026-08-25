@@ -11,8 +11,27 @@ from openpilot.common.test import OpenpilotTestCase
 class TestSunnylinkdMethods(OpenpilotTestCase):
   def setup_method(self):
     self.saved_params = []
+    self.params_writes = []
 
     self.original_save = sunnylinkd.save_param_from_base64_encoded_string
+    self.original_params = sunnylinkd.params
+
+    class FakeParams:
+      offroad = True
+
+      def get_bool(inner_self, key):
+        assert key == "IsOffroad"
+        return inner_self.offroad
+
+      def get(inner_self, key):
+        assert key == "ParamsVersion"
+        return None
+
+      def put(inner_self, key, value, block=False):
+        self.params_writes.append((key, value, block))
+
+    self.fake_params = FakeParams()
+    sunnylinkd.params = self.fake_params
 
     def mock_save_param(key, value, compression=False):
       self.saved_params.append((key, value, compression))
@@ -21,6 +40,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
   def teardown_method(self):
     sunnylinkd.save_param_from_base64_encoded_string = self.original_save  # ty: ignore[invalid-assignment]
+    sunnylinkd.params = self.original_params
 
   def test_saveParams_blocked(self):
     blocked_params = {
@@ -58,3 +78,13 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
     assert len(self.saved_params) == 1
     assert self.saved_params[0][0] == "SpeedLimitOffset"
     assert self.saved_params[0][1] == "10"
+
+  def test_saveParams_blocks_personality_onroad(self):
+    self.fake_params.offroad = False
+
+    sunnylinkd.saveParams({
+      "LongitudinalPersonality": "3",
+      "SpeedLimitOffset": "10",
+    })
+
+    assert self.saved_params == [("SpeedLimitOffset", "10", False)]

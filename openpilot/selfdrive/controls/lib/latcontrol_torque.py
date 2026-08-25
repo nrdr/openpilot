@@ -8,6 +8,8 @@ from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.common.pid import PIDController
+from openpilot.sunnypilot.nrdr.lane_change import torque_controller_active, torque_from_lateral_accel
+from openpilot.sunnypilot.livedelay.helpers import LAT_DELAY_BUFFER_SECONDS
 
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext import LatControlTorqueExt
 
@@ -31,7 +33,7 @@ KP_INTERP = [250, 120, 65, 30, 11.5, 5.5, 3.5, 2.0, KP]
 LP_FILTER_CUTOFF_HZ = 1.2
 JERK_LOOKAHEAD_SECONDS = 0.19
 JERK_GAIN = 0.3
-LAT_ACCEL_REQUEST_BUFFER_SECONDS = 1.0
+LAT_ACCEL_REQUEST_BUFFER_SECONDS = LAT_DELAY_BUFFER_SECONDS
 VERSION = 1
 
 class LatControlTorque(LatControl):
@@ -88,7 +90,9 @@ class LatControlTorque(LatControl):
     ff = gravity_adjusted_future_lateral_accel
     # latAccelOffset corrects roll compensation bias from device roll misalignment relative to car roll
     ff -= self.torque_params.latAccelOffset
-    ff += get_friction(error + JERK_GAIN * desired_lateral_jerk, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
+    lane_changing = torque_controller_active(self.extension)
+    if not lane_changing:
+      ff += get_friction(error + JERK_GAIN * desired_lateral_jerk, lateral_accel_deadzone, FRICTION_THRESHOLD, self.torque_params)
 
     if not active:
       output_torque = 0.0
@@ -99,7 +103,7 @@ class LatControlTorque(LatControl):
 
       freeze_integrator = steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
       output_lataccel = self.pid.update(pid_log.error, speed=CS.vEgo, feedforward=ff, freeze_integrator=freeze_integrator)
-      output_torque = self.torque_from_lateral_accel(output_lataccel, self.torque_params)
+      output_torque = torque_from_lateral_accel(self.torque_from_lateral_accel, output_lataccel, self.torque_params, lane_changing)
 
       # Lateral acceleration torque controller extension updates
       # Overrides pid_log.error and output_torque

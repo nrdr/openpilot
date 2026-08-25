@@ -10,6 +10,7 @@ from openpilot.cereal import messaging, log, custom
 from opendbc.car.structs import car
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.display import OnroadBrightness
+from openpilot.sunnypilot.nrdr.settings import UI_CONSTRAINT_PARAMS, restore_params, snapshot_params
 from openpilot.sunnypilot.sunnylink.sunnylink_state import SunnylinkState
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.sunnypilot.widgets.screen_saver import ScreenSaverSP
@@ -181,6 +182,7 @@ class UIStateSP:
       self.reset_onroad_sleep_timer()
 
   def _enforce_constraints(self) -> None:
+    pending_preferences = snapshot_params(self.params, UI_CONSTRAINT_PARAMS)
     has_long = self.has_longitudinal_control
     CP = self.CP
 
@@ -232,6 +234,8 @@ class UIStateSP:
       self.params.remove("CustomAccIncrementsEnabled")
       self.params.remove("SmartCruiseControlVision")
       self.params.remove("SmartCruiseControlMap")
+
+    restore_params(self.params, pending_preferences)
 
 
 class DeviceSP:

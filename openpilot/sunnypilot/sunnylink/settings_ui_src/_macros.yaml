@@ -26,6 +26,13 @@ macros:
   advanced_only:
     - {type: param, key: ShowAdvancedControls, equals: true}
 
+  handcrafted_lateral_unlocked:
+    - type: any
+      conditions:
+        - {type: param, key: NrdrHandcraftedLateralTune, equals: false}
+        - type: not
+          condition: {type: capability, field: has_handcrafted_lateral_profile, equals: true}
+
   # Hide on MICI hardware (no analog HUD support yet).
   hide_on_mici:
     - type: not
