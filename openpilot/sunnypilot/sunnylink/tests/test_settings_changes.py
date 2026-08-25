@@ -18,8 +18,6 @@ import sys
 from types import ModuleType, SimpleNamespace
 from typing import Any
 
-import pytest
-
 from openpilot.common.parameterized import parameterized
 
 
@@ -312,11 +310,11 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     "LongPidTuneScaleEcon",
   )
 
-  @pytest.mark.parametrize(("key", "widget"), [
+  @parameterized.expand([
     ("NrdrHondaFullBrakeAuthority", "toggle"),
     ("NrdrRoenAccelerationLimits", "toggle"),
     ("NrdrCruiseOverspeedAllowance", "option"),
-  ])
+  ], names=["key", "widget"])
   def test_options_are_independent_of_live_learning_gas(self, schema, key, widget):
     item = _find_item(schema, key)
     assert item is not None
@@ -344,7 +342,7 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     assert "openpilot longitudinal control is enabled" in copy
     assert "radar ecu is silenced" in copy
 
-  @pytest.mark.parametrize("key", PERSONALITY_SCALE_KEYS)
+  @parameterized.expand(PERSONALITY_SCALE_KEYS, names=["key"])
   def test_personality_pid_scale_range(self, schema, key):
     item = _find_item(schema, key)
     assert item is not None
@@ -368,9 +366,9 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     assert scale_indices == list(range(scale_indices[0], scale_indices[0] + len(self.PERSONALITY_SCALE_KEYS)))
     assert [keys[index] for index in scale_indices] == list(self.PERSONALITY_SCALE_KEYS)
 
-  @pytest.mark.parametrize(
-    ("key", "default"),
+  @parameterized.expand(
     tuple(zip(PERSONALITY_SCALE_KEYS, (200, 100, 80, 50), strict=True)),
+    names=["key", "default"],
   )
   def test_personality_pid_scale_describes_default(self, schema, key, default):
     item = _find_item(schema, key)
@@ -415,7 +413,7 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert "pid-only" in description
     assert "vehicle's own steering geometry" in description
 
-  @pytest.mark.parametrize("key", HANDCRAFTED_LOCKED_KEYS)
+  @parameterized.expand(HANDCRAFTED_LOCKED_KEYS, names=["key"])
   def test_winning_profile_controls_are_locked_while_handcrafted_is_on(self, schema, key):
     item = _find_item(schema, key)
     assert item is not None
@@ -435,13 +433,13 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert "NrdrHandcraftedLateralTune" in enablement
     assert "not_engaged" in enablement
 
-  @pytest.mark.parametrize("key", [
+  @parameterized.expand([
     "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
     "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
     "NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord",
     "NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g",
     "NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight",
-  ])
+  ], names=["key"])
   def test_steer_ratio_endpoints_cannot_change_while_engaged(self, schema, key):
     item = _find_item(schema, key)
     assert item is not None
