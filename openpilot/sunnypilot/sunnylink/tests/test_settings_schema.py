@@ -254,14 +254,18 @@ class TestKnownPanels(OpenpilotTestCase):
     sub_ids = {sp["id"] for sp in _iter_all_sub_panels(steering)}
     assert "mads_settings" in sub_ids
 
-  def test_nrdr_car_info_contains_screenshot_summary(self, schema):
+  def test_nrdr_vehicle_model_learning_contains_tune_summary(self, schema):
     steering = next(p for p in schema["panels"] if p["id"] == "steering")
-    car_info = next(sp for sp in _iter_all_sub_panels(steering) if sp["id"] == "nrdr_car_info")
-    keys = [item["key"] for item in car_info["items"]]
+    vehicle_model_learning = next(
+      sp for sp in _iter_all_sub_panels(steering) if sp["id"] == "nrdr_vehicle_model_learning"
+    )
+    keys = [item["key"] for item in vehicle_model_learning["items"]]
     assert keys == [
+      "NrdrRemoteTuneScan",
       "NrdrCarTuneInfo", "NrdrCarControllerInfo", "NrdrCarHandcraftedInfo", "NrdrCarPidLowInfo",
       "NrdrCarPidMidInfo", "NrdrCarPidHighInfo", "NrdrCarDampingInfo", "NrdrCarCenterInfo", "NrdrCarNnlcInfo",
       "NrdrCarSteerRatioInfo", "NrdrCarLearningInfo", "NrdrCarHelpersInfo",
+      "NrdrLearnSteerRatio", "NrdrLearnStiffness", "NrdrLearnAngleOffset",
     ]
 
   def test_mutual_exclusion_torque_nnlc(self, schema):
