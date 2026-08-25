@@ -63,7 +63,11 @@ Current status on `nrdr-architecture-development`:
 - Step 2 is complete for NRDR-owned defaults, profiles, and snapshots. There is
   no NRDR-specific versioned migration to relocate yet. SunnyPilot-wide
   migrations remain with SunnyPilot rather than being relabeled as NRDR code.
-- Steps 3 through 6 remain pending.
+- Step 3 has started with shared, catalog-validated metadata for the six
+  low/standard/high-speed lateral P/I scale controls. Their native and
+  Sunnylink adapters now consume one definition while preserving the existing
+  layouts, generated schema, translations, and edit rules.
+- The remaining Step 3 controls and Steps 4 through 6 remain pending.
 
 1. Add the first-class package, typed parameter catalog, generated registry
    artifacts, tests, and compatibility forwarding with no behavior change.

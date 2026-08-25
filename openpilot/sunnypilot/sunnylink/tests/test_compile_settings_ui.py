@@ -18,6 +18,9 @@ from __future__ import annotations
 import difflib
 import json
 import os
+import subprocess
+import sys
+import tempfile
 
 import yaml
 
@@ -25,6 +28,7 @@ from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import (
   CompileError,
   DEFAULT_OUT,
   DEFAULT_SRC,
+  _canon_item,
   _resolve_refs,
   compile_schema,
 )
@@ -72,8 +76,17 @@ class TestRoundtrip(OpenpilotTestCase):
     ))
     self.fail(f"settings_ui.json out of sync — run compile_settings_ui.py\n\n{diff}")
 
+  def test_direct_check_entrypoint_is_cwd_independent(self):
+    script = os.path.join(os.path.dirname(DEFAULT_SRC), "tools", "compile_settings_ui.py")
+    with tempfile.TemporaryDirectory() as temporary_directory:
+      subprocess.run([sys.executable, script, "--check"], cwd=temporary_directory, check=True, capture_output=True, text=True)
+
 
 class TestRefResolution(OpenpilotTestCase):
+  def test_nrdr_explicit_metadata_conflict_raises(self):
+    with self.assertRaisesRegex(CompileError, "LatPScaleLowSpeed.*'max'"):
+      _canon_item({"key": "LatPScaleLowSpeed", "widget": "option", "max": 501}, {})
+
   def test_list_context_splices(self):
     macros = {"a": [{"type": "offroad_only"}], "b": [{"type": "not_engaged"}]}
     out = _resolve_refs([{"$ref": "#/macros/a"}, {"$ref": "#/macros/b"}], macros)

@@ -37,6 +37,12 @@ import sys
 
 import yaml
 
+_REPOSITORY_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+if _REPOSITORY_ROOT not in sys.path:
+  sys.path.insert(0, _REPOSITORY_ROOT)
+
+from openpilot.nrdr.ui.sunnylink_schema import SunnylinkMetadataConflict, apply_sunnylink_metadata
+
 DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_SRC = os.path.join(DIR, "settings_ui_src")
 DEFAULT_OUT = os.path.join(DIR, "settings_ui.json")
@@ -126,7 +132,10 @@ _ITEM_KEY_ORDER = [
 
 
 def _canon_item(item: dict, macros: dict) -> dict:
-  resolved = dict(item)
+  try:
+    resolved = apply_sunnylink_metadata(item)
+  except SunnylinkMetadataConflict as exc:
+    raise CompileError(str(exc)) from exc
   for ctx in ("visibility", "enablement"):
     if ctx in resolved:
       resolved[ctx] = _resolve_refs(resolved[ctx], macros)

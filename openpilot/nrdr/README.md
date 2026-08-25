@@ -51,10 +51,12 @@ forwarders so external users are not broken while production call sites move.
 
 - Complete: parameter catalog/generation, typed keys, startup defaults,
   handcrafted parameter profiles, and openpilot-process live snapshots.
+- In progress: shared native/Sunnylink UI metadata. The first six lateral P/I
+  scale controls now have one declarative owner with output-parity tests.
 - Compatibility only: the old defaults, handcrafted-profile, and live-snapshot
   modules under `openpilot.sunnypilot.nrdr`.
-- Pending: feature algorithms, hook implementations, UI ownership, shared UI
-  metadata, and the typed opendbc configuration boundary.
+- Pending: the remaining UI metadata, feature algorithms, hook implementations,
+  UI ownership, and the typed opendbc configuration boundary.
 
 SunnyPilot-wide migrations (including display and non-NRDR vehicle migrations)
 remain owned by SunnyPilot. No NRDR-specific versioned migration exists yet;
