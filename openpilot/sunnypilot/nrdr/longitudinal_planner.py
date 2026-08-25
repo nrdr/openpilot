@@ -7,7 +7,7 @@ from openpilot.selfdrive.car.cruise import V_CRUISE_MAX
 from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan
 from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.sunnypilot.nrdr.live_params import get_live_params
-from openpilot.sunnypilot.nrdr.params import read_bool, read_float
+from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
 
 
 LAUNCH_DISARM_SPEED = 2.0
@@ -51,10 +51,12 @@ class NrdrLongitudinalPlanner:
 
   def _refresh_settings(self) -> None:
     snapshot = self.params.snapshot
-    self.v_ego_stopping = read_float(snapshot, "HondaVEgoStopping", self.CP.deprecated.vEgoStopping, 0.0, 5.0)
-    self.cruise_scale = read_float(snapshot, "NrdrCruiseMismatchCorrection", 100.0, 95.0, 105.0) / 100.0
-    self.cruise_overspeed_allowance = read_float(snapshot, "NrdrCruiseOverspeedAllowance", 0.0, 0.0, 10.0) * CV.MPH_TO_MS
-    self.roen_acceleration_limits = read_bool(snapshot, "NrdrRoenAccelerationLimits", True)
+    self.v_ego_stopping = read_float(snapshot, NrdrParamKey.HONDA_V_EGO_STOPPING, self.CP.deprecated.vEgoStopping, 0.0, 5.0)
+    self.cruise_scale = read_float(snapshot, NrdrParamKey.NRDR_CRUISE_MISMATCH_CORRECTION, 100.0, 95.0, 105.0) / 100.0
+    self.cruise_overspeed_allowance = read_float(
+      snapshot, NrdrParamKey.NRDR_CRUISE_OVERSPEED_ALLOWANCE, 0.0, 0.0, 10.0,
+    ) * CV.MPH_TO_MS
+    self.roen_acceleration_limits = read_bool(snapshot, NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS, True)
     self.settings_generation = snapshot.generation
 
   @property
