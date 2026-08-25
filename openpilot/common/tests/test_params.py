@@ -1,11 +1,59 @@
 import datetime
 import os
+from pathlib import Path
+import re
 import threading
 import time
 import uuid
 
 from openpilot.common.test import OpenpilotTestCase
-from openpilot.common.params import Params, ParamKeyFlag, UnknownKeyName
+from openpilot.common.params import (
+  Params,
+  ParamKeyFlag,
+  UnknownKeyName,
+  _copy_string,
+  params_key_at,
+  params_key_has_flag_at,
+  params_keys_size,
+)
+
+
+_FLAG_VALUES = {
+  "PERSISTENT": int(ParamKeyFlag.PERSISTENT),
+  "CLEAR_ON_MANAGER_START": int(ParamKeyFlag.CLEAR_ON_MANAGER_START),
+  "CLEAR_ON_ONROAD_TRANSITION": int(ParamKeyFlag.CLEAR_ON_ONROAD_TRANSITION),
+  "CLEAR_ON_OFFROAD_TRANSITION": int(ParamKeyFlag.CLEAR_ON_OFFROAD_TRANSITION),
+  "DONT_LOG": int(ParamKeyFlag.DONT_LOG),
+  "DEVELOPMENT_ONLY": int(ParamKeyFlag.DEVELOPMENT_ONLY),
+  "CLEAR_ON_IGNITION_ON": int(ParamKeyFlag.CLEAR_ON_IGNITION_ON),
+  "BACKUP": int(ParamKeyFlag.BACKUP),
+}
+_REGISTRY_ENTRY_RE = re.compile(r'^\s*\{"([^"]+)", \{([^,]+),')
+
+
+def _registry_key_flags():
+  common_dir = Path(__file__).resolve().parents[1]
+  registry_paths = (
+    common_dir / "params_keys.h",
+    common_dir.parent / "nrdr" / "params" / "generated" / "params_keys.inc",
+  )
+  key_flags = {}
+  for path in registry_paths:
+    for line in path.read_text(encoding="utf-8").splitlines():
+      match = _REGISTRY_ENTRY_RE.match(line)
+      if match is None:
+        continue
+      key, flag_expression = match.groups()
+      assert key not in key_flags
+      flags = 0
+      for name in flag_expression.split("|"):
+        flags |= _FLAG_VALUES[name.strip()]
+      key_flags[key.encode()] = flags
+  return key_flags
+
+
+_REGISTRY_KEY_FLAGS = _registry_key_flags()
+
 
 class TestParams(OpenpilotTestCase):
   def setup_method(self):
@@ -107,12 +155,74 @@ class TestParams(OpenpilotTestCase):
     assert q.get("CarParams", True) == b"1"
 
   def test_params_all_keys(self):
-    keys = Params().all_keys()
+    keys = self.params.all_keys()
 
-    # sanity checks
-    assert len(keys) > 20
+    assert set(keys) == set(_REGISTRY_KEY_FLAGS)
+    assert len(keys) == len(_REGISTRY_KEY_FLAGS)
     assert len(keys) == len(set(keys))
     assert b"CarParams" in keys
+
+  def test_params_all_keys_by_flag(self):
+    all_keys = self.params.all_keys()
+    flags = (
+      *_FLAG_VALUES.values(),
+      int(ParamKeyFlag.PERSISTENT | ParamKeyFlag.CLEAR_ON_MANAGER_START),
+      int(ParamKeyFlag.CLEAR_ON_ONROAD_TRANSITION | ParamKeyFlag.CLEAR_ON_IGNITION_ON),
+      int(ParamKeyFlag.ALL),
+    )
+
+    for flag in flags:
+      expected = all_keys if flag == int(ParamKeyFlag.ALL) else [
+        key for key in all_keys if _REGISTRY_KEY_FLAGS[key] & flag
+      ]
+      actual = self.params.all_keys(flag)
+      assert actual == expected
+      assert len(actual) == len(set(actual))
+      assert all(b"\0" not in key and key.decode("utf-8") for key in actual)
+
+    combined_flag = ParamKeyFlag.BACKUP | ParamKeyFlag.CLEAR_ON_MANAGER_START
+    any_match = self.params.all_keys(combined_flag)
+    assert set(any_match) == set(self.params.all_keys(ParamKeyFlag.BACKUP)) | set(
+      self.params.all_keys(ParamKeyFlag.CLEAR_ON_MANAGER_START)
+    )
+    assert b"IsMetric" in any_match
+    assert b"DoReboot" in any_match
+    assert b"DongleId" not in any_match
+    assert self.params.all_keys(0) == []
+    assert self.params.all_keys(ParamKeyFlag.ALL) == all_keys
+
+    backup_keys = self.params.all_keys(ParamKeyFlag.BACKUP)
+    assert b"Mads" in backup_keys
+    assert b"TorqueParamsOverrideLatAccelFactor" in backup_keys
+    assert b"AccessToken" not in backup_keys
+
+    dont_log_keys = self.params.all_keys(ParamKeyFlag.DONT_LOG)
+    assert b"AccessToken" in dont_log_keys
+    assert b"RemoteAccessPinSalt" in dont_log_keys
+    assert b"NrdrTuneLearnerMap" in dont_log_keys
+    assert b"DongleId" not in dont_log_keys
+
+  def test_params_all_keys_repeat_stability(self):
+    expected = self.params.all_keys(ParamKeyFlag.BACKUP)
+
+    self.params.get_default_value("LanguageSetting")
+    self.params.get_param_path("CarParams")
+    assert self.params.all_keys(ParamKeyFlag.BACKUP) == expected
+
+    self.params.get_default_value("DisablePowerDown")
+    assert self.params.all_keys(ParamKeyFlag.BACKUP) == expected
+
+  def test_params_key_flag_scalar_abi(self):
+    key_count = params_keys_size(self.params.p)
+    assert key_count == len(_REGISTRY_KEY_FLAGS)
+    assert not params_key_has_flag_at(self.params.p, key_count, int(ParamKeyFlag.ALL))
+
+    for index in range(key_count):
+      assert params_key_has_flag_at(self.params.p, index, int(ParamKeyFlag.ALL))
+      assert not params_key_has_flag_at(self.params.p, index, 0)
+      key = _copy_string(params_key_at(self.params.p, index))
+      for flag in _FLAG_VALUES.values():
+        assert params_key_has_flag_at(self.params.p, index, flag) == bool(_REGISTRY_KEY_FLAGS[key] & flag)
 
   def test_params_default_value(self):
     self.params.remove("LanguageSetting")
