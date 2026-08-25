@@ -67,9 +67,10 @@ Current status on `nrdr-architecture-development`:
   low/standard/high-speed lateral P/I scale controls. Their native and
   Sunnylink adapters now consume one definition while preserving the existing
   layouts, generated schema, translations, and edit rules.
-- Step 4 has started with the standard-library steer-ratio analysis helpers,
-  now owned by `openpilot.nrdr.tools`; the former SunnyPilot module remains an
-  explicit compatibility facade.
+- Step 4 has started with the standard-library steer-ratio analysis helpers
+  under `openpilot.nrdr.tools` and the pure lateral phase detector under
+  `openpilot.nrdr.features.lateral`; both former SunnyPilot modules remain
+  explicit compatibility facades.
 - The remaining Step 3 controls, driving features/hooks, and Steps 5 through 6
   remain pending.
 

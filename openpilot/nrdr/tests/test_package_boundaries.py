@@ -41,6 +41,7 @@ class TestPackageBoundaries(unittest.TestCase):
     self.assertEqual(package_path.name, "nrdr")
     self.assertEqual(package_path.parent.name, "openpilot")
     self.assertIsNotNone(import_module("openpilot.nrdr.features"))
+    self.assertIsNotNone(import_module("openpilot.nrdr.features.lateral"))
     self.assertIsNotNone(import_module("openpilot.nrdr.hooks"))
     self.assertIsNotNone(import_module("openpilot.nrdr.tools"))
     self.assertIsNotNone(import_module("openpilot.nrdr.ui"))
@@ -147,3 +148,17 @@ class TestPackageBoundaries(unittest.TestCase):
     source = (repository_root / "steerratio_correction.py").read_text()
     self.assertIn("from openpilot.nrdr.tools.sr_correction_analysis import", source)
     self.assertNotIn("from openpilot.sunnypilot.nrdr.sr_correction_analysis import", source)
+
+  def test_legacy_phase_detector_preserves_public_object_identities(self):
+    canonical = import_module("openpilot.nrdr.features.lateral.phase_detector")
+    legacy = import_module("openpilot.sunnypilot.nrdr.phase_detector")
+    self.assertEqual(legacy.__all__, ("PHASE_SWITCH_MIN_SPEED", "phase_with_latch"))
+    for name in legacy.__all__:
+      with self.subTest(name=name):
+        self.assertIs(getattr(legacy, name), getattr(canonical, name))
+
+  def test_legacy_latcontrol_pid_imports_the_canonical_phase_detector(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    source = (repository_root / "openpilot/sunnypilot/nrdr/latcontrol_pid.py").read_text()
+    self.assertIn("from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch", source)
+    self.assertNotIn("from openpilot.sunnypilot.nrdr.phase_detector import", source)
