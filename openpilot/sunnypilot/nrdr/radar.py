@@ -20,8 +20,8 @@ class NrdrRadar:
     if not self.active:
       return {point.trackId: [point.dRel, point.yRel, point.vRel] for point in radar_data.points}
 
-    fresh = sm.recv_frame["liveTracks"] != self.last_tracks_frame
-    self.last_tracks_frame = sm.recv_frame["liveTracks"]
+    fresh = sm.recv_frame["radarTracks"] != self.last_tracks_frame
+    self.last_tracks_frame = sm.recv_frame["radarTracks"]
     return {
       point.trackId: [point.dRel, point.yRel, point.vRel, point.deprecated.measured and fresh]
       for point in radar_data.points

@@ -1,8 +1,11 @@
 import math
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
+from opendbc.car.honda.values import CAR as HONDA_CAR
+from openpilot.sunnypilot.nrdr.radar import NrdrRadar
 from openpilot.sunnypilot.nrdr.radar_core import COAST_CYCLES, CivicBoschKalmanParams, CivicBoschTrack
 
 
@@ -23,6 +26,28 @@ def test_kalman_gain():
   params = CivicBoschKalmanParams()
   assert params.K[0][0] == pytest.approx(0.3513, abs=0.01)
   assert params.K[1][0] == pytest.approx(1.2477, abs=0.01)
+
+
+def test_nrdr_radar_uses_current_radar_tracks_service_for_freshness():
+  radar = NrdrRadar(SimpleNamespace(
+    brand="honda",
+    radarUnavailable=False,
+    carFingerprint=HONDA_CAR.HONDA_CIVIC_BOSCH,
+  ))
+  point = SimpleNamespace(
+    trackId=7,
+    dRel=40.0,
+    yRel=0.5,
+    vRel=-2.0,
+    deprecated=SimpleNamespace(measured=True),
+  )
+  radar_data = SimpleNamespace(points=[point])
+  sm = SimpleNamespace(recv_frame={"radarTracks": 10})
+
+  assert radar.points(sm, radar_data)[7][3] is True
+  assert radar.points(sm, radar_data)[7][3] is False
+  sm.recv_frame["radarTracks"] = 11
+  assert radar.points(sm, radar_data)[7][3] is True
 
 
 def test_measured_track_converges():
