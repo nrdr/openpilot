@@ -468,8 +468,8 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
           update_car_params(context, event.carParams)
           result.fingerprints.add(context.fingerprint)
 
-        elif which == "liveCalibration":
-          calibrator.feed_live_calib(event.liveCalibration)
+        elif which == "extrinsicsCalibration":
+          calibrator.feed_extrinsics_calibration(event.extrinsicsCalibration)
 
         elif which == "vehicleParameters":
           lp = event.vehicleParameters
@@ -532,12 +532,12 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
             torque=finite(event.carOutput.actuatorsOutput.torque),
           ))
 
-        elif which == "livePose":
+        elif which == "deviceMotion":
           if context.fingerprint == "UNKNOWN":
             strict_since = None
             continue
-          live_pose = event.livePose
-          raw_pose = Pose.from_live_pose(live_pose)
+          device_motion = event.deviceMotion
+          raw_pose = Pose.from_device_motion(device_motion)
           calibrated_pose = calibrator.build_calibrated_pose(raw_pose)
           yaw_rate = finite(calibrated_pose.angular_velocity.z)
           yaw_std = finite(calibrated_pose.angular_velocity.z_std)
@@ -554,10 +554,10 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
 
           pose_valid = bool(
             calibrator.calib_valid
-            and live_pose.inputsOK
-            and live_pose.posenetOK
-            and live_pose.sensorsOK
-            and live_pose.angularVelocityDevice.valid
+            and device_motion.inputsOK
+            and device_motion.posenetOK
+            and device_motion.sensorsOK
+            and device_motion.angularVelocityDevice.valid
           )
           raw_angle = state.steering_angle_deg
           learn_offset = setting_bool(context, "NrdrLearnAngleOffset", True)

@@ -55,17 +55,17 @@ def mapping_sample(**overrides) -> MappingSample:
 def install_fake_scan_dependencies(monkeypatch):
   class FakePose:
     @staticmethod
-    def from_live_pose(live_pose):
-      return live_pose
+    def from_device_motion(device_motion):
+      return device_motion
 
   class FakePoseCalibrator:
     calib_valid = True
 
-    def feed_live_calib(self, _calibration):
+    def feed_extrinsics_calibration(self, _calibration):
       pass
 
-    def build_calibrated_pose(self, live_pose):
-      return SimpleNamespace(angular_velocity=SimpleNamespace(z=live_pose.yaw_rate, z_std=0.01))
+    def build_calibrated_pose(self, device_motion):
+      return SimpleNamespace(angular_velocity=SimpleNamespace(z=device_motion.yaw_rate, z_std=0.01))
 
   fake_cereal = ModuleType("openpilot.cereal")
   fake_cereal.log = SimpleNamespace(LaneChangeState=SimpleNamespace(off=0))
@@ -129,7 +129,7 @@ def manual_scan_frame(timestamp, *, average_offset=0.0, stiffness=1.0, steering_
       steerFaultTemporary=False,
       steerFaultPermanent=False,
     )),
-    scan_event("livePose", timestamp, SimpleNamespace(
+    scan_event("deviceMotion", timestamp, SimpleNamespace(
       yaw_rate=0.1,
       inputsOK=True,
       posenetOK=True,
@@ -292,17 +292,17 @@ def test_make_sample_uses_learned_geometry_even_when_application_toggles_are_off
 def test_scan_requires_half_second_continuous_steady_dwell_for_strict(tmp_path, monkeypatch):
   class FakePose:
     @staticmethod
-    def from_live_pose(live_pose):
-      return live_pose
+    def from_device_motion(device_motion):
+      return device_motion
 
   class FakePoseCalibrator:
     calib_valid = True
 
-    def feed_live_calib(self, _calibration):
+    def feed_extrinsics_calibration(self, _calibration):
       pass
 
-    def build_calibrated_pose(self, live_pose):
-      return SimpleNamespace(angular_velocity=SimpleNamespace(z=live_pose.yaw_rate, z_std=0.01))
+    def build_calibrated_pose(self, device_motion):
+      return SimpleNamespace(angular_velocity=SimpleNamespace(z=device_motion.yaw_rate, z_std=0.01))
 
   fake_cereal = ModuleType("openpilot.cereal")
   fake_cereal.log = SimpleNamespace(LaneChangeState=SimpleNamespace(off=0))
@@ -369,7 +369,7 @@ def test_scan_requires_half_second_continuous_steady_dwell_for_strict(tmp_path, 
       event("carOutput", timestamp, SimpleNamespace(
         actuatorsOutput=SimpleNamespace(torque=0.5),
       )),
-      event("livePose", timestamp, SimpleNamespace(
+      event("deviceMotion", timestamp, SimpleNamespace(
         yaw_rate=0.1,
         inputsOK=True,
         posenetOK=True,
