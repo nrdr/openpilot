@@ -8,6 +8,7 @@ import time
 from opendbc.car.structs import car
 from openpilot.common.test import OpenpilotTestCase
 from openpilot.common.params import Params
+from openpilot.common.version import terms_version, terms_version_sp, training_version, sunnylink_consent_version
 import openpilot.system.manager.manager as manager
 from openpilot.system.manager.process import ensure_running
 from openpilot.system.manager.process_config import managed_processes, procs
@@ -45,6 +46,15 @@ class TestManager(OpenpilotTestCase):
     os.environ['PREPAREONLY'] = '1'
     manager.main()
     nrdr_defaults = {**BOOL_DEFAULTS, **VALUE_DEFAULTS}
+    nrdr_defaults.update({
+      "EnforceTorqueControl": False,
+      "NeuralNetworkLateralControl": False,
+      "HasAcceptedTerms": terms_version,
+      "HasAcceptedTermsSP": terms_version_sp,
+      "CompletedTrainingVersion": training_version,
+      "CompletedSunnylinkConsentVersion": sunnylink_consent_version,
+      "SunnylinkEnabled": True,
+    })
     if HARDWARE.get_device_type() == "mici":
       nrdr_defaults.pop("QuietMode", None)
     for k in params.all_keys():
