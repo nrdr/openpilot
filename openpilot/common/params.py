@@ -15,6 +15,7 @@ class ParamKeyFlag(IntFlag):
   CLEAR_ON_MANAGER_START = 0x04
   CLEAR_ON_ONROAD_TRANSITION = 0x08
   CLEAR_ON_OFFROAD_TRANSITION = 0x10
+  DONT_LOG = 0x20
   DEVELOPMENT_ONLY = 0x40
   CLEAR_ON_IGNITION_ON = 0x80
   BACKUP = 0x100
@@ -77,7 +78,7 @@ params_remove = _bind("params_remove", [ParamsHandle, ctypes.c_char_p], ctypes.c
 params_get_path = _bind("params_get_path", [ParamsHandle, ctypes.c_char_p, ctypes.c_size_t], ParamsBuffer)
 params_keys_size = _bind("params_keys_size", [ParamsHandle], ctypes.c_size_t)
 params_key_at = _bind("params_key_at", [ParamsHandle, ctypes.c_size_t], ParamsBuffer)
-params_keys_by_flag = _bind("params_keys_by_flag", [ParamsHandle, ctypes.c_uint, ctypes.POINTER(ParamsBuffer), ctypes.c_size_t], ctypes.c_size_t)
+params_key_has_flag_at = _bind("params_key_has_flag_at", [ParamsHandle, ctypes.c_size_t, ctypes.c_uint32], ctypes.c_bool)
 
 PYTHON_2_CPP = {
   (str, ParamKeyType.STRING): lambda v: v,
@@ -189,15 +190,12 @@ class Params:
     return ParamKeyType(params_get_key_type(self.p, self.check_key(key)))
 
   def all_keys(self, flag=ParamKeyFlag.ALL):
-    if flag == ParamKeyFlag.ALL:
-      keys = []
-      for i in range(params_keys_size(self.p)):
+    keys = []
+    for i in range(params_keys_size(self.p)):
+      if params_key_has_flag_at(self.p, i, int(flag)):
+        # params_key_at returns handle-owned storage, so copy it before the next native call.
         keys.append(_copy_string(params_key_at(self.p, i)))
-      return keys
-    max_keys = 1024
-    buf = (ParamsBuffer * max_keys)()
-    count = params_keys_by_flag(self.p, int(flag), buf, max_keys)
-    return [_copy_string(buf[i]) for i in range(min(count, max_keys))]
+    return keys
 
   def get_default_value(self, key):
     k = self.check_key(key)

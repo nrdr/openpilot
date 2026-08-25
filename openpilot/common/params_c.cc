@@ -13,11 +13,22 @@ typedef struct {
 } ParamsBuffer;
 
 struct ParamsHandle {
-  ParamsHandle(const char *path, size_t path_size) : params(std::string(path, path_size)), keys(params.allKeys()) {
+  static std::vector<uint32_t> keyFlags(Params &params, const std::vector<std::string> &keys) {
+    std::vector<uint32_t> flags;
+    flags.reserve(keys.size());
+    for (const auto &key : keys) {
+      flags.push_back(static_cast<uint32_t>(params.getKeyFlag(key)));
+    }
+    return flags;
+  }
+
+  ParamsHandle(const char *path, size_t path_size)
+      : params(std::string(path, path_size)), keys(params.allKeys()), key_flags(keyFlags(params, keys)) {
   }
 
   Params params;
   const std::vector<std::string> keys;
+  const std::vector<uint32_t> key_flags;
 };
 
 namespace {
@@ -156,18 +167,17 @@ ParamsBuffer params_key_at(ParamsHandle *handle, size_t index) noexcept {
     if (index >= handle->keys.size()) {
       return ParamsBuffer{nullptr, 0};
     }
-    return return_string(handle->keys[index]);
+    // The immutable key snapshot owns this storage until params_destroy(handle).
+    return ParamsBuffer{handle->keys[index].data(), handle->keys[index].size()};
   });
 }
 
-size_t params_keys_by_flag(ParamsHandle *handle, uint32_t flag, ParamsBuffer *out, size_t out_size) noexcept {
-  return translate_exceptions(size_t{0}, [&]() {
-    auto filtered = handle->params.allKeys(static_cast<ParamKeyFlag>(flag));
-    size_t count = std::min(filtered.size(), out_size);
-    for (size_t i = 0; i < count; i++) {
-      out[i] = return_string(filtered[i]);
+bool params_key_has_flag_at(ParamsHandle *handle, size_t index, uint32_t flag) noexcept {
+  return translate_exceptions(false, [&]() {
+    if (index >= handle->key_flags.size()) {
+      return false;
     }
-    return filtered.size();
+    return flag == static_cast<uint32_t>(ALL) || (handle->key_flags[index] & flag) != 0;
   });
 }
 
