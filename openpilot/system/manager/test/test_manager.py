@@ -2,6 +2,7 @@
 
 import os
 import unittest
+from unittest import mock
 import signal
 import time
 
@@ -44,7 +45,8 @@ class TestManager(OpenpilotTestCase):
     params.clear_all()
 
     os.environ['PREPAREONLY'] = '1'
-    manager.main()
+    with mock.patch.object(manager, "run_migration"):
+      manager.main()
     nrdr_defaults = {**BOOL_DEFAULTS, **VALUE_DEFAULTS}
     nrdr_defaults.update({
       "EnforceTorqueControl": False,
