@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tune_learn_tool.py - offline companion to the 2D online tune learner (nrdr_tune_learner.py).
+tune_learn_tool.py - offline companion to the 2D online tune learner (tune_learner.py).
 
   view                       show the learned trim map (NrdrTuneLearnerMap) as L/R grids + heatmap.
   view <rlog> [<rlog> ...]   same, plus the residual error grid from those logs, so you can see how
@@ -26,7 +26,7 @@ import sys
 import numpy as np
 
 from openpilot.common.params import Params
-from openpilot.selfdrive.controls.lib.nrdr_tune_learner import (
+from openpilot.sunnypilot.nrdr.tune_learner import (
   N_SPEED, N_ANGLE, SPEED_BIN_MPH, ANGLE_BIN_DEG, TRIM_HARD_FRAC,
 )
 
