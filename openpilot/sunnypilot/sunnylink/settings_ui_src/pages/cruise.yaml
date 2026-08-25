@@ -304,11 +304,11 @@ sections:
       title: Roen Nidec Acceleration Limits
       description: Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.
       details: Enabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas.
-    - key: HondaCivicRadarTryout
+    - key: HondaBoschARadar
       widget: toggle
-      title: Try Honda Bosch Radar (experimental)
-      description: EXPERIMENTAL — Honda Bosch radar fed into the longitudinal controller.
-      details: EXPERIMENTAL — Honda Bosch radar. When ON, openpilot reads the factory Bosch radar's fine-range objects (0x280) and feeds them into the longitudinal controller.
+      title: Honda Bosch-A Radar (experimental)
+      description: Decodes the factory radar on supported Honda Bosch-A vehicles while stock Honda longitudinal control is active.
+      details: EXPERIMENTAL — The reverse-engineered object format has not been road-validated on every supported model. Disable this setting if radar tracks look incorrect. When openpilot longitudinal control is enabled, Honda's radar ECU is silenced and this decoder remains unavailable.
     - key: NrdrHondaDashVariantB
       widget: toggle
       title: Honda Dashboard Variant B

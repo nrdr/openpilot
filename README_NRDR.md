@@ -80,13 +80,13 @@ These settings eliminate steering wheel vibrations, optimize steering wheel retu
 
 ---
 
-### 📍 Phase 4: Engaging the Bosch Radar Tryout
+### 📍 Phase 4: Honda Bosch-A Radar
 
 Once your lateral control, stopping, and overrides are perfectly dialed, activate the radar:
 
-* **`HondaCivicRadarTryout` (Default: `ON`)**
-   - **What it does**: Commands openpilot to read fine-range radar object states (`0x280`) directly from the Bosch radar bus, fusing them into the longitudinal lead-estimation Kalman Filter.
-   - **Expected behavior**: Eliminates camera-only "ghost leads" and improves stop-and-go reaction speed when trailing a vehicle.
+* **`HondaBoschARadar` (Default: `ON`)**
+   - **What it does**: Decodes the factory object tracks on supported Honda Bosch-A vehicles while stock Honda longitudinal control is active.
+   - **Important**: The decoder is reverse-engineered and has not been road-validated on every supported model. With openpilot longitudinal control enabled, Honda's radar ECU is silenced and this decoder remains unavailable.
 
 ---
 
@@ -104,4 +104,4 @@ Once your lateral control, stopping, and overrides are perfectly dialed, activat
 | **`HondaUnwindFreeze`** | `OFF` | `ON / OFF` | Freezes PID integrator on steer unwind |
 | **`HondaUnwindLookahead`** | `OFF` | `ON / OFF` | Looks ahead in model path to start unwind early |
 | **`HondaLiveLearningGas`** | `OFF with gas interceptor` | `ON / OFF` | Adapts gas/wind compensation factors live; the first detected Honda sets the initial value and later user changes persist |
-| **`HondaCivicRadarTryout`** | `ON` | `ON / OFF` | Fuses Bosch fine-range radar track data |
+| **`HondaBoschARadar`** | `ON` | `ON / OFF` | Decodes supported Honda Bosch-A factory radar tracks in stock-longitudinal mode |
