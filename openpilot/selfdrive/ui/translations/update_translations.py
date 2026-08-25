@@ -7,10 +7,11 @@ from openpilot.selfdrive.ui.translations.potools import extract_strings, generat
 
 LANGUAGES_FILE = os.path.join(str(TRANSLATIONS_DIR), "languages.json")
 POT_FILE = os.path.join(str(TRANSLATIONS_DIR), "app.pot")
+NRDR_UI_METADATA_FILE = os.path.join(BASEDIR, "openpilot", "nrdr", "params", "ui_metadata.py")
 
 
 def update_translations():
-  files = []
+  files = [os.path.relpath(NRDR_UI_METADATA_FILE, BASEDIR)]
   for root, _, filenames in chain(os.walk(SYSTEM_UI_DIR),
                                   os.walk(os.path.join(str(UI_DIR), "widgets")),
                                   os.walk(os.path.join(str(UI_DIR), "layouts")),

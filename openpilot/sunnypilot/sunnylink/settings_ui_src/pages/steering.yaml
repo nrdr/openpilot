@@ -546,26 +546,8 @@ sections:
       details: The fade starts only when the planner enters lane-change-starting, so pre-lane-change waiting does not consume it. Once started, the fade continues through finishing or completion without a ratio jump. This reacts to the planner state, not blinkers alone.
     - key: LatPScaleLowSpeed
       widget: option
-      enablement:
-      - $ref: '#/macros/handcrafted_lateral_unlocked'
-      title: Low Speed Proportional Scale (Below 25mph)
-      description: Scales the proportional (P) term below 25 mph.
-      details: Scales the proportional (P) term below 25 mph. Higher = more error correction (tighter, can cut corners); lower = looser with wider swings.
-      min: 0
-      max: 500
-      step: 5
-      unit: '%'
     - key: LatIScaleLowSpeed
       widget: option
-      enablement:
-      - $ref: '#/macros/handcrafted_lateral_unlocked'
-      title: Low Speed Integral Scale (Below 25mph)
-      description: Scales the integral (I) term below 25 mph.
-      details: Scales the integral (I) term below 25 mph. Builds correction over time to erase steady-state error; too high oscillates.
-      min: 0
-      max: 500
-      step: 5
-      unit: '%'
     - key: LatFScaleLowSpeed
       widget: option
       enablement:
@@ -579,24 +561,8 @@ sections:
       unit: '%'
     - key: LatPScaleStandard
       widget: option
-      enablement:
-      - $ref: '#/macros/handcrafted_lateral_unlocked'
-      title: Standard Speed Proportional Scale (25-50mph)
-      description: Scales the proportional (P) term between 25 and 50 mph.
-      min: 0
-      max: 500
-      step: 5
-      unit: '%'
     - key: LatIScaleStandard
       widget: option
-      enablement:
-      - $ref: '#/macros/handcrafted_lateral_unlocked'
-      title: Standard Speed Integral Scale (25-50mph)
-      description: Scales the integral (I) term between 25 and 50 mph.
-      min: 0
-      max: 500
-      step: 5
-      unit: '%'
     - key: LatFScaleStandard
       widget: option
       enablement:
@@ -609,24 +575,8 @@ sections:
       unit: '%'
     - key: LatPScaleHighway
       widget: option
-      enablement:
-      - $ref: '#/macros/handcrafted_lateral_unlocked'
-      title: Highway Proportional Scale (50mph+)
-      description: Scales the proportional (P) term above 50 mph.
-      min: 0
-      max: 500
-      step: 5
-      unit: '%'
     - key: LatIScaleHighway
       widget: option
-      enablement:
-      - $ref: '#/macros/handcrafted_lateral_unlocked'
-      title: Highway Integral Scale (50mph+)
-      description: Scales the integral (I) term above 50 mph.
-      min: 0
-      max: 500
-      step: 5
-      unit: '%'
     - key: LatFScaleHighway
       widget: option
       enablement:

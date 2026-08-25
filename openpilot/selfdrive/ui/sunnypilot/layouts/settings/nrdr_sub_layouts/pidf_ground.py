@@ -3,10 +3,12 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params import (
+  NrdrParamKey,
   STEER_RATIO_ENDPOINT_PROFILES,
   get_steer_ratio_endpoint_profile,
   is_handcrafted_lateral_enabled,
 )
+from openpilot.nrdr.ui.native_param_controls import option_item_from_metadata
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
@@ -71,21 +73,8 @@ class PidfGroundLayout(Widget):
       param="NrdrLaneChangeEndpointSteerRatio",
     )
 
-    self._lat_p_low = option_item_sp(
-      param="LatPScaleLowSpeed",
-      title=lambda: tr("Low Speed Proportional Scale (Below 25mph) (Default: 100%)"),
-      min_value=0, max_value=500, value_change_step=5,
-      description=lambda: tr("Scales the proportional (P) term below 25 mph. Higher = more error correction " +
-                             "(tighter, can cut corners); lower = looser with wider swings."),
-      label_callback=lambda value: f"{value}%",
-    )
-    self._lat_i_low = option_item_sp(
-      param="LatIScaleLowSpeed",
-      title=lambda: tr("Low Speed Integral Scale (Below 25mph) (Default: 100%)"),
-      min_value=0, max_value=500, value_change_step=5,
-      description=lambda: tr("Scales the integral (I) term below 25 mph. Builds correction over time to erase steady-state error; too high oscillates."),
-      label_callback=lambda value: f"{value}%",
-    )
+    self._lat_p_low = option_item_from_metadata(NrdrParamKey.LAT_P_SCALE_LOW_SPEED)
+    self._lat_i_low = option_item_from_metadata(NrdrParamKey.LAT_I_SCALE_LOW_SPEED)
     self._lat_f_low = option_item_sp(
       param="LatFScaleLowSpeed",
       title=lambda: tr("Low Speed Feedforward Scale (Below 25mph) (Default: 100%)"),
@@ -95,20 +84,8 @@ class PidfGroundLayout(Widget):
       label_callback=lambda value: f"{value}%",
     )
 
-    self._lat_p_standard = option_item_sp(
-      param="LatPScaleStandard",
-      title=lambda: tr("Standard Speed Proportional Scale (25-50mph) (Default: 100%)"),
-      min_value=0, max_value=500, value_change_step=5,
-      description=lambda: tr("Scales the proportional (P) term between 25 and 50 mph."),
-      label_callback=lambda value: f"{value}%",
-    )
-    self._lat_i_standard = option_item_sp(
-      param="LatIScaleStandard",
-      title=lambda: tr("Standard Speed Integral Scale (25-50mph) (Default: 100%)"),
-      min_value=0, max_value=500, value_change_step=5,
-      description=lambda: tr("Scales the integral (I) term between 25 and 50 mph."),
-      label_callback=lambda value: f"{value}%",
-    )
+    self._lat_p_standard = option_item_from_metadata(NrdrParamKey.LAT_P_SCALE_STANDARD)
+    self._lat_i_standard = option_item_from_metadata(NrdrParamKey.LAT_I_SCALE_STANDARD)
     self._lat_f_standard = option_item_sp(
       param="LatFScaleStandard",
       title=lambda: tr("Standard Speed Feedforward Scale (25-50mph) (Default: 100%)"),
@@ -117,20 +94,8 @@ class PidfGroundLayout(Widget):
       label_callback=lambda value: f"{value}%",
     )
 
-    self._lat_p_highway = option_item_sp(
-      param="LatPScaleHighway",
-      title=lambda: tr("Highway Proportional Scale (50mph+) (Default: 100%)"),
-      min_value=0, max_value=500, value_change_step=5,
-      description=lambda: tr("Scales the proportional (P) term above 50 mph."),
-      label_callback=lambda value: f"{value}%",
-    )
-    self._lat_i_highway = option_item_sp(
-      param="LatIScaleHighway",
-      title=lambda: tr("Highway Integral Scale (50mph+) (Default: 100%)"),
-      min_value=0, max_value=500, value_change_step=5,
-      description=lambda: tr("Scales the integral (I) term above 50 mph."),
-      label_callback=lambda value: f"{value}%",
-    )
+    self._lat_p_highway = option_item_from_metadata(NrdrParamKey.LAT_P_SCALE_HIGHWAY)
+    self._lat_i_highway = option_item_from_metadata(NrdrParamKey.LAT_I_SCALE_HIGHWAY)
     self._lat_f_highway = option_item_sp(
       param="LatFScaleHighway",
       title=lambda: tr("Highway Feedforward Scale (50mph+) (Default: 100%)"),

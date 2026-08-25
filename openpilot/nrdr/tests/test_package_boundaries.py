@@ -96,3 +96,23 @@ class TestPackageBoundaries(unittest.TestCase):
     params_package = import_module("openpilot.nrdr.params")
     self.assertEqual(set(params_package.__all__), set(params_package._EXPORT_MODULES))
     self.assertEqual(len(params_package.__all__), len(set(params_package.__all__)))
+
+  def test_ui_metadata_keeps_params_dependency_direction(self):
+    params_dir = Path(__file__).resolve().parent.parent / "params"
+    tree = ast.parse((params_dir / "ui_metadata.py").read_text(), filename="ui_metadata.py")
+    forbidden_prefixes = (
+      "openpilot.common",
+      "openpilot.nrdr.features",
+      "openpilot.nrdr.hooks",
+      "openpilot.nrdr.ui",
+      "openpilot.selfdrive",
+      "openpilot.system.ui",
+      "openpilot.sunnypilot",
+    )
+    imported: list[str] = []
+    for node in ast.walk(tree):
+      if isinstance(node, ast.Import):
+        imported.extend(alias.name for alias in node.names)
+      elif isinstance(node, ast.ImportFrom) and node.module is not None:
+        imported.append(node.module)
+    self.assertFalse(any(name.startswith(forbidden_prefixes) for name in imported), imported)
