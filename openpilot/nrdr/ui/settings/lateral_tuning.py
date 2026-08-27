@@ -121,7 +121,7 @@ class LateralTuningLayout(Widget):
     try:
       self._scan_fh = open(TUNE_REPORT_TMP, "w")
       self._scan_proc = subprocess.Popen(
-        ["python3", os.path.join(BASEDIR, "tune_report.py"), *paths],
+        ["python3", "-m", "openpilot.nrdr.tools.lateral.tune_report", *paths],
         stdout=self._scan_fh,
         stderr=subprocess.STDOUT,
         cwd=BASEDIR,

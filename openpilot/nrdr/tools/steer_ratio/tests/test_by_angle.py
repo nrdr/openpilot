@@ -1,6 +1,6 @@
 import math
 
-from steerratio_by_angle import CarStateSample, angle_bin_start, effective_ratio, nearest_state_sample
+from openpilot.nrdr.tools.steer_ratio.by_angle import CarStateSample, angle_bin_start, effective_ratio, nearest_state_sample
 
 
 def state(timestamp: float, angle: float = 10.0, offset: float = 0.0) -> CarStateSample:

@@ -282,9 +282,9 @@ class TestPackageBoundaries(unittest.TestCase):
       with self.subTest(name=name):
         self.assertIs(getattr(legacy, name), getattr(canonical, name))
 
-  def test_root_steer_ratio_cli_imports_the_canonical_analysis_module(self):
+  def test_canonical_steer_ratio_cli_imports_the_canonical_analysis_module(self):
     repository_root = Path(__file__).resolve().parents[3]
-    source = (repository_root / "steerratio_correction.py").read_text()
+    source = (repository_root / "openpilot/nrdr/tools/steer_ratio/correction.py").read_text()
     self.assertIn("from openpilot.nrdr.tools.sr_correction_analysis import", source)
     self.assertNotIn("from openpilot.sunnypilot.nrdr.sr_correction_analysis import", source)
 
@@ -363,7 +363,7 @@ class TestPackageBoundaries(unittest.TestCase):
   def test_steer_ratio_policy_consumers_use_canonical_feature_modules(self):
     repository_root = Path(__file__).resolve().parents[3]
     consumers = (
-      "lateral_attribution.py",
+      "openpilot/nrdr/tools/lateral/attribution.py",
       "openpilot/nrdr/ui/settings/pidf_ground.py",
       "openpilot/nrdr/features/services/car_tune_report.py",
       "openpilot/nrdr/features/lateral/latcontrol_pid.py",

@@ -120,7 +120,7 @@ class RemoteActions:
     try:
       with open(temporary_path, "w") as report:
         result = subprocess.run(
-          ["python3", os.path.join(BASEDIR, "tune_report.py"), *paths],
+          ["python3", "-m", "openpilot.nrdr.tools.lateral.tune_report", *paths],
           stdout=report,
           stderr=subprocess.STDOUT,
           cwd=BASEDIR,

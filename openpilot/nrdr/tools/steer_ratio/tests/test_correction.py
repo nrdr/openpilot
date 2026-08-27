@@ -9,8 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import steerratio_correction as cli
-from openpilot.sunnypilot.nrdr.sr_correction_analysis import CommandSample, CorrectionSample, MappingSample, VehicleSample
+import openpilot.nrdr.tools.steer_ratio.correction as cli
+from openpilot.nrdr.tools.sr_correction_analysis import CommandSample, CorrectionSample, MappingSample, VehicleSample
 
 
 def sample(**overrides) -> CorrectionSample:

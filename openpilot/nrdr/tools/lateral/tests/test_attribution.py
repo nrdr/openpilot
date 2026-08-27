@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lateral_attribution import (
+from openpilot.nrdr.tools.lateral.attribution import (
   ControlSample,
   classify_attribution,
   extract_controller_reading,

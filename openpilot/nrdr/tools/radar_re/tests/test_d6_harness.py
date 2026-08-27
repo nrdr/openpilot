@@ -1,9 +1,9 @@
 """
 test_d6_harness.py — D6 acceptance test suite
 
-Run from C:\\nrdrbranchdebug\\pyshim:
-    PYTHONPATH="C:\\nrdrbranchdebug\\wt-long" py -3.13 -m pytest \\
-        "C:\\nrdrbranchdebug\\wt-long\\tools\\nrdr_radar_re\\tests" \\
+Run from the openpilot checkout:
+    py -3.13 -m pytest \\
+        "openpilot\\nrdr\\tools\\radar_re\\tests" \\
         -q -p no:cacheprovider -o addopts=""
 
 Covers:
@@ -35,17 +35,17 @@ CLOSING_10M_CSV = "C:/claudecode/firmware-analysis-kit/radar-re/captures/closing
 
 # worktree root for module imports
 WT_ROOT = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..")
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..")
 )
 if WT_ROOT not in sys.path:
     sys.path.insert(0, WT_ROOT)
 
-from openpilot.tools.nrdr_radar_re import BOSCH_RADAR_ALL_IDS, BOSCH_RADAR_HDR_MSGS
-from openpilot.tools.nrdr_radar_re.sweep import enumerate_windows, _extract_window, score_windows, HypothesisResult, BitWindow
-from openpilot.tools.nrdr_radar_re.enums import detect_enum
-from openpilot.tools.nrdr_radar_re.gates import apply, apply_with_holdout, apply_batch, GateResult
-from openpilot.tools.nrdr_radar_re.ingest import load_csv, FrameRecord
-from openpilot.tools.nrdr_radar_re.pairing import assemble_sweeps, derive_vrel, attach_truth, build_matched_table, build_csv_truth_channels
+from openpilot.nrdr.tools.radar_re import BOSCH_RADAR_ALL_IDS, BOSCH_RADAR_HDR_MSGS
+from openpilot.nrdr.tools.radar_re.sweep import enumerate_windows, _extract_window, score_windows, HypothesisResult, BitWindow
+from openpilot.nrdr.tools.radar_re.enums import detect_enum
+from openpilot.nrdr.tools.radar_re.gates import apply, apply_with_holdout, apply_batch, GateResult
+from openpilot.nrdr.tools.radar_re.ingest import load_csv, FrameRecord
+from openpilot.nrdr.tools.radar_re.pairing import assemble_sweeps, derive_vrel, attach_truth, build_matched_table, build_csv_truth_channels
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ class TestGateLogic(unittest.TestCase):
 
     def test_holdout_failure_quarantines(self):
         """apply_with_holdout with a constant signal fails holdout -> quarantine."""
-        from openpilot.tools.nrdr_radar_re.sweep import _extract_window
+        from openpilot.nrdr.tools.radar_re.sweep import _extract_window
 
         # Build rows where planted signal is constant in b4:b5 (R^2=0 on holdout)
         n = 100
@@ -416,7 +416,7 @@ class TestEndToEndCLI(unittest.TestCase):
 
     def test_cli_end_to_end(self):
         """Run the full pipeline on a tiny synthetic CSV, verify no crash and report written."""
-        from openpilot.tools.nrdr_radar_re.cli import run
+        from openpilot.nrdr.tools.radar_re.cli import run
 
         with tempfile.TemporaryDirectory() as tmpdir:
             csv_path = os.path.join(tmpdir, "synth.csv")

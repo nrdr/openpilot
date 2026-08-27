@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import lat_stiction_shadow
-from lat_stiction_shadow import ShadowFrame, iter_shadow_frames, replay_shadow, score_triggers, summarize
+import openpilot.nrdr.tools.lateral.stiction_shadow as lat_stiction_shadow
+from openpilot.nrdr.tools.lateral.stiction_shadow import ShadowFrame, iter_shadow_frames, replay_shadow, score_triggers, summarize
 from openpilot.nrdr.features.lateral.lat_stiction import LatStiction
 
 

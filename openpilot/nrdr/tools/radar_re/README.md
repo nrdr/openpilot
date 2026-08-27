@@ -1,6 +1,6 @@
 # nrdr_radar_re — Offline Radar Bit-Discovery Tool
 
-D6 (nrdrbranchdebug-2td.1). Zero on-car risk: this tool never ships to device.
+D6 (nrdrbranchdebug-2td.1). Read-only: the tool never writes vehicle state or parameters.
 
 ## Purpose
 
@@ -78,7 +78,7 @@ documented in `radar_interface.py:40-69`.
 ## Usage
 
 ```
-py -3.13 -m tools.nrdr_radar_re.cli \
+py -3.13 -m openpilot.nrdr.tools.radar_re.cli \
     --captures path/to/closing_bfcar.csv path/to/closing_10m.csv \
     --report-dir /tmp/radar_report \
     --top-n 100
@@ -88,11 +88,11 @@ Output: `radar_re_report.md` and `radar_re_report.json` in `--report-dir`.
 
 ## Running Tests
 
-From `C:\nrdrbranchdebug\pyshim`:
+From the openpilot checkout:
 
 ```
-PYTHONPATH="C:\nrdrbranchdebug\wt-long" py -3.13 -m pytest ^
-    "C:\nrdrbranchdebug\wt-long\tools\nrdr_radar_re\tests" ^
+py -3.13 -m pytest ^
+    "openpilot\nrdr\tools\radar_re\tests" ^
     -q -p no:cacheprovider -o addopts="" --noconftest
 ```
 
@@ -100,7 +100,9 @@ PYTHONPATH="C:\nrdrbranchdebug\wt-long" py -3.13 -m pytest ^
 imports on-device openpilot modules (`openpilot.common`, etc.) that are not
 available in the Windows Python environment.  The `pytest.ini` in this directory
 prevents the root conftest from loading when pytest is started with
-`--rootdir=tools/nrdr_radar_re` or `--noconftest`.
+`--rootdir=openpilot/nrdr/tools/radar_re` or `--noconftest`.
+
+The former `openpilot.tools.nrdr_radar_re` import and CLI paths remain compatibility facades.
 
 Known-answer bfcar tests skip cleanly if captures are not present.
 
