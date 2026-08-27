@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from openpilot.sunnypilot.nrdr.controlsd import refresh_live_parameter_settings
-from openpilot.sunnypilot.nrdr.live_params import CONTROL_GROUPS, PLANNER_GROUPS, LiveParams, ParamGroup, REFRESH_PERIOD
+from openpilot.nrdr.params import CONTROL_GROUPS, PLANNER_GROUPS, LiveParams, ParamGroup, REFRESH_PERIOD
 
 
 class RecordingParams:

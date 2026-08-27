@@ -59,7 +59,9 @@ forwarders so external users are not broken while production call sites move.
 - In progress: implementation relocation. The steer-ratio correction analysis
   library is the first canonical `tools` module; its legacy import remains a
   forwarding facade. The pure lateral phase detector is the first driving-path
-  helper under `features/lateral`, also with an identity-preserving facade.
+  helper under `features/lateral`. The pure model-artifact policy and
+  steer-ratio/lane-fade behavior now live there too; each old SunnyPilot import
+  path remains an explicit identity-preserving facade.
 - Compatibility only: the old defaults, handcrafted-profile, and live-snapshot
   modules under `openpilot.sunnypilot.nrdr`.
 - Pending: the remaining UI metadata, feature algorithms, hook implementations,

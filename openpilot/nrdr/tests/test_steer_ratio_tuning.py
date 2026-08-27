@@ -1,6 +1,6 @@
 import pytest
 
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   LANE_CHANGE_SR_FADE_SECONDS,
   STEER_RATIO_ENDPOINT_PROFILES,
   LaneChangeSteerRatioFade,

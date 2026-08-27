@@ -138,7 +138,9 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("NrdrSteerRatioOuterCrv5g", ParamType.FLOAT, PB, "12.30", owner=ParamOwner.LATERAL),
   _added("NrdrSteerRatioCenterInsight", ParamType.FLOAT, PB, "16.82", owner=ParamOwner.LATERAL),
   _added("NrdrSteerRatioOuterInsight", ParamType.FLOAT, PB, "12.58", owner=ParamOwner.LATERAL),
-  _added("NrdrLegacyDualBpSteerRatio", ParamType.BOOL, PB, "1", owner=ParamOwner.LATERAL),
+  # Retained with its exact registry metadata/default for downgrade compatibility;
+  # model-artifact policy replaced this manual setting in profile v14.
+  _added("NrdrLegacyDualBpSteerRatio", ParamType.BOOL, PB, "1", ParamLifecycle.TOMBSTONE, ParamOwner.LATERAL),
   _added("NrdrLaneChangeEndpointSteerRatio", ParamType.BOOL, PB, "1", owner=ParamOwner.LATERAL),
   _added("NrdrSteerRatioOffset", ParamType.FLOAT, PB, "0.0", ParamLifecycle.TOMBSTONE, ParamOwner.LATERAL),
   _added("NrdrSteerRatioMin", ParamType.FLOAT, PB, "16.84", ParamLifecycle.TOMBSTONE, ParamOwner.LATERAL),

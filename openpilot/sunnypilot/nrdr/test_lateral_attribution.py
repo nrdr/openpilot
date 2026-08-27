@@ -12,7 +12,7 @@ from lateral_attribution import (
   logged_steer_ratio_model_policy,
   summarize_controls,
 )
-from openpilot.sunnypilot.nrdr.model_policy import SteerRatioModelPolicy
+from openpilot.nrdr.features.lateral.model_policy import SteerRatioModelPolicy
 
 
 def _lateral_state(which: str, state):

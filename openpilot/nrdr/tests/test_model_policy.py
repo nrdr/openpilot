@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 import unittest
 
-from openpilot.sunnypilot.nrdr.model_policy import (
+from openpilot.nrdr.features.lateral.model_policy import (
   LEGACY_DUAL_BP_ARTIFACT_SHA256S,
   PURE_FIRMWARE_VGR_ARTIFACT_SHA256S,
   REVIEWED_MODEL_ARTIFACTS,

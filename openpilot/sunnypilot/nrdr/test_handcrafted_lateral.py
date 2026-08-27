@@ -1,14 +1,14 @@
 import pytest
 
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
+from openpilot.nrdr.params import (
   CLARITY_ROAD_TESTED_2026_08_21,
   HANDCRAFTED_LATERAL_PROFILES,
   HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS,
   apply_handcrafted_lateral_profile,
   get_handcrafted_lateral_profile,
+  get_steer_ratio_endpoint_profile,
   is_handcrafted_lateral_enabled,
 )
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoint_profile
 
 
 EXPECTED_FINGERPRINTS = (

@@ -32,7 +32,7 @@ import sys
 
 import numpy as np
 
-from openpilot.sunnypilot.nrdr.model_policy import SteerRatioModelPolicy, classify_steer_ratio_model
+from openpilot.nrdr.features.lateral.model_policy import SteerRatioModelPolicy, classify_steer_ratio_model
 
 
 MPS_TO_MPH = 2.236936

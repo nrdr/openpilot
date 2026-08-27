@@ -69,8 +69,14 @@ Current status on `nrdr-architecture-development`:
   layouts, generated schema, translations, and edit rules.
 - Step 4 has started with the standard-library steer-ratio analysis helpers
   under `openpilot.nrdr.tools` and the pure lateral phase detector under
-  `openpilot.nrdr.features.lateral`; both former SunnyPilot modules remain
-  explicit compatibility facades.
+  `openpilot.nrdr.features.lateral`. The model-artifact steer-ratio policy and
+  lane-change steer-ratio interpolation now live beside it. All four former
+  SunnyPilot modules remain explicit, identity-preserving compatibility
+  facades while production consumers import their canonical owners.
+- The retired `NrdrLegacyDualBpSteerRatio` manual selector is a parameter
+  tombstone. Its exact persistent/backup BOOL registry metadata and default of
+  `1` remain generated for downgrade compatibility, but profile v14, live
+  snapshots, controllers, analyzers, and settings UIs no longer consume it.
 - The remaining Step 3 controls, driving features/hooks, and Steps 5 through 6
   remain pending.
 

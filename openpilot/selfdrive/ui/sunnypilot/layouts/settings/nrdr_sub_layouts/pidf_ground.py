@@ -8,7 +8,7 @@ from openpilot.nrdr.params import (
   get_steer_ratio_endpoint_profile,
   is_handcrafted_lateral_enabled,
 )
-from openpilot.sunnypilot.nrdr.model_policy import (
+from openpilot.nrdr.features.lateral.model_policy import (
   SteerRatioModelPolicy,
   classify_steer_ratio_model,
 )

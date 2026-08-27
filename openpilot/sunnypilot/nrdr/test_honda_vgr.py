@@ -11,8 +11,8 @@ from openpilot.sunnypilot.nrdr.honda_vgr import (
   get_honda_vgr_profile,
   normalize_honda_eps_firmware,
 )
-from openpilot.sunnypilot.nrdr.model_policy import SteerRatioModelPolicy
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
+from openpilot.nrdr.features.lateral.model_policy import SteerRatioModelPolicy
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   LaneChangeSteerRatioFade,
   get_steer_ratio_endpoint_profile,
 )
@@ -272,7 +272,7 @@ def test_clarity_hybrid_preserves_trw_firmware_and_enters_firmware_mode():
   from openpilot.common.realtime import DT_CTRL
   from openpilot.selfdrive.car.helpers import convert_to_capnp
   from openpilot.sunnypilot.nrdr.latcontrol_clarity_hybrid import LatControlClarityHybrid
-  from openpilot.sunnypilot.nrdr.live_params import reset_live_params_for_tests
+  from openpilot.nrdr.params import reset_live_params_for_tests
   from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
   from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 

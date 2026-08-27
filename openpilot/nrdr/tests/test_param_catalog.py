@@ -57,6 +57,7 @@ class TestParamCatalog(unittest.TestCase):
       "HondaNotchQ",
       "HondaPidFriction",
       "HondaPidTuneScale",
+      "NrdrLegacyDualBpSteerRatio",
       "NrdrSteerRatioMax",
       "NrdrSteerRatioMin",
       "NrdrSteerRatioOffset",

@@ -162,3 +162,38 @@ class TestPackageBoundaries(unittest.TestCase):
     source = (repository_root / "openpilot/sunnypilot/nrdr/latcontrol_pid.py").read_text()
     self.assertIn("from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch", source)
     self.assertNotIn("from openpilot.sunnypilot.nrdr.phase_detector import", source)
+
+  def test_legacy_model_policy_preserves_all_public_object_identities(self):
+    canonical = import_module("openpilot.nrdr.features.lateral.model_policy")
+    legacy = import_module("openpilot.sunnypilot.nrdr.model_policy")
+    self.assertEqual(legacy.__all__, canonical.__all__)
+    for name in canonical.__all__:
+      with self.subTest(name=name):
+        self.assertIs(getattr(legacy, name), getattr(canonical, name))
+
+  def test_legacy_steer_ratio_tuning_preserves_all_public_object_identities(self):
+    canonical = import_module("openpilot.nrdr.features.lateral.steer_ratio_tuning")
+    legacy = import_module("openpilot.sunnypilot.nrdr.steer_ratio_tuning")
+    self.assertEqual(legacy.__all__, canonical.__all__)
+    for name in canonical.__all__:
+      with self.subTest(name=name):
+        self.assertIs(getattr(legacy, name), getattr(canonical, name))
+
+  def test_steer_ratio_policy_consumers_use_canonical_feature_modules(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    consumers = (
+      "lateral_attribution.py",
+      "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/pidf_ground.py",
+      "openpilot/sunnypilot/nrdr/car_tune_report.py",
+      "openpilot/sunnypilot/nrdr/latcontrol_pid.py",
+      "openpilot/sunnypilot/sunnylink/capabilities.py",
+    )
+    for relative_path in consumers:
+      with self.subTest(path=relative_path):
+        source = (repository_root / relative_path).read_text()
+        self.assertIn("from openpilot.nrdr.features.lateral.model_policy import", source)
+        self.assertNotIn("from openpilot.sunnypilot.nrdr.model_policy import", source)
+
+    controller = (repository_root / "openpilot/sunnypilot/nrdr/latcontrol_pid.py").read_text()
+    self.assertIn("from openpilot.nrdr.features.lateral.steer_ratio_tuning import", controller)
+    self.assertNotIn("from openpilot.sunnypilot.nrdr.steer_ratio_tuning import", controller)

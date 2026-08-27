@@ -21,8 +21,8 @@ from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 from openpilot.sunnypilot.nrdr.latcontrol_clarity_hybrid import LatControlClarityHybrid, clarity_nnlc_blend_target
-from openpilot.sunnypilot.nrdr.live_params import reset_live_params_for_tests
-from openpilot.sunnypilot.nrdr.model_policy import (
+from openpilot.nrdr.params import reset_live_params_for_tests
+from openpilot.nrdr.features.lateral.model_policy import (
   LEGACY_DUAL_BP_ARTIFACT_SHA256S,
   PURE_FIRMWARE_VGR_ARTIFACT_SHA256S,
   SteerRatioModelPolicy,

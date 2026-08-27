@@ -12,13 +12,13 @@ from openpilot.nrdr.params import NrdrParamKey, get_live_params, get_steer_ratio
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile, normalize_honda_eps_firmware
 from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
-from openpilot.sunnypilot.nrdr.model_policy import (
+from openpilot.nrdr.features.lateral.model_policy import (
   SteerRatioModelPolicy,
   classify_steer_ratio_model,
 )
 from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.nrdr.tune_learner import TuneLearner
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   LaneChangeSteerRatioFade,
 )
 
