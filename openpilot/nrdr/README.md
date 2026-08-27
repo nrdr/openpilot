@@ -13,6 +13,7 @@ component, and gives contributors one obvious place to start.
 
 ```text
 openpilot/nrdr/
+├── car/       typed, immutable configuration passed into opendbc
 ├── params/    contracts, startup policy, profiles, snapshots, and typed access
 ├── features/  lateral, longitudinal, radar, driver-policy, and service behavior
 ├── hooks/     small adapters called by openpilot processes
@@ -26,6 +27,9 @@ The separation is intentional:
 
 - `params` owns names, types, startup defaults, validation, profiles, snapshots,
   and future NRDR-specific migrations.
+- `car` owns the narrow adapter that converts NRDR configuration into the
+  immutable typed values consumed by opendbc. It is the only NRDR owner of that
+  cross-repository contract.
 - `features` owns algorithms.  Parameter mechanics do not belong here.
 - `hooks` translates openpilot state into calls to NRDR features.  Hooks should
   remain small and contain no tuning algorithm.
@@ -60,14 +64,15 @@ while downstream consumers migrate.
   narrow import/call seams.
 - Complete: offline lateral, steer-ratio, and radar reverse-engineering tool
   ownership, with old command paths retained as compatibility entrypoints.
+- Complete: the typed openpilot-to-opendbc configuration boundary. Opendbc no
+  longer reads NRDR Params or owns NRDR default and persistence policy.
 - In progress: shared native/Sunnylink UI metadata. The first six lateral P/I
   scale controls now have one declarative owner with output-parity tests.
 - Compatibility only: the old defaults, handcrafted-profile, and live-snapshot
   modules and every former NRDR feature module under
   `openpilot.sunnypilot.nrdr`.
-- Pending: the remaining shared UI metadata, the typed opendbc configuration
-  boundary, downstream import migration, and eventual compatibility-facade
-  retirement.
+- Pending: the remaining shared UI metadata, downstream import migration, and
+  eventual compatibility-facade retirement.
 
 SunnyPilot-wide migrations (including display and non-NRDR vehicle migrations)
 remain owned by SunnyPilot. No NRDR-specific versioned migration exists yet;

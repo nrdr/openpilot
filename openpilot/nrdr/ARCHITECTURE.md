@@ -26,6 +26,8 @@ The intended direction is:
 openpilot process -> NRDR hook -> NRDR feature -> immutable configuration
                                       ^
 NRDR UI ------------------------------| (commands/settings only)
+
+openpilot card setup -> NRDR car adapter -> typed immutable config -> opendbc
 ```
 
 Rules for new code:
@@ -41,8 +43,9 @@ Rules for new code:
 - `features` must not import hooks or UI.
 - UI can consume parameter metadata but cannot become the source of controller
   defaults.
-- The opendbc boundary should eventually receive typed Honda configuration from
-  openpilot rather than importing openpilot's Params implementation.
+- Opendbc receives typed, immutable Honda configuration from the NRDR car
+  adapter. It must not import openpilot's Params implementation or re-own NRDR
+  defaults and persistence policy.
 
 ## Public surface
 
@@ -75,11 +78,14 @@ Current status on `nrdr-architecture-development`:
   `openpilot.nrdr.tools`. Former SunnyPilot modules and root commands are
   explicit compatibility facades, while production callers use canonical
   owners.
+- Step 5 is complete. `openpilot.nrdr.car` owns startup conversion, live
+  snapshots, and persistence callbacks; the car-interface seam threads those
+  typed immutable values into opendbc without direct Params access.
 - The retired `NrdrLegacyDualBpSteerRatio` manual selector is a parameter
   tombstone. Its exact persistent/backup BOOL registry metadata and default of
   `1` remain generated for downgrade compatibility, but profile v14, live
   snapshots, controllers, analyzers, and settings UIs no longer consume it.
-- The remaining Step 3 metadata, and Steps 5 through 6, remain pending.
+- The remaining Step 3 metadata and Step 6 remain pending.
 
 1. Add the first-class package, typed parameter catalog, generated registry
    artifacts, tests, and compatibility forwarding with no behavior change.
