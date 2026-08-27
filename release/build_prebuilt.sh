@@ -248,7 +248,7 @@ apply_clean_overlay() {
   replace_once "$BUILD_DIR/openpilot/sunnypilot/nrdr/mici_home.py" \
     'home._version_label.set_text("stable.konik.ai")' \
     'home._version_label.set_text("connect.comma.ai")'
-  replace_once "$BUILD_DIR/openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/party_tricks.py" \
+  replace_once "$BUILD_DIR/openpilot/nrdr/ui/settings/party_tricks.py" \
     '      self._reregister_item,' \
     ''
 

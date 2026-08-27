@@ -24,7 +24,7 @@ from openpilot.selfdrive.ui.sunnypilot.layouts.settings.sunnylink import Sunnyli
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.trips import TripsLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.vehicle import VehicleLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.visuals import VisualsLayout
-from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr import NrdrLayout
+from openpilot.nrdr.ui.settings.layout import NrdrLayout
 from openpilot.system.ui.lib.application import gui_app, MousePos
 from openpilot.system.ui.lib.multilang import tr_noop
 from openpilot.system.ui.lib.text_measure import measure_text_cached

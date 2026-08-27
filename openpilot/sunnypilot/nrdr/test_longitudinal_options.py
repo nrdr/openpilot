@@ -217,7 +217,7 @@ def test_controlsd_passes_selfdrive_personality_directly_to_long_control():
 
 
 def test_on_device_longitudinal_items_follow_toggle_then_option_order():
-  layout_path = Path(__file__).parents[2] / "selfdrive" / "ui" / "sunnypilot" / "layouts" / "settings" / "nrdr_sub_layouts" / "longitudinal_tuning.py"
+  layout_path = Path(__file__).parents[2] / "nrdr" / "ui" / "settings" / "longitudinal_tuning.py"
   tree = ast.parse(layout_path.read_text(encoding="utf-8"))
   initialize = next(node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "_initialize_items")
   widgets_by_attribute = {}

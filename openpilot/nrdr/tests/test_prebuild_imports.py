@@ -22,6 +22,7 @@ from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import LaneChangeSteerRatioFade
 from openpilot.nrdr.tools.sr_correction_analysis import CommandSample
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
+import openpilot.nrdr.ui.settings
 from openpilot.nrdr.ui.sunnylink_schema import sunnylink_fields_for_key
 from openpilot.sunnypilot.nrdr.sr_correction_analysis import CommandSample as LegacyCommandSample
 from openpilot.sunnypilot.nrdr.model_policy import classify_steer_ratio_model as legacy_classify_steer_ratio_model
@@ -40,5 +41,6 @@ assert sunnylink_fields_for_key("LatPScaleLowSpeed")["max"] == 500
 assert "openpilot.nrdr.params.store" not in sys.modules
 assert "openpilot.system.ui.lib.multilang" not in sys.modules
 assert "openpilot.system.ui.sunnypilot.widgets.list_view" not in sys.modules
+assert "openpilot.nrdr.ui.settings.layout" not in sys.modules
 """
     subprocess.run([sys.executable, "-c", script], cwd=repository_root, env=environment, check=True)

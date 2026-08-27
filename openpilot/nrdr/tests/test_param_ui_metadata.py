@@ -169,7 +169,7 @@ class TestParamUiMetadata(unittest.TestCase):
 
   def test_consumers_do_not_redeclare_managed_metadata(self):
     repository_root = Path(__file__).resolve().parents[3]
-    native_path = repository_root / "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/pidf_ground.py"
+    native_path = repository_root / "openpilot/nrdr/ui/settings/pidf_ground.py"
     native_source = native_path.read_text()
     self.assertEqual(native_source.count("option_item_from_metadata("), len(EXPECTED_KEYS))
     for key in EXPECTED_KEYS:

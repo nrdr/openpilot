@@ -459,8 +459,8 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     item = _find_item(schema, "NrdrLaneChangeEndpointSteerRatio")
     sunnylink_copy = f"{item.get('title', '')} {item.get('description', '')} {item.get('details', '')}".lower()
     repo_root = Path(__file__).parents[4]
-    native_copy = (repo_root / "openpilot" / "selfdrive" / "ui" / "sunnypilot" / "layouts" / "settings" /
-                   "nrdr_sub_layouts" / "pidf_ground.py").read_text(encoding="utf-8").lower()
+    native_copy = (repo_root / "openpilot" / "nrdr" / "ui" / "settings" /
+                   "pidf_ground.py").read_text(encoding="utf-8").lower()
 
     for phrase in ("outer steer ratio", "1.5 seconds", "pre-lane-change waiting does not consume"):
       assert phrase in sunnylink_copy

@@ -45,11 +45,11 @@ LATERAL_COMPATIBILITY_EXPORTS = {
 
 PHASE_TWO_CONSUMERS = (
   "openpilot/selfdrive/car/card.py",
-  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/lateral_tuning.py",
-  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/override_tuning.py",
-  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/pidf_ground.py",
-  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/steer_filters.py",
-  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/vehicle_model_learning.py",
+  "openpilot/nrdr/ui/settings/lateral_tuning.py",
+  "openpilot/nrdr/ui/settings/override_tuning.py",
+  "openpilot/nrdr/ui/settings/pidf_ground.py",
+  "openpilot/nrdr/ui/settings/steer_filters.py",
+  "openpilot/nrdr/ui/settings/vehicle_model_learning.py",
   "openpilot/sunnypilot/nrdr/car_tune_report.py",
   "openpilot/sunnypilot/nrdr/controlsd.py",
   "openpilot/nrdr/features/lateral/latcontrol_pid.py",
@@ -253,7 +253,7 @@ class TestPackageBoundaries(unittest.TestCase):
     repository_root = Path(__file__).resolve().parents[3]
     consumers = (
       "lateral_attribution.py",
-      "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/pidf_ground.py",
+      "openpilot/nrdr/ui/settings/pidf_ground.py",
       "openpilot/sunnypilot/nrdr/car_tune_report.py",
       "openpilot/nrdr/features/lateral/latcontrol_pid.py",
       "openpilot/sunnypilot/sunnylink/capabilities.py",

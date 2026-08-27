@@ -542,7 +542,7 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
     Path("openpilot/system/athena/athenad.py"),
     Path("openpilot/sunnypilot/nrdr/home.py"),
     Path("openpilot/sunnypilot/nrdr/mici_home.py"),
-    Path("openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/party_tricks.py"),
+    Path("openpilot/nrdr/ui/settings/party_tricks.py"),
   )
   for relative in overlay_targets:
     copy_file_from_source(relative, build)
@@ -582,5 +582,5 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
   assert 'home._version_label.set_text("connect.comma.ai")' in mici_home
   assert 'home._version_label.set_text("stable.konik.ai")' not in mici_home
 
-  party_tricks = (build / "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/party_tricks.py").read_text(encoding="utf-8")
+  party_tricks = (build / "openpilot/nrdr/ui/settings/party_tricks.py").read_text(encoding="utf-8")
   assert "      self._reregister_item," not in party_tricks
