@@ -8,6 +8,7 @@ import unittest
 
 CANONICAL_CONSUMERS = {
   "openpilot/system/hardware/hardwared.py": "from openpilot.nrdr.features.services.hardware import",
+  "openpilot/system/hardware/power_monitoring.py": "from openpilot.nrdr.features.services.power import",
   "openpilot/system/athena/athenad.py": "from openpilot.nrdr.features.services import athena as nrdr_athena",
   "openpilot/system/athena/registration.py": "from openpilot.nrdr.features.services import registration as nrdr_registration",
   "openpilot/system/manager/process_config.py": '"openpilot.system.manager.nrdr_remoted"',

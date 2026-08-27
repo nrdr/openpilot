@@ -57,7 +57,9 @@ UI_MODULES = {
 UI_PRODUCTION_IMPORTS = {
   "openpilot/selfdrive/ui/mici/layouts/main.py": ("openpilot.nrdr.ui.onroad.mici_onroad", "mici_onroad"),
   "openpilot/selfdrive/ui/sunnypilot/layouts/home.py": ("openpilot.nrdr.ui.home.layout", "home"),
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/device.py": ("openpilot.nrdr.ui.settings.device_power", "device_power"),
   "openpilot/selfdrive/ui/sunnypilot/mici/layouts/home.py": ("openpilot.nrdr.ui.home.mici", "mici_home"),
+  "openpilot/selfdrive/ui/sunnypilot/mici/layouts/device.py": ("openpilot.nrdr.ui.settings.device_power", "device_power"),
   "openpilot/selfdrive/ui/sunnypilot/mici/onroad/hud_renderer.py": ("openpilot.nrdr.ui.onroad.mici_hud", "mici_hud"),
   "openpilot/selfdrive/ui/sunnypilot/onroad/circular_alerts.py": ("openpilot.nrdr.ui.onroad.circular_alerts", "circular_alerts"),
 }

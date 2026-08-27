@@ -8,10 +8,12 @@ from openpilot.selfdrive.ui.layouts.settings.device import DeviceLayout
 from openpilot.selfdrive.ui.onroad.cabin_camera_dialog import CabinCameraDialog
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.hardware import HARDWARE
+from openpilot.nrdr.ui.settings.device_power import automatic_shutdown_timer_description, automatic_shutdown_timer_enabled, \
+  automatic_shutdown_toggle_item
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp, multiple_button_item_sp, button_item_sp, \
-  dual_button_item_sp, toggle_item_sp, Spacer
+  dual_button_item_sp, Spacer
 from openpilot.system.ui.widgets import DialogResult
 from openpilot.system.ui.widgets.button import ButtonStyle
 from openpilot.system.ui.widgets.confirm_dialog import alert_dialog, ConfirmDialog
@@ -53,13 +55,13 @@ class DeviceLayoutSP(DeviceLayout):
 
     self._max_time_offroad = option_item_sp(
       title=lambda: tr("Max Time Offroad"),
-      description=lambda: tr("Sets the automatic shutdown timer after the vehicle is turned off. This applies only when Prevent Automatic Shutdown is disabled; battery safeguards may shut the device down sooner.\n(30h is the default)"),  # noqa: E501
+      description=automatic_shutdown_timer_description,
       param="MaxTimeOffroad",
       min_value=0,
       max_value=11,
       value_change_step=1,
       on_value_changed=None,
-      enabled=lambda: ui_state.is_offroad() and not ui_state.params.get_bool("DisablePowerDown"),
+      enabled=automatic_shutdown_timer_enabled,
       icon="",
       value_map=offroad_time_options,
       label_width=360,
@@ -78,12 +80,7 @@ class DeviceLayoutSP(DeviceLayout):
       inline=True,
     )
 
-    self._disable_power_down = toggle_item_sp(
-      title=lambda: tr("Prevent Automatic Shutdown"),
-      description=lambda: tr("Prevents openpilot's automatic offroad shutdowns after the vehicle is turned off. This bypasses the Max Time Offroad timer and its low-voltage and estimated-battery safeguards, and can drain the vehicle battery. When disabled, those safeguards resume after a 60-second grace period. Manual Power Off still works."),  # noqa: E501
-      param="DisablePowerDown",
-      enabled=ui_state.is_offroad,
-    )
+    self._disable_power_down = automatic_shutdown_toggle_item()
 
     self._quiet_mode_and_dcam = dual_button_item_sp(
       left_text=lambda: tr("Quiet Mode"),

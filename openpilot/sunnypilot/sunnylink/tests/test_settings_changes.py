@@ -264,8 +264,8 @@ class TestDevicePowerPolicy(OpenpilotTestCase):
     assert prevent is not None
     sunnylink_copy = f"{prevent.get('title', '')} {prevent.get('description', '')} {prevent.get('details', '')}".lower()
     repo_root = Path(__file__).parents[4]
-    native_copy = (repo_root / "openpilot" / "selfdrive" / "ui" / "sunnypilot" / "layouts" / "settings" /
-                   "device.py").read_text(encoding="utf-8").lower()
+    canonical_copy = (repo_root / "openpilot" / "nrdr" / "ui" / "settings" /
+                      "device_power.py").read_text(encoding="utf-8").lower()
 
     for phrase in (
       "prevent automatic shutdown",
@@ -277,17 +277,14 @@ class TestDevicePowerPolicy(OpenpilotTestCase):
       "manual power off still works",
     ):
       assert phrase in sunnylink_copy
-      assert phrase in native_copy
+      assert phrase in canonical_copy
 
-    assert 'enabled=lambda: ui_state.is_offroad() and not ui_state.params.get_bool("disablepowerdown")' in native_copy
-    assert 'tr("no time limit")' in native_copy
-
-    mici_copy = (repo_root / "openpilot" / "selfdrive" / "ui" / "sunnypilot" / "mici" / "layouts" /
-                 "device.py").read_text(encoding="utf-8").lower()
-    assert "disablepowerdown" in mici_copy
-    assert "prevent automatic\\nshutdown" in mici_copy
-    assert "battery drain risk" in mici_copy
-    assert "ui_state.is_offroad" in mici_copy
+    assert "return ui_state.is_offroad() and not ui_state.params.get_bool(nrdrparamkey.disable_power_down)" in canonical_copy
+    assert "enabled=ui_state.is_offroad" in canonical_copy
+    assert "nrdrparamkey.disable_power_down" in canonical_copy
+    assert "prevent automatic\\nshutdown" in canonical_copy
+    assert "battery drain risk" in canonical_copy
+    assert "ui_state.is_offroad" in canonical_copy
 
   def test_offroad_timer_is_subordinate_and_not_mislabeled(self, schema):
     timer = _find_item(schema, "MaxTimeOffroad")

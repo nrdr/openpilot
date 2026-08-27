@@ -4,6 +4,7 @@ import threading
 from openpilot.common.params import Params
 from openpilot.common.hardware import HARDWARE
 from openpilot.common.swaglog import cloudlog
+from openpilot.nrdr.features.services.power import PreventAutomaticShutdownPolicy
 from openpilot.sunnypilot.system.statsd import statlog
 
 CAR_VOLTAGE_LOW_PASS_K = 0.011 # LPF gain for 45s tau (dt/tau / (dt/tau + 1))
@@ -16,7 +17,6 @@ VBATT_PAUSE_CHARGING = 11.8           # Lower limit on the LPF car battery volta
 MAX_TIME_OFFROAD_S = 30*3600
 MIN_ON_TIME_S = 3600
 DELAY_SHUTDOWN_TIME_S = 300 # Wait at least DELAY_SHUTDOWN_TIME_S seconds after offroad_time to shutdown.
-AUTOMATIC_POWER_DOWN_GRACE_S = 60
 VOLTAGE_SHUTDOWN_MIN_OFFROAD_TIME_S = 60
 
 class PowerMonitoring:
@@ -29,8 +29,7 @@ class PowerMonitoring:
     self.car_voltage_mV = 12e3                  # Low-passed version of peripheralState voltage
     self.car_voltage_instant_mV = 12e3          # Last value of peripheralState voltage
     self.integration_lock = threading.Lock()
-    self._disable_power_down = self.params.get_bool("DisablePowerDown")
-    self._automatic_power_down_grace_start = None
+    self._prevent_automatic_shutdown = PreventAutomaticShutdownPolicy(self.params)
 
     car_battery_capacity_uWh = self.params.get("CarBatteryCapacity") or 0
 
@@ -120,14 +119,6 @@ class PowerMonitoring:
       return False
 
     now = time.monotonic()
-    disable_power_down = self.params.get_bool("DisablePowerDown")
-    if disable_power_down != self._disable_power_down:
-      self._automatic_power_down_grace_start = now if self._disable_power_down else None
-      self._disable_power_down = disable_power_down
-
-    if (self._automatic_power_down_grace_start is not None and
-        now - self._automatic_power_down_grace_start >= AUTOMATIC_POWER_DOWN_GRACE_S):
-      self._automatic_power_down_grace_start = None
 
     should_shutdown = False
     offroad_time = (now - offroad_timestamp)
@@ -137,8 +128,7 @@ class PowerMonitoring:
     should_shutdown |= low_voltage_shutdown
     should_shutdown |= (self.car_battery_capacity_uWh <= 0)
     should_shutdown &= not ignition
-    should_shutdown &= not disable_power_down
-    should_shutdown &= self._automatic_power_down_grace_start is None
+    should_shutdown &= self._prevent_automatic_shutdown.allows_automatic_shutdown(now)
     should_shutdown &= in_car
     should_shutdown &= offroad_time > DELAY_SHUTDOWN_TIME_S
     should_shutdown |= self.params.get_bool("ForcePowerDown")
