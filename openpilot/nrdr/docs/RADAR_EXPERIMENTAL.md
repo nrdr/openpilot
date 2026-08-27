@@ -16,4 +16,3 @@ turn `HondaBoschARadar` off before driving again and preserve the route logs for
 
 The historical Civic-only decoder and its incompatible DBC are retained in the
 `nrdr-development-archive-08.24.2026` archive, not in this branch.
-
