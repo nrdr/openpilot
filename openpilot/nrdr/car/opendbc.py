@@ -14,15 +14,7 @@ from types import MappingProxyType
 from typing import Any
 
 from opendbc.sunnypilot.car.honda.longitudinal import LEARN_VERSION
-from opendbc.sunnypilot.car.runtime_config import (
-  HondaCarConfig,
-  HondaLiveTuning,
-  HyundaiCarConfig,
-  SubaruCarConfig,
-  SunnypilotCarConfig,
-  TeslaCarConfig,
-  ToyotaCarConfig,
-)
+from opendbc.sunnypilot.car.runtime_config import HondaLiveTuning
 
 from openpilot.nrdr.params.generated.keys import NrdrParamKey
 
@@ -34,19 +26,10 @@ LONG_FACTOR_MIN = 0.6
 LONG_FACTOR_MAX = 1.6
 
 
-class OpendbcParamKey(StrEnum):
-  """The only string-key ownership point for the openpilot-to-opendbc boundary."""
+class NrdrHondaParamKey(StrEnum):
+  """NRDR-owned Honda keys consumed across the openpilot-to-opendbc boundary."""
 
   HONDA_BOSCH_A_RADAR = NrdrParamKey.HONDA_BOSCH_A_RADAR
-  HONDA_ENFORCE_STOCK_LONGITUDINAL = "HondaEnforceStockLongitudinal"
-  HYUNDAI_LONGITUDINAL_TUNING = "HyundaiLongitudinalTuning"
-  SUBARU_STOP_AND_GO = "SubaruStopAndGo"
-  SUBARU_STOP_AND_GO_MANUAL_PARKING_BRAKE = "SubaruStopAndGoManualParkingBrake"
-  TESLA_COOPERATIVE_STEERING = "TeslaCoopSteering"
-  TESLA_MADS_SCREEN_BUTTON = "TeslaMadsScreenButton"
-  TOYOTA_ENFORCE_STOCK_LONGITUDINAL = "ToyotaEnforceStockLongitudinal"
-  TOYOTA_STOP_AND_GO_HACK = "ToyotaStopAndGoHack"
-
   HONDA_GAS_FACTOR = "HondaGasFactorParams"
   HONDA_WIND_FACTOR = "HondaWindFactorParams"
   HONDA_OVERRIDE_FADE_DOWN_SECS = NrdrParamKey.HONDA_OVERRIDE_FADE_DOWN_SECS
@@ -75,6 +58,11 @@ class OpendbcParamKey(StrEnum):
   NRDR_HONDA_ECU_MATCHED_LONG = NrdrParamKey.NRDR_HONDA_ECU_MATCHED_LONG
   NRDR_HONDA_FULL_BRAKE_AUTHORITY = NrdrParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY
   NRDR_ROEN_ACCELERATION_LIMITS = NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS
+
+
+# Compatibility name for the typed key enum introduced with the first boundary.
+# Its membership is now deliberately limited to NRDR-owned Honda policy.
+OpendbcParamKey = NrdrHondaParamKey
 
 
 SLOW_PARAM_GROUPS = (
@@ -394,57 +382,26 @@ class HondaParamsProvider:
       pass
 
 
-def build_opendbc_config(params, *, start_worker: bool = True,
-                         metadata_path: Path = LEARNER_META_PATH) -> SunnypilotCarConfig:
-  """Gather openpilot Params once and return opendbc's immutable typed boundary."""
+@dataclass(frozen=True, slots=True)
+class NrdrHondaConfig:
+  """NRDR-owned values which the SunnyPilot host composes into its typed config."""
+
+  bosch_a_radar: bool
+  provider: HondaParamsProvider
+
+
+def build_nrdr_honda_config(params, *, start_worker: bool = True,
+                            metadata_path: Path = LEARNER_META_PATH) -> NrdrHondaConfig:
+  """Build only NRDR's Bosch-A choice and live Honda tuning provider."""
 
   provider = HondaParamsProvider(params, start_worker=start_worker, metadata_path=metadata_path)
   # The historical Honda interface used Params.get_bool directly, which is false
   # when the registered key has no stored value (it does not consult registry defaults).
   radar_value = _read_param(params, OpendbcParamKey.HONDA_BOSCH_A_RADAR)
 
-  return SunnypilotCarConfig(
-    honda=HondaCarConfig(
-      bosch_a_radar=_bool_value(radar_value, False),
-      enforce_stock_longitudinal=_bool_value(
-        _read_param(params, OpendbcParamKey.HONDA_ENFORCE_STOCK_LONGITUDINAL, return_default=True),
-        False,
-      ),
-      provider=provider,
-    ),
-    hyundai=HyundaiCarConfig(
-      longitudinal_tuning=int(_float_value(
-        _read_param(params, OpendbcParamKey.HYUNDAI_LONGITUDINAL_TUNING, return_default=True),
-        0.0,
-      )),
-    ),
-    subaru=SubaruCarConfig(
-      stop_and_go=_bool_value(_read_param(params, OpendbcParamKey.SUBARU_STOP_AND_GO, return_default=True), False),
-      stop_and_go_manual_parking_brake=_bool_value(
-        _read_param(params, OpendbcParamKey.SUBARU_STOP_AND_GO_MANUAL_PARKING_BRAKE, return_default=True),
-        False,
-      ),
-    ),
-    tesla=TeslaCarConfig(
-      cooperative_steering=_bool_value(
-        _read_param(params, OpendbcParamKey.TESLA_COOPERATIVE_STEERING, return_default=True),
-        False,
-      ),
-      mads_screen_button=int(_float_value(
-        _read_param(params, OpendbcParamKey.TESLA_MADS_SCREEN_BUTTON, return_default=True),
-        0.0,
-      )),
-    ),
-    toyota=ToyotaCarConfig(
-      enforce_stock_longitudinal=_bool_value(
-        _read_param(params, OpendbcParamKey.TOYOTA_ENFORCE_STOCK_LONGITUDINAL, return_default=True),
-        False,
-      ),
-      stop_and_go_hack=_bool_value(
-        _read_param(params, OpendbcParamKey.TOYOTA_STOP_AND_GO_HACK, return_default=True),
-        False,
-      ),
-    ),
+  return NrdrHondaConfig(
+    bosch_a_radar=_bool_value(radar_value, False),
+    provider=provider,
   )
 
 
@@ -453,8 +410,10 @@ __all__ = (
   "FAST_REFRESH_PERIOD",
   "HondaParamsProvider",
   "LEARNER_META_PATH",
+  "NrdrHondaConfig",
+  "NrdrHondaParamKey",
   "OpendbcParamKey",
   "REFRESH_PERIOD",
   "SLOW_PARAM_GROUPS",
-  "build_opendbc_config",
+  "build_nrdr_honda_config",
 )

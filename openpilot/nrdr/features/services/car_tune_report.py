@@ -2,7 +2,6 @@ from openpilot.cereal import custom, messaging
 from opendbc.car.structs import car
 from opendbc.car.car_helpers import interfaces
 from openpilot.common.swaglog import cloudlog
-from openpilot.nrdr.car.opendbc import build_opendbc_config
 from openpilot.nrdr.params import (
   apply_handcrafted_lateral_profile,
   get_handcrafted_lateral_profile,
@@ -15,6 +14,7 @@ from openpilot.nrdr.features.lateral.model_policy import (
   SteerRatioModelPolicy,
   resolve_steer_ratio_model,
 )
+from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.sunnypilot.models.helpers import get_active_bundle
 
 
@@ -61,9 +61,10 @@ class CarTuneReporter:
     if CP.lateralTuning.which() == "pid":
       return CP
     CarInterface = interfaces[CP.carFingerprint]
+    # Reconstructing CarParams requires opendbc's complete host-owned multi-brand config.
     reconstructed = CarInterface.get_non_essential_params(
       CP.carFingerprint,
-      build_opendbc_config(self.params, start_worker=False),
+      build_sunnypilot_car_config(self.params, start_worker=False),
     )
     CarInterface.get_non_essential_params_sp(reconstructed, CP.carFingerprint)
     return reconstructed if reconstructed.lateralTuning.which() == "pid" else CP

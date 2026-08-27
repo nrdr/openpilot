@@ -27,7 +27,9 @@ openpilot process -> NRDR hook -> NRDR feature -> immutable configuration
                                       ^
 NRDR UI ------------------------------| (commands/settings only)
 
-openpilot card setup -> NRDR car adapter -> typed immutable config -> opendbc
+openpilot card setup -> SunnyPilot host composer -> typed immutable config -> opendbc
+                                      ^
+                         NRDR Honda/provider adapter
 ```
 
 Rules for new code:
@@ -43,9 +45,11 @@ Rules for new code:
 - `features` must not import hooks or UI.
 - UI can consume parameter metadata but cannot become the source of controller
   defaults.
-- Opendbc receives typed, immutable Honda configuration from the NRDR car
-  adapter. It must not import openpilot's Params implementation or re-own NRDR
-  defaults and persistence policy.
+- Opendbc receives a typed, immutable multi-brand configuration from the
+  SunnyPilot host composer. NRDR supplies only its Honda/provider portion and
+  does not own SunnyPilot's generic brand keys or defaults. Opendbc must not
+  import openpilot's Params implementation or re-own NRDR defaults and
+  persistence policy.
 
 ## Public surface
 
@@ -78,9 +82,10 @@ Current status on `nrdr-architecture-development`:
   `openpilot.nrdr.tools`. Former SunnyPilot modules and root commands are
   explicit compatibility facades, while production callers use canonical
   owners.
-- Step 5 is complete. `openpilot.nrdr.car` owns startup conversion, live
-  snapshots, and persistence callbacks; the car-interface seam threads those
-  typed immutable values into opendbc without direct Params access.
+- Step 5 is complete. `openpilot.nrdr.car` owns only NRDR Honda startup
+  conversion, live snapshots, and persistence callbacks. SunnyPilot's host
+  adapter owns its pre-existing multi-brand keys/defaults and composes both
+  portions before the car-interface seam passes immutable values to opendbc.
 - The retired `NrdrLegacyDualBpSteerRatio` manual selector is a parameter
   tombstone. Its exact persistent/backup BOOL registry metadata and default of
   `1` remain generated for downgrade compatibility, but profile v14, live

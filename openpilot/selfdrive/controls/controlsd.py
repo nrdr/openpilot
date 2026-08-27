@@ -9,8 +9,6 @@ from openpilot.common.constants import CV
 from openpilot.common.params import Params
 from openpilot.common.realtime import config_realtime_process, DT_CTRL, Priority, Ratekeeper
 from openpilot.common.swaglog import cloudlog
-from openpilot.nrdr.car.opendbc import build_opendbc_config
-
 from opendbc.car.car_helpers import interfaces
 from opendbc.car.vehicle_model import VehicleModel
 from openpilot.selfdrive.controls.lib.drive_helpers import clip_curvature
@@ -24,6 +22,7 @@ from openpilot.selfdrive.modeld.modeld import LAT_SMOOTH_SECONDS
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
 
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
+from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 from openpilot.nrdr.hooks import allow_longitudinal, apply_hud_lead, stopping_inputs, vehicle_model_params
 
@@ -44,7 +43,7 @@ class Controls(ControlsExt):
     # Initialize sunnypilot controlsd extension and base model state
     ControlsExt.__init__(self, self.CP, self.params)
 
-    self.CI = interfaces[self.CP.carFingerprint](self.CP, self.CP_SP, build_opendbc_config(self.params))
+    self.CI = interfaces[self.CP.carFingerprint](self.CP, self.CP_SP, build_sunnypilot_car_config(self.params))
 
     self.sm = messaging.SubMaster(['lateralDelay', 'vehicleParameters', 'lateralTorqueParameters', 'modelV2', 'selfdriveState',
                                    'extrinsicsCalibration', 'deviceMotion', 'longitudinalPlan', 'lateralManeuverPlan', 'carState', 'carOutput',

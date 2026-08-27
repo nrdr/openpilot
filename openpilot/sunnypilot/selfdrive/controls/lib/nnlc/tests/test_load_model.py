@@ -9,7 +9,7 @@ from openpilot.selfdrive.car.helpers import convert_to_capnp
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.common.test import OpenpilotTestCase
-from openpilot.nrdr.car.opendbc import build_opendbc_config
+from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 
 
 class TestNNTorqueModel(OpenpilotTestCase):
@@ -20,7 +20,7 @@ class TestNNTorqueModel(OpenpilotTestCase):
     params.put_bool("NeuralNetworkLateralControl", True, block=True)
 
     CarInterface = interfaces[car_name]
-    interface_config = build_opendbc_config(params, start_worker=False)
+    interface_config = build_sunnypilot_car_config(params, start_worker=False)
     CP = CarInterface.get_non_essential_params(car_name, interface_config)
     CP_SP = CarInterface.get_non_essential_params_sp(CP, car_name)
     CI = CarInterface(CP, CP_SP, interface_config)

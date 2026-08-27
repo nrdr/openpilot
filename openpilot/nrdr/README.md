@@ -13,7 +13,7 @@ component, and gives contributors one obvious place to start.
 
 ```text
 openpilot/nrdr/
-├── car/       typed, immutable configuration passed into opendbc
+├── car/       NRDR Honda/provider portion of opendbc's typed configuration
 ├── params/    contracts, startup policy, profiles, snapshots, and typed access
 ├── features/  lateral, longitudinal, radar, driver-policy, and service behavior
 ├── hooks/     small adapters called by openpilot processes
@@ -27,9 +27,9 @@ The separation is intentional:
 
 - `params` owns names, types, startup defaults, validation, profiles, snapshots,
   and future NRDR-specific migrations.
-- `car` owns the narrow adapter that converts NRDR configuration into the
-  immutable typed values consumed by opendbc. It is the only NRDR owner of that
-  cross-repository contract.
+- `car` owns the narrow adapter that converts only NRDR's Honda configuration
+  into immutable typed values. SunnyPilot owns the neutral multi-brand host
+  composer and its pre-existing vehicle settings.
 - `features` owns algorithms.  Parameter mechanics do not belong here.
 - `hooks` translates openpilot state into calls to NRDR features.  Hooks should
   remain small and contain no tuning algorithm.
@@ -65,7 +65,8 @@ while downstream consumers migrate.
 - Complete: offline lateral, steer-ratio, and radar reverse-engineering tool
   ownership, with old command paths retained as compatibility entrypoints.
 - Complete: the typed openpilot-to-opendbc configuration boundary. Opendbc no
-  longer reads NRDR Params or owns NRDR default and persistence policy.
+  longer reads openpilot Params; SunnyPilot composes its generic vehicle policy
+  with NRDR's isolated Honda provider before passing immutable data across.
 - In progress: shared native/Sunnylink UI metadata. The first six lateral P/I
   scale controls now have one declarative owner with output-parity tests.
 - Compatibility only: the old defaults, handcrafted-profile, and live-snapshot

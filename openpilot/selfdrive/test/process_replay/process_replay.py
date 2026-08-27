@@ -21,7 +21,7 @@ from msgq.visionipc import VisionIpcServer, get_endpoint_name as vipc_get_endpoi
 from opendbc.car.can_definitions import CanData
 from opendbc.car.car_helpers import get_car, interfaces
 from openpilot.common.params import Params
-from openpilot.nrdr.car.opendbc import build_opendbc_config
+from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.common.prefix import OpenpilotPrefix
 from openpilot.common.timeout import Timeout
 from openpilot.common.realtime import DT_CTRL
@@ -355,7 +355,7 @@ def get_car_params_callback(rc, pm, msgs, fingerprint):
   params = Params()
   if fingerprint:
     CarInterface = interfaces[fingerprint]
-    CP = CarInterface.get_non_essential_params(fingerprint, build_opendbc_config(params))
+    CP = CarInterface.get_non_essential_params(fingerprint, build_sunnypilot_car_config(params))
     CP_SP = CarInterface.get_non_essential_params_sp(CP, fingerprint)
   else:
     can_msgs = ([CanData(can.address, can.dat, can.src) for can in m.can] for m in msgs if m.which() == "can")
@@ -372,7 +372,7 @@ def get_car_params_callback(rc, pm, msgs, fingerprint):
       with car.CarParams.from_bytes(cached_params_raw) as _cached_params:
         cached_params = _cached_params
 
-    interface_config = build_opendbc_config(params)
+    interface_config = build_sunnypilot_car_config(params)
     _CI = get_car(can_recv, lambda _msgs: None, lambda obd: None, params.get_bool("AlphaLongitudinalEnabled"), False,
                   cached_params=cached_params, interface_config=interface_config)
     CP, CP_SP = _CI.CP, _CI.CP_SP

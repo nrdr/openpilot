@@ -22,7 +22,7 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 from openpilot.nrdr.features.lateral.latcontrol_clarity_hybrid import LatControlClarityHybrid, clarity_nnlc_blend_target
 from openpilot.nrdr.params import reset_live_params_for_tests
-from openpilot.nrdr.car.opendbc import build_opendbc_config
+from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.nrdr.features.lateral.model_policy import (
   LEGACY_DUAL_BP_ARTIFACT_SHA256S,
   PURE_FIRMWARE_VGR_ARTIFACT_SHA256S,
@@ -114,7 +114,7 @@ class TestNNTorqueModel:
     params.put_bool("NeuralNetworkLateralControl", True, block=True)
 
     CarInterface = interfaces[car_name]
-    interface_config = build_opendbc_config(params, start_worker=False)
+    interface_config = build_sunnypilot_car_config(params, start_worker=False)
     CP = CarInterface.get_non_essential_params(car_name, interface_config)
     CP_SP = CarInterface.get_non_essential_params_sp(CP, car_name)
     CI = CarInterface(CP, CP_SP, interface_config)
@@ -144,7 +144,7 @@ class TestNNTorqueModel:
       params.put("ModelManager_ActiveBundle", _active_model_bundle(next(iter(LEGACY_DUAL_BP_ARTIFACT_SHA256S))), block=True)
 
       CarInterface = interfaces[HONDA.HONDA_CLARITY]
-      interface_config = build_opendbc_config(params, start_worker=False)
+      interface_config = build_sunnypilot_car_config(params, start_worker=False)
       CP = CarInterface.get_non_essential_params(HONDA.HONDA_CLARITY, interface_config)
       CP.carFw = [CarParams.CarFw(ecu=CarParams.Ecu.eps, fwVersion=b"39990-TRW-A020")]
       CP_SP = CarInterface.get_non_essential_params_sp(CP, HONDA.HONDA_CLARITY)
@@ -287,7 +287,7 @@ class TestNNTorqueModel:
       params.put_bool("NeuralNetworkLateralControl", False, block=True)
 
       CarInterface = interfaces[HONDA.HONDA_CIVIC]
-      interface_config = build_opendbc_config(params, start_worker=False)
+      interface_config = build_sunnypilot_car_config(params, start_worker=False)
       CP = CarInterface.get_non_essential_params(HONDA.HONDA_CIVIC, interface_config)
       CP_SP = CarInterface.get_non_essential_params_sp(CP, HONDA.HONDA_CIVIC)
       CI = CarInterface(CP, CP_SP, interface_config)

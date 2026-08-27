@@ -272,7 +272,7 @@ def test_clarity_hybrid_preserves_trw_firmware_and_enters_firmware_mode():
   from openpilot.common.realtime import DT_CTRL
   from openpilot.selfdrive.car.helpers import convert_to_capnp
   from openpilot.nrdr.features.lateral.latcontrol_clarity_hybrid import LatControlClarityHybrid
-  from openpilot.nrdr.car.opendbc import build_opendbc_config
+  from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
   from openpilot.nrdr.params import reset_live_params_for_tests
   from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
   from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
@@ -286,7 +286,7 @@ def test_clarity_hybrid_preserves_trw_firmware_and_enters_firmware_mode():
     reset_live_params_for_tests()
 
     CarInterface = interfaces[HONDA.HONDA_CLARITY]
-    interface_config = build_opendbc_config(settings, start_worker=False)
+    interface_config = build_sunnypilot_car_config(settings, start_worker=False)
     CP = CarInterface.get_non_essential_params(HONDA.HONDA_CLARITY, interface_config)
     CP.carFw = [CarParams.CarFw(ecu=CarParams.Ecu.eps, fwVersion=b"39990-TRW-A020")]
     CP_SP = CarInterface.get_non_essential_params_sp(CP, HONDA.HONDA_CLARITY)

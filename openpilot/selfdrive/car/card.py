@@ -25,6 +25,7 @@ from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_cap
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
 from openpilot.nrdr.params import restore_handcrafted_lateral_profile
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
+from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 
 REPLAY = "REPLAY" in os.environ
 
@@ -108,7 +109,7 @@ class Car:
           cached_params = _cached_params
 
       fixed_fingerprint = (self.params.get("CarPlatformBundle") or {}).get("platform", None)
-      interface_config = sunnypilot_interfaces.initialize_params(self.params)
+      interface_config = build_sunnypilot_car_config(self.params)
 
       self.CI = get_car(*self.can_callbacks, obd_callback(self.params), alpha_long_allowed, is_release,
                         cached_params=cached_params, fixed_fingerprint=fixed_fingerprint,

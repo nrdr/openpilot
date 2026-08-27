@@ -9,6 +9,7 @@ from opendbc.car.interfaces import CarInterfaceBase
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.nrdr.features.lateral.nnlc_model import is_nnlc_forced
+from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import get_nn_model_path
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import set_speed_limit_assist_availability
 
@@ -112,6 +113,5 @@ def setup_interfaces(CI: CarInterfaceBase, params: Params | None = None) -> None
 
 
 def initialize_params(params):
-  """Compatibility seam; canonical NRDR code owns all keys and values."""
-  from openpilot.nrdr.car.opendbc import build_opendbc_config
-  return build_opendbc_config(params)
+  """Compatibility name for SunnyPilot's typed host configuration builder."""
+  return build_sunnypilot_car_config(params)

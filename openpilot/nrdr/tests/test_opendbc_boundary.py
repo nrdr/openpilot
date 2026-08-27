@@ -12,9 +12,14 @@ from opendbc.sunnypilot.car.runtime_config import HondaLiveTuning
 from openpilot.nrdr.car.opendbc import (
   FAST_PARAM_GROUP,
   HondaParamsProvider,
+  NrdrHondaParamKey,
   OpendbcParamKey,
   SLOW_PARAM_GROUPS,
-  build_opendbc_config,
+  build_nrdr_honda_config,
+)
+from openpilot.sunnypilot.selfdrive.car.opendbc_config import (
+  SunnypilotCarParamKey,
+  build_sunnypilot_car_config,
 )
 
 
@@ -22,23 +27,22 @@ class UnknownKeyName(Exception):
   pass
 
 
-STARTUP_DEFAULTS = {
-  OpendbcParamKey.HONDA_BOSCH_A_RADAR: True,
-  OpendbcParamKey.HONDA_ENFORCE_STOCK_LONGITUDINAL: False,
-  OpendbcParamKey.HYUNDAI_LONGITUDINAL_TUNING: 0,
-  OpendbcParamKey.SUBARU_STOP_AND_GO: False,
-  OpendbcParamKey.SUBARU_STOP_AND_GO_MANUAL_PARKING_BRAKE: False,
-  OpendbcParamKey.TESLA_COOPERATIVE_STEERING: False,
-  OpendbcParamKey.TESLA_MADS_SCREEN_BUTTON: 0,
-  OpendbcParamKey.TOYOTA_ENFORCE_STOCK_LONGITUDINAL: False,
-  OpendbcParamKey.TOYOTA_STOP_AND_GO_HACK: False,
+HOST_STARTUP_DEFAULTS = {
+  SunnypilotCarParamKey.HONDA_ENFORCE_STOCK_LONGITUDINAL: False,
+  SunnypilotCarParamKey.HYUNDAI_LONGITUDINAL_TUNING: 0,
+  SunnypilotCarParamKey.SUBARU_STOP_AND_GO: False,
+  SunnypilotCarParamKey.SUBARU_STOP_AND_GO_MANUAL_PARKING_BRAKE: False,
+  SunnypilotCarParamKey.TESLA_COOPERATIVE_STEERING: False,
+  SunnypilotCarParamKey.TESLA_MADS_SCREEN_BUTTON: 0,
+  SunnypilotCarParamKey.TOYOTA_ENFORCE_STOCK_LONGITUDINAL: False,
+  SunnypilotCarParamKey.TOYOTA_STOP_AND_GO_HACK: False,
 }
 
 
 class FakeParams:
   def __init__(self, values=None, defaults=None, unknown=()):
     self.values = {str(key): value for key, value in (values or {}).items()}
-    self.defaults = {str(key): value for key, value in (defaults or STARTUP_DEFAULTS).items()}
+    self.defaults = {str(key): value for key, value in (defaults or HOST_STARTUP_DEFAULTS).items()}
     self.unknown = {str(key) for key in unknown}
     self.fail_keys = set()
     self.reads = []
@@ -74,7 +78,7 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.addCleanup(self._temporary_directory.cleanup)
     self.tmp_path = Path(self._temporary_directory.name)
 
-  def test_all_former_param_consumers_have_one_canonical_key_owner(self):
+  def test_nrdr_honda_consumers_have_one_canonical_key_owner(self):
     grouped_keys = [key for group in (*SLOW_PARAM_GROUPS, FAST_PARAM_GROUP) for key in group]
     self.assertEqual(len(grouped_keys), len(set(grouped_keys)))
     self.assertSetEqual(set(grouped_keys), {
@@ -105,14 +109,17 @@ class TestOpendbcBoundary(unittest.TestCase):
       OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY,
       OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS,
     })
-    self.assertTrue(set(STARTUP_DEFAULTS).isdisjoint(grouped_keys))
-    self.assertSetEqual(set(OpendbcParamKey), set(grouped_keys) | set(STARTUP_DEFAULTS) | {
+    self.assertIs(OpendbcParamKey, NrdrHondaParamKey)
+    self.assertTrue(set(HOST_STARTUP_DEFAULTS).isdisjoint(set(NrdrHondaParamKey)))
+    self.assertSetEqual(set(NrdrHondaParamKey), set(grouped_keys) | {
+      NrdrHondaParamKey.HONDA_BOSCH_A_RADAR,
       OpendbcParamKey.HONDA_GAS_FACTOR,
       OpendbcParamKey.HONDA_WIND_FACTOR,
     })
 
   def test_missing_startup_values_preserve_previous_interface_behavior(self):
-    config = build_opendbc_config(FakeParams(), start_worker=False, metadata_path=self.tmp_path / "meta.json")
+    params = FakeParams()
+    config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
     self.assertFalse(config.honda.bosch_a_radar)
     self.assertFalse(config.honda.enforce_stock_longitudinal)
     self.assertEqual(config.hyundai.longitudinal_tuning, 0)
@@ -122,12 +129,21 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertEqual(config.tesla.mads_screen_button, 0)
     self.assertFalse(config.toyota.enforce_stock_longitudinal)
     self.assertFalse(config.toyota.stop_and_go_hack)
+    self.assertEqual([key for key, _ in params.reads], [
+      str(NrdrHondaParamKey.HONDA_BOSCH_A_RADAR),
+      *(str(key) for key in HOST_STARTUP_DEFAULTS),
+    ])
 
   def test_honda_workers_stay_dormant_until_honda_interface_activation(self):
     params = FakeParams()
-    config = build_opendbc_config(params, start_worker=True, metadata_path=self.tmp_path / "meta.json")
-    provider = config.honda.provider
+    honda = build_nrdr_honda_config(
+      params,
+      start_worker=True,
+      metadata_path=self.tmp_path / "meta.json",
+    )
+    provider = honda.provider
     try:
+      self.assertFalse(honda.bosch_a_radar)
       self.assertFalse(provider._workers_started)
       self.assertFalse({key for key, _ in params.reads} & {str(key) for group in SLOW_PARAM_GROUPS for key in group})
       provider.initialize_live_learning_gas(False)
@@ -136,7 +152,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       provider.close()
 
   def test_honda_state_and_controller_receive_the_same_typed_boundary(self):
-    config = build_opendbc_config(FakeParams(), start_worker=False, metadata_path=self.tmp_path / "meta.json")
+    config = build_sunnypilot_car_config(FakeParams(), start_worker=False, metadata_path=self.tmp_path / "meta.json")
     cp = HondaCarInterface.get_non_essential_params(HONDA.HONDA_CLARITY, config)
     cp_sp = HondaCarInterface.get_non_essential_params_sp(cp, HONDA.HONDA_CLARITY)
     interface = HondaCarInterface(cp, cp_sp, config)
@@ -148,10 +164,11 @@ class TestOpendbcBoundary(unittest.TestCase):
 
   def test_explicit_startup_values_preserve_typed_parity(self):
     params = FakeParams(values={key: (2 if key in (
-      OpendbcParamKey.HYUNDAI_LONGITUDINAL_TUNING,
-      OpendbcParamKey.TESLA_MADS_SCREEN_BUTTON,
-    ) else True) for key in STARTUP_DEFAULTS})
-    config = build_opendbc_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+      SunnypilotCarParamKey.HYUNDAI_LONGITUDINAL_TUNING,
+      SunnypilotCarParamKey.TESLA_MADS_SCREEN_BUTTON,
+    ) else True) for key in HOST_STARTUP_DEFAULTS})
+    params.values[str(NrdrHondaParamKey.HONDA_BOSCH_A_RADAR)] = True
+    config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
 
     self.assertTrue(config.honda.bosch_a_radar)
     self.assertTrue(config.honda.enforce_stock_longitudinal)
@@ -164,8 +181,8 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertTrue(config.toyota.stop_and_go_hack)
 
   def test_unknown_keys_receive_characterized_safe_fallbacks(self):
-    params = FakeParams(unknown=STARTUP_DEFAULTS)
-    config = build_opendbc_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+    params = FakeParams(unknown={*HOST_STARTUP_DEFAULTS, NrdrHondaParamKey.HONDA_BOSCH_A_RADAR})
+    config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
 
     self.assertFalse(config.honda.bosch_a_radar)
     self.assertFalse(config.honda.enforce_stock_longitudinal)
@@ -324,28 +341,61 @@ class TestOpendbcBoundary(unittest.TestCase):
       source = path.read_text(encoding="utf-8")
       self.assertNotIn("openpilot.common.params", source, str(path))
 
+    nrdr_source = (repository_root / "openpilot/nrdr/car/opendbc.py").read_text(encoding="utf-8")
+    host_source = (repository_root / "openpilot/sunnypilot/selfdrive/car/opendbc_config.py").read_text(encoding="utf-8")
+    for host_owned_name in (
+      "HondaEnforceStockLongitudinal",
+      "HyundaiLongitudinalTuning",
+      "SubaruStopAndGo",
+      "TeslaCoopSteering",
+      "ToyotaEnforceStockLongitudinal",
+      "HondaCarConfig",
+      "HyundaiCarConfig",
+      "SubaruCarConfig",
+      "TeslaCarConfig",
+      "ToyotaCarConfig",
+      "SunnypilotCarConfig",
+    ):
+      with self.subTest(host_owned_name=host_owned_name):
+        self.assertNotIn(host_owned_name, nrdr_source)
+        self.assertIn(host_owned_name, host_source)
+    self.assertNotIn("openpilot.sunnypilot", nrdr_source)
+    self.assertIn("build_nrdr_honda_config", host_source)
+
     caller_expectations = {
-      "openpilot/selfdrive/car/card.py": "sunnypilot_interfaces.initialize_params(self.params)",
-      "openpilot/selfdrive/controls/controlsd.py": "build_opendbc_config(self.params)",
-      "openpilot/selfdrive/test/process_replay/process_replay.py": "build_opendbc_config(params)",
+      "openpilot/selfdrive/car/card.py": "build_sunnypilot_car_config(self.params)",
+      "openpilot/selfdrive/controls/controlsd.py": "build_sunnypilot_car_config(self.params)",
+      "openpilot/selfdrive/test/process_replay/process_replay.py": "build_sunnypilot_car_config(params)",
       "openpilot/nrdr/features/lateral/latcontrol_clarity_hybrid.py": "CI.interface_config",
-      "openpilot/nrdr/features/services/car_tune_report.py": "build_opendbc_config(self.params, start_worker=False)",
-      "openpilot/nrdr/ui/settings/lateral_tuning.py": "build_opendbc_config(ui_state.params, start_worker=False)",
+      "openpilot/nrdr/features/services/car_tune_report.py": "build_sunnypilot_car_config(self.params, start_worker=False)",
+      "openpilot/nrdr/ui/settings/lateral_tuning.py": "build_sunnypilot_car_config(ui_state.params, start_worker=False)",
     }
     for relative_path, seam in caller_expectations.items():
       with self.subTest(relative_path=relative_path):
         source = (repository_root / relative_path).read_text(encoding="utf-8")
         self.assertTrue(
-          "from openpilot.nrdr.car.opendbc import build_opendbc_config" in source
+          "from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config" in source
           or "CI.interface_config" in source
           or "sunnypilot_interfaces.initialize_params" in source,
         )
         self.assertIn(seam, source)
+        if relative_path.startswith("openpilot/selfdrive/"):
+          self.assertNotIn("from openpilot.nrdr.car.opendbc import", source)
 
     legacy_source = (repository_root / "openpilot/sunnypilot/selfdrive/car/interfaces.py").read_text(encoding="utf-8")
     self.assertNotIn("init_params_list_sp", legacy_source)
-    self.assertIn("from openpilot.nrdr.car.opendbc import build_opendbc_config", legacy_source)
-    self.assertIn("return build_opendbc_config(params)", legacy_source)
+    self.assertIn("from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config", legacy_source)
+    self.assertIn("return build_sunnypilot_car_config(params)", legacy_source)
+
+    explicit_host_reconstruction = sorted(
+      str(path.relative_to(repository_root)).replace("\\", "/")
+      for path in (repository_root / "openpilot/nrdr").rglob("*.py")
+      if "tests" not in path.parts and "openpilot.sunnypilot.selfdrive.car.opendbc_config" in path.read_text(encoding="utf-8")
+    )
+    self.assertEqual(explicit_host_reconstruction, [
+      "openpilot/nrdr/features/services/car_tune_report.py",
+      "openpilot/nrdr/ui/settings/lateral_tuning.py",
+    ])
 
   def test_live_snapshot_is_plain_immutable_typed_data(self):
     provider = HondaParamsProvider(FakeParams(), start_worker=False, metadata_path=self.tmp_path / "meta.json")

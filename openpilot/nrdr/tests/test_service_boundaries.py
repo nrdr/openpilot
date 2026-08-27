@@ -89,7 +89,7 @@ install_module("openpilot.cereal", package=True, custom=types.SimpleNamespace(),
 install_module("openpilot.nrdr.params", apply_handcrafted_lateral_profile=lambda *args: None,
                get_handcrafted_lateral_profile=lambda *args: None, get_steer_ratio_endpoint_profile=lambda *args: None,
                is_handcrafted_lateral_enabled=lambda *args: False)
-install_module("openpilot.nrdr.car.opendbc", build_opendbc_config=lambda *args, **kwargs: None)
+install_module("openpilot.sunnypilot.selfdrive.car.opendbc_config", build_sunnypilot_car_config=lambda *args, **kwargs: None)
 install_module("openpilot.nrdr.features.lateral", package=True)
 install_module("openpilot.nrdr.features.lateral.model_policy", SteerRatioModelResolution=dummy_type,
                SteerRatioModelPolicy=types.SimpleNamespace(LEGACY_DUAL_BP=object(), PURE_FIRMWARE_VGR=object()),
