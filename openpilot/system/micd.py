@@ -5,8 +5,8 @@ import threading
 
 from openpilot.cereal import messaging
 from openpilot.common.realtime import Ratekeeper
-from openpilot.common.utils import retry
 from openpilot.common.swaglog import cloudlog
+from openpilot.system.audio import open_audio_stream
 
 RATE = 10
 FFT_SAMPLES = 1600 # 100ms
@@ -51,9 +51,10 @@ def apply_a_weighting(measurements: np.ndarray) -> np.ndarray:
 
 
 class Mic:
-  def __init__(self):
+  def __init__(self, ready_event=None):
     self.rk = Ratekeeper(RATE)
     self.pm = messaging.PubMaster(['soundPressure', 'rawAudioData'])
+    self.ready_event = ready_event
 
     self.measurements = np.empty(0)
 
@@ -102,12 +103,13 @@ class Mic:
 
         self.measurements = self.measurements[FFT_SAMPLES:]
 
-  @retry(attempts=10, delay=3)
   def get_stream(self, sd):
-    # reload sounddevice to reinitialize portaudio
-    sd._terminate()
-    sd._initialize()
-    return sd.InputStream(channels=1, samplerate=SAMPLE_RATE, callback=self.callback, blocksize=SAMPLE_BUFFER)
+    return open_audio_stream(
+      sd,
+      lambda callback: sd.InputStream(channels=1, samplerate=SAMPLE_RATE, callback=callback, blocksize=SAMPLE_BUFFER),
+      self.callback,
+      "micd",
+    )
 
   def micd_thread(self):
     # sounddevice must be imported after forking processes
@@ -115,14 +117,24 @@ class Mic:
     patch_sounddevice(sd)
 
     with self.get_stream(sd) as stream:
+      if self.ready_event is not None:
+        self.ready_event.set()
       cloudlog.info(f"micd stream started: {stream.samplerate=} {stream.channels=} {stream.dtype=} {stream.device=}, {stream.blocksize=}")
       while True:
         self.update()
+        if not stream.active:
+          raise RuntimeError("micd audio stream became inactive")
 
 
-def main():
-  mic = Mic()
-  mic.micd_thread()
+def main(ready_event=None):
+  if ready_event is not None:
+    ready_event.clear()
+  try:
+    mic = Mic(ready_event)
+    mic.micd_thread()
+  finally:
+    if ready_event is not None:
+      ready_event.clear()
 
 
 if __name__ == "__main__":

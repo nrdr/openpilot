@@ -8,10 +8,10 @@ from openpilot.cereal import log, messaging, custom
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import Ratekeeper
-from openpilot.common.utils import retry
 from openpilot.common.swaglog import cloudlog
 
 from openpilot.system import micd
+from openpilot.system.audio import open_audio_stream
 from openpilot.common.hardware import HARDWARE
 
 from openpilot.sunnypilot.selfdrive.ui.quiet_mode import QuietMode
@@ -71,10 +71,11 @@ def check_selfdrive_timeout_alert(sm):
 
 
 class Soundd(QuietMode):
-  def __init__(self):
+  def __init__(self, ready_event=None):
     super().__init__()
 
     self.load_sounds()
+    self.ready_event = ready_event
 
     self.current_alert = AudibleAlert.none
     self.current_volume = MIN_VOLUME
@@ -168,12 +169,13 @@ class Soundd(QuietMode):
     volume = ((weighted_db - AMBIENT_DB) / DB_SCALE) * (MAX_VOLUME - MIN_VOLUME) + MIN_VOLUME
     return math.pow(VOLUME_BASE, (np.clip(volume, MIN_VOLUME, MAX_VOLUME) - 1))
 
-  @retry(attempts=10, delay=3)
   def get_stream(self, sd):
-    # reload sounddevice to reinitialize portaudio
-    sd._terminate()
-    sd._initialize()
-    return sd.OutputStream(channels=1, samplerate=SAMPLE_RATE, callback=self.callback, blocksize=SAMPLE_BUFFER)
+    return open_audio_stream(
+      sd,
+      lambda callback: sd.OutputStream(channels=1, samplerate=SAMPLE_RATE, callback=callback, blocksize=SAMPLE_BUFFER),
+      self.callback,
+      "soundd",
+    )
 
   def soundd_thread(self):
     # sounddevice must be imported after forking processes
@@ -183,6 +185,8 @@ class Soundd(QuietMode):
     sm = messaging.SubMaster(['selfdriveState', 'selfdriveStateSP', 'soundPressure'])
 
     with self.get_stream(sd) as stream:
+      if self.ready_event is not None:
+        self.ready_event.set()
       rk = Ratekeeper(20)
 
       cloudlog.info(f"soundd stream started: {stream.samplerate=} {stream.channels=} {stream.dtype=} {stream.device=}, {stream.blocksize=}")
@@ -207,12 +211,19 @@ class Soundd(QuietMode):
 
         rk.keep_time()
 
-        assert stream.active
+        if not stream.active:
+          raise RuntimeError("soundd audio stream became inactive")
 
 
-def main():
-  s = Soundd()
-  s.soundd_thread()
+def main(ready_event=None):
+  if ready_event is not None:
+    ready_event.clear()
+  try:
+    s = Soundd(ready_event)
+    s.soundd_thread()
+  finally:
+    if ready_event is not None:
+      ready_event.clear()
 
 
 if __name__ == "__main__":
