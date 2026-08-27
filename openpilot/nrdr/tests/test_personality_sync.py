@@ -5,7 +5,7 @@ import pytest
 from openpilot.cereal import custom
 from opendbc.car.structs import car
 from openpilot.selfdrive.selfdrived.selfdrived import SelfdriveD
-from openpilot.sunnypilot.nrdr.selfdrived import NrdrSelfdrive
+from openpilot.nrdr.hooks.selfdrived import NrdrSelfdrive
 
 
 class RecordingParams:
@@ -18,7 +18,7 @@ class RecordingParams:
 
 @pytest.mark.parametrize(("initial", "expected"), ((0, 3), (1, 0), (2, 1), (3, 2)))
 def test_button_personality_change_is_live_and_persisted(monkeypatch, initial, expected):
-  monkeypatch.setattr("openpilot.sunnypilot.nrdr.selfdrived.consume_button_press", lambda _: True)
+  monkeypatch.setattr("openpilot.nrdr.hooks.selfdrived.consume_button_press", lambda _: True)
   selfdrived = SimpleNamespace(
     CP=SimpleNamespace(openpilotLongitudinalControl=True),
     params=RecordingParams(),
@@ -60,7 +60,7 @@ def test_onroad_params_thread_does_not_read_personality(monkeypatch):
 
 def test_sla_confirmation_release_stays_reserved_across_planner_race(monkeypatch):
   times = iter((10.0, 10.1, 10.8))
-  monkeypatch.setattr("openpilot.sunnypilot.nrdr.selfdrived.time.monotonic", lambda: next(times))
+  monkeypatch.setattr("openpilot.nrdr.hooks.selfdrived.time.monotonic", lambda: next(times))
 
   nrdr = NrdrSelfdrive()
   pre_active = custom.LongitudinalPlanSP.SpeedLimit.AssistState.preActive

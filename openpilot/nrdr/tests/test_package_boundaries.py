@@ -51,12 +51,12 @@ PHASE_TWO_CONSUMERS = (
   "openpilot/nrdr/ui/settings/steer_filters.py",
   "openpilot/nrdr/ui/settings/vehicle_model_learning.py",
   "openpilot/nrdr/features/services/car_tune_report.py",
-  "openpilot/sunnypilot/nrdr/controlsd.py",
+  "openpilot/nrdr/hooks/controlsd.py",
   "openpilot/nrdr/features/lateral/latcontrol_pid.py",
   "openpilot/nrdr/features/longitudinal/longcontrol.py",
   "openpilot/nrdr/features/longitudinal/longitudinal_planner.py",
   "openpilot/nrdr/features/lateral/nnlc.py",
-  "openpilot/sunnypilot/nrdr/settings.py",
+  "openpilot/nrdr/ui/settings_policy.py",
   "openpilot/nrdr/features/lateral/tune_learner.py",
   "openpilot/sunnypilot/sunnylink/capabilities.py",
   "openpilot/system/manager/manager.py",
@@ -69,7 +69,7 @@ FEATURE_CONSUMERS = {
   "openpilot/selfdrive/controls/lib/longitudinal_planner.py": "openpilot.nrdr.features.longitudinal.longitudinal_planner",
   "openpilot/selfdrive/controls/radard.py": "openpilot.nrdr.features.radar.radar",
   "openpilot/selfdrive/ui/sunnypilot/onroad/speed_limit.py": "openpilot.nrdr.features.driver_policy.speed_limit",
-  "openpilot/sunnypilot/nrdr/selfdrived.py": "openpilot.nrdr.features.driver_policy.hud_submode",
+  "openpilot/nrdr/hooks/selfdrived.py": "openpilot.nrdr.features.driver_policy.hud_submode",
   "openpilot/sunnypilot/selfdrive/car/cruise_ext.py": "openpilot.nrdr.features.driver_policy.speed_limit",
   "openpilot/sunnypilot/selfdrive/controls/lib/dec/dec.py": "openpilot.nrdr.features.driver_policy.dec",
   "openpilot/sunnypilot/selfdrive/controls/lib/longitudinal_planner.py": "openpilot.nrdr.features.driver_policy.speed_limit_assist",
@@ -80,6 +80,8 @@ CANONICAL_FEATURE_MODULES = (
   "openpilot/nrdr/features/driver_policy/cruise.py",
   "openpilot/nrdr/features/driver_policy/dec.py",
   "openpilot/nrdr/features/driver_policy/hud_submode.py",
+  "openpilot/nrdr/features/driver_policy/lane_change.py",
+  "openpilot/nrdr/features/driver_policy/mads.py",
   "openpilot/nrdr/features/driver_policy/speed_limit.py",
   "openpilot/nrdr/features/driver_policy/speed_limit_assist.py",
   "openpilot/nrdr/features/longitudinal/long_tune.py",
@@ -89,6 +91,34 @@ CANONICAL_FEATURE_MODULES = (
   "openpilot/nrdr/features/longitudinal/longitudinal_stopping.py",
   "openpilot/nrdr/features/radar/radar.py",
   "openpilot/nrdr/features/radar/radar_core.py",
+)
+
+HOOK_AND_UI_CONSUMERS = {
+  "openpilot/selfdrive/car/car_events.py": ("openpilot.nrdr.hooks",),
+  "openpilot/selfdrive/controls/controlsd.py": ("openpilot.nrdr.hooks",),
+  "openpilot/selfdrive/controls/lib/desire_helper.py": ("openpilot.nrdr.features.driver_policy",),
+  "openpilot/selfdrive/controls/lib/latcontrol_torque.py": ("openpilot.nrdr.features.driver_policy",),
+  "openpilot/selfdrive/monitoring/policy.py": ("openpilot.nrdr.hooks",),
+  "openpilot/selfdrive/selfdrived/selfdrived.py": ("openpilot.nrdr.hooks",),
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/cruise.py": ("openpilot.nrdr.ui",),
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/cruise_sub_layouts/speed_limit_settings.py": ("openpilot.nrdr.ui",),
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/models.py": ("openpilot.nrdr.ui",),
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/steering.py": ("openpilot.nrdr.ui",),
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/visuals.py": ("openpilot.nrdr.ui",),
+  "openpilot/selfdrive/ui/sunnypilot/ui_state.py": ("openpilot.nrdr.ui",),
+  "openpilot/sunnypilot/mads/mads.py": ("openpilot.nrdr.features.driver_policy", "openpilot.nrdr.hooks"),
+  "openpilot/sunnypilot/mads/state.py": ("openpilot.nrdr.hooks",),
+  "openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py": ("openpilot.nrdr.hooks",),
+  "openpilot/sunnypilot/selfdrive/selfdrived/events.py": ("openpilot.nrdr.hooks",),
+}
+
+CANONICAL_HOOK_AND_UI_MODULES = (
+  "openpilot/nrdr/hooks/controlsd.py",
+  "openpilot/nrdr/hooks/driver_monitoring.py",
+  "openpilot/nrdr/hooks/events.py",
+  "openpilot/nrdr/hooks/events_sp.py",
+  "openpilot/nrdr/hooks/selfdrived.py",
+  "openpilot/nrdr/ui/settings_policy.py",
 )
 
 
@@ -170,6 +200,13 @@ class TestPackageBoundaries(unittest.TestCase):
         self.assertEqual(set(feature_package.__all__), set(feature_package._EXPORT_MODULES))
         self.assertEqual(len(feature_package.__all__), len(set(feature_package.__all__)))
 
+  def test_hook_and_ui_package_exports_are_lazy_and_complete(self):
+    for module_name in ("openpilot.nrdr.hooks", "openpilot.nrdr.ui"):
+      with self.subTest(module=module_name):
+        package = import_module(module_name)
+        self.assertEqual(set(package.__all__), set(package._EXPORT_MODULES))
+        self.assertEqual(len(package.__all__), len(set(package.__all__)))
+
   def test_feature_implementations_do_not_import_legacy_nrdr_modules(self):
     repository_root = Path(__file__).resolve().parents[3]
     for relative_path in CANONICAL_FEATURE_MODULES:
@@ -183,6 +220,22 @@ class TestPackageBoundaries(unittest.TestCase):
       with self.subTest(path=relative_path):
         source = (repository_root / relative_path).read_text()
         self.assertIn(f"from {module_name} import", source)
+        self.assertNotIn("from openpilot.sunnypilot.nrdr.", source)
+
+  def test_hook_and_ui_implementations_do_not_import_legacy_nrdr_modules(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    for relative_path in CANONICAL_HOOK_AND_UI_MODULES:
+      with self.subTest(path=relative_path):
+        source = (repository_root / relative_path).read_text()
+        self.assertNotIn("openpilot.sunnypilot.nrdr", source)
+
+  def test_framework_consumers_use_canonical_hook_and_policy_facades(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    for relative_path, module_names in HOOK_AND_UI_CONSUMERS.items():
+      with self.subTest(path=relative_path):
+        source = (repository_root / relative_path).read_text()
+        for module_name in module_names:
+          self.assertIn(f"from {module_name} import", source)
         self.assertNotIn("from openpilot.sunnypilot.nrdr.", source)
 
   def test_ui_metadata_keeps_params_dependency_direction(self):

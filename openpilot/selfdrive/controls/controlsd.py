@@ -24,8 +24,7 @@ from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
 
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
-from openpilot.sunnypilot.nrdr.controlsd import apply_hud_lead, stopping_inputs, vehicle_model_params
-from openpilot.sunnypilot.nrdr.events import allow_longitudinal
+from openpilot.nrdr.hooks import allow_longitudinal, apply_hud_lead, stopping_inputs, vehicle_model_params
 
 State = log.SelfdriveState.OpenpilotState
 LaneChangeState = log.LaneChangeState

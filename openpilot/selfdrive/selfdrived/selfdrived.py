@@ -28,8 +28,7 @@ from openpilot.common.hardware import HARDWARE
 
 from openpilot.sunnypilot.mads.mads import ModularAssistiveDrivingSystem
 from openpilot.sunnypilot import get_sanitize_int_param
-from openpilot.sunnypilot.nrdr.events import filter_car_events
-from openpilot.sunnypilot.nrdr.selfdrived import NrdrSelfdrive
+from openpilot.nrdr.hooks import NrdrSelfdrive, filter_car_events
 from openpilot.sunnypilot.selfdrive.car.car_specific import CarSpecificEventsSP
 from openpilot.sunnypilot.selfdrive.car.cruise_helpers import CruiseHelper
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.controller import IntelligentCruiseButtonManagement

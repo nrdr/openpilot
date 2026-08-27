@@ -12,8 +12,8 @@ from opendbc.car.hyundai.values import HyundaiFlags
 from openpilot.common.params import Params
 from openpilot.sunnypilot.mads.helpers import MadsSteeringModeOnBrake, read_steering_mode_param, MADS_NO_ACC_MAIN_BUTTON
 from openpilot.sunnypilot.mads.state import StateMachine, GEARS_ALLOW_PAUSED_SILENT
-from openpilot.sunnypilot.nrdr.events import keep_lateral_active
-from openpilot.sunnypilot.nrdr.mads import AutoLkas
+from openpilot.nrdr.features.driver_policy import AutoLkas
+from openpilot.nrdr.hooks import keep_lateral_active
 
 State = custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState
 ButtonType = structs.CarState.ButtonEvent.Type

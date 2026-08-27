@@ -225,13 +225,16 @@ PY
 }
 
 apply_clean_overlay() {
-  local target="$BUILD_DIR/openpilot/sunnypilot/nrdr" item
+  local hooks_target="$BUILD_DIR/openpilot/nrdr/hooks"
+  local driver_policy_target="$BUILD_DIR/openpilot/nrdr/features/driver_policy"
   [ -d "$BUILD_DIR/.git" ] || die "clean overlay target is not a Git tree: $BUILD_DIR"
-  [ -d "$target" ] || die "clean overlay target is missing: $target"
+  [ -d "$hooks_target" ] || die "clean hook overlay target is missing: $hooks_target"
+  [ -d "$driver_policy_target" ] || die "clean driver-policy overlay target is missing: $driver_policy_target"
 
-  for item in events.py events_sp.py driver_monitoring.py mads.py; do
-    cp -p -- "$CLEAN_OVERLAY_DIR/$item" "$target/$item"
-  done
+  cp -p -- "$CLEAN_OVERLAY_DIR/events.py" "$hooks_target/events.py"
+  cp -p -- "$CLEAN_OVERLAY_DIR/events_sp.py" "$hooks_target/events_sp.py"
+  cp -p -- "$CLEAN_OVERLAY_DIR/driver_monitoring.py" "$hooks_target/driver_monitoring.py"
+  cp -p -- "$CLEAN_OVERLAY_DIR/mads.py" "$driver_policy_target/mads.py"
 
   # Route registration and uploads to comma on the clean branch.
   sed -i '/^export API_HOST=https:\/\/api\.konik\.ai$/d; /^export ATHENA_HOST=wss:\/\/athena\.konik\.ai$/d' \
@@ -259,11 +262,11 @@ apply_clean_overlay() {
   grep -Fq "connect.comma.ai" "$BUILD_DIR/openpilot/nrdr/ui/home/layout.py"
   grep -Fq "connect.comma.ai" "$BUILD_DIR/openpilot/nrdr/ui/home/mici.py"
   python3 -m py_compile \
-    "$target/events.py" \
-    "$target/events_sp.py" \
-    "$target/driver_monitoring.py" \
-    "$target/mads.py"
-  find "$target" -name '__pycache__' -type d -prune -exec rm -rf -- '{}' +
+    "$hooks_target/events.py" \
+    "$hooks_target/events_sp.py" \
+    "$hooks_target/driver_monitoring.py" \
+    "$driver_policy_target/mads.py"
+  find "$BUILD_DIR/openpilot/nrdr" -name '__pycache__' -type d -prune -exec rm -rf -- '{}' +
 }
 
 safe_remove_build_dir() {

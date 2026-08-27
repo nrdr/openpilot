@@ -15,7 +15,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.lane_change_settings import LaneChangeSettingsLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.mads_settings import MadsSettingsLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.torque_settings import TorqueSettingsLayout
-from openpilot.sunnypilot.nrdr.settings import hide_global_controller_settings
+from openpilot.nrdr.ui import hide_global_controller_settings
 
 
 class PanelType(IntEnum):

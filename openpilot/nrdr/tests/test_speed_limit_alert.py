@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from openpilot.common.constants import CV
-from openpilot.sunnypilot.nrdr.events_sp import speed_limit_pre_active_alert
+from openpilot.nrdr.hooks.events_sp import speed_limit_pre_active_alert
 
 
 @pytest.mark.parametrize(("metric", "speed", "expected"), ((False, 35, "35 mph"), (True, 50, "50 km/h")))

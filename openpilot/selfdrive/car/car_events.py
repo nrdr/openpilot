@@ -6,7 +6,7 @@ from opendbc.car.interfaces import MAX_CTRL_SPEED
 from opendbc.car.toyota.values import ToyotaFlags
 
 from openpilot.selfdrive.selfdrived.events import Events
-from openpilot.sunnypilot.nrdr.events import is_drivable_gear
+from openpilot.nrdr.hooks import is_drivable_gear
 
 ButtonType = structs.CarState.ButtonEvent.Type
 GearShifter = structs.CarState.GearShifter

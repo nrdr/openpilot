@@ -1,6 +1,6 @@
 from openpilot.cereal import log, custom
 from openpilot.common.constants import CV
-from openpilot.sunnypilot.nrdr.lane_change import driver_nudging
+from openpilot.nrdr.features.driver_policy import driver_nudging
 from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot.selfdrive.controls.lib.auto_lane_change import AutoLaneChangeController, AutoLaneChangeMode
 from openpilot.sunnypilot.selfdrive.controls.lib.lane_turn_desire import LaneTurnController

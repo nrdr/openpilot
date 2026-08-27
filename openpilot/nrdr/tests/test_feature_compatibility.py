@@ -55,6 +55,14 @@ LEGACY_FEATURE_EXPORTS = {
     "openpilot.nrdr.features.longitudinal.longitudinal_stopping",
     ("ACCELERATION_DUE_TO_GRAVITY", "CONTROL_DT", "HARD_HOLD_FLOOR", "compute_stopping_accel"),
   ),
+  "lane_change": (
+    "openpilot.nrdr.features.driver_policy.lane_change",
+    ("driver_nudging", "torque_controller_active", "torque_from_lateral_accel"),
+  ),
+  "mads": (
+    "openpilot.nrdr.features.driver_policy.mads",
+    ("AutoLkas",),
+  ),
   "radar": (
     "openpilot.nrdr.features.radar.radar",
     ("NrdrRadar",),
@@ -77,7 +85,7 @@ LEGACY_FEATURE_EXPORTS = {
   ),
 }
 
-PURE_MODULES = ("dec", "hud_submode", "long_tune")
+PURE_MODULES = ("dec", "hud_submode", "long_tune", "mads")
 NUMPY_MODULES = ("longitudinal_mpc", "longitudinal_stopping")
 PLATFORM_MODULES = ("radar_core",)
 RUNTIME_MODULES = tuple(name for name in LEGACY_FEATURE_EXPORTS if name not in (*PURE_MODULES, *NUMPY_MODULES, *PLATFORM_MODULES))

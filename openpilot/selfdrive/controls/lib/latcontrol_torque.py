@@ -8,7 +8,7 @@ from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.common.pid import PIDController
-from openpilot.sunnypilot.nrdr.lane_change import torque_controller_active, torque_from_lateral_accel
+from openpilot.nrdr.features.driver_policy import torque_controller_active, torque_from_lateral_accel
 from openpilot.sunnypilot.livedelay.helpers import LAT_DELAY_BUFFER_SECONDS
 
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext import LatControlTorqueExt

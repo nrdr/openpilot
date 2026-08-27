@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from openpilot.sunnypilot.nrdr.controlsd import refresh_live_parameter_settings
+from openpilot.nrdr.hooks.controlsd import refresh_live_parameter_settings
 from openpilot.nrdr.params import CONTROL_GROUPS, PLANNER_GROUPS, LiveParams, ParamGroup, REFRESH_PERIOD
 
 

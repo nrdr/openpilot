@@ -23,7 +23,9 @@ from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import LaneChangeSteerRatioFade
 import openpilot.nrdr.features.longitudinal as longitudinal
 import openpilot.nrdr.features.radar as radar
+import openpilot.nrdr.hooks as hooks
 from openpilot.nrdr.tools.sr_correction_analysis import CommandSample
+import openpilot.nrdr.ui as nrdr_ui
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
 import openpilot.nrdr.ui.settings
 from openpilot.nrdr.ui.sunnylink_schema import sunnylink_fields_for_key
@@ -35,6 +37,8 @@ assert PARAM_SPECS
 assert set(driver_policy.__all__) == set(driver_policy._EXPORT_MODULES)
 assert set(longitudinal.__all__) == set(longitudinal._EXPORT_MODULES)
 assert set(radar.__all__) == set(radar._EXPORT_MODULES)
+assert set(hooks.__all__) == set(hooks._EXPORT_MODULES)
+assert set(nrdr_ui.__all__) == set(nrdr_ui._EXPORT_MODULES)
 assert len(NRDR_UI_METADATA) == 6
 assert NrdrParamKey.HONDA_BOSCH_A_RADAR == "HondaBoschARadar"
 assert LegacyCommandSample is CommandSample
@@ -46,10 +50,16 @@ assert get_native_option_spec("LatPScaleLowSpeed").format_label(100) == "100%"
 assert sunnylink_fields_for_key("LatPScaleLowSpeed")["max"] == 500
 assert "openpilot.nrdr.params.store" not in sys.modules
 assert "openpilot.nrdr.features.driver_policy.speed_limit_assist" not in sys.modules
+assert "openpilot.nrdr.features.driver_policy.lane_change" not in sys.modules
+assert "openpilot.nrdr.features.driver_policy.mads" not in sys.modules
 assert "openpilot.nrdr.features.longitudinal.longcontrol" not in sys.modules
 assert "openpilot.nrdr.features.radar.radar" not in sys.modules
+assert "openpilot.nrdr.hooks.controlsd" not in sys.modules
+assert "openpilot.nrdr.hooks.events" not in sys.modules
+assert "openpilot.nrdr.hooks.selfdrived" not in sys.modules
 assert "openpilot.system.ui.lib.multilang" not in sys.modules
 assert "openpilot.system.ui.sunnypilot.widgets.list_view" not in sys.modules
 assert "openpilot.nrdr.ui.settings.layout" not in sys.modules
+assert "openpilot.nrdr.ui.settings_policy" not in sys.modules
 """
     subprocess.run([sys.executable, "-c", script], cwd=repository_root, env=environment, check=True)

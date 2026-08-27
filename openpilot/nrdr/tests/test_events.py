@@ -5,7 +5,7 @@ import pytest
 
 from openpilot.cereal import log
 from opendbc.car import structs
-from openpilot.sunnypilot.nrdr.events import allow_longitudinal, filter_car_events, is_drivable_gear, keep_lateral_active
+from openpilot.nrdr.hooks.events import allow_longitudinal, filter_car_events, is_drivable_gear, keep_lateral_active
 
 
 EventName = log.OnroadEvent.EventName

@@ -9,7 +9,7 @@ from openpilot.cereal import log, custom
 from openpilot.selfdrive.selfdrived.events import ET
 from openpilot.selfdrive.selfdrived.state import SOFT_DISABLE_TIME
 from openpilot.common.realtime import DT_CTRL
-from openpilot.sunnypilot.nrdr.events import keep_lateral_active
+from openpilot.nrdr.hooks import keep_lateral_active
 
 State = custom.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState
 EventName = log.OnroadEvent.EventName

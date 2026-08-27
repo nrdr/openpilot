@@ -11,7 +11,7 @@ import pyray as rl
 
 from openpilot.cereal import custom
 from openpilot.sunnypilot.models.default_model import get_default_model
-from openpilot.sunnypilot.nrdr.settings import apply_handcrafted_delay_controls
+from openpilot.nrdr.ui import apply_handcrafted_delay_controls
 from openpilot.common.constants import CV
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from openpilot.system.ui.lib.multilang import tr

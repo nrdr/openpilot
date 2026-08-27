@@ -11,6 +11,12 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BUILD_SCRIPT = REPO_ROOT / "release" / "build_prebuilt.sh"
 CLEAN_OVERLAY = REPO_ROOT / "release" / "clean_overlay"
+CLEAN_OVERLAY_TARGETS = {
+  "events.py": Path("openpilot/nrdr/hooks/events.py"),
+  "events_sp.py": Path("openpilot/nrdr/hooks/events_sp.py"),
+  "driver_monitoring.py": Path("openpilot/nrdr/hooks/driver_monitoring.py"),
+  "mads.py": Path("openpilot/nrdr/features/driver_policy/mads.py"),
+}
 
 
 def find_bash() -> str | None:
@@ -547,8 +553,8 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
   for relative in overlay_targets:
     copy_file_from_source(relative, build)
 
-  for name in ("events.py", "events_sp.py", "driver_monitoring.py", "mads.py"):
-    copy_file_from_source(Path("openpilot/sunnypilot/nrdr") / name, build)
+  for relative in CLEAN_OVERLAY_TARGETS.values():
+    copy_file_from_source(relative, build)
 
   original_head = init_repo(build)
   result = run_builder(
@@ -565,9 +571,9 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
   assert git("branch", "--list", "nrdr-clean", cwd=build).stdout.strip() == ""
   assert not (build / "prebuilt").exists()
 
-  for name in ("events.py", "events_sp.py", "driver_monitoring.py", "mads.py"):
-    assert (build / "openpilot" / "sunnypilot" / "nrdr" / name).read_bytes() == (CLEAN_OVERLAY / name).read_bytes()
-  assert not list((build / "openpilot" / "sunnypilot" / "nrdr").rglob("__pycache__"))
+  for name, relative in CLEAN_OVERLAY_TARGETS.items():
+    assert (build / relative).read_bytes() == (CLEAN_OVERLAY / name).read_bytes()
+  assert not list((build / "openpilot" / "nrdr").rglob("__pycache__"))
 
   assert "konik.ai" not in (build / "launch_openpilot.sh").read_text(encoding="utf-8")
   assert "konik.ai" not in (build / "launch_env.sh").read_text(encoding="utf-8")
