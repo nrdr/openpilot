@@ -2,6 +2,7 @@ from openpilot.cereal import custom, messaging
 from opendbc.car.structs import car
 from opendbc.car.car_helpers import interfaces
 from openpilot.common.swaglog import cloudlog
+from openpilot.nrdr.car.opendbc import build_opendbc_config
 from openpilot.nrdr.params import (
   apply_handcrafted_lateral_profile,
   get_handcrafted_lateral_profile,
@@ -60,7 +61,10 @@ class CarTuneReporter:
     if CP.lateralTuning.which() == "pid":
       return CP
     CarInterface = interfaces[CP.carFingerprint]
-    reconstructed = CarInterface.get_non_essential_params(CP.carFingerprint)
+    reconstructed = CarInterface.get_non_essential_params(
+      CP.carFingerprint,
+      build_opendbc_config(self.params, start_worker=False),
+    )
     CarInterface.get_non_essential_params_sp(reconstructed, CP.carFingerprint)
     return reconstructed if reconstructed.lateralTuning.which() == "pid" else CP
 

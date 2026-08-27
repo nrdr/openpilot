@@ -13,6 +13,7 @@ from opendbc.car.fw_versions import FW_QUERY_CONFIGS
 from opendbc.car.structs import CarParams
 from opendbc.car.mock.values import CAR as MOCK
 from opendbc.car.values import PLATFORMS
+from opendbc.sunnypilot.car.tests.runtime_config import make_test_car_config
 from openpilot.selfdrive.car.helpers import convert_carControlSP
 from openpilot.selfdrive.controls.lib.latcontrol_angle import LatControlAngle
 from openpilot.selfdrive.controls.lib.latcontrol_pid import LatControlPID
@@ -40,13 +41,15 @@ class TestCarInterfaces(OpenpilotTestCase):
       return CarParams.CarFw(ecu=ecu, address=address, subAddress=sub_address or 0, request=fuzzy.choice(ALL_REQUESTS))
 
     CarInterface = interfaces[car_name]
+    interface_config = make_test_car_config()
     car_fw = fuzzy.list(generate_car_fw)
     alpha_long = fuzzy.boolean()
     car_params = CarInterface.get_params(car_name, fingerprints, car_fw,
-                                         alpha_long=alpha_long, is_release=False, docs=False)
+                                         alpha_long=alpha_long, is_release=False, docs=False,
+                                         interface_config=interface_config)
     car_params_sp = CarInterface.get_params_sp(car_params, car_name, fingerprints, car_fw,
                                                alpha_long=alpha_long, is_release_sp=False, docs=False)
-    car_interface = CarInterface(car_params, car_params_sp)
+    car_interface = CarInterface(car_params, car_params_sp, interface_config)
     car_params = car_interface.CP.as_reader()
     car_params_sp = car_interface.CP_SP
     sunnypilot_interfaces.setup_interfaces(car_interface)

@@ -20,6 +20,7 @@ from openpilot.common.mock.generators import generate_deviceMotion
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.common.test import OpenpilotTestCase
+from openpilot.nrdr.car.opendbc import build_opendbc_config
 
 
 def _make_controller(enhanced=False, nnlc=False):
@@ -30,9 +31,10 @@ def _make_controller(enhanced=False, nnlc=False):
 
   car_name = HONDA.HONDA_CIVIC
   CarInterface = interfaces[car_name]
-  CP = CarInterface.get_non_essential_params(car_name)
+  interface_config = build_opendbc_config(params, start_worker=False)
+  CP = CarInterface.get_non_essential_params(car_name, interface_config)
   CP_SP = CarInterface.get_non_essential_params_sp(CP, car_name)
-  CI = CarInterface(CP, CP_SP)
+  CI = CarInterface(CP, CP_SP, interface_config)
   sunnypilot_interfaces.setup_interfaces(CI, params)
   CP_SP = convert_to_capnp(CP_SP)
   VM = VehicleModel(CP)

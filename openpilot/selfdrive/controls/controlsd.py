@@ -9,6 +9,7 @@ from openpilot.common.constants import CV
 from openpilot.common.params import Params
 from openpilot.common.realtime import config_realtime_process, DT_CTRL, Priority, Ratekeeper
 from openpilot.common.swaglog import cloudlog
+from openpilot.nrdr.car.opendbc import build_opendbc_config
 
 from opendbc.car.car_helpers import interfaces
 from opendbc.car.vehicle_model import VehicleModel
@@ -43,7 +44,7 @@ class Controls(ControlsExt):
     # Initialize sunnypilot controlsd extension and base model state
     ControlsExt.__init__(self, self.CP, self.params)
 
-    self.CI = interfaces[self.CP.carFingerprint](self.CP, self.CP_SP)
+    self.CI = interfaces[self.CP.carFingerprint](self.CP, self.CP_SP, build_opendbc_config(self.params))
 
     self.sm = messaging.SubMaster(['lateralDelay', 'vehicleParameters', 'lateralTorqueParameters', 'modelV2', 'selfdriveState',
                                    'extrinsicsCalibration', 'deviceMotion', 'longitudinalPlan', 'lateralManeuverPlan', 'carState', 'carOutput',

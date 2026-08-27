@@ -4,6 +4,7 @@ from openpilot.common.parameterized import parameterized
 from openpilot.cereal import log
 from opendbc.car.structs import car
 from opendbc.car.car_helpers import interfaces
+from opendbc.sunnypilot.car.tests.runtime_config import make_test_car_config
 from opendbc.car.honda.values import CAR as HONDA
 from opendbc.car.toyota.values import CAR as TOYOTA
 from opendbc.car.nissan.values import CAR as NISSAN
@@ -25,9 +26,10 @@ class TestLatControl(OpenpilotTestCase):
                          (NISSAN.NISSAN_LEAF, LatControlAngle), (GM.CHEVROLET_BOLT_EUV, LatControlTorque)])
   def test_saturation(self, car_name, controller):
     CarInterface = interfaces[car_name]
-    CP = CarInterface.get_non_essential_params(car_name)
+    interface_config = make_test_car_config()
+    CP = CarInterface.get_non_essential_params(car_name, interface_config)
     CP_SP = CarInterface.get_non_essential_params_sp(CP, car_name)
-    CI = CarInterface(CP, CP_SP)
+    CI = CarInterface(CP, CP_SP, interface_config)
     sunnypilot_interfaces.setup_interfaces(CI)
     CP_SP = convert_to_capnp(CP_SP)
     VM = VehicleModel(CP)

@@ -11,6 +11,7 @@ from opendbc.car.car_helpers import interfaces
 from opendbc.car.structs import car
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.nrdr.car.opendbc import build_opendbc_config
 from openpilot.nrdr.params import get_handcrafted_lateral_profile
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
@@ -234,7 +235,10 @@ class LateralTuningLayout(Widget):
       hybrid_base = False
       if CP.lateralTuning.which() != "pid":
         CarInterface = interfaces[CP.carFingerprint]
-        reconstructed = CarInterface.get_non_essential_params(CP.carFingerprint)
+        reconstructed = CarInterface.get_non_essential_params(
+          CP.carFingerprint,
+          build_opendbc_config(ui_state.params, start_worker=False),
+        )
         CarInterface.get_non_essential_params_sp(reconstructed, CP.carFingerprint)
         if reconstructed.lateralTuning.which() == "pid":
           pid_source = reconstructed

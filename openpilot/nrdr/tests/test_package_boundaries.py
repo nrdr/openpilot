@@ -127,6 +127,7 @@ class TestPackageBoundaries(unittest.TestCase):
     package_path = Path(openpilot.nrdr.__file__).resolve().parent
     self.assertEqual(package_path.name, "nrdr")
     self.assertEqual(package_path.parent.name, "openpilot")
+    self.assertIsNotNone(import_module("openpilot.nrdr.car"))
     self.assertIsNotNone(import_module("openpilot.nrdr.features"))
     self.assertIsNotNone(import_module("openpilot.nrdr.features.driver_policy"))
     self.assertIsNotNone(import_module("openpilot.nrdr.features.lateral"))

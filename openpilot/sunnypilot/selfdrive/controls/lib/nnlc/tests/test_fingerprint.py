@@ -8,6 +8,7 @@ from openpilot.common.parameterized import parameterized
 from openpilot.common.params import Params
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.common.test import OpenpilotTestCase
+from openpilot.nrdr.car.opendbc import build_opendbc_config
 
 
 FINGERPRINT_EXACT_MATCH = [HONDA.HONDA_CIVIC_BOSCH, TOYOTA.TOYOTA_RAV4_TSS2_2022, HYUNDAI.HYUNDAI_IONIQ_5]
@@ -20,11 +21,13 @@ class TestNNLCFingerprintBase(OpenpilotTestCase):
   @staticmethod
   def _setup_platform(car_name):
     CarInterface = interfaces[car_name]
-    CP = CarInterface.get_non_essential_params(car_name)
+    params = Params()
+    interface_config = build_opendbc_config(params, start_worker=False)
+    CP = CarInterface.get_non_essential_params(car_name, interface_config)
     CP_SP = CarInterface.get_non_essential_params_sp(CP, car_name)
-    CI = CarInterface(CP, CP_SP)
+    CI = CarInterface(CP, CP_SP, interface_config)
 
-    sunnypilot_interfaces.setup_interfaces(CI, Params())
+    sunnypilot_interfaces.setup_interfaces(CI, params)
 
     return CI
 

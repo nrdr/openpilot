@@ -17,6 +17,7 @@ sys.modules["pyray"] = None
 sys.modules["zmq"] = None
 from openpilot.nrdr.params import NRDR_UI_METADATA, NrdrParamKey
 from openpilot.nrdr.params.specs import PARAM_SPECS
+import openpilot.nrdr.car
 import openpilot.nrdr.features.driver_policy as driver_policy
 from openpilot.nrdr.features.lateral.model_policy import SteerRatioModelPolicy, classify_steer_ratio_model
 from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch
@@ -55,6 +56,7 @@ assert classify_steer_ratio_model(None) is SteerRatioModelPolicy.UNKNOWN
 assert get_native_option_spec("LatPScaleLowSpeed").format_label(100) == "100%"
 assert sunnylink_fields_for_key("LatPScaleLowSpeed")["max"] == 500
 assert "openpilot.nrdr.params.store" not in sys.modules
+assert "openpilot.nrdr.car.opendbc" not in sys.modules
 assert "openpilot.nrdr.features.driver_policy.speed_limit_assist" not in sys.modules
 assert "openpilot.nrdr.features.driver_policy.lane_change" not in sys.modules
 assert "openpilot.nrdr.features.driver_policy.mads" not in sys.modules

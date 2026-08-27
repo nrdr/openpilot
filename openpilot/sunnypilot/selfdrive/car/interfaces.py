@@ -4,8 +4,6 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
-from typing import Any
-
 from opendbc.car import structs
 from opendbc.car.interfaces import CarInterfaceBase
 from openpilot.common.params import Params
@@ -113,36 +111,7 @@ def setup_interfaces(CI: CarInterfaceBase, params: Params | None = None) -> None
   # STATSLOGSP.raw('sunnypilot_params.car_params_sp', CP_SP.to_dict()) # https://github.com/sunnypilot/opendbc/pull/361
 
 
-def initialize_params(params) -> list[dict[str, Any]]:
-  keys: list = []
-
-  # honda
-  keys.extend([
-    "HondaBoschARadar",
-    "HondaEnforceStockLongitudinal",
-  ])
-
-  # hyundai
-  keys.extend([
-    "HyundaiLongitudinalTuning",
-  ])
-
-  # subaru
-  keys.extend([
-    "SubaruStopAndGo",
-    "SubaruStopAndGoManualParkingBrake",
-  ])
-
-  # tesla
-  keys.extend([
-    "TeslaCoopSteering",
-    "TeslaMadsScreenButton",
-  ])
-
-  # toyota
-  keys.extend([
-    "ToyotaEnforceStockLongitudinal",
-    "ToyotaStopAndGoHack",
-  ])
-
-  return [{k: params.get(k, return_default=True)} for k in keys]
+def initialize_params(params):
+  """Compatibility seam; canonical NRDR code owns all keys and values."""
+  from openpilot.nrdr.car.opendbc import build_opendbc_config
+  return build_opendbc_config(params)

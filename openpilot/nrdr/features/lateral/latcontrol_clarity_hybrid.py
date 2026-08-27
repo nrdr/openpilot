@@ -59,7 +59,7 @@ class LatControlClarityHybrid(LatControl):
   def __init__(self, CP, CP_SP, CI, dt):
     super().__init__(CP, CP_SP, CI, dt)
 
-    pid_cp = CI.get_non_essential_params(CP.carFingerprint)
+    pid_cp = CI.get_non_essential_params(CP.carFingerprint, CI.interface_config)
     CI.get_non_essential_params_sp(pid_cp, CP.carFingerprint)
     pid_cp.carFw = CP.carFw
     if pid_cp.lateralTuning.which() != "pid":

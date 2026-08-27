@@ -18,6 +18,7 @@ from openpilot.common.mock.generators import generate_deviceMotion
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.common.test import OpenpilotTestCase
+from openpilot.nrdr.car.opendbc import build_opendbc_config
 
 
 def generate_modelV2():
@@ -51,9 +52,10 @@ class TestNeuralNetworkLateralControl(OpenpilotTestCase):
     params.put_bool("NeuralNetworkLateralControl", True, block=True)
 
     CarInterface = interfaces[car_name]
-    CP = CarInterface.get_non_essential_params(car_name)
+    interface_config = build_opendbc_config(params, start_worker=False)
+    CP = CarInterface.get_non_essential_params(car_name, interface_config)
     CP_SP = CarInterface.get_non_essential_params_sp(CP, car_name)
-    CI = CarInterface(CP, CP_SP)
+    CI = CarInterface(CP, CP_SP, interface_config)
 
     sunnypilot_interfaces.setup_interfaces(CI, params)
 
