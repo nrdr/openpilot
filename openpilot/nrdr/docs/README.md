@@ -9,6 +9,8 @@ code:
   changes.
 - [Predictive lateral stiction](LATERAL_STICTION.md) documents the current
   stiction overlay.
+- [Honda Bosch-A radar](RADAR_EXPERIMENTAL.md) documents the experimental
+  factory-radar decoder and its operating limits.
 - [Radar reverse engineering](../tools/radar_re/README.md) documents the
   offline Bosch radar analysis tools.
 
