@@ -1,5 +1,9 @@
 # openpilot Fork — Session Handoff
 
+> [!WARNING]
+> Historical assistant handoff. Paths, branches, commands, and assumptions may
+> be obsolete and are retained only for provenance.
+
 Context dump for continuing this work in another assistant. Written by Claude (Cowork), for Brett (GitHub: **nrdr**).
 
 ## Who / setup

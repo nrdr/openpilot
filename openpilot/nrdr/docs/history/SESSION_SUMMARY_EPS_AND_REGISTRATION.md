@@ -1,5 +1,9 @@
 # nrdr / Honda openpilot — session handoff summary
 
+> [!WARNING]
+> Historical development record. It includes one-time vehicle and device work;
+> do not use it as a current flashing or deployment procedure.
+
 ## Who / project
 - User: Brett (Discord "Aragon"). Maintains the **nrdr** openpilot/sunnypilot fork for Honda; ~6 years building the Honda community's EPS tooling.
 - Cars: **Honda Clarity** (EPS `39990-TRW,A020`) and **2019 Honda Pilot Elite** (Nidec **V850** EPS `39990-TG7-A060`).

@@ -1,4 +1,8 @@
 # NRDR Clarity — Pre-Reset Tune Snapshot & Re-Tune Plan
+
+> [!WARNING]
+> Historical tuning snapshot only. Do not treat these values or steps as the
+> current Clarity configuration.
 *Captured 2026-06-25, immediately before factory reset.*
 
 This is the handoff note for picking the lateral work back up after the reset + relearn.

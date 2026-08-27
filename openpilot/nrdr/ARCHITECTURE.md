@@ -66,19 +66,20 @@ Current status on `nrdr-architecture-development`:
 - Step 3 has started with shared, catalog-validated metadata for the six
   low/standard/high-speed lateral P/I scale controls. Their native and
   Sunnylink adapters now consume one definition while preserving the existing
-  layouts, generated schema, translations, and edit rules.
-- Step 4 has started with the standard-library steer-ratio analysis helpers
-  under `openpilot.nrdr.tools` and the pure lateral phase detector under
-  `openpilot.nrdr.features.lateral`. The model-artifact steer-ratio policy and
-  lane-change steer-ratio interpolation now live beside it. All four former
-  SunnyPilot modules remain explicit, identity-preserving compatibility
-  facades while production consumers import their canonical owners.
+  generated schema, translations, and edit rules. Native NRDR settings, home,
+  and on-road implementations now have canonical UI owners; framework layout
+  files retain only import/registration seams.
+- Step 4 implementation ownership is complete. Lateral, longitudinal, radar,
+  driver-policy, service, and process-hook implementations live under
+  `openpilot.nrdr`; offline lateral, steer-ratio, and radar tools live under
+  `openpilot.nrdr.tools`. Former SunnyPilot modules and root commands are
+  explicit compatibility facades, while production callers use canonical
+  owners.
 - The retired `NrdrLegacyDualBpSteerRatio` manual selector is a parameter
   tombstone. Its exact persistent/backup BOOL registry metadata and default of
   `1` remain generated for downgrade compatibility, but profile v14, live
   snapshots, controllers, analyzers, and settings UIs no longer consume it.
-- The remaining Step 3 controls, driving features/hooks, and Steps 5 through 6
-  remain pending.
+- The remaining Step 3 metadata, and Steps 5 through 6, remain pending.
 
 1. Add the first-class package, typed parameter catalog, generated registry
    artifacts, tests, and compatibility forwarding with no behavior change.

@@ -1,5 +1,9 @@
 # NRDR Tuning Runbook — `radar-experimental`
 
+> [!WARNING]
+> Retired branch runbook. Its build, branch, and parameter instructions do not
+> describe the current source or release process.
+
 Welcome to the `radar-experimental` branch. This guide is a step-by-step reference to help you dial in the custom lateral, override, and longitudinal (gas/brake) parameters before fully engaging the experimental Bosch radar.
 
 > [!IMPORTANT]
