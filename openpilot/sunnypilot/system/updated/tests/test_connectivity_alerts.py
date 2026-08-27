@@ -36,7 +36,6 @@ if sys.platform == "win32":
 
 
 updated = importlib.import_module("openpilot.system.updated.updated")
-nrdr_hardware = importlib.import_module("openpilot.sunnypilot.nrdr.hardware")
 
 
 class FakeParams:
@@ -102,21 +101,3 @@ def test_stale_connectivity_alerts_stay_retired_but_online_failure_remains(monke
 
   assert active_alerts == {"Offroad_UpdateFailed": "git fetch failed"}
   assert not any(show and name.startswith("Offroad_ConnectivityNeeded") for name, show, _ in alert_calls)
-
-
-def test_nrdr_startup_policy_explicitly_ignores_expired_update_block():
-  startup_conditions = {
-    "up_to_date": False,
-    "accepted_terms": False,
-    "accepted_terms_sp": False,
-    "completed_training": False,
-    "unrelated_safety_gate": False,
-  }
-
-  nrdr_hardware.apply_startup_policy(startup_conditions)
-
-  assert startup_conditions["up_to_date"] is True
-  assert startup_conditions["accepted_terms"] is True
-  assert startup_conditions["accepted_terms_sp"] is True
-  assert startup_conditions["completed_training"] is True
-  assert startup_conditions["unrelated_safety_gate"] is False

@@ -148,6 +148,40 @@ for name in service.__all__:
                 exports = set(ast.literal_eval(value))
         self.assertLessEqual(public_names, exports)
 
+  def test_startup_policy_owns_only_nrdr_onboarding_gates(self):
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = os.pathsep.join(filter(None, (str(self.repository_root), environment.get("PYTHONPATH"))))
+    script = r'''
+import sys
+import types
+
+version = types.ModuleType("openpilot.common.version")
+version.sunnylink_consent_version = "1"
+version.terms_version = "1"
+version.terms_version_sp = "1"
+version.training_version = "1"
+sys.modules["openpilot.common.version"] = version
+
+from openpilot.nrdr.features.services.hardware import apply_startup_policy
+
+startup_conditions = {
+  "up_to_date": False,
+  "accepted_terms": False,
+  "accepted_terms_sp": False,
+  "completed_training": False,
+  "unrelated_safety_gate": False,
+}
+apply_startup_policy(startup_conditions)
+assert startup_conditions == {
+  "up_to_date": True,
+  "accepted_terms": True,
+  "accepted_terms_sp": True,
+  "completed_training": True,
+  "unrelated_safety_gate": False,
+}
+'''
+    subprocess.run([sys.executable, "-c", script], cwd=self.repository_root, env=environment, check=True)
+
   def test_legacy_service_files_are_explicit_shims(self):
     legacy_dir = self.repository_root / "openpilot" / "sunnypilot" / "nrdr"
     for module_name in LEGACY_SERVICE_MODULES:
