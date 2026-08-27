@@ -64,6 +64,10 @@ while downstream consumers migrate.
   narrow import/call seams.
 - Complete: offline lateral, steer-ratio, and radar reverse-engineering tool
   ownership, with old command paths retained as compatibility entrypoints.
+- Deliberately deferred: the root `eps_tools` firmware flashing bundle. Moving
+  code and recovery images that can erase an EPS requires its own on-device,
+  byte-for-byte safety review; it is not part of this behavior-neutral runtime
+  reorganization.
 - Complete: NRDR Sunnylink macros and settings authoring fragments. The generic
   Sunnylink compiler merges them at explicit page, section, and item anchors;
   the generated consumer schema remains in Sunnylink's framework package.

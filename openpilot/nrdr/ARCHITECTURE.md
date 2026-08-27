@@ -79,12 +79,15 @@ Current status on `nrdr-architecture-development`:
   framework compiler merges them at explicit anchors and continues to own the
   generated consumer schema. Framework layout files retain only
   import/registration seams.
-- Step 4 implementation ownership is complete. Lateral, longitudinal, radar,
+- Step 4 runtime implementation ownership is complete. Lateral, longitudinal, radar,
   driver-policy, service, and process-hook implementations live under
   `openpilot.nrdr`; offline lateral, steer-ratio, and radar tools live under
   `openpilot.nrdr.tools`. Former SunnyPilot modules and root commands are
   explicit compatibility facades, while production callers use canonical
-  owners.
+  owners. The safety-critical `eps_tools` firmware flashing bundle is an
+  explicit exception: it remains at its established root path until a dedicated
+  migration can preserve every firmware image hash, old invocation path,
+  checksum result, dry-run safeguard, and recovery workflow on device.
 - Step 5 is complete. `openpilot.nrdr.car` owns only NRDR Honda startup
   conversion, live snapshots, and persistence callbacks. SunnyPilot's host
   adapter owns its pre-existing multi-brand keys/defaults and composes both
@@ -103,7 +106,8 @@ Current status on `nrdr-architecture-development`:
    custom layouts handwritten.
 4. Move existing NRDR implementations into domain folders under `features`,
    offline utilities under `tools`, and reduce their openpilot call sites to
-   hooks.
+   hooks. Migrate firmware flashing tools only as a separate safety-reviewed
+   change with byte-level asset validation and stable compatibility commands.
 5. Replace direct opendbc Params reads with typed configuration passed across
    the car-interface boundary.
 6. Remove compatibility modules only after downstream imports and deployed
