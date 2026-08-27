@@ -204,10 +204,15 @@ class TestPowerOwnershipBoundaries(unittest.TestCase):
     self.assertNotIn("BigParamControl", mici_source)
     self.assertNotIn("prevent automatic", mici_source.lower())
 
-  def test_sunnylink_device_fragment_has_an_explicit_deferred_integration_note(self):
-    source = (self.repository_root / "openpilot/nrdr/ui/settings/device_power.py").read_text(encoding="utf-8")
-    self.assertIn("settings_ui_src/pages/device.yaml", source)
-    self.assertIn("separate canonical-fragment", source)
+  def test_sunnylink_device_item_is_canonically_owned(self):
+    canonical_source = (self.repository_root / "openpilot/nrdr/ui/sunnylink/items/device.yaml").read_text(encoding="utf-8")
+    host_source = (self.repository_root / "openpilot/sunnypilot/sunnylink/settings_ui_src/pages/device.yaml").read_text(encoding="utf-8")
+    native_source = (self.repository_root / "openpilot/nrdr/ui/settings/device_power.py").read_text(encoding="utf-8")
+
+    self.assertIn("key: DisablePowerDown", canonical_source)
+    self.assertIn("item_key: MaxTimeOffroad", canonical_source)
+    self.assertNotIn("DisablePowerDown", host_source)
+    self.assertNotIn("deferred", native_source.lower())
 
 
 if __name__ == "__main__":

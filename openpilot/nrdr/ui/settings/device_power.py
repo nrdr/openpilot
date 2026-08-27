@@ -1,9 +1,4 @@
-"""Native presentation adapters for Prevent Automatic Shutdown.
-
-Sunnylink integration note: its device fragment remains in
-``settings_ui_src/pages/device.yaml`` until the separate canonical-fragment
-migration lands. This module intentionally does not read or rewrite that file.
-"""
+"""Native presentation adapters for Prevent Automatic Shutdown."""
 
 from __future__ import annotations
 
