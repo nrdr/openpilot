@@ -5,7 +5,7 @@ import time
 import subprocess
 from collections.abc import Callable, ValuesView
 from abc import ABC, abstractmethod
-from multiprocessing import Process
+from multiprocessing import Event, Process
 
 from setproctitle import setproctitle
 
@@ -18,7 +18,7 @@ from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 
 
-def launcher(proc: str, name: str) -> None:
+def launcher(proc: str, name: str, ready_event=None) -> None:
   try:
     # import the process
     mod = importlib.import_module(proc)
@@ -34,7 +34,10 @@ def launcher(proc: str, name: str) -> None:
     sentry.set_tag("daemon", name)
 
     # exec the process
-    mod.main()
+    if ready_event is None:
+      mod.main()
+    else:
+      mod.main(ready_event)
   except KeyboardInterrupt:
     cloudlog.warning(f"child {proc} got SIGINT")
   except Exception:
@@ -42,6 +45,9 @@ def launcher(proc: str, name: str) -> None:
     # with threads, so catch it here.
     sentry.capture_exception()
     raise
+  finally:
+    if ready_event is not None:
+      ready_event.clear()
 
 
 def nativelauncher(pargs: list[str], cwd: str, name: str) -> None:
@@ -120,11 +126,14 @@ class ManagerProcess(ABC):
     cloudlog.info(f"sending signal {sig} to {self.name}")
     os.kill(self.proc.pid, sig)
 
+  def is_healthy(self) -> bool:
+    return self.proc is not None and self.proc.is_alive()
+
   def get_process_state_msg(self):
     state = log.ManagerState.ProcessState.new_message()
     state.name = self.name
     if self.proc:
-      state.running = self.proc.is_alive()
+      state.running = self.is_healthy()
       state.shouldBeRunning = self.proc is not None and not self.shutting_down
       state.pid = self.proc.pid or 0
       state.exitCode = self.proc.exitcode or 0
@@ -157,13 +166,17 @@ class NativeProcess(ManagerProcess):
 
 
 class PythonProcess(ManagerProcess):
-  def __init__(self, name, module, should_run, enabled=True, sigkill=False):
+  def __init__(self, name, module, should_run, enabled=True, sigkill=False, wait_for_ready=False):
     self.name = name
     self.module = module
     self.should_run = should_run
     self.enabled = enabled
     self.sigkill = sigkill
+    self.ready_event = Event() if wait_for_ready else None
     self.launcher = launcher
+
+  def is_healthy(self) -> bool:
+    return super().is_healthy() and (self.ready_event is None or self.ready_event.is_set())
 
   def start(self) -> None:
     # In case we only tried a non blocking stop we need to stop it before restarting
@@ -173,8 +186,12 @@ class PythonProcess(ManagerProcess):
     if self.proc is not None:
       return
 
+    if self.ready_event is not None:
+      self.ready_event.clear()
+
     cloudlog.info(f"starting python {self.module}")
-    self.proc = Process(name=self.name, target=self.launcher, args=(self.module, self.name))
+    args = (self.module, self.name) if self.ready_event is None else (self.module, self.name, self.ready_event)
+    self.proc = Process(name=self.name, target=self.launcher, args=args)
     self.proc.start()
     self.shutting_down = False
 
