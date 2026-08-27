@@ -15,7 +15,7 @@ import os
 from collections.abc import Callable
 
 from openpilot.sunnypilot.sunnylink.capabilities import CAPABILITY_FIELDS, CAPABILITY_LABELS
-from openpilot.sunnypilot.nrdr.sunnylink import inject_car_tune_details
+from openpilot.nrdr.features.services.sunnylink import inject_car_tune_details
 
 SCHEMA_VERSION = "1.0"
 _DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

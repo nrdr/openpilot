@@ -28,7 +28,7 @@ from openpilot.sunnypilot.system.statsd import statlog
 from openpilot.system.hardware.power_monitoring import PowerMonitoring
 from openpilot.system.hardware.fan_controller import FanController
 from openpilot.common.version import terms_version, training_version, get_build_metadata, terms_version_sp, CHESTNUT_BRANCHES
-from openpilot.sunnypilot.nrdr.hardware import apply_startup_policy, initialize_onboarding
+from openpilot.nrdr.features.services.hardware import apply_startup_policy, initialize_onboarding
 
 
 ThermalStatus = log.DeviceState.ThermalStatus

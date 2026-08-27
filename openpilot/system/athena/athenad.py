@@ -48,7 +48,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
 from openpilot.system.athena.rpc import dispatcher, handle, is_call, is_response, loads
-from openpilot.sunnypilot.nrdr import athena as nrdr_athena
+from openpilot.nrdr.features.services import athena as nrdr_athena
 
 
 ATHENA_HOST = os.getenv('ATHENA_HOST', 'wss://athena.konik.ai')

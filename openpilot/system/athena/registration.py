@@ -13,7 +13,7 @@ from openpilot.selfdrive.selfdrived.alertmanager import set_offroad_alert
 from openpilot.common.hardware import HARDWARE, PC
 from openpilot.common.hardware.hw import Paths
 from openpilot.common.swaglog import cloudlog
-from openpilot.sunnypilot.nrdr import registration as nrdr_registration
+from openpilot.nrdr.features.services import registration as nrdr_registration
 
 
 UNREGISTERED_DONGLE_ID = "UnregisteredDevice"

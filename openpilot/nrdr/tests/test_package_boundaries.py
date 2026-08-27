@@ -50,7 +50,7 @@ PHASE_TWO_CONSUMERS = (
   "openpilot/nrdr/ui/settings/pidf_ground.py",
   "openpilot/nrdr/ui/settings/steer_filters.py",
   "openpilot/nrdr/ui/settings/vehicle_model_learning.py",
-  "openpilot/sunnypilot/nrdr/car_tune_report.py",
+  "openpilot/nrdr/features/services/car_tune_report.py",
   "openpilot/sunnypilot/nrdr/controlsd.py",
   "openpilot/nrdr/features/lateral/latcontrol_pid.py",
   "openpilot/nrdr/features/longitudinal/longcontrol.py",
@@ -312,7 +312,7 @@ class TestPackageBoundaries(unittest.TestCase):
     consumers = (
       "lateral_attribution.py",
       "openpilot/nrdr/ui/settings/pidf_ground.py",
-      "openpilot/sunnypilot/nrdr/car_tune_report.py",
+      "openpilot/nrdr/features/services/car_tune_report.py",
       "openpilot/nrdr/features/lateral/latcontrol_pid.py",
       "openpilot/sunnypilot/sunnylink/capabilities.py",
     )

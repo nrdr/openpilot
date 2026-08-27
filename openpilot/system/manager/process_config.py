@@ -174,7 +174,7 @@ procs += [
   # Backup
   PythonProcess("backup_manager", "openpilot.sunnypilot.sunnylink.backups.manager", and_(only_offroad, sunnylink_ready_shim)),
 
-  PythonProcess("nrdr_remoted", "openpilot.sunnypilot.nrdr.remoted", only_offroad),
+  PythonProcess("nrdr_remoted", "openpilot.system.manager.nrdr_remoted", only_offroad),
 
   # mapd
   NativeProcess("mapd", Paths.mapd_root(), ["bash", "-c", f"{MAPD_PATH} > /dev/null 2>&1"], mapd_ready),

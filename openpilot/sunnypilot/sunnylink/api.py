@@ -10,7 +10,7 @@ from openpilot.common.api.base import BaseApi
 from openpilot.common.params import Params
 from openpilot.common.hardware import HARDWARE
 from openpilot.common.hardware.hw import Paths
-from openpilot.sunnypilot.nrdr.sunnylink import persist_dongle_id, restore_dongle_id
+from openpilot.nrdr.features.services.sunnylink import persist_dongle_id, restore_dongle_id
 
 API_HOST = os.getenv('SUNNYLINK_API_HOST', 'https://stg.api.sunnypilot.ai')
 UNREGISTERED_SUNNYLINK_DONGLE_ID = "UnregisteredDevice"

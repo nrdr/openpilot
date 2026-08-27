@@ -35,7 +35,7 @@ from openpilot.sunnypilot.sunnylink.api import SunnylinkApi
 from openpilot.sunnypilot.sunnylink.utils import sunnylink_need_register, sunnylink_ready, get_param_as_byte, save_param_from_base64_encoded_string
 from openpilot.sunnypilot.sunnylink.capabilities import generate_capabilities, CAPABILITY_LABELS
 from openpilot.sunnypilot.sunnylink.tools.generate_settings_schema import generate_schema
-from openpilot.sunnypilot.nrdr.sunnylink import allow_param_write
+from openpilot.nrdr.features.services.sunnylink import allow_param_write
 
 SUNNYLINK_ATHENA_HOST = os.getenv('SUNNYLINK_ATHENA_HOST', 'wss://athena.sunnylink.ai')
 HANDLER_THREADS = int(os.getenv('HANDLER_THREADS', "4"))

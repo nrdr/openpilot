@@ -18,7 +18,7 @@ from openpilot.common.hardware.hw import Paths
 from openpilot.cereal import messaging, custom
 from openpilot.sunnypilot.models.fetcher import ModelFetcher
 from openpilot.sunnypilot.models.helpers import get_active_bundle, validate_active_bundle, verify_file
-from openpilot.sunnypilot.nrdr.model_manager import select_default_model
+from openpilot.nrdr.features.services.model_manager import select_default_model
 
 # (connect, read) seconds. read is per-request inactivity, not a total cap
 DOWNLOAD_TIMEOUT = (30, 30)

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from openpilot.sunnypilot.nrdr import registration
+from openpilot.nrdr.features.services import registration
 
 
 @pytest.fixture
