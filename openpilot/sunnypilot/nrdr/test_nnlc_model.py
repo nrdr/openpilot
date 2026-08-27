@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from openpilot.cereal import log
+from openpilot.cereal import custom, log
 from opendbc.car.car_helpers import interfaces
 from opendbc.car.structs import CarParams, car
 from opendbc.car.honda.values import CAR as HONDA
@@ -20,11 +20,24 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 from openpilot.sunnypilot.nrdr.latcontrol_clarity_hybrid import LatControlClarityHybrid, clarity_nnlc_blend_target
 from openpilot.sunnypilot.nrdr.live_params import reset_live_params_for_tests
+from openpilot.sunnypilot.nrdr.model_policy import (
+  LEGACY_DUAL_BP_ARTIFACT_SHA256S,
+  PURE_FIRMWARE_VGR_ARTIFACT_SHA256S,
+  SteerRatioModelPolicy,
+)
 from openpilot.sunnypilot.nrdr.nnlc_model import get_forced_nnlc_model
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 
 CLARITY_MODEL_SHA256 = "4f2e92c085c5eeebb7c6714e4733ea7b71c1e69c7de7776a2bff6def12ce0134"
+
+
+def _active_model_bundle(artifact_sha256: str) -> dict:
+  bundle = custom.ModelManagerSP.ModelBundle.new_message()
+  bundle.minimumSelectorVersion = 18
+  bundle.models = [custom.ModelManagerSP.Model.new_message()]
+  bundle.models[0].artifact.downloadUri.sha256 = artifact_sha256
+  return bundle.to_dict()
 
 
 @pytest.fixture(autouse=True)
@@ -58,7 +71,7 @@ class TestNNTorqueModel:
     params = Params()
     keys = ("EnforceTorqueControl", "NeuralNetworkLateralControl", "NrdrNnlcEnabled",
             "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain",
-            "NrdrLegacyDualBpSteerRatio")
+            "ModelManager_ActiveBundle")
     previous = {key: params.get(key) for key in keys}
     try:
       params.put_bool("EnforceTorqueControl", False, block=True)
@@ -68,7 +81,7 @@ class TestNNTorqueModel:
       params.put("NrdrNnlcKpGain", 100, block=True)
       params.put("NrdrNnlcKfGain", 50, block=True)
       params.put("NrdrNnlcKiGain", 10, block=True)
-      params.put_bool("NrdrLegacyDualBpSteerRatio", True, block=True)
+      params.put("ModelManager_ActiveBundle", _active_model_bundle(next(iter(LEGACY_DUAL_BP_ARTIFACT_SHA256S))), block=True)
 
       CarInterface = interfaces[HONDA.HONDA_CLARITY]
       CP = CarInterface.get_non_essential_params(HONDA.HONDA_CLARITY)
@@ -97,6 +110,7 @@ class TestNNTorqueModel:
       assert pid_controller.sr_profile is not None
       assert pid_controller.vgr_profile is not None
       assert pid_controller.vgr_profile.name == "Clarity TRW-A020"
+      assert pid_controller.model_sr_policy is SteerRatioModelPolicy.LEGACY_DUAL_BP
       assert len(pid_controller.pid._k_p[0]) == len(pid_controller.pid._k_p[1]) == 4
       assert len(pid_controller.pid._k_i[0]) == len(pid_controller.pid._k_i[1]) == 4
       low_max = 25.0 * CV.MPH_TO_MS
@@ -162,17 +176,20 @@ class TestNNTorqueModel:
       CS.vEgo = 10.0 * CV.MPH_TO_MS
       controller.update(True, CS, VM, vehicle_params, False, 0.0, None, False, 0.2)
 
-      # Firmware EPS mode is PID-only until NNLC can dewarp both position and rate coordinates.
-      params.put_bool("NrdrLegacyDualBpSteerRatio", False, block=True)
-      pid_controller.params.refresh_all()
-      pid_controller._refresh_settings()
-      assert pid_controller.firmware_vgr_selected
-      controller.nnlc_blend = 1.0
-      controller.extension._pid.i = 0.2
+      # Model policy is resolved once with the controller. Selecting a pure-firmware
+      # artifact applies only to the newly constructed controller and makes Clarity PID-only.
+      params.put("ModelManager_ActiveBundle", _active_model_bundle(next(iter(PURE_FIRMWARE_VGR_ARTIFACT_SHA256S))), block=True)
+      assert pid_controller.model_sr_policy is SteerRatioModelPolicy.LEGACY_DUAL_BP
+      firmware_controller = controls_ext.initialize_lateral_control(object(), CI, DT_CTRL)
+      firmware_pid = firmware_controller.pid_controller.nrdr_controller
+      assert firmware_pid.model_sr_policy is SteerRatioModelPolicy.PURE_FIRMWARE_VGR
+      assert firmware_pid.firmware_vgr_selected
+      firmware_controller.nnlc_blend = 1.0
+      firmware_controller.extension._pid.i = 0.2
       VM.sR = 17.123
-      controller.update(True, CS, VM, vehicle_params, False, 0.0, None, False, 0.2)
-      assert controller.nnlc_blend == 0.0
-      assert controller.extension._pid.i == 0.0
+      firmware_controller.update(True, CS, VM, vehicle_params, False, 0.0, None, False, 0.2)
+      assert firmware_controller.nnlc_blend == 0.0
+      assert firmware_controller.extension._pid.i == 0.0
       assert VM.sR == 17.123
     finally:
       for key, value in previous.items():

@@ -34,7 +34,6 @@ HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS = (
 
 HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
   ("NrdrStarPilotPid", False),
-  ("NrdrLegacyDualBpSteerRatio", False),
   ("NrdrLaneChangeEndpointSteerRatio", True),
   ("NrdrLearnSteerRatio", False),
   ("NrdrLearnStiffness", True),
@@ -84,7 +83,7 @@ def _build_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
   return HandcraftedLateralProfile(
     name="Honda Clarity-Derived Road-Tested 2026-08-21",
     fingerprint=fingerprint,
-    version=13,
+    version=14,
     values=steer_ratio.param_values + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
   )
 

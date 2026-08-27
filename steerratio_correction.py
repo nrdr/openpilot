@@ -49,7 +49,6 @@ SETTINGS_KEYS = (
   "NrdrLearnSteerRatio",
   "NrdrLearnStiffness",
   "NrdrLearnAngleOffset",
-  "NrdrLegacyDualBpSteerRatio",
   "NrdrLaneChangeEndpointSteerRatio",
   "NrdrSteerRatioCenterClarity",
   "NrdrSteerRatioOuterClarity",

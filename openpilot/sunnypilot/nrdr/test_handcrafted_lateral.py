@@ -33,7 +33,6 @@ EXPECTED_GEOMETRY = (
 
 EXPECTED_C4_SHARED_VALUES = {
   "NrdrStarPilotPid": False,
-  "NrdrLegacyDualBpSteerRatio": False,
   "NrdrLaneChangeEndpointSteerRatio": True,
   "NrdrLearnSteerRatio": False,
   "NrdrLearnStiffness": True,
@@ -100,7 +99,7 @@ def test_torque_mod_profiles_are_versioned_and_fingerprint_scoped():
     profile = get_handcrafted_lateral_profile(fingerprint)
     assert profile is HANDCRAFTED_LATERAL_PROFILES[fingerprint]
     assert profile.fingerprint == fingerprint
-    assert profile.version == 13
+    assert profile.version == 14
     assert "2026-08-21" in profile.name
   assert get_handcrafted_lateral_profile("HONDA_CIVIC_2022") is None
   assert get_handcrafted_lateral_profile("HONDA_CRV_HYBRID") is None
@@ -162,7 +161,6 @@ def test_v11_profile_state_migrates_once_then_is_idempotent():
   profile = get_handcrafted_lateral_profile("HONDA_CLARITY")
   old_values = dict(profile.values)
   old_values.update({
-    "NrdrLegacyDualBpSteerRatio": True,
     "HondaCenterScale": 0.5,
     "NrdrLatStiction": False,
     "NrdrDriverOverrideThreshold": 1400,
@@ -173,7 +171,6 @@ def test_v11_profile_state_migrates_once_then_is_idempotent():
   params = FakeParams({"NrdrHandcraftedLateralTune": True, **old_values})
 
   assert apply_handcrafted_lateral_profile("HONDA_CLARITY", params) == [
-    "NrdrLegacyDualBpSteerRatio",
     "HondaCenterScale",
     "NrdrLatStiction",
     "NrdrDriverOverrideThreshold",
@@ -215,7 +212,7 @@ def test_profile_can_be_disabled_and_never_affects_other_fingerprints():
   assert is_handcrafted_lateral_enabled("HONDA_CLARITY", disabled)
   apply_handcrafted_lateral_profile("HONDA_CLARITY", disabled)
   assert disabled.values["LatPScaleLowSpeed"] == 100
-  assert disabled.values["NrdrLegacyDualBpSteerRatio"] is False
+  assert disabled.values["NrdrLegacyDualBpSteerRatio"] is True
   assert disabled.values["NrdrLatStiction"] is True
   assert disabled.values["NrdrNnlcEnabled"] is False
 
@@ -231,7 +228,7 @@ def test_profile_preserves_the_current_road_tested_choices():
   clarity_sr = get_steer_ratio_endpoint_profile("HONDA_CLARITY")
   assert values[clarity_sr.center_param] == 18.50
   assert values[clarity_sr.outer_param] == 12.72
-  assert values["NrdrLegacyDualBpSteerRatio"] is False
+  assert "NrdrLegacyDualBpSteerRatio" not in values
   assert values["NrdrLaneChangeEndpointSteerRatio"] is True
   assert "NrdrSteerRatioOffset" not in values
   assert values["HondaCenterScale"] == 1.0
