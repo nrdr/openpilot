@@ -20,14 +20,14 @@ from openpilot.selfdrive.car.helpers import convert_to_capnp
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
-from openpilot.sunnypilot.nrdr.latcontrol_clarity_hybrid import LatControlClarityHybrid, clarity_nnlc_blend_target
+from openpilot.nrdr.features.lateral.latcontrol_clarity_hybrid import LatControlClarityHybrid, clarity_nnlc_blend_target
 from openpilot.nrdr.params import reset_live_params_for_tests
 from openpilot.nrdr.features.lateral.model_policy import (
   LEGACY_DUAL_BP_ARTIFACT_SHA256S,
   PURE_FIRMWARE_VGR_ARTIFACT_SHA256S,
   SteerRatioModelPolicy,
 )
-from openpilot.sunnypilot.nrdr.nnlc_model import get_forced_nnlc_model
+from openpilot.nrdr.features.lateral.nnlc_model import get_forced_nnlc_model
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 
@@ -153,6 +153,9 @@ class TestNNTorqueModel:
       assert not CP_SP.neuralNetworkLateralControl.fuzzyFingerprint
       model_path = Path(CP_SP.neuralNetworkLateralControl.model.path)
       assert model_path == Path(get_forced_nnlc_model(CP))
+      assert model_path.relative_to(Path(__file__).resolve().parents[3]).as_posix() == (
+        "openpilot/nrdr/features/lateral/neural_network_lateral_control/HONDA_CLARITY.json"
+      )
       assert hashlib.sha256(model_path.read_bytes()).hexdigest() == CLARITY_MODEL_SHA256
 
       controls_ext = ControlsExt.__new__(ControlsExt)

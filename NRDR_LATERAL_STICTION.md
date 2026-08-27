@@ -1,7 +1,7 @@
 # Predictive Lateral Stiction
 
 `NrdrLatStiction` is a default-off final-stage steering overlay implemented in
-`openpilot/sunnypilot/nrdr/lat_stiction.py`. Normal PID output provides the
+`openpilot/nrdr/features/lateral/lat_stiction.py`. Normal PID output provides the
 throw; the overlay only removes torque while the wheel closes on a stable
 target, freezes the captured output briefly, and returns smoothly to PID when
 another correction is required.

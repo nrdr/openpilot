@@ -10,7 +10,7 @@ from difflib import SequenceMatcher
 
 from opendbc.car import structs
 from openpilot.common.basedir import BASEDIR
-from openpilot.sunnypilot.nrdr.nnlc_model import get_forced_nnlc_model
+from openpilot.nrdr.features.lateral.nnlc_model import get_forced_nnlc_model
 
 TORQUE_NN_MODEL_PATH = os.path.join(BASEDIR, "openpilot", "sunnypilot", "neural_network_data", "neural_network_lateral_control")
 TORQUE_NN_MODEL_SUBSTITUTE_PATH = os.path.join(BASEDIR, "opendbc_repo", "opendbc", "car", "torque_data/substitute.toml")

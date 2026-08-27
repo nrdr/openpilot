@@ -18,7 +18,7 @@ from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.nrdr.controlsd import initialize_live_parameter_settings, refresh_live_parameter_settings
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
-from openpilot.sunnypilot.nrdr.latcontrol_clarity_hybrid import LatControlClarityHybrid
+from openpilot.nrdr.features.lateral.latcontrol_clarity_hybrid import LatControlClarityHybrid
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 

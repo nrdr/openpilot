@@ -8,7 +8,7 @@ from openpilot.nrdr.params import (
   get_steer_ratio_endpoint_profile,
   is_handcrafted_lateral_enabled,
 )
-from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
+from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
 from openpilot.nrdr.features.lateral.model_policy import (
   SteerRatioModelResolution,
   SteerRatioModelPolicy,

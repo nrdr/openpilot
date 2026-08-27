@@ -19,7 +19,7 @@ import math
 from pathlib import Path
 from statistics import median
 
-from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
+from openpilot.nrdr.features.lateral.lat_stiction import LatStiction
 from steerratio_correction import expand_sources, iter_local_events, route_segment
 
 

@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import pytest
 
-from openpilot.sunnypilot.nrdr.honda_vgr import (
+from openpilot.nrdr.features.lateral.honda_vgr import (
   HONDA_VGR_PROFILES,
   Q14,
   RAW_UNITS_PER_DEGREE,
@@ -81,7 +81,7 @@ def test_wrong_fingerprint_or_unknown_firmware_does_not_select_profile(CP):
 
 @requires_controller
 def test_civic_teg_center_boost_fade_is_exactly_scoped():
-  from openpilot.sunnypilot.nrdr.latcontrol_pid import _center_boost_angle_fade
+  from openpilot.nrdr.features.lateral.latcontrol_pid import _center_boost_angle_fade
 
   assert _center_boost_angle_fade(_car_params("HONDA_CIVIC", b"39990-TEG-A010")) == 2.0
   for CP in (
@@ -96,7 +96,7 @@ def test_civic_teg_center_boost_fade_is_exactly_scoped():
 
 @requires_controller
 def test_civic_teg_center_boost_smooths_only_the_ten_to_twelve_degree_handoff():
-  from openpilot.sunnypilot.nrdr.latcontrol_pid import _center_boost
+  from openpilot.nrdr.features.lateral.latcontrol_pid import _center_boost
 
   values = {
     angle: _center_boost(angle, v_ego=0.0, fade=1.0, magnitude=1.0,
@@ -119,7 +119,7 @@ def test_civic_teg_center_boost_smooths_only_the_ten_to_twelve_degree_handoff():
 
 @requires_controller
 def test_non_teg_center_boost_retains_the_existing_one_degree_fade():
-  from openpilot.sunnypilot.nrdr.latcontrol_pid import _center_boost
+  from openpilot.nrdr.features.lateral.latcontrol_pid import _center_boost
 
   for angle in (0.0, 9.9, 10.0, 10.25, 10.5, 10.999, 11.0, 12.0, 70.0):
     expected = 1.0 + np.clip(11.0 - abs(angle), 0.0, 1.0)
@@ -173,7 +173,7 @@ class _VehicleModel:
 
 
 def _pid_controller(*, policy: SteerRatioModelPolicy, lane_change: bool = False):
-  from openpilot.sunnypilot.nrdr.latcontrol_pid import NrdrLatControlPID
+  from openpilot.nrdr.features.lateral.latcontrol_pid import NrdrLatControlPID
 
   controller = NrdrLatControlPID.__new__(NrdrLatControlPID)
   controller.sr_profile = get_steer_ratio_endpoint_profile("HONDA_CLARITY")
@@ -271,7 +271,7 @@ def test_clarity_hybrid_preserves_trw_firmware_and_enters_firmware_mode():
   from openpilot.common.params import Params
   from openpilot.common.realtime import DT_CTRL
   from openpilot.selfdrive.car.helpers import convert_to_capnp
-  from openpilot.sunnypilot.nrdr.latcontrol_clarity_hybrid import LatControlClarityHybrid
+  from openpilot.nrdr.features.lateral.latcontrol_clarity_hybrid import LatControlClarityHybrid
   from openpilot.nrdr.params import reset_live_params_for_tests
   from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
   from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt

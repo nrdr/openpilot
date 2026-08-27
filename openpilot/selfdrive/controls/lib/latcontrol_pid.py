@@ -3,7 +3,7 @@ import math
 from openpilot.cereal import log
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.common.pid import PIDController
-from openpilot.sunnypilot.nrdr.latcontrol_pid import NrdrLatControlPID
+from openpilot.nrdr.features.lateral.latcontrol_pid import NrdrLatControlPID
 
 
 class LatControlPID(LatControl):

@@ -15,7 +15,7 @@ from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
 from openpilot.nrdr.params import get_handcrafted_lateral_profile
-from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
+from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
 from openpilot.nrdr.features.lateral.model_policy import classify_steer_ratio_model
 
 

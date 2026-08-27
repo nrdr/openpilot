@@ -6,7 +6,7 @@ import pytest
 
 import lat_stiction_shadow
 from lat_stiction_shadow import ShadowFrame, iter_shadow_frames, replay_shadow, score_triggers, summarize
-from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
+from openpilot.nrdr.features.lateral.lat_stiction import LatStiction
 
 
 DT = 0.01

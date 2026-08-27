@@ -1,19 +1,47 @@
 import ast
 from importlib import import_module
 from pathlib import Path
+import sys
 import unittest
 
 import openpilot.nrdr
 from openpilot.nrdr.params import NrdrParamKey, ParamReader, ParamValue, read_bool, read_float
 
 
-MIGRATED_CONSUMERS = (
-  "latcontrol_pid.py",
-  "longcontrol.py",
-  "longitudinal_planner.py",
-  "nnlc.py",
-  "tune_learner.py",
+MIGRATED_PARAM_CONSUMERS = (
+  "openpilot/nrdr/features/lateral/latcontrol_pid.py",
+  "openpilot/nrdr/features/lateral/nnlc.py",
+  "openpilot/nrdr/features/lateral/tune_learner.py",
+  "openpilot/sunnypilot/nrdr/longcontrol.py",
+  "openpilot/sunnypilot/nrdr/longitudinal_planner.py",
 )
+
+LATERAL_COMPATIBILITY_EXPORTS = {
+  "honda_vgr": (
+    "HONDA_VGR_PROFILES", "Q14", "RAW_UNITS_PER_DEGREE", "HondaVgrProfile",
+    "get_honda_vgr_profile", "normalize_honda_eps_firmware",
+  ),
+  "lat_stiction": ("LatStiction", "LatStictionState"),
+  "latcontrol_clarity_hybrid": (
+    "BLEND_TO_NNLC_SECONDS", "BLEND_TO_PID_SECONDS", "NNLC_BLEND_HALF_WIDTH",
+    "NNLC_DEFAULT_ACTIVATION_SPEED", "ClarityHybridExtension", "LatControlClarityHybrid",
+    "clarity_nnlc_blend_target",
+  ),
+  "latcontrol_pid": (
+    "CENTER_BOOST_SPEED_FADE", "CENTER_TAPER_FADE_TAU", "CIVIC_TEG_CENTER_BOOST_FADE_DEG",
+    "LOW_SPEED_MAX", "MPH_TO_MS", "RATE_DAMPING_REFERENCE", "RATE_DAMPING_UNWIND_ANGLE",
+    "STANDARD_SPEED_MAX", "NrdrLatControlPID",
+  ),
+  "nnlc": ("NrdrNnlc",),
+  "nnlc_model": ("MODEL_PATHS", "get_forced_nnlc_model", "is_nnlc_forced"),
+  "pid": ("FeedforwardPIDController",),
+  "tune_learner": (
+    "ANGLE_BIN_DEG", "ANGLE_MAX_DEG", "ERROR_GATE_FULL_DEG", "ERR_REJECT_DEG",
+    "LEARN_MIN_SPEED_MS", "LEARN_RATE_REF", "MIN_ABS_DES", "MS_TO_MPH", "N_ANGLE",
+    "N_SPEED", "RATE_GATE_DEG_S", "SAVE_FRAMES", "SPEED_BIN_MPH", "SPEED_MAX_MPH",
+    "TRIM_HARD_FRAC", "TuneLearner",
+  ),
+}
 
 PHASE_TWO_CONSUMERS = (
   "openpilot/selfdrive/car/card.py",
@@ -24,12 +52,12 @@ PHASE_TWO_CONSUMERS = (
   "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/vehicle_model_learning.py",
   "openpilot/sunnypilot/nrdr/car_tune_report.py",
   "openpilot/sunnypilot/nrdr/controlsd.py",
-  "openpilot/sunnypilot/nrdr/latcontrol_pid.py",
+  "openpilot/nrdr/features/lateral/latcontrol_pid.py",
   "openpilot/sunnypilot/nrdr/longcontrol.py",
   "openpilot/sunnypilot/nrdr/longitudinal_planner.py",
-  "openpilot/sunnypilot/nrdr/nnlc.py",
+  "openpilot/nrdr/features/lateral/nnlc.py",
   "openpilot/sunnypilot/nrdr/settings.py",
-  "openpilot/sunnypilot/nrdr/tune_learner.py",
+  "openpilot/nrdr/features/lateral/tune_learner.py",
   "openpilot/sunnypilot/sunnylink/capabilities.py",
   "openpilot/system/manager/manager.py",
 )
@@ -56,18 +84,18 @@ class TestPackageBoundaries(unittest.TestCase):
     self.assertEqual(legacy.__all__, ("NrdrParamKey", "ParamReader", "ParamValue", "read_bool", "read_float"))
 
   def test_first_consumers_use_public_parameter_api(self):
-    legacy_dir = Path(__file__).resolve().parents[2] / "sunnypilot" / "nrdr"
-    for filename in MIGRATED_CONSUMERS:
-      with self.subTest(filename=filename):
-        source = (legacy_dir / filename).read_text()
+    repository_root = Path(__file__).resolve().parents[3]
+    for relative_path in MIGRATED_PARAM_CONSUMERS:
+      with self.subTest(path=relative_path):
+        source = (repository_root / relative_path).read_text()
         self.assertIn("from openpilot.nrdr.params import", source)
         self.assertNotIn("from openpilot.sunnypilot.nrdr.params import", source)
 
   def test_migrated_readers_do_not_use_static_string_keys(self):
-    legacy_dir = Path(__file__).resolve().parents[2] / "sunnypilot" / "nrdr"
+    repository_root = Path(__file__).resolve().parents[3]
     failures: list[str] = []
-    for filename in MIGRATED_CONSUMERS:
-      tree = ast.parse((legacy_dir / filename).read_text(), filename=filename)
+    for relative_path in MIGRATED_PARAM_CONSUMERS:
+      tree = ast.parse((repository_root / relative_path).read_text(), filename=relative_path)
       for node in ast.walk(tree):
         if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
           continue
@@ -75,7 +103,7 @@ class TestPackageBoundaries(unittest.TestCase):
           continue
         key = node.args[1]
         if isinstance(key, ast.Constant) and isinstance(key.value, str):
-          failures.append(f"{filename}:{node.lineno}: {key.value}")
+          failures.append(f"{relative_path}:{node.lineno}: {key.value}")
     self.assertEqual(failures, [], "static parameter keys must use NrdrParamKey")
 
   def test_phase_two_consumers_use_the_public_facade(self):
@@ -157,11 +185,53 @@ class TestPackageBoundaries(unittest.TestCase):
       with self.subTest(name=name):
         self.assertIs(getattr(legacy, name), getattr(canonical, name))
 
-  def test_legacy_latcontrol_pid_imports_the_canonical_phase_detector(self):
+  def test_canonical_latcontrol_pid_uses_canonical_lateral_dependencies(self):
     repository_root = Path(__file__).resolve().parents[3]
-    source = (repository_root / "openpilot/sunnypilot/nrdr/latcontrol_pid.py").read_text()
+    source = (repository_root / "openpilot/nrdr/features/lateral/latcontrol_pid.py").read_text()
     self.assertIn("from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch", source)
-    self.assertNotIn("from openpilot.sunnypilot.nrdr.phase_detector import", source)
+    for module in ("honda_vgr", "lat_stiction", "phase_detector", "tune_learner"):
+      with self.subTest(module=module):
+        self.assertIn(f"from openpilot.nrdr.features.lateral.{module} import", source)
+        self.assertNotIn(f"from openpilot.sunnypilot.nrdr.{module} import", source)
+
+  def test_lateral_compatibility_modules_are_explicit_forwarders(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    legacy_dir = repository_root / "openpilot" / "sunnypilot" / "nrdr"
+    for module_name, expected_exports in LATERAL_COMPATIBILITY_EXPORTS.items():
+      with self.subTest(module=module_name):
+        tree = ast.parse((legacy_dir / f"{module_name}.py").read_text(), filename=module_name)
+        import_nodes = [node for node in tree.body if isinstance(node, ast.ImportFrom)]
+        self.assertEqual(len(import_nodes), 1)
+        self.assertEqual(import_nodes[0].module, f"openpilot.nrdr.features.lateral.{module_name}")
+        self.assertEqual(tuple(alias.name for alias in import_nodes[0].names), expected_exports)
+        assignments = [node for node in tree.body if isinstance(node, ast.Assign)]
+        self.assertEqual(len(assignments), 1)
+        self.assertEqual(assignments[0].targets[0].id, "__all__")
+        self.assertEqual(ast.literal_eval(assignments[0].value), expected_exports)
+        implementation_nodes = [
+          node for node in tree.body
+          if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        self.assertEqual(implementation_nodes, [])
+
+  def test_portable_lateral_forwarders_preserve_object_identities(self):
+    for module_name in ("honda_vgr", "lat_stiction", "pid"):
+      with self.subTest(module=module_name):
+        canonical = import_module(f"openpilot.nrdr.features.lateral.{module_name}")
+        legacy = import_module(f"openpilot.sunnypilot.nrdr.{module_name}")
+        self.assertEqual(legacy.__all__, canonical.__all__)
+        for name in canonical.__all__:
+          self.assertIs(getattr(legacy, name), getattr(canonical, name))
+
+  @unittest.skipIf(sys.platform == "win32", "full controller imports require openpilot's Linux runtime")
+  def test_runtime_lateral_forwarders_preserve_object_identities(self):
+    for module_name in LATERAL_COMPATIBILITY_EXPORTS:
+      with self.subTest(module=module_name):
+        canonical = import_module(f"openpilot.nrdr.features.lateral.{module_name}")
+        legacy = import_module(f"openpilot.sunnypilot.nrdr.{module_name}")
+        self.assertEqual(legacy.__all__, canonical.__all__)
+        for name in canonical.__all__:
+          self.assertIs(getattr(legacy, name), getattr(canonical, name))
 
   def test_legacy_model_policy_preserves_all_public_object_identities(self):
     canonical = import_module("openpilot.nrdr.features.lateral.model_policy")
@@ -185,7 +255,7 @@ class TestPackageBoundaries(unittest.TestCase):
       "lateral_attribution.py",
       "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/pidf_ground.py",
       "openpilot/sunnypilot/nrdr/car_tune_report.py",
-      "openpilot/sunnypilot/nrdr/latcontrol_pid.py",
+      "openpilot/nrdr/features/lateral/latcontrol_pid.py",
       "openpilot/sunnypilot/sunnylink/capabilities.py",
     )
     for relative_path in consumers:
@@ -194,6 +264,6 @@ class TestPackageBoundaries(unittest.TestCase):
         self.assertIn("from openpilot.nrdr.features.lateral.model_policy import", source)
         self.assertNotIn("from openpilot.sunnypilot.nrdr.model_policy import", source)
 
-    controller = (repository_root / "openpilot/sunnypilot/nrdr/latcontrol_pid.py").read_text()
+    controller = (repository_root / "openpilot/nrdr/features/lateral/latcontrol_pid.py").read_text()
     self.assertIn("from openpilot.nrdr.features.lateral.steer_ratio_tuning import", controller)
     self.assertNotIn("from openpilot.sunnypilot.nrdr.steer_ratio_tuning import", controller)

@@ -13,7 +13,7 @@ from openpilot.nrdr.features.lateral.model_policy import (
   classify_steer_ratio_model,
 )
 from openpilot.nrdr.ui.native_param_controls import option_item_from_metadata
-from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
+from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton

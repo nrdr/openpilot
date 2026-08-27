@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction, LatStictionState
+from openpilot.nrdr.features.lateral.lat_stiction import LatStiction, LatStictionState
 
 
 DT = 0.01

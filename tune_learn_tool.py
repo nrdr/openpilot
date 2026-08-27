@@ -26,7 +26,7 @@ import sys
 import numpy as np
 
 from openpilot.common.params import Params
-from openpilot.sunnypilot.nrdr.tune_learner import (
+from openpilot.nrdr.features.lateral.tune_learner import (
   N_SPEED, N_ANGLE, SPEED_BIN_MPH, ANGLE_BIN_DEG, TRIM_HARD_FRAC,
 )
 

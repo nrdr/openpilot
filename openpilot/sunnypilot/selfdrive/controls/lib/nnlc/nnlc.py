@@ -14,7 +14,7 @@ from opendbc.sunnypilot.car.lateral_ext import get_friction as get_friction_in_t
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.selfdrive.modeld.constants import ModelConstants
-from openpilot.sunnypilot.nrdr.nnlc import NrdrNnlc
+from openpilot.nrdr.features.lateral.nnlc import NrdrNnlc
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_ext_base import sign
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_jerk_aware import LatControlTorqueJerkAware
 from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import MOCK_MODEL_PATH
