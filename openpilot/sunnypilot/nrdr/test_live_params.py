@@ -120,9 +120,9 @@ def test_personality_pid_scales_and_learning_gate_publish_atomically():
   assert "HondaLiveLearningGas" in matching_groups[0].keys
 
 
-def test_steer_ratio_mode_is_cached_with_controller_settings():
+def test_deprecated_steer_ratio_mode_is_not_polled_by_controller():
   control_keys = {key for group in CONTROL_GROUPS for key in group.keys}
-  assert "NrdrLegacyDualBpSteerRatio" in control_keys
+  assert "NrdrLegacyDualBpSteerRatio" not in control_keys
 
 
 def test_learning_toggles_preserve_typed_boolean_values():

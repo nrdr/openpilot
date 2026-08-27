@@ -378,7 +378,6 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
 
 class TestNrdrSteerRatioMode(OpenpilotTestCase):
   HANDCRAFTED_LOCKED_KEYS = (
-    "NrdrLegacyDualBpSteerRatio",
     "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
     "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
     "NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord",
@@ -406,11 +405,12 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert "enable this" in description
     assert "leave this off" in description
     assert "clarity-derived" in description
-    assert "firmware-derived" in description
-    assert "70 degrees" in description and "90 degrees" in description
+    assert "pop" in description and "off-policy" in description
+    assert "deep-rl" in description
+    assert "raw firmware vgr at every" in description
+    assert "stock vehiclemodel" in description
+    assert "70 degrees" not in description and "90 degrees" not in description
     assert "predictive stiction" in description
-    assert "nnlc disabled" in description
-    assert "pid-only" in description
     assert "vehicle's own steering geometry" in description
 
   @parameterized.expand(HANDCRAFTED_LOCKED_KEYS, names=["key"])
@@ -419,19 +419,8 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert item is not None
     assert "NrdrHandcraftedLateralTune" in json.dumps(item.get("enablement") or [])
 
-  def test_legacy_mode_is_explicit_and_fingerprint_scoped(self, schema):
-    item = _find_item(schema, "NrdrLegacyDualBpSteerRatio")
-    assert item is not None
-    assert item.get("widget") == "toggle"
-    visibility = json.dumps(item.get("visibility") or [])
-    assert "HONDA_CLARITY" in visibility
-    assert "HONDA_CIVIC" in visibility
-    assert "HONDA_ACCORD" in visibility
-    assert "HONDA_CRV_5G" in visibility
-    assert "HONDA_INSIGHT" in visibility
-    enablement = json.dumps(item.get("enablement") or [])
-    assert "NrdrHandcraftedLateralTune" in enablement
-    assert "not_engaged" in enablement
+  def test_deprecated_manual_legacy_toggle_is_not_exposed(self, schema):
+    assert _find_item(schema, "NrdrLegacyDualBpSteerRatio") is None
 
   @parameterized.expand([
     "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
@@ -445,12 +434,26 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert item is not None
     assert "not_engaged" in json.dumps(item.get("enablement") or [])
 
-  def test_firmware_mode_documents_exact_handoff(self, schema):
-    item = _find_item(schema, "NrdrLegacyDualBpSteerRatio")
-    details = item.get("details", "")
-    assert "exactly through 70 degrees" in details
-    assert "70 to 90 degrees" in details
-    assert "above 90 degrees" in details
+  def test_endpoint_visibility_matches_effective_model_policy(self, schema):
+    center = _find_item(schema, "NrdrSteerRatioCenterClarity")
+    outer = _find_item(schema, "NrdrSteerRatioOuterClarity")
+    lane_fade = _find_item(schema, "NrdrLaneChangeEndpointSteerRatio")
+    center_visibility = json.dumps(center.get("visibility") or [])
+    outer_visibility = json.dumps(outer.get("visibility") or [])
+    lane_visibility = json.dumps(lane_fade.get("visibility") or [])
+
+    assert "nrdr_firmware_vgr_available" in center_visibility
+    assert "nrdr_steer_ratio_policy" in center_visibility
+    assert "legacy_dual_bp" in center_visibility
+    assert "nrdr_firmware_vgr_available" not in outer_visibility
+    assert "nrdr_steer_ratio_policy" in outer_visibility and "legacy_dual_bp" in outer_visibility
+    assert "nrdr_steer_ratio_policy" in lane_visibility and "legacy_dual_bp" in lane_visibility
+
+    combined_copy = " ".join(
+      f"{item.get('description', '')} {item.get('details', '')}" for item in (center, outer, lane_fade)
+    ).lower()
+    assert "at every angle" in combined_copy
+    assert "70-to-90" not in combined_copy and "70 to 90" not in combined_copy
 
   def test_lane_change_outer_sr_copy_matches_timed_fade_behavior(self, schema):
     item = _find_item(schema, "NrdrLaneChangeEndpointSteerRatio")

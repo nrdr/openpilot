@@ -9,7 +9,12 @@ from openpilot.nrdr.params import (
   is_handcrafted_lateral_enabled,
 )
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import FirmwareLegacySteerRatioCurve
+from openpilot.sunnypilot.nrdr.model_policy import (
+  SteerRatioModelResolution,
+  SteerRatioModelPolicy,
+  resolve_steer_ratio_model,
+)
+from openpilot.sunnypilot.models.helpers import get_active_bundle
 
 
 def _format_values(values) -> str:
@@ -77,32 +82,35 @@ class CarTuneReporter:
     speeds = "0 / <25 / 25 / 50 mph" if len(pid.kpV) == 4 else "0 / 25 / 50 mph"
     return gains, feedforward, speeds
 
-  def _steer_ratio_info(self, CP) -> str:
+  @staticmethod
+  def _model_identity(model: SteerRatioModelResolution) -> str:
+    name = model.display_name or model.internal_name or "default/unidentified model"
+    if model.internal_name and model.internal_name not in name:
+      name += f" [{model.internal_name}]"
+    artifact = model.artifact_sha256[:12] if model.artifact_sha256 is not None else "no artifact SHA"
+    return f"{name} @ {artifact}"
+
+  def _steer_ratio_info(self, CP, model: SteerRatioModelResolution) -> str:
     profile = get_steer_ratio_endpoint_profile(CP.carFingerprint)
     if profile is None:
       return f"Auto {self._state('NrdrLearnSteerRatio')} | base {float(CP.steerRatio):g}"
     center = float(self._value(profile.center_param))
     outer = float(self._value(profile.outer_param))
     firmware_profile = get_honda_vgr_profile(CP)
-    firmware_curve = FirmwareLegacySteerRatioCurve(firmware_profile, center, outer, profile.outer_angle) \
-      if firmware_profile is not None else None
-    if self.params.get_bool("NrdrLegacyDualBpSteerRatio"):
-      mode = "legacy dual-BP"
-    elif firmware_curve is not None and firmware_curve.valid:
-      mode = f"EPS map -> dual-BP at 70-90 deg ({firmware_profile.name})"
-    elif firmware_profile is not None:
-      mode = f"invalid handoff -> raw EPS map ({firmware_profile.name})"
-    else:
-      mode = "firmware unavailable -> legacy dual-BP"
-    lane_change = self._state("NrdrLaneChangeEndpointSteerRatio")
-    if firmware_profile is not None and not self.params.get_bool("NrdrLegacyDualBpSteerRatio"):
-      outer_role = "high-angle/lane-fade anchor" if firmware_curve.valid else "lane-fade-only anchor"
-      return f"{mode} | {center:.2f} center anchor | {outer:.2f} {outer_role} | 1.5s lane fade {lane_change}"
-    return f"{mode} | {center:.2f} center -> {outer:.2f} outer | 1.5s lane fade {lane_change}"
+    identity = self._model_identity(model)
+    if model.policy is SteerRatioModelPolicy.LEGACY_DUAL_BP:
+      lane_change = self._state("NrdrLaneChangeEndpointSteerRatio")
+      return f"{identity} | model-locked legacy dual-BP | {center:.2f} center -> {outer:.2f} outer | 1.5s lane fade {lane_change}"
+    if firmware_profile is not None:
+      policy = "model-locked" if model.policy is SteerRatioModelPolicy.PURE_FIRMWARE_VGR else "unclassified model"
+      return f"{identity} | {policy} raw EPS map ({firmware_profile.name}) | {center:.2f} static center anchor | no lane fade"
+    policy = "pure-firmware model" if model.policy is SteerRatioModelPolicy.PURE_FIRMWARE_VGR else "unclassified model"
+    return f"{identity} | {policy} | exact EPS map unavailable -> stock VehicleModel | no NRDR steer-ratio curve or lane fade"
 
-  def _controller_info(self, CP, controller: str, handcrafted_enabled: bool, profile) -> str:
+  def _controller_info(self, CP, controller: str, handcrafted_enabled: bool, profile,
+                       model_policy: SteerRatioModelPolicy) -> str:
     if controller == "PID/NNLC":
-      firmware_pid_only = not self.params.get_bool("NrdrLegacyDualBpSteerRatio") and get_honda_vgr_profile(CP) is not None
+      firmware_pid_only = model_policy is not SteerRatioModelPolicy.LEGACY_DUAL_BP and get_honda_vgr_profile(CP) is not None
       if firmware_pid_only:
         nnlc = "PID only | NNLC unavailable in firmware EPS mode"
       else:
@@ -125,10 +133,11 @@ class CarTuneReporter:
     eps_short = eps.rsplit(",", 1)[-1].strip() if "," in eps else eps
     interceptor = self._gas_interceptor()
     controller = self._controller_name(CP)
+    model = resolve_steer_ratio_model(get_active_bundle(self.params))
     profile = get_handcrafted_lateral_profile(CP.carFingerprint)
     handcrafted_enabled = is_handcrafted_lateral_enabled(CP.carFingerprint, self.params)
     handcrafted = f"{profile.name} (v{profile.version})" if handcrafted_enabled and profile is not None else "OFF"
-    controller_info = self._controller_info(CP, controller, handcrafted_enabled, profile)
+    controller_info = self._controller_info(CP, controller, handcrafted_enabled, profile, model.policy)
 
     pid_base, pid_feedforward, pid_speeds = self._pid_info(CP)
     longitudinal = CP.longitudinalTuning
@@ -151,9 +160,9 @@ class CarTuneReporter:
       f"KF {float(self._value('NrdrNnlcKfGain')) / 100.0:g} | ",
       f"KI {float(self._value('NrdrNnlcKiGain')) / 100.0:g}",
     ))
-    if not self.params.get_bool("NrdrLegacyDualBpSteerRatio") and get_honda_vgr_profile(CP) is not None:
+    if model.policy is not SteerRatioModelPolicy.LEGACY_DUAL_BP and get_honda_vgr_profile(CP) is not None:
       nnlc += " | inactive in firmware EPS mode"
-    steer_ratio = self._steer_ratio_info(CP)
+    steer_ratio = self._steer_ratio_info(CP, model)
     learning = f"stiffness {self._state('NrdrLearnStiffness')} | angle {self._state('NrdrLearnAngleOffset')}"
     helpers = f"stiction {self._state('NrdrLatStiction')} | StarPilot {self._state('NrdrStarPilotPid')}"
     gas = "gas" if interceptor == "true" else "no gas"
@@ -182,6 +191,7 @@ class CarTuneReporter:
       "",
       "CONTROLLER",
       controller_info,
+      f"Driving model: {self._model_identity(model)}",
       f"Handcrafted profile: {handcrafted}",
       f"NNLC: {nnlc}",
       "",

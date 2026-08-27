@@ -11,13 +11,9 @@ from openpilot.sunnypilot.nrdr.honda_vgr import (
   get_honda_vgr_profile,
   normalize_honda_eps_firmware,
 )
+from openpilot.sunnypilot.nrdr.model_policy import SteerRatioModelPolicy
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
-  FIRMWARE_LEGACY_BLEND_END_DEG,
-  FIRMWARE_LEGACY_BLEND_START_DEG,
-  FirmwareLegacySteerRatioCurve,
   LaneChangeSteerRatioFade,
-  dual_bp_desired_angle,
-  dual_bp_ratio,
   get_steer_ratio_endpoint_profile,
 )
 
@@ -168,88 +164,6 @@ def test_forward_map_slope_matches_finite_difference(profile):
   assert profile.linear_to_physical_slope(linear_angle) == pytest.approx(finite_difference, rel=1e-6)
 
 
-def _endpoint_profile(vgr_profile):
-  return get_steer_ratio_endpoint_profile(vgr_profile.fingerprints[0])
-
-
-def _firmware_legacy_curve(vgr_profile):
-  endpoint = _endpoint_profile(vgr_profile)
-  return FirmwareLegacySteerRatioCurve(
-    vgr_profile, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle,
-  )
-
-
-@pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
-def test_firmware_legacy_curve_is_valid_symmetric_and_monotonic(vgr_profile):
-  curve = _firmware_legacy_curve(vgr_profile)
-  endpoint = _endpoint_profile(vgr_profile)
-  assert curve.valid
-
-  final_linear = endpoint.center_default * (endpoint.outer_angle + 50.0) / endpoint.outer_default
-  linear_samples = np.linspace(0.0, final_linear, 4001)
-  desired = np.array([curve.desired_angle(value) for value in linear_samples])
-  assert np.all(np.diff(desired) > 0.0)
-  assert np.array([curve.desired_angle(-value) for value in linear_samples]) == pytest.approx(-desired)
-
-
-@pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
-def test_firmware_curve_is_exact_through_70_degrees(vgr_profile):
-  curve = _firmware_legacy_curve(vgr_profile)
-  for physical_angle in (0.0, 35.0, 69.999, FIRMWARE_LEGACY_BLEND_START_DEG):
-    linear_angle = vgr_profile.physical_to_linear(physical_angle)
-    for signed_linear in (linear_angle, -linear_angle):
-      expected = vgr_profile.linear_to_physical(signed_linear)
-      assert curve.desired_angle(signed_linear) == expected
-
-
-@pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
-def test_presolved_legacy_curve_is_exact_from_90_degrees(vgr_profile):
-  curve = _firmware_legacy_curve(vgr_profile)
-  endpoint = _endpoint_profile(vgr_profile)
-  for desired_angle in (FIRMWARE_LEGACY_BLEND_END_DEG, 120.0, endpoint.outer_angle, endpoint.outer_angle + 50.0):
-    ratio = dual_bp_ratio(desired_angle, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle)
-    linear_angle = endpoint.center_default * desired_angle / ratio
-    assert curve.desired_angle(linear_angle) == pytest.approx(desired_angle, abs=1e-10)
-    assert dual_bp_desired_angle(
-      linear_angle, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle,
-    ) == pytest.approx(desired_angle, abs=1e-10)
-
-
-@pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
-def test_firmware_legacy_handoff_is_c1(vgr_profile):
-  curve = _firmware_legacy_curve(vgr_profile)
-  step = 1e-3
-  for boundary in (curve.transition_start_linear, curve.transition_end_linear):
-    value = curve.desired_angle(boundary)
-    left_slope = (value - curve.desired_angle(boundary - step)) / step
-    right_slope = (curve.desired_angle(boundary + step) - value) / step
-    assert left_slope == pytest.approx(right_slope, rel=2e-4, abs=2e-4)
-
-
-def test_invalid_or_nonmonotonic_handoff_falls_back_to_raw_firmware():
-  vgr_profile = HONDA_VGR_PROFILES[0]
-  curve = FirmwareLegacySteerRatioCurve(vgr_profile, center_ratio=8.0, outer_ratio=25.0, outer_angle=250.0)
-  assert not curve.valid
-  for linear_angle in (50.0, 80.0, 150.0, -150.0):
-    assert curve.desired_angle(linear_angle) == pytest.approx(vgr_profile.linear_to_physical(linear_angle))
-
-
-@pytest.mark.parametrize("vgr_profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
-@pytest.mark.parametrize(("center_ratio", "outer_ratio"), (
-  (8.0, 8.0), (18.5, 8.0), (18.5, 18.5), (25.0, 12.0), (8.0, 25.0), (25.0, 25.0),
-))
-def test_configured_endpoint_range_is_monotonic_or_uses_exact_fallback(vgr_profile, center_ratio, outer_ratio):
-  endpoint = _endpoint_profile(vgr_profile)
-  curve = FirmwareLegacySteerRatioCurve(vgr_profile, center_ratio, outer_ratio, endpoint.outer_angle)
-  linear_samples = np.linspace(0.0, 500.0, 1001)
-  desired = np.array([curve.desired_angle(value) for value in linear_samples])
-  if curve.valid:
-    assert np.all(np.diff(desired) > 0.0)
-  else:
-    expected = np.array([vgr_profile.linear_to_physical(value) for value in linear_samples])
-    assert desired == pytest.approx(expected)
-
-
 class _VehicleModel:
   def __init__(self):
     self.sR = 0.0
@@ -258,17 +172,14 @@ class _VehicleModel:
     return curvature * self.sR
 
 
-def _pid_controller(*, legacy: bool, lane_change: bool = False):
+def _pid_controller(*, policy: SteerRatioModelPolicy, lane_change: bool = False):
   from openpilot.sunnypilot.nrdr.latcontrol_pid import NrdrLatControlPID
 
   controller = NrdrLatControlPID.__new__(NrdrLatControlPID)
   controller.sr_profile = get_steer_ratio_endpoint_profile("HONDA_CLARITY")
   controller.sr_values = list(controller.sr_profile.default_values)
   controller.vgr_profile = next(profile for profile in HONDA_VGR_PROFILES if profile.name == "Clarity TRW-A020")
-  controller.firmware_legacy_sr_curve = FirmwareLegacySteerRatioCurve(
-    controller.vgr_profile, controller.sr_values[0], controller.sr_values[-1], controller.sr_profile.outer_angle,
-  )
-  controller.legacy_dual_bp_sr = legacy
+  controller.model_sr_policy = policy
   controller.lane_change_endpoint_sr = True
   controller.lane_change_sr_fade = LaneChangeSteerRatioFade(dt=0.5)
   controller._lane_change_active = lambda: lane_change
@@ -277,10 +188,11 @@ def _pid_controller(*, legacy: bool, lane_change: bool = False):
   return controller
 
 
+@pytest.mark.parametrize("policy", (SteerRatioModelPolicy.PURE_FIRMWARE_VGR, SteerRatioModelPolicy.UNKNOWN))
 @pytest.mark.parametrize("measured_angle", (0.0, 175.0))
 @requires_controller
-def test_firmware_desired_angle_does_not_depend_on_measured_steering(measured_angle):
-  controller = _pid_controller(legacy=False)
+def test_firmware_desired_angle_does_not_depend_on_measured_steering(policy, measured_angle):
+  controller = _pid_controller(policy=policy)
   VM = _VehicleModel()
   CS = SimpleNamespace(steeringAngleDeg=measured_angle, vEgo=20.0)
   params = SimpleNamespace(roll=0.0, angleOffsetDeg=1.25)
@@ -293,27 +205,27 @@ def test_firmware_desired_angle_does_not_depend_on_measured_steering(measured_an
 
 
 @requires_controller
-def test_firmware_controller_uses_presolved_legacy_curve_above_handoff():
-  controller = _pid_controller(legacy=False)
-  endpoint = controller.sr_profile
-  expected_angle = 120.0
-  ratio = dual_bp_ratio(expected_angle, endpoint.center_default, endpoint.outer_default, endpoint.outer_angle)
-  linear_angle = endpoint.center_default * expected_angle / ratio
-  desired_curvature = -np.radians(linear_angle) / endpoint.center_default
+@pytest.mark.parametrize("linear_angle", (35.0, 80.0, 120.0, 220.0, -220.0))
+@pytest.mark.parametrize("policy", (SteerRatioModelPolicy.PURE_FIRMWARE_VGR, SteerRatioModelPolicy.UNKNOWN))
+def test_firmware_controller_uses_raw_eps_map_at_every_angle(policy, linear_angle):
+  controller = _pid_controller(policy=policy)
+  desired_curvature = -np.radians(linear_angle) / controller.sr_values[0]
+  VM = _VehicleModel()
+  VM.sR = 13.75
 
   desired_no_offset, desired_with_offset = controller._desired_angles(
-    _VehicleModel(),
-    SimpleNamespace(steeringAngleDeg=0.0, vEgo=20.0),
-    SimpleNamespace(roll=0.0, angleOffsetDeg=1.25),
-    desired_curvature,
+    VM, SimpleNamespace(steeringAngleDeg=175.0, vEgo=20.0),
+    SimpleNamespace(roll=0.0, angleOffsetDeg=1.25), desired_curvature,
   )
-  assert desired_no_offset == pytest.approx(expected_angle)
-  assert desired_with_offset == pytest.approx(expected_angle + 1.25)
+  expected = controller.vgr_profile.linear_to_physical(linear_angle)
+  assert desired_no_offset == pytest.approx(expected)
+  assert desired_with_offset == pytest.approx(expected + 1.25)
+  assert VM.sR == 13.75
 
 
 @requires_controller
 def test_legacy_desired_angle_retains_measured_angle_ratio_lookup():
-  controller = _pid_controller(legacy=True)
+  controller = _pid_controller(policy=SteerRatioModelPolicy.LEGACY_DUAL_BP)
   params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
 
   centered = controller._desired_angles(
@@ -325,17 +237,30 @@ def test_legacy_desired_angle_retains_measured_angle_ratio_lookup():
   assert centered != pytest.approx(off_center)
 
 
+@pytest.mark.parametrize("policy", (SteerRatioModelPolicy.PURE_FIRMWARE_VGR, SteerRatioModelPolicy.UNKNOWN))
 @requires_controller
-def test_unknown_firmware_profile_falls_back_to_legacy_ratio_lookup():
-  firmware_controller = _pid_controller(legacy=False)
-  firmware_controller.vgr_profile = None
-  legacy_controller = _pid_controller(legacy=True)
+def test_pure_or_unknown_model_without_exact_firmware_leaves_stock_vehicle_model_untouched(policy):
+  controller = _pid_controller(policy=policy)
+  controller.vgr_profile = None
   params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.75)
   CS = SimpleNamespace(steeringAngleDeg=175.0, vEgo=20.0)
+  VM = _VehicleModel()
+  VM.sR = 14.25
 
-  fallback = firmware_controller._desired_angles(_VehicleModel(), CS, params, desired_curvature=0.01)
-  legacy = legacy_controller._desired_angles(_VehicleModel(), CS, params, desired_curvature=0.01)
-  assert fallback == legacy
+  desired_no_offset, desired_with_offset = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
+  assert desired_no_offset == pytest.approx(np.degrees(-0.01 * 14.25))
+  assert desired_with_offset == pytest.approx(desired_no_offset + 0.75)
+  assert VM.sR == 14.25
+
+
+@requires_controller
+def test_legacy_model_uses_dual_bp_without_exact_firmware_map():
+  controller = _pid_controller(policy=SteerRatioModelPolicy.LEGACY_DUAL_BP)
+  controller.vgr_profile = None
+  VM = _VehicleModel()
+  CS = SimpleNamespace(steeringAngleDeg=250.0, vEgo=20.0)
+  controller._desired_angles(VM, CS, SimpleNamespace(roll=0.0, angleOffsetDeg=0.0), desired_curvature=0.01)
+  assert VM.sR == pytest.approx(controller.sr_values[-1])
 
 
 @requires_controller
@@ -352,11 +277,11 @@ def test_clarity_hybrid_preserves_trw_firmware_and_enters_firmware_mode():
   from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 
   settings = Params()
-  keys = ("NrdrHandcraftedLateralTune", "NrdrLegacyDualBpSteerRatio")
+  keys = ("NrdrHandcraftedLateralTune", "ModelManager_ActiveBundle")
   previous = {key: settings.get(key) for key in keys}
   try:
     settings.put_bool("NrdrHandcraftedLateralTune", False, block=True)
-    settings.put_bool("NrdrLegacyDualBpSteerRatio", False, block=True)
+    settings.remove("ModelManager_ActiveBundle")
     reset_live_params_for_tests()
 
     CarInterface = interfaces[HONDA.HONDA_CLARITY]
@@ -377,7 +302,8 @@ def test_clarity_hybrid_preserves_trw_firmware_and_enters_firmware_mode():
     assert controller is not None
     assert controller.vgr_profile is not None
     assert controller.vgr_profile.name == "Clarity TRW-A020"
-    assert not controller.legacy_dual_bp_sr
+    assert controller.model_sr_policy is SteerRatioModelPolicy.UNKNOWN
+    assert controller.firmware_vgr_selected
 
     VM = _VehicleModel()
     CS = SimpleNamespace(steeringAngleDeg=175.0, vEgo=20.0)
@@ -394,32 +320,23 @@ def test_clarity_hybrid_preserves_trw_firmware_and_enters_firmware_mode():
     reset_live_params_for_tests()
 
 
+@pytest.mark.parametrize("policy", (SteerRatioModelPolicy.PURE_FIRMWARE_VGR, SteerRatioModelPolicy.UNKNOWN))
 @requires_controller
-def test_lane_change_endpoint_starts_at_outer_then_fades_to_firmware_map():
-  controller = _pid_controller(legacy=False, lane_change=True)
+def test_pure_and_unknown_firmware_modes_never_apply_lane_change_ratio_fade(policy):
+  controller = _pid_controller(policy=policy, lane_change=True)
   VM = _VehicleModel()
   CS = SimpleNamespace(steeringAngleDeg=80.0, vEgo=20.0)
   params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
-  endpoint_angle, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
-  first_fade_angle, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
-  second_fade_angle, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
-  normal_angle, _ = controller._desired_angles(VM, CS, params, desired_curvature=0.01)
-
-  normal_controller = _pid_controller(legacy=False)
-  expected_normal, _ = normal_controller._desired_angles(
-    _VehicleModel(), CS, params, desired_curvature=0.01,
-  )
-  expected_endpoint = np.degrees(-0.01 * controller.sr_values[-1])
-
-  assert endpoint_angle == pytest.approx(expected_endpoint)
-  assert first_fade_angle == pytest.approx(expected_normal + (2.0 / 3.0) * (expected_endpoint - expected_normal))
-  assert second_fade_angle == pytest.approx(expected_normal + (1.0 / 3.0) * (expected_endpoint - expected_normal))
-  assert normal_angle == pytest.approx(expected_normal)
+  values = [controller._desired_angles(VM, CS, params, desired_curvature=0.01)[0] for _ in range(4)]
+  linear_angle = np.degrees(-0.01 * controller.sr_values[0])
+  expected = controller.vgr_profile.linear_to_physical(linear_angle)
+  assert values == pytest.approx([expected] * 4)
+  assert controller.lane_change_sr_fade._elapsed == controller.lane_change_sr_fade.duration
 
 
 @requires_controller
 def test_lane_change_fade_continues_through_finishing_and_rearms_only_for_a_new_start():
-  controller = _pid_controller(legacy=False, lane_change=True)
+  controller = _pid_controller(policy=SteerRatioModelPolicy.LEGACY_DUAL_BP, lane_change=True)
   CS = SimpleNamespace(steeringAngleDeg=80.0, vEgo=20.0)
   params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
   expected_endpoint = np.degrees(-0.01 * controller.sr_values[-1])
@@ -431,7 +348,7 @@ def test_lane_change_fade_continues_through_finishing_and_rearms_only_for_a_new_
   controller._lane_change_starting_for_test = True
   retriggered, _ = controller._desired_angles(_VehicleModel(), CS, params, desired_curvature=0.01)
 
-  normal_controller = _pid_controller(legacy=False)
+  normal_controller = _pid_controller(policy=SteerRatioModelPolicy.LEGACY_DUAL_BP)
   expected_normal, _ = normal_controller._desired_angles(
     _VehicleModel(), CS, params, desired_curvature=0.01,
   )
@@ -443,7 +360,7 @@ def test_lane_change_fade_continues_through_finishing_and_rearms_only_for_a_new_
 
 @requires_controller
 def test_lane_change_fade_preserves_legacy_dual_bp_normal_ratio():
-  controller = _pid_controller(legacy=True, lane_change=True)
+  controller = _pid_controller(policy=SteerRatioModelPolicy.LEGACY_DUAL_BP, lane_change=True)
   VM = _VehicleModel()
   CS = SimpleNamespace(steeringAngleDeg=80.0, vEgo=20.0)
   params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
@@ -465,14 +382,14 @@ def test_lane_change_endpoint_disabled_and_unknown_profile_are_noops():
   CS = SimpleNamespace(steeringAngleDeg=80.0, vEgo=20.0)
   params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
 
-  disabled = _pid_controller(legacy=True, lane_change=True)
+  disabled = _pid_controller(policy=SteerRatioModelPolicy.LEGACY_DUAL_BP, lane_change=True)
   disabled.lane_change_endpoint_sr = False
   disabled_vm = _VehicleModel()
   disabled_angle, _ = disabled._desired_angles(disabled_vm, CS, params, desired_curvature=0.01)
   normal_ratio = float(np.interp(abs(CS.steeringAngleDeg), disabled.sr_profile.breakpoints, disabled.sr_values))
   assert disabled_angle == pytest.approx(np.degrees(-0.01 * normal_ratio))
 
-  unknown = _pid_controller(legacy=True, lane_change=True)
+  unknown = _pid_controller(policy=SteerRatioModelPolicy.LEGACY_DUAL_BP, lane_change=True)
   unknown.sr_profile = None
   unknown_vm = _VehicleModel()
   unknown_vm.sR = 14.0

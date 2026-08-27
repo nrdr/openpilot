@@ -131,7 +131,6 @@ HANDCRAFTED_EXTERNAL_PARAM_KEYS = frozenset(("LagdToggle", "LagdToggleDelay"))
 
 HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
   (NrdrParamKey.NRDR_STAR_PILOT_PID.value, False),
-  (NrdrParamKey.NRDR_LEGACY_DUAL_BP_STEER_RATIO.value, False),
   (NrdrParamKey.NRDR_LANE_CHANGE_ENDPOINT_STEER_RATIO.value, True),
   (NrdrParamKey.NRDR_LEARN_STEER_RATIO.value, False),
   (NrdrParamKey.NRDR_LEARN_STIFFNESS.value, True),
@@ -181,7 +180,7 @@ def _build_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
   return HandcraftedLateralProfile(
     name="Honda Clarity-Derived Road-Tested 2026-08-21",
     fingerprint=fingerprint,
-    version=13,
+    version=14,
     values=steer_ratio.param_values + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
   )
 

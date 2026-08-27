@@ -312,9 +312,9 @@ class LateralTuningLayout(Widget):
     self._handcrafted_tune = toggle_item_sp(
       title=lambda: tr("Handcrafted Lateral Tuning"),
       description=lambda: tr("Off by default. Enable this to load the Clarity-derived, road-tested PID profile with this vehicle's own steering geometry: " +
-                             "exact firmware steering through 70°, a smooth handoff to dual-BP by 90°, predictive stiction, and " +
-                             "NNLC off. Cars without an exact firmware map safely use dual-BP. Conflicting tuning controls are " +
-                             "locked while enabled."),
+                             "exact Pop/Off-Policy artifacts use legacy dual-BP, while exact Deep-RL artifacts use the raw firmware " +
+                             "VGR at every angle. Unclassified models use raw firmware VGR when mapped or stock geometry when not. " +
+                             "Conflicting tuning controls are locked while enabled."),
       param="NrdrHandcraftedLateralTune",
     )
 

@@ -62,7 +62,7 @@ class TestParamSnapshots(unittest.TestCase):
     self.assertEqual(len(CONTROL_GROUPS), 8 + len(expected))
     keys = [key for group in CONTROL_GROUPS for key in group.keys]
     self.assertEqual(len(keys), len(set(keys)))
-    self.assertEqual(len(keys), 52)
+    self.assertEqual(len(keys), 51)
 
   def test_snapshot_keeps_legacy_get_and_bool_semantics(self):
     snapshot = ParamSnapshot(4, MappingProxyType({"Bytes": b"value", "False": b" FALSE ", "True": "yes"}))

@@ -13,6 +13,7 @@ the same commit so the bump shows up in code review.
 from __future__ import annotations
 
 
+from openpilot.common.params import Params
 from openpilot.sunnypilot.sunnylink.capabilities import (
   CAPABILITY_DEFAULTS,
   CAPABILITY_FIELDS,
@@ -29,6 +30,14 @@ LATEST_KNOWN = max(KNOWN_PROTOCOL_VERSIONS)
 
 def caps():
   return generate_capabilities()
+
+
+def params():
+  return Params()
+
+
+def _active_bundle(artifact_sha256: str) -> dict:
+  return {"models": [{"artifact": {"downloadUri": {"sha256": artifact_sha256}}}]}
 
 
 class TestProtocolVersion(OpenpilotTestCase):
@@ -69,6 +78,30 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
   def test_handcrafted_lateral_profile_default_false(self, caps):
     assert caps["has_handcrafted_lateral_profile"] is False
 
+  def test_nrdr_steer_ratio_policy_fields_present(self):
+    assert "nrdr_steer_ratio_policy" in CAPABILITY_FIELDS
+    assert "nrdr_firmware_vgr_available" in CAPABILITY_FIELDS
+
+  def test_nrdr_steer_ratio_policy_defaults_are_conservative(self, caps):
+    assert caps["nrdr_steer_ratio_policy"] == "unknown"
+    assert caps["nrdr_firmware_vgr_available"] is False
+
+  def test_pop_v2_bundle_emits_legacy_policy(self, params):
+    params.put("ModelManager_ActiveBundle", _active_bundle(
+      "c48899574c1303e47ca2a6f80113876ca5eb749c4a75c89b53cc8029bb3bb710",
+    ))
+    model_caps = generate_capabilities(params)
+    assert model_caps["nrdr_steer_ratio_policy"] == "legacy_dual_bp"
+    assert model_caps["nrdr_firmware_vgr_available"] is False
+
+  def test_tsfdo_bundle_emits_pure_firmware_policy(self, params):
+    params.put("ModelManager_ActiveBundle", _active_bundle(
+      "92d06467e4de97c40ffdc366e385a4f5897f36fc8ea632bd9bed113a3083fea8",
+    ))
+    model_caps = generate_capabilities(params)
+    assert model_caps["nrdr_steer_ratio_policy"] == "pure_firmware_vgr"
+    assert model_caps["nrdr_firmware_vgr_available"] is False
+
   def test_subaru_has_sng_field_present(self):
     assert "subaru_has_sng" in CAPABILITY_FIELDS
 
@@ -95,3 +128,4 @@ class TestCapabilitiesShape(OpenpilotTestCase):
     assert isinstance(caps["brand"], str)
     assert isinstance(caps["steer_control_type"], str)
     assert isinstance(caps["device_type"], str)
+    assert isinstance(caps["nrdr_steer_ratio_policy"], str)

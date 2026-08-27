@@ -32,6 +32,8 @@ import sys
 
 import numpy as np
 
+from openpilot.sunnypilot.nrdr.model_policy import SteerRatioModelPolicy, classify_steer_ratio_model
+
 
 MPS_TO_MPH = 2.236936
 MIN_LANE_PROB = 0.60
@@ -55,7 +57,7 @@ RELEVANT_PARAMS = (
   "NrdrLearnAngleOffset",
   "NrdrLearnSteerRatio",
   "NrdrLearnStiffness",
-  "NrdrLegacyDualBpSteerRatio",
+  "ModelManager_ActiveBundle",
   "NrdrLaneChangeEndpointSteerRatio",
   "NrdrSteerRatioCenterClarity",
   "NrdrSteerRatioOuterClarity",
@@ -200,6 +202,14 @@ def param_bool(settings: dict[str, str], key: str) -> bool | None:
   return settings[key].strip().lower() not in ("", "0", "false", "off", "no")
 
 
+def logged_steer_ratio_model_policy(raw_bundle: str | None) -> SteerRatioModelPolicy:
+  try:
+    bundle = json.loads(raw_bundle) if raw_bundle else None
+  except (json.JSONDecodeError, TypeError):
+    bundle = None
+  return classify_steer_ratio_model(bundle)
+
+
 @dataclass
 class Context:
   route: str
@@ -209,12 +219,13 @@ class Context:
   steer_ratio: float = math.nan
   steer_actuator_delay: float = math.nan
   eps_firmware: str = "unknown"
+  model_sr_policy: SteerRatioModelPolicy = SteerRatioModelPolicy.UNKNOWN
   settings: dict[str, str] = field(default_factory=dict)
 
   @property
   def cohort(self) -> str:
     settings = ",".join(f"{key}={value}" for key, value in sorted(self.settings.items()))
-    return f"{self.fingerprint}|{self.branch}@{self.commit[:12]}|eps={self.eps_firmware}|{settings}"
+    return f"{self.fingerprint}|{self.branch}@{self.commit[:12]}|eps={self.eps_firmware}|sr={self.model_sr_policy.value}|{settings}"
 
 
 @dataclass(frozen=True)
@@ -445,7 +456,9 @@ def collect(sources: Sequence[str], log_kind: str = "auto", min_speed_mph: float
           init = msg.initData
           context.branch = str(init.gitBranch or context.branch)
           context.commit = str(init.gitSrcCommit or init.gitCommit or context.commit)
-          context.settings.update(decode_params(init.params.entries))
+          decoded_settings = decode_params(init.params.entries)
+          context.model_sr_policy = logged_steer_ratio_model_policy(decoded_settings.pop("ModelManager_ActiveBundle", None))
+          context.settings.update(decoded_settings)
 
         elif which == "carParams":
           car_params = msg.carParams
@@ -538,7 +551,7 @@ def collect(sources: Sequence[str], log_kind: str = "auto", min_speed_mph: float
           nnlc_enabled = param_bool(context.settings, "NeuralNetworkLateralControl")
           firmware_vgr_pid_only = (
             context.fingerprint == "HONDA_CLARITY"
-            and param_bool(context.settings, "NrdrLegacyDualBpSteerRatio") is False
+            and context.model_sr_policy is not SteerRatioModelPolicy.LEGACY_DUAL_BP
             and "39990-TRW-A020" in context.eps_firmware.replace(",", "-")
           )
           reading = extract_controller_reading(
@@ -923,6 +936,7 @@ def build_report(result: ScanResult, min_samples: int = 30,
       "branch": context.branch if context else "unknown",
       "commit": context.commit if context else "unknown",
       "eps_firmware": context.eps_firmware if context else "unknown",
+      "model_sr_policy": context.model_sr_policy.value if context else SteerRatioModelPolicy.UNKNOWN.value,
       "settings": context.settings if context else {},
       "configured_steer_ratio": finite_median(result.configured_steer_ratios[cohort]),
       "learned_steer_ratio_median": finite_median(result.learned_steer_ratios[cohort]),

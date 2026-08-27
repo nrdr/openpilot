@@ -34,8 +34,8 @@ class VehicleModelLearningLayout(Widget):
     self._learn_steer_ratio = toggle_item_sp(
       param="NrdrLearnSteerRatio",
       title=lambda: tr("Learn Steer Ratio (Auto)"),
-      description=lambda: tr("On uses the learned scalar on normal cars. Supported mapped Hondas use their configured " +
-                             "On-Center anchor in both legacy and firmware-derived modes."),
+      description=lambda: tr("On uses the learned scalar outside NRDR's active steering policy. A mapped Honda in raw-firmware " +
+                             "mode keeps its configured On-Center anchor; model-locked legacy artifacts use the configured curve."),
       initial_state=False,
     )
     self._lp_stiffness = ListItemSP(

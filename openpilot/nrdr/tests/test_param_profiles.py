@@ -37,7 +37,6 @@ EXPECTED_HANDCRAFTED_FINGERPRINTS = (
 )
 
 EXPECTED_REGISTRY_OVERRIDES = {
-  "NrdrLegacyDualBpSteerRatio",
   "NrdrLatRateDamping",
   "HondaCenterScale",
   "NrdrLatStiction",
@@ -102,7 +101,7 @@ class TestParamProfiles(unittest.TestCase):
   def test_profile_shape_order_types_and_ownership(self) -> None:
     self.assertEqual(HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS, EXPECTED_HANDCRAFTED_FINGERPRINTS)
     self.assertEqual(tuple(HANDCRAFTED_LATERAL_PROFILES), EXPECTED_HANDCRAFTED_FINGERPRINTS)
-    self.assertEqual(len(HONDA_TORQUE_MOD_HANDCRAFTED_VALUES), 41)
+    self.assertEqual(len(HONDA_TORQUE_MOD_HANDCRAFTED_VALUES), 40)
     self.assertEqual(HANDCRAFTED_EXTERNAL_PARAM_KEYS, frozenset(BORROWED_DEFAULTS))
 
     all_values = {
@@ -110,31 +109,31 @@ class TestParamProfiles(unittest.TestCase):
       for profile in HANDCRAFTED_LATERAL_PROFILES.values()
       for key, value in profile.values
     }
-    self.assertEqual(len(all_values), 51)
+    self.assertEqual(len(all_values), 50)
     self.assertTrue(all(type(key) is str for key in all_values))
     self.assertEqual(
       Counter("bool" if isinstance(value, bool) else type(value).__name__ for value in all_values.values()),
-      Counter({"bool": 14, "int": 17, "float": 20}),
+      Counter({"bool": 13, "int": 17, "float": 20}),
     )
 
     owned_keys = set(all_values) - HANDCRAFTED_EXTERNAL_PARAM_KEYS
-    self.assertEqual(len(owned_keys), 49)
+    self.assertEqual(len(owned_keys), 48)
     self.assertTrue(owned_keys <= {key.value for key in NrdrParamKey})
     self.assertTrue(all(PARAM_SPECS_BY_KEY[key].flags == (ParamFlag.PERSISTENT, ParamFlag.BACKUP)
                         for key in owned_keys))
     self.assertEqual(
       Counter(PARAM_SPECS_BY_KEY[key].owner for key in owned_keys),
-      Counter({ParamOwner.LATERAL: 35, ParamOwner.HONDA: 14}),
+      Counter({ParamOwner.LATERAL: 34, ParamOwner.HONDA: 14}),
     )
 
     for fingerprint, profile in HANDCRAFTED_LATERAL_PROFILES.items():
       endpoint = get_steer_ratio_endpoint_profile(fingerprint)
       self.assertIsNotNone(endpoint)
-      self.assertEqual(len(profile.values), 43)
-      self.assertEqual(len(dict(profile.values)), 43)
+      self.assertEqual(len(profile.values), 42)
+      self.assertEqual(len(dict(profile.values)), 42)
       self.assertEqual(profile.values[:2], endpoint.param_values)
       self.assertEqual(profile.values[2:], HONDA_TORQUE_MOD_HANDCRAFTED_VALUES)
-      self.assertEqual(profile.version, 13)
+      self.assertEqual(profile.version, 14)
       self.assertEqual(profile.fingerprint, fingerprint)
 
     self.assertIs(CLARITY_ROAD_TESTED_2026_08_21, HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"])
@@ -161,7 +160,7 @@ class TestParamProfiles(unittest.TestCase):
 
     changed = apply_handcrafted_lateral_profile("HONDA_CLARITY", params, block=True)
     self.assertEqual(changed, expected_changed)
-    self.assertEqual(len(changed), 17)
+    self.assertEqual(len(changed), 16)
     self.assertEqual(set(changed), EXPECTED_REGISTRY_OVERRIDES | HANDCRAFTED_EXTERNAL_PARAM_KEYS)
     self.assertEqual([write[1] for write in params.writes], changed)
     self.assertTrue(all(write[3] is True for write in params.writes))
@@ -172,7 +171,7 @@ class TestParamProfiles(unittest.TestCase):
       self.assertEqual(value, values[key])
 
     self.assertEqual(apply_handcrafted_lateral_profile("HONDA_CLARITY", params, block=True), [])
-    self.assertEqual(len(params.writes), 17)
+    self.assertEqual(len(params.writes), 16)
 
   def test_legacy_modules_reexport_the_canonical_objects(self) -> None:
     legacy_handcrafted = import_module("openpilot.sunnypilot.nrdr.handcrafted_lateral")
