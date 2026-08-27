@@ -2,6 +2,7 @@ import ast
 from importlib import import_module
 from pathlib import Path
 import sys
+from tokenize import open as open_python_source
 import unittest
 
 import openpilot.nrdr
@@ -260,7 +261,9 @@ class TestPackageBoundaries(unittest.TestCase):
     for path in (repository_root / "openpilot").rglob("*.py"):
       if path.is_relative_to(legacy_dir) or path.name.startswith("test_") or {"test", "tests"} & set(path.parts):
         continue
-      if "openpilot.sunnypilot.nrdr" in path.read_text():
+      with open_python_source(path) as source_file:
+        source = source_file.read()
+      if "openpilot.sunnypilot.nrdr" in source:
         offenders.append(str(path.relative_to(repository_root)))
     self.assertEqual(offenders, [])
 
