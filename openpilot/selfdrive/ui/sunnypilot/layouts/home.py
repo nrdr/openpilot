@@ -6,7 +6,7 @@ See the LICENSE.md file in the root directory for more details.
 """
 import pyray as rl
 from openpilot.selfdrive.ui.layouts.home import HomeLayout, HomeLayoutState, HEAD_BUTTON_FONT_SIZE, SPACING
-from openpilot.sunnypilot.nrdr.home import NrdrHomeLayout
+from openpilot.nrdr.ui.home.layout import NrdrHomeLayout
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.multilang import tr, trn

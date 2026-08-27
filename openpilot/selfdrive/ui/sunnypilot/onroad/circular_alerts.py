@@ -12,7 +12,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiState
 from openpilot.system.ui.lib.application import gui_app, FontWeight, FONT_SCALE
 from openpilot.system.ui.lib.text_measure import measure_text_cached
-from openpilot.sunnypilot.nrdr.circular_alerts import StandstillLatch
+from openpilot.nrdr.ui.onroad.circular_alerts import StandstillLatch
 
 
 class CircularAlertsRenderer:

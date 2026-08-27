@@ -8,7 +8,7 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.sunnypilot.onroad.blind_spot_indicators import BlindSpotIndicators
-from openpilot.sunnypilot.nrdr.mici_hud import NrdrHudRenderer
+from openpilot.nrdr.ui.onroad.mici_hud import NrdrHudRenderer
 
 
 class HudRendererSP(NrdrHudRenderer, HudRenderer):

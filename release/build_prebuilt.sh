@@ -242,10 +242,10 @@ apply_clean_overlay() {
   replace_once "$BUILD_DIR/openpilot/system/athena/athenad.py" \
     "os.getenv('ATHENA_HOST', 'wss://athena.konik.ai')" \
     "os.getenv('ATHENA_HOST', 'wss://athena.comma.ai')"
-  replace_once "$BUILD_DIR/openpilot/sunnypilot/nrdr/home.py" \
+  replace_once "$BUILD_DIR/openpilot/nrdr/ui/home/layout.py" \
     "Your drives will upload to stable.konik.ai." \
     "Your drives will upload to connect.comma.ai."
-  replace_once "$BUILD_DIR/openpilot/sunnypilot/nrdr/mici_home.py" \
+  replace_once "$BUILD_DIR/openpilot/nrdr/ui/home/mici.py" \
     'home._version_label.set_text("stable.konik.ai")' \
     'home._version_label.set_text("connect.comma.ai")'
   replace_once "$BUILD_DIR/openpilot/nrdr/ui/settings/party_tricks.py" \
@@ -256,8 +256,8 @@ apply_clean_overlay() {
     die "clean launch files still select the konik backend"
   grep -Fq "https://api.commadotai.com" "$BUILD_DIR/openpilot/common/api/comma_connect.py"
   grep -Fq "wss://athena.comma.ai" "$BUILD_DIR/openpilot/system/athena/athenad.py"
-  grep -Fq "connect.comma.ai" "$BUILD_DIR/openpilot/sunnypilot/nrdr/home.py"
-  grep -Fq "connect.comma.ai" "$BUILD_DIR/openpilot/sunnypilot/nrdr/mici_home.py"
+  grep -Fq "connect.comma.ai" "$BUILD_DIR/openpilot/nrdr/ui/home/layout.py"
+  grep -Fq "connect.comma.ai" "$BUILD_DIR/openpilot/nrdr/ui/home/mici.py"
   python3 -m py_compile \
     "$target/events.py" \
     "$target/events_sp.py" \

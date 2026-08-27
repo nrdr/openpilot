@@ -5,7 +5,7 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 from openpilot.selfdrive.ui.mici.layouts.home import MiciHomeLayout
-from openpilot.sunnypilot.nrdr.mici_home import NrdrMiciHome
+from openpilot.nrdr.ui.home.mici import NrdrMiciHome
 from openpilot.system.ui.lib.application import FontWeight
 from openpilot.system.ui.widgets.label import UnifiedLabel
 

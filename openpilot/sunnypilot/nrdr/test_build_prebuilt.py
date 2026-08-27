@@ -540,8 +540,8 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
     Path("launch_env.sh"),
     Path("openpilot/common/api/comma_connect.py"),
     Path("openpilot/system/athena/athenad.py"),
-    Path("openpilot/sunnypilot/nrdr/home.py"),
-    Path("openpilot/sunnypilot/nrdr/mici_home.py"),
+    Path("openpilot/nrdr/ui/home/layout.py"),
+    Path("openpilot/nrdr/ui/home/mici.py"),
     Path("openpilot/nrdr/ui/settings/party_tricks.py"),
   )
   for relative in overlay_targets:
@@ -574,11 +574,11 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
   assert "https://api.commadotai.com" in (build / "openpilot/common/api/comma_connect.py").read_text(encoding="utf-8")
   assert "wss://athena.comma.ai" in (build / "openpilot/system/athena/athenad.py").read_text(encoding="utf-8")
 
-  home = (build / "openpilot/sunnypilot/nrdr/home.py").read_text(encoding="utf-8")
+  home = (build / "openpilot/nrdr/ui/home/layout.py").read_text(encoding="utf-8")
   assert "Your drives will upload to connect.comma.ai." in home
   assert "Your drives will upload to stable.konik.ai." not in home
 
-  mici_home = (build / "openpilot/sunnypilot/nrdr/mici_home.py").read_text(encoding="utf-8")
+  mici_home = (build / "openpilot/nrdr/ui/home/mici.py").read_text(encoding="utf-8")
   assert 'home._version_label.set_text("connect.comma.ai")' in mici_home
   assert 'home._version_label.set_text("stable.konik.ai")' not in mici_home
 
