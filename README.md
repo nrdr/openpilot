@@ -20,10 +20,12 @@ Linearized EPS firmware alters the steering torque response characteristics. As 
 
 ## Branches
 
-- **`nrdr-development`** — the main dev branch; all work lands here first (source, not pre-compiled).
-- **`nrdr-staging-<DATE>`** — pre-compiled snapshots cut from `nrdr-development`. Dated so you can pin a known-good build.
-- **`nrdr-nightly`** — always tracks the latest `nrdr-staging`. Run this if you just want the newest pre-compiled build.
-- **`nrdr-clean`** — compliance build that follows all the rules needed for valid standing with comma and their servers.
+- **`nrdr-architecture-development`** — architecture/QC branch. NRDR-owned code is isolated under `openpilot/nrdr`; it should remain behaviorally aligned with `nrdr-development-new` except for this ownership and file-layout work.
+- **`nrdr-development-new`** — current source-development line with the same active NRDR behavior and tuning, without the architecture rewrite. It may replace `nrdr-development` later, but has not replaced it yet.
+- **`nrdr-development`** — existing development branch retained during the transition.
+- **`nrdr-bare`** — lightly maintained comma-master baseline without the NRDR feature set.
+- **`nrdr-bare-only-tune`** — comma-master baseline carrying only the intended tune delta.
+- **`nrdr-nightly`** and **`nrdr-clean`** — tested release branches with validated tuning. Both are currently held while the next update is verified; development or architecture commits do not automatically make them releases.
 
 > **Factory reset whenever you switch between a non-clean and a clean branch** — otherwise old logs can carry over and defeat the entire point of the clean branch. Also factory reset if you leave the nrdr fork family completely.
 
@@ -42,9 +44,9 @@ Additional EPS firmware variants may be supported as they are validated.
 
 ## Installation
 
-```
-installer.comma.ai/nrdr/mvl-staging-03.03.2026
-```
+The development and architecture branches are not end-user release channels.
+Use an installer only when a current `nrdr-nightly` or `nrdr-clean` release is
+announced; the previously documented March staging installer is retired.
 
 ---
 
