@@ -9,13 +9,15 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-BUILD_SCRIPT = REPO_ROOT / "release" / "build_prebuilt.sh"
-CLEAN_OVERLAY = REPO_ROOT / "release" / "clean_overlay"
+BUILD_LAUNCHER = REPO_ROOT / "release" / "build_prebuilt.sh"
+BUILD_SCRIPT = REPO_ROOT / "openpilot" / "nrdr" / "tools" / "release" / "build_prebuilt.sh"
+CLEAN_OVERLAY = BUILD_SCRIPT.parent / "clean_overlay"
 CLEAN_OVERLAY_TARGETS = {
   "events.py": Path("openpilot/nrdr/hooks/events.py"),
   "events_sp.py": Path("openpilot/nrdr/hooks/events_sp.py"),
   "driver_monitoring.py": Path("openpilot/nrdr/hooks/driver_monitoring.py"),
   "mads.py": Path("openpilot/nrdr/features/driver_policy/mads.py"),
+  "backend_env.sh": Path("openpilot/nrdr/config/backend_env.sh"),
 }
 
 
@@ -152,11 +154,23 @@ def make_source(tmp_path: Path, entries: list[str], existing_entries: list[str])
   source = tmp_path / "openpilot"
   release_dir = source / "release"
   release_dir.mkdir(parents=True)
-  shutil.copy2(BUILD_SCRIPT, release_dir / BUILD_SCRIPT.name)
-  make_executable(release_dir / BUILD_SCRIPT.name)
+  shutil.copy2(BUILD_LAUNCHER, release_dir / BUILD_LAUNCHER.name)
+  make_executable(release_dir / BUILD_LAUNCHER.name)
+
+  canonical_release = source / "openpilot" / "nrdr" / "tools" / "release"
+  canonical_release.mkdir(parents=True)
+  shutil.copy2(BUILD_SCRIPT, canonical_release / BUILD_SCRIPT.name)
+  make_executable(canonical_release / BUILD_SCRIPT.name)
+
+  backend_env = source / "openpilot" / "nrdr" / "config" / "backend_env.sh"
+  backend_env.parent.mkdir(parents=True)
+  shutil.copy2(REPO_ROOT / "openpilot" / "nrdr" / "config" / "backend_env.sh", backend_env)
   required_entries = [
     "tools/release/release_files.py",
     "openpilot/sunnypilot/common/version.h",
+    "release/build_prebuilt.sh",
+    "openpilot/nrdr/tools/release/build_prebuilt.sh",
+    "openpilot/nrdr/config/backend_env.sh",
   ]
   write_manifest(source, [*required_entries, *entries])
 
@@ -167,10 +181,11 @@ def make_source(tmp_path: Path, entries: list[str], existing_entries: list[str])
     directory.mkdir(parents=True)
     (directory / ".fixture").write_text("fixture\n", encoding="utf-8")
 
-  clean_overlay = release_dir / "clean_overlay"
+  clean_overlay = canonical_release / "clean_overlay"
   clean_overlay.mkdir()
   for name in ("events.py", "events_sp.py", "driver_monitoring.py", "mads.py"):
     (clean_overlay / name).write_text("# clean overlay fixture\n", encoding="utf-8")
+  shutil.copy2(CLEAN_OVERLAY / "backend_env.sh", clean_overlay / "backend_env.sh")
 
   # A deliberately broken copy at the pre-migration location proves preflight
   # uses tools/release/release_files.py, not release/release_files.py.
@@ -214,6 +229,22 @@ def run_builder(script: Path, *, source: Path, build: Path, **extra_env: str) ->
   )
 
 
+def source_backend_environment(launch_env: Path) -> subprocess.CompletedProcess[str]:
+  assert BASH is not None
+  return subprocess.run(
+    [
+      BASH,
+      "-c",
+      'unset API_HOST ATHENA_HOST; source "$1"; printf "%s\\n%s\\n" "${API_HOST-}" "${ATHENA_HOST-}"',
+      "bash",
+      bash_path(launch_env),
+    ],
+    capture_output=True,
+    text=True,
+    timeout=10,
+  )
+
+
 def result_details(result: subprocess.CompletedProcess[str]) -> str:
   return f"exit={result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
@@ -224,6 +255,77 @@ def assert_repo_unchanged(source: Path, original_head: str) -> None:
   assert git("branch", "--show-current", cwd=source).stdout.strip() == "main"
   assert git("remote", "get-url", "origin", cwd=source).stdout.strip() == "https://example.invalid/original.git"
   assert git("status", "--porcelain", cwd=source).stdout == ""
+
+
+def test_release_shell_entry_points_and_backend_fragments_parse() -> None:
+  scripts = (
+    BUILD_LAUNCHER,
+    BUILD_SCRIPT,
+    REPO_ROOT / "launch_env.sh",
+    REPO_ROOT / "openpilot" / "nrdr" / "config" / "backend_env.sh",
+    CLEAN_OVERLAY / "backend_env.sh",
+  )
+  assert BASH is not None
+  result = subprocess.run(
+    [BASH, "-n", *(bash_path(script) for script in scripts)],
+    capture_output=True,
+    text=True,
+    timeout=10,
+  )
+  assert result.returncode == 0, result_details(result)
+
+
+def test_launch_env_selects_nrdr_backend_through_owned_fragment() -> None:
+  result = source_backend_environment(REPO_ROOT / "launch_env.sh")
+
+  assert result.returncode == 0, result_details(result)
+  assert result.stdout.splitlines() == ["https://api.konik.ai", "wss://athena.konik.ai"]
+
+
+def test_root_launcher_and_canonical_builder_have_preflight_parity(tmp_path: Path) -> None:
+  source = make_source(tmp_path, [], [])
+  original_head = init_repo(source)
+  build = tmp_path / "prebuilt-build"
+  canonical = source / "openpilot" / "nrdr" / "tools" / "release" / "build_prebuilt.sh"
+  launcher = source / "release" / "build_prebuilt.sh"
+
+  direct_result = run_builder(canonical, source=source, build=build, PREBUILT_PREFLIGHT_ONLY="1")
+  launcher_result = run_builder(launcher, source=source, build=build, PREBUILT_PREFLIGHT_ONLY="1")
+
+  assert direct_result.returncode == 0, result_details(direct_result)
+  assert launcher_result.returncode == 0, result_details(launcher_result)
+  assert launcher_result.stdout == direct_result.stdout
+  assert launcher_result.stderr == direct_result.stderr
+  assert not build.exists()
+  assert_repo_unchanged(source, original_head)
+
+
+@pytest.mark.parametrize("entry_point", [BUILD_LAUNCHER, BUILD_SCRIPT], ids=["launcher", "canonical"])
+def test_entry_points_resolve_repository_without_source_override(tmp_path: Path, entry_point: Path) -> None:
+  assert BASH is not None
+  build = tmp_path / "prebuilt-build"
+  environment = os.environ.copy()
+  environment.pop("SOURCE_DIR", None)
+  environment.update({
+    "BUILD_DIR": bash_path(build),
+    "SCONS_BIN": bash_path(Path(BASH)),
+    "PREBUILT_PREFLIGHT_ONLY": "1",
+    "PUSH": "0",
+    "REBOOT_WHEN_DONE": "0",
+  })
+
+  result = subprocess.run(
+    [BASH, bash_path(entry_point)],
+    cwd=REPO_ROOT,
+    env=environment,
+    capture_output=True,
+    text=True,
+    timeout=30,
+  )
+
+  assert result.returncode == 0, result_details(result)
+  assert "PREBUILT_PREFLIGHT_ONLY=1: no files changed" in result.stdout
+  assert not build.exists()
 
 
 def test_runtime_linkage_check_rejects_locationd_runpath_into_temporary_build_tree(tmp_path: Path) -> None:
@@ -542,7 +644,6 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
   build.mkdir()
 
   overlay_targets = (
-    Path("launch_openpilot.sh"),
     Path("launch_env.sh"),
     Path("openpilot/common/api/comma_connect.py"),
     Path("openpilot/system/athena/athenad.py"),
@@ -555,6 +656,13 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
 
   for relative in CLEAN_OVERLAY_TARGETS.values():
     copy_file_from_source(relative, build)
+
+  generic_files = (
+    Path("launch_env.sh"),
+    Path("openpilot/common/api/comma_connect.py"),
+    Path("openpilot/system/athena/athenad.py"),
+  )
+  generic_bytes = {relative: (build / relative).read_bytes() for relative in generic_files}
 
   original_head = init_repo(build)
   result = run_builder(
@@ -575,10 +683,15 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
     assert (build / relative).read_bytes() == (CLEAN_OVERLAY / name).read_bytes()
   assert not list((build / "openpilot" / "nrdr").rglob("__pycache__"))
 
-  assert "konik.ai" not in (build / "launch_openpilot.sh").read_text(encoding="utf-8")
-  assert "konik.ai" not in (build / "launch_env.sh").read_text(encoding="utf-8")
+  for relative, contents in generic_bytes.items():
+    assert (build / relative).read_bytes() == contents
+  assert "openpilot/nrdr/config/backend_env.sh" in (build / "launch_env.sh").read_text(encoding="utf-8")
+  assert "konik.ai" not in (build / "openpilot/nrdr/config/backend_env.sh").read_text(encoding="utf-8")
   assert "https://api.commadotai.com" in (build / "openpilot/common/api/comma_connect.py").read_text(encoding="utf-8")
   assert "wss://athena.comma.ai" in (build / "openpilot/system/athena/athenad.py").read_text(encoding="utf-8")
+  clean_environment = source_backend_environment(build / "launch_env.sh")
+  assert clean_environment.returncode == 0, result_details(clean_environment)
+  assert clean_environment.stdout.splitlines() == ["", ""]
 
   home = (build / "openpilot/nrdr/ui/home/layout.py").read_text(encoding="utf-8")
   assert "Your drives will upload to connect.comma.ai." in home

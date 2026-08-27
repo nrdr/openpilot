@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 
-# nrdr: route the backend to konik. Set here (launch_env.sh is sourced by
-# launch_chffrplus.sh on every boot) rather than only in launch_openpilot.sh,
-# which is not the boot entry on this base. build_prebuilt.sh strips these for
-# the clean branch.
-export API_HOST=https://api.konik.ai
-export ATHENA_HOST=wss://athena.konik.ai
+# NRDR-owned backend policy is isolated behind this single host seam.
+source "$(dirname "${BASH_SOURCE[0]}")/openpilot/nrdr/config/backend_env.sh"
 
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1

@@ -92,7 +92,7 @@ def test_brake_hold_does_not_disable_longitudinal():
 
 
 def test_clean_overlay_retains_stock_policy():
-  overlay_path = Path(__file__).parents[3] / "release" / "clean_overlay" / "events.py"
+  overlay_path = Path(__file__).parents[1] / "tools" / "release" / "clean_overlay" / "events.py"
   spec = importlib.util.spec_from_file_location("clean_events", overlay_path)
   assert spec is not None and spec.loader is not None
   clean_events = importlib.util.module_from_spec(spec)
