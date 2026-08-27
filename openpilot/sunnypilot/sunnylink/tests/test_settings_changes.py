@@ -11,6 +11,7 @@ and additive — they do not replace the broader test_settings_schema.py.
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 from pathlib import Path
@@ -62,6 +63,14 @@ from openpilot.common.test import OpenpilotTestCase
 
 
 SCHEMA_VALIDATOR_PATH = os.path.join(os.path.dirname(DEFINITION_PATH), "settings_ui.schema.json")
+
+
+def _fold_static_string(node: ast.AST) -> str:
+  if isinstance(node, ast.Constant) and isinstance(node.value, str):
+    return node.value
+  if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+    return _fold_static_string(node.left) + _fold_static_string(node.right)
+  raise AssertionError(f"expected a static string expression, got {ast.dump(node)}")
 
 
 def _walk_items(schema: dict[str, Any]):
@@ -456,8 +465,20 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     item = _find_item(schema, "NrdrLaneChangeEndpointSteerRatio")
     sunnylink_copy = f"{item.get('title', '')} {item.get('description', '')} {item.get('details', '')}".lower()
     repo_root = Path(__file__).parents[4]
-    native_copy = (repo_root / "openpilot" / "nrdr" / "ui" / "settings" /
-                   "pidf_ground.py").read_text(encoding="utf-8").lower()
+    native_path = repo_root / "openpilot" / "nrdr" / "ui" / "settings" / "pidf_ground.py"
+    native_tree = ast.parse(native_path.read_text(encoding="utf-8"))
+    native_copy = None
+    for node in ast.walk(native_tree):
+      if not isinstance(node, ast.Assign):
+        continue
+      if not any(isinstance(target, ast.Attribute) and target.attr == "_lane_change_endpoint_sr" for target in node.targets):
+        continue
+      assert isinstance(node.value, ast.Call)
+      description = next((keyword.value for keyword in node.value.keywords if keyword.arg == "description"), None)
+      assert isinstance(description, ast.Call) and description.args
+      native_copy = _fold_static_string(description.args[0]).lower()
+      break
+    assert native_copy is not None
 
     for phrase in ("outer steer ratio", "1.5 seconds", "pre-lane-change waiting does not consume"):
       assert phrase in sunnylink_copy

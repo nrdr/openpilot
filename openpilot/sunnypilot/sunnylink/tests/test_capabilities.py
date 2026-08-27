@@ -89,7 +89,7 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
   def test_pop_v2_bundle_emits_legacy_policy(self, params):
     params.put("ModelManager_ActiveBundle", _active_bundle(
       "c48899574c1303e47ca2a6f80113876ca5eb749c4a75c89b53cc8029bb3bb710",
-    ))
+    ), block=True)
     model_caps = generate_capabilities(params)
     assert model_caps["nrdr_steer_ratio_policy"] == "legacy_dual_bp"
     assert model_caps["nrdr_firmware_vgr_available"] is False
@@ -97,7 +97,7 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
   def test_tsfdo_bundle_emits_pure_firmware_policy(self, params):
     params.put("ModelManager_ActiveBundle", _active_bundle(
       "92d06467e4de97c40ffdc366e385a4f5897f36fc8ea632bd9bed113a3083fea8",
-    ))
+    ), block=True)
     model_caps = generate_capabilities(params)
     assert model_caps["nrdr_steer_ratio_policy"] == "pure_firmware_vgr"
     assert model_caps["nrdr_firmware_vgr_available"] is False
