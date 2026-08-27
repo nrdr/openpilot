@@ -7,6 +7,7 @@ See the LICENSE.md file in the root directory for more details.
 Tests for the settings_ui_src/ -> settings_ui.json compiler. Covers:
   - Roundtrip: compiled output matches the checked-in settings_ui.json
   - $ref macro resolution semantics (list-splice, scalar-substitute, depth, cycles)
+  - Strict NRDR macro, section, item, and condition extension merging
   - Per-page tree integrity (every page has id; vehicle page emits to vehicle_settings)
 
 Does not cover device-side generator (test_settings_schema.py) or per-bug
@@ -18,6 +19,7 @@ from __future__ import annotations
 import difflib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -26,9 +28,15 @@ import yaml
 
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import (
   CompileError,
+  DEFAULT_EXTENSION_SRC,
   DEFAULT_OUT,
   DEFAULT_SRC,
   _canon_item,
+  _load_extension_sources,
+  _load_yaml,
+  _merge_extension_macros,
+  _merge_item_extensions,
+  _merge_page_extensions,
   _resolve_refs,
   compile_schema,
 )
@@ -133,6 +141,171 @@ class TestRefResolution(OpenpilotTestCase):
     macros = {"x": {"type": "offroad_only"}}  # macro is a single rule (dict), not a list
     with self.assertRaisesRegex(CompileError, "must resolve to a list"):
       _resolve_refs([{"$ref": "#/macros/x"}], macros)
+
+
+class TestExtensionMerge(OpenpilotTestCase):
+  def test_page_sections_insert_after_explicit_anchor(self):
+    pages = [{"id": "steering", "sections": [
+      {"id": "base", "title": "Base"},
+      {"id": "following", "title": "Following"},
+    ]}]
+    extensions = [("nrdr.yaml", {
+      "page_id": "steering",
+      "after_section": "base",
+      "sections": [{"id": "nrdr", "title": "NRDR"}],
+    })]
+
+    merged = _merge_page_extensions(pages, extensions)
+
+    assert [section["id"] for section in merged[0]["sections"]] == ["base", "nrdr", "following"]
+
+  def test_missing_anchor_raises(self):
+    pages = [{"id": "steering", "sections": [{"id": "base", "title": "Base"}]}]
+    extensions = [("nrdr.yaml", {
+      "page_id": "steering",
+      "after_section": "missing",
+      "sections": [{"id": "nrdr", "title": "NRDR"}],
+    })]
+    with self.assertRaisesRegex(CompileError, "anchor section.*missing"):
+      _merge_page_extensions(pages, extensions)
+
+  def test_duplicate_section_id_raises(self):
+    pages = [{"id": "steering", "sections": [{"id": "base", "title": "Base"}]}]
+    extensions = [("nrdr.yaml", {
+      "page_id": "steering",
+      "after_section": "base",
+      "sections": [{"id": "base", "title": "Conflicting"}],
+    })]
+    with self.assertRaisesRegex(CompileError, "duplicate/conflicting section ids"):
+      _merge_page_extensions(pages, extensions)
+
+  def test_duplicate_page_extension_raises(self):
+    pages = [{"id": "steering", "sections": [{"id": "base", "title": "Base"}]}]
+    document = {
+      "page_id": "steering",
+      "after_section": "base",
+      "sections": [{"id": "nrdr", "title": "NRDR"}],
+    }
+    with self.assertRaisesRegex(CompileError, "duplicate extension for page"):
+      _merge_page_extensions(pages, [("one.yaml", document), ("two.yaml", document)])
+
+  def test_unknown_fragment_field_raises(self):
+    pages = [{"id": "steering", "sections": [{"id": "base", "title": "Base"}]}]
+    extensions = [("nrdr.yaml", {
+      "page_id": "steering",
+      "after_section": "base",
+      "sections": [{"id": "nrdr", "title": "NRDR"}],
+      "label": "conflicts with host page metadata",
+    })]
+    with self.assertRaisesRegex(CompileError, "unexpected/conflicting fields: label"):
+      _merge_page_extensions(pages, extensions)
+
+  def test_missing_fragment_field_raises(self):
+    pages = [{"id": "steering", "sections": [{"id": "base", "title": "Base"}]}]
+    extensions = [("nrdr.yaml", {
+      "page_id": "steering",
+      "sections": [{"id": "nrdr", "title": "NRDR"}],
+    })]
+    with self.assertRaisesRegex(CompileError, "missing required fields: after_section"):
+      _merge_page_extensions(pages, extensions)
+
+  def test_duplicate_macro_name_raises(self):
+    with self.assertRaisesRegex(CompileError, "duplicate/conflicting macros: offroad"):
+      _merge_extension_macros(
+        {"offroad": [{"type": "offroad_only"}]},
+        {"macros": {"offroad": [{"type": "not_engaged"}]}},
+        "nrdr.yaml",
+      )
+
+  def test_duplicate_yaml_field_raises(self):
+    with tempfile.TemporaryDirectory() as temporary_directory:
+      path = os.path.join(temporary_directory, "duplicate.yaml")
+      with open(path, "w", encoding="utf-8") as file:
+        file.write("macros:\n  duplicate: []\n  duplicate: []\n")
+      with self.assertRaisesRegex(CompileError, "duplicate field 'duplicate'"):
+        _load_yaml(path)
+
+  def test_missing_or_unregistered_extension_source_raises(self):
+    with tempfile.TemporaryDirectory() as temporary_directory:
+      with self.assertRaisesRegex(CompileError, "source files are missing"):
+        _load_extension_sources(temporary_directory)
+
+      shutil.copytree(DEFAULT_EXTENSION_SRC, temporary_directory, dirs_exist_ok=True)
+      with open(os.path.join(temporary_directory, "unexpected.yaml"), "w", encoding="utf-8") as file:
+        file.write("macros: {}\n")
+      with self.assertRaisesRegex(CompileError, "unregistered files: unexpected.yaml"):
+        _load_extension_sources(temporary_directory)
+
+  @staticmethod
+  def _device_page():
+    return [{"id": "device", "sections": [{
+      "id": "general",
+      "title": "General",
+      "items": [
+        {"key": "OnroadUploads", "widget": "toggle"},
+        {"key": "MaxTimeOffroad", "widget": "option", "enablement": [{"type": "offroad_only"}]},
+      ],
+    }]}]
+
+  @staticmethod
+  def _device_extension():
+    return ("device.yaml", {
+      "page_id": "device",
+      "section_id": "general",
+      "after_item": "OnroadUploads",
+      "items": [{"key": "DisablePowerDown", "widget": "toggle"}],
+      "extend_enablement": [{
+        "item_key": "MaxTimeOffroad",
+        "conditions": [{"type": "param", "key": "DisablePowerDown", "equals": False}],
+      }],
+    })
+
+  def test_items_insert_after_explicit_anchor_and_extend_conditions(self):
+    pages = _merge_item_extensions(self._device_page(), [self._device_extension()])
+    items = pages[0]["sections"][0]["items"]
+
+    assert [item["key"] for item in items] == ["OnroadUploads", "DisablePowerDown", "MaxTimeOffroad"]
+    assert items[-1]["enablement"] == [
+      {"type": "offroad_only"},
+      {"type": "param", "key": "DisablePowerDown", "equals": False},
+    ]
+
+  def test_item_extension_missing_section_or_anchor_raises(self):
+    source, extension = self._device_extension()
+    missing_section = {**extension, "section_id": "missing"}
+    with self.assertRaisesRegex(CompileError, "target section 'missing' is missing"):
+      _merge_item_extensions(self._device_page(), [(source, missing_section)])
+
+    missing_anchor = {**extension, "after_item": "missing"}
+    with self.assertRaisesRegex(CompileError, "anchor item 'missing' is missing"):
+      _merge_item_extensions(self._device_page(), [(source, missing_anchor)])
+
+  def test_item_extension_conflicting_key_raises(self):
+    source, extension = self._device_extension()
+    conflict = {**extension, "items": [{"key": "MaxTimeOffroad", "widget": "toggle"}]}
+    with self.assertRaisesRegex(CompileError, "duplicate/conflicting item keys"):
+      _merge_item_extensions(self._device_page(), [(source, conflict)])
+
+  def test_duplicate_item_extension_raises(self):
+    extension = self._device_extension()
+    with self.assertRaisesRegex(CompileError, "duplicate item extension for section"):
+      _merge_item_extensions(self._device_page(), [extension, extension])
+
+  def test_item_enablement_target_or_condition_conflict_raises(self):
+    source, extension = self._device_extension()
+    missing_target = {
+      **extension,
+      "extend_enablement": [{"item_key": "missing", "conditions": [{"type": "offroad_only"}]}],
+    }
+    with self.assertRaisesRegex(CompileError, "enablement target item 'missing' is missing"):
+      _merge_item_extensions(self._device_page(), [(source, missing_target)])
+
+    duplicate_condition = {
+      **extension,
+      "extend_enablement": [{"item_key": "MaxTimeOffroad", "conditions": [{"type": "offroad_only"}]}],
+    }
+    with self.assertRaisesRegex(CompileError, "duplicate/conflicting enablement condition"):
+      _merge_item_extensions(self._device_page(), [(source, duplicate_condition)])
 
 
 class TestCompiledShape(OpenpilotTestCase):

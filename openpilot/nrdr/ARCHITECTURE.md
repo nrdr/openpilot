@@ -74,8 +74,11 @@ Current status on `nrdr-architecture-development`:
   low/standard/high-speed lateral P/I scale controls. Their native and
   Sunnylink adapters now consume one definition while preserving the existing
   generated schema, translations, and edit rules. Native NRDR settings, home,
-  and on-road implementations now have canonical UI owners; framework layout
-  files retain only import/registration seams.
+  and on-road implementations now have canonical UI owners. NRDR Sunnylink
+  macros and settings fragments also live under `openpilot.nrdr.ui`; the
+  framework compiler merges them at explicit anchors and continues to own the
+  generated consumer schema. Framework layout files retain only
+  import/registration seams.
 - Step 4 implementation ownership is complete. Lateral, longitudinal, radar,
   driver-policy, service, and process-hook implementations live under
   `openpilot.nrdr`; offline lateral, steer-ratio, and radar tools live under

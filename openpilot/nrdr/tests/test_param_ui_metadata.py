@@ -178,7 +178,7 @@ class TestParamUiMetadata(unittest.TestCase):
         for text in EXPECTED_NATIVE[key.value]:
           self.assertNotIn(text, native_source)
 
-    yaml_path = repository_root / "openpilot/sunnypilot/sunnylink/settings_ui_src/pages/steering.yaml"
+    yaml_path = repository_root / "openpilot/nrdr/ui/sunnylink/pages/steering.yaml"
     source = yaml.safe_load(yaml_path.read_text())
     items: dict[str, dict] = {}
 

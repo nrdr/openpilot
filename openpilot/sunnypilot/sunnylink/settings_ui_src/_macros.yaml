@@ -26,21 +26,6 @@ macros:
   advanced_only:
     - {type: param, key: ShowAdvancedControls, equals: true}
 
-  handcrafted_lateral_unlocked:
-    - type: any
-      conditions:
-        - {type: param, key: NrdrHandcraftedLateralTune, equals: false}
-        - type: not
-          condition: {type: capability, field: has_handcrafted_lateral_profile, equals: true}
-
-  nrdr_steer_ratio_active:
-    - type: any
-      conditions:
-        - {type: capability, field: nrdr_steer_ratio_policy, equals: legacy_dual_bp}
-        - {type: capability, field: nrdr_firmware_vgr_available, equals: true}
-
-  nrdr_legacy_steer_ratio:
-    - {type: capability, field: nrdr_steer_ratio_policy, equals: legacy_dual_bp}
 
   # Hide on MICI hardware (no analog HUD support yet).
   hide_on_mici:

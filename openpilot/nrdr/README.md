@@ -18,7 +18,7 @@ openpilot/nrdr/
 ├── features/  lateral, longitudinal, radar, driver-policy, and service behavior
 ├── hooks/     small adapters called by openpilot processes
 ├── tools/     offline lateral, steer-ratio, and radar analysis tools
-├── ui/        NRDR-owned settings, home, and on-road presentation
+├── ui/        NRDR-owned settings, Sunnylink source, home, and on-road presentation
 ├── docs/      current references plus clearly labeled historical notes
 └── tests/     package and boundary tests
 ```
@@ -64,6 +64,9 @@ while downstream consumers migrate.
   narrow import/call seams.
 - Complete: offline lateral, steer-ratio, and radar reverse-engineering tool
   ownership, with old command paths retained as compatibility entrypoints.
+- Complete: NRDR Sunnylink macros and settings authoring fragments. The generic
+  Sunnylink compiler merges them at explicit page, section, and item anchors;
+  the generated consumer schema remains in Sunnylink's framework package.
 - Complete: the typed openpilot-to-opendbc configuration boundary. Opendbc no
   longer reads openpilot Params; SunnyPilot composes its generic vehicle policy
   with NRDR's isolated Honda provider before passing immutable data across.
