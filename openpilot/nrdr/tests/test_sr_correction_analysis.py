@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from openpilot.sunnypilot.nrdr.sr_correction_analysis import (
+from openpilot.nrdr.tools.sr_correction_analysis import (
   CommandSample,
   CorrectionSample,
   GateConfig,

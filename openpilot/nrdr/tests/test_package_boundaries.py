@@ -238,6 +238,31 @@ class TestPackageBoundaries(unittest.TestCase):
           self.assertIn(f"from {module_name} import", source)
         self.assertNotIn("from openpilot.sunnypilot.nrdr.", source)
 
+  def test_legacy_namespace_contains_no_production_implementations(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    legacy_dir = repository_root / "openpilot" / "sunnypilot" / "nrdr"
+    for path in legacy_dir.glob("*.py"):
+      if path.name == "__init__.py" or path.name.startswith("test_"):
+        continue
+      with self.subTest(path=path.name):
+        tree = ast.parse(path.read_text(), filename=path.name)
+        definitions = [
+          node for node in tree.body
+          if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        self.assertEqual(definitions, [])
+
+  def test_production_code_never_imports_the_legacy_namespace(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    legacy_dir = repository_root / "openpilot" / "sunnypilot" / "nrdr"
+    offenders: list[str] = []
+    for path in (repository_root / "openpilot").rglob("*.py"):
+      if path.is_relative_to(legacy_dir) or path.name.startswith("test_") or {"test", "tests"} & set(path.parts):
+        continue
+      if "openpilot.sunnypilot.nrdr" in path.read_text():
+        offenders.append(str(path.relative_to(repository_root)))
+    self.assertEqual(offenders, [])
+
   def test_ui_metadata_keeps_params_dependency_direction(self):
     params_dir = Path(__file__).resolve().parent.parent / "params"
     tree = ast.parse((params_dir / "ui_metadata.py").read_text(), filename="ui_metadata.py")

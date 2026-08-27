@@ -14,7 +14,7 @@ import openpilot.system.manager.manager as manager
 from openpilot.system.manager.process import ensure_running
 from openpilot.system.manager.process_config import managed_processes, procs
 from openpilot.common.hardware import HARDWARE
-from openpilot.sunnypilot.nrdr.manager import BOOL_DEFAULTS, VALUE_DEFAULTS
+from openpilot.nrdr.params import BOOL_DEFAULTS, VALUE_DEFAULTS
 
 os.environ['FAKEUPLOAD'] = "1"
 

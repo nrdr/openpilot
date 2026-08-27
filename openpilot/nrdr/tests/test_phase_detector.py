@@ -1,6 +1,6 @@
 import pytest
 
-from openpilot.sunnypilot.nrdr.phase_detector import PHASE_SWITCH_MIN_SPEED, phase_with_latch
+from openpilot.nrdr.features.lateral.phase_detector import PHASE_SWITCH_MIN_SPEED, phase_with_latch
 
 
 def test_phase_can_initialize_but_not_switch_at_or_below_half_mph():

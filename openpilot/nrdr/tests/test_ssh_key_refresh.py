@@ -1,4 +1,4 @@
-from openpilot.sunnypilot.nrdr.ssh_key_refresh import refresh_github_ssh_keys
+from openpilot.nrdr.features.services.ssh_key_refresh import refresh_github_ssh_keys
 
 
 VALID_KEYS = "\n".join((
