@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 
 from opendbc.car.honda.values import CAR as HONDA_CAR
-from openpilot.sunnypilot.nrdr.radar import NrdrRadar
-from openpilot.sunnypilot.nrdr.radar_core import COAST_CYCLES, CivicBoschKalmanParams, CivicBoschTrack
+from openpilot.nrdr.features.radar.radar import NrdrRadar
+from openpilot.nrdr.features.radar.radar_core import COAST_CYCLES, CivicBoschKalmanParams, CivicBoschTrack
 
 
 DT = 0.06

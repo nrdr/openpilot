@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from openpilot.sunnypilot.nrdr.long_tune import LEAD_FIELDS
-from openpilot.sunnypilot.nrdr.longitudinal_mpc import (
+from openpilot.nrdr.features.longitudinal.long_tune import LEAD_FIELDS
+from openpilot.nrdr.features.longitudinal.longitudinal_mpc import (
   BRAKE_ENGAGE_DELAY,
   BRAKE_PERSISTENCE,
   CROSSFADE_FRAMES,

@@ -17,9 +17,12 @@ sys.modules["pyray"] = None
 sys.modules["zmq"] = None
 from openpilot.nrdr.params import NRDR_UI_METADATA, NrdrParamKey
 from openpilot.nrdr.params.specs import PARAM_SPECS
+import openpilot.nrdr.features.driver_policy as driver_policy
 from openpilot.nrdr.features.lateral.model_policy import SteerRatioModelPolicy, classify_steer_ratio_model
 from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import LaneChangeSteerRatioFade
+import openpilot.nrdr.features.longitudinal as longitudinal
+import openpilot.nrdr.features.radar as radar
 from openpilot.nrdr.tools.sr_correction_analysis import CommandSample
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
 import openpilot.nrdr.ui.settings
@@ -29,6 +32,9 @@ from openpilot.sunnypilot.nrdr.model_policy import classify_steer_ratio_model as
 from openpilot.sunnypilot.nrdr.phase_detector import phase_with_latch as legacy_phase_with_latch
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import LaneChangeSteerRatioFade as LegacyLaneChangeSteerRatioFade
 assert PARAM_SPECS
+assert set(driver_policy.__all__) == set(driver_policy._EXPORT_MODULES)
+assert set(longitudinal.__all__) == set(longitudinal._EXPORT_MODULES)
+assert set(radar.__all__) == set(radar._EXPORT_MODULES)
 assert len(NRDR_UI_METADATA) == 6
 assert NrdrParamKey.HONDA_BOSCH_A_RADAR == "HondaBoschARadar"
 assert LegacyCommandSample is CommandSample
@@ -39,6 +45,9 @@ assert classify_steer_ratio_model(None) is SteerRatioModelPolicy.UNKNOWN
 assert get_native_option_spec("LatPScaleLowSpeed").format_label(100) == "100%"
 assert sunnylink_fields_for_key("LatPScaleLowSpeed")["max"] == 500
 assert "openpilot.nrdr.params.store" not in sys.modules
+assert "openpilot.nrdr.features.driver_policy.speed_limit_assist" not in sys.modules
+assert "openpilot.nrdr.features.longitudinal.longcontrol" not in sys.modules
+assert "openpilot.nrdr.features.radar.radar" not in sys.modules
 assert "openpilot.system.ui.lib.multilang" not in sys.modules
 assert "openpilot.system.ui.sunnypilot.widgets.list_view" not in sys.modules
 assert "openpilot.nrdr.ui.settings.layout" not in sys.modules

@@ -12,7 +12,7 @@ from numpy import interp
 from openpilot.common.params import Params
 from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot.selfdrive.controls.lib.dec.constants import WMACConstants
-from openpilot.sunnypilot.nrdr.dec import enforce_mode_dwell, slow_down_threshold
+from openpilot.nrdr.features.driver_policy.dec import enforce_mode_dwell, slow_down_threshold
 from typing import Literal
 
 # d-e2e, from modeldata.h

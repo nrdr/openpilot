@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from openpilot.sunnypilot.nrdr.longitudinal_stopping import CONTROL_DT, HARD_HOLD_FLOOR, compute_stopping_accel
+from openpilot.nrdr.features.longitudinal.longitudinal_stopping import CONTROL_DT, HARD_HOLD_FLOOR, compute_stopping_accel
 
 
 DEFAULTS = {

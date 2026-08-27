@@ -3,7 +3,7 @@ import numpy as np
 
 from opendbc.car.structs import car
 from openpilot.common.constants import CV
-from openpilot.sunnypilot.nrdr.cruise import NrdrCruise
+from openpilot.nrdr.features.driver_policy.cruise import NrdrCruise
 from openpilot.sunnypilot.selfdrive.car.cruise_ext import VCruiseHelperSP
 
 

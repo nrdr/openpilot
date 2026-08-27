@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from openpilot.sunnypilot.nrdr.dec import enforce_mode_dwell, slow_down_threshold
+from openpilot.nrdr.features.driver_policy.dec import enforce_mode_dwell, slow_down_threshold
 
 
 @pytest.mark.parametrize(

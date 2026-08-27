@@ -13,7 +13,7 @@ from openpilot.common.constants import CV
 from openpilot.common.params import Params
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import get_minimum_set_speed
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.speed_limit_assist import ACTIVE_STATES as SLA_ACTIVE_STATES
-from openpilot.sunnypilot.nrdr.speed_limit import compare_cluster_target, quantize_set_speed
+from openpilot.nrdr.features.driver_policy.speed_limit import compare_cluster_target, quantize_set_speed
 
 ButtonType = car.CarState.ButtonEvent.Type
 SpeedLimitAssistState = custom.LongitudinalPlanSP.SpeedLimit.AssistState

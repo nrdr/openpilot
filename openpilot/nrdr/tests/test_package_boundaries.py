@@ -12,8 +12,8 @@ MIGRATED_PARAM_CONSUMERS = (
   "openpilot/nrdr/features/lateral/latcontrol_pid.py",
   "openpilot/nrdr/features/lateral/nnlc.py",
   "openpilot/nrdr/features/lateral/tune_learner.py",
-  "openpilot/sunnypilot/nrdr/longcontrol.py",
-  "openpilot/sunnypilot/nrdr/longitudinal_planner.py",
+  "openpilot/nrdr/features/longitudinal/longcontrol.py",
+  "openpilot/nrdr/features/longitudinal/longitudinal_planner.py",
 )
 
 LATERAL_COMPATIBILITY_EXPORTS = {
@@ -53,13 +53,42 @@ PHASE_TWO_CONSUMERS = (
   "openpilot/sunnypilot/nrdr/car_tune_report.py",
   "openpilot/sunnypilot/nrdr/controlsd.py",
   "openpilot/nrdr/features/lateral/latcontrol_pid.py",
-  "openpilot/sunnypilot/nrdr/longcontrol.py",
-  "openpilot/sunnypilot/nrdr/longitudinal_planner.py",
+  "openpilot/nrdr/features/longitudinal/longcontrol.py",
+  "openpilot/nrdr/features/longitudinal/longitudinal_planner.py",
   "openpilot/nrdr/features/lateral/nnlc.py",
   "openpilot/sunnypilot/nrdr/settings.py",
   "openpilot/nrdr/features/lateral/tune_learner.py",
   "openpilot/sunnypilot/sunnylink/capabilities.py",
   "openpilot/system/manager/manager.py",
+)
+
+FEATURE_CONSUMERS = {
+  "openpilot/selfdrive/car/cruise.py": "openpilot.nrdr.features.driver_policy.cruise",
+  "openpilot/selfdrive/controls/lib/longcontrol.py": "openpilot.nrdr.features.longitudinal.longcontrol",
+  "openpilot/selfdrive/controls/lib/longitudinal_mpc_lib/long_mpc.py": "openpilot.nrdr.features.longitudinal.longitudinal_mpc",
+  "openpilot/selfdrive/controls/lib/longitudinal_planner.py": "openpilot.nrdr.features.longitudinal.longitudinal_planner",
+  "openpilot/selfdrive/controls/radard.py": "openpilot.nrdr.features.radar.radar",
+  "openpilot/selfdrive/ui/sunnypilot/onroad/speed_limit.py": "openpilot.nrdr.features.driver_policy.speed_limit",
+  "openpilot/sunnypilot/nrdr/selfdrived.py": "openpilot.nrdr.features.driver_policy.hud_submode",
+  "openpilot/sunnypilot/selfdrive/car/cruise_ext.py": "openpilot.nrdr.features.driver_policy.speed_limit",
+  "openpilot/sunnypilot/selfdrive/controls/lib/dec/dec.py": "openpilot.nrdr.features.driver_policy.dec",
+  "openpilot/sunnypilot/selfdrive/controls/lib/longitudinal_planner.py": "openpilot.nrdr.features.driver_policy.speed_limit_assist",
+  "openpilot/sunnypilot/selfdrive/controls/lib/speed_limit/speed_limit_resolver.py": "openpilot.nrdr.features.driver_policy.speed_limit",
+}
+
+CANONICAL_FEATURE_MODULES = (
+  "openpilot/nrdr/features/driver_policy/cruise.py",
+  "openpilot/nrdr/features/driver_policy/dec.py",
+  "openpilot/nrdr/features/driver_policy/hud_submode.py",
+  "openpilot/nrdr/features/driver_policy/speed_limit.py",
+  "openpilot/nrdr/features/driver_policy/speed_limit_assist.py",
+  "openpilot/nrdr/features/longitudinal/long_tune.py",
+  "openpilot/nrdr/features/longitudinal/longcontrol.py",
+  "openpilot/nrdr/features/longitudinal/longitudinal_mpc.py",
+  "openpilot/nrdr/features/longitudinal/longitudinal_planner.py",
+  "openpilot/nrdr/features/longitudinal/longitudinal_stopping.py",
+  "openpilot/nrdr/features/radar/radar.py",
+  "openpilot/nrdr/features/radar/radar_core.py",
 )
 
 
@@ -69,7 +98,10 @@ class TestPackageBoundaries(unittest.TestCase):
     self.assertEqual(package_path.name, "nrdr")
     self.assertEqual(package_path.parent.name, "openpilot")
     self.assertIsNotNone(import_module("openpilot.nrdr.features"))
+    self.assertIsNotNone(import_module("openpilot.nrdr.features.driver_policy"))
     self.assertIsNotNone(import_module("openpilot.nrdr.features.lateral"))
+    self.assertIsNotNone(import_module("openpilot.nrdr.features.longitudinal"))
+    self.assertIsNotNone(import_module("openpilot.nrdr.features.radar"))
     self.assertIsNotNone(import_module("openpilot.nrdr.hooks"))
     self.assertIsNotNone(import_module("openpilot.nrdr.tools"))
     self.assertIsNotNone(import_module("openpilot.nrdr.ui"))
@@ -126,6 +158,32 @@ class TestPackageBoundaries(unittest.TestCase):
     params_package = import_module("openpilot.nrdr.params")
     self.assertEqual(set(params_package.__all__), set(params_package._EXPORT_MODULES))
     self.assertEqual(len(params_package.__all__), len(set(params_package.__all__)))
+
+  def test_feature_package_exports_are_lazy_and_complete(self):
+    for module_name in (
+      "openpilot.nrdr.features.driver_policy",
+      "openpilot.nrdr.features.longitudinal",
+      "openpilot.nrdr.features.radar",
+    ):
+      with self.subTest(module=module_name):
+        feature_package = import_module(module_name)
+        self.assertEqual(set(feature_package.__all__), set(feature_package._EXPORT_MODULES))
+        self.assertEqual(len(feature_package.__all__), len(set(feature_package.__all__)))
+
+  def test_feature_implementations_do_not_import_legacy_nrdr_modules(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    for relative_path in CANONICAL_FEATURE_MODULES:
+      with self.subTest(path=relative_path):
+        source = (repository_root / relative_path).read_text()
+        self.assertNotIn("openpilot.sunnypilot.nrdr", source)
+
+  def test_production_consumers_import_canonical_feature_owners(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    for relative_path, module_name in FEATURE_CONSUMERS.items():
+      with self.subTest(path=relative_path):
+        source = (repository_root / relative_path).read_text()
+        self.assertIn(f"from {module_name} import", source)
+        self.assertNotIn("from openpilot.sunnypilot.nrdr.", source)
 
   def test_ui_metadata_keeps_params_dependency_direction(self):
     params_dir = Path(__file__).resolve().parent.parent / "params"

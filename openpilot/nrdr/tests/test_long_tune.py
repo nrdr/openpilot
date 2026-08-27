@@ -6,7 +6,7 @@ openpilot deps, so the fail-safe behavior is provable before anything touches th
 import json
 import os
 
-from openpilot.sunnypilot.nrdr.long_tune import (
+from openpilot.nrdr.features.longitudinal.long_tune import (
   LongTune, write_tune, NRDR_LONG_TUNE_PATH, PERSONALITIES,
 )
 

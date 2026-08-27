@@ -16,7 +16,7 @@ from openpilot.selfdrive.car.cruise import V_CRUISE_MAX, V_CRUISE_UNSET
 from openpilot.common.swaglog import cloudlog
 
 from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP
-from openpilot.sunnypilot.nrdr.longitudinal_planner import NrdrLongitudinalPlanner
+from openpilot.nrdr.features.longitudinal.longitudinal_planner import NrdrLongitudinalPlanner
 
 A_CRUISE_MAX_VALS = [1.6, 1.2, 0.8, 0.6]
 A_CRUISE_MAX_BP = [0., 10.0, 25., 40.]

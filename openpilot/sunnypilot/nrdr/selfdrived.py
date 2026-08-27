@@ -2,7 +2,7 @@ import time
 
 from openpilot.cereal import log, custom
 from opendbc.car.structs import car
-from openpilot.sunnypilot.nrdr.hud_submode import consume_button_press
+from openpilot.nrdr.features.driver_policy.hud_submode import consume_button_press
 
 
 ButtonType = car.CarState.ButtonEvent.Type

@@ -9,7 +9,7 @@ from openpilot.common.swaglog import cloudlog
 # WARNING: imports outside of constants will not trigger a rebuild
 from openpilot.selfdrive.modeld.constants import index_function
 from openpilot.selfdrive.controls.radard import _LEAD_ACCEL_TAU
-from openpilot.sunnypilot.nrdr.longitudinal_mpc import NrdrLongitudinalMpc
+from openpilot.nrdr.features.longitudinal.longitudinal_mpc import NrdrLongitudinalMpc
 
 if __name__ == '__main__':  # generating code
   from acados.acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver

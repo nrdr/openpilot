@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from openpilot.sunnypilot.nrdr.speed_limit import (
+from openpilot.nrdr.features.driver_policy.speed_limit import (
   SpeedLimitConfirmation,
   apply_map_limit,
   compare_cluster_target,

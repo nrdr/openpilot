@@ -15,7 +15,7 @@ from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD, get_sanitize_int_param
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import LIMIT_MAX_MAP_DATA_AGE, LIMIT_ADAPT_ACC
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Policy, OffsetType
-from openpilot.sunnypilot.nrdr.speed_limit import apply_map_limit
+from openpilot.nrdr.features.driver_policy.speed_limit import apply_map_limit
 
 SpeedLimitSource = custom.LongitudinalPlanSP.SpeedLimit.Source
 

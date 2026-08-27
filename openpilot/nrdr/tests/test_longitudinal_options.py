@@ -38,7 +38,7 @@ if sys.platform == "win32":
 
 from opendbc.car.honda.values import HondaFlags
 from openpilot.common.pid import PIDController
-from openpilot.sunnypilot.nrdr.longcontrol import (
+from openpilot.nrdr.features.longitudinal.longcontrol import (
   LONG_PID_SCALE_DEFAULTS,
   LONG_PID_SCALE_EPSILON,
   LONG_PID_SCALE_SLEW_PER_SECOND,
@@ -48,7 +48,7 @@ from openpilot.sunnypilot.nrdr.longcontrol import (
   longitudinal_pid_gains,
   scaled_pid_limits,
 )
-from openpilot.sunnypilot.nrdr.longitudinal_planner import NrdrLongitudinalPlanner, apply_cruise_overspeed_allowance
+from openpilot.nrdr.features.longitudinal.longitudinal_planner import NrdrLongitudinalPlanner, apply_cruise_overspeed_allowance
 
 
 def _long_control(*, enabled: bool, nidec: bool = True, gas_interceptor: bool = True, brand: str = "honda"):

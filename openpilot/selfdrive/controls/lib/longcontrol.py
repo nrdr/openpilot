@@ -4,7 +4,7 @@ from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.modeld.constants import ModelConstants
-from openpilot.sunnypilot.nrdr.longcontrol import NrdrLongControl
+from openpilot.nrdr.features.longitudinal.longcontrol import NrdrLongControl
 
 CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 

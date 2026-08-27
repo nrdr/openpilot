@@ -16,7 +16,7 @@ from openpilot.common.simple_kalman import KF1D
 from opendbc.car import structs
 from opendbc.car.hyundai.values import HyundaiFlags
 from opendbc.sunnypilot.car.hyundai.values import HyundaiFlagsSP
-from openpilot.sunnypilot.nrdr.radar import NrdrRadar
+from openpilot.nrdr.features.radar.radar import NrdrRadar
 
 
 # Default lead acceleration decay set to 50% at 1s
