@@ -1,6 +1,6 @@
 # EPS firmware images (`.rwd`)
 
-Honda/Acura EPS firmware files for use with `eps-update.py` (in the repo root).
+Honda/Acura EPS firmware files for the root `eps-update.py` command.
 All files here were checksum-validated with `check_rwd.py` (file checksum +
 decrypted firmware checksums all PASS).
 
@@ -14,7 +14,7 @@ python3 check_rwd.py rwd/<file>.rwd       # single
 python3 check_rwd.py rwd/*.rwd            # all
 ```
 
-## Flash (see ../README.md and ../eps-update.py)
+## Flash (see ../README.md)
 Prefer the guided flasher: `python3 flash.py` (auto-detects bus, offers dry run).
 For the manual path, always run a `--danger`-less dry run first (it stops before
 erase; default bus is **1**), and flash from a persistent copy — the comma updater

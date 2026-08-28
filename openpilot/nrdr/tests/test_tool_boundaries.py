@@ -34,6 +34,7 @@ CANONICAL_TOOL_DIRS = (
   "openpilot/nrdr/tools/lateral",
   "openpilot/nrdr/tools/steer_ratio",
   "openpilot/nrdr/tools/radar_re",
+  "openpilot/nrdr/tools/eps",
 )
 
 

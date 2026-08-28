@@ -17,7 +17,7 @@ openpilot/nrdr/
 ├── params/    contracts, startup policy, profiles, snapshots, and typed access
 ├── features/  lateral, longitudinal, radar, driver-policy, and service behavior
 ├── hooks/     small adapters called by openpilot processes
-├── tools/     offline lateral, steer-ratio, and radar analysis tools
+├── tools/     offline analysis, device helpers, and EPS flashing tools
 ├── ui/        NRDR-owned settings, Sunnylink source, home, and on-road presentation
 ├── docs/      current references plus clearly labeled historical notes
 └── tests/     package and boundary tests
@@ -33,8 +33,9 @@ The separation is intentional:
 - `features` owns algorithms.  Parameter mechanics do not belong here.
 - `hooks` translates openpilot state into calls to NRDR features.  Hooks should
   remain small and contain no tuning algorithm.
-- `tools` owns offline analysis libraries. Compatibility modules may retain old
-  import paths while scripts move to this canonical package.
+- `tools` owns offline analysis libraries and safety-reviewed device utilities.
+  Compatibility modules may retain old import or command paths while the real
+  implementation lives in this canonical package.
 - `ui` owns NRDR presentation.  Shared parameter metadata may be consumed here,
   while custom screen layout remains explicit.
 
@@ -64,10 +65,10 @@ while downstream consumers migrate.
   narrow import/call seams.
 - Complete: offline lateral, steer-ratio, and radar reverse-engineering tool
   ownership, with old command paths retained as compatibility entrypoints.
-- Deliberately deferred: the root `eps_tools` firmware flashing bundle. Moving
-  code and recovery images that can erase an EPS requires its own on-device,
-  byte-for-byte safety review; it is not part of this behavior-neutral runtime
-  reorganization.
+- Complete: EPS flashing implementation, parser, validation tests, and all 15
+  firmware images live under `openpilot.nrdr.tools.eps`. Root and historical
+  `eps_tools` commands are thin launchers; the firmware manifest pins every
+  shipped image byte-for-byte.
 - Complete: NRDR Sunnylink macros and settings authoring fragments. The generic
   Sunnylink compiler merges them at explicit page, section, and item anchors;
   the generated consumer schema remains in Sunnylink's framework package.

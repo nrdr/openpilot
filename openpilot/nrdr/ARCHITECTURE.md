@@ -84,10 +84,10 @@ Current status on `nrdr-architecture-development`:
   `openpilot.nrdr`; offline lateral, steer-ratio, and radar tools live under
   `openpilot.nrdr.tools`. Former SunnyPilot modules and root commands are
   explicit compatibility facades, while production callers use canonical
-  owners. The safety-critical `eps_tools` firmware flashing bundle is an
-  explicit exception: it remains at its established root path until a dedicated
-  migration can preserve every firmware image hash, old invocation path,
-  checksum result, dry-run safeguard, and recovery workflow on device.
+  owners. The safety-critical EPS flashing implementation, parser, tests, and
+  all firmware images now live under `openpilot.nrdr.tools.eps`. Root and former
+  `eps_tools` command paths are launch-only compatibility surfaces. Every image
+  is pinned by SHA-256 and validated without changing its bytes.
 - Step 5 is complete. `openpilot.nrdr.car` owns only NRDR Honda startup
   conversion, live snapshots, and persistence callbacks. SunnyPilot's host
   adapter owns its pre-existing multi-brand keys/defaults and composes both
@@ -106,8 +106,8 @@ Current status on `nrdr-architecture-development`:
    custom layouts handwritten.
 4. Move existing NRDR implementations into domain folders under `features`,
    offline utilities under `tools`, and reduce their openpilot call sites to
-   hooks. Migrate firmware flashing tools only as a separate safety-reviewed
-   change with byte-level asset validation and stable compatibility commands.
+   hooks. Keep firmware flashing changes separate, byte-validated, and reachable
+   through stable compatibility commands.
 5. Replace direct opendbc Params reads with typed configuration passed across
    the car-interface boundary.
 6. Remove compatibility modules only after downstream imports and deployed
