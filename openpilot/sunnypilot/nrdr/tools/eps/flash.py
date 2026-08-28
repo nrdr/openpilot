@@ -3,10 +3,11 @@
 Guided EPS flash helper.
 
 Steps it runs for you:
-  1. Reads the car's current EPS firmware, scans .rwd images (in rwd/ and next to
-     this script), and shows only ones compatible with your EPS — pre-validating
-     each with check_rwd.py (flags any that fail). If none are compatible (or the
-     car isn't fingerprinted yet), it asks before listing all images.
+  1. Reads the car's current EPS firmware and shows the curated Proper Torque
+     Mod and clearly-labelled stock images compatible with your EPS —
+     pre-validating each with check_rwd.py. Reference, legacy, and experimental
+     files stay out of this menu. If none are compatible (or the car isn't
+     fingerprinted yet), it asks before listing the curated images.
   2. Shows a numbered list; you pick one.
   3. Confirms the car is OFF, then stops openpilot (frees the panda), then
      prompts you to switch the car to accessory mode (ignition ON, engine OFF).
@@ -57,6 +58,28 @@ EPS_ADDR = 0x18DA30F1
 DEFAULT_BUS = 1
 PROBE_BUSES = (0, 1)
 
+# This is deliberately narrower than "every valid .rwd in the library". Only
+# the current Proper Torque Mod images and unambiguous stock recovery images are
+# safe choices for the ordinary guided menu. Legacy, testing, WIP, T6Z, and x31
+# files remain available as catalogued reference material for expert/manual use.
+GUIDED_FLASH_FILES = (
+    "39990-TBA-A030/Legacy and Stock/stock-39990-TBA-A030.rwd",
+    "39990-TBA-A030/Proper Torque Mod/39990-TBA,A030-PTM.rwd",
+    "39990-TBA-C020 (2019 Honda Civic Sport)/Legacy and Stock/stock-39990-TBA-C020.rwd",
+    "39990-TBA-C020 (2019 Honda Civic Sport)/Proper Torque Mod/39990-TBA,C020-Trk4000-PTM.rwd",
+    "39990-TBA-C120/Legacy and Stock/stock-39990-TBA-C120.rwd",
+    "39990-TBA-C120/Proper Torque Mod/39990-TBA,C120-PTM.rwd",
+    "39990-TEG-A010/Proper Torque Mod/39990-TEG,A010-PTM.rwd",
+    "39990-TG7-A060 (2019 Honda Pilot)/Legacy and Stock/39990-TG7-A060-STOCK.rwd",
+    "39990-TGG-A020/Legacy and Stock/stock-39990-TGG-A020-HatchbackSport.rwd",
+    "39990-TGG-A120/stock-39990-TGG-A120.rwd",
+    "39990-TLA-A040 - (Honda_CRV_5G)/Legacy and Stock/39990-TLA-A040-stock.rwd",
+    "39990-TLA-A040 - (Honda_CRV_5G)/Proper Torque Mod/39990-TLA-A040_Clarity_FF_tune_telemety_8cf8e537.rwd",
+    "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM.rwd",
+    "39990-TXM-A040 (2019-2022 Honda Insight)/Legacy and Stock/TXM-A040-STOCK.rwd",
+    "39990-TXM-A040 (2019-2022 Honda Insight)/Proper Torque Mod/39990-TXM,A040-PTM.rwd",
+)
+
 sys.path.insert(0, HERE)
 import check_rwd  # noqa: E402  (reuse the validated checksum logic)
 
@@ -83,9 +106,28 @@ def validate(path):
 
 
 def find_images():
-    files = set(glob.glob(os.path.join(RWD_DIR, "*.rwd")))
+    files = {
+        os.path.join(RWD_DIR, *relative_path.split("/"))
+        for relative_path in GUIDED_FLASH_FILES
+        if os.path.isfile(os.path.join(RWD_DIR, *relative_path.split("/")))
+    }
+    # Preserve the historical escape hatch for an operator's own flat .rwd:
+    # immediately inside rwd/ or beside this script. Nested library files must
+    # be explicitly allowlisted above, so a reference image cannot leak in.
+    files |= set(glob.glob(os.path.join(RWD_DIR, "*.rwd")))
     files |= set(glob.glob(os.path.join(HERE, "*.rwd")))
     return sorted(files)
+
+
+def image_display_name(path):
+    """Readable library-relative path, including its safety/category folders."""
+    absolute = os.path.abspath(path)
+    try:
+        inside_library = os.path.commonpath((RWD_DIR, absolute)) == RWD_DIR
+    except ValueError:
+        inside_library = False
+    base = RWD_DIR if inside_library else HERE
+    return os.path.relpath(absolute, base).replace(os.sep, "/")
 
 
 def norm_fw(s):
@@ -382,15 +424,16 @@ def run_dry_run(rel, bus, skip_checksum, env, name, seed_timeout=None):
             )
         if SEED_LOCKOUT_MARKER in combined:
             print(f"\nThe EPS security-access delay hasn't cleared after {effective:.0f}s.")
-            print("This is the ECU's delay timer, not a bad image — waiting is the fix.")
+            print("The ECU reported its delay timer. Waiting may clear this response;")
+            print("it does not prove that the selected image matches this EPS.")
             if interactive and input(
                     f"Keep waiting another {SEED_EXTEND_S:.0f}s? [Y/n]: ").strip().lower() in ("", "y", "yes"):
                 effective = SEED_EXTEND_S
                 continue
-            exit_with_op_stopped(
-                "\nStopping while the EPS delay is still active — NOT flashing.\n"
-                "Leave the car in accessory mode (ignition off restarts the timer) and re-run."
-            )
+            exit_with_op_stopped("".join((
+                "\nStopping while the EPS delay is still active — NOT flashing.\n",
+                "After re-checking image compatibility, leave the car in accessory mode (ignition off restarts the timer) and retry the seed flow.",
+            )))
         if DRY_RUN_OK_MARKER not in combined:
             exit_with_op_stopped(
                 "\nDry run did NOT reach the safe abort point — NOT flashing. Review the output above."
@@ -415,7 +458,9 @@ def flash_failure_menu(rel, bus, skip_checksum, env, name, rc, seed_timeout=None
     """
     while rc != 0:
         print(f"\nFlash process exited ({rc}).")
-        print("FLASH FAILED or incomplete — EPS may need a recovery re-flash.")
+        print("FLASH FAILED or incomplete — power-steering assist may be unavailable.")
+        print("A retry is not guaranteed recovery. First verify this image matches the exact")
+        print("EPS, diagnose the failure, and confirm stable vehicle power and CAN/Panda.")
         print("A security lockout after a dry run is common on some cars:")
         print("  wait a bit, power-cycle the car (OFF → accessory), then retry.")
         print("  [r] Retry flash (--danger only, no dry run)")
@@ -466,12 +511,13 @@ def main():
             shown = compatible
         else:
             print(f"\n!! No .rwd here is compatible with your EPS ({car_fw}).")
-            if input("   Show ALL images and continue anyway? type 'yes': ").strip().lower() != "yes":
+            if input("   Show all curated guided images and continue anyway? type 'yes': ").strip().lower() != "yes":
                 sys.exit("Aborted.")
-            print("\nAll firmware (compatibility NOT guaranteed — pre-validated):\n")
+            print("\nAll curated guided firmware (compatibility NOT guaranteed — pre-validated):\n")
             shown = images
     else:
-        print("Could not read the car's EPS firmware (not fingerprinted yet?). Showing all images.\n")
+        print("Could not read the car's EPS firmware (not fingerprinted yet?). "
+              "Showing all curated guided images.\n")
         shown = images
 
     rows = []
@@ -479,7 +525,7 @@ def main():
         ok = validate(f)
         rows.append((f, ok))
         status = "valid ✓" if ok else "INVALID ✗  -> will need --skip-checksum (brick risk)"
-        print(f"  [{i + 1:>2}] {os.path.basename(f):<44} {status}")
+        print(f"  [{i + 1:>2}] {image_display_name(f)}  {status}")
 
     sel = input("\nSelect a firmware number to flash (q to quit): ").strip()
     if sel.lower() in ("", "q", "quit"):
@@ -494,7 +540,7 @@ def main():
     path, ok = rows[idx]
 
     rel = os.path.relpath(path, HERE)
-    name = os.path.basename(path)
+    name = image_display_name(path)
     skip_checksum = not ok
 
     if not ok:
@@ -520,7 +566,8 @@ def main():
 
     print(f"\n=== READY TO FLASH: {name} (bus {bus}) ===")
     print("Make sure the car is in accessory mode (ignition ON, engine OFF, A/C off).")
-    print("If it crashes mid-flash, the EPS is recoverable: just run this again.")
+    print("An interrupted flash can remove steering assist or permanently damage the EPS;")
+    print("recovery is not guaranteed.")
     if input("Type 'FLASH' to commit the real flash (--danger): ").strip() != "FLASH":
         exit_with_op_stopped("Aborted — no flash performed.")
 

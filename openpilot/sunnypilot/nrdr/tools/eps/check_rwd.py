@@ -11,9 +11,30 @@ FIRMWARE_CHECKSUMS = {
     0x4c000: [(0, 0x4bf80, "sum"), (1, 0x4bffe, "negative-sum")],
 }
 PILOT_APP_ID = b'39990-TG7-A060\x00\x00'
+T6Z_APP_IDS = (
+    b'39990-T6Z-A110\x00\x00',
+    b'39990-TG7-A040\x00\x00',
+    b'39990-TG7-A030\x00\x00',
+    b'39990-TG7-A020\x00\x00',
+)
+T6Z_SECRETS = (b'\x00\x11\x00\x12\x10\x20',) * 4
+V850_APP_ID_GROUPS = ((PILOT_APP_ID,), T6Z_APP_IDS)
+T6Z_REFERENCE_NOTICE = "".join((
+    "T6Z checksum validation is offline/catalog-only; the current ",
+    "eps-update.py and guided flash.py do not support flashing this image.",
+))
 PILOT_KEYS = b'\x01\x02\x03'
 PILOT_FLASH_START = 0x10000
 PILOT_CHECKSUM_ENDS = (0xa000, 0x1d000, 0x4ff00)
+T6Z_HEADER_PROFILE = (
+    (b'\x00',),
+    (),
+    (b'0',),  # tester address byte 0x30 -> UDS address 0x18DA30F1
+    T6Z_APP_IDS,
+    T6Z_SECRETS,
+    (PILOT_KEYS,),
+)
+T6Z_IDENTITY_OFFSET = 0x3438
 
 
 def check(path):
@@ -61,14 +82,25 @@ def check(path):
 
     # 3. Decrypt
     enc = raw[idx:idx+fw_len]
-    pilot_v850 = fw_len == 0x50000
-    if pilot_v850:
-        if (headers[3] != [PILOT_APP_ID] or headers[5] != [PILOT_KEYS] or
+    honda_v850 = fw_len == 0x50000
+    t6z_reference = tuple(headers[3]) == T6Z_APP_IDS
+    if honda_v850:
+        if (tuple(headers[3]) not in V850_APP_ID_GROUPS or headers[5] != [PILOT_KEYS] or
                 fw_start != PILOT_FLASH_START or idx + fw_len != len(raw) - 4):
             print("\n  ERROR: unexpected 0x50000 firmware identity, layout, or encryption keys")
             return False
+        if t6z_reference and tuple(tuple(values) for values in headers) != T6Z_HEADER_PROFILE:
+            print("\n  ERROR: unexpected T6Z header, CAN address, software secret, or encryption key")
+            return False
+        if t6z_reference:
+            print(f"\n  NOTICE: {T6Z_REFERENCE_NOTICE}")
         k0, k1, k2 = PILOT_KEYS
         dec = bytes(((((b + k0) ^ k1) - k2) & 0xff) for b in enc)
+        if t6z_reference:
+            identity_end = T6Z_IDENTITY_OFFSET + len(T6Z_APP_IDS[0])
+            if dec[T6Z_IDENTITY_OFFSET:identity_end] != T6Z_APP_IDS[0]:
+                print("\n  ERROR: decrypted T6Z payload identity does not match 39990-T6Z-A110")
+                return False
     else:
         try:
             dec = bytes(DECRYPT_LOOKUP[b] for b in enc)
@@ -79,7 +111,7 @@ def check(path):
     # 4. Firmware checksums
     print(f"\n  [3] Firmware checksums")
     cs_defs = FIRMWARE_CHECKSUMS.get(fw_len)
-    if pilot_v850:
+    if honda_v850:
         all_fw_ok = True
         checksum = 0
         start = 0
@@ -109,10 +141,13 @@ def check(path):
     # 5. Summary
     fw_str = ('PASS ✓' if all_fw_ok else 'FAIL ✗') if all_fw_ok is not None else 'SKIP'
     overall = file_ok and (all_fw_ok is not False)
+    overall_label = 'ALL GOOD ✓' if overall else 'CHECKSUM FAILURE ✗'
+    if overall and t6z_reference:
+        overall_label += ' (OFFLINE ONLY; NOT FLASH APPROVAL)'
     print(f"\n  {'='*40}")
     print(f"  File checksum:     {'PASS ✓' if file_ok else 'FAIL ✗'}")
     print(f"  Firmware checksum: {fw_str}")
-    print(f"  Overall:           {'ALL GOOD ✓' if overall else 'CHECKSUM FAILURE ✗'}")
+    print(f"  Overall:           {overall_label}")
 
     return overall
 
