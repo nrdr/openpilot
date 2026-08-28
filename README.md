@@ -10,7 +10,7 @@ Linearized EPS firmware alters the steering torque response characteristics. As 
 
 ## Recent Changes
 
-- **Custom P/I/F Lateral Scaling** — Proportional, Integral, and Feedforward are now scaled independently per speed band (Low / Standard / Highway), replacing the single lateral PID scale. The defaults reproduce the prior tune (Standard 135%, Highway 200% on P and I; feedforward held static at 100%).
+- **Custom P/I/F Lateral Scaling** — Optional Low / Standard / Highway multipliers can scale Proportional, Integral, and Feedforward independently. Every multiplier defaults to a neutral 100%, leaving the static base tune unchanged.
 - **Comma 4 (C4) support** — full C4 UI day-one: redesigned home screen (nrdr branding, live Device IP, "last updated" feed, NY-time stamp) and a fix for the personality toggle that was crash-looping the C4 on boot.
 - **Ford OEM-Style Lateral** — optional four-signal Ford lateral control (curvature + curvature-rate + lane-centering path-angle) for the Expedition, with human-turn detection, lane positioning, and a lateral-accel ceiling. Behind a master toggle, default OFF — Honda is untouched.
 - **Car & Tune Info** — on-device and Sunnylink readout of the detected car: fingerprint, EPS/camera firmware, gas interceptor, radar, and the live kp/ki/kf in use.
@@ -115,13 +115,13 @@ All three only do anything while the **Low Pass Filter** toggle is ON. Higher sp
 
 ### 2/4 — P / I / F scales
 
-The lateral controller is a PID: **P** reacts to the current path error, **I** accumulates stubborn error over time, and a feedforward (**kf**) term pre-applies torque for the curvature the model already knows is coming. Each term is now scaled **independently** and banded by speed, so you can fix one behavior in one regime without wrecking another. Per band — Low Speed (<25mph) / Standard (25–50mph) / Highway (50mph+):
+The lateral controller is a PID: **P** reacts to the current path error, **I** accumulates stubborn error over time, and a feedforward (**kf**) term pre-applies torque for the curvature the model already knows is coming. On NRDR's torque-mod Honda platforms, the base tune is static at every speed: `kp = 0.03`, `ki = 0.01`, and `kf = 1.2e-5`. The controls below are optional percentage multipliers evaluated independently in the Low Speed (<25mph), Standard (25–50mph), and Highway (50mph+) bands; they are not a baked-in gain schedule.
 
 - **Proportional Scale** — percentage multiplier on the P term. Higher = sharper reaction to error (tighter tracking and corner-cutting, but more twitch and possible weaving); lower = softer (wider swings on curves, fewer corrections).
 - **Integral Scale** — multiplier on the I term. Higher = harder pull out of persistent error (holds a corner, but can wind up and weave); lower lets small steady errors stand.
 - **Feedforward Scale** — multiplier on kf, the pre-applied curvature torque. Higher shoves the car into curves earlier (can over-corner); **100% leaves it at the tuned value.** Holding F at 100% while you raise P/I is the new equivalent of the old "Keep Feedforward Static" — you gain correction authority without inflating the feedforward.
 
-100% = the base tune on every term. The defaults reproduce the prior single-scale tune (Standard 135%, Highway 200% on P and I; feedforward static at 100%). *(Longitudinal uses four personality-specific combined scales plus its own Keep Feedforward Static toggle — see Longitudinal Tuning.)*
+100% is neutral for every term in every band and preserves the same static base tune across all speeds. Change a band only when you intentionally want a speed-specific live multiplier. *(Longitudinal uses four personality-specific combined scales plus its own Keep Feedforward Static toggle — see Longitudinal Tuning.)*
 
 ### 3/4 — center boost & unwind
 

@@ -21,6 +21,14 @@ def _format_values(values) -> str:
   return "/".join(f"{float(value):g}" for value in values)
 
 
+def _schedule_label(value_count: int) -> str:
+  return {
+    1: "all speeds",
+    3: "0 / 25 / 50 mph",
+    4: "0 / <25 / 25 / 50 mph",
+  }.get(value_count, "custom breakpoints")
+
+
 class CarTuneReporter:
   def __init__(self, params):
     self.params = params
@@ -79,7 +87,15 @@ class CarTuneReporter:
       if len(pid.kfV)
       else f"{float(pid.kf):g}"
     )
-    speeds = "0 / <25 / 25 / 50 mph" if len(pid.kpV) == 4 else "0 / 25 / 50 mph"
+    p_speeds = _schedule_label(len(pid.kpV))
+    i_speeds = _schedule_label(len(pid.kiV))
+    f_speeds = _schedule_label(len(pid.kfV)) if len(pid.kfV) else "all speeds"
+    if p_speeds == i_speeds == f_speeds:
+      speeds = p_speeds
+    elif p_speeds == i_speeds:
+      speeds = f"P/I {p_speeds} | F {f_speeds}"
+    else:
+      speeds = f"P {p_speeds} | I {i_speeds} | F {f_speeds}"
     return gains, feedforward, speeds
 
   @staticmethod
