@@ -175,21 +175,13 @@ class TestNNTorqueModel:
       assert pid_controller.vgr_profile is not None
       assert pid_controller.vgr_profile.name == "Clarity TRW-A020"
       assert pid_controller.model_sr_policy is SteerRatioModelPolicy.LEGACY_DUAL_BP
-      assert len(pid_controller.pid._k_p[0]) == len(pid_controller.pid._k_p[1]) == 4
-      assert len(pid_controller.pid._k_i[0]) == len(pid_controller.pid._k_i[1]) == 4
-      low_max = 25.0 * CV.MPH_TO_MS
-      assert all(abs(a - b) < 1e-6 for a, b in zip(pid_controller.pid._k_p[0],
-                                                     [0.0, low_max - 1e-3, low_max, 50.0 * CV.MPH_TO_MS], strict=True))
-      assert all(abs(a - b) < 1e-6 for a, b in zip(pid_controller.pid._k_p[1],
-                                                     [0.018, 0.024, 0.048, 0.060], strict=True))
-      assert all(abs(a - b) < 1e-6 for a, b in zip(pid_controller.pid._k_i[0],
-                                                     [0.0, low_max - 1e-3, low_max, 50.0 * CV.MPH_TO_MS], strict=True))
-      assert all(abs(a - b) < 1e-6 for a, b in zip(pid_controller.pid._k_i[1],
-                                                     [0.006, 0.008, 0.016, 0.020], strict=True))
-      assert all(abs(a - b) < 1e-6 for a, b in zip(pid_controller.kf_bp,
-                                                     [0.0, low_max - 1e-3, low_max, 50.0 * CV.MPH_TO_MS], strict=True))
-      assert all(abs(a - b) < 1e-12 for a, b in zip(pid_controller.kf_v,
-                                                      [2.4e-6, 1.8e-6, 3.6e-6, 6.0e-6], strict=True))
+      assert list(pid_controller.pid._k_p[0]) == [0.0]
+      assert list(pid_controller.pid._k_p[1]) == pytest.approx([0.03])
+      assert list(pid_controller.pid._k_i[0]) == [0.0]
+      assert list(pid_controller.pid._k_i[1]) == pytest.approx([0.01])
+      assert pid_controller.ff_factor == pytest.approx(1.2e-5, abs=1e-12)
+      assert pid_controller.kf_bp == []
+      assert pid_controller.kf_v == []
       assert controller.extension.enabled
       assert controller.extension.has_nn_model
       assert abs(controller.extension.activation_speed_mps - 30.0 * CV.MPH_TO_MS) < 1e-6
