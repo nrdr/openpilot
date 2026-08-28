@@ -6,6 +6,7 @@ from openpilot.common.constants import CV
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.selfdrive.controls.lib.latcontrol_pid import LatControlPID
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import SteerRatioSelection
 
 
 __all__ = (
@@ -77,6 +78,11 @@ class LatControlClarityHybrid(LatControl):
 
   def update_torque_parameters(self, latAccelFactor, latAccelOffset, friction):
     self.torque_controller.update_torque_parameters(latAccelFactor, latAccelOffset, friction)
+
+  def set_steer_ratio_selection(self, selection: SteerRatioSelection):
+    super().set_steer_ratio_selection(selection)
+    self.pid_controller.set_steer_ratio_selection(selection)
+    self.torque_controller.set_steer_ratio_selection(selection)
 
   def _lane_change_state(self):
     model_v2 = self.torque_controller.extension.model_v2

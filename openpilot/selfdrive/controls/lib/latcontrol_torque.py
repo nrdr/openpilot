@@ -1,4 +1,3 @@
-import math
 import numpy as np
 from collections import deque
 
@@ -69,13 +68,17 @@ class LatControlTorque(LatControl):
 
     pid_log = log.ControlsState.LateralTorqueState.new_message()
     pid_log.version = VERSION
-    measured_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
+    measured_curvature = self.steer_ratio_selection.measured_curvature(
+      VM, CS.steeringAngleDeg, CS.vEgo, params.roll, params.angleOffsetDeg,
+    )
     measurement = measured_curvature * CS.vEgo ** 2
     future_desired_lateral_accel = desired_curvature * CS.vEgo ** 2
     self.lat_accel_request_buffer.append(future_desired_lateral_accel)
 
     roll_compensation = params.roll * ACCELERATION_DUE_TO_GRAVITY
-    curvature_deadzone = abs(VM.calc_curvature(math.radians(self.steering_angle_deadzone_deg), CS.vEgo, 0.0))
+    curvature_deadzone = self.steer_ratio_selection.curvature_deadzone(
+      VM, CS.steeringAngleDeg, self.steering_angle_deadzone_deg, CS.vEgo, params.angleOffsetDeg,
+    )
     lateral_accel_deadzone = curvature_deadzone * CS.vEgo ** 2
 
     delay_frames = int(np.clip(lat_delay / self.dt + 1, 1, self.lat_accel_request_buffer_len))

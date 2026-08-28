@@ -2,7 +2,6 @@ from types import MappingProxyType
 import unittest
 
 from openpilot.nrdr.params import snapshots
-from openpilot.nrdr.params.profiles import STEER_RATIO_ENDPOINT_PROFILES
 from openpilot.nrdr.params.snapshots import CONTROL_GROUPS, LiveParams, ParamGroup, ParamSnapshot
 from openpilot.sunnypilot.nrdr import live_params as legacy_live_params
 
@@ -55,14 +54,25 @@ class TestParamSnapshots(unittest.TestCase):
     finally:
       snapshots.reset_live_params_for_tests()
 
-  def test_control_groups_follow_canonical_endpoint_profile_order(self):
-    expected = tuple((profile.center_param, profile.outer_param) for profile in STEER_RATIO_ENDPOINT_PROFILES)
-    actual = tuple(group.keys for group in CONTROL_GROUPS[4:4 + len(expected)])
-    self.assertEqual(actual, expected)
-    self.assertEqual(len(CONTROL_GROUPS), 8 + len(expected))
+  def test_steer_ratio_mode_and_manual_values_share_one_atomic_group(self):
+    self.assertEqual(CONTROL_GROUPS[4].keys, (
+      "NrdrSteerRatioMode",
+      "NrdrSteerRatioManualCenter",
+      "NrdrSteerRatioManualFinal",
+    ))
+    retired = {
+      "NrdrLearnSteerRatio", "NrdrLaneChangeEndpointSteerRatio",
+      "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
+      "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
+      "NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord",
+      "NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g",
+      "NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight",
+    }
     keys = [key for group in CONTROL_GROUPS for key in group.keys]
+    self.assertFalse(retired & set(keys))
+    self.assertEqual(len(CONTROL_GROUPS), 9)
     self.assertEqual(len(keys), len(set(keys)))
-    self.assertEqual(len(keys), 51)
+    self.assertEqual(len(keys), 42)
 
   def test_snapshot_keeps_legacy_get_and_bool_semantics(self):
     snapshot = ParamSnapshot(4, MappingProxyType({"Bytes": b"value", "False": b" FALSE ", "True": "yes"}))

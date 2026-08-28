@@ -88,7 +88,7 @@ install_module("openpilot.common.swaglog", cloudlog=cloudlog)
 install_module("openpilot.common.version", sunnylink_consent_version="1", terms_version="1", terms_version_sp="1", training_version="1")
 install_module("openpilot.cereal", package=True, custom=types.SimpleNamespace(), messaging=types.SimpleNamespace())
 install_module("openpilot.nrdr.params", apply_handcrafted_lateral_profile=lambda *args: None,
-               get_handcrafted_lateral_profile=lambda *args: None, get_steer_ratio_endpoint_profile=lambda *args: None,
+               get_handcrafted_lateral_profile=lambda *args: None,
                is_handcrafted_lateral_enabled=lambda *args: False)
 install_module("openpilot.sunnypilot.selfdrive.car.opendbc_config", build_sunnypilot_car_config=lambda *args, **kwargs: None)
 install_module("openpilot.nrdr.features.lateral", package=True)
@@ -96,6 +96,8 @@ install_module("openpilot.nrdr.features.lateral.model_policy", SteerRatioModelRe
                SteerRatioModelPolicy=types.SimpleNamespace(LEGACY_DUAL_BP=object(), PURE_FIRMWARE_VGR=object()),
                resolve_steer_ratio_model=lambda *args: None)
 install_module("openpilot.nrdr.features.lateral.honda_vgr", get_honda_vgr_profile=lambda *args: None)
+install_module("openpilot.nrdr.features.lateral.steer_ratio_tuning", SteerRatioMode=dummy_type,
+               SteerRatioSelection=dummy_type, resolve_steer_ratio_selection=lambda *args: None)
 install_module("openpilot.sunnypilot.models.helpers", get_active_bundle=lambda *args: None)
 install_module("openpilot.system.webrtc.device", package=True)
 install_module("openpilot.system.webrtc.device.video", LiveStreamVideoStreamTrack=dummy_type)

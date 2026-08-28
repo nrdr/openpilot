@@ -14,7 +14,6 @@ from openpilot.nrdr.params.profiles import (
   ProfileValue,
   apply_handcrafted_lateral_profile,
   get_handcrafted_lateral_profile,
-  get_steer_ratio_endpoint_profile,
   is_handcrafted_lateral_enabled,
   restore_handcrafted_lateral_profile,
 )
@@ -33,7 +32,6 @@ __all__ = (
   "ParamsLike",
   "apply_handcrafted_lateral_profile",
   "get_handcrafted_lateral_profile",
-  "get_steer_ratio_endpoint_profile",
   "is_handcrafted_lateral_enabled",
   "restore_handcrafted_lateral_profile",
 )

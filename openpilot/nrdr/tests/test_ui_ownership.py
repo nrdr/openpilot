@@ -49,6 +49,9 @@ UI_MODULES = {
   "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.steer_filters": (
     "openpilot.nrdr.ui.settings.steer_filters", ("SteerFiltersLayout",),
   ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.steer_ratio_tuning": (
+    "openpilot.nrdr.ui.settings.steer_ratio_tuning", ("SteerRatioTuningLayout",),
+  ),
   "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.vehicle_model_learning": (
     "openpilot.nrdr.ui.settings.vehicle_model_learning", ("VehicleModelLearningLayout",),
   ),
@@ -66,6 +69,23 @@ UI_PRODUCTION_IMPORTS = {
 
 
 class TestUiOwnership(unittest.TestCase):
+  def test_native_steer_ratio_page_enforces_exclusive_modes_and_geometry_lock(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    source = (repository_root / "openpilot/nrdr/ui/settings/steer_ratio_tuning.py").read_text(encoding="utf-8")
+
+    for title in (
+      "Use Comma Steer Ratio Learner",
+      "Use nrdr Steer Ratio Learner",
+      "Use Firmware Steer Ratio",
+      "Manual Override On-Center Ratio",
+      "Manual Override Final Ratio",
+    ):
+      self.assertIn(title, source)
+    self.assertIn("if ui_state.engaged:", source)
+    self.assertIn("new_mode = mode if state else SteerRatioMode.MANUAL if current is mode else current", source)
+    self.assertIn("selected or (mode is SteerRatioMode.MANUAL and available[item_mode])", source)
+    self.assertIn("not ui_state.engaged and mode is SteerRatioMode.MANUAL and manual_available", source)
+
   def test_lateral_tuning_routes_all_feedforward_outputs_through_decimal_formatters(self):
     repository_root = Path(__file__).resolve().parents[3]
     source = (repository_root / "openpilot/nrdr/ui/settings/lateral_tuning.py").read_text(encoding="utf-8")

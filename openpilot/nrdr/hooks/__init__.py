@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     refresh_live_parameter_settings,
     stopping_inputs,
     vehicle_model_params,
+    vehicle_model_state,
   )
   from openpilot.nrdr.hooks.driver_monitoring import apply_driver_monitoring_policy
   from openpilot.nrdr.hooks.events import allow_longitudinal, filter_car_events, is_drivable_gear, keep_lateral_active
@@ -31,6 +32,7 @@ __all__ = (
   "speed_limit_pre_active_alert",
   "stopping_inputs",
   "vehicle_model_params",
+  "vehicle_model_state",
 )
 _EXPORT_MODULES = {
   "apply_hud_lead": "openpilot.nrdr.hooks.controlsd",
@@ -38,6 +40,7 @@ _EXPORT_MODULES = {
   "refresh_live_parameter_settings": "openpilot.nrdr.hooks.controlsd",
   "stopping_inputs": "openpilot.nrdr.hooks.controlsd",
   "vehicle_model_params": "openpilot.nrdr.hooks.controlsd",
+  "vehicle_model_state": "openpilot.nrdr.hooks.controlsd",
   "apply_driver_monitoring_policy": "openpilot.nrdr.hooks.driver_monitoring",
   "allow_longitudinal": "openpilot.nrdr.hooks.events",
   "filter_car_events": "openpilot.nrdr.hooks.events",

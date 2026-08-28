@@ -1,5 +1,3 @@
-import math
-
 import numpy as np
 
 from openpilot.cereal import log
@@ -7,19 +5,16 @@ from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.pid import PIDController
 from openpilot.common.realtime import DT_CTRL
-from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile, normalize_honda_eps_firmware
+from openpilot.nrdr.features.lateral.honda_vgr import normalize_honda_eps_firmware
 from openpilot.nrdr.features.lateral.lat_stiction import LatStiction
 from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch
 from openpilot.nrdr.features.lateral.tune_learner import TuneLearner
-from openpilot.nrdr.params import NrdrParamKey, get_live_params, get_steer_ratio_endpoint_profile, read_bool, read_float
+from openpilot.nrdr.params import NrdrParamKey, get_live_params, read_bool, read_float
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
-from openpilot.nrdr.features.lateral.model_policy import (
-  SteerRatioModelPolicy,
-  classify_steer_ratio_model,
-)
-from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
-  LaneChangeSteerRatioFade,
+  SteerRatioSelection,
+  get_steer_ratio_metadata,
+  resolve_steer_ratio_selection,
 )
 
 
@@ -118,7 +113,7 @@ class NrdrLatControlPID(LatControl):
   def supports(CP, CP_SP) -> bool:
     fingerprint = str(CP.carFingerprint)
     eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
-    return eps_modified or get_steer_ratio_endpoint_profile(fingerprint) is not None
+    return eps_modified or get_steer_ratio_metadata(fingerprint) is not None
 
   def __init__(self, CP, CP_SP, CI, dt):
     super().__init__(CP, CP_SP, CI, dt)
@@ -135,12 +130,7 @@ class NrdrLatControlPID(LatControl):
     self.is_eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
     self.dt = dt
     self.params = get_live_params()
-    self.sr_profile = get_steer_ratio_endpoint_profile(str(CP.carFingerprint))
-    self.vgr_profile = get_honda_vgr_profile(CP)
-    self.sr_values = list(self.sr_profile.default_values) if self.sr_profile else None
-    self.model_sr_policy = classify_steer_ratio_model(get_active_bundle())
-    self.lane_change_endpoint_sr = read_bool(self.params, NrdrParamKey.NRDR_LANE_CHANGE_ENDPOINT_STEER_RATIO, True)
-    self.lane_change_sr_fade = LaneChangeSteerRatioFade(dt)
+    self.steer_ratio_selection = resolve_steer_ratio_selection(CP, self.params.snapshot)
     self.center_boost_magnitude = 0.5
     self.center_boost_threshold = 3.0
     self.center_boost_min_speed = 50.0
@@ -170,6 +160,9 @@ class NrdrLatControlPID(LatControl):
   def update_model_v2(self, model_v2) -> None:
     self.model_v2 = model_v2
 
+  def set_steer_ratio_selection(self, selection: SteerRatioSelection) -> None:
+    self.steer_ratio_selection = selection
+
   def _lane_change_active(self) -> bool:
     return self.model_v2 is not None and self.model_v2.meta.laneChangeState != log.LaneChangeState.off
 
@@ -178,36 +171,12 @@ class NrdrLatControlPID(LatControl):
 
   @property
   def firmware_vgr_selected(self) -> bool:
-    return self.sr_profile is not None and self.vgr_profile is not None and \
-      self.model_sr_policy is not SteerRatioModelPolicy.LEGACY_DUAL_BP
-
-  @property
-  def legacy_dual_bp_selected(self) -> bool:
-    return self.sr_profile is not None and self.model_sr_policy is SteerRatioModelPolicy.LEGACY_DUAL_BP
+    return self.steer_ratio_selection.firmware_vgr_selected
 
   def _desired_angles(self, VM, CS, params, desired_curvature):
-    lane_change_endpoint_enabled = self.legacy_dual_bp_selected and self.lane_change_endpoint_sr
-    if not lane_change_endpoint_enabled:
-      self.lane_change_sr_fade.reset()
-    lane_change_weight = self.lane_change_sr_fade.update(self._lane_change_starting()) if lane_change_endpoint_enabled else 0.0
-
-    if self.firmware_vgr_selected:
-      center_ratio = self.sr_values[0]
-      previous_ratio = VM.sR
-      try:
-        VM.sR = center_ratio
-        linear_angle = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
-      finally:
-        VM.sR = previous_ratio
-      angle_no_offset = self.vgr_profile.linear_to_physical(linear_angle)
-    elif self.legacy_dual_bp_selected:
-      normal_ratio = float(np.interp(abs(CS.steeringAngleDeg), self.sr_profile.breakpoints, self.sr_values))
-      VM.sR = normal_ratio + lane_change_weight * (self.sr_values[-1] - normal_ratio)
-      angle_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
-    else:
-      # Unknown model with no exact EPS map keeps openpilot's stock VehicleModel
-      # ratio. Do not guess a model correction or silently select dual-BP.
-      angle_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+    angle_no_offset = self.steer_ratio_selection.desired_angle_no_offset(
+      VM, CS.steeringAngleDeg, CS.vEgo, params.roll, desired_curvature,
+    )
     return angle_no_offset, angle_no_offset + params.angleOffsetDeg
 
   def _reset(self, desired_angle: float) -> None:
@@ -217,7 +186,6 @@ class NrdrLatControlPID(LatControl):
     self.previous_output = 0.0
     self.previous_desired_angle = desired_angle
     self.previous_saturated = False
-    self.lane_change_sr_fade.reset()
     self.stiction.reset()
 
   def _feedforward(self, CS, desired_angle: float) -> float:
@@ -258,9 +226,6 @@ class NrdrLatControlPID(LatControl):
     self.injection_test = read_bool(snapshot, NrdrParamKey.HONDA_INJECTION_TEST)
     self.starpilot = read_bool(snapshot, NrdrParamKey.NRDR_STAR_PILOT_PID)
     self.stiction_enabled = read_bool(snapshot, NrdrParamKey.NRDR_LAT_STICTION)
-    if self.sr_profile is not None:
-      self.sr_values[:] = [read_float(snapshot, key, default, 8.0, 25.0) for key, default in self.sr_profile.param_values]
-      self.lane_change_endpoint_sr = read_bool(snapshot, NrdrParamKey.NRDR_LANE_CHANGE_ENDPOINT_STEER_RATIO, True)
     self.settings_generation = snapshot.generation
 
   def _scaled_pid_output(self, CS, desired_angle: float, angle_delta: float, phase: float) -> float:

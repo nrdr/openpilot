@@ -125,9 +125,8 @@ def test_deprecated_steer_ratio_mode_is_not_polled_by_controller():
   assert "NrdrLegacyDualBpSteerRatio" not in control_keys
 
 
-def test_learning_toggles_preserve_typed_boolean_values():
+def test_remaining_learning_toggles_preserve_typed_boolean_values():
   values = {
-    "NrdrLearnSteerRatio": False,
     "NrdrLearnStiffness": True,
     "NrdrLearnAngleOffset": False,
   }
@@ -136,7 +135,6 @@ def test_learning_toggles_preserve_typed_boolean_values():
 
   refresh_live_parameter_settings(controls, None)
 
-  assert not controls.learn_steer_ratio
   assert controls.learn_stiffness
   assert not controls.learn_angle_offset
 

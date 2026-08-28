@@ -1,5 +1,3 @@
-import math
-
 from openpilot.cereal import log
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
@@ -28,7 +26,9 @@ class LatControlCurvature(LatControl):
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, calibrated_pose, curvature_limited, lat_delay):
     curvature_log = log.ControlsState.LateralCurvatureState.new_message()
-    actual_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
+    actual_curvature = self.steer_ratio_selection.measured_curvature(
+      VM, CS.steeringAngleDeg, CS.vEgo, params.roll, params.angleOffsetDeg,
+    )
     error = desired_curvature - actual_curvature
 
     if not active:

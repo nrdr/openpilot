@@ -165,6 +165,9 @@ class TestParamDefaults(unittest.TestCase):
     for key, value in EXPECTED_VALUE_DEFAULTS.items():
       if key != "LaneTurnValue":
         self.assertEqual(params.values[key], value)
+    self.assertEqual(params.values["NrdrSteerRatioMode"], 0)
+    self.assertEqual(params.values["NrdrSteerRatioManualCenter"], 15.38)
+    self.assertEqual(params.values["NrdrSteerRatioManualFinal"], 10.93)
 
     forced = {
       "EnforceTorqueControl": False,
@@ -179,16 +182,94 @@ class TestParamDefaults(unittest.TestCase):
       self.assertEqual(params.values[key], value)
 
     expected_keys = (
-      [key for key in EXPECTED_BOOL_DEFAULTS if key != "QuietMode"]
+      ["NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal", "NrdrSteerRatioMode"]
+      + [key for key in EXPECTED_BOOL_DEFAULTS if key != "QuietMode"]
       + [key for key in EXPECTED_VALUE_DEFAULTS if key != "LaneTurnValue"]
       + list(forced)
     )
     self.assertEqual([call[1] for call in params.calls], expected_keys)
-    self.assertTrue(all(call[3:] == ((), {}) for call in params.calls), "startup writes must keep nonblocking defaults")
-    self.assertTrue(all(call[0] == "put_bool" for call in params.calls[:len(EXPECTED_BOOL_DEFAULTS) - 1]))
-    value_start = len(EXPECTED_BOOL_DEFAULTS) - 1
+    self.assertTrue(all(call[4] == {"block": True} for call in params.calls[:3]))
+    self.assertTrue(all(call[3:] == ((), {}) for call in params.calls[3:]), "ordinary startup defaults must remain nonblocking")
+    bool_start = 3
+    bool_end = bool_start + len(EXPECTED_BOOL_DEFAULTS) - 1
+    self.assertTrue(all(call[0] == "put_bool" for call in params.calls[bool_start:bool_end]))
+    value_start = bool_end
     value_end = value_start + sum(key not in existing for key in EXPECTED_VALUE_DEFAULTS)
     self.assertTrue(all(call[0] == "put" for call in params.calls[value_start:value_end]))
+
+  def test_legacy_true_migrates_to_comma_and_current_car_endpoints(self):
+    params = FakeParams({
+      "CarPlatformBundle": {"platform": "HONDA_CLARITY"},
+      "NrdrLearnSteerRatio": True,
+      "NrdrSteerRatioCenterClarity": 19.25,
+      "NrdrSteerRatioOuterClarity": 13.10,
+    })
+
+    self.defaults._migrate_steer_ratio_settings(params)
+
+    self.assertEqual(params.values["NrdrSteerRatioManualCenter"], 19.25)
+    self.assertEqual(params.values["NrdrSteerRatioManualFinal"], 13.10)
+    self.assertEqual(params.values["NrdrSteerRatioMode"], 1)
+    self.assertEqual([call[1] for call in params.calls], [
+      "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal", "NrdrSteerRatioMode",
+    ])
+    self.assertTrue(all(call[4] == {"block": True} for call in params.calls))
+
+  def test_partial_migration_retries_only_missing_values_and_writes_mode_last(self):
+    params = FakeParams(
+      {
+        "CarPlatformBundle": {"platform": "HONDA_CIVIC"},
+        "NrdrLearnSteerRatio": True,
+        "NrdrSteerRatioCenterCivic": 17.24,
+        "NrdrSteerRatioOuterCivic": 10.93,
+      },
+      put_errors={"NrdrSteerRatioManualFinal"},
+    )
+
+    self.defaults._migrate_steer_ratio_settings(params)
+
+    self.assertEqual(params.values["NrdrSteerRatioManualCenter"], 17.24)
+    self.assertNotIn("NrdrSteerRatioManualFinal", params.values)
+    self.assertNotIn("NrdrSteerRatioMode", params.values)
+    self.assertEqual([call[1] for call in params.calls], [
+      "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
+    ])
+
+    params.put_errors.clear()
+    params.calls.clear()
+    self.defaults._migrate_steer_ratio_settings(params)
+
+    self.assertEqual(params.values["NrdrSteerRatioManualCenter"], 17.24)
+    self.assertEqual(params.values["NrdrSteerRatioManualFinal"], 10.93)
+    self.assertEqual(params.values["NrdrSteerRatioMode"], 1)
+    self.assertEqual([call[1] for call in params.calls], [
+      "NrdrSteerRatioManualFinal", "NrdrSteerRatioMode",
+    ])
+    self.assertTrue(all(call[4] == {"block": True} for call in params.calls))
+
+  def test_fresh_clarity_uses_requested_global_manual_defaults(self):
+    params = FakeParams({"CarPlatformBundle": {"platform": "HONDA_CLARITY"}})
+
+    self.defaults._migrate_steer_ratio_settings(params)
+
+    self.assertEqual(params.values["NrdrSteerRatioManualCenter"], 15.38)
+    self.assertEqual(params.values["NrdrSteerRatioManualFinal"], 10.93)
+    self.assertEqual(params.values["NrdrSteerRatioMode"], 0)
+
+  def test_existing_new_values_are_never_overwritten_by_migration(self):
+    params = FakeParams({
+      "NrdrSteerRatioMode": 3,
+      "NrdrSteerRatioManualCenter": 16.2,
+      "NrdrSteerRatioManualFinal": 11.1,
+      "NrdrLearnSteerRatio": True,
+    })
+
+    self.defaults._migrate_steer_ratio_settings(params)
+
+    self.assertEqual(params.values["NrdrSteerRatioMode"], 3)
+    self.assertEqual(params.values["NrdrSteerRatioManualCenter"], 16.2)
+    self.assertEqual(params.values["NrdrSteerRatioManualFinal"], 11.1)
+    self.assertEqual(params.calls, [])
 
   def test_mici_omits_quiet_mode_seed(self):
     self.defaults.HARDWARE = SimpleNamespace(get_device_type=lambda: "mici")

@@ -2,37 +2,44 @@ from types import SimpleNamespace
 import unittest
 
 from openpilot.nrdr.features.driver_policy.mads import AutoLkas
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import SteerRatioModeLatch, resolve_steer_ratio_selection
 from openpilot.nrdr.hooks.controlsd import apply_hud_lead, stopping_inputs, vehicle_model_params
 from openpilot.nrdr.hooks.driver_monitoring import apply_driver_monitoring_policy
 
 
 class TestHookPolicies(unittest.TestCase):
-  def test_vehicle_model_policy_respects_each_learning_gate(self):
-    controls = SimpleNamespace(
+  @staticmethod
+  def _controls(mode=1):
+    CP = SimpleNamespace(brand="honda", carFingerprint="HONDA_CLARITY", steerRatio=15.0, carFw=[])
+    selection = resolve_steer_ratio_selection(CP, {
+      "NrdrSteerRatioMode": mode,
+      "NrdrSteerRatioManualCenter": 15.38,
+      "NrdrSteerRatioManualFinal": 10.93,
+    })
+    return SimpleNamespace(
       learn_stiffness=False,
-      learn_steer_ratio=True,
       learn_angle_offset=False,
-      CP=SimpleNamespace(steerRatio=15.0),
+      CP=CP,
+      sm=SimpleNamespace(valid={"vehicleParameters": True}),
+      steer_ratio_latch=SteerRatioModeLatch(selection),
     )
-    live_params = SimpleNamespace(stiffnessFactor=0.8, steerRatio=16.5, angleOffsetDeg=1.2)
+
+  def test_vehicle_model_policy_respects_learning_gates_and_explicit_comma_mode(self):
+    controls = self._controls()
+    live_params = SimpleNamespace(stiffnessFactor=0.8, steerRatio=16.5, steerRatioValid=True, angleOffsetDeg=1.2)
 
     self.assertEqual(vehicle_model_params(controls, live_params), (1.0, 16.5, 0.0))
 
     controls.learn_stiffness = True
-    controls.learn_steer_ratio = False
     controls.learn_angle_offset = True
-    self.assertEqual(vehicle_model_params(controls, live_params), (0.8, 15.0, 1.2))
+    self.assertEqual(vehicle_model_params(controls, live_params), (0.8, 16.5, 1.2))
 
-  def test_vehicle_model_policy_preserves_positive_floor(self):
-    controls = SimpleNamespace(
-      learn_stiffness=True,
-      learn_steer_ratio=True,
-      learn_angle_offset=False,
-      CP=SimpleNamespace(steerRatio=15.0),
-    )
-    live_params = SimpleNamespace(stiffnessFactor=-1.0, steerRatio=0.0, angleOffsetDeg=0.0)
+  def test_vehicle_model_policy_preserves_positive_floor_and_rejects_invalid_comma_ratio(self):
+    controls = self._controls()
+    controls.learn_stiffness = True
+    live_params = SimpleNamespace(stiffnessFactor=-1.0, steerRatio=0.0, steerRatioValid=True, angleOffsetDeg=0.0)
 
-    self.assertEqual(vehicle_model_params(controls, live_params), (0.1, 0.1, 0.0))
+    self.assertEqual(vehicle_model_params(controls, live_params), (0.1, 15.0, 0.0))
 
   def test_stopping_inputs_and_hud_lead_translate_framework_messages(self):
     pose = SimpleNamespace(orientation=SimpleNamespace(xyz=(0.0, 0.04, 0.0)))

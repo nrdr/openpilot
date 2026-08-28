@@ -38,7 +38,7 @@ If this happens, take over and disengage safely. Once parked, go to **Settings �
 
 If the controls are gray, **Handcrafted Lateral Tuning** owns them and locks them to its profile (`2000` main and `1200` near center). Turn that profile off only if you intend to tune these values by hand. Do not max either control: higher thresholds make NRDR slower to yield to real driver input. This is only a false-detection workaround, not a cure. If stutter is strong, repeatable, or affects control, stop testing that firmware, return to a known-good configuration, and report the exact rack/firmware plus logs in Discord.
 
-Many Hondas also have a non-linear variable steering ratio inside the rack. A single static ratio cannot describe the whole steering range, so the car may track too far inside or outside a curve when the model and rack geometry disagree. NRDR maps reviewed EPS firmware and model artifacts to the correct geometry policy; coverage is still being expanded car by car.
+Many Hondas also have a non-linear variable steering ratio inside the rack. A single wrong ratio can make the car track too far inside or outside a curve even when higher P/I/F gains do not help. NRDR now makes the geometry source an explicit choice; the driving model can never silently replace it.
 
 ## Branches to install
 
@@ -64,14 +64,14 @@ Many Hondas also have a non-linear variable steering ratio inside the rack. A si
 
 ## Settings in plain English
 
-Settings appear only when they apply to the detected car and hardware. A grayed-out control is usually locked because **Handcrafted Lateral Tuning** owns it. Start from defaults, change one thing at a time, and never use a slider to hide a firmware mismatch.
+Settings appear only when they apply to the detected car and hardware. A control may be gray because the car is engaged, another steer-ratio mode is selected, an exact data source is unavailable, or **Handcrafted Lateral Tuning** owns that controller setting. Start from defaults, change one thing at a time, and never use a slider to hide a firmware mismatch.
 
 <details>
 <summary><strong>Handcrafted Lateral Tuning and vehicle learning</strong></summary>
 
-- **Handcrafted Lateral Tuning** loads the versioned, Clarity-derived road-tested profile for the supported Accord, Civic, Clarity, CR-V, and Insight fingerprints. It also restores the profile if another setting tries to change one of its owned values. Leave it OFF if you intend to tune manually.
+- **Handcrafted Lateral Tuning** loads the versioned, Clarity-derived road-tested controller gains and filters for supported Honda fingerprints. It does not choose or rewrite steer ratio. Leave it OFF if you intend to tune its other owned controls manually.
 - **Loaded Vehicle & Tune** shows the detected fingerprint, EPS firmware, controller, geometry, and the actual gains in use. Check this before assuming a setting loaded.
-- **Learn Steer Ratio (Auto)** uses openpilot's learned scalar only outside NRDR's active model/firmware geometry policy. Mapped firmware and exact legacy-model policies keep their configured geometry authoritative.
+- **Learned Steer Ratio** remains here as a read-only diagnostic. Choose whether to use it inside **Controller Tuning Dungeon → Steer Ratio Tuning**.
 - **Learn Tire Stiffness (Auto)** lets openpilot learn how strongly the tires respond. OFF pins the factor to `1.0`.
 - **Learn Angle Offset (Auto)** learns which sensor angle means straight ahead. Turn it OFF temporarily if a bad learned offset is pulling the car sideways.
 - **Run Tune Report Scan** reads saved drive logs and summarizes tracking by speed. It is a diagnosis helper, not an automatic permission to change gains.
@@ -82,13 +82,19 @@ Settings appear only when they apply to the detected car and hardware. A grayed-
 <summary><strong>Controller Tuning Dungeon</strong></summary>
 
 - **P / I / F scales** are split into Low (below 25 mph), Standard (25–50 mph), and Highway (50 mph and above). P reacts now, I corrects an error that will not go away, and F prepares for the curve the model already requested. `100%` keeps the tuned base.
-- **On-Center Steer Ratio** is the rack ratio near straight ahead. **Outer Steer Ratio** is the high-angle endpoint used only by exact legacy dual-BP model artifacts.
-- **Start Lane Changes at Outer SR** affects only legacy dual-BP mode. It starts a lane change at the outer ratio and fades back to the normal curve; it does nothing in pure-firmware or unclassified mode.
+- **Steer Ratio Tuning** has four mutually exclusive modes:
+  - **Manual** is represented by all three switches being OFF. On supported Hondas it blends the global **On-Center** and **Final** values (`15.38` and `10.93` defaults) using hidden car-specific outer-angle information. On every other car the sliders stay disabled and the stock ratio remains untouched.
+  - **Use Comma Steer Ratio Learner** uses Comma's valid live learned ratio as one number at every steering angle. It uses the car's stock ratio until the first valid sample, then holds the last valid value through brief message dropouts so geometry cannot jump mid-turn.
+  - **Use nrdr Steer Ratio Learner** uses NRDR's fixed curve made from real steering-angle logs. Despite the historical name, it does not keep learning while you drive. It is currently available only for the exact Honda Clarity fingerprint.
+  - **Use Firmware Steer Ratio** follows the curve read from an exactly recognized steering-rack firmware and keeps the car's stock straight-ahead ratio as its starting point.
+- Selecting unsupported NRDR-raw or firmware mode does not borrow data from a related car. The whole controller uses the stock car ratio and reports the fallback. Geometry changes are latched so measured curvature and desired angle cannot switch separately mid-turn.
+
+Developers and reviewers can find the exact raw-data provenance and math in [the steer-ratio mode reference](openpilot/nrdr/docs/STEER_RATIO_MODES.md).
 - **StarPilot PID Additions** enables borrowed turn-in, unwind, and left/right scaling that was not built for Honda. Leave it OFF unless you are deliberately comparing it.
 - **Rate Damping (D) Strength / Fade-Out Speed** resists fast wheel movement to calm low-speed ringing, then fades away with speed. Too much makes steering heavy.
 - **Center Boost / Threshold / Minimum Speed** adds extra P correction only near center and only above the chosen speed. It does not multiply I, F, or damping.
 - **Predictive Lateral Stiction** tapers and holds torque as the wheel reaches a stable target, then releases immediately for driver input, lane changes, faults, or steering limits.
-- **NNLC** is the optional Clarity neural lateral controller. Activation speed chooses the PID-to-NNLC handoff; KP, KI, and KF scale its three terms. Lane changes remain on PID, and raw firmware-VGR mode disables NNLC.
+- **NNLC** is the optional Clarity neural lateral controller. Activation speed chooses the PID-to-NNLC handoff; KP, KI, and KF scale its three terms. Lane changes remain on PID, and explicit Firmware Steer Ratio mode disables NNLC.
 
 </details>
 

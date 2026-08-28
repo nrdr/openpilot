@@ -7,17 +7,14 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.nrdr.params import (
   apply_handcrafted_lateral_profile,
   get_handcrafted_lateral_profile,
-  get_steer_ratio_endpoint_profile,
   is_handcrafted_lateral_enabled,
 )
-from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
-from openpilot.nrdr.features.lateral.model_policy import (
-  SteerRatioModelResolution,
-  SteerRatioModelPolicy,
-  resolve_steer_ratio_model,
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
+  SteerRatioMode,
+  SteerRatioSelection,
+  resolve_steer_ratio_selection,
 )
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
-from openpilot.sunnypilot.models.helpers import get_active_bundle
 
 
 def _format_values(values) -> str:
@@ -120,35 +117,26 @@ class CarTuneReporter:
     return gains, feedforward, speeds
 
   @staticmethod
-  def _model_identity(model: SteerRatioModelResolution) -> str:
-    name = model.display_name or model.internal_name or "default/unidentified model"
-    if model.internal_name and model.internal_name not in name:
-      name += f" [{model.internal_name}]"
-    artifact = model.artifact_sha256[:12] if model.artifact_sha256 is not None else "no artifact SHA"
-    return f"{name} @ {artifact}"
+  def _steer_ratio_info(selection: SteerRatioSelection) -> str:
+    prefix = f"selected {selection.requested_label} | effective {selection.effective_label}"
+    if not selection.available:
+      return f"{prefix} | {selection.unavailable_reason} | CP {selection.cp_ratio:g}"
+    if selection.effective_mode is SteerRatioMode.MANUAL:
+      return (f"{prefix} | {selection.manual_center:.2f} center -> {selection.manual_final:.2f} final " +
+              f"by {selection.manual_outer_angle_deg:g} deg | no lane fade")
+    if selection.effective_mode is SteerRatioMode.COMMA:
+      return (f"{prefix} | last valid live vehicleParameters.steerRatio scalar | " +
+              f"CP {selection.cp_ratio:g} until the first valid sample")
+    if selection.effective_mode is SteerRatioMode.NRDR_RAW:
+      return (f"{prefix} | {selection.raw_profile.name} | raw data ends at 247.5 deg, then holds 15.279368 | " +
+              f"source {selection.raw_profile.provenance}")
+    return (f"{prefix} | {selection.firmware_profile.name} relative Table-A shape | " +
+            f"immutable CP center anchor {selection.cp_ratio:g} | no lane fade")
 
-  def _steer_ratio_info(self, CP, model: SteerRatioModelResolution) -> str:
-    profile = get_steer_ratio_endpoint_profile(CP.carFingerprint)
-    if profile is None:
-      return f"Auto {self._state('NrdrLearnSteerRatio')} | base {float(CP.steerRatio):g}"
-    center = float(self._value(profile.center_param))
-    outer = float(self._value(profile.outer_param))
-    firmware_profile = get_honda_vgr_profile(CP)
-    identity = self._model_identity(model)
-    if model.policy is SteerRatioModelPolicy.LEGACY_DUAL_BP:
-      lane_change = self._state("NrdrLaneChangeEndpointSteerRatio")
-      return f"{identity} | model-locked legacy dual-BP | {center:.2f} center -> {outer:.2f} outer | 1.5s lane fade {lane_change}"
-    if firmware_profile is not None:
-      policy = "model-locked" if model.policy is SteerRatioModelPolicy.PURE_FIRMWARE_VGR else "unclassified model"
-      return f"{identity} | {policy} raw EPS map ({firmware_profile.name}) | {center:.2f} static center anchor | no lane fade"
-    policy = "pure-firmware model" if model.policy is SteerRatioModelPolicy.PURE_FIRMWARE_VGR else "unclassified model"
-    return f"{identity} | {policy} | exact EPS map unavailable -> stock VehicleModel | no NRDR steer-ratio curve or lane fade"
-
-  def _controller_info(self, CP, controller: str, handcrafted_enabled: bool, profile,
-                       model_policy: SteerRatioModelPolicy) -> str:
+  def _controller_info(self, controller: str, handcrafted_enabled: bool, profile,
+                       steer_ratio: SteerRatioSelection) -> str:
     if controller == "PID/NNLC":
-      firmware_pid_only = model_policy is not SteerRatioModelPolicy.LEGACY_DUAL_BP and get_honda_vgr_profile(CP) is not None
-      if firmware_pid_only:
+      if steer_ratio.firmware_vgr_selected:
         nnlc = "PID only | NNLC unavailable in firmware EPS mode"
       else:
         nnlc = "PID/NNLC hybrid | PID for lane changes" if self._state("NrdrNnlcEnabled") == "ON" \
@@ -170,11 +158,11 @@ class CarTuneReporter:
     eps_short = eps.rsplit(",", 1)[-1].strip() if "," in eps else eps
     interceptor = self._gas_interceptor()
     controller = self._controller_name(CP)
-    model = resolve_steer_ratio_model(get_active_bundle(self.params))
+    steer_ratio_selection = resolve_steer_ratio_selection(CP, self.params)
     profile = get_handcrafted_lateral_profile(CP.carFingerprint)
     handcrafted_enabled = is_handcrafted_lateral_enabled(CP.carFingerprint, self.params)
     handcrafted = f"{profile.name} (v{profile.version})" if handcrafted_enabled and profile is not None else "OFF"
-    controller_info = self._controller_info(CP, controller, handcrafted_enabled, profile, model.policy)
+    controller_info = self._controller_info(controller, handcrafted_enabled, profile, steer_ratio_selection)
 
     pid_base, pid_feedforward, pid_speeds = self._pid_info(CP)
     longitudinal = CP.longitudinalTuning
@@ -195,9 +183,9 @@ class CarTuneReporter:
       f"KF {float(self._value('NrdrNnlcKfGain')) / 100.0:g} | ",
       f"KI {float(self._value('NrdrNnlcKiGain')) / 100.0:g}",
     ))
-    if model.policy is not SteerRatioModelPolicy.LEGACY_DUAL_BP and get_honda_vgr_profile(CP) is not None:
+    if steer_ratio_selection.firmware_vgr_selected:
       nnlc += " | inactive in firmware EPS mode"
-    steer_ratio = self._steer_ratio_info(CP, model)
+    steer_ratio = self._steer_ratio_info(steer_ratio_selection)
     learning = f"stiffness {self._state('NrdrLearnStiffness')} | angle {self._state('NrdrLearnAngleOffset')}"
     helpers = f"stiction {self._state('NrdrLatStiction')} | StarPilot {self._state('NrdrStarPilotPid')}"
     gas = "gas" if interceptor == "true" else "no gas"
@@ -226,7 +214,6 @@ class CarTuneReporter:
       "",
       "CONTROLLER",
       controller_info,
-      f"Driving model: {self._model_identity(model)}",
       f"Handcrafted profile: {handcrafted}",
       f"NNLC: {nnlc}",
       "",

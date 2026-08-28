@@ -31,13 +31,6 @@ class VehicleModelLearningLayout(Widget):
     self._lp_steer_ratio = ListItemSP(
       title=lambda: f"{tr('Learned Steer Ratio')}: {self._lp_text['steerRatio']}",
     )
-    self._learn_steer_ratio = toggle_item_sp(
-      param="NrdrLearnSteerRatio",
-      title=lambda: tr("Learn Steer Ratio (Auto)"),
-      description=lambda: tr("On uses the learned scalar outside NRDR's active steering policy. A mapped Honda in raw-firmware " +
-                             "mode keeps its configured On-Center anchor; model-locked legacy artifacts use the configured curve."),
-      initial_state=False,
-    )
     self._lp_stiffness = ListItemSP(
       title=lambda: f"{tr('Learned Tire Stiffness Factor')}: {self._lp_text['stiffnessFactor']}",
     )
@@ -63,7 +56,6 @@ class VehicleModelLearningLayout(Widget):
 
     return [
       self._lp_steer_ratio,
-      self._learn_steer_ratio,
       self._lp_stiffness,
       self._learn_stiffness,
       self._lp_angle_avg,
@@ -102,7 +94,7 @@ class VehicleModelLearningLayout(Widget):
     self._refresh_live_params()
     fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
     editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
-    for item in (self._learn_steer_ratio, self._learn_stiffness, self._learn_angle_offset):
+    for item in (self._learn_stiffness, self._learn_angle_offset):
       item.action_item.set_enabled(editable)
 
   def _render(self, rect):

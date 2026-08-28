@@ -50,11 +50,7 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
   def test_fragments_declare_exact_consumer_anchors(self):
     macros = _yaml_document("_macros.yaml")
     self.assertEqual(set(macros), {"macros"})
-    self.assertEqual(set(macros["macros"]), {
-      "handcrafted_lateral_unlocked",
-      "nrdr_legacy_steer_ratio",
-      "nrdr_steer_ratio_active",
-    })
+    self.assertEqual(set(macros["macros"]), {"handcrafted_lateral_unlocked"})
 
     expected_pages = {
       "pages/cruise.yaml": ("cruise", "smart_cruise", ["nrdr"]),
@@ -76,7 +72,7 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
     self.assertEqual([item["key"] for item in device["items"]], ["DisablePowerDown"])
     self.assertEqual([extension["item_key"] for extension in device["extend_enablement"]], ["MaxTimeOffroad"])
 
-  def test_all_90_generated_nrdr_settings_keys_have_canonical_source(self):
+  def test_all_active_generated_nrdr_settings_keys_have_canonical_source(self):
     catalog_keys = {key.value for key in NrdrParamKey}
     canonical_references: list[str] = []
     for relative_path in SOURCE_FILES:
@@ -86,9 +82,18 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
 
     canonical_keys = set(canonical_references) & catalog_keys
     generated_nrdr_keys = set(generated_references) & catalog_keys
-    self.assertEqual(len(canonical_keys), 90)
+    self.assertEqual(len(canonical_keys), 81)
     self.assertEqual(canonical_keys, generated_nrdr_keys)
     self.assertEqual(set(canonical_references) - catalog_keys, set())
+    retired_steer_ratio_keys = {
+      "NrdrLearnSteerRatio", "NrdrLaneChangeEndpointSteerRatio",
+      "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
+      "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
+      "NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord",
+      "NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g",
+      "NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight",
+    }
+    self.assertFalse(retired_steer_ratio_keys & canonical_keys)
 
   def test_consumer_sources_do_not_redeclare_canonical_nrdr_keys(self):
     canonical_references: list[str] = []

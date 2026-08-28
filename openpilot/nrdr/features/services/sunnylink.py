@@ -5,6 +5,12 @@ from openpilot.common.hardware.hw import Paths
 
 
 UNREGISTERED = "UnregisteredDevice"
+ONROAD_WRITE_BLOCKLIST = frozenset((
+  "LongitudinalPersonality",
+  "NrdrSteerRatioMode",
+  "NrdrSteerRatioManualCenter",
+  "NrdrSteerRatioManualFinal",
+))
 
 
 def _identity_path() -> Path:
@@ -37,7 +43,7 @@ def persist_dongle_id(dongle_id) -> None:
 
 
 def allow_param_write(key: str, onroad: bool) -> bool:
-  return not onroad or key != "LongitudinalPersonality"
+  return not onroad or key not in ONROAD_WRITE_BLOCKLIST
 
 
 def inject_car_tune_details(schema: dict, walk) -> None:
@@ -58,6 +64,7 @@ def inject_car_tune_details(schema: dict, walk) -> None:
 
 
 __all__ = (
+  "ONROAD_WRITE_BLOCKLIST",
   "UNREGISTERED",
   "_identity_path",
   "allow_param_write",

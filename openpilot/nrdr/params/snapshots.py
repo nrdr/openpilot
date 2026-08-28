@@ -9,9 +9,6 @@ import time
 from types import MappingProxyType
 from typing import Any
 
-from openpilot.nrdr.params.profiles import STEER_RATIO_ENDPOINT_PROFILES
-
-
 REFRESH_PERIOD = 10.0
 
 
@@ -35,24 +32,23 @@ class ParamSnapshot:
     return _bool_value(self.values.get(key))
 
 
-_STEER_RATIO_GROUPS = tuple(ParamGroup((profile.center_param, profile.outer_param))
-                            for profile in STEER_RATIO_ENDPOINT_PROFILES)
-
 CONTROL_GROUPS = (
   ParamGroup(("LatPScaleLowSpeed", "LatPScaleStandard", "LatPScaleHighway",
               "LatIScaleLowSpeed", "LatIScaleStandard", "LatIScaleHighway",
               "LatFScaleLowSpeed", "LatFScaleStandard", "LatFScaleHighway")),
   ParamGroup(("HondaCenterScale", "HondaCenterBoostThreshold", "HondaCenterBoostMinSpeed")),
   ParamGroup(("NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed")),
-  ParamGroup(("HondaInjectionTest", "NrdrStarPilotPid", "NrdrLatStiction", "NrdrLaneChangeEndpointSteerRatio")),
-  *_STEER_RATIO_GROUPS,
+  ParamGroup(("HondaInjectionTest", "NrdrStarPilotPid", "NrdrLatStiction")),
+  # Mode and both manual endpoints are deliberately one atomic snapshot. A
+  # latched resolver consumes this group so geometry cannot half-update.
+  ParamGroup(("NrdrSteerRatioMode", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal")),
   ParamGroup(("NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate", "NrdrTuneLearnerReset")),
   ParamGroup(("NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain")),
   ParamGroup(("LongPidTuneScaleAggressive", "LongPidTuneScaleStandard", "LongPidTuneScaleRelaxed",
               "LongPidTuneScaleEcon", "HondaLiveLearningGas", "StaticFeedforwardLong", "HondaStopAccel",
               "HondaStoppingDecelRateLong", "HondaVEgoStarting", "HondaVEgoStopping",
               "NrdrRoenAccelerationLimits")),
-  ParamGroup(("NrdrLearnSteerRatio", "NrdrLearnStiffness", "NrdrLearnAngleOffset")),
+  ParamGroup(("NrdrLearnStiffness", "NrdrLearnAngleOffset")),
 )
 
 PLANNER_GROUPS = (

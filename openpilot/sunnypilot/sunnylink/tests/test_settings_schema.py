@@ -265,7 +265,7 @@ class TestKnownPanels(OpenpilotTestCase):
       "NrdrCarTuneInfo", "NrdrCarControllerInfo", "NrdrCarHandcraftedInfo", "NrdrCarPidLowInfo",
       "NrdrCarPidMidInfo", "NrdrCarPidHighInfo", "NrdrCarDampingInfo", "NrdrCarCenterInfo", "NrdrCarNnlcInfo",
       "NrdrCarSteerRatioInfo", "NrdrCarLearningInfo", "NrdrCarHelpersInfo",
-      "NrdrLearnSteerRatio", "NrdrLearnStiffness", "NrdrLearnAngleOffset",
+      "NrdrLearnStiffness", "NrdrLearnAngleOffset",
     ]
 
   def test_mutual_exclusion_torque_nnlc(self, schema):

@@ -4,15 +4,15 @@ from types import SimpleNamespace
 import pytest
 
 from openpilot.nrdr.tools.lateral.attribution import (
+  _logged_firmware_vgr_pid_only,
   ControlSample,
   classify_attribution,
   extract_controller_reading,
   is_fresh,
   lane_observation,
-  logged_steer_ratio_model_policy,
+  logged_steer_ratio_mode,
   summarize_controls,
 )
-from openpilot.nrdr.features.lateral.model_policy import SteerRatioModelPolicy
 
 
 def _lateral_state(which: str, state):
@@ -59,20 +59,49 @@ def test_clarity_exact_firmware_vgr_remains_pid_when_nnlc_toggle_is_on():
 
 @pytest.mark.parametrize(("artifact_sha256", "expected"), (
   ("c48899574c1303e47ca2a6f80113876ca5eb749c4a75c89b53cc8029bb3bb710",
-   SteerRatioModelPolicy.LEGACY_DUAL_BP),
+   "legacy-log/legacy_dual_bp"),
   ("92d06467e4de97c40ffdc366e385a4f5897f36fc8ea632bd9bed113a3083fea8",
-   SteerRatioModelPolicy.PURE_FIRMWARE_VGR),
+   "legacy-log/pure_firmware_vgr"),
 ))
-def test_logged_bundle_uses_exact_artifact_policy(artifact_sha256, expected):
+def test_old_log_without_explicit_mode_preserves_exact_artifact_policy(artifact_sha256, expected):
   raw_bundle = json.dumps({
     "models": [{"artifact": {"downloadUri": {"sha256": artifact_sha256}}}],
   })
-  assert logged_steer_ratio_model_policy(raw_bundle) is expected
+  assert logged_steer_ratio_mode(None, raw_bundle) == expected
 
 
 @pytest.mark.parametrize("raw_bundle", (None, "", "{malformed", json.dumps({"models": []})))
 def test_logged_missing_or_malformed_bundle_is_unknown(raw_bundle):
-  assert logged_steer_ratio_model_policy(raw_bundle) is SteerRatioModelPolicy.UNKNOWN
+  assert logged_steer_ratio_mode(None, raw_bundle) == "legacy-log/unknown"
+
+
+@pytest.mark.parametrize(("raw_mode", "expected"), (
+  ("0", "Manual override"),
+  ("1", "Comma steer-ratio learner"),
+  ("2", "NRDR measured-angle curve"),
+  ("3", "Firmware steer ratio"),
+  ("99", "invalid/manual-safe"),
+))
+def test_new_log_explicit_mode_ignores_legacy_bundle(raw_mode, expected):
+  legacy_bundle = json.dumps({
+    "models": [{"artifact": {"downloadUri": {
+      "sha256": "92d06467e4de97c40ffdc366e385a4f5897f36fc8ea632bd9bed113a3083fea8",
+    }}}],
+  })
+  assert logged_steer_ratio_mode(raw_mode, legacy_bundle) == expected
+
+
+@pytest.mark.parametrize(("mode", "expected"), (
+  ("Firmware steer ratio", True),
+  ("legacy-log/pure_firmware_vgr", True),
+  ("legacy-log/unknown", True),
+  ("legacy-log/legacy_dual_bp", False),
+  ("Manual override", False),
+))
+def test_clarity_pid_only_decoding_preserves_old_and_new_firmware_modes(mode, expected):
+  assert _logged_firmware_vgr_pid_only(mode, "HONDA_CLARITY", "39990,TRW,A020") is expected
+  assert not _logged_firmware_vgr_pid_only(mode, "HONDA_CIVIC", "39990,TRW,A020")
+  assert not _logged_firmware_vgr_pid_only(mode, "HONDA_CLARITY", "39990-TRW-UNKNOWN")
 
 
 def test_freshness_rejects_future_and_stale_timestamps():

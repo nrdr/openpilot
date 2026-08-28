@@ -23,14 +23,14 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "144416a70cc5f361354e235147b9d2288bbe48de873f52a65f74756d74c1195e"
+REGISTRY_METADATA_SHA256 = "d01dea6e08577385d59a28044f9d02ca862207e1eeec0e2be7cd3ec3455cc425"
 
 
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 122)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 121)
+    self.assertEqual(len(PARAM_SPECS), 125)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 124)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
 
@@ -56,12 +56,24 @@ class TestParamCatalog(unittest.TestCase):
       "HondaNotchFreq",
       "HondaNotchQ",
       "HondaPidFriction",
-      "HondaPidTuneScale",
-      "NrdrLegacyDualBpSteerRatio",
-      "NrdrSteerRatioMax",
-      "NrdrSteerRatioMin",
-      "NrdrSteerRatioOffset",
-    })
+        "HondaPidTuneScale",
+        "NrdrLaneChangeEndpointSteerRatio",
+        "NrdrLearnSteerRatio",
+        "NrdrLegacyDualBpSteerRatio",
+        "NrdrSteerRatioCenterAccord",
+        "NrdrSteerRatioCenterCivic",
+        "NrdrSteerRatioCenterClarity",
+        "NrdrSteerRatioCenterCrv5g",
+        "NrdrSteerRatioCenterInsight",
+        "NrdrSteerRatioMax",
+        "NrdrSteerRatioMin",
+        "NrdrSteerRatioOffset",
+        "NrdrSteerRatioOuterAccord",
+        "NrdrSteerRatioOuterCivic",
+        "NrdrSteerRatioOuterClarity",
+        "NrdrSteerRatioOuterCrv5g",
+        "NrdrSteerRatioOuterInsight",
+      })
 
   def test_committed_generated_files_and_header_are_current(self) -> None:
     self.assertEqual(repository_errors(), ())

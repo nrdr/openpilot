@@ -28,6 +28,7 @@ from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, si
 from openpilot.nrdr.ui.settings.pidf_ground import PidfGroundLayout
 from openpilot.nrdr.ui.settings.vehicle_model_learning import VehicleModelLearningLayout
 from openpilot.nrdr.ui.settings.override_tuning import OverrideTuningLayout
+from openpilot.nrdr.ui.settings.steer_ratio_tuning import SteerRatioTuningLayout
 from openpilot.nrdr.ui.settings.steer_filters import SteerFiltersLayout
 
 TUNE_REPORT_PATH = "/data/nrdr_tune_report.txt"
@@ -42,6 +43,7 @@ class LateralPanel(IntEnum):
   PIDF = 2
   OVERRIDE = 3
   STEER_FILTERS = 4
+  STEER_RATIO = 5
 
 
 class _TuneReportAction(ItemAction):
@@ -96,7 +98,11 @@ class LateralTuningLayout(Widget):
       lambda: self._set_panel(LateralPanel.HUB),
       vehicle_items,
     )
-    self._pidf_layout = PidfGroundLayout(lambda: self._set_panel(LateralPanel.HUB))
+    self._pidf_layout = PidfGroundLayout(
+      lambda: self._set_panel(LateralPanel.HUB),
+      lambda: self._set_panel(LateralPanel.STEER_RATIO),
+    )
+    self._steer_ratio_layout = SteerRatioTuningLayout(lambda: self._set_panel(LateralPanel.PIDF))
     self._override_layout = OverrideTuningLayout(lambda: self._set_panel(LateralPanel.HUB))
     self._steer_filters_layout = SteerFiltersLayout(lambda: self._set_panel(LateralPanel.HUB))
 
@@ -326,10 +332,9 @@ class LateralTuningLayout(Widget):
   def _initialize_items(self):
     self._handcrafted_tune = toggle_item_sp(
       title=lambda: tr("Handcrafted Lateral Tuning"),
-      description=lambda: tr("Off by default. Enable this to load the Clarity-derived, road-tested PID profile with this vehicle's own steering geometry: " +
-                             "exact Pop/Off-Policy artifacts use legacy dual-BP, while exact Deep-RL artifacts use the raw firmware " +
-                             "VGR at every angle. Unclassified models use raw firmware VGR when mapped or stock geometry when not. " +
-                             "Conflicting tuning controls are locked while enabled."),
+      description=lambda: tr("Off by default. Loads the Clarity-derived, road-tested controller gains and filters. " +
+                             "Steer-ratio mode is chosen separately and is never changed by this profile. " +
+                             "Other controller controls are locked while enabled."),
       param="NrdrHandcraftedLateralTune",
     )
 
@@ -379,6 +384,9 @@ class LateralTuningLayout(Widget):
       return
     if self._current_panel == LateralPanel.PIDF:
       self._pidf_layout.render(rect)
+      return
+    if self._current_panel == LateralPanel.STEER_RATIO:
+      self._steer_ratio_layout.render(rect)
       return
     if self._current_panel == LateralPanel.OVERRIDE:
       self._override_layout.render(rect)

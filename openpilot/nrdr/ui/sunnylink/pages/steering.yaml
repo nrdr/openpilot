@@ -9,8 +9,8 @@ sections:
     - key: NrdrHandcraftedLateralTune
       widget: toggle
       title: Handcrafted Lateral Tuning
-      description: Off by default. Enable this to load the Clarity-derived, road-tested PID profile with this vehicle's own steering geometry and lock conflicting controls.
-      details: Loads the shared versioned Honda profile with model-locked steering geometry, predictive stiction, controller helpers, steering filters, and fixed live delay. Exact Pop and Off-Policy artifacts use the road-tested legacy dual-BP curve. Exact Deep-RL artifacts, and unclassified models when this car's EPS firmware is mapped, use the raw firmware VGR at every steering angle with no high-angle handoff or lane-change ratio fade. Unclassified models without an exact EPS map keep openpilot's stock VehicleModel. Leave this off for manual tuning.
+      description: Off by default. Enable this to load the Clarity-derived, road-tested lateral controller profile and lock the controls that profile owns.
+      details: Loads the shared versioned Honda PID/feedforward profile with predictive stiction, controller helpers, steering filters, and fixed live delay. Steer ratio is intentionally independent; choose its source in Steer Ratio Tuning. Leave this off to tune the controller values manually.
       visibility:
       - {type: capability, field: has_handcrafted_lateral_profile, equals: true}
       enablement:
@@ -61,13 +61,6 @@ sections:
       - key: NrdrCarHelpersInfo
         widget: info
         title: Helpers
-      - key: NrdrLearnSteerRatio
-        widget: toggle
-        title: Learn Steer Ratio (Auto)
-        description: Uses openpilot's learned scalar on normal cars. Supported mapped Hondas use their configured On-Center anchor.
-        details: When ON, cars outside NRDR's active model/firmware steering policy use openpilot's live-learned steer ratio. A mapped Honda in raw-firmware mode keeps its configured On-Center anchor authoritative, avoiding double-counting the rack's variable geometry. Model-locked legacy artifacts use the configured center-to-outer curve.
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
       - key: NrdrLearnStiffness
         widget: toggle
         title: Learn Tire Stiffness (Auto)
@@ -92,179 +85,6 @@ sections:
         title: StarPilot PID Additions
         description: Adds the borrowed StarPilot turn-in / unwind / per-direction output scaling, not built for Honda.
         details: The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base.
-      - key: NrdrSteerRatioCenterClarity
-        widget: option
-        visibility:
-        - {type: capability, field: car_fingerprint, equals: HONDA_CLARITY}
-        - $ref: '#/macros/nrdr_steer_ratio_active'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        - $ref: '#/macros/not_engaged'
-        title: On-Center Steer Ratio
-        description: Directly sets the Clarity's steer ratio at zero steering-wheel angle. Default 18.50.
-        details: This is the static center anchor for Clarity's exact firmware VGR and the starting point of model-locked legacy dual-BP. Raw-firmware mode follows the extracted EPS map at every angle and does not blend toward the Outer Steer Ratio.
-        min: 8.0
-        max: 25.0
-        step: 0.01
-      - key: NrdrSteerRatioOuterClarity
-        widget: option
-        visibility:
-        - {type: capability, field: car_fingerprint, equals: HONDA_CLARITY}
-        - $ref: '#/macros/nrdr_legacy_steer_ratio'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        - $ref: '#/macros/not_engaged'
-        title: Outer Steer Ratio
-        description: Directly sets the Clarity's high-angle steer ratio. Default 12.72.
-        details: This is used only by model-locked legacy dual-BP; its outer endpoint is reached at 250 degrees and held beyond it, and it supplies the starting anchor for the optional 1.5-second legacy lane-change fade.
-        min: 8.0
-        max: 25.0
-        step: 0.01
-      - key: NrdrSteerRatioCenterCivic
-        widget: option
-        visibility:
-        - type: any
-          conditions:
-          - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH_DIESEL}
-        - $ref: '#/macros/nrdr_steer_ratio_active'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        - $ref: '#/macros/not_engaged'
-        title: On-Center Steer Ratio
-        description: Directly sets the 10th-gen Civic's steer ratio at zero steering-wheel angle. Default 17.24.
-        details: This is the static center anchor for the Civic's exact firmware VGR and the starting point of model-locked legacy dual-BP. Raw-firmware mode follows the extracted EPS map at every angle and does not blend toward the Outer Steer Ratio.
-        min: 8.0
-        max: 25.0
-        step: 0.01
-      - key: NrdrSteerRatioOuterCivic
-        widget: option
-        visibility:
-        - type: any
-          conditions:
-          - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH_DIESEL}
-        - $ref: '#/macros/nrdr_legacy_steer_ratio'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        - $ref: '#/macros/not_engaged'
-        title: Outer Steer Ratio
-        description: Directly sets the 10th-gen Civic's high-angle steer ratio. Default 10.93.
-        details: This is used only by model-locked legacy dual-BP; it is the Civic curve's high-angle endpoint and supplies the starting anchor for the optional 1.5-second legacy lane-change fade.
-        min: 8.0
-        max: 25.0
-        step: 0.01
-      - key: NrdrSteerRatioCenterAccord
-        widget: option
-        visibility:
-        - {type: capability, field: car_fingerprint, equals: HONDA_ACCORD}
-        - $ref: '#/macros/nrdr_steer_ratio_active'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        - $ref: '#/macros/not_engaged'
-        title: On-Center Steer Ratio
-        description: Directly sets the 10th-gen Accord's steer ratio at zero steering-wheel angle. Default 18.31.
-        details: This is the starting point of model-locked legacy dual-BP. Raw-firmware or unclassified models use it only when the Accord has an exact mapped EPS VGR; otherwise openpilot's stock VehicleModel remains untouched.
-        min: 8.0
-        max: 25.0
-        step: 0.01
-      - key: NrdrSteerRatioOuterAccord
-        widget: option
-        visibility:
-        - {type: capability, field: car_fingerprint, equals: HONDA_ACCORD}
-        - $ref: '#/macros/nrdr_legacy_steer_ratio'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        - $ref: '#/macros/not_engaged'
-        title: Outer Steer Ratio
-        description: Directly sets the 10th-gen Accord's high-angle steer ratio. Default 11.82.
-        details: This is used only by model-locked legacy dual-BP; it is the Accord curve's high-angle endpoint and supplies the starting anchor for the optional 1.5-second legacy lane-change fade.
-        min: 8.0
-        max: 25.0
-        step: 0.01
-      - key: NrdrSteerRatioCenterCrv5g
-        widget: option
-        visibility:
-        - type: any
-          conditions:
-          - {type: capability, field: car_fingerprint, equals: HONDA_CRV_5G}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CRV_HYBRID}
-        - $ref: '#/macros/nrdr_steer_ratio_active'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        - $ref: '#/macros/not_engaged'
-        title: On-Center Steer Ratio
-        description: Directly sets the 5th-gen CR-V's steer ratio at zero steering-wheel angle. Default 17.94.
-        details: This is the static center anchor when exact CR-V firmware VGR is recognized and the starting point of model-locked legacy dual-BP. Raw-firmware mode follows the extracted EPS map at every angle and does not blend toward the Outer Steer Ratio.
-        min: 8.0
-        max: 25.0
-        step: 0.01
-      - key: NrdrSteerRatioOuterCrv5g
-        widget: option
-        visibility:
-        - type: any
-          conditions:
-          - {type: capability, field: car_fingerprint, equals: HONDA_CRV_5G}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CRV_HYBRID}
-        - $ref: '#/macros/nrdr_legacy_steer_ratio'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        - $ref: '#/macros/not_engaged'
-        title: Outer Steer Ratio
-        description: Directly sets the 5th-gen CR-V's high-angle steer ratio. Default 12.30.
-        details: This is used only by model-locked legacy dual-BP; it is the CR-V curve's high-angle endpoint and supplies the starting anchor for the optional 1.5-second legacy lane-change fade.
-        min: 8.0
-        max: 25.0
-        step: 0.01
-      - key: NrdrSteerRatioCenterInsight
-        widget: option
-        visibility:
-        - {type: capability, field: car_fingerprint, equals: HONDA_INSIGHT}
-        - $ref: '#/macros/nrdr_steer_ratio_active'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        - $ref: '#/macros/not_engaged'
-        title: On-Center Steer Ratio
-        description: Directly sets the 3rd-gen Insight's steer ratio at zero steering-wheel angle. Default 16.82.
-        details: This is the static center anchor for the Insight's exact firmware VGR and the starting point of model-locked legacy dual-BP. Raw-firmware mode follows the extracted EPS map at every angle and does not blend toward the Outer Steer Ratio.
-        min: 8.0
-        max: 25.0
-        step: 0.01
-      - key: NrdrSteerRatioOuterInsight
-        widget: option
-        visibility:
-        - {type: capability, field: car_fingerprint, equals: HONDA_INSIGHT}
-        - $ref: '#/macros/nrdr_legacy_steer_ratio'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        - $ref: '#/macros/not_engaged'
-        title: Outer Steer Ratio
-        description: Directly sets the 3rd-gen Insight's high-angle steer ratio. Default 12.58.
-        details: This is used only by model-locked legacy dual-BP; it is the Insight curve's high-angle endpoint and supplies the starting anchor for the optional 1.5-second legacy lane-change fade.
-        min: 8.0
-        max: 25.0
-        step: 0.01
-      - key: NrdrLaneChangeEndpointSteerRatio
-        widget: toggle
-        visibility:
-        - type: any
-          conditions:
-          - {type: capability, field: car_fingerprint, equals: HONDA_CLARITY}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC_BOSCH_DIESEL}
-          - {type: capability, field: car_fingerprint, equals: HONDA_ACCORD}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CRV_5G}
-          - {type: capability, field: car_fingerprint, equals: HONDA_CRV_HYBRID}
-          - {type: capability, field: car_fingerprint, equals: HONDA_INSIGHT}
-        - $ref: '#/macros/nrdr_legacy_steer_ratio'
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
-        title: Start Lane Changes at Outer SR
-        description: In model-locked legacy dual-BP mode, starts at the Outer Steer Ratio and fades to the normal legacy curve over 1.5 seconds. Default ON.
-        details: This setting has no effect for pure-firmware or unclassified models. In legacy mode the fade starts only when the planner enters lane-change-starting, so pre-lane-change waiting does not consume it. Once started, the fade continues through finishing or completion without a ratio jump. This reacts to the planner state, not blinkers alone.
       - key: LatPScaleLowSpeed
         widget: option
       - key: LatIScaleLowSpeed
@@ -424,6 +244,53 @@ sections:
           - type: param
             key: NrdrNnlcEnabled
             equals: true
+    - id: nrdr_steer_ratio_tuning
+      label: Steer Ratio Tuning
+      trigger_key: null
+      items:
+      - key: NrdrSteerRatioMode
+        widget: multiple_button
+        title: Steer Ratio Mode
+        description: Choose exactly one geometry source. Manual is the same as turning all three in-car switches off.
+        details: Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR uses the fixed audited Clarity angle-log curve; the raw data ends at 247.5 degrees and then holds 15.279368. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. If an exact NRDR, firmware, or manual source is unavailable, the device safely uses the stock car ratio and reports that fallback.
+        options:
+        - value: 0
+          label: Manual
+        - value: 1
+          label: Comma Learner
+        - value: 2
+          label: nrdr Learner
+          enablement:
+          - {type: capability, field: nrdr_raw_steer_ratio_available, equals: true}
+        - value: 3
+          label: Firmware
+          enablement:
+          - {type: capability, field: nrdr_firmware_steer_ratio_available, equals: true}
+        enablement:
+        - $ref: '#/macros/offroad'
+      - key: NrdrSteerRatioManualCenter
+        widget: option
+        title: Manual Override On-Center Ratio
+        description: Ratio used with the wheel straight ahead. A bigger number asks for more steering-wheel movement for the same planned curve; a smaller number asks for less. Default 15.38.
+        min: 8.0
+        max: 25.0
+        step: 0.01
+        enablement:
+        - $ref: '#/macros/offroad'
+        - {type: param, key: NrdrSteerRatioMode, equals: 0}
+        - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
+      - key: NrdrSteerRatioManualFinal
+        widget: option
+        title: Manual Override Final Ratio
+        description: Ratio used near the end of wheel travel. Default 10.93.
+        details: NRDR blends smoothly from the on-center number to this final number using hidden car-specific outer-angle metadata. Cars without exact metadata keep their stock ratio instead.
+        min: 8.0
+        max: 25.0
+        step: 0.01
+        enablement:
+        - $ref: '#/macros/offroad'
+        - {type: param, key: NrdrSteerRatioMode, equals: 0}
+        - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
     - id: nrdr_override
       label: Override Tuning
       trigger_key: null

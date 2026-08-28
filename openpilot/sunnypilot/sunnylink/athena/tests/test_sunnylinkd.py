@@ -88,3 +88,15 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
     })
 
     assert self.saved_params == [("SpeedLimitOffset", "10", False)]
+
+  def test_saveParams_blocks_complete_steer_ratio_snapshot_onroad(self):
+    self.fake_params.offroad = False
+
+    sunnylinkd.saveParams({
+      "NrdrSteerRatioMode": "2",
+      "NrdrSteerRatioManualCenter": "15.38",
+      "NrdrSteerRatioManualFinal": "10.93",
+      "SpeedLimitOffset": "10",
+    })
+
+    assert self.saved_params == [("SpeedLimitOffset", "10", False)]

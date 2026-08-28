@@ -1,5 +1,6 @@
 import numpy as np
 from abc import abstractmethod, ABC
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import SteerRatioSelection, stock_steer_ratio_selection
 from openpilot.selfdrive.locationd.helpers import Pose
 
 
@@ -12,6 +13,13 @@ class LatControl(ABC):
 
     # we define the steer torque scale as [-1.0...1.0]
     self.steer_max = 1.0
+    # controlsd replaces this construction-safe stock selection before the
+    # first controller update. Keeping it on the common base makes every
+    # controller consume the same latched geometry snapshot.
+    self.steer_ratio_selection = stock_steer_ratio_selection(CP)
+
+  def set_steer_ratio_selection(self, selection: SteerRatioSelection) -> None:
+    self.steer_ratio_selection = selection
 
   @abstractmethod
   def update(self, active: bool, CS, VM, params, steer_limited_by_safety: bool, desired_curvature: float, calibrated_pose: Pose | None,

@@ -32,7 +32,8 @@ import sys
 
 import numpy as np
 
-from openpilot.nrdr.features.lateral.model_policy import SteerRatioModelPolicy, classify_steer_ratio_model
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import SteerRatioMode, steer_ratio_mode_label
+from openpilot.nrdr.features.lateral.model_policy import classify_steer_ratio_model
 
 
 MPS_TO_MPH = 2.236936
@@ -55,9 +56,13 @@ RELEVANT_PARAMS = (
   "NeuralNetworkLateralControl",
   "NrdrHandcraftedLateralTune",
   "NrdrLearnAngleOffset",
-  "NrdrLearnSteerRatio",
   "NrdrLearnStiffness",
+  "NrdrSteerRatioMode",
+  "NrdrSteerRatioManualCenter",
+  "NrdrSteerRatioManualFinal",
+  # Historical-route decoding only; these tombstones have no runtime effect.
   "ModelManager_ActiveBundle",
+  "NrdrLearnSteerRatio",
   "NrdrLaneChangeEndpointSteerRatio",
   "NrdrSteerRatioCenterClarity",
   "NrdrSteerRatioOuterClarity",
@@ -202,12 +207,30 @@ def param_bool(settings: dict[str, str], key: str) -> bool | None:
   return settings[key].strip().lower() not in ("", "0", "false", "off", "no")
 
 
-def logged_steer_ratio_model_policy(raw_bundle: str | None) -> SteerRatioModelPolicy:
+def logged_steer_ratio_mode(raw_mode: str | None, raw_bundle: str | None = None) -> str:
+  try:
+    if raw_mode is not None:
+      return steer_ratio_mode_label(SteerRatioMode(int(raw_mode)))
+  except (TypeError, ValueError):
+    return "invalid/manual-safe"
   try:
     bundle = json.loads(raw_bundle) if raw_bundle else None
   except (json.JSONDecodeError, TypeError):
     bundle = None
-  return classify_steer_ratio_model(bundle)
+  return f"legacy-log/{classify_steer_ratio_model(bundle).value}"
+
+
+def _logged_firmware_vgr_pid_only(steer_ratio_mode: str, fingerprint: str, eps_firmware: str) -> bool:
+  # Before the explicit mode Param existed, every exact mapped Clarity except
+  # a legacy-dual-BP artifact used firmware geometry. Preserve that decoding
+  # for historical routes without letting model policy affect new logs.
+  legacy_firmware_geometry = steer_ratio_mode.startswith("legacy-log/") and \
+    steer_ratio_mode != "legacy-log/legacy_dual_bp"
+  return (
+    fingerprint == "HONDA_CLARITY"
+    and (steer_ratio_mode == steer_ratio_mode_label(SteerRatioMode.FIRMWARE) or legacy_firmware_geometry)
+    and "39990-TRW-A020" in eps_firmware.replace(",", "-")
+  )
 
 
 @dataclass
@@ -219,13 +242,13 @@ class Context:
   steer_ratio: float = math.nan
   steer_actuator_delay: float = math.nan
   eps_firmware: str = "unknown"
-  model_sr_policy: SteerRatioModelPolicy = SteerRatioModelPolicy.UNKNOWN
+  steer_ratio_mode: str = "unreported/manual-safe"
   settings: dict[str, str] = field(default_factory=dict)
 
   @property
   def cohort(self) -> str:
     settings = ",".join(f"{key}={value}" for key, value in sorted(self.settings.items()))
-    return f"{self.fingerprint}|{self.branch}@{self.commit[:12]}|eps={self.eps_firmware}|sr={self.model_sr_policy.value}|{settings}"
+    return f"{self.fingerprint}|{self.branch}@{self.commit[:12]}|eps={self.eps_firmware}|sr={self.steer_ratio_mode}|{settings}"
 
 
 @dataclass(frozen=True)
@@ -457,7 +480,8 @@ def collect(sources: Sequence[str], log_kind: str = "auto", min_speed_mph: float
           context.branch = str(init.gitBranch or context.branch)
           context.commit = str(init.gitSrcCommit or init.gitCommit or context.commit)
           decoded_settings = decode_params(init.params.entries)
-          context.model_sr_policy = logged_steer_ratio_model_policy(decoded_settings.pop("ModelManager_ActiveBundle", None))
+          legacy_bundle = decoded_settings.pop("ModelManager_ActiveBundle", None)
+          context.steer_ratio_mode = logged_steer_ratio_mode(decoded_settings.get("NrdrSteerRatioMode"), legacy_bundle)
           context.settings.update(decoded_settings)
 
         elif which == "carParams":
@@ -549,10 +573,8 @@ def collect(sources: Sequence[str], log_kind: str = "auto", min_speed_mph: float
             active_since = math.nan
             continue
           nnlc_enabled = param_bool(context.settings, "NeuralNetworkLateralControl")
-          firmware_vgr_pid_only = (
-            context.fingerprint == "HONDA_CLARITY"
-            and context.model_sr_policy is not SteerRatioModelPolicy.LEGACY_DUAL_BP
-            and "39990-TRW-A020" in context.eps_firmware.replace(",", "-")
+          firmware_vgr_pid_only = _logged_firmware_vgr_pid_only(
+            context.steer_ratio_mode, context.fingerprint, context.eps_firmware,
           )
           reading = extract_controller_reading(
             controls.lateralControlState, context.fingerprint, actual_angle, desired_angle, nnlc_enabled, firmware_vgr_pid_only,
@@ -936,7 +958,7 @@ def build_report(result: ScanResult, min_samples: int = 30,
       "branch": context.branch if context else "unknown",
       "commit": context.commit if context else "unknown",
       "eps_firmware": context.eps_firmware if context else "unknown",
-      "model_sr_policy": context.model_sr_policy.value if context else SteerRatioModelPolicy.UNKNOWN.value,
+      "steer_ratio_mode": context.steer_ratio_mode if context else "unreported/manual-safe",
       "settings": context.settings if context else {},
       "configured_steer_ratio": finite_median(result.configured_steer_ratios[cohort]),
       "learned_steer_ratio_median": finite_median(result.learned_steer_ratios[cohort]),
@@ -1128,7 +1150,7 @@ __all__ = (
   "infer_yaw_sign",
   "is_fresh",
   "lane_observation",
-  "logged_steer_ratio_model_policy",
+  "logged_steer_ratio_mode",
   "main",
   "param_bool",
   "parse_edges",

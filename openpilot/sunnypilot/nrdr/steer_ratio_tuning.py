@@ -1,20 +1,7 @@
-"""Compatibility exports for canonical NRDR steer-ratio tuning behavior."""
+"""Compatibility facade for the canonical NRDR steer-ratio mode API."""
 
-from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
-  LANE_CHANGE_SR_FADE_SECONDS,
-  STEER_RATIO_ENDPOINT_PROFILE_BY_FP,
-  STEER_RATIO_ENDPOINT_PROFILES,
-  LaneChangeSteerRatioFade,
-  SteerRatioEndpointProfile,
-  get_steer_ratio_endpoint_profile,
-)
+from openpilot.nrdr.features.lateral import steer_ratio_tuning as _canonical
 
 
-__all__ = (
-  "LANE_CHANGE_SR_FADE_SECONDS",
-  "STEER_RATIO_ENDPOINT_PROFILE_BY_FP",
-  "STEER_RATIO_ENDPOINT_PROFILES",
-  "LaneChangeSteerRatioFade",
-  "SteerRatioEndpointProfile",
-  "get_steer_ratio_endpoint_profile",
-)
+__all__ = _canonical.__all__
+globals().update({name: getattr(_canonical, name) for name in __all__})

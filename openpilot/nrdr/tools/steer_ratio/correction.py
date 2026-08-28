@@ -46,9 +46,11 @@ from openpilot.nrdr.tools.sr_correction_analysis import (
 MPS_TO_MPH = 2.236936
 SEGMENT_DIR_RE = re.compile(r"^(.*)--(\d+)$")
 SETTINGS_KEYS = (
+  "NrdrSteerRatioMode",
+  "NrdrSteerRatioManualCenter",
+  "NrdrSteerRatioManualFinal",
+  # Historical-route decoding only; these tombstones have no runtime effect.
   "NrdrLearnSteerRatio",
-  "NrdrLearnStiffness",
-  "NrdrLearnAngleOffset",
   "NrdrLaneChangeEndpointSteerRatio",
   "NrdrSteerRatioCenterClarity",
   "NrdrSteerRatioOuterClarity",
@@ -63,6 +65,8 @@ SETTINGS_KEYS = (
   "NrdrSteerRatioMin",
   "NrdrSteerRatioMax",
   "NrdrSteerRatioOffset",
+  "NrdrLearnStiffness",
+  "NrdrLearnAngleOffset",
   "NrdrCurvServo",
   "NrdrCurvatureTrim",
   "NrdrNnlcEnabled",

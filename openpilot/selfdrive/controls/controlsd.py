@@ -24,7 +24,7 @@ from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
-from openpilot.nrdr.hooks import allow_longitudinal, apply_hud_lead, stopping_inputs, vehicle_model_params
+from openpilot.nrdr.hooks import allow_longitudinal, apply_hud_lead, stopping_inputs, vehicle_model_state
 
 State = log.SelfdriveState.OpenpilotState
 LaneChangeState = log.LaneChangeState
@@ -85,12 +85,20 @@ class Controls(ControlsExt):
     if self.sm.updated["lateralDelay"]:
       self.lat_delay = get_lat_delay(self.params, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay)
 
+    # Resolve the final lateral-active state before geometry. The mode resolver
+    # latches while active, so measured curvature and PID desired angle always
+    # use the same complete steer-ratio snapshot.
+    standstill = abs(CS.vEgo) <= max(self.CP.minSteerSpeed, 0.3) or CS.standstill
+    requested_lat_active = self.get_lat_active(self.sm)
+    lat_active = requested_lat_active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
+                 (not standstill or self.CP.steerAtStandstill)
+
     # Update VehicleModel
     lp = self.sm['vehicleParameters']
-    x, sr, angle_offset = vehicle_model_params(self, lp)
+    x, sr, _angle_offset, measured_steer_angle = vehicle_model_state(self, lp, CS, lat_active)
     self.VM.update_params(x, sr)
 
-    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - angle_offset)
+    steer_angle_without_offset = math.radians(measured_steer_angle)
     self.curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
 
     # Update Torque Params
@@ -115,14 +123,7 @@ class Controls(ControlsExt):
     CC = car.CarControl.new_message()
     CC.enabled = self.sm['selfdriveState'].enabled
 
-    # Check which actuators can be enabled
-    standstill = abs(CS.vEgo) <= max(self.CP.minSteerSpeed, 0.3) or CS.standstill
-
-    # Get which state to use for active lateral control
-    _lat_active = self.get_lat_active(self.sm)
-
-    CC.latActive = _lat_active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
-                   (not standstill or self.CP.steerAtStandstill)
+    CC.latActive = lat_active
     CC.longActive = CC.enabled and allow_longitudinal(CS, self.CI.DRIVABLE_GEARS, self.CP.brand) and \
                     not any(e.overrideLongitudinal for e in self.sm['onroadEvents']) and \
                     (self.CP.openpilotLongitudinalControl or not self.CP_SP.pcmCruiseSpeed)

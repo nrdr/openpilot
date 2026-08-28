@@ -4,7 +4,6 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
-import math
 import numpy as np
 
 from openpilot.common.pid import PIDController
@@ -110,13 +109,15 @@ class LatControlTorqueExtBase:
 
     return _value
 
-  def update_calculations(self, CS, VM, desired_lateral_accel):
+  def update_calculations(self, CS, VM, desired_lateral_accel, angle_offset_deg=0.0):
     self.actual_lateral_jerk = 0.0
     self.lateral_jerk_setpoint = 0.0
     self.lateral_jerk_measurement = 0.0
     self.lookahead_lateral_jerk = 0.0
 
-    actual_curvature_rate = -VM.calc_curvature(math.radians(CS.steeringRateDeg), CS.vEgo, 0.0)
+    actual_curvature_rate = self.lac_torque.steer_ratio_selection.measured_curvature_rate(
+      VM, CS.steeringAngleDeg, CS.steeringRateDeg, CS.vEgo, self.lac_torque.dt, angle_offset_deg,
+    )
     self.actual_lateral_jerk = actual_curvature_rate * CS.vEgo ** 2
 
     if self.model_valid:

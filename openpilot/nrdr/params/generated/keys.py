@@ -37,6 +37,9 @@ class NrdrParamKey(StrEnum):
   HONDA_NOTCH_ENABLED = "HondaNotchEnabled"
   HONDA_NOTCH_FREQ = "HondaNotchFreq"
   HONDA_NOTCH_Q = "HondaNotchQ"
+  NRDR_STEER_RATIO_MODE = "NrdrSteerRatioMode"
+  NRDR_STEER_RATIO_MANUAL_CENTER = "NrdrSteerRatioManualCenter"
+  NRDR_STEER_RATIO_MANUAL_FINAL = "NrdrSteerRatioManualFinal"
   NRDR_LEARN_STEER_RATIO = "NrdrLearnSteerRatio"
   NRDR_STEER_RATIO_CENTER_CLARITY = "NrdrSteerRatioCenterClarity"
   NRDR_STEER_RATIO_OUTER_CLARITY = "NrdrSteerRatioOuterClarity"
@@ -161,6 +164,9 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.HONDA_NOTCH_ENABLED,
   NrdrParamKey.HONDA_NOTCH_FREQ,
   NrdrParamKey.HONDA_NOTCH_Q,
+  NrdrParamKey.NRDR_STEER_RATIO_MODE,
+  NrdrParamKey.NRDR_STEER_RATIO_MANUAL_CENTER,
+  NrdrParamKey.NRDR_STEER_RATIO_MANUAL_FINAL,
   NrdrParamKey.NRDR_LEARN_STEER_RATIO,
   NrdrParamKey.NRDR_STEER_RATIO_CENTER_CLARITY,
   NrdrParamKey.NRDR_STEER_RATIO_OUTER_CLARITY,

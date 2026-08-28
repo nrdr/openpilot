@@ -1,9 +1,8 @@
-import math
-
 from openpilot.cereal import log
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.common.pid import PIDController
 from openpilot.nrdr.features.lateral.latcontrol_pid import NrdrLatControlPID
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import SteerRatioSelection
 
 
 class LatControlPID(LatControl):
@@ -20,6 +19,11 @@ class LatControlPID(LatControl):
     if self.nrdr_controller is not None:
       self.nrdr_controller.update_model_v2(model_v2)
 
+  def set_steer_ratio_selection(self, selection: SteerRatioSelection):
+    super().set_steer_ratio_selection(selection)
+    if self.nrdr_controller is not None:
+      self.nrdr_controller.set_steer_ratio_selection(selection)
+
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, calibrated_pose, curvature_limited, lat_delay):
     if self.nrdr_controller is not None:
       return self.nrdr_controller.update(
@@ -30,7 +34,9 @@ class LatControlPID(LatControl):
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
 
-    angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+    angle_steers_des_no_offset = self.steer_ratio_selection.desired_angle_no_offset(
+      VM, CS.steeringAngleDeg, CS.vEgo, params.roll, desired_curvature,
+    )
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
     error = angle_steers_des - CS.steeringAngleDeg
 

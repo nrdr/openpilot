@@ -19,9 +19,10 @@ from openpilot.nrdr.params import NRDR_UI_METADATA, NrdrParamKey
 from openpilot.nrdr.params.specs import PARAM_SPECS
 import openpilot.nrdr.car
 import openpilot.nrdr.features.driver_policy as driver_policy
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import SteerRatioMode
+assert "openpilot.nrdr.features.lateral.model_policy" not in sys.modules
 from openpilot.nrdr.features.lateral.model_policy import SteerRatioModelPolicy, classify_steer_ratio_model
 from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch
-from openpilot.nrdr.features.lateral.steer_ratio_tuning import LaneChangeSteerRatioFade
 import openpilot.nrdr.features.longitudinal as longitudinal
 import openpilot.nrdr.features.radar as radar
 import openpilot.nrdr.hooks as hooks
@@ -36,7 +37,7 @@ from openpilot.nrdr.ui.sunnylink_schema import sunnylink_fields_for_key
 from openpilot.sunnypilot.nrdr.sr_correction_analysis import CommandSample as LegacyCommandSample
 from openpilot.sunnypilot.nrdr.model_policy import classify_steer_ratio_model as legacy_classify_steer_ratio_model
 from openpilot.sunnypilot.nrdr.phase_detector import phase_with_latch as legacy_phase_with_latch
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import LaneChangeSteerRatioFade as LegacyLaneChangeSteerRatioFade
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import SteerRatioMode as LegacySteerRatioMode
 assert PARAM_SPECS
 assert set(driver_policy.__all__) == set(driver_policy._EXPORT_MODULES)
 assert set(longitudinal.__all__) == set(longitudinal._EXPORT_MODULES)
@@ -51,7 +52,7 @@ assert NrdrParamKey.HONDA_BOSCH_A_RADAR == "HondaBoschARadar"
 assert LegacyCommandSample is CommandSample
 assert legacy_classify_steer_ratio_model is classify_steer_ratio_model
 assert legacy_phase_with_latch is phase_with_latch
-assert LegacyLaneChangeSteerRatioFade is LaneChangeSteerRatioFade
+assert LegacySteerRatioMode is SteerRatioMode
 assert classify_steer_ratio_model(None) is SteerRatioModelPolicy.UNKNOWN
 assert get_native_option_spec("LatPScaleLowSpeed").format_label(100) == "100%"
 assert sunnylink_fields_for_key("LatPScaleLowSpeed")["max"] == 500

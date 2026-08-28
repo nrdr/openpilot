@@ -13,15 +13,11 @@ from openpilot.nrdr.params.profiles import (
   HANDCRAFTED_LATERAL_PROFILES,
   HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS,
   HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
-  STEER_RATIO_ENDPOINT_PROFILE_BY_FP,
-  STEER_RATIO_ENDPOINT_PROFILES,
   HandcraftedLateralProfile,
   ProfileParamStore,
   ProfileValue,
-  SteerRatioEndpointProfile,
   apply_handcrafted_lateral_profile,
   get_handcrafted_lateral_profile,
-  get_steer_ratio_endpoint_profile,
 )
 from openpilot.nrdr.params.specs import PARAM_SPECS_BY_KEY, ParamFlag, ParamOwner, ParamType
 
@@ -101,7 +97,7 @@ class TestParamProfiles(unittest.TestCase):
   def test_profile_shape_order_types_and_ownership(self) -> None:
     self.assertEqual(HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS, EXPECTED_HANDCRAFTED_FINGERPRINTS)
     self.assertEqual(tuple(HANDCRAFTED_LATERAL_PROFILES), EXPECTED_HANDCRAFTED_FINGERPRINTS)
-    self.assertEqual(len(HONDA_TORQUE_MOD_HANDCRAFTED_VALUES), 40)
+    self.assertEqual(len(HONDA_TORQUE_MOD_HANDCRAFTED_VALUES), 38)
     self.assertEqual(HANDCRAFTED_EXTERNAL_PARAM_KEYS, frozenset(BORROWED_DEFAULTS))
 
     all_values = {
@@ -109,36 +105,33 @@ class TestParamProfiles(unittest.TestCase):
       for profile in HANDCRAFTED_LATERAL_PROFILES.values()
       for key, value in profile.values
     }
-    self.assertEqual(len(all_values), 50)
+    self.assertEqual(len(all_values), 38)
     self.assertTrue(all(type(key) is str for key in all_values))
     self.assertEqual(
       Counter("bool" if isinstance(value, bool) else type(value).__name__ for value in all_values.values()),
-      Counter({"bool": 13, "int": 17, "float": 20}),
+      Counter({"int": 17, "bool": 11, "float": 10}),
     )
 
     owned_keys = set(all_values) - HANDCRAFTED_EXTERNAL_PARAM_KEYS
-    self.assertEqual(len(owned_keys), 48)
+    self.assertEqual(len(owned_keys), 36)
     self.assertTrue(owned_keys <= {key.value for key in NrdrParamKey})
     self.assertTrue(all(PARAM_SPECS_BY_KEY[key].flags == (ParamFlag.PERSISTENT, ParamFlag.BACKUP)
                         for key in owned_keys))
     self.assertEqual(
       Counter(PARAM_SPECS_BY_KEY[key].owner for key in owned_keys),
-      Counter({ParamOwner.LATERAL: 34, ParamOwner.HONDA: 14}),
+      Counter({ParamOwner.LATERAL: 22, ParamOwner.HONDA: 14}),
     )
 
     for fingerprint, profile in HANDCRAFTED_LATERAL_PROFILES.items():
-      endpoint = get_steer_ratio_endpoint_profile(fingerprint)
-      self.assertIsNotNone(endpoint)
-      self.assertEqual(len(profile.values), 42)
-      self.assertEqual(len(dict(profile.values)), 42)
-      self.assertEqual(profile.values[:2], endpoint.param_values)
-      self.assertEqual(profile.values[2:], HONDA_TORQUE_MOD_HANDCRAFTED_VALUES)
-      self.assertEqual(profile.version, 14)
+      self.assertEqual(len(profile.values), 38)
+      self.assertEqual(len(dict(profile.values)), 38)
+      self.assertEqual(profile.values, HONDA_TORQUE_MOD_HANDCRAFTED_VALUES)
+      self.assertFalse(any("SteerRatio" in key for key in dict(profile.values)))
+      self.assertEqual(profile.version, 15)
       self.assertEqual(profile.fingerprint, fingerprint)
 
     self.assertIs(CLARITY_ROAD_TESTED_2026_08_21, HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"])
     self.assertIsNone(get_handcrafted_lateral_profile("HONDA_CRV_HYBRID"))
-    self.assertIsNotNone(get_steer_ratio_endpoint_profile("HONDA_CRV_HYBRID"))
 
   def test_registry_and_profile_defaults_remain_distinct_layers(self) -> None:
     profile_values = {
@@ -175,7 +168,7 @@ class TestParamProfiles(unittest.TestCase):
 
   def test_legacy_modules_reexport_the_canonical_objects(self) -> None:
     legacy_handcrafted = import_module("openpilot.sunnypilot.nrdr.handcrafted_lateral")
-    legacy_steer_ratio = import_module("openpilot.sunnypilot.nrdr.steer_ratio_tuning")
+    params_api = import_module("openpilot.nrdr.params")
 
     self.assertIs(legacy_handcrafted.HandcraftedLateralProfile, HandcraftedLateralProfile)
     self.assertIs(legacy_handcrafted.ProfileParamStore, ProfileParamStore)
@@ -186,11 +179,9 @@ class TestParamProfiles(unittest.TestCase):
     self.assertIs(legacy_handcrafted.CLARITY_ROAD_TESTED_2026_08_21, CLARITY_ROAD_TESTED_2026_08_21)
     self.assertIs(legacy_handcrafted.get_handcrafted_lateral_profile, get_handcrafted_lateral_profile)
     self.assertIs(legacy_handcrafted.apply_handcrafted_lateral_profile, apply_handcrafted_lateral_profile)
-
-    self.assertIs(legacy_steer_ratio.SteerRatioEndpointProfile, SteerRatioEndpointProfile)
-    self.assertIs(legacy_steer_ratio.STEER_RATIO_ENDPOINT_PROFILES, STEER_RATIO_ENDPOINT_PROFILES)
-    self.assertIs(legacy_steer_ratio.STEER_RATIO_ENDPOINT_PROFILE_BY_FP, STEER_RATIO_ENDPOINT_PROFILE_BY_FP)
-    self.assertIs(legacy_steer_ratio.get_steer_ratio_endpoint_profile, get_steer_ratio_endpoint_profile)
+    for module in (legacy_handcrafted, params_api):
+      self.assertFalse(hasattr(module, "get_steer_ratio_endpoint_profile"))
+      self.assertFalse(hasattr(module, "STEER_RATIO_ENDPOINT_PROFILES"))
 
   def test_direct_profile_import_has_no_runtime_params_dependency(self) -> None:
     repository_root = Path(__file__).resolve().parents[3]
