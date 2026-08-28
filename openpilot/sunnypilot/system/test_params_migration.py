@@ -139,6 +139,97 @@ def test_nrdr_steer_ratio_migration_retries_an_interrupted_manual_pair_before_mo
   assert params.puts[-1] == ("NrdrSteerRatioMode", 1)
 
 
+def test_interpolated_torque_friction_migration_seeds_all_missing_bands_from_default_low():
+  params = FakeParams()
+
+  params_migration._migrate_interpolated_torque_friction(params)
+
+  assert params.puts == [
+    ("NrdrInterpolatedTorqueFriction", 0.50),
+    ("NrdrInterpolatedTorqueFrictionStandard", 0.50),
+    ("NrdrInterpolatedTorqueFrictionHighway", 0.50),
+  ]
+
+
+def test_interpolated_torque_friction_migration_preserves_legacy_tune_in_new_bands():
+  params = FakeParams({"NrdrInterpolatedTorqueFriction": 0.12})
+
+  params_migration._migrate_interpolated_torque_friction(params)
+
+  assert params.values["NrdrInterpolatedTorqueFriction"] == 0.12
+  assert params.values["NrdrInterpolatedTorqueFrictionStandard"] == 0.12
+  assert params.values["NrdrInterpolatedTorqueFrictionHighway"] == 0.12
+  assert params.puts == [
+    ("NrdrInterpolatedTorqueFrictionStandard", 0.12),
+    ("NrdrInterpolatedTorqueFrictionHighway", 0.12),
+  ]
+
+
+def test_interpolated_torque_friction_migration_never_overwrites_present_bands_and_is_idempotent():
+  params = FakeParams({
+    "NrdrInterpolatedTorqueFriction": 0.12,
+    "NrdrInterpolatedTorqueFrictionStandard": 0.34,
+  })
+
+  params_migration._migrate_interpolated_torque_friction(params)
+
+  assert params.values["NrdrInterpolatedTorqueFriction"] == 0.12
+  assert params.values["NrdrInterpolatedTorqueFrictionStandard"] == 0.34
+  assert params.values["NrdrInterpolatedTorqueFrictionHighway"] == 0.12
+  first_puts = list(params.puts)
+  params_migration._migrate_interpolated_torque_friction(params)
+  assert params.puts == first_puts
+
+
+def test_interpolated_torque_friction_migration_stops_dependents_when_low_seed_is_interrupted():
+  params = FailOnceParams(fail_key="NrdrInterpolatedTorqueFriction")
+
+  params_migration._migrate_interpolated_torque_friction(params)
+
+  assert not params.values
+  assert not params.puts
+
+  params_migration._migrate_interpolated_torque_friction(params)
+  assert params.puts == [
+    ("NrdrInterpolatedTorqueFriction", 0.50),
+    ("NrdrInterpolatedTorqueFrictionStandard", 0.50),
+    ("NrdrInterpolatedTorqueFrictionHighway", 0.50),
+  ]
+
+
+def test_interpolated_torque_friction_migration_independently_retries_interrupted_band():
+  params = FailOnceParams(
+    {"NrdrInterpolatedTorqueFriction": 0.12},
+    fail_key="NrdrInterpolatedTorqueFrictionStandard",
+  )
+
+  params_migration._migrate_interpolated_torque_friction(params)
+
+  assert "NrdrInterpolatedTorqueFrictionStandard" not in params.values
+  assert params.values["NrdrInterpolatedTorqueFrictionHighway"] == 0.12
+  assert params.puts == [("NrdrInterpolatedTorqueFrictionHighway", 0.12)]
+
+  params_migration._migrate_interpolated_torque_friction(params)
+  assert params.values["NrdrInterpolatedTorqueFrictionStandard"] == 0.12
+  assert params.puts[-1] == ("NrdrInterpolatedTorqueFrictionStandard", 0.12)
+
+
+def test_interpolated_torque_friction_migration_runs_after_steer_ratio(monkeypatch):
+  order = []
+  params = FakeParams({
+    "OnroadScreenOffBrightnessMigrated": params_migration.ONROAD_BRIGHTNESS_MIGRATION_VERSION,
+    "OnroadScreenOffTimerMigrated": params_migration.ONROAD_BRIGHTNESS_TIMER_MIGRATION_VERSION,
+  })
+  monkeypatch.setattr(params_migration, "_migrate_car_platform_bundle", lambda _params: order.append("car"))
+  monkeypatch.setattr(params_migration, "_migrate_nrdr_steer_ratio_mode", lambda _params: order.append("steer_ratio"))
+  monkeypatch.setattr(params_migration, "_migrate_interpolated_torque_friction", lambda _params: order.append("friction"))
+  monkeypatch.setattr(params_migration, "_migrate_tesla_mads_screen_button", lambda _params: order.append("tesla"))
+
+  params_migration.run_migration(params)
+
+  assert order == ["car", "steer_ratio", "friction", "tesla"]
+
+
 @pytest.mark.parametrize("car_params_key", ["CarParamsPersistent", "CarParams"])
 def test_nrdr_steer_ratio_migration_falls_back_to_each_carparams_store(monkeypatch, car_params_key):
   monkeypatch.setattr(

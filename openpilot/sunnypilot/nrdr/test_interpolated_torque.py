@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
+from openpilot.common.constants import CV
 from openpilot.sunnypilot.nrdr.interpolated_torque import (
   FRICTION_DEFAULT,
   InterpolatedTorqueSettings,
@@ -15,6 +16,7 @@ from openpilot.sunnypilot.nrdr.interpolated_torque import (
   maybe_blend_interpolated_torque_pif,
   resolve_interpolated_torque_pif_settings,
   select_classic_torque_measurement,
+  speed_banded_friction,
   settings_from_params,
 )
 from openpilot.sunnypilot.nrdr.latcontrol_pid import NrdrLatControlPID
@@ -51,18 +53,53 @@ def _cp_sp(modified=True):
 
 def test_settings_defaults_bounds_and_friction_independence():
   defaults = settings_from_params(FakeParams())
-  assert defaults == InterpolatedTorqueSettings(False, 0.5, 5.0, FRICTION_DEFAULT)
+  assert defaults == InterpolatedTorqueSettings(
+    False, 0.5, 5.0, FRICTION_DEFAULT, FRICTION_DEFAULT, FRICTION_DEFAULT,
+  )
+  assert defaults.friction == defaults.friction_low
 
   bounded = settings_from_params(FakeParams({
     "NrdrInterpolatedTorquePifBlend": True,
     "NrdrInterpolatedTorqueShare": 200,
     "NrdrInterpolatedTorqueLatAccelFactor": 0.0,
     "NrdrInterpolatedTorqueFriction": 5.0,
+    "NrdrInterpolatedTorqueFrictionStandard": -1.0,
+    "NrdrInterpolatedTorqueFrictionHighway": 0.75,
   }))
-  assert bounded == InterpolatedTorqueSettings(True, 1.0, 0.1, 1.0)
+  assert bounded == InterpolatedTorqueSettings(True, 1.0, 0.1, 1.0, 0.0, 0.75)
   assert resolve_interpolated_torque_pif_settings(FakeParams({
     "NrdrInterpolatedTorquePifBlend": True,
   }), supported=False).enabled is False
+
+
+@pytest.mark.parametrize(("speed_mph", "expected"), [
+  (-1.0, 0.10),
+  (24.0, 0.10),
+  (24.5, 0.20),
+  (25.0, 0.30),
+  (25.5, 0.40),
+  (26.0, 0.50),
+  (49.0, 0.50),
+  (49.5, 0.60),
+  (50.0, 0.70),
+  (50.5, 0.80),
+  (51.0, 0.90),
+  (80.0, 0.90),
+])
+def test_speed_banded_friction_plateaus_and_one_mph_handoffs(speed_mph, expected):
+  assert speed_banded_friction(speed_mph * CV.MPH_TO_MS, 0.10, 0.50, 0.90) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("speed", [float("nan"), float("inf"), -float("inf")])
+def test_speed_banded_friction_nonfinite_speed_fails_safe_to_low(speed):
+  assert speed_banded_friction(speed, 0.10, 0.50, 0.90) == 0.10
+
+
+@pytest.mark.parametrize("speed", [-1e9, 0.0, 25.0 * CV.MPH_TO_MS, 1e9, float("nan"), float("inf")])
+def test_all_equal_speed_banded_friction_returns_legacy_value_bit_exact(speed):
+  legacy = -0.0
+  selected = speed_banded_friction(speed, legacy, legacy, legacy)
+  assert struct.pack("!d", selected) == struct.pack("!d", legacy)
 
 
 @pytest.mark.parametrize(("CP", "CP_SP", "expected"), [
@@ -146,7 +183,7 @@ def test_f13_normal_path_math_sign_and_direct_friction():
   controller = LegacyTorqueController(0.01)
   CS = _cs(10.0)
   vehicle_params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
-  settings = InterpolatedTorqueSettings(True, 0.5, 5.0, 0.5)
+  settings = InterpolatedTorqueSettings(True, 0.5, 5.0, 0.5, 0.5, 0.5)
   resolver = FakeResolver(99.0)
 
   result = controller.update(
@@ -170,6 +207,33 @@ def test_f13_normal_path_math_sign_and_direct_friction():
 
   assert controller._direct_friction(1.0, 0.0, 0.5) == pytest.approx(0.5)
   assert controller._direct_friction(-1.0, 0.0, 0.5) == pytest.approx(-0.5)
+
+
+@pytest.mark.parametrize(("speed_mph", "expected_friction"), [
+  (24.0, 0.10),
+  (25.0, 0.30),
+  (26.0, 0.50),
+  (49.0, 0.50),
+  (50.0, 0.70),
+  (51.0, 0.90),
+])
+def test_legacy_torque_controller_uses_speed_banded_direct_friction(speed_mph, expected_friction):
+  v_ego = speed_mph * CV.MPH_TO_MS
+  controller = LegacyTorqueController(0.01)
+  settings = InterpolatedTorqueSettings(True, 0.5, 5.0, 0.10, 0.50, 0.90)
+
+  result = controller.update(
+    _cs(v_ego),
+    object(),
+    SimpleNamespace(roll=0.0, angleOffsetDeg=0.0),
+    False,
+    1.0 / v_ego ** 2,
+    _pose(0.4 / v_ego),
+    FakeResolver(99.0),
+    settings,
+  )
+
+  assert result.f == pytest.approx(1.0 / settings.lat_accel_factor + expected_friction)
 
 
 def test_curvature_feedback_uses_angle_low_speed_and_blends_from_two_to_five_mps():
@@ -225,7 +289,7 @@ def test_invalid_yaw_never_substitutes_angle_anywhere_yaw_is_requested(speed, ex
 
 
 def test_valid_high_speed_yaw_is_invariant_to_steer_ratio_mode():
-  settings = InterpolatedTorqueSettings(True, 0.5, 5.0, 0.5)
+  settings = InterpolatedTorqueSettings(True, 0.5, 5.0, 0.5, 0.5, 0.5)
   params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
   outputs = []
   for angle_curvature in (-10.0, 10.0):
@@ -240,7 +304,7 @@ def test_valid_high_speed_yaw_is_invariant_to_steer_ratio_mode():
 
 
 def test_invalid_high_speed_yaw_holds_all_classic_pid_state_and_recovery_is_sr_invariant():
-  settings = InterpolatedTorqueSettings(True, 0.5, 5.0, 0.5)
+  settings = InterpolatedTorqueSettings(True, 0.5, 5.0, 0.5, 0.5, 0.5)
   params = SimpleNamespace(roll=0.0, angleOffsetDeg=0.0)
   controllers = [LegacyTorqueController(0.01), LegacyTorqueController(0.01)]
   resolvers = [FakeResolver(-0.05), FakeResolver(0.05)]
@@ -307,28 +371,32 @@ def _latch_controller(values, classic=None):
   return controller
 
 
-def test_all_four_values_latch_for_engagement_then_classic_resets_inactive():
+def test_all_six_values_latch_for_engagement_then_classic_resets_inactive():
   classic = ResetSpy()
   controller = _latch_controller({
     "NrdrInterpolatedTorquePifBlend": True,
     "NrdrInterpolatedTorqueShare": 25,
     "NrdrInterpolatedTorqueLatAccelFactor": 6.0,
     "NrdrInterpolatedTorqueFriction": 0.4,
+    "NrdrInterpolatedTorqueFrictionStandard": 0.5,
+    "NrdrInterpolatedTorqueFrictionHighway": 0.6,
   }, classic)
 
   controller._update_interpolated_torque_latch(True)
   assert controller.interpolated_torque_pif_effective
-  assert controller._interpolated_torque_settings == InterpolatedTorqueSettings(True, 0.25, 6.0, 0.4)
+  assert controller._interpolated_torque_settings == InterpolatedTorqueSettings(True, 0.25, 6.0, 0.4, 0.5, 0.6)
 
   controller.params.snapshot.values.update({
     "NrdrInterpolatedTorquePifBlend": False,
     "NrdrInterpolatedTorqueShare": 99,
     "NrdrInterpolatedTorqueLatAccelFactor": 9.0,
     "NrdrInterpolatedTorqueFriction": 0.9,
+    "NrdrInterpolatedTorqueFrictionStandard": 0.8,
+    "NrdrInterpolatedTorqueFrictionHighway": 0.7,
   })
   controller._update_interpolated_torque_latch(True)
   assert controller.interpolated_torque_pif_effective
-  assert controller._interpolated_torque_settings == InterpolatedTorqueSettings(True, 0.25, 6.0, 0.4)
+  assert controller._interpolated_torque_settings == InterpolatedTorqueSettings(True, 0.25, 6.0, 0.4, 0.5, 0.6)
 
   controller._update_interpolated_torque_latch(False)
   assert not controller.interpolated_torque_pif_effective

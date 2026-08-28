@@ -107,7 +107,9 @@ class TestCarTuneReporter(unittest.TestCase):
       "NrdrInterpolatedTorquePifBlend": True,
       "NrdrInterpolatedTorqueShare": 35,
       "NrdrInterpolatedTorqueLatAccelFactor": 5.0,
-      "NrdrInterpolatedTorqueFriction": 0.5,
+      "NrdrInterpolatedTorqueFriction": 0.12,
+      "NrdrInterpolatedTorqueFrictionStandard": 0.34,
+      "NrdrInterpolatedTorqueFrictionHighway": 0.56,
     }))
     CP = SimpleNamespace(
       brand="honda",
@@ -121,7 +123,7 @@ class TestCarTuneReporter(unittest.TestCase):
     self.assertIn("engagement-latched", report)
     self.assertIn("Torque 35% / P/I/F 65%", report)
     self.assertIn("LAF 5 m/s^2", report)
-    self.assertIn("friction 0.50", report)
+    self.assertIn("friction Low 0.12 / Standard 0.34 / Highway 0.56", report)
     self.assertIn("learner paused", report)
     self.assertIn("P/I/F angle feedback", report)
     self.assertIn("Torque angle-to-yaw feedback", report)
@@ -140,6 +142,7 @@ class TestCarTuneReporter(unittest.TestCase):
     report = reporter._interpolated_torque_info(CP, CP_SP)
     self.assertIn("OFF | Torque 0% / P/I/F 100% | P/I/F unchanged", report)
     self.assertIn("stored next engagement", report)
+    self.assertIn("friction Low 0.50 / Standard 0.50 / Highway 0.50", report)
 
   def test_unavailable_request_reports_effective_pif_and_stored_values(self):
     reporter = CarTuneReporter(self.FakeParams({
@@ -147,6 +150,8 @@ class TestCarTuneReporter(unittest.TestCase):
       "NrdrInterpolatedTorqueShare": 40,
       "NrdrInterpolatedTorqueLatAccelFactor": 6.0,
       "NrdrInterpolatedTorqueFriction": 0.25,
+      "NrdrInterpolatedTorqueFrictionStandard": 0.35,
+      "NrdrInterpolatedTorqueFrictionHighway": 0.45,
     }))
     CP = SimpleNamespace(
       brand="honda",
@@ -156,7 +161,10 @@ class TestCarTuneReporter(unittest.TestCase):
     report = reporter._interpolated_torque_info(CP, SimpleNamespace(flags=0))
     self.assertIn("requested ON but unavailable", report)
     self.assertIn("Torque 0% / P/I/F 100% | P/I/F unchanged", report)
-    self.assertIn("stored: Torque 40% / P/I/F 60% | LAF 6 m/s^2 | friction 0.25", report)
+    self.assertIn(
+      "stored: Torque 40% / P/I/F 60% | LAF 6 m/s^2 | friction Low 0.25 / Standard 0.35 / Highway 0.45",
+      report,
+    )
 
 
 if __name__ == "__main__":

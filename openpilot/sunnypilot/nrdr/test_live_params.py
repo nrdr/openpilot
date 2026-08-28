@@ -141,6 +141,8 @@ def test_interpolated_torque_controls_publish_as_one_snapshot():
     "NrdrInterpolatedTorqueShare",
     "NrdrInterpolatedTorqueLatAccelFactor",
     "NrdrInterpolatedTorqueFriction",
+    "NrdrInterpolatedTorqueFrictionStandard",
+    "NrdrInterpolatedTorqueFrictionHighway",
   )
 
 

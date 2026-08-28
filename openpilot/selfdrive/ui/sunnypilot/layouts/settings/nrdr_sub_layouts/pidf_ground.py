@@ -113,7 +113,8 @@ class PidfGroundLayout(Widget):
                      "steering angle through 2 m/s, changes to calibrated yaw from 2-5 m/s, and uses yaw from 5 m/s up. " +
                      "If required yaw is bad or stale above 2 m/s, the final answer temporarily becomes exact P/I/F and every " +
                      "Torque state holds until yaw returns; angle is not substituted. This f13 generic yaw branch was not " +
-                     "historically road-proven on Honda. OFF leaves P/I/F exactly as it is. Settings stay fixed for one engagement. On " +
+                     "historically road-proven on Honda. OFF leaves P/I/F exactly as it is. All six settings stay fixed for one " +
+                     "engagement. On " +
                      "Clarity, this bypasses NNLC without changing its saved settings."),
       param="NrdrInterpolatedTorquePifBlend",
     )
@@ -131,18 +132,38 @@ class PidfGroundLayout(Widget):
       title=lambda: tr("Spoofed Lateral Acceleration Factor (Default: 5.0 m/s²)"),
       min_value=10, max_value=1000, value_change_step=10,
       description=lambda: tr("Tunes only the classic torque side. A larger number asks that side for less non-friction torque; " +
-                             "a smaller number asks for more. It scales Torque error and feedforward, but not friction. " +
+                             "a smaller number asks for more. It scales Torque error and feedforward, but not any friction band. " +
                              "It does not change the car's cornering limit."),
       label_callback=lambda value: f"{value / 100:.1f} m/s²",
       use_float_scaling=True,
     )
-    self._interpolated_torque_friction = option_item_sp(
+    self._interpolated_torque_friction_low = option_item_sp(
       param="NrdrInterpolatedTorqueFriction",
-      title=lambda: tr("Torque-Side Friction Compensation (Default: 0.50)"),
+      title=lambda: tr("Low-Speed Torque Friction (Below 25mph)"),
       min_value=0, max_value=100, value_change_step=1,
-      description=lambda: tr("Tunes only the classic torque side. This direct compensation helps the rack move through its sticky " +
-                             "center and stays at the chosen amount while the error is large. The lateral acceleration factor does " +
-                             "not scale it. Too much can make small corrections jumpy."),
+      description=lambda: tr("Direct classic-Torque friction for low speed. It is independent of the lateral acceleration factor. " +
+                             "The low-to-standard handoff blends smoothly from 24-26 mph (±1 mph around 25). All three friction " +
+                             "values latch for the whole engagement. Default 0.50; too much can make small corrections jumpy."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+    self._interpolated_torque_friction_standard = option_item_sp(
+      param="NrdrInterpolatedTorqueFrictionStandard",
+      title=lambda: tr("Standard-Speed Torque Friction (25-50mph)"),
+      min_value=0, max_value=100, value_change_step=1,
+      description=lambda: tr("Direct classic-Torque friction for standard speed, independent of the lateral acceleration factor. " +
+                             "It is fully active from 26-49 mph, with smooth ±1 mph handoffs around 25 and 50 mph. All three " +
+                             "friction values latch for the whole engagement. Default 0.50."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+    self._interpolated_torque_friction_highway = option_item_sp(
+      param="NrdrInterpolatedTorqueFrictionHighway",
+      title=lambda: tr("Highway Torque Friction (50mph+)"),
+      min_value=0, max_value=100, value_change_step=1,
+      description=lambda: tr("Direct classic-Torque friction for highway speed, independent of the lateral acceleration factor. " +
+                             "The standard-to-highway handoff blends smoothly from 49-51 mph (±1 mph around 50). All three friction " +
+                             "values latch for the whole engagement. Default 0.50."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -253,7 +274,9 @@ class PidfGroundLayout(Widget):
       self._interpolated_torque_pif_blend,
       self._interpolated_torque_share,
       self._interpolated_torque_laf,
-      self._interpolated_torque_friction,
+      self._interpolated_torque_friction_low,
+      self._interpolated_torque_friction_standard,
+      self._interpolated_torque_friction_highway,
       LineSeparatorSP(40),
       self._starpilot,
       LineSeparatorSP(40),
@@ -298,7 +321,9 @@ class PidfGroundLayout(Widget):
       self._interpolated_torque_pif_blend,
       self._interpolated_torque_share,
       self._interpolated_torque_laf,
-      self._interpolated_torque_friction,
+      self._interpolated_torque_friction_low,
+      self._interpolated_torque_friction_standard,
+      self._interpolated_torque_friction_highway,
     ):
       item.set_visible(interpolated_supported)
     self._interpolated_torque_pif_blend.action_item.set_enabled(interpolated_unlocked)
@@ -306,7 +331,9 @@ class PidfGroundLayout(Widget):
     for item in (
       self._interpolated_torque_share,
       self._interpolated_torque_laf,
-      self._interpolated_torque_friction,
+      self._interpolated_torque_friction_low,
+      self._interpolated_torque_friction_standard,
+      self._interpolated_torque_friction_highway,
     ):
       item.action_item.set_enabled(interpolated_unlocked and interpolated_enabled)
     for item in (

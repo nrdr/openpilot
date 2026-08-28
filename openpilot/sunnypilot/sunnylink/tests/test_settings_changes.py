@@ -462,6 +462,8 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     "NrdrInterpolatedTorqueShare",
     "NrdrInterpolatedTorqueLatAccelFactor",
     "NrdrInterpolatedTorqueFriction",
+    "NrdrInterpolatedTorqueFrictionStandard",
+    "NrdrInterpolatedTorqueFrictionHighway",
   )
 
   def test_group_is_contiguous_in_controller_tuning_dungeon(self, schema):
@@ -484,6 +486,7 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     assert "stale" in copy and "exact p/i/f" in copy
     assert "every torque state holds" in copy
     assert "angle is not substituted" in copy
+    assert "all six settings" in copy
     rules = json.dumps(item["enablement"])
     assert "offroad_only" in rules
     assert "nrdr_interpolated_torque_pif_blend_available" in rules
@@ -491,8 +494,10 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
   @parameterized.expand([
     ("NrdrInterpolatedTorqueShare", "Torque Share", 0, 100, 1),
     ("NrdrInterpolatedTorqueLatAccelFactor", "Spoofed Lateral Acceleration Factor", 0.1, 10.0, 0.1),
-    ("NrdrInterpolatedTorqueFriction", "Torque-Side Friction Compensation", 0.0, 1.0, 0.01),
-  ], names=["key", "title", "min", "max", "step"])
+    ("NrdrInterpolatedTorqueFriction", "Low-Speed Torque Friction (Below 25mph)", 0.0, 1.0, 0.01),
+    ("NrdrInterpolatedTorqueFrictionStandard", "Standard-Speed Torque Friction (25-50mph)", 0.0, 1.0, 0.01),
+    ("NrdrInterpolatedTorqueFrictionHighway", "Highway Torque Friction (50mph+)", 0.0, 1.0, 0.01),
+  ], names=["key", "title", "minimum", "maximum", "step"])
   def test_slider_contract_and_master_gate(self, schema, key, title, minimum, maximum, step):
     item = _find_item(schema, key)
     assert item["title"] == title
@@ -509,8 +514,17 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     laf = _find_item(schema, "NrdrInterpolatedTorqueLatAccelFactor")
     assert "not a cornering-limit" in laf["details"]
     assert "non-friction error and feedforward" in laf["details"]
-    friction = _find_item(schema, "NrdrInterpolatedTorqueFriction")
-    assert "independent of the lateral acceleration factor" in friction["details"]
+    for key in (
+      "NrdrInterpolatedTorqueFriction",
+      "NrdrInterpolatedTorqueFrictionStandard",
+      "NrdrInterpolatedTorqueFrictionHighway",
+    ):
+      friction = _find_item(schema, key)
+      assert "independent of the lateral acceleration factor" in friction["details"]
+      assert "latch for the whole engagement" in friction["details"]
+    assert "24–26 mph" in _find_item(schema, "NrdrInterpolatedTorqueFriction")["details"]
+    assert "26–49 mph" in _find_item(schema, "NrdrInterpolatedTorqueFrictionStandard")["details"]
+    assert "49–51 mph" in _find_item(schema, "NrdrInterpolatedTorqueFrictionHighway")["details"]
 
   def test_nnlc_stays_configured_but_is_disabled_while_supported_blend_is_on(self, schema):
     nnlc = _find_item(schema, "NrdrNnlcEnabled")

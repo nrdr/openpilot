@@ -103,7 +103,11 @@ class CarTuneReporter:
     configured = " | ".join((
       f"Torque {torque_percent}% / P/I/F {100 - torque_percent}%",
       f"LAF {settings.lat_accel_factor:g} m/s^2",
-      f"friction {settings.friction:.2f}",
+      "friction " + " / ".join((
+        f"Low {settings.friction_low:.2f}",
+        f"Standard {settings.friction_standard:.2f}",
+        f"Highway {settings.friction_highway:.2f}",
+      )),
     ))
     if settings.enabled and supported:
       return "".join((

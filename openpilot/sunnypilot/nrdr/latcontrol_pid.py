@@ -181,7 +181,7 @@ class NrdrLatControlPID(LatControl):
 
   def _update_interpolated_torque_latch(self, active: bool) -> None:
     if active and not self._interpolated_torque_was_active:
-      # The four values occupy one LiveParams group, so this captures one
+      # The six values occupy one LiveParams group, so this captures one
       # coherent configuration for the whole engagement.
       self._interpolated_torque_settings = resolve_interpolated_torque_pif_settings(
         self.params.snapshot,

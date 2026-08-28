@@ -12,6 +12,8 @@ def test_local_interpolated_torque_controls_have_shared_support_and_engagement_g
     "NrdrInterpolatedTorqueShare",
     "NrdrInterpolatedTorqueLatAccelFactor",
     "NrdrInterpolatedTorqueFriction",
+    "NrdrInterpolatedTorqueFrictionStandard",
+    "NrdrInterpolatedTorqueFrictionHighway",
   ):
     assert f'param="{key}"' in source
 
@@ -26,7 +28,16 @@ def test_local_interpolated_torque_controls_have_shared_support_and_engagement_g
   assert "Torque state holds until yaw returns" in source
   assert "angle is not substituted" in source
   assert "historically road-proven on Honda" in source
-  assert "It scales Torque error and feedforward, but not friction" in source
+  assert "All six settings stay fixed for one" in source
+  assert "It scales Torque error and feedforward, but not any friction band" in source
+  assert 'tr("Low-Speed Torque Friction (Below 25mph)")' in source
+  assert 'tr("Standard-Speed Torque Friction (25-50mph)")' in source
+  assert 'tr("Highway Torque Friction (50mph+)")' in source
+  assert "24-26 mph (±1 mph around 25)" in source
+  assert "fully active from 26-49 mph" in source
+  assert "49-51 mph (±1 mph around 50)" in source
+  assert source.count("independent of the lateral acceleration factor") == 3
+  assert source.count("latch for the whole engagement") == 3
   assert 'f"Torque {value}% / P/I/F {100 - value}%"' in source
   assert source.index("self._interpolated_torque_pif_blend,", source.index("return [")) \
     < source.index("self._starpilot,", source.index("return ["))

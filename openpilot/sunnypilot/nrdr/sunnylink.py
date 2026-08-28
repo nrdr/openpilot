@@ -10,6 +10,8 @@ ONROAD_BLOCKED_PARAMS = {
   "NrdrInterpolatedTorqueShare",
   "NrdrInterpolatedTorqueLatAccelFactor",
   "NrdrInterpolatedTorqueFriction",
+  "NrdrInterpolatedTorqueFrictionStandard",
+  "NrdrInterpolatedTorqueFrictionHighway",
 }
 
 

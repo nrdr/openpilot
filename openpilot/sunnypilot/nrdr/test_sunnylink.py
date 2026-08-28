@@ -18,6 +18,8 @@ def test_interpolated_torque_group_cannot_be_written_onroad():
     "NrdrInterpolatedTorqueShare",
     "NrdrInterpolatedTorqueLatAccelFactor",
     "NrdrInterpolatedTorqueFriction",
+    "NrdrInterpolatedTorqueFrictionStandard",
+    "NrdrInterpolatedTorqueFrictionHighway",
   ):
     assert not allow_param_write(key, onroad=True)
     assert allow_param_write(key, onroad=False)

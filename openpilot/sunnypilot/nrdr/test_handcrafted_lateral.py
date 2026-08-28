@@ -208,6 +208,8 @@ def test_profile_preserves_the_current_road_tested_choices():
   assert "NrdrInterpolatedTorqueShare" not in values
   assert "NrdrInterpolatedTorqueLatAccelFactor" not in values
   assert "NrdrInterpolatedTorqueFriction" not in values
+  assert "NrdrInterpolatedTorqueFrictionStandard" not in values
+  assert "NrdrInterpolatedTorqueFrictionHighway" not in values
   assert values["NrdrDriverOverrideThreshold"] == 2000
   assert values["NrdrOverrideThresholdCenterBoost"] == 1200
   assert values["HondaOverrideFadeDownSecs"] == 0.0

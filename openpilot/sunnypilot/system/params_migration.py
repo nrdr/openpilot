@@ -17,6 +17,10 @@ ONROAD_BRIGHTNESS_TIMER_VALUES = {0: 3, 1: 5, 2: 7, 3: 10, 4: 15, 5: 30, **{i: (
 VALID_TIMER_VALUES = set(ONROAD_BRIGHTNESS_TIMER_VALUES.values())
 
 _NRDR_STEER_RATIO_MANUAL_DEFAULTS = (15.38, 10.93)
+_NRDR_INTERPOLATED_TORQUE_FRICTION_LOW = "NrdrInterpolatedTorqueFriction"
+_NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD = "NrdrInterpolatedTorqueFrictionStandard"
+_NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY = "NrdrInterpolatedTorqueFrictionHighway"
+_NRDR_INTERPOLATED_TORQUE_FRICTION_DEFAULT = 0.50
 
 # These old keys are tombstones after the steer-ratio mode migration. They are
 # read here only to preserve an existing owner's tune for the attached car.
@@ -131,6 +135,50 @@ def _migrate_nrdr_steer_ratio_mode(_params) -> None:
     cloudlog.exception(f"Error migrating nrdr steer-ratio settings: {e}")
 
 
+def _migrate_interpolated_torque_friction(_params) -> None:
+  """Split legacy friction into three bands without changing an existing tune."""
+  try:
+    low = _params.get(_NRDR_INTERPOLATED_TORQUE_FRICTION_LOW)
+    standard = _params.get(_NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD)
+    highway = _params.get(_NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY)
+  except Exception as e:
+    cloudlog.exception(f"Error reading interpolated Torque friction settings for migration: {e}")
+    return
+
+  if low is None:
+    try:
+      _params.put(
+        _NRDR_INTERPOLATED_TORQUE_FRICTION_LOW,
+        _NRDR_INTERPOLATED_TORQUE_FRICTION_DEFAULT,
+        block=True,
+      )
+      low = _params.get(_NRDR_INTERPOLATED_TORQUE_FRICTION_LOW)
+    except Exception as e:
+      cloudlog.exception(f"Error seeding low-speed interpolated Torque friction: {e}")
+      return
+    if low is None:
+      cloudlog.error("Interpolated Torque friction migration could not read back the low-speed value")
+      return
+
+  migrated = []
+  for key, value, label in (
+    (_NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD, standard, "standard"),
+    (_NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY, highway, "highway"),
+  ):
+    if value is not None:
+      continue
+    try:
+      _params.put(key, low, block=True)
+      migrated.append(label)
+    except Exception as e:
+      cloudlog.exception(f"Error seeding {label}-speed interpolated Torque friction: {e}")
+
+  if migrated:
+    cloudlog.info(
+      f"params_migration: initialized interpolated Torque friction {','.join(migrated)} from low-speed value {low}"
+    )
+
+
 def _migrate_car_platform_bundle(_params):
   bundle = _params.get("CarPlatformBundle")
   if bundle is None:
@@ -215,6 +263,10 @@ def run_migration(_params):
   # Replace the legacy boolean + per-family endpoint matrix with one atomic
   # mode and one global manual pair, preserving an attached car's old values.
   _migrate_nrdr_steer_ratio_mode(_params)
+
+  # Preserve the legacy single friction tune by copying it into each new
+  # speed band before ordinary registry defaults are materialized.
+  _migrate_interpolated_torque_friction(_params)
 
   # seed TeslaMadsScreenButton for existing Tesla installs
   _migrate_tesla_mads_screen_button(_params)

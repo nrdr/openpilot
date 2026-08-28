@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
-from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY
+from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY, CV
 from openpilot.sunnypilot.nrdr.params import read_bool, read_float
 
 
@@ -14,11 +14,23 @@ PARAM_BLEND = "NrdrInterpolatedTorquePifBlend"
 PARAM_TORQUE_SHARE = "NrdrInterpolatedTorqueShare"
 PARAM_LAT_ACCEL_FACTOR = "NrdrInterpolatedTorqueLatAccelFactor"
 PARAM_FRICTION = "NrdrInterpolatedTorqueFriction"
-PARAM_KEYS = (PARAM_BLEND, PARAM_TORQUE_SHARE, PARAM_LAT_ACCEL_FACTOR, PARAM_FRICTION)
+PARAM_FRICTION_STANDARD = "NrdrInterpolatedTorqueFrictionStandard"
+PARAM_FRICTION_HIGHWAY = "NrdrInterpolatedTorqueFrictionHighway"
+PARAM_KEYS = (
+  PARAM_BLEND,
+  PARAM_TORQUE_SHARE,
+  PARAM_LAT_ACCEL_FACTOR,
+  PARAM_FRICTION,
+  PARAM_FRICTION_STANDARD,
+  PARAM_FRICTION_HIGHWAY,
+)
 
 TORQUE_SHARE_DEFAULT = 50.0
 LAT_ACCEL_FACTOR_DEFAULT = 5.0
 FRICTION_DEFAULT = 0.50
+FRICTION_LOW_STANDARD_TRANSITION_MPH = 25.0
+FRICTION_STANDARD_HIGHWAY_TRANSITION_MPH = 50.0
+FRICTION_TRANSITION_HALF_WIDTH_MPH = 1.0
 
 # The normal, non-neural controller at f13de17baffd152c321fd179dcc764af3eb1433f.
 KP = 0.5
@@ -34,7 +46,14 @@ class InterpolatedTorqueSettings:
   enabled: bool = False
   torque_share: float = TORQUE_SHARE_DEFAULT / 100.0
   lat_accel_factor: float = LAT_ACCEL_FACTOR_DEFAULT
-  friction: float = FRICTION_DEFAULT
+  friction_low: float = FRICTION_DEFAULT
+  friction_standard: float = FRICTION_DEFAULT
+  friction_highway: float = FRICTION_DEFAULT
+
+  @property
+  def friction(self) -> float:
+    """Compatibility alias for callers that still mean the legacy low band."""
+    return self.friction_low
 
 
 @dataclass(frozen=True)
@@ -113,7 +132,9 @@ def settings_from_params(params) -> InterpolatedTorqueSettings:
     enabled=read_bool(params, PARAM_BLEND),
     torque_share=read_float(params, PARAM_TORQUE_SHARE, TORQUE_SHARE_DEFAULT, 0.0, 100.0) / 100.0,
     lat_accel_factor=read_float(params, PARAM_LAT_ACCEL_FACTOR, LAT_ACCEL_FACTOR_DEFAULT, 0.1, 10.0),
-    friction=read_float(params, PARAM_FRICTION, FRICTION_DEFAULT, 0.0, 1.0),
+    friction_low=read_float(params, PARAM_FRICTION, FRICTION_DEFAULT, 0.0, 1.0),
+    friction_standard=read_float(params, PARAM_FRICTION_STANDARD, FRICTION_DEFAULT, 0.0, 1.0),
+    friction_highway=read_float(params, PARAM_FRICTION_HIGHWAY, FRICTION_DEFAULT, 0.0, 1.0),
   )
 
 
@@ -123,8 +144,37 @@ def resolve_interpolated_torque_pif_settings(params, supported: bool) -> Interpo
     enabled=bool(supported and settings.enabled),
     torque_share=settings.torque_share,
     lat_accel_factor=settings.lat_accel_factor,
-    friction=settings.friction,
+    friction_low=settings.friction_low,
+    friction_standard=settings.friction_standard,
+    friction_highway=settings.friction_highway,
   )
+
+
+def speed_banded_friction(v_ego: float, low: float, standard: float, highway: float) -> float:
+  """Select friction by speed with continuous two-mph handoffs around 25 and 50 mph."""
+  low = float(low)
+  standard = float(standard)
+  highway = float(highway)
+  if low == standard == highway:
+    return low
+
+  v_ego = float(v_ego)
+  if not np.isfinite(v_ego):
+    return low
+
+  low_blend_start = (FRICTION_LOW_STANDARD_TRANSITION_MPH - FRICTION_TRANSITION_HALF_WIDTH_MPH) * CV.MPH_TO_MS
+  low_blend_end = (FRICTION_LOW_STANDARD_TRANSITION_MPH + FRICTION_TRANSITION_HALF_WIDTH_MPH) * CV.MPH_TO_MS
+  highway_blend_start = (FRICTION_STANDARD_HIGHWAY_TRANSITION_MPH - FRICTION_TRANSITION_HALF_WIDTH_MPH) * CV.MPH_TO_MS
+  highway_blend_end = (FRICTION_STANDARD_HIGHWAY_TRANSITION_MPH + FRICTION_TRANSITION_HALF_WIDTH_MPH) * CV.MPH_TO_MS
+  if v_ego <= low_blend_start:
+    return low
+  if v_ego < low_blend_end:
+    return float(np.interp(v_ego, (low_blend_start, low_blend_end), (low, standard)))
+  if v_ego <= highway_blend_start:
+    return standard
+  if v_ego < highway_blend_end:
+    return float(np.interp(v_ego, (highway_blend_start, highway_blend_end), (standard, highway)))
+  return highway
 
 
 def is_interpolated_torque_pif_supported(CP, CP_SP) -> bool:
@@ -292,7 +342,12 @@ class LegacyTorqueController:
     feedforward += self._direct_friction(
       desired_lateral_accel - actual_lateral_accel,
       0.0,
-      settings.friction,
+      speed_banded_friction(
+        v_ego,
+        settings.friction_low,
+        settings.friction_standard,
+        settings.friction_highway,
+      ),
     )
 
     freeze_integrator = (
