@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from openpilot.cereal import custom, messaging
 from opendbc.car.structs import car
 from opendbc.car.car_helpers import interfaces
@@ -19,6 +21,20 @@ from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoin
 
 def _format_values(values) -> str:
   return "/".join(f"{float(value):g}" for value in values)
+
+
+def _format_decimal(value) -> str:
+  number = Decimal(f"{float(value):g}")
+  return "0" if number == 0 else format(number, "f")
+
+
+def _format_decimal_values(values) -> str:
+  return "/".join(_format_decimal(value) for value in values)
+
+
+def _longitudinal_pid_info(longitudinal) -> str:
+  deprecated = longitudinal.deprecated
+  return f"P {_format_values(deprecated.kpV)} | I {_format_values(longitudinal.kiV)} | F {_format_decimal(deprecated.kf)}"
 
 
 def _schedule_label(value_count: int) -> str:
@@ -83,9 +99,9 @@ class CarTuneReporter:
     pid = source.lateralTuning.pid
     gains = f"P {_format_values(pid.kpV)} | I {_format_values(pid.kiV)}"
     feedforward = (
-      f"{_format_values(float(value) * 1e6 for value in pid.kfV)} x10^-6"
+      _format_decimal_values(pid.kfV)
       if len(pid.kfV)
-      else f"{float(pid.kf):g}"
+      else _format_decimal(pid.kf)
     )
     p_speeds = _schedule_label(len(pid.kpV))
     i_speeds = _schedule_label(len(pid.kiV))
@@ -157,9 +173,7 @@ class CarTuneReporter:
 
     pid_base, pid_feedforward, pid_speeds = self._pid_info(CP)
     longitudinal = CP.longitudinalTuning
-    long_deprecated = longitudinal.deprecated
-    long_base = f"P {_format_values(long_deprecated.kpV)} | I {_format_values(longitudinal.kiV)}"
-    long_base += f" | F {float(long_deprecated.kf):g}"
+    long_base = _longitudinal_pid_info(longitudinal)
 
     pid_low = f"P {self._value('LatPScaleLowSpeed')}% | I {self._value('LatIScaleLowSpeed')}% | F {self._value('LatFScaleLowSpeed')}%"
     pid_mid = f"P {self._value('LatPScaleStandard')}% | I {self._value('LatIScaleStandard')}% | F {self._value('LatFScaleStandard')}%"
