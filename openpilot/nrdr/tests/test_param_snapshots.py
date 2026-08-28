@@ -72,7 +72,7 @@ class TestParamSnapshots(unittest.TestCase):
     self.assertFalse(retired & set(keys))
     self.assertEqual(len(CONTROL_GROUPS), 10)
     self.assertEqual(len(keys), len(set(keys)))
-    self.assertEqual(len(keys), 46)
+    self.assertEqual(len(keys), 48)
 
   def test_interpolated_torque_settings_share_one_atomic_group(self):
     expected = {
@@ -80,6 +80,8 @@ class TestParamSnapshots(unittest.TestCase):
       "NrdrInterpolatedTorqueShare",
       "NrdrInterpolatedTorqueLatAccelFactor",
       "NrdrInterpolatedTorqueFriction",
+      "NrdrInterpolatedTorqueFrictionStandard",
+      "NrdrInterpolatedTorqueFrictionHighway",
     }
     matching = [group for group in CONTROL_GROUPS if expected.intersection(group.keys)]
     self.assertEqual(len(matching), 1)

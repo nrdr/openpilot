@@ -108,12 +108,42 @@ NRDR_UI_METADATA: Final = (
   ParamUiMetadata(
     key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
     widget=UiWidget.OPTION,
-    title=tr_noop("Torque-Side Friction Compensation"),
-    native_title=tr_noop("Torque-Side Friction Compensation (Default: 0.50)"),
-    description=tr_noop("Adds direct normalized steering torque to help the legacy torque half overcome rack friction."),
+    title=tr_noop("Low-Speed Torque Friction (Below 25mph)"),
+    native_title=tr_noop("Low-Speed Torque Friction (Below 25mph) (Default: 0.50)"),
+    description=tr_noop("Sets direct normalized steering torque for the legacy torque half below 25 mph."),
     details=tr_noop(
-      "This value is independent of the lateral acceleration factor. Large values can make the torque half hit its limit quickly. " +
-      "Changes apply on the next engagement."
+      "Helps the legacy torque half overcome rack friction. A ±1 mph handoff blends this value smoothly into Standard from " +
+      "24-26 mph. It is independent of the lateral acceleration factor. Changes apply on the next engagement."
+    ),
+    native_description_source=UiDescriptionSource.DETAILS,
+    numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
+    edit_policies=(),
+    remote_write_policy=UiRemoteWritePolicy.OFFROAD_ONLY,
+  ),
+  ParamUiMetadata(
+    key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD,
+    widget=UiWidget.OPTION,
+    title=tr_noop("Standard-Speed Torque Friction (25-50mph)"),
+    native_title=tr_noop("Standard-Speed Torque Friction (25-50mph) (Default: 0.50)"),
+    description=tr_noop("Sets direct normalized steering torque for the legacy torque half between 25 and 50 mph."),
+    details=tr_noop(
+      "Helps the legacy torque half overcome rack friction. ±1 mph handoffs blend Low into this value from 24-26 mph and this " +
+      "value into Highway from 49-51 mph. It is independent of the lateral acceleration factor. Changes apply on the next engagement."
+    ),
+    native_description_source=UiDescriptionSource.DETAILS,
+    numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
+    edit_policies=(),
+    remote_write_policy=UiRemoteWritePolicy.OFFROAD_ONLY,
+  ),
+  ParamUiMetadata(
+    key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY,
+    widget=UiWidget.OPTION,
+    title=tr_noop("Highway Torque Friction (50mph+)"),
+    native_title=tr_noop("Highway Torque Friction (50mph+) (Default: 0.50)"),
+    description=tr_noop("Sets direct normalized steering torque for the legacy torque half above 50 mph."),
+    details=tr_noop(
+      "Helps the legacy torque half overcome rack friction. A ±1 mph handoff blends Standard smoothly into this value from " +
+      "49-51 mph. It is independent of the lateral acceleration factor. Changes apply on the next engagement."
     ),
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),

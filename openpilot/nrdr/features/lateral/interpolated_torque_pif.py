@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
-from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY
+from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY, CV
 from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
 
 
@@ -24,6 +24,9 @@ LEGACY_TORQUE_YAW_BLEND_X = (2.0, 5.0)
 DEFAULT_TORQUE_SHARE_PERCENT = 50.0
 DEFAULT_LAT_ACCEL_FACTOR = 5.0
 DEFAULT_FRICTION = 0.5
+FRICTION_LOW_STANDARD_TRANSITION_MPH = 25.0
+FRICTION_STANDARD_HIGHWAY_TRANSITION_MPH = 50.0
+FRICTION_TRANSITION_HALF_WIDTH_MPH = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +34,14 @@ class InterpolatedTorquePifSettings:
   enabled: bool = False
   torque_share: float = DEFAULT_TORQUE_SHARE_PERCENT / 100.0
   lat_accel_factor: float = DEFAULT_LAT_ACCEL_FACTOR
-  friction: float = DEFAULT_FRICTION
+  friction_low: float = DEFAULT_FRICTION
+  friction_standard: float = DEFAULT_FRICTION
+  friction_highway: float = DEFAULT_FRICTION
+
+  @property
+  def friction(self) -> float:
+    """Compatibility name for the original low-speed setting."""
+    return self.friction_low
 
   @property
   def torque_share_percent(self) -> int:
@@ -107,14 +117,57 @@ def resolve_interpolated_torque_pif_settings(settings, supported: bool) -> Inter
       0.1,
       10.0,
     ),
-    friction=read_float(
+    friction_low=read_float(
       settings,
       NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
       DEFAULT_FRICTION,
       0.0,
       1.0,
     ),
+    friction_standard=read_float(
+      settings,
+      NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD,
+      DEFAULT_FRICTION,
+      0.0,
+      1.0,
+    ),
+    friction_highway=read_float(
+      settings,
+      NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY,
+      DEFAULT_FRICTION,
+      0.0,
+      1.0,
+    ),
   )
+
+
+def speed_banded_friction(v_ego: float, low: float, standard: float, highway: float) -> float:
+  """Select friction by speed with continuous two-mph handoffs around 25 and 50 mph."""
+  low = float(low)
+  standard = float(standard)
+  highway = float(highway)
+  if low == standard == highway:
+    # Preserve the original single-setting arithmetic exactly after migration.
+    return low
+
+  v_ego = float(v_ego)
+  if not np.isfinite(v_ego):
+    return low
+
+  low_start = (FRICTION_LOW_STANDARD_TRANSITION_MPH - FRICTION_TRANSITION_HALF_WIDTH_MPH) * CV.MPH_TO_MS
+  low_end = (FRICTION_LOW_STANDARD_TRANSITION_MPH + FRICTION_TRANSITION_HALF_WIDTH_MPH) * CV.MPH_TO_MS
+  highway_start = (FRICTION_STANDARD_HIGHWAY_TRANSITION_MPH - FRICTION_TRANSITION_HALF_WIDTH_MPH) * CV.MPH_TO_MS
+  highway_end = (FRICTION_STANDARD_HIGHWAY_TRANSITION_MPH + FRICTION_TRANSITION_HALF_WIDTH_MPH) * CV.MPH_TO_MS
+
+  if v_ego <= low_start:
+    return low
+  if v_ego < low_end:
+    return float(np.interp(v_ego, (low_start, low_end), (low, standard)))
+  if v_ego <= highway_start:
+    return standard
+  if v_ego < highway_end:
+    return float(np.interp(v_ego, (highway_start, highway_end), (standard, highway)))
+  return highway
 
 
 def convex_torque_pif_blend(pif_output: float, torque_output: float, torque_share: float,
@@ -295,7 +348,13 @@ class ClassicTorqueCandidate:
     roll_compensation = float(vehicle_params.roll) * ACCELERATION_DUE_TO_GRAVITY
     friction_input = desired_lateral_accel - actual_lateral_accel
     feedforward = (desired_lateral_accel - roll_compensation) / lat_accel_factor
-    feedforward += self._friction(friction_input, lateral_accel_deadzone, settings.friction)
+    friction = speed_banded_friction(
+      v_ego,
+      settings.friction_low,
+      settings.friction_standard,
+      settings.friction_highway,
+    )
+    feedforward += self._friction(friction_input, lateral_accel_deadzone, friction)
 
     freeze_integrator = bool(steer_limited_by_safety or CS.steeringPressed or v_ego < 5.0)
     internal_output = self.pid.update(error, feedforward, freeze_integrator)
@@ -323,6 +382,9 @@ __all__ = (
   "DEFAULT_FRICTION",
   "DEFAULT_LAT_ACCEL_FACTOR",
   "DEFAULT_TORQUE_SHARE_PERCENT",
+  "FRICTION_LOW_STANDARD_TRANSITION_MPH",
+  "FRICTION_STANDARD_HIGHWAY_TRANSITION_MPH",
+  "FRICTION_TRANSITION_HALF_WIDTH_MPH",
   "InterpolatedTorquePifSettings",
   "InterpolatedTorquePifSettingsLatch",
   "LEGACY_TORQUE_FRICTION_THRESHOLD",
@@ -338,5 +400,6 @@ __all__ = (
   "resolve_interpolated_torque_pif_settings",
   "select_classic_torque_measurement",
   "should_run_pif_tune_learner",
+  "speed_banded_friction",
   "supports_interpolated_torque_pif",
 )

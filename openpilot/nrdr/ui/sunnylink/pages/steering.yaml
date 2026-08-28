@@ -82,7 +82,7 @@ sections:
         widget: toggle
         title: Interpolated Torque/PIF Blend
         description: Blend angle-feedback P/I/F with the generic f13 legacy torque controller.
-        details: The final request is Torque share times the f13de17 generic torque controller plus the remaining share times today's complete P/I/F controller. Torque uses angle feedback through 2 m/s, transitions from angle to calibrated yaw over 2-5 m/s, and uses calibrated yaw at 5 m/s and above. If required yaw is invalid, stale, missing, or non-finite, Torque does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F. This generic yaw branch was not historically road-proven on Honda. All four settings are frozen while engaged, and Clarity NNLC is bypassed and reset.
+        details: The final request is Torque share times the f13de17 generic torque controller plus the remaining share times today's complete P/I/F controller. Torque uses angle feedback through 2 m/s, transitions from angle to calibrated yaw over 2-5 m/s, and uses calibrated yaw at 5 m/s and above. If required yaw is invalid, stale, missing, or non-finite, Torque does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F. This generic yaw branch was not historically road-proven on Honda. All six settings are frozen while engaged, and Clarity NNLC is bypassed and reset.
         enablement:
         - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
         - $ref: '#/macros/offroad'
@@ -107,6 +107,18 @@ sections:
           - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
           - $ref: '#/macros/offroad'
         - key: NrdrInterpolatedTorqueFriction
+          widget: option
+          enablement:
+          - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+          - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
+          - $ref: '#/macros/offroad'
+        - key: NrdrInterpolatedTorqueFrictionStandard
+          widget: option
+          enablement:
+          - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+          - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
+          - $ref: '#/macros/offroad'
+        - key: NrdrInterpolatedTorqueFrictionHighway
           widget: option
           enablement:
           - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
+from openpilot.common.constants import CV
 from openpilot.selfdrive.locationd.helpers import Pose, PoseCalibrator, gate_calibrated_pose_angular_velocity
 from openpilot.nrdr.features.lateral.interpolated_torque_pif import (
   ClassicTorqueCandidate,
@@ -16,6 +17,7 @@ from openpilot.nrdr.features.lateral.interpolated_torque_pif import (
   resolve_interpolated_torque_pif_settings,
   select_classic_torque_measurement,
   should_run_pif_tune_learner,
+  speed_banded_friction,
   supports_interpolated_torque_pif,
 )
 
@@ -73,6 +75,8 @@ def _settings(**overrides):
     "NrdrInterpolatedTorqueShare": 50,
     "NrdrInterpolatedTorqueLatAccelFactor": 5.0,
     "NrdrInterpolatedTorqueFriction": 0.5,
+    "NrdrInterpolatedTorqueFrictionStandard": 0.5,
+    "NrdrInterpolatedTorqueFrictionHighway": 0.5,
   }
   values.update(overrides)
   return Settings(**values)
@@ -149,12 +153,16 @@ def test_settings_are_bounded_and_master_is_gated_by_support():
     NrdrInterpolatedTorqueShare=150,
     NrdrInterpolatedTorqueLatAccelFactor=0,
     NrdrInterpolatedTorqueFriction=2,
+    NrdrInterpolatedTorqueFrictionStandard=-1,
+    NrdrInterpolatedTorqueFrictionHighway=1.5,
   ), supported=False)
 
   assert not settings.enabled
   assert settings.torque_share == 1.0
   assert settings.lat_accel_factor == 0.1
-  assert settings.friction == 1.0
+  assert settings.friction == settings.friction_low == 1.0
+  assert settings.friction_standard == 0.0
+  assert settings.friction_highway == 1.0
 
 
 def test_settings_latch_replaces_the_whole_tuple_only_while_inactive():
@@ -166,13 +174,47 @@ def test_settings_latch_replaces_the_whole_tuple_only_while_inactive():
     NrdrInterpolatedTorqueShare=80,
     NrdrInterpolatedTorqueLatAccelFactor=7.0,
     NrdrInterpolatedTorqueFriction=0.2,
+    NrdrInterpolatedTorqueFrictionStandard=0.3,
+    NrdrInterpolatedTorqueFrictionHighway=0.4,
   )
 
   engaged = latch.update(changed, supported=True, active=True)
-  assert engaged == InterpolatedTorquePifSettings(True, 0.5, 5.0, 0.5)
+  assert engaged == InterpolatedTorquePifSettings(True, 0.5, 5.0, 0.5, 0.5, 0.5)
 
   inactive = latch.update(changed, supported=True, active=False)
-  assert inactive == InterpolatedTorquePifSettings(False, 0.8, 7.0, 0.2)
+  assert inactive == InterpolatedTorquePifSettings(False, 0.8, 7.0, 0.2, 0.3, 0.4)
+
+
+@pytest.mark.parametrize("speed_mph,expected", (
+  (0.0, 0.1),
+  (24.0, 0.1),
+  (24.5, 0.15),
+  (25.0, 0.2),
+  (25.5, 0.25),
+  (26.0, 0.3),
+  (49.0, 0.3),
+  (49.5, 0.35),
+  (50.0, 0.4),
+  (50.5, 0.45),
+  (51.0, 0.5),
+  (80.0, 0.5),
+))
+def test_friction_speed_bands_crossfade_continuously_around_canonical_boundaries(speed_mph, expected):
+  selected = speed_banded_friction(speed_mph * CV.MPH_TO_MS, 0.1, 0.3, 0.5)
+
+  assert selected == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("speed", (-1.0, 0.0, 24.0, 25.0, 26.0, 49.0, 50.0, 51.0, 100.0, float("nan")))
+def test_equal_friction_bands_preserve_original_value_bits_at_every_speed(speed):
+  selected = speed_banded_friction(speed * CV.MPH_TO_MS, 0.12, 0.12, 0.12)
+
+  assert struct.pack("!d", selected) == struct.pack("!d", 0.12)
+
+
+@pytest.mark.parametrize("speed", (float("nan"), float("inf"), float("-inf")))
+def test_nonfinite_speed_with_distinct_bands_fails_safe_to_low(speed):
+  assert speed_banded_friction(speed, 0.1, 0.3, 0.5) == 0.1
 
 
 @pytest.mark.parametrize("share,expected", ((0.0, 0.25), (0.25, 0.125), (1.0, -0.25)))
@@ -389,6 +431,31 @@ def test_friction_is_independent_of_lateral_acceleration_factor_and_clamps_at_sl
   assert ClassicTorqueCandidate._friction(0.5, 0.0, 0.5) == pytest.approx(0.5)
   assert ClassicTorqueCandidate._friction(-0.5, 0.0, 0.5) == pytest.approx(-0.5)
   assert ClassicTorqueCandidate._friction(0.2, 0.1, 0.5) == pytest.approx(1.0 / 6.0)
+
+
+@pytest.mark.parametrize("speed_mph,selected_friction", ((20.0, 0.1), (35.0, 0.2), (60.0, 0.3)))
+def test_classic_candidate_uses_the_selected_speed_band(speed_mph, selected_friction):
+  speed = speed_mph * CV.MPH_TO_MS
+  desired_lateral_accel = 0.3
+  settings = InterpolatedTorquePifSettings(
+    enabled=True,
+    lat_accel_factor=10.0,
+    friction_low=0.1,
+    friction_standard=0.2,
+    friction_highway=0.3,
+  )
+  result = ClassicTorqueCandidate(dt=0.01).update(
+    SimpleNamespace(vEgo=speed, steeringAngleDeg=0.0, steeringPressed=False),
+    object(),
+    SimpleNamespace(roll=0.0, angleOffsetDeg=0.0),
+    False,
+    desired_lateral_accel / speed ** 2,
+    _pose(yaw_rate=0.0),
+    FixedGeometry(measured_curvature=0.0),
+    settings,
+  )
+
+  assert result.f == pytest.approx(desired_lateral_accel / settings.lat_accel_factor + selected_friction)
 
 
 def test_classic_pid_state_resets_on_disengagement_boundary():

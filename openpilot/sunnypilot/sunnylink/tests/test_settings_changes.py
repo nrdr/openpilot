@@ -388,6 +388,8 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     "NrdrInterpolatedTorqueShare",
     "NrdrInterpolatedTorqueLatAccelFactor",
     "NrdrInterpolatedTorqueFriction",
+    "NrdrInterpolatedTorqueFrictionStandard",
+    "NrdrInterpolatedTorqueFrictionHighway",
   )
 
   def test_master_and_complete_tuple_are_offroad_capability_gated(self, schema):
@@ -399,6 +401,7 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     assert "final request temporarily returns to 100% P/I/F" in master["details"]
     assert "does not reuse angle or update its controller state" in master["details"]
     assert "not historically road-proven on Honda" in master["details"]
+    assert "All six settings are frozen while engaged" in master["details"]
     assert "NNLC is bypassed and reset" in master["details"]
     assert [item["key"] for item in master["sub_items"]] == list(self.KEYS[1:])
 
@@ -420,9 +423,16 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     assert "scales Torque feedback error" in laf["details"]
     assert "never direct friction" in laf["details"]
 
-    friction = _find_item(schema, "NrdrInterpolatedTorqueFriction")
-    assert (friction["min"], friction["max"], friction["step"]) == (0.0, 1.0, 0.01)
-    assert friction["title"] == "Torque-Side Friction Compensation"
+    friction_titles = {
+      "NrdrInterpolatedTorqueFriction": "Low-Speed Torque Friction (Below 25mph)",
+      "NrdrInterpolatedTorqueFrictionStandard": "Standard-Speed Torque Friction (25-50mph)",
+      "NrdrInterpolatedTorqueFrictionHighway": "Highway Torque Friction (50mph+)",
+    }
+    for key, title in friction_titles.items():
+      friction = _find_item(schema, key)
+      assert (friction["min"], friction["max"], friction["step"]) == (0.0, 1.0, 0.01)
+      assert friction["title"] == title
+      assert "±1 mph handoff" in friction["details"]
 
   def test_nnlc_controls_are_mutually_exclusive(self, schema):
     for key in ("NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain"):

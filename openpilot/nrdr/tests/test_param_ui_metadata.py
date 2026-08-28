@@ -30,10 +30,12 @@ EXPECTED_KEYS = (
   NrdrParamKey.LAT_I_SCALE_HIGHWAY,
 )
 
-INTERPOLATED_KEYS = (
-  NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR,
+FRICTION_KEYS = (
   NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
+  NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD,
+  NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY,
 )
+INTERPOLATED_KEYS = (NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR, *FRICTION_KEYS)
 ALL_EXPECTED_KEYS = INTERPOLATED_KEYS + EXPECTED_KEYS
 
 EXPECTED_NATIVE = {
@@ -121,13 +123,20 @@ class TestParamUiMetadata(unittest.TestCase):
     self.assertEqual(laf.format_label(500), "5.0 m/s²")
     self.assertTrue(laf.use_float_scaling)
 
-    friction = get_native_option_spec(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION)
-    self.assertEqual((friction.min_value, friction.max_value, friction.value_change_step), (0, 100, 1))
-    self.assertEqual(friction.format_label(50), "0.50")
-    self.assertTrue(friction.use_float_scaling)
-
     self.assertEqual(PARAM_SPECS_BY_KEY[laf.param].default, "5.0")
-    self.assertEqual(PARAM_SPECS_BY_KEY[friction.param].default, "0.50")
+    expected_titles = (
+      "Low-Speed Torque Friction (Below 25mph) (Default: 0.50)",
+      "Standard-Speed Torque Friction (25-50mph) (Default: 0.50)",
+      "Highway Torque Friction (50mph+) (Default: 0.50)",
+    )
+    for key, expected_title in zip(FRICTION_KEYS, expected_titles, strict=True):
+      with self.subTest(key=key.value):
+        friction = get_native_option_spec(key)
+        self.assertEqual((friction.min_value, friction.max_value, friction.value_change_step), (0, 100, 1))
+        self.assertEqual(friction.format_label(50), "0.50")
+        self.assertTrue(friction.use_float_scaling)
+        self.assertEqual(friction.title, expected_title)
+        self.assertEqual(PARAM_SPECS_BY_KEY[friction.param].default, "0.50")
 
   def test_native_adapter_reproduces_exact_option_specs(self):
     for key in EXPECTED_KEYS:

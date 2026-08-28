@@ -737,7 +737,7 @@
                   "widget": "toggle",
                   "title": "Interpolated Torque/PIF Blend",
                   "description": "Blend angle-feedback P/I/F with the generic f13 legacy torque controller.",
-                  "details": "The final request is Torque share times the f13de17 generic torque controller plus the remaining share times today's complete P/I/F controller. Torque uses angle feedback through 2 m/s, transitions from angle to calibrated yaw over 2-5 m/s, and uses calibrated yaw at 5 m/s and above. If required yaw is invalid, stale, missing, or non-finite, Torque does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F. This generic yaw branch was not historically road-proven on Honda. All four settings are frozen while engaged, and Clarity NNLC is bypassed and reset.",
+                  "details": "The final request is Torque share times the f13de17 generic torque controller plus the remaining share times today's complete P/I/F controller. Torque uses angle feedback through 2 m/s, transitions from angle to calibrated yaw over 2-5 m/s, and uses calibrated yaw at 5 m/s and above. If required yaw is invalid, stale, missing, or non-finite, Torque does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F. This generic yaw branch was not historically road-proven on Honda. All six settings are frozen while engaged, and Clarity NNLC is bypassed and reset.",
                   "enablement": [
                     {
                       "type": "capability",
@@ -804,9 +804,59 @@
                     {
                       "key": "NrdrInterpolatedTorqueFriction",
                       "widget": "option",
-                      "title": "Torque-Side Friction Compensation",
-                      "description": "Adds direct normalized steering torque to help the legacy torque half overcome rack friction.",
-                      "details": "This value is independent of the lateral acceleration factor. Large values can make the torque half hit its limit quickly. Changes apply on the next engagement.",
+                      "title": "Low-Speed Torque Friction (Below 25mph)",
+                      "description": "Sets direct normalized steering torque for the legacy torque half below 25 mph.",
+                      "details": "Helps the legacy torque half overcome rack friction. A \u00b11 mph handoff blends this value smoothly into Standard from 24-26 mph. It is independent of the lateral acceleration factor. Changes apply on the next engagement.",
+                      "min": 0.0,
+                      "max": 1.0,
+                      "step": 0.01,
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_interpolated_torque_pif_blend_available",
+                          "equals": true
+                        },
+                        {
+                          "type": "param",
+                          "key": "NrdrInterpolatedTorquePifBlend",
+                          "equals": true
+                        },
+                        {
+                          "type": "offroad_only"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "NrdrInterpolatedTorqueFrictionStandard",
+                      "widget": "option",
+                      "title": "Standard-Speed Torque Friction (25-50mph)",
+                      "description": "Sets direct normalized steering torque for the legacy torque half between 25 and 50 mph.",
+                      "details": "Helps the legacy torque half overcome rack friction. \u00b11 mph handoffs blend Low into this value from 24-26 mph and this value into Highway from 49-51 mph. It is independent of the lateral acceleration factor. Changes apply on the next engagement.",
+                      "min": 0.0,
+                      "max": 1.0,
+                      "step": 0.01,
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_interpolated_torque_pif_blend_available",
+                          "equals": true
+                        },
+                        {
+                          "type": "param",
+                          "key": "NrdrInterpolatedTorquePifBlend",
+                          "equals": true
+                        },
+                        {
+                          "type": "offroad_only"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "NrdrInterpolatedTorqueFrictionHighway",
+                      "widget": "option",
+                      "title": "Highway Torque Friction (50mph+)",
+                      "description": "Sets direct normalized steering torque for the legacy torque half above 50 mph.",
+                      "details": "Helps the legacy torque half overcome rack friction. A \u00b11 mph handoff blends Standard smoothly into this value from 49-51 mph. It is independent of the lateral acceleration factor. Changes apply on the next engagement.",
                       "min": 0.0,
                       "max": 1.0,
                       "step": 0.01,

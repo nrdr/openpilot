@@ -32,6 +32,8 @@
     {"NrdrInterpolatedTorqueShare", {PERSISTENT | BACKUP, INT, "50"}},
     {"NrdrInterpolatedTorqueLatAccelFactor", {PERSISTENT | BACKUP, FLOAT, "5.0"}},
     {"NrdrInterpolatedTorqueFriction", {PERSISTENT | BACKUP, FLOAT, "0.50"}},
+    {"NrdrInterpolatedTorqueFrictionStandard", {PERSISTENT | BACKUP, FLOAT, "0.50"}},
+    {"NrdrInterpolatedTorqueFrictionHighway", {PERSISTENT | BACKUP, FLOAT, "0.50"}},
     {"HondaNotchEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaNotchFreq", {PERSISTENT | BACKUP, FLOAT, "7.5"}},
     {"HondaNotchQ", {PERSISTENT | BACKUP, FLOAT, "1.5"}},

@@ -47,7 +47,7 @@ assert set(nrdr_ui.__all__) == set(nrdr_ui._EXPORT_MODULES)
 assert lateral_tools.__doc__
 assert radar_re_tools.BOSCH_RADAR_HDR_MSGS
 assert steer_ratio_tools.__doc__
-assert len(NRDR_UI_METADATA) == 8
+assert len(NRDR_UI_METADATA) == 10
 assert NrdrParamKey.HONDA_BOSCH_A_RADAR == "HondaBoschARadar"
 assert LegacyCommandSample is CommandSample
 assert legacy_classify_steer_ratio_model is classify_steer_ratio_model

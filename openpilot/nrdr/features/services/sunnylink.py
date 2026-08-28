@@ -14,6 +14,8 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
   "NrdrInterpolatedTorqueShare",
   "NrdrInterpolatedTorqueLatAccelFactor",
   "NrdrInterpolatedTorqueFriction",
+  "NrdrInterpolatedTorqueFrictionStandard",
+  "NrdrInterpolatedTorqueFrictionHighway",
 ))
 
 

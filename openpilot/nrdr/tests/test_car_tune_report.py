@@ -15,6 +15,8 @@ class TestCarTuneReporter(unittest.TestCase):
       "NrdrInterpolatedTorqueShare": "60",
       "NrdrInterpolatedTorqueLatAccelFactor": "5.0",
       "NrdrInterpolatedTorqueFriction": "0.50",
+      "NrdrInterpolatedTorqueFrictionStandard": "0.30",
+      "NrdrInterpolatedTorqueFrictionHighway": "0.12",
     }
     params = SimpleNamespace(
       get_bool=lambda key: enabled if key == "NrdrInterpolatedTorquePifBlend" else False,
@@ -76,7 +78,7 @@ class TestCarTuneReporter(unittest.TestCase):
 
     self.assertTrue(effective)
     self.assertIn("ON | Torque 60% / P/I/F 40%", report)
-    self.assertIn("LAF 5 m/s² | friction 0.5 | P/I/F angle feedback", report)
+    self.assertIn("LAF 5 m/s² | friction Low 0.5 / Standard 0.3 / Highway 0.12 | P/I/F angle feedback", report)
     self.assertIn("Torque angle→yaw 2-5 m/s, calibrated yaw >=5 m/s", report)
     self.assertIn("invalid required yaw: exact P/I/F output + Torque state held", report)
     self.assertIn("generic f13 yaw branch (not Honda road-proven)", report)

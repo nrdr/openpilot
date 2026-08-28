@@ -128,6 +128,8 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("NrdrInterpolatedTorqueShare", ParamType.INT, PB, "50", owner=ParamOwner.LATERAL),
   _added("NrdrInterpolatedTorqueLatAccelFactor", ParamType.FLOAT, PB, "5.0", owner=ParamOwner.LATERAL),
   _added("NrdrInterpolatedTorqueFriction", ParamType.FLOAT, PB, "0.50", owner=ParamOwner.LATERAL),
+  _added("NrdrInterpolatedTorqueFrictionStandard", ParamType.FLOAT, PB, "0.50", owner=ParamOwner.LATERAL),
+  _added("NrdrInterpolatedTorqueFrictionHighway", ParamType.FLOAT, PB, "0.50", owner=ParamOwner.LATERAL),
   _added("HondaNotchEnabled", ParamType.BOOL, PB, "0", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),
   _added("HondaNotchFreq", ParamType.FLOAT, PB, "7.5", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),
   _added("HondaNotchQ", ParamType.FLOAT, PB, "1.5", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),

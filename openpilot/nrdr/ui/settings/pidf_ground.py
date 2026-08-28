@@ -49,11 +49,13 @@ class PidfGroundLayout(Widget):
       max_value=100,
       value_change_step=1,
       description=lambda: tr("Splits the final steering request between the two complete controllers. " +
-                             "The shares always add to 100%. All four values are frozen until the next disengagement."),
+                             "The shares always add to 100%. All six settings are frozen until the next disengagement."),
       label_callback=lambda value: f"Torque {value}% / P/I/F {100 - value}%",
     )
     self._interpolated_laf = option_item_from_metadata(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR)
-    self._interpolated_friction = option_item_from_metadata(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION)
+    self._interpolated_friction_low = option_item_from_metadata(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION)
+    self._interpolated_friction_standard = option_item_from_metadata(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD)
+    self._interpolated_friction_highway = option_item_from_metadata(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY)
 
     self._starpilot = toggle_item_sp(
       title=tr("StarPilot PID Additions"),
@@ -200,7 +202,9 @@ class PidfGroundLayout(Widget):
       self._interpolated_torque_pif,
       self._interpolated_torque_share,
       self._interpolated_laf,
-      self._interpolated_friction,
+      self._interpolated_friction_low,
+      self._interpolated_friction_standard,
+      self._interpolated_friction_highway,
       LineSeparatorSP(40),
       self._starpilot,
       LineSeparatorSP(40),
@@ -248,7 +252,9 @@ class PidfGroundLayout(Widget):
     interpolated_children = (
       self._interpolated_torque_share,
       self._interpolated_laf,
-      self._interpolated_friction,
+      self._interpolated_friction_low,
+      self._interpolated_friction_standard,
+      self._interpolated_friction_highway,
     )
     self._interpolated_torque_pif.set_visible(interpolated_supported)
     self._interpolated_torque_pif.action_item.set_enabled(interpolated_supported and not ui_state.engaged)

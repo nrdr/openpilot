@@ -45,7 +45,8 @@ CONTROL_GROUPS = (
   # The controller latches this complete tuple at an inactive boundary. Keep
   # it isolated so a polling generation can never expose a mixed blend.
   ParamGroup(("NrdrInterpolatedTorquePifBlend", "NrdrInterpolatedTorqueShare",
-              "NrdrInterpolatedTorqueLatAccelFactor", "NrdrInterpolatedTorqueFriction")),
+              "NrdrInterpolatedTorqueLatAccelFactor", "NrdrInterpolatedTorqueFriction",
+              "NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway")),
   ParamGroup(("NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate", "NrdrTuneLearnerReset")),
   ParamGroup(("NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain")),
   ParamGroup(("LongPidTuneScaleAggressive", "LongPidTuneScaleStandard", "LongPidTuneScaleRelaxed",

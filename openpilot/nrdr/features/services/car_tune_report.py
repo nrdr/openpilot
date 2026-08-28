@@ -91,7 +91,11 @@ class CarTuneReporter:
     configured = " | ".join((
       f"Torque {share}% / P/I/F {100 - share}%",
       f"LAF {float(self._value('NrdrInterpolatedTorqueLatAccelFactor')):g} m/s²",
-      f"friction {float(self._value('NrdrInterpolatedTorqueFriction')):g}",
+      "friction " + " / ".join((
+        f"Low {float(self._value('NrdrInterpolatedTorqueFriction')):g}",
+        f"Standard {float(self._value('NrdrInterpolatedTorqueFrictionStandard')):g}",
+        f"Highway {float(self._value('NrdrInterpolatedTorqueFrictionHighway')):g}",
+      )),
     ))
     if enabled:
       return (

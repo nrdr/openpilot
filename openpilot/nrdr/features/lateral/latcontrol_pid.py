@@ -218,7 +218,7 @@ class NrdrLatControlPID(LatControl):
 
   def _refresh_interpolated_torque_pif_settings(self) -> None:
     # This method is called only while lateral control is inactive. The complete
-    # four-value tuple is therefore frozen from engagement until disengagement.
+    # six-value tuple is therefore frozen from engagement until disengagement.
     self.interpolated_torque_pif_latch.update(
       self.params.snapshot,
       self.interpolated_torque_pif_supported,

@@ -8,6 +8,7 @@ from openpilot.common.hardware import HARDWARE
 
 
 STEER_RATIO_MANUAL_DEFAULTS = (15.38, 10.93)
+INTERPOLATED_TORQUE_FRICTION_DEFAULT = 0.50
 
 # Legacy endpoint Params remain registered only so this one-time migration can
 # preserve an existing owner's tune. They have no runtime consumers afterward.
@@ -160,8 +161,41 @@ def _migrate_steer_ratio_settings(params: Params) -> None:
            params.put, block=True)
 
 
+def _migrate_interpolated_torque_friction(params: Params) -> None:
+  """Split the original friction tune without changing its effective value."""
+  low_key = "NrdrInterpolatedTorqueFriction"
+  new_keys = (
+    "NrdrInterpolatedTorqueFrictionStandard",
+    "NrdrInterpolatedTorqueFrictionHighway",
+  )
+  try:
+    low = params.get(low_key)
+    missing = {key: params.get(key) is None for key in new_keys}
+  except Exception:
+    cloudlog.exception("failed to inspect interpolated torque friction migration state")
+    return
+
+  if low is None:
+    if not _write(params, low_key, INTERPOLATED_TORQUE_FRICTION_DEFAULT, params.put, block=True):
+      return
+    try:
+      low = params.get(low_key)
+    except Exception:
+      cloudlog.exception("failed to read interpolated torque friction migration source")
+      return
+    if low is None:
+      return
+
+  # Each new band is independently guarded and copied from the durable Low
+  # value. Interrupted boots retry only missing bands and never overwrite a tune.
+  for key in new_keys:
+    if missing[key]:
+      _write(params, key, low, params.put, block=True)
+
+
 def apply_defaults(params: Params) -> None:
   _migrate_steer_ratio_settings(params)
+  _migrate_interpolated_torque_friction(params)
 
   bool_defaults = dict(BOOL_DEFAULTS)
   if HARDWARE.get_device_type() == "mici":

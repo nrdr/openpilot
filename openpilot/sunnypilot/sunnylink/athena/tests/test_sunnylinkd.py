@@ -110,6 +110,8 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "NrdrInterpolatedTorqueShare": "60",
       "NrdrInterpolatedTorqueLatAccelFactor": "5.0",
       "NrdrInterpolatedTorqueFriction": "0.50",
+      "NrdrInterpolatedTorqueFrictionStandard": "0.30",
+      "NrdrInterpolatedTorqueFrictionHighway": "0.12",
       "SpeedLimitOffset": "10",
     })
 
@@ -121,6 +123,8 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "NrdrInterpolatedTorqueShare": "60",
       "NrdrInterpolatedTorqueLatAccelFactor": "5.0",
       "NrdrInterpolatedTorqueFriction": "0.50",
+      "NrdrInterpolatedTorqueFrictionStandard": "0.30",
+      "NrdrInterpolatedTorqueFrictionHighway": "0.12",
     }
 
     sunnylinkd.saveParams(values)
@@ -133,6 +137,8 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "NrdrInterpolatedTorqueShare",
       "NrdrInterpolatedTorqueLatAccelFactor",
       "NrdrInterpolatedTorqueFriction",
+      "NrdrInterpolatedTorqueFrictionStandard",
+      "NrdrInterpolatedTorqueFrictionHighway",
     ):
       assert not allow_param_write(key, onroad=True)
       assert allow_param_write(key, onroad=False)

@@ -168,6 +168,9 @@ class TestParamDefaults(unittest.TestCase):
     self.assertEqual(params.values["NrdrSteerRatioMode"], 0)
     self.assertEqual(params.values["NrdrSteerRatioManualCenter"], 15.38)
     self.assertEqual(params.values["NrdrSteerRatioManualFinal"], 10.93)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.50)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.50)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.50)
 
     forced = {
       "EnforceTorqueControl": False,
@@ -183,14 +186,16 @@ class TestParamDefaults(unittest.TestCase):
 
     expected_keys = (
       ["NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal", "NrdrSteerRatioMode"]
+      + ["NrdrInterpolatedTorqueFriction", "NrdrInterpolatedTorqueFrictionStandard",
+         "NrdrInterpolatedTorqueFrictionHighway"]
       + [key for key in EXPECTED_BOOL_DEFAULTS if key != "QuietMode"]
       + [key for key in EXPECTED_VALUE_DEFAULTS if key != "LaneTurnValue"]
       + list(forced)
     )
     self.assertEqual([call[1] for call in params.calls], expected_keys)
-    self.assertTrue(all(call[4] == {"block": True} for call in params.calls[:3]))
-    self.assertTrue(all(call[3:] == ((), {}) for call in params.calls[3:]), "ordinary startup defaults must remain nonblocking")
-    bool_start = 3
+    self.assertTrue(all(call[4] == {"block": True} for call in params.calls[:6]))
+    self.assertTrue(all(call[3:] == ((), {}) for call in params.calls[6:]), "ordinary startup defaults must remain nonblocking")
+    bool_start = 6
     bool_end = bool_start + len(EXPECTED_BOOL_DEFAULTS) - 1
     self.assertTrue(all(call[0] == "put_bool" for call in params.calls[bool_start:bool_end]))
     value_start = bool_end
@@ -270,6 +275,76 @@ class TestParamDefaults(unittest.TestCase):
     self.assertEqual(params.values["NrdrSteerRatioManualCenter"], 16.2)
     self.assertEqual(params.values["NrdrSteerRatioManualFinal"], 11.1)
     self.assertEqual(params.calls, [])
+
+  def test_existing_single_friction_tune_seeds_both_new_bands_exactly(self):
+    params = FakeParams({"NrdrInterpolatedTorqueFriction": 0.12})
+
+    self.defaults._migrate_interpolated_torque_friction(params)
+
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.12)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.12)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.12)
+    self.assertEqual([call[1] for call in params.calls], [
+      "NrdrInterpolatedTorqueFrictionStandard",
+      "NrdrInterpolatedTorqueFrictionHighway",
+    ])
+    self.assertTrue(all(call[4] == {"block": True} for call in params.calls))
+
+  def test_partial_friction_migration_fills_only_missing_band_without_overwrite(self):
+    params = FakeParams({
+      "NrdrInterpolatedTorqueFriction": 0.12,
+      "NrdrInterpolatedTorqueFrictionStandard": 0.08,
+    })
+
+    self.defaults._migrate_interpolated_torque_friction(params)
+
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.08)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.12)
+    self.assertEqual([call[1] for call in params.calls], ["NrdrInterpolatedTorqueFrictionHighway"])
+
+  def test_friction_migration_seeds_low_before_dependent_bands_and_retries_after_failure(self):
+    params = FakeParams(put_errors={"NrdrInterpolatedTorqueFriction"})
+
+    self.defaults._migrate_interpolated_torque_friction(params)
+
+    self.assertEqual([call[1] for call in params.calls], ["NrdrInterpolatedTorqueFriction"])
+    self.assertNotIn("NrdrInterpolatedTorqueFrictionStandard", params.values)
+    self.assertNotIn("NrdrInterpolatedTorqueFrictionHighway", params.values)
+
+    params.put_errors.clear()
+    params.calls.clear()
+    self.defaults._migrate_interpolated_torque_friction(params)
+
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.50)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.50)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.50)
+    self.assertEqual([call[1] for call in params.calls], [
+      "NrdrInterpolatedTorqueFriction",
+      "NrdrInterpolatedTorqueFrictionStandard",
+      "NrdrInterpolatedTorqueFrictionHighway",
+    ])
+
+  def test_one_failed_friction_band_does_not_block_the_other_and_retries_only_missing(self):
+    params = FakeParams(
+      {"NrdrInterpolatedTorqueFriction": 0.12},
+      put_errors={"NrdrInterpolatedTorqueFrictionStandard"},
+    )
+
+    self.defaults._migrate_interpolated_torque_friction(params)
+
+    self.assertNotIn("NrdrInterpolatedTorqueFrictionStandard", params.values)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.12)
+    self.assertEqual([call[1] for call in params.calls], [
+      "NrdrInterpolatedTorqueFrictionStandard",
+      "NrdrInterpolatedTorqueFrictionHighway",
+    ])
+
+    params.put_errors.clear()
+    params.calls.clear()
+    self.defaults._migrate_interpolated_torque_friction(params)
+
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.12)
+    self.assertEqual([call[1] for call in params.calls], ["NrdrInterpolatedTorqueFrictionStandard"])
 
   def test_mici_omits_quiet_mode_seed(self):
     self.defaults.HARDWARE = SimpleNamespace(get_device_type=lambda: "mici")

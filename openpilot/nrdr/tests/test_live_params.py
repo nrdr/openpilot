@@ -105,6 +105,8 @@ def test_interpolated_torque_settings_publish_together():
     "NrdrInterpolatedTorqueShare",
     "NrdrInterpolatedTorqueLatAccelFactor",
     "NrdrInterpolatedTorqueFriction",
+    "NrdrInterpolatedTorqueFrictionStandard",
+    "NrdrInterpolatedTorqueFrictionHighway",
   }
   matching = [group for group in CONTROL_GROUPS if keys.intersection(group.keys)]
 
