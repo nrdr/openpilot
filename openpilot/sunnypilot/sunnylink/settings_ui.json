@@ -733,6 +733,102 @@
               "trigger_key": null,
               "items": [
                 {
+                  "key": "NrdrInterpolatedTorquePifBlend",
+                  "widget": "toggle",
+                  "title": "Interpolated Torque/PIF Blend",
+                  "description": "Blend angle-feedback P/I/F with the generic f13 legacy torque controller.",
+                  "details": "The final request is Torque share times the f13de17 generic torque controller plus the remaining share times today's complete P/I/F controller. Torque uses angle feedback through 2 m/s, transitions from angle to calibrated yaw over 2-5 m/s, and uses calibrated yaw at 5 m/s and above. If required yaw is invalid, stale, missing, or non-finite, Torque does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F. This generic yaw branch was not historically road-proven on Honda. All four settings are frozen while engaged, and Clarity NNLC is bypassed and reset.",
+                  "enablement": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_interpolated_torque_pif_blend_available",
+                      "equals": true
+                    },
+                    {
+                      "type": "offroad_only"
+                    }
+                  ],
+                  "sub_items": [
+                    {
+                      "key": "NrdrInterpolatedTorqueShare",
+                      "widget": "option",
+                      "title": "Torque / P/I/F Share",
+                      "description": "Splits the final steering request between both complete controllers. Torque X% / P/I/F (100-X)%; default is 50% / 50%.",
+                      "details": "The two shares always add to 100%. Changes are accepted only while disengaged and take effect on the next engagement.",
+                      "min": 0,
+                      "max": 100,
+                      "step": 1,
+                      "unit": "%",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_interpolated_torque_pif_blend_available",
+                          "equals": true
+                        },
+                        {
+                          "type": "param",
+                          "key": "NrdrInterpolatedTorquePifBlend",
+                          "equals": true
+                        },
+                        {
+                          "type": "offroad_only"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "NrdrInterpolatedTorqueLatAccelFactor",
+                      "widget": "option",
+                      "title": "Spoofed Lateral Acceleration Factor",
+                      "description": "Sets how much lateral acceleration the legacy torque half treats as full normalized steering torque.",
+                      "details": "Higher values ask the torque half for less steering for the same planned curve. It scales Torque feedback error and non-friction feedforward, but never direct friction. This is m/s\u00b2, not m/s. Changes apply on the next engagement.",
+                      "min": 0.1,
+                      "max": 10.0,
+                      "step": 0.1,
+                      "unit": "m/s\u00b2",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_interpolated_torque_pif_blend_available",
+                          "equals": true
+                        },
+                        {
+                          "type": "param",
+                          "key": "NrdrInterpolatedTorquePifBlend",
+                          "equals": true
+                        },
+                        {
+                          "type": "offroad_only"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "NrdrInterpolatedTorqueFriction",
+                      "widget": "option",
+                      "title": "Torque-Side Friction Compensation",
+                      "description": "Adds direct normalized steering torque to help the legacy torque half overcome rack friction.",
+                      "details": "This value is independent of the lateral acceleration factor. Large values can make the torque half hit its limit quickly. Changes apply on the next engagement.",
+                      "min": 0.0,
+                      "max": 1.0,
+                      "step": 0.01,
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_interpolated_torque_pif_blend_available",
+                          "equals": true
+                        },
+                        {
+                          "type": "param",
+                          "key": "NrdrInterpolatedTorquePifBlend",
+                          "equals": true
+                        },
+                        {
+                          "type": "offroad_only"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
                   "key": "NrdrStarPilotPid",
                   "widget": "toggle",
                   "title": "StarPilot PID Additions",
@@ -1217,7 +1313,7 @@
                   "widget": "toggle",
                   "title": "Enable Neural Network Lateral Model (NNLC)",
                   "description": "Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is OFF.",
-                  "details": "OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command. NNLC remains configured but is inactive whenever a recognized Clarity is using the experimental firmware EPS position map.",
+                  "details": "OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command. NNLC remains configured but is inactive whenever a recognized Clarity is using the experimental firmware EPS position map or Interpolated Torque/PIF Blend.",
                   "enablement": [
                     {
                       "type": "any",
@@ -1236,6 +1332,14 @@
                           }
                         }
                       ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrInterpolatedTorquePifBlend",
+                        "equals": true
+                      }
                     }
                   ],
                   "sub_items": [
@@ -1253,6 +1357,14 @@
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
                           "equals": true
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrInterpolatedTorquePifBlend",
+                            "equals": true
+                          }
                         }
                       ]
                     },
@@ -1270,6 +1382,14 @@
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
                           "equals": true
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrInterpolatedTorquePifBlend",
+                            "equals": true
+                          }
                         }
                       ]
                     },
@@ -1287,6 +1407,14 @@
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
                           "equals": true
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrInterpolatedTorquePifBlend",
+                            "equals": true
+                          }
                         }
                       ]
                     },
@@ -1304,6 +1432,14 @@
                           "type": "param",
                           "key": "NrdrNnlcEnabled",
                           "equals": true
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrInterpolatedTorquePifBlend",
+                            "equals": true
+                          }
                         }
                       ]
                     }

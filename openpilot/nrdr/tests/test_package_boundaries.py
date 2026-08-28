@@ -10,6 +10,7 @@ from openpilot.nrdr.params import NrdrParamKey, ParamReader, ParamValue, read_bo
 
 
 MIGRATED_PARAM_CONSUMERS = (
+  "openpilot/nrdr/features/lateral/interpolated_torque_pif.py",
   "openpilot/nrdr/features/lateral/latcontrol_pid.py",
   "openpilot/nrdr/features/lateral/nnlc.py",
   "openpilot/nrdr/features/lateral/tune_learner.py",

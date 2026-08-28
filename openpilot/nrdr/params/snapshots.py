@@ -42,6 +42,10 @@ CONTROL_GROUPS = (
   # Mode and both manual endpoints are deliberately one atomic snapshot. A
   # latched resolver consumes this group so geometry cannot half-update.
   ParamGroup(("NrdrSteerRatioMode", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal")),
+  # The controller latches this complete tuple at an inactive boundary. Keep
+  # it isolated so a polling generation can never expose a mixed blend.
+  ParamGroup(("NrdrInterpolatedTorquePifBlend", "NrdrInterpolatedTorqueShare",
+              "NrdrInterpolatedTorqueLatAccelFactor", "NrdrInterpolatedTorqueFriction")),
   ParamGroup(("NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate", "NrdrTuneLearnerReset")),
   ParamGroup(("NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain")),
   ParamGroup(("LongPidTuneScaleAggressive", "LongPidTuneScaleStandard", "LongPidTuneScaleRelaxed",

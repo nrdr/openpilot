@@ -2,11 +2,35 @@ import struct
 import unittest
 from types import SimpleNamespace
 
+from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import resolve_steer_ratio_selection
 from openpilot.nrdr.features.services.car_tune_report import CarTuneReporter, _longitudinal_pid_info
 
 
 class TestCarTuneReporter(unittest.TestCase):
+
+  @staticmethod
+  def _interpolated_reporter(enabled):
+    values = {
+      "NrdrInterpolatedTorqueShare": "60",
+      "NrdrInterpolatedTorqueLatAccelFactor": "5.0",
+      "NrdrInterpolatedTorqueFriction": "0.50",
+    }
+    params = SimpleNamespace(
+      get_bool=lambda key: enabled if key == "NrdrInterpolatedTorquePifBlend" else False,
+      get=lambda key, **_kwargs: values.get(key),
+    )
+    reporter = CarTuneReporter(params)
+    reporter._cp_sp = lambda: SimpleNamespace(flags=HondaFlagsSP.EPS_MODIFIED.value)
+    return reporter
+
+  @staticmethod
+  def _interpolated_cp():
+    return SimpleNamespace(
+      brand="honda",
+      carFingerprint="HONDA_CIVIC",
+      lateralTuning=SimpleNamespace(which=lambda: "pid"),
+    )
 
   @staticmethod
   def _steer_ratio_selection(mode, fingerprint="HONDA_CLARITY", brand="honda"):
@@ -39,6 +63,24 @@ class TestCarTuneReporter(unittest.TestCase):
       CarTuneReporter(params=None)._pid_info(CP),
       ("P 0.2 | I 0.05", "0.0000024/0.0000018/0.0000036/0.000006", "P/I all speeds | F 0 / <25 / 25 / 50 mph"),
     )
+
+  def test_disabled_interpolated_report_is_explicitly_unchanged_pif(self):
+    report, effective = self._interpolated_reporter(False)._interpolated_torque_pif_info(self._interpolated_cp())
+
+    self.assertFalse(effective)
+    self.assertIn("OFF | Torque 0% / P/I/F 100% | P/I/F unchanged", report)
+    self.assertIn("stored next engagement: Torque 60% / P/I/F 40%", report)
+
+  def test_enabled_interpolated_report_uses_complementary_share(self):
+    report, effective = self._interpolated_reporter(True)._interpolated_torque_pif_info(self._interpolated_cp())
+
+    self.assertTrue(effective)
+    self.assertIn("ON | Torque 60% / P/I/F 40%", report)
+    self.assertIn("LAF 5 m/s² | friction 0.5 | P/I/F angle feedback", report)
+    self.assertIn("Torque angle→yaw 2-5 m/s, calibrated yaw >=5 m/s", report)
+    self.assertIn("invalid required yaw: exact P/I/F output + Torque state held", report)
+    self.assertIn("generic f13 yaw branch (not Honda road-proven)", report)
+    self.assertIn("engagement-latched | NNLC bypassed/reset", report)
 
   def test_small_scalar_feedforward_never_uses_exponent_notation(self):
     pid = SimpleNamespace(kpV=[0.2], kiV=[0.05], kf=0.0000036, kfV=[])

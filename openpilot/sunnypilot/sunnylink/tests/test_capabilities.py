@@ -79,10 +79,14 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
     assert "nrdr_raw_steer_ratio_available" in CAPABILITY_FIELDS
     assert "nrdr_firmware_steer_ratio_available" in CAPABILITY_FIELDS
 
+  def test_interpolated_torque_pif_blend_availability_field_present(self):
+    assert "nrdr_interpolated_torque_pif_blend_available" in CAPABILITY_FIELDS
+
   def test_nrdr_steer_ratio_availability_defaults_are_conservative(self, caps):
     assert caps["nrdr_manual_steer_ratio_available"] is False
     assert caps["nrdr_raw_steer_ratio_available"] is False
     assert caps["nrdr_firmware_steer_ratio_available"] is False
+    assert caps["nrdr_interpolated_torque_pif_blend_available"] is False
 
   def test_exact_honda_bundle_enables_manual_and_clarity_raw(self, params):
     params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CLARITY"}, block=True)

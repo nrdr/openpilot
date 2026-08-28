@@ -30,6 +30,12 @@ EXPECTED_KEYS = (
   NrdrParamKey.LAT_I_SCALE_HIGHWAY,
 )
 
+INTERPOLATED_KEYS = (
+  NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR,
+  NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
+)
+ALL_EXPECTED_KEYS = INTERPOLATED_KEYS + EXPECTED_KEYS
+
 EXPECTED_NATIVE = {
   "LatPScaleLowSpeed": (
     "Low Speed Proportional Scale (Below 25mph) (Default: 100%)",
@@ -93,8 +99,8 @@ EXPECTED_SUNNYLINK_COPY = {
 
 class TestParamUiMetadata(unittest.TestCase):
   def test_first_slice_is_exact_and_valid(self):
-    self.assertEqual(tuple(metadata.key for metadata in NRDR_UI_METADATA), EXPECTED_KEYS)
-    self.assertEqual(tuple(NRDR_UI_METADATA_BY_KEY), tuple(key.value for key in EXPECTED_KEYS))
+    self.assertEqual(tuple(metadata.key for metadata in NRDR_UI_METADATA), ALL_EXPECTED_KEYS)
+    self.assertEqual(tuple(NRDR_UI_METADATA_BY_KEY), tuple(key.value for key in ALL_EXPECTED_KEYS))
     self.assertEqual(validate_ui_metadata(), ())
     self.assertFalse(any("LatFScale" in key for key in NRDR_UI_METADATA_BY_KEY))
 
@@ -108,6 +114,20 @@ class TestParamUiMetadata(unittest.TestCase):
         self.assertEqual(spec.default, "100")
         self.assertEqual(profile[key.value], 100)
         self.assertIs(get_ui_metadata(key), NRDR_UI_METADATA_BY_KEY[key.value])
+
+  def test_interpolated_torque_metadata_preserves_locked_ranges_and_defaults(self):
+    laf = get_native_option_spec(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR)
+    self.assertEqual((laf.min_value, laf.max_value, laf.value_change_step), (10, 1000, 10))
+    self.assertEqual(laf.format_label(500), "5.0 m/s²")
+    self.assertTrue(laf.use_float_scaling)
+
+    friction = get_native_option_spec(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION)
+    self.assertEqual((friction.min_value, friction.max_value, friction.value_change_step), (0, 100, 1))
+    self.assertEqual(friction.format_label(50), "0.50")
+    self.assertTrue(friction.use_float_scaling)
+
+    self.assertEqual(PARAM_SPECS_BY_KEY[laf.param].default, "5.0")
+    self.assertEqual(PARAM_SPECS_BY_KEY[friction.param].default, "0.50")
 
   def test_native_adapter_reproduces_exact_option_specs(self):
     for key in EXPECTED_KEYS:
@@ -148,15 +168,21 @@ class TestParamUiMetadata(unittest.TestCase):
       apply_sunnylink_metadata({"key": "LatPScaleLowSpeed", "widget": "option", "max": 501})
 
   def test_invalid_step_is_reported_without_crashing(self):
-    metadata = NRDR_UI_METADATA[0]
+    metadata = get_ui_metadata(NrdrParamKey.LAT_P_SCALE_LOW_SPEED)
     invalid = replace(metadata, numeric=replace(metadata.numeric, step=0))
     self.assertIn("LatPScaleLowSpeed: step must be positive", validate_ui_metadata((invalid,)))
 
   def test_policies_are_explicit_and_separate(self):
-    for metadata in NRDR_UI_METADATA:
-      with self.subTest(key=metadata.key.value):
+    for key in EXPECTED_KEYS:
+      with self.subTest(key=key.value):
+        metadata = get_ui_metadata(key)
         self.assertEqual(metadata.edit_policies, (UiEditPolicy.HANDCRAFTED_LATERAL_UNLOCKED,))
         self.assertIs(metadata.remote_write_policy, UiRemoteWritePolicy.ANY_ROAD_STATE)
+    for key in INTERPOLATED_KEYS:
+      with self.subTest(key=key.value):
+        metadata = get_ui_metadata(key)
+        self.assertEqual(metadata.edit_policies, ())
+        self.assertIs(metadata.remote_write_policy, UiRemoteWritePolicy.OFFROAD_ONLY)
     self.assertIs(get_ui_metadata("LatPScaleLowSpeed").native_description_source, UiDescriptionSource.DETAILS)
     self.assertIs(get_ui_metadata("LatPScaleStandard").native_description_source, UiDescriptionSource.DESCRIPTION)
 
@@ -171,7 +197,9 @@ class TestParamUiMetadata(unittest.TestCase):
     repository_root = Path(__file__).resolve().parents[3]
     native_path = repository_root / "openpilot/nrdr/ui/settings/pidf_ground.py"
     native_source = native_path.read_text()
-    self.assertEqual(native_source.count("option_item_from_metadata("), len(EXPECTED_KEYS))
+    self.assertEqual(native_source.count("option_item_from_metadata("), len(ALL_EXPECTED_KEYS))
+    self.assertIn('title=tr("Interpolated Torque/PIF Blend")', native_source)
+    self.assertIn('f"Torque {value}% / P/I/F {100 - value}%"', native_source)
     for key in EXPECTED_KEYS:
       with self.subTest(surface="native", key=key.value):
         self.assertNotIn(f'param="{key.value}"', native_source)
@@ -197,6 +225,10 @@ class TestParamUiMetadata(unittest.TestCase):
     for key in EXPECTED_KEYS:
       with self.subTest(surface="sunnylink", key=key.value):
         self.assertEqual(items[key.value], {"key": key.value, "widget": "option"})
+
+    for key in INTERPOLATED_KEYS:
+      with self.subTest(surface="sunnylink", key=key.value):
+        self.assertEqual(set(items[key.value]), {"key", "widget", "enablement"})
 
 
 if __name__ == "__main__":

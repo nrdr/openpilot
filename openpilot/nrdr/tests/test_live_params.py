@@ -99,6 +99,19 @@ def test_nnlc_enable_and_gains_publish_together():
   assert reader.get("NrdrNnlcKiGain") == b"15"
 
 
+def test_interpolated_torque_settings_publish_together():
+  keys = {
+    "NrdrInterpolatedTorquePifBlend",
+    "NrdrInterpolatedTorqueShare",
+    "NrdrInterpolatedTorqueLatAccelFactor",
+    "NrdrInterpolatedTorqueFriction",
+  }
+  matching = [group for group in CONTROL_GROUPS if keys.intersection(group.keys)]
+
+  assert len(matching) == 1
+  assert set(matching[0].keys) == keys
+
+
 def test_roen_setting_reaches_control_and_planner_snapshots():
   control_keys = {key for group in CONTROL_GROUPS for key in group.keys}
   planner_keys = {key for group in PLANNER_GROUPS for key in group.keys}

@@ -8,6 +8,7 @@ from openpilot.nrdr.params import (
 )
 from openpilot.nrdr.ui.native_param_controls import option_item_from_metadata
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
+from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import SteerRatioMode
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
@@ -32,6 +33,27 @@ class PidfGroundLayout(Widget):
       button_width=800,
       callback=self._steer_ratio_callback,
     )
+
+    self._interpolated_torque_pif = toggle_item_sp(
+      title=tr("Interpolated Torque/PIF Blend"),
+      description=tr("Blends angle-feedback P/I/F with the generic f13 legacy torque controller. " +
+                     "Torque uses angle feedback through 2 m/s, transitions to calibrated yaw from 2-5 m/s, and uses yaw above 5 m/s. " +
+                     "If required yaw is invalid, Torque holds its state without reusing angle and the final request temporarily returns to P/I/F. " +
+                     "This generic branch was not Honda road-proven; NNLC is bypassed."),
+      param="NrdrInterpolatedTorquePifBlend",
+    )
+    self._interpolated_torque_share = option_item_sp(
+      param="NrdrInterpolatedTorqueShare",
+      title=lambda: tr("Torque / P/I/F Share (Default: 50%)"),
+      min_value=0,
+      max_value=100,
+      value_change_step=1,
+      description=lambda: tr("Splits the final steering request between the two complete controllers. " +
+                             "The shares always add to 100%. All four values are frozen until the next disengagement."),
+      label_callback=lambda value: f"Torque {value}% / P/I/F {100 - value}%",
+    )
+    self._interpolated_laf = option_item_from_metadata(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR)
+    self._interpolated_friction = option_item_from_metadata(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION)
 
     self._starpilot = toggle_item_sp(
       title=tr("StarPilot PID Additions"),
@@ -175,6 +197,11 @@ class PidfGroundLayout(Widget):
     return [
       self._steer_ratio_button,
       LineSeparatorSP(40),
+      self._interpolated_torque_pif,
+      self._interpolated_torque_share,
+      self._interpolated_laf,
+      self._interpolated_friction,
+      LineSeparatorSP(40),
       self._starpilot,
       LineSeparatorSP(40),
       self._lat_p_low,
@@ -213,6 +240,21 @@ class PidfGroundLayout(Widget):
     except (TypeError, ValueError):
       firmware_mode = False
     firmware_vgr_active = firmware_mode and ui_state.CP is not None and get_honda_vgr_profile(ui_state.CP) is not None
+    interpolated_supported = (
+      ui_state.CP is not None and ui_state.CP_SP is not None and
+      supports_interpolated_torque_pif(ui_state.CP, ui_state.CP_SP)
+    )
+    interpolated_enabled = interpolated_supported and self._interpolated_torque_pif.action_item.get_state()
+    interpolated_children = (
+      self._interpolated_torque_share,
+      self._interpolated_laf,
+      self._interpolated_friction,
+    )
+    self._interpolated_torque_pif.set_visible(interpolated_supported)
+    self._interpolated_torque_pif.action_item.set_enabled(interpolated_supported and not ui_state.engaged)
+    for item in interpolated_children:
+      item.set_visible(interpolated_supported)
+      item.action_item.set_enabled(interpolated_enabled and not ui_state.engaged)
     for item in (
       self._starpilot,
       self._lat_p_low, self._lat_i_low, self._lat_f_low,
@@ -225,7 +267,7 @@ class PidfGroundLayout(Widget):
       item.action_item.set_enabled(editable)
 
     for item in (self._nnlc_enabled, self._nnlc_activation_speed, self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain):
-      item.action_item.set_enabled(editable and not firmware_vgr_active)
+      item.action_item.set_enabled(editable and not firmware_vgr_active and not interpolated_enabled)
 
     nnlc_enabled = self._nnlc_enabled.action_item.get_state()
     self._nnlc_activation_speed.set_visible(nnlc_enabled)

@@ -70,9 +70,20 @@ class TestParamSnapshots(unittest.TestCase):
     }
     keys = [key for group in CONTROL_GROUPS for key in group.keys]
     self.assertFalse(retired & set(keys))
-    self.assertEqual(len(CONTROL_GROUPS), 9)
+    self.assertEqual(len(CONTROL_GROUPS), 10)
     self.assertEqual(len(keys), len(set(keys)))
-    self.assertEqual(len(keys), 42)
+    self.assertEqual(len(keys), 46)
+
+  def test_interpolated_torque_settings_share_one_atomic_group(self):
+    expected = {
+      "NrdrInterpolatedTorquePifBlend",
+      "NrdrInterpolatedTorqueShare",
+      "NrdrInterpolatedTorqueLatAccelFactor",
+      "NrdrInterpolatedTorqueFriction",
+    }
+    matching = [group for group in CONTROL_GROUPS if expected.intersection(group.keys)]
+    self.assertEqual(len(matching), 1)
+    self.assertEqual(set(matching[0].keys), expected)
 
   def test_snapshot_keeps_legacy_get_and_bool_semantics(self):
     snapshot = ParamSnapshot(4, MappingProxyType({"Bytes": b"value", "False": b" FALSE ", "True": "yes"}))

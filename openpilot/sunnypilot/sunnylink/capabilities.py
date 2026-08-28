@@ -16,6 +16,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
 from openpilot.nrdr.params import get_handcrafted_lateral_profile
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
+from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import RAW_STEER_RATIO_PROFILES, get_steer_ratio_metadata
 
 
@@ -50,6 +51,7 @@ CAPABILITY_FIELDS = (
   "nrdr_manual_steer_ratio_available",
   "nrdr_raw_steer_ratio_available",
   "nrdr_firmware_steer_ratio_available",
+  "nrdr_interpolated_torque_pif_blend_available",
 )
 
 CAPABILITY_LABELS: dict[str, str] = {
@@ -77,6 +79,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio geometry available",
   "nrdr_raw_steer_ratio_available": "Exact audited NRDR raw steer-ratio curve available",
   "nrdr_firmware_steer_ratio_available": "Exact NRDR firmware steer-ratio geometry available",
+  "nrdr_interpolated_torque_pif_blend_available": "Modified-EPS Honda interpolated torque/P/I/F control available",
 }
 
 # Explicit defaults for non-boolean capability fields
@@ -181,6 +184,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
       cloudlog.exception("capabilities: failed to deserialize CarParamsPersistent")
 
   # CarParamsSP-derived capabilities
+  CP_SP = None
   CP_SP_bytes = params.get("CarParamsSPPersistent")
   if CP_SP_bytes is not None:
     try:
@@ -198,6 +202,9 @@ def generate_capabilities(params: Params | None = None) -> dict:
   caps["nrdr_manual_steer_ratio_available"] = is_honda and get_steer_ratio_metadata(fingerprint) is not None
   caps["nrdr_raw_steer_ratio_available"] = is_honda and fingerprint in RAW_STEER_RATIO_PROFILES
   caps["nrdr_firmware_steer_ratio_available"] = CP is not None and get_honda_vgr_profile(CP) is not None
+  caps["nrdr_interpolated_torque_pif_blend_available"] = (
+    CP is not None and CP_SP is not None and supports_interpolated_torque_pif(CP, CP_SP)
+  )
 
   return caps
 

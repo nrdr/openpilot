@@ -81,6 +81,11 @@ Settings appear only when they apply to the detected car and hardware. A control
 <details>
 <summary><strong>Controller Tuning Dungeon</strong></summary>
 
+- **Interpolated Torque/PIF Blend** is an experimental modified-EPS Honda option. OFF keeps today's controller unchanged. ON mixes two complete steering controllers: the older torque controller and today's P/I/F controller. **Torque Share** shows both sides together, such as `Torque 60% / P/I/F 40%`; they always total 100%.
+  - P/I/F keeps using steering-wheel angle feedback. The torque side uses the generic `f13de17` yaw-feedback branch: steering angle through 2 m/s, an exact angle-to-calibrated-yaw transition from 2–5 m/s, and calibrated yaw response at 5 m/s and above. This historical generic branch was not road-proven on Honda. If required yaw is unavailable, invalid, stale, or non-finite, the torque side does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F.
+  - **Spoofed Lateral Acceleration Factor** tells the torque side how many `m/s²` count as full steering torque. Higher values make that side ask for less torque for the same curve. It scales the torque side's feedback error and non-friction feedforward, but never its direct friction term.
+  - **Torque-Side Friction Compensation** adds direct normalized torque to help start the rack moving. It is independent of the lateral-acceleration factor, so high values can reach the steering limit quickly.
+  - These four settings can be changed only while disengaged and are held for the entire engagement. The legacy torque state resets when you disengage. NNLC is a separate controller; on the Clarity, this mode bypasses and resets it so a hidden third controller cannot change the selected percentages.
 - **P / I / F scales** are split into Low (below 25 mph), Standard (25–50 mph), and Highway (50 mph and above). P reacts now, I corrects an error that will not go away, and F prepares for the curve the model already requested. `100%` keeps the tuned base.
 - **Steer Ratio Tuning** has four mutually exclusive modes:
   - **Manual** is represented by all three switches being OFF. On supported Hondas it blends the global **On-Center** and **Final** values (`15.38` and `10.93` defaults) using hidden car-specific outer-angle information. On every other car the sliders stay disabled and the stock ratio remains untouched.
@@ -94,7 +99,7 @@ Developers and reviewers can find the exact raw-data provenance and math in [the
 - **Rate Damping (D) Strength / Fade-Out Speed** resists fast wheel movement to calm low-speed ringing, then fades away with speed. Too much makes steering heavy.
 - **Center Boost / Threshold / Minimum Speed** adds extra P correction only near center and only above the chosen speed. It does not multiply I, F, or damping.
 - **Predictive Lateral Stiction** tapers and holds torque as the wheel reaches a stable target, then releases immediately for driver input, lane changes, faults, or steering limits.
-- **NNLC** is the optional Clarity neural lateral controller. Activation speed chooses the PID-to-NNLC handoff; KP, KI, and KF scale its three terms. Lane changes remain on PID, and explicit Firmware Steer Ratio mode disables NNLC.
+- **NNLC** is the optional Clarity neural lateral controller. Activation speed chooses the PID-to-NNLC handoff; KP, KI, and KF scale its three terms. Lane changes remain on PID; explicit Firmware Steer Ratio mode or an active Interpolated Torque/PIF Blend disables NNLC.
 
 </details>
 

@@ -39,6 +39,7 @@ class UiRemoteWritePolicy(StrEnum):
   """Server-side road-state policy, separate from frontend enablement."""
 
   ANY_ROAD_STATE = "any_road_state"
+  OFFROAD_ONLY = "offroad_only"
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +90,36 @@ _HANDCRAFTED_UNLOCKED: Final = (UiEditPolicy.HANDCRAFTED_LATERAL_UNLOCKED,)
 
 
 NRDR_UI_METADATA: Final = (
+  ParamUiMetadata(
+    key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR,
+    widget=UiWidget.OPTION,
+    title=tr_noop("Spoofed Lateral Acceleration Factor"),
+    native_title=tr_noop("Spoofed Lateral Acceleration Factor (Default: 5.0 m/s²)"),
+    description=tr_noop("Sets how much lateral acceleration the legacy torque half treats as full normalized steering torque."),
+    details=tr_noop(
+      "Higher values ask the torque half for less steering for the same planned curve. It scales Torque feedback error and " +
+      "non-friction feedforward, but never direct friction. This is m/s², not m/s. Changes apply on the next engagement."
+    ),
+    native_description_source=UiDescriptionSource.DETAILS,
+    numeric=NumericUiMetadata(minimum=0.1, maximum=10.0, step=0.1, unit="m/s²", display_precision=1, display_suffix=" m/s²"),
+    edit_policies=(),
+    remote_write_policy=UiRemoteWritePolicy.OFFROAD_ONLY,
+  ),
+  ParamUiMetadata(
+    key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
+    widget=UiWidget.OPTION,
+    title=tr_noop("Torque-Side Friction Compensation"),
+    native_title=tr_noop("Torque-Side Friction Compensation (Default: 0.50)"),
+    description=tr_noop("Adds direct normalized steering torque to help the legacy torque half overcome rack friction."),
+    details=tr_noop(
+      "This value is independent of the lateral acceleration factor. Large values can make the torque half hit its limit quickly. " +
+      "Changes apply on the next engagement."
+    ),
+    native_description_source=UiDescriptionSource.DETAILS,
+    numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
+    edit_policies=(),
+    remote_write_policy=UiRemoteWritePolicy.OFFROAD_ONLY,
+  ),
   ParamUiMetadata(
     key=NrdrParamKey.LAT_P_SCALE_LOW_SPEED,
     widget=UiWidget.OPTION,

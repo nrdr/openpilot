@@ -382,6 +382,55 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     assert f"Defaults to {default}%" in item.get("details", "")
 
 
+class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
+  KEYS = (
+    "NrdrInterpolatedTorquePifBlend",
+    "NrdrInterpolatedTorqueShare",
+    "NrdrInterpolatedTorqueLatAccelFactor",
+    "NrdrInterpolatedTorqueFriction",
+  )
+
+  def test_master_and_complete_tuple_are_offroad_capability_gated(self, schema):
+    master = _find_item(schema, self.KEYS[0])
+    assert master is not None
+    assert master["title"] == "Interpolated Torque/PIF Blend"
+    assert "angle feedback through 2 m/s" in master["details"]
+    assert "calibrated yaw at 5 m/s and above" in master["details"]
+    assert "final request temporarily returns to 100% P/I/F" in master["details"]
+    assert "does not reuse angle or update its controller state" in master["details"]
+    assert "not historically road-proven on Honda" in master["details"]
+    assert "NNLC is bypassed and reset" in master["details"]
+    assert [item["key"] for item in master["sub_items"]] == list(self.KEYS[1:])
+
+    for item in (master, *master["sub_items"]):
+      rules = item.get("enablement")
+      assert "offroad_only" in _flatten_rule_types(rules)
+      assert _references_capability_field(rules, "nrdr_interpolated_torque_pif_blend_available")
+
+    for item in master["sub_items"]:
+      assert "NrdrInterpolatedTorquePifBlend" in json.dumps(item["enablement"])
+
+  def test_locked_ranges_units_and_complementary_copy(self, schema):
+    share = _find_item(schema, "NrdrInterpolatedTorqueShare")
+    assert (share["min"], share["max"], share["step"], share["unit"]) == (0, 100, 1, "%")
+    assert "Torque X% / P/I/F (100-X)%" in share["description"]
+
+    laf = _find_item(schema, "NrdrInterpolatedTorqueLatAccelFactor")
+    assert (laf["min"], laf["max"], laf["step"], laf["unit"]) == (0.1, 10.0, 0.1, "m/s²")
+    assert "scales Torque feedback error" in laf["details"]
+    assert "never direct friction" in laf["details"]
+
+    friction = _find_item(schema, "NrdrInterpolatedTorqueFriction")
+    assert (friction["min"], friction["max"], friction["step"]) == (0.0, 1.0, 0.01)
+    assert friction["title"] == "Torque-Side Friction Compensation"
+
+  def test_nnlc_controls_are_mutually_exclusive(self, schema):
+    for key in ("NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain"):
+      rules = json.dumps(_find_item(schema, key).get("enablement") or [])
+      assert "NrdrInterpolatedTorquePifBlend" in rules
+      assert '"type": "not"' in rules
+
+
 class TestNrdrSteerRatioMode(OpenpilotTestCase):
   HANDCRAFTED_LOCKED_KEYS = (
     "NrdrLatStiction",

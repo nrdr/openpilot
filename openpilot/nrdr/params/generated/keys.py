@@ -34,6 +34,10 @@ class NrdrParamKey(StrEnum):
   NRDR_CRUISE_OVERSPEED_ALLOWANCE = "NrdrCruiseOverspeedAllowance"
   HONDA_CENTER_SCALE = "HondaCenterScale"
   HONDA_PID_FRICTION = "HondaPidFriction"
+  NRDR_INTERPOLATED_TORQUE_PIF_BLEND = "NrdrInterpolatedTorquePifBlend"
+  NRDR_INTERPOLATED_TORQUE_SHARE = "NrdrInterpolatedTorqueShare"
+  NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR = "NrdrInterpolatedTorqueLatAccelFactor"
+  NRDR_INTERPOLATED_TORQUE_FRICTION = "NrdrInterpolatedTorqueFriction"
   HONDA_NOTCH_ENABLED = "HondaNotchEnabled"
   HONDA_NOTCH_FREQ = "HondaNotchFreq"
   HONDA_NOTCH_Q = "HondaNotchQ"
@@ -161,6 +165,10 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.NRDR_CRUISE_OVERSPEED_ALLOWANCE,
   NrdrParamKey.HONDA_CENTER_SCALE,
   NrdrParamKey.HONDA_PID_FRICTION,
+  NrdrParamKey.NRDR_INTERPOLATED_TORQUE_PIF_BLEND,
+  NrdrParamKey.NRDR_INTERPOLATED_TORQUE_SHARE,
+  NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR,
+  NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
   NrdrParamKey.HONDA_NOTCH_ENABLED,
   NrdrParamKey.HONDA_NOTCH_FREQ,
   NrdrParamKey.HONDA_NOTCH_Q,

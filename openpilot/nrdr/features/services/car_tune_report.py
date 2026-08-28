@@ -14,6 +14,7 @@ from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   SteerRatioSelection,
   resolve_steer_ratio_selection,
 )
+from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 
 
@@ -72,11 +73,39 @@ class CarTuneReporter:
     ) or "n/a"
 
   def _gas_interceptor(self) -> str:
-    cp_sp_bytes = self.params.get("CarParamsSPPersistent")
-    if not cp_sp_bytes:
+    cp_sp = self._cp_sp()
+    if cp_sp is None:
       return "n/a"
-    cp_sp = messaging.log_from_bytes(cp_sp_bytes, custom.CarParamsSP)
     return str(bool(cp_sp.enableGasInterceptor)).lower()
+
+  def _cp_sp(self):
+    cp_sp_bytes = self.params.get("CarParamsSPPersistent")
+    return messaging.log_from_bytes(cp_sp_bytes, custom.CarParamsSP) if cp_sp_bytes else None
+
+  def _interpolated_torque_pif_info(self, CP) -> tuple[str, bool]:
+    requested = self.params.get_bool("NrdrInterpolatedTorquePifBlend")
+    cp_sp = self._cp_sp()
+    supported = cp_sp is not None and supports_interpolated_torque_pif(CP, cp_sp)
+    enabled = requested and supported
+    share = int(max(0.0, min(100.0, float(self._value("NrdrInterpolatedTorqueShare")))))
+    configured = " | ".join((
+      f"Torque {share}% / P/I/F {100 - share}%",
+      f"LAF {float(self._value('NrdrInterpolatedTorqueLatAccelFactor')):g} m/s²",
+      f"friction {float(self._value('NrdrInterpolatedTorqueFriction')):g}",
+    ))
+    if enabled:
+      return (
+        f"ON | {configured} | P/I/F angle feedback | Torque angle→yaw 2-5 m/s, calibrated yaw >=5 m/s | " +
+        "invalid required yaw: exact P/I/F output + Torque state held | generic f13 yaw branch (not Honda road-proven) | " +
+        "engagement-latched | NNLC bypassed/reset",
+        True,
+      )
+    if requested:
+      return (
+        f"requested ON but unavailable for this car | Torque 0% / P/I/F 100% | P/I/F unchanged | stored: {configured}",
+        False,
+      )
+    return f"OFF | Torque 0% / P/I/F 100% | P/I/F unchanged | stored next engagement: {configured}", False
 
   def _pid_source(self, CP):
     if CP.lateralTuning.which() == "pid":
@@ -164,6 +193,9 @@ class CarTuneReporter:
     handcrafted_enabled = is_handcrafted_lateral_enabled(CP.carFingerprint, self.params)
     handcrafted = f"{profile.name} (v{profile.version})" if handcrafted_enabled and profile is not None else "OFF"
     controller_info = self._controller_info(controller, handcrafted_enabled, profile, steer_ratio_selection)
+    interpolated, interpolated_enabled = self._interpolated_torque_pif_info(CP)
+    if interpolated_enabled:
+      controller_info += f" | {interpolated}"
 
     pid_base, pid_feedforward, pid_speeds = self._pid_info(CP)
     longitudinal = CP.longitudinalTuning
@@ -186,9 +218,11 @@ class CarTuneReporter:
     ))
     if steer_ratio_selection.firmware_vgr_selected:
       nnlc += " | inactive in firmware EPS mode"
+    if interpolated_enabled:
+      nnlc += " | inactive while Interpolated Torque/PIF Blend is active"
     steer_ratio = self._steer_ratio_info(steer_ratio_selection)
     learning = f"stiffness {self._state('NrdrLearnStiffness')} | angle {self._state('NrdrLearnAngleOffset')}"
-    helpers = f"stiction {self._state('NrdrLatStiction')} | StarPilot {self._state('NrdrStarPilotPid')}"
+    helpers = f"stiction {self._state('NrdrLatStiction')} | StarPilot {self._state('NrdrStarPilotPid')} | {interpolated}"
     gas = "gas" if interceptor == "true" else "no gas"
     radar = "radar" if not CP.radarUnavailable else "no radar"
 
