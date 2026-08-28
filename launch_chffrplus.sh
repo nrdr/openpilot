@@ -6,8 +6,8 @@ source "$DIR/launch_env.sh"
 
 # Recreate local developer helpers after branch switches, reinstalls, or factory resets.
 # This is the actual boot entry on the August base; launch_openpilot.sh only delegates here.
-if [[ -f "${DIR}/scripts/setup_dev_helpers.sh" ]]; then
-  bash "${DIR}/scripts/setup_dev_helpers.sh" || true
+if [[ -f "${DIR}/openpilot/nrdr/tools/device/setup_dev_helpers.sh" ]]; then
+  bash "${DIR}/openpilot/nrdr/tools/device/setup_dev_helpers.sh" || true
 fi
 
 function agnos_init {
