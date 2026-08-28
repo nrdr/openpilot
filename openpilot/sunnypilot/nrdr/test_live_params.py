@@ -133,6 +133,17 @@ def test_steer_ratio_mode_and_manual_pair_publish_as_one_snapshot():
   assert not any(key.startswith(("NrdrSteerRatioCenter", "NrdrSteerRatioOuter")) for key in control_keys)
 
 
+def test_interpolated_torque_controls_publish_as_one_snapshot():
+  matching = [group for group in CONTROL_GROUPS if "NrdrInterpolatedTorquePifBlend" in group.keys]
+  assert len(matching) == 1
+  assert matching[0].keys == (
+    "NrdrInterpolatedTorquePifBlend",
+    "NrdrInterpolatedTorqueShare",
+    "NrdrInterpolatedTorqueLatAccelFactor",
+    "NrdrInterpolatedTorqueFriction",
+  )
+
+
 def test_learning_toggles_preserve_typed_boolean_values():
   values = {
     "NrdrLearnStiffness": True,

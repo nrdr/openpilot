@@ -4,6 +4,7 @@ import pyray as rl
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
+from openpilot.sunnypilot.nrdr.interpolated_torque import is_interpolated_torque_pif_supported
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import SteerRatioMode, parse_steer_ratio_mode
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.steer_ratio_tuning import SteerRatioTuningLayout
 from openpilot.system.ui.lib.multilang import tr
@@ -104,6 +105,46 @@ class PidfGroundLayout(Widget):
       min_value=0, max_value=500, value_change_step=5,
       description=lambda: tr("Scales the feedforward (kf) term above 50 mph. 100% = tuned value (static)."),
       label_callback=lambda value: f"{value}%",
+    )
+
+    self._interpolated_torque_pif_blend = toggle_item_sp(
+      title=tr("Interpolated Torque/PIF Blend"),
+      description=tr("Mixes the complete steering-angle P/I/F answer with f13's separate classic Torque answer. Torque uses " +
+                     "steering angle through 2 m/s, changes to calibrated yaw from 2-5 m/s, and uses yaw from 5 m/s up. " +
+                     "If required yaw is bad or stale above 2 m/s, the final answer temporarily becomes exact P/I/F and every " +
+                     "Torque state holds until yaw returns; angle is not substituted. This f13 generic yaw branch was not " +
+                     "historically road-proven on Honda. OFF leaves P/I/F exactly as it is. Settings stay fixed for one engagement. On " +
+                     "Clarity, this bypasses NNLC without changing its saved settings."),
+      param="NrdrInterpolatedTorquePifBlend",
+    )
+    self._interpolated_torque_share = option_item_sp(
+      param="NrdrInterpolatedTorqueShare",
+      title=lambda: tr("Torque Share (Default: 50%)"),
+      min_value=0, max_value=100, value_change_step=1,
+      description=lambda: tr("Chooses the one final weighted steering command. For example, 30% Torque means 30% classic torque " +
+                             "and 70% P/I/F; the two answers are not stacked."),
+      label_callback=lambda value: f"Torque {value}% / P/I/F {100 - value}%",
+      label_width=600,
+    )
+    self._interpolated_torque_laf = option_item_sp(
+      param="NrdrInterpolatedTorqueLatAccelFactor",
+      title=lambda: tr("Spoofed Lateral Acceleration Factor (Default: 5.0 m/s²)"),
+      min_value=10, max_value=1000, value_change_step=10,
+      description=lambda: tr("Tunes only the classic torque side. A larger number asks that side for less non-friction torque; " +
+                             "a smaller number asks for more. It scales Torque error and feedforward, but not friction. " +
+                             "It does not change the car's cornering limit."),
+      label_callback=lambda value: f"{value / 100:.1f} m/s²",
+      use_float_scaling=True,
+    )
+    self._interpolated_torque_friction = option_item_sp(
+      param="NrdrInterpolatedTorqueFriction",
+      title=lambda: tr("Torque-Side Friction Compensation (Default: 0.50)"),
+      min_value=0, max_value=100, value_change_step=1,
+      description=lambda: tr("Tunes only the classic torque side. This direct compensation helps the rack move through its sticky " +
+                             "center and stays at the chosen amount while the error is large. The lateral acceleration factor does " +
+                             "not scale it. Too much can make small corrections jumpy."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
     )
 
     self._rate_damping = option_item_sp(
@@ -209,6 +250,11 @@ class PidfGroundLayout(Widget):
     return [
       self._steer_ratio_button,
       LineSeparatorSP(40),
+      self._interpolated_torque_pif_blend,
+      self._interpolated_torque_share,
+      self._interpolated_torque_laf,
+      self._interpolated_torque_friction,
+      LineSeparatorSP(40),
       self._starpilot,
       LineSeparatorSP(40),
       self._lat_p_low,
@@ -246,6 +292,23 @@ class PidfGroundLayout(Widget):
     firmware_vgr_active = bool(
       mode is SteerRatioMode.FIRMWARE and ui_state.CP is not None and get_honda_vgr_profile(ui_state.CP) is not None
     )
+    interpolated_supported = is_interpolated_torque_pif_supported(ui_state.CP, ui_state.CP_SP)
+    interpolated_unlocked = interpolated_supported and not ui_state.engaged
+    for item in (
+      self._interpolated_torque_pif_blend,
+      self._interpolated_torque_share,
+      self._interpolated_torque_laf,
+      self._interpolated_torque_friction,
+    ):
+      item.set_visible(interpolated_supported)
+    self._interpolated_torque_pif_blend.action_item.set_enabled(interpolated_unlocked)
+    interpolated_enabled = interpolated_supported and self._interpolated_torque_pif_blend.action_item.get_state()
+    for item in (
+      self._interpolated_torque_share,
+      self._interpolated_torque_laf,
+      self._interpolated_torque_friction,
+    ):
+      item.action_item.set_enabled(interpolated_unlocked and interpolated_enabled)
     for item in (
       self._starpilot,
       self._lat_p_low, self._lat_i_low, self._lat_f_low,
@@ -258,7 +321,7 @@ class PidfGroundLayout(Widget):
       item.action_item.set_enabled(editable)
 
     for item in (self._nnlc_enabled, self._nnlc_activation_speed, self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain):
-      item.action_item.set_enabled(editable and not firmware_vgr_active)
+      item.action_item.set_enabled(editable and not firmware_vgr_active and not interpolated_enabled)
 
     nnlc_enabled = self._nnlc_enabled.action_item.get_state()
     self._nnlc_activation_speed.set_visible(nnlc_enabled)

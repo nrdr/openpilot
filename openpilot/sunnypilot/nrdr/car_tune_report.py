@@ -10,6 +10,10 @@ from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
   is_handcrafted_lateral_enabled,
 )
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
+from openpilot.sunnypilot.nrdr.interpolated_torque import (
+  is_interpolated_torque_pif_supported,
+  settings_from_params as interpolated_torque_settings_from_params,
+)
 from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
   CLARITY_RAW_NEAR_LOCK_ANGLE_DEG,
@@ -85,6 +89,34 @@ class CarTuneReporter:
       return "n/a"
     cp_sp = messaging.log_from_bytes(cp_sp_bytes, custom.CarParamsSP)
     return str(bool(cp_sp.enableGasInterceptor)).lower()
+
+  def _car_params_sp(self):
+    cp_sp_bytes = self.params.get("CarParamsSPPersistent")
+    if not cp_sp_bytes:
+      return None
+    return messaging.log_from_bytes(cp_sp_bytes, custom.CarParamsSP)
+
+  def _interpolated_torque_info(self, CP, CP_SP) -> str:
+    settings = interpolated_torque_settings_from_params(self.params)
+    supported = is_interpolated_torque_pif_supported(CP, CP_SP)
+    torque_percent = int(round(settings.torque_share * 100.0))
+    configured = " | ".join((
+      f"Torque {torque_percent}% / P/I/F {100 - torque_percent}%",
+      f"LAF {settings.lat_accel_factor:g} m/s^2",
+      f"friction {settings.friction:.2f}",
+    ))
+    if settings.enabled and supported:
+      return "".join((
+        f"ON | {configured} | engagement-latched | P/I/F angle feedback | ",
+        "f13 generic Torque angle-to-yaw feedback (2-5 m/s; yaw at 5+ m/s; not Honda road-proven) | ",
+        "required yaw unavailable: exact P/I/F + all Torque state held | learner paused while active | Clarity NNLC bypassed",
+      ))
+    if settings.enabled:
+      return (
+        "requested ON but unavailable for this controller/EPS | " +
+        f"Torque 0% / P/I/F 100% | P/I/F unchanged | stored: {configured}"
+      )
+    return f"OFF | Torque 0% / P/I/F 100% | P/I/F unchanged | stored next engagement: {configured}"
 
   def _pid_source(self, CP):
     if CP.lateralTuning.which() == "pid":
@@ -194,12 +226,15 @@ class CarTuneReporter:
     eps = self._eps_firmware(CP)
     eps_short = eps.rsplit(",", 1)[-1].strip() if "," in eps else eps
     interceptor = self._gas_interceptor()
+    CP_SP = self._car_params_sp()
     controller = self._controller_name(CP)
     model = get_active_bundle(self.params)
     profile = get_handcrafted_lateral_profile(CP.carFingerprint)
     handcrafted_enabled = is_handcrafted_lateral_enabled(CP.carFingerprint, self.params)
     handcrafted = f"{profile.name} (v{profile.version})" if handcrafted_enabled and profile is not None else "OFF"
     controller_info = self._controller_info(CP, controller, handcrafted_enabled, profile)
+    interpolated_torque = self._interpolated_torque_info(CP, CP_SP)
+    controller_info = f"{controller_info} | Torque/PIF blend: {interpolated_torque}"
 
     pid_base, pid_feedforward, pid_speeds = self._pid_info(CP)
     longitudinal = CP.longitudinalTuning
@@ -254,6 +289,7 @@ class CarTuneReporter:
       f"Driving model: {self._model_identity(model)}",
       f"Handcrafted profile: {handcrafted}",
       f"NNLC: {nnlc}",
+      f"Interpolated Torque/PIF blend: {interpolated_torque}",
       "",
       f"LATERAL PID BASE ({pid_speeds})",
       pid_base,

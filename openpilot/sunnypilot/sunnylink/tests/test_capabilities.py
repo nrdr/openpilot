@@ -13,6 +13,9 @@ the same commit so the bump shows up in code review.
 from __future__ import annotations
 
 
+from openpilot.cereal import custom
+from opendbc.car.structs import car
+from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.params import Params
 from openpilot.sunnypilot.sunnylink.capabilities import (
   CAPABILITY_DEFAULTS,
@@ -83,6 +86,25 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
     assert caps["nrdr_manual_steer_ratio_available"] is False
     assert caps["nrdr_raw_steer_ratio_available"] is False
     assert caps["nrdr_firmware_steer_ratio_available"] is False
+
+  def test_interpolated_torque_pif_capability_is_declared_and_defaults_false(self, caps):
+    assert "nrdr_interpolated_torque_pif_blend_available" in CAPABILITY_FIELDS
+    assert caps["nrdr_interpolated_torque_pif_blend_available"] is False
+
+  def test_interpolated_torque_pif_requires_modified_eps_honda_pid(self, params):
+    CP = car.CarParams.new_message()
+    CP.brand = "honda"
+    CP.carFingerprint = "HONDA_CIVIC"
+    CP.lateralTuning.init("pid")
+    CP_SP = custom.CarParamsSP.new_message()
+
+    params.put("CarParamsPersistent", CP.to_bytes(), block=True)
+    params.put("CarParamsSPPersistent", CP_SP.to_bytes(), block=True)
+    assert generate_capabilities(params)["nrdr_interpolated_torque_pif_blend_available"] is False
+
+    CP_SP.flags = HondaFlagsSP.EPS_MODIFIED.value
+    params.put("CarParamsSPPersistent", CP_SP.to_bytes(), block=True)
+    assert generate_capabilities(params)["nrdr_interpolated_torque_pif_blend_available"] is True
 
   def test_exact_honda_bundle_enables_manual_and_clarity_raw(self, params):
     params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CLARITY"}, block=True)

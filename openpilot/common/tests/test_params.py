@@ -128,6 +128,11 @@ class TestParams(OpenpilotTestCase):
     assert self.params.get_default_value("DisablePowerDown") is True
     assert self.params.get_default_value("HondaBoschARadar") is True
     assert self.params.get_default_value("NrdrHandcraftedLateralTune") is False
+    assert self.params.get_default_value("NrdrInterpolatedTorquePifBlend") is False
+    assert self.params.get_default_value("NrdrInterpolatedTorqueShare") == 50
+    assert self.params.get_default_value("NrdrInterpolatedTorqueLatAccelFactor") == 5.0
+    assert self.params.get_default_value("NrdrInterpolatedTorqueFriction") == 0.5
+    assert self.params.get_default_value("HondaPidFriction") == 0.0
 
   def test_params_get_type(self):
     # json

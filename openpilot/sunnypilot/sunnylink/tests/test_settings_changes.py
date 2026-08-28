@@ -456,6 +456,72 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert "NrdrHandcraftedLateralTune" not in rules
 
 
+class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
+  KEYS = (
+    "NrdrInterpolatedTorquePifBlend",
+    "NrdrInterpolatedTorqueShare",
+    "NrdrInterpolatedTorqueLatAccelFactor",
+    "NrdrInterpolatedTorqueFriction",
+  )
+
+  def test_group_is_contiguous_in_controller_tuning_dungeon(self, schema):
+    section = _find_section(schema, "steering", "nrdr")
+    panel = next(sub_panel for sub_panel in section["sub_panels"] if sub_panel["id"] == "nrdr_pidf_ground")
+    keys = [item["key"] for item in panel["items"]]
+    start = keys.index(self.KEYS[0])
+    assert start == 0
+    assert tuple(keys[start:start + len(self.KEYS)]) == self.KEYS
+
+  def test_master_title_copy_and_gating_are_exact(self, schema):
+    item = _find_item(schema, self.KEYS[0])
+    assert item["title"] == "Interpolated Torque/PIF Blend"
+    copy = f"{item.get('description', '')} {item.get('details', '')}".lower()
+    assert "off leaves p/i/f exactly as it is" in copy
+    assert "does not stack" in copy
+    assert "steering-angle p/i/f" in copy
+    assert "generic yaw-feedback branch" in copy
+    assert "not historically road-proven on honda" in copy
+    assert "stale" in copy and "exact p/i/f" in copy
+    assert "every torque state holds" in copy
+    assert "angle is not substituted" in copy
+    rules = json.dumps(item["enablement"])
+    assert "offroad_only" in rules
+    assert "nrdr_interpolated_torque_pif_blend_available" in rules
+
+  @parameterized.expand([
+    ("NrdrInterpolatedTorqueShare", "Torque Share", 0, 100, 1),
+    ("NrdrInterpolatedTorqueLatAccelFactor", "Spoofed Lateral Acceleration Factor", 0.1, 10.0, 0.1),
+    ("NrdrInterpolatedTorqueFriction", "Torque-Side Friction Compensation", 0.0, 1.0, 0.01),
+  ], names=["key", "title", "min", "max", "step"])
+  def test_slider_contract_and_master_gate(self, schema, key, title, minimum, maximum, step):
+    item = _find_item(schema, key)
+    assert item["title"] == title
+    assert (item["min"], item["max"], item["step"]) == (minimum, maximum, step)
+    rules = json.dumps(item["enablement"])
+    assert "offroad_only" in rules
+    assert "nrdr_interpolated_torque_pif_blend_available" in rules
+    assert "NrdrInterpolatedTorquePifBlend" in rules
+    assert "NrdrHandcraftedLateralTune" not in rules
+
+  def test_copy_explains_complement_and_torque_only_scopes(self, schema):
+    share = _find_item(schema, "NrdrInterpolatedTorqueShare")
+    assert "100 minus" in share["description"]
+    laf = _find_item(schema, "NrdrInterpolatedTorqueLatAccelFactor")
+    assert "not a cornering-limit" in laf["details"]
+    assert "non-friction error and feedforward" in laf["details"]
+    friction = _find_item(schema, "NrdrInterpolatedTorqueFriction")
+    assert "independent of the lateral acceleration factor" in friction["details"]
+
+  def test_nnlc_stays_configured_but_is_disabled_while_supported_blend_is_on(self, schema):
+    nnlc = _find_item(schema, "NrdrNnlcEnabled")
+    copy = f"{nnlc.get('description', '')} {nnlc.get('details', '')}"
+    assert "remains configured" in copy
+    for item in (nnlc, *nnlc["sub_items"]):
+      rules = json.dumps(item["enablement"])
+      assert "NrdrInterpolatedTorquePifBlend" in rules
+      assert "nrdr_interpolated_torque_pif_blend_available" in rules
+
+
 class TestNotEngagedReplacement(OpenpilotTestCase):
   @parameterized.expand([
     "AlphaLongitudinalEnabled",

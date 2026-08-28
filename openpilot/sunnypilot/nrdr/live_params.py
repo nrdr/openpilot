@@ -39,6 +39,8 @@ CONTROL_GROUPS = (
   ParamGroup(("HondaCenterScale", "HondaCenterBoostThreshold", "HondaCenterBoostMinSpeed")),
   ParamGroup(("NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed")),
   ParamGroup(("HondaInjectionTest", "NrdrStarPilotPid", "NrdrLatStiction")),
+  ParamGroup(("NrdrInterpolatedTorquePifBlend", "NrdrInterpolatedTorqueShare",
+              "NrdrInterpolatedTorqueLatAccelFactor", "NrdrInterpolatedTorqueFriction")),
   ParamGroup(("NrdrSteerRatioMode", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal")),
   ParamGroup(("NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate", "NrdrTuneLearnerReset")),
   ParamGroup(("NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain")),

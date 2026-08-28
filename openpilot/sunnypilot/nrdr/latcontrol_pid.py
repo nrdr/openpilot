@@ -8,6 +8,14 @@ from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.sunnypilot.nrdr.honda_vgr import normalize_honda_eps_firmware
 from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
+from openpilot.sunnypilot.nrdr.interpolated_torque import (
+  ClassicTorqueCandidateResult,
+  InterpolatedTorqueSettings,
+  LegacyTorqueController,
+  is_interpolated_torque_pif_supported,
+  maybe_blend_interpolated_torque_pif,
+  resolve_interpolated_torque_pif_settings,
+)
 from openpilot.sunnypilot.nrdr.live_params import get_live_params
 from openpilot.sunnypilot.nrdr.tune_learner import TuneLearner
 from openpilot.sunnypilot.nrdr.params import read_bool, read_float
@@ -133,6 +141,12 @@ class NrdrLatControlPID(LatControl):
     self.stiction_enabled = False
     self.stiction = LatStiction(dt, self.steer_max)
     self.tune_learner = TuneLearner(dt, self.steer_max, self.params)
+    self._interpolated_torque_supported = is_interpolated_torque_pif_supported(CP, CP_SP)
+    self._interpolated_torque_controller = LegacyTorqueController(self.dt, self.steer_max)
+    self.last_classic_torque_result: ClassicTorqueCandidateResult | None = None
+    self._interpolated_torque_settings = InterpolatedTorqueSettings()
+    self._interpolated_torque_pif_effective = False
+    self._interpolated_torque_was_active = False
     self.settings_generation = -1
     self.frame = -1
     self.previous_output = 0.0
@@ -156,6 +170,38 @@ class NrdrLatControlPID(LatControl):
   @property
   def firmware_vgr_selected(self) -> bool:
     return self.steer_ratio_resolver.firmware_vgr_selected
+
+  @property
+  def interpolated_torque_pif_effective(self) -> bool:
+    return self._interpolated_torque_pif_effective
+
+  @property
+  def interpolated_torque_pif_enabled(self) -> bool:
+    return self._interpolated_torque_pif_effective
+
+  def _update_interpolated_torque_latch(self, active: bool) -> None:
+    if active and not self._interpolated_torque_was_active:
+      # The four values occupy one LiveParams group, so this captures one
+      # coherent configuration for the whole engagement.
+      self._interpolated_torque_settings = resolve_interpolated_torque_pif_settings(
+        self.params.snapshot,
+        self._interpolated_torque_supported,
+      )
+      self._interpolated_torque_pif_effective = self._interpolated_torque_settings.enabled
+      if self._interpolated_torque_pif_effective:
+        self._interpolated_torque_controller.reset()
+        self.last_classic_torque_result = None
+
+    if not active:
+      self._interpolated_torque_pif_effective = False
+
+    # Never carry the isolated controller's integral across a disengagement or
+    # an engagement where the master was latched OFF.
+    if not active or not self._interpolated_torque_pif_effective:
+      self._interpolated_torque_controller.reset()
+      self.last_classic_torque_result = None
+
+    self._interpolated_torque_was_active = active
 
   def _active_steer_ratio_resolver(self, VM) -> SteerRatioResolver:
     resolver = getattr(VM, "nrdr_steer_ratio_resolver", None)
@@ -219,6 +265,24 @@ class NrdrLatControlPID(LatControl):
     self.stiction_enabled = read_bool(snapshot, "NrdrLatStiction")
     self.settings_generation = snapshot.generation
 
+  def _update_tune_learner(self, CS, desired_angle: float, error: float, steering_pressed: bool,
+                           params_valid: bool, lane_change: bool, stiction_limited: bool) -> None:
+    if not self.is_eps_modified:
+      return
+
+    learner_allowed = (
+      not self._interpolated_torque_pif_effective
+      and params_valid
+      and not lane_change
+      and not stiction_limited
+      and not (self.stiction_enabled and self.stiction.freeze_integrator)
+    )
+    # Even while sampling is paused by the blend, keep TuneLearner's settings
+    # refresh, reset-request, and dirty-save maintenance alive.
+    self.tune_learner.learn(
+      CS.vEgo, desired_angle, error, float(CS.steeringRateDeg), steering_pressed, learner_allowed, self.frame,
+    )
+
   def _scaled_pid_output(self, CS, desired_angle: float, angle_delta: float, phase: float) -> float:
     p_term = self.pid.p * _speed_banded_value(CS.vEgo, *self.p_scales)
     i_term = self.pid.i * _speed_banded_value(CS.vEgo, *self.i_scales)
@@ -264,6 +328,7 @@ class NrdrLatControlPID(LatControl):
     error = desired_angle - CS.steeringAngleDeg
     pid_log.steeringAngleDesiredDeg = desired_angle
     pid_log.angleError = error
+    self._update_interpolated_torque_latch(active)
 
     if not active:
       output_torque = 0.0
@@ -314,12 +379,26 @@ class NrdrLatControlPID(LatControl):
       else:
         self.stiction.reset()
 
-      if self.is_eps_modified:
-        learner_allowed = params_valid and not lane_change and not stiction_limited \
-          and not (self.stiction_enabled and self.stiction.freeze_integrator)
-        self.tune_learner.learn(
-          CS.vEgo, desired_angle, error, float(CS.steeringRateDeg), steering_pressed, learner_allowed, self.frame,
+      if self._interpolated_torque_pif_effective:
+        output_torque, self.last_classic_torque_result = maybe_blend_interpolated_torque_pif(
+          output_torque,
+          self._interpolated_torque_settings,
+          lambda: self._interpolated_torque_controller.update(
+            CS,
+            VM,
+            params,
+            steer_limited_by_safety,
+            desired_curvature,
+            calibrated_pose,
+            resolver,
+            self._interpolated_torque_settings,
+          ),
+          self.steer_max,
         )
+
+      self._update_tune_learner(
+        CS, desired_angle, error, steering_pressed, params_valid, lane_change, stiction_limited,
+      )
 
       pid_log.active = True
       pid_log.p = float(self.pid.p)

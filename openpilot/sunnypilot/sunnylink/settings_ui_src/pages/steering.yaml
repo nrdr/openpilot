@@ -395,6 +395,52 @@ sections:
     label: Controller Tuning Dungeon
     trigger_key: null
     items:
+    - key: NrdrInterpolatedTorquePifBlend
+      widget: toggle
+      title: Interpolated Torque/PIF Blend
+      description: Mixes the complete steering-angle P/I/F answer with a separate classic Torque answer. OFF leaves P/I/F exactly as it is.
+      details: The Torque side follows f13's generic yaw-feedback branch, which was not historically road-proven on Honda. It uses steering-angle geometry through 2 m/s, blends to calibrated yaw response from 2–5 m/s, and uses yaw from 5 m/s up. Whenever yaw is required above 2 m/s but is missing, stale, invalid, or non-finite, the final command temporarily returns to exact P/I/F and every Torque state holds until valid yaw returns; angle is not substituted. This makes one weighted final command; it does not stack two commands. All four values stay fixed for one engagement. On Clarity, NNLC stays configured but is bypassed and reset while this blend is active.
+      enablement:
+      - $ref: '#/macros/offroad'
+      - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+    - key: NrdrInterpolatedTorqueShare
+      widget: option
+      title: Torque Share
+      description: Chooses how much of the final command comes from classic torque. The P/I/F share is always 100 minus this value.
+      details: For example, 30% Torque means 30% classic torque and 70% P/I/F. The result stays between the two complete controller answers and is bounded to the normal steering-command limits.
+      min: 0
+      max: 100
+      step: 1
+      unit: '% Torque'
+      enablement:
+      - $ref: '#/macros/offroad'
+      - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+      - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
+    - key: NrdrInterpolatedTorqueLatAccelFactor
+      widget: option
+      title: Spoofed Lateral Acceleration Factor
+      description: Tunes only the classic torque side. Larger asks for less non-friction torque; smaller asks for more. Default 5.0 m/s².
+      details: This is a Torque conversion number, not the car's measured acceleration and not a cornering-limit setting. It divides the Torque side's non-friction error and feedforward. It does not change P/I/F or the friction value below.
+      min: 0.1
+      max: 10.0
+      step: 0.1
+      unit: m/s²
+      enablement:
+      - $ref: '#/macros/offroad'
+      - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+      - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
+    - key: NrdrInterpolatedTorqueFriction
+      widget: option
+      title: Torque-Side Friction Compensation
+      description: Tunes only the classic torque side. This direct compensation helps the rack move through its sticky center. Default 0.50.
+      details: Friction ramps with lateral-acceleration error and stays at the chosen direct torque-side amount once that error reaches 0.3 m/s². It is independent of the lateral acceleration factor. Too much can make small corrections jumpy; 0 turns this help off.
+      min: 0.0
+      max: 1.0
+      step: 0.01
+      enablement:
+      - $ref: '#/macros/offroad'
+      - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+      - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
     - key: NrdrStarPilotPid
       widget: toggle
       enablement:
@@ -559,9 +605,15 @@ sections:
       widget: toggle
       enablement:
       - $ref: '#/macros/handcrafted_lateral_unlocked'
+      - type: not
+        condition:
+          type: all
+          conditions:
+          - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+          - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
       title: Enable Neural Network Lateral Model (NNLC)
       description: Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is OFF.
-      details: OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command. NNLC remains configured but is inactive whenever a recognized Clarity is using the experimental firmware EPS position map.
+      details: OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command. NNLC remains configured but is inactive whenever a recognized Clarity is using the experimental firmware EPS position map or Interpolated Torque/PIF Blend.
       sub_items:
       - key: NrdrNnlcActivationSpeed
         widget: option
@@ -575,6 +627,12 @@ sections:
         - type: param
           key: NrdrNnlcEnabled
           equals: true
+        - type: not
+          condition:
+            type: all
+            conditions:
+            - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+            - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
       - key: NrdrNnlcKpGain
         widget: option
         title: NNLC KP Gain Scale
@@ -587,6 +645,12 @@ sections:
         - type: param
           key: NrdrNnlcEnabled
           equals: true
+        - type: not
+          condition:
+            type: all
+            conditions:
+            - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+            - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
       - key: NrdrNnlcKfGain
         widget: option
         title: NNLC KF Gain Scale
@@ -599,6 +663,12 @@ sections:
         - type: param
           key: NrdrNnlcEnabled
           equals: true
+        - type: not
+          condition:
+            type: all
+            conditions:
+            - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+            - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
       - key: NrdrNnlcKiGain
         widget: option
         title: NNLC KI Gain Scale
@@ -611,6 +681,12 @@ sections:
         - type: param
           key: NrdrNnlcEnabled
           equals: true
+        - type: not
+          condition:
+            type: all
+            conditions:
+            - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+            - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
   - id: nrdr_override
     label: Override Tuning
     trigger_key: null

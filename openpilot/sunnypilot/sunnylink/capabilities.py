@@ -16,6 +16,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import get_handcrafted_lateral_profile
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
+from openpilot.sunnypilot.nrdr.interpolated_torque import is_interpolated_torque_pif_supported
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_metadata
 
 
@@ -50,6 +51,7 @@ CAPABILITY_FIELDS = (
   "nrdr_manual_steer_ratio_available",
   "nrdr_raw_steer_ratio_available",
   "nrdr_firmware_steer_ratio_available",
+  "nrdr_interpolated_torque_pif_blend_available",
 )
 
 CAPABILITY_LABELS: dict[str, str] = {
@@ -77,6 +79,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio tuning available",
   "nrdr_raw_steer_ratio_available": "NRDR raw road-learned steer-ratio data available",
   "nrdr_firmware_steer_ratio_available": "Exact NRDR firmware steer-ratio map available",
+  "nrdr_interpolated_torque_pif_blend_available": "NRDR interpolated torque/PIF blend available",
 }
 
 # Explicit defaults for non-boolean capability fields
@@ -182,6 +185,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
       cloudlog.exception("capabilities: failed to deserialize CarParamsPersistent")
 
   # CarParamsSP-derived capabilities
+  CP_SP = None
   CP_SP_bytes = params.get("CarParamsSPPersistent")
   if CP_SP_bytes is not None:
     try:
@@ -198,6 +202,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
   caps["nrdr_manual_steer_ratio_available"] = str(caps["brand"]).lower() == "honda" and get_steer_ratio_metadata(fingerprint) is not None
   caps["nrdr_raw_steer_ratio_available"] = str(caps["brand"]).lower() == "honda" and fingerprint == "HONDA_CLARITY"
   caps["nrdr_firmware_steer_ratio_available"] = CP is not None and get_honda_vgr_profile(CP) is not None
+  caps["nrdr_interpolated_torque_pif_blend_available"] = is_interpolated_torque_pif_supported(CP, CP_SP)
 
   return caps
 

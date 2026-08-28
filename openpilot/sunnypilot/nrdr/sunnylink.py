@@ -6,6 +6,10 @@ ONROAD_BLOCKED_PARAMS = {
   "NrdrSteerRatioMode",
   "NrdrSteerRatioManualCenter",
   "NrdrSteerRatioManualFinal",
+  "NrdrInterpolatedTorquePifBlend",
+  "NrdrInterpolatedTorqueShare",
+  "NrdrInterpolatedTorqueLatAccelFactor",
+  "NrdrInterpolatedTorqueFriction",
 }
 
 

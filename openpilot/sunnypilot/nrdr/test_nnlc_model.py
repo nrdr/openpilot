@@ -1,5 +1,7 @@
 import hashlib
+from collections import deque
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -195,6 +197,121 @@ class TestNNTorqueModel:
     controller.dt = DT_CTRL
     controller.nnlc_blend = 1.0
     assert controller._update_blend(True, 0.0, log.LaneChangeState.preLaneChange) == 0.0
+
+  def test_interpolated_blend_resets_outer_nnlc_state(self):
+    class ResetSpy:
+      def __init__(self):
+        self.count = 0
+        self.i = 1.0
+
+      def reset(self):
+        self.count += 1
+        self.i = 0.0
+
+    controller = LatControlClarityHybrid.__new__(LatControlClarityHybrid)
+    controller.nnlc_blend = 0.8
+    torque_reset = ResetSpy()
+    base_pid_reset = ResetSpy()
+    extension_pid_reset = ResetSpy()
+    extension = SimpleNamespace(
+      _pid=extension_pid_reset,
+      lateral_accel_desired_deque=deque([1.0]),
+      roll_deque=deque([1.0]),
+      error_deque=deque([1.0]),
+      pitch=SimpleNamespace(x=1.0, initialized=False),
+      pitch_last=1.0,
+      _pid_log=object(),
+      _steer_limited_by_safety=True,
+      lat_accel_friction_factor=1.0,
+      nrdr=SimpleNamespace(previous_curvature=1.0),
+    )
+    request_buffer = deque([1.0, 2.0], maxlen=2)
+    controller.torque_controller = SimpleNamespace(
+      reset=torque_reset.reset,
+      pid=base_pid_reset,
+      previous_measurement=1.0,
+      measurement_rate_filter=SimpleNamespace(x=1.0, initialized=False),
+      lat_accel_request_buffer=request_buffer,
+      jerk_filter=SimpleNamespace(x=1.0),
+      extension=extension,
+    )
+
+    controller._reset_outer_nnlc()
+    assert controller.nnlc_blend == 0.0
+    assert torque_reset.count == base_pid_reset.count == extension_pid_reset.count == 1
+    assert not extension.lateral_accel_desired_deque
+    assert not extension.roll_deque
+    assert not extension.error_deque
+    assert extension.pitch.x == extension.pitch_last == extension.nrdr.previous_curvature == 0.0
+    assert controller.torque_controller.previous_measurement == 0.0
+    assert controller.torque_controller.measurement_rate_filter.x == 0.0
+    assert controller.torque_controller.measurement_rate_filter.initialized
+    assert list(controller.torque_controller.lat_accel_request_buffer) == [0.0, 0.0]
+    assert controller.torque_controller.jerk_filter.x == 0.0
+    assert extension._pid_log is None
+    assert not extension._steer_limited_by_safety
+    assert extension.pitch.initialized
+    assert extension.lat_accel_friction_factor == 0.7
+    assert extension._ff == extension._setpoint == extension._measurement == extension._output_torque == 0.0
+
+  def test_interpolated_blend_never_runs_outer_nnlc_candidate(self):
+    class ResetSpy:
+      def __init__(self):
+        self.i = 1.0
+
+      def reset(self):
+        self.i = 0.0
+
+    class PidStub:
+      nrdr_controller = SimpleNamespace(interpolated_torque_pif_effective=True)
+
+      @staticmethod
+      def update(*_args):
+        pid_log = log.ControlsState.LateralPIDState.new_message()
+        pid_log.active = True
+        pid_log.angleError = 0.1
+        pid_log.p = 0.2
+        pid_log.i = 0.3
+        pid_log.f = 0.4
+        pid_log.output = 0.5
+        pid_log.saturated = False
+        return 0.5, 12.0, pid_log
+
+    extension = SimpleNamespace(
+      _pid=ResetSpy(),
+      lateral_accel_desired_deque=deque([1.0]),
+      roll_deque=deque([1.0]),
+      error_deque=deque([1.0]),
+      pitch=SimpleNamespace(x=1.0, initialized=False),
+      pitch_last=1.0,
+      _pid_log=object(),
+      _steer_limited_by_safety=True,
+      lat_accel_friction_factor=1.0,
+      nrdr=SimpleNamespace(previous_curvature=1.0),
+    )
+    torque_controller = SimpleNamespace(
+      reset=lambda: None,
+      pid=ResetSpy(),
+      previous_measurement=1.0,
+      measurement_rate_filter=SimpleNamespace(x=1.0, initialized=False),
+      lat_accel_request_buffer=deque([1.0, 2.0], maxlen=2),
+      extension=extension,
+    )
+    torque_controller.update = lambda *_args: pytest.fail("outer NNLC candidate must not run")
+
+    controller = LatControlClarityHybrid.__new__(LatControlClarityHybrid)
+    controller.pid_controller = PidStub()
+    controller.torque_controller = torque_controller
+    controller.nnlc_blend = 0.8
+
+    output, angle, torque_log = controller.update(
+      True, SimpleNamespace(vEgo=20.0), object(), object(), False, 0.01, object(), False, 0.2,
+    )
+
+    assert output == torque_log.output == 0.5
+    assert angle == 12.0
+    assert controller.nnlc_blend == 0.0
+    assert torque_controller.pid.i == extension._pid.i == 0.0
 
   def test_hidden_global_toggles_do_not_force_other_hondas(self):
     params = Params()

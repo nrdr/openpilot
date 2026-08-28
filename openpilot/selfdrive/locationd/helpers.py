@@ -138,11 +138,15 @@ class Measurement:
 
 
 class Pose:
-  def __init__(self, orientation: Measurement, velocity: Measurement, acceleration: Measurement, angular_velocity: Measurement):
+  def __init__(self, orientation: Measurement, velocity: Measurement, acceleration: Measurement, angular_velocity: Measurement,
+               angular_velocity_valid: bool = False):
     self.orientation = orientation
     self.velocity = velocity
     self.acceleration = acceleration
     self.angular_velocity = angular_velocity
+    # Keep the source-quality signal beside the calibrated measurement. Direct
+    # constructors fail closed unless the caller has explicit validity proof.
+    self.angular_velocity_valid = bool(angular_velocity_valid)
 
   @classmethod
   def from_device_motion(cls, device_motion: log.DeviceMotion) -> 'Pose':
@@ -150,7 +154,22 @@ class Pose:
       orientation=Measurement.from_measurement_xyz(device_motion.orientationNED),
       velocity=Measurement.from_measurement_xyz(device_motion.velocityDevice),
       acceleration=Measurement.from_measurement_xyz(device_motion.accelerationDevice),
-      angular_velocity=Measurement.from_measurement_xyz(device_motion.angularVelocityDevice)
+      angular_velocity=Measurement.from_measurement_xyz(device_motion.angularVelocityDevice),
+      angular_velocity_valid=bool(
+        device_motion.angularVelocityDevice.valid
+        and device_motion.inputsOK
+        and device_motion.posenetOK
+        and device_motion.sensorsOK
+      ),
+    )
+
+
+def gate_calibrated_pose_angular_velocity(pose: Pose | None, service_valid: bool,
+                                          calibration_valid: bool) -> None:
+  """One-way invalidate a held calibrated gyro sample until a new Pose replaces it."""
+  if pose is not None:
+    pose.angular_velocity_valid = bool(
+      pose.angular_velocity_valid and service_valid and calibration_valid
     )
 
 
@@ -176,7 +195,13 @@ class PoseCalibrator:
     acceleration_calib = self._transform_calib_from_device(pose.acceleration)
     velocity_calib = self._transform_calib_from_device(pose.velocity)
 
-    return Pose(ned_from_calib_euler, velocity_calib, acceleration_calib, angular_velocity_calib)
+    return Pose(
+      ned_from_calib_euler,
+      velocity_calib,
+      acceleration_calib,
+      angular_velocity_calib,
+      angular_velocity_valid=pose.angular_velocity_valid and self.calib_valid,
+    )
 
   def feed_extrinsics_calibration(self, extrinsics_calibration: log.ExtrinsicsCalibration):
     calib_rpy = np.array(extrinsics_calibration.rpyCalib)

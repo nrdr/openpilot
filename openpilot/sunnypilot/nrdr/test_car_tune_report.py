@@ -2,6 +2,7 @@ import struct
 import unittest
 from types import SimpleNamespace
 
+from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.sunnypilot.nrdr.car_tune_report import CarTuneReporter, _longitudinal_pid_info
 
 
@@ -13,6 +14,9 @@ class TestCarTuneReporter(unittest.TestCase):
 
     def get(self, key, return_default=False):
       return self.values.get(key)
+
+    def get_bool(self, key):
+      return bool(self.values.get(key, False))
 
   def test_raw_mode_requires_exact_honda_brand_and_clarity_fingerprint(self):
     reporter = CarTuneReporter(self.FakeParams({"NrdrSteerRatioMode": 2}))
@@ -97,6 +101,62 @@ class TestCarTuneReporter(unittest.TestCase):
     )
 
     self.assertEqual(_longitudinal_pid_info(longitudinal), "P 0.4 | I 0.05 | F 0.00006")
+
+  def test_interpolated_torque_report_shows_complement_and_locked_values(self):
+    reporter = CarTuneReporter(self.FakeParams({
+      "NrdrInterpolatedTorquePifBlend": True,
+      "NrdrInterpolatedTorqueShare": 35,
+      "NrdrInterpolatedTorqueLatAccelFactor": 5.0,
+      "NrdrInterpolatedTorqueFriction": 0.5,
+    }))
+    CP = SimpleNamespace(
+      brand="honda",
+      carFingerprint="HONDA_CIVIC",
+      lateralTuning=SimpleNamespace(which=lambda: "pid"),
+    )
+    CP_SP = SimpleNamespace(flags=HondaFlagsSP.EPS_MODIFIED.value)
+
+    report = reporter._interpolated_torque_info(CP, CP_SP)
+    self.assertIn("ON", report)
+    self.assertIn("engagement-latched", report)
+    self.assertIn("Torque 35% / P/I/F 65%", report)
+    self.assertIn("LAF 5 m/s^2", report)
+    self.assertIn("friction 0.50", report)
+    self.assertIn("learner paused", report)
+    self.assertIn("P/I/F angle feedback", report)
+    self.assertIn("Torque angle-to-yaw feedback", report)
+    self.assertIn("not Honda road-proven", report)
+    self.assertIn("required yaw unavailable: exact P/I/F + all Torque state held", report)
+    self.assertIn("NNLC bypassed", report)
+
+  def test_interpolated_torque_report_explains_master_off(self):
+    reporter = CarTuneReporter(self.FakeParams({"NrdrInterpolatedTorquePifBlend": False}))
+    CP = SimpleNamespace(
+      brand="honda",
+      carFingerprint="HONDA_CIVIC",
+      lateralTuning=SimpleNamespace(which=lambda: "pid"),
+    )
+    CP_SP = SimpleNamespace(flags=HondaFlagsSP.EPS_MODIFIED.value)
+    report = reporter._interpolated_torque_info(CP, CP_SP)
+    self.assertIn("OFF | Torque 0% / P/I/F 100% | P/I/F unchanged", report)
+    self.assertIn("stored next engagement", report)
+
+  def test_unavailable_request_reports_effective_pif_and_stored_values(self):
+    reporter = CarTuneReporter(self.FakeParams({
+      "NrdrInterpolatedTorquePifBlend": True,
+      "NrdrInterpolatedTorqueShare": 40,
+      "NrdrInterpolatedTorqueLatAccelFactor": 6.0,
+      "NrdrInterpolatedTorqueFriction": 0.25,
+    }))
+    CP = SimpleNamespace(
+      brand="honda",
+      carFingerprint="HONDA_CIVIC",
+      lateralTuning=SimpleNamespace(which=lambda: "pid"),
+    )
+    report = reporter._interpolated_torque_info(CP, SimpleNamespace(flags=0))
+    self.assertIn("requested ON but unavailable", report)
+    self.assertIn("Torque 0% / P/I/F 100% | P/I/F unchanged", report)
+    self.assertIn("stored: Torque 40% / P/I/F 60% | LAF 6 m/s^2 | friction 0.25", report)
 
 
 if __name__ == "__main__":

@@ -310,7 +310,13 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}},
     {"NrdrCruiseOverspeedAllowance", {PERSISTENT | BACKUP, INT, "0"}},
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
+    // Legacy HondaPidFriction is intentionally retained as a tombstone. The
+    // interpolated controller owns the four dedicated settings below.
     {"HondaPidFriction", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
+    {"NrdrInterpolatedTorquePifBlend", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrInterpolatedTorqueShare", {PERSISTENT | BACKUP, INT, "50"}},
+    {"NrdrInterpolatedTorqueLatAccelFactor", {PERSISTENT | BACKUP, FLOAT, "5.0"}},
+    {"NrdrInterpolatedTorqueFriction", {PERSISTENT | BACKUP, FLOAT, "0.50"}},
     {"HondaNotchEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaNotchFreq", {PERSISTENT | BACKUP, FLOAT, "7.5"}},
     {"HondaNotchQ", {PERSISTENT | BACKUP, FLOAT, "1.5"}},

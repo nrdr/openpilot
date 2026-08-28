@@ -204,6 +204,10 @@ def test_profile_preserves_the_current_road_tested_choices():
   assert values["HondaTorqueLowPassFilter"] is True
   assert values["HondaLpfTauLowSpeed"] == values["HondaLpfTauStandard"] == 0.1
   assert "HondaPidFriction" not in values
+  assert "NrdrInterpolatedTorquePifBlend" not in values
+  assert "NrdrInterpolatedTorqueShare" not in values
+  assert "NrdrInterpolatedTorqueLatAccelFactor" not in values
+  assert "NrdrInterpolatedTorqueFriction" not in values
   assert values["NrdrDriverOverrideThreshold"] == 2000
   assert values["NrdrOverrideThresholdCenterBoost"] == 1200
   assert values["HondaOverrideFadeDownSecs"] == 0.0

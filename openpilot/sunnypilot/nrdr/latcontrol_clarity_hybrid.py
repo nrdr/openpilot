@@ -98,14 +98,52 @@ class LatControlClarityHybrid(LatControl):
     torque_log.saturated = pid_log.saturated
     return float(pid_output), float(pid_angle), torque_log
 
+  def _reset_outer_nnlc(self) -> None:
+    self.nnlc_blend = 0.0
+    self.torque_controller.reset()
+    self.torque_controller.pid.reset()
+    self.torque_controller.previous_measurement = 0.0
+    self.torque_controller.measurement_rate_filter.x = 0.0
+    self.torque_controller.measurement_rate_filter.initialized = True
+    request_buffer = self.torque_controller.lat_accel_request_buffer
+    request_buffer.clear()
+    request_buffer.extend([0.0] * request_buffer.maxlen)
+    jerk_filter = getattr(self.torque_controller, "jerk_filter", None)
+    if jerk_filter is not None:
+      jerk_filter.x = 0.0
+
+    extension = self.torque_controller.extension
+    extension._pid.reset()
+    extension._pid_log = None
+    extension._steer_limited_by_safety = False
+    extension.lateral_accel_desired_deque.clear()
+    extension.roll_deque.clear()
+    extension.error_deque.clear()
+    extension.pitch.x = 0.0
+    extension.pitch.initialized = True
+    extension.pitch_last = 0.0
+    extension.lat_accel_friction_factor = 0.7
+    extension.nrdr.previous_curvature = 0.0
+    for name in (
+      "actual_lateral_jerk", "lateral_jerk_setpoint", "lateral_jerk_measurement", "lookahead_lateral_jerk",
+      "_ff", "_setpoint", "_measurement", "_roll_compensation", "_lateral_accel_deadzone",
+      "_desired_lateral_accel", "_actual_lateral_accel", "_desired_curvature", "_actual_curvature",
+      "_gravity_adjusted_lateral_accel", "_output_torque",
+    ):
+      setattr(extension, name, 0.0)
+
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
              calibrated_pose, curvature_limited, lat_delay):
     pid_output, pid_angle, pid_log = self.pid_controller.update(
       active, CS, VM, params, steer_limited_by_safety, desired_curvature,
       calibrated_pose, curvature_limited, lat_delay,
     )
-    self.torque_controller.extension.nrdr.update()
     pid_extension = self.pid_controller.nrdr_controller
+    if pid_extension is not None and pid_extension.interpolated_torque_pif_effective:
+      self._reset_outer_nnlc()
+      return self._pid_only_result(pid_output, pid_angle, pid_log)
+
+    self.torque_controller.extension.nrdr.update()
     if pid_extension is not None and pid_extension.firmware_vgr_selected:
       return self._pid_only_result(pid_output, pid_angle, pid_log)
 

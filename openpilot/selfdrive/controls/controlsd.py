@@ -20,7 +20,7 @@ from openpilot.selfdrive.controls.lib.latcontrol_curvature import LatControlCurv
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.selfdrive.controls.lib.longcontrol import LongControl
 from openpilot.selfdrive.modeld.modeld import LAT_SMOOTH_SECONDS
-from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
+from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose, gate_calibrated_pose_angular_velocity
 
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
@@ -80,9 +80,23 @@ class Controls(ControlsExt):
     self.sm.update(15)
     if self.sm.updated["extrinsicsCalibration"]:
       self.pose_calibrator.feed_extrinsics_calibration(self.sm['extrinsicsCalibration'])
+    # deviceMotion runs below the controls rate, so retain its latest calibrated
+    # yaw sample while SubMaster's service validity/freshness checks stay green.
+    # Once those checks fail, a finite cached sample is explicitly invalid until
+    # a new valid deviceMotion message replaces it.
+    gate_calibrated_pose_angular_velocity(
+      self.calibrated_pose,
+      self.sm.all_checks(['deviceMotion']),
+      self.pose_calibrator.calib_valid,
+    )
     if self.sm.updated["deviceMotion"]:
       device_motion = Pose.from_device_motion(self.sm['deviceMotion'])
       self.calibrated_pose = self.pose_calibrator.build_calibrated_pose(device_motion)
+      gate_calibrated_pose_angular_velocity(
+        self.calibrated_pose,
+        self.sm.all_checks(['deviceMotion']),
+        self.pose_calibrator.calib_valid,
+      )
 
   def state_control(self):
     CS = self.sm['carState']
