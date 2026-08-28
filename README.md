@@ -32,9 +32,11 @@ This is research software, not a safety certification and not a self-driving sys
 
 ## What doesn't yet
 
-Some steering racks can develop **stutter**: a low-frequency feedback loop that may make noise or rock the wheel back and forth like a ratchet. Firmware tuning has improved it substantially, but not every rack is solved.
+Some steering racks can develop **stutter**: a low-frequency feedback loop that may make noise or rock the wheel back and forth like a ratchet. Stutter is usually more of a control-quality problem than an EPS-hardware problem, but it can push the torque sensor past the driver-override threshold. NRDR may then mistake it for you taking the wheel and instantly drop NRDR's steering assist torque—even mid-turn.
 
-Do not assume stutter is harmless. If it is strong, repeatable, or affects control, take over, disengage safely, stop testing that firmware, and report the exact rack/firmware plus logs in Discord. Return to a known-good configuration before driving again.
+If this happens, take over and disengage safely. Once parked, go to **Settings → nrdr → Lateral Tuning → Override Tuning** and raise **Driver Override Threshold** one `100`-point step at a time; use the lowest value that stops false overrides. For drops near center, raise **Override Threshold Center Boost** too, or set it equal to the main threshold so the lower near-center threshold is not used. The normal editable defaults are `1400` for the main threshold and `1000` near center. Both controls run from `100` to `5000`, and `1200` represents the car's stock threshold even when its raw sensor value is different.
+
+If the controls are gray, **Handcrafted Lateral Tuning** owns them and locks them to its profile (`2000` main and `1200` near center). Turn that profile off only if you intend to tune these values by hand. Do not max either control: higher thresholds make NRDR slower to yield to real driver input. This is only a false-detection workaround, not a cure. If stutter is strong, repeatable, or affects control, stop testing that firmware, return to a known-good configuration, and report the exact rack/firmware plus logs in Discord.
 
 Many Hondas also have a non-linear variable steering ratio inside the rack. A single static ratio cannot describe the whole steering range, so the car may track too far inside or outside a curve when the model and rack geometry disagree. NRDR maps reviewed EPS firmware and model artifacts to the correct geometry policy; coverage is still being expanded car by car.
 
@@ -59,18 +61,6 @@ Many Hondas also have a non-linear variable steering ratio inside the rack. A si
 - **`nrdr-development`** remains the existing development branch during that transition.
 
 </details>
-
-## How NRDR chooses a steering ratio
-
-Think of steer ratio as a translator between the steering wheel and the road wheels. The rack's firmware supplies its physical shape; a model-specific correction is used only when that exact model file has been reviewed.
-
-The runtime checks the active model artifact's complete SHA-256. A friendly model name, Git reference, or “same family” resemblance never selects a policy.
-
-- Seven exact reviewed Pop and Off-Policy artifacts use the road-tested legacy center-to-outer curve.
-- Six exact reviewed Deep-RL artifacts — Michael RL v2, Get Your Hopes Up, RDF, RDF v2, TSF, and TSF Do Over — use pure firmware VGR at every steering angle.
-- An unclassified model uses pure firmware VGR only when the car's exact EPS firmware is mapped. Without that EPS map, NRDR leaves openpilot's stock `VehicleModel` geometry untouched.
-
-A new model related to TSF or TSF Do Over is therefore **not** automatically treated like them. Its exact aggregate artifact hash must be reviewed and registered first.
 
 ## Settings in plain English
 
