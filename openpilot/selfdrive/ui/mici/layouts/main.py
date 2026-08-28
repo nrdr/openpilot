@@ -86,9 +86,9 @@ class MiciMainLayout(Scroller):
     device.add_interactive_timeout_callback(self._on_interactive_timeout)
     ui_state.add_on_body_changed_callbacks(self._on_body_changed)
 
-  def _scroll_to(self, layout: Widget):
+  def _scroll_to(self, layout: Widget, *, smooth: bool = True):
     layout_x = int(layout.rect.x)
-    self._scroller.scroll_to(layout_x, smooth=True)
+    self._scroller.scroll_to(layout_x, smooth=smooth)
 
   def _update_state(self):
     super()._update_state()
@@ -119,7 +119,11 @@ class MiciMainLayout(Scroller):
       if ui_state.started:
         self._onroad_time_delay = rl.get_time()
       else:
-        self._scroll_to(self._home_layout)
+        # Ignition-off owns the destination immediately. Cancel the delayed
+        # onroad transition and any in-flight page animation, but preserve the
+        # navigation stack so an open settings page remains open.
+        self._onroad_time_delay = None
+        self._scroll_to(self._home_layout, smooth=False)
 
     # FIXME: these two pops can interrupt user interacting in the settings
     if self._onroad_time_delay is not None and rl.get_time() - self._onroad_time_delay >= ONROAD_DELAY:
@@ -128,7 +132,7 @@ class MiciMainLayout(Scroller):
 
     # When car leaves standstill, pop nav stack and scroll to onroad
     CS = ui_state.sm["carState"]
-    if not CS.standstill and self._prev_standstill:
+    if ui_state.started and not CS.standstill and self._prev_standstill:
       gui_app.pop_widgets_to(self, lambda: self._scroll_to(self._onroad_layout))
     self._prev_standstill = CS.standstill
 

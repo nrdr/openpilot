@@ -117,6 +117,11 @@ class _Scroller(Widget):
   def scroll_to(self, pos: float, smooth: bool = False, block_interrupt: bool = False, block_widget_interaction: bool = False):
     assert smooth or (not block_interrupt and not block_widget_interaction), "Instant scroll cannot block interaction"
 
+    # An instant destination supersedes any in-flight animation, including when
+    # the destination is already in place and the early return below applies.
+    if not smooth:
+      self._scrolling_to = None, False, False
+
     # already there
     if abs(pos) < 1:
       return
