@@ -1321,7 +1321,7 @@
                   "widget": "multiple_button",
                   "title": "Steer Ratio Mode",
                   "description": "Choose exactly one geometry source. Manual is the same as turning all three in-car switches off.",
-                  "details": "Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR uses the fixed audited Clarity angle-log curve; the raw data ends at 247.5 degrees and then holds 15.279368. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. If an exact NRDR, firmware, or manual source is unavailable, the device safely uses the stock car ratio and reports that fallback.",
+                  "details": "Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. If an exact NRDR, firmware, or manual source is unavailable, the device safely uses the stock car ratio and reports that fallback.",
                   "options": [
                     {
                       "value": 0,

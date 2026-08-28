@@ -128,7 +128,8 @@ class CarTuneReporter:
       return (f"{prefix} | last valid live vehicleParameters.steerRatio scalar | " +
               f"CP {selection.cp_ratio:g} until the first valid sample")
     if selection.effective_mode is SteerRatioMode.NRDR_RAW:
-      return (f"{prefix} | {selection.raw_profile.name} | raw data ends at 247.5 deg, then holds 15.279368 | " +
+      return (f"{prefix} | {selection.raw_profile.name} | audited near-lock anchor 435.7 deg " +
+              f"(VM ratio {selection.raw_profile.ratio_at(435.7):.6f}), endpoint-clamped | " +
               f"source {selection.raw_profile.provenance}")
     return (f"{prefix} | {selection.firmware_profile.name} relative Table-A shape | " +
             f"immutable CP center anchor {selection.cp_ratio:g} | no lane fade")

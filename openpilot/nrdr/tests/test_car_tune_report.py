@@ -88,7 +88,7 @@ class TestCarTuneReporter(unittest.TestCase):
     report = CarTuneReporter._steer_ratio_info(self._steer_ratio_selection(2))
 
     self.assertIn("selected NRDR measured-angle curve | effective NRDR measured-angle curve", report)
-    self.assertIn("raw data ends at 247.5 deg, then holds 15.279368", report)
+    self.assertIn("audited near-lock anchor 435.7 deg (VM ratio 14.165673), endpoint-clamped", report)
     self.assertIn("54f74ae3e5973aa681904780f8cac140870a2b5f", report)
     self.assertIn("8a96cab2b8d5fcfa055709e997bea38e3f5724b0", report)
 

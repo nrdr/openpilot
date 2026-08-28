@@ -29,17 +29,18 @@ class SteerRatioTuningLayout(Widget):
     self._back_button.set_click_callback(back_btn_callback)
     self._mode_items = {
       SteerRatioMode.COMMA: self._mode_item(
-          SteerRatioMode.COMMA,
-          "Use Comma Steer Ratio Learner",
-          "Uses Comma's last valid learned steer ratio as one number at every wheel angle. "
-          "It holds the last good value through brief message dropouts.",  # noqa: ISC002
+        SteerRatioMode.COMMA,
+        "Use Comma Steer Ratio Learner",
+        "Uses Comma's last valid learned steer ratio as one number at every wheel angle. " +
+        "It holds the last good value through brief message dropouts.",
       ),
       SteerRatioMode.NRDR_RAW: self._mode_item(
-          SteerRatioMode.NRDR_RAW,
-          "Use nrdr Steer Ratio Learner",
-          "Uses NRDR's fixed curve made directly from logged steering angles. It does not learn while you drive. "
-          "The Clarity raw data ends at 247.5 degrees and then holds 15.279368. "
-          "This is available only when NRDR has an exact audited curve for your car.",  # noqa: ISC002
+        SteerRatioMode.NRDR_RAW,
+        "Use nrdr Steer Ratio Learner",
+        "Uses NRDR's fixed curve made directly from logged steering angles. It does not learn while you drive. " +
+        "The audited Clarity curve now reaches its 435.7-degree near-lock anchor instead of holding the " +
+        "247.5-degree point through the rest of the rack. " +
+        "This is available only when NRDR has an exact audited curve for your car.",
       ),
       SteerRatioMode.FIRMWARE: self._mode_item(
         SteerRatioMode.FIRMWARE,
@@ -54,8 +55,8 @@ class SteerRatioTuningLayout(Widget):
       min_value=800,
       max_value=2500,
       value_change_step=1,
-      description=lambda: tr("The ratio used with the wheel straight ahead. A bigger number asks for more steering-wheel movement "
-                             "for the same planned curve; a smaller number asks for less."),  # noqa: ISC002
+      description=lambda: tr("The ratio used with the wheel straight ahead. A bigger number asks for more steering-wheel movement " +
+                             "for the same planned curve; a smaller number asks for less."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )

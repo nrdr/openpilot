@@ -68,30 +68,48 @@ class RawSteerRatioProfile:
     if any(not math.isfinite(value) or value <= 0.0 for value in self.ratios):
       raise ValueError("raw steer-ratio samples must be finite and positive")
 
+  def _clamped_angle_deg(self, measured_angle_deg: float) -> float:
+    angle_deg = abs(float(measured_angle_deg))
+    if math.isnan(angle_deg):
+      return 0.0
+    return min(angle_deg, self.angles_deg[-1])
+
+  def raw_domain_ratio_at(self, measured_angle_deg: float) -> float:
+    """Interpolate the archived theta/atan(wheel-angle) ratio domain."""
+    angle_deg = self._clamped_angle_deg(measured_angle_deg)
+    return float(np.interp(angle_deg, self.angles_deg, self.ratios))
+
   def ratio_at(self, measured_angle_deg: float) -> float:
-    # np.interp deliberately endpoint-clamps. The historical data has real
-    # non-monotonic bins, so do not smooth or manufacture a firmware tail.
-    return float(np.interp(abs(measured_angle_deg), self.angles_deg, self.ratios))
+    """Return the equivalent small-angle ratio expected by VehicleModel."""
+    angle_deg = self._clamped_angle_deg(measured_angle_deg)
+    raw_domain_ratio = self.raw_domain_ratio_at(angle_deg)
+    if angle_deg == 0.0:
+      return raw_domain_ratio
+    theta_rad = math.radians(angle_deg)
+    return theta_rad / math.tan(theta_rad / raw_domain_ratio)
 
 
-_CLARITY_RAW_ANGLES = (
+_CLARITY_54F_RAW_ANGLES = (
   0.0, 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5,
   57.5, 62.5, 67.5, 72.5, 77.5, 82.5, 87.5, 92.5, 107.5, 182.5, 217.5, 247.5,
 )
-_CLARITY_RAW_RATIOS = (
+_CLARITY_54F_RAW_DOMAIN_RATIOS = (
   19.679678, 19.679678, 20.665984, 19.948804, 19.330348, 19.362985,
   19.307147, 19.150893, 18.394874, 18.300584, 18.578655, 18.087309,
   17.979249, 18.036352, 17.710230, 17.497041, 17.279111, 17.025118,
   17.088272, 16.797072, 16.530043, 15.739778, 15.319622, 15.279368,
 )
+_CLARITY_NEAR_LOCK_ANGLE_DEG = 435.7
+_CLARITY_NEAR_LOCK_RAW_DOMAIN_RATIO = 15.435171905851
 
 CLARITY_RAW_STEER_RATIO = RawSteerRatioProfile(
-  name="Clarity measured-angle raw bins",
+  name="Clarity measured-angle raw-to-VM curve",
   fingerprint="HONDA_CLARITY",
-  angles_deg=_CLARITY_RAW_ANGLES,
-  ratios=_CLARITY_RAW_RATIOS,
+  angles_deg=_CLARITY_54F_RAW_ANGLES + (_CLARITY_NEAR_LOCK_ANGLE_DEG,),
+  ratios=_CLARITY_54F_RAW_DOMAIN_RATIOS + (_CLARITY_NEAR_LOCK_RAW_DOMAIN_RATIO,),
   provenance="54f74ae3e5973aa681904780f8cac140870a2b5f:sr-capture/clarity-sr-angle-5deg-HONDA_CLARITY.csv" +
-             "@8a96cab2b8d5fcfa055709e997bea38e3f5724b0",
+             "@8a96cab2b8d5fcfa055709e997bea38e3f5724b0 + audited bilateral near-lock anchor; " +
+             "see openpilot/nrdr/features/lateral/CLARITY_RAW_STEER_RATIO_EVIDENCE.md",
 )
 
 RAW_STEER_RATIO_PROFILES = {CLARITY_RAW_STEER_RATIO.fingerprint: CLARITY_RAW_STEER_RATIO}
