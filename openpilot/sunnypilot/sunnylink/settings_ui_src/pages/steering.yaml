@@ -353,7 +353,7 @@ sections:
       widget: multiple_button
       title: Steer Ratio Source
       description: Choose exactly one source. Manual uses the two overrides below; unavailable vehicle-specific modes safely fall back to the car's stock ratio.
-      details: Comma starts from the car's stock ratio, then holds its last validated learned value through brief learner dropouts. nrdr Raw preserves the non-monotonic audited Clarity bin medians, linearly interpolates between retained bin centers (including unsampled gaps), and holds 15.279368 after 247.5 degrees. Firmware uses an exact EPS firmware map and the car's stock ratio as its fixed anchor. Changes are locked while driving and take effect together.
+      details: Comma starts from the car's stock ratio, then holds its last validated learned value through brief learner dropouts. nrdr Raw uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact EPS firmware map and the car's stock ratio as its fixed anchor. Changes are locked while driving and take effect together.
       options:
       - value: 0
         label: Manual

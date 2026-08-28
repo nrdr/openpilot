@@ -143,7 +143,8 @@ class TestNNTorqueModel:
       VM = VehicleModel(CP)
       vehicle_params = log.VehicleParameters.new_message()
       controller.update(False, CS, VM, vehicle_params, False, 0.0, None, False, 0.2)
-      assert pid_controller.steer_ratio_resolver.effective_ratio(100.0) == pytest.approx(16.6635575)
+      # Raw estimator values are converted into VehicleModel's small-angle ratio domain.
+      assert pid_controller.steer_ratio_resolver.effective_ratio(100.0) == pytest.approx(16.6025780370)
       assert VM.sR == pytest.approx(CP.steerRatio)
 
       # Exercise the real PID interpolation while active. The hybrid previously

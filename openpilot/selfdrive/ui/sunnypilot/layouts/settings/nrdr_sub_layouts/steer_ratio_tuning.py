@@ -115,8 +115,8 @@ class SteerRatioTuningLayout(Widget):
     if not self._raw_available():
       return tr("Unavailable for this car. NRDR's raw road-learned values currently exist only for the Honda Clarity.")
     return tr(" ".join((
-      "Uses NRDR's raw Clarity road-learning bin medians, including their real rises. NRDR draws straight lines between",
-      "the retained bin centers—even across gaps with no samples—and holds 15.279368 after the final 247.5° bin.",
+      "Uses NRDR's fixed curve made directly from logged Clarity steering angles. It does not learn while you drive.",
+      "The audited curve now reaches its 435.7° near-lock point instead of holding the 247.5° point through the rest of the rack.",
     )))
 
   def _firmware_description(self) -> str:

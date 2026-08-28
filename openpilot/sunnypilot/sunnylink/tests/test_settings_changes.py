@@ -437,6 +437,8 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert "offroad_only" in json.dumps(item["enablement"])
     assert "nrdr_raw_steer_ratio_available" in json.dumps(item["options"][2]["enablement"])
     assert "nrdr_firmware_steer_ratio_available" in json.dumps(item["options"][3]["enablement"])
+    assert "435.7 degrees" in item["details"]
+    assert "no longer holds the 247.5-degree point" in item["details"]
 
   @parameterized.expand([
     ("NrdrSteerRatioManualCenter", "Manual Override On-Center Ratio", 15.38),

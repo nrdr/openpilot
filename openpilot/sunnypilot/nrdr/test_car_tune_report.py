@@ -23,6 +23,21 @@ class TestCarTuneReporter(unittest.TestCase):
       "NRDR Raw unavailable for HONDA_CLARITY -> CP static 16.5",
     )
 
+  def test_raw_mode_reports_full_lock_anchor_domain_conversion_and_support(self):
+    reporter = CarTuneReporter(self.FakeParams({"NrdrSteerRatioMode": 2}))
+    clarity = SimpleNamespace(
+      brand="honda", carFingerprint="HONDA_CLARITY", steerRatio=16.5, carFw=[],
+    )
+
+    report = reporter._steer_ratio_info(clarity)
+    self.assertIn("original non-monotonic Clarity atan-domain medians preserved", report)
+    self.assertIn("bilateral 435.7 deg anchor n=825 L/R=598/227", report)
+    self.assertIn("interpolate raw, then VehicleModel conversion", report)
+    self.assertIn("effective 247.5=14.870103, 435.7=14.165673", report)
+    self.assertIn("clamps at 435.7 deg", report)
+    self.assertIn("54f74ae3e5973aa681904780f8cac140870a2b5f", report)
+    self.assertIn("8a96cab2b8d5fcfa055709e997bea38e3f5724b0", report)
+
   def test_static_pid_base_is_reported_for_all_speeds(self):
     pid = SimpleNamespace(kpV=[0.03], kiV=[0.01], kf=0.000012, kfV=[])
     CP = SimpleNamespace(lateralTuning=SimpleNamespace(which=lambda: "pid", pid=pid))

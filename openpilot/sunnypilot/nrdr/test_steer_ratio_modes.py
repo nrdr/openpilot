@@ -1,25 +1,39 @@
+import math
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
   CLARITY_RAW_ANGLE_BP,
+  CLARITY_RAW_EXTRACTOR_SHA256,
+  CLARITY_RAW_NEAR_LOCK_ANGLE_DEG,
+  CLARITY_RAW_NEAR_LOCK_LEFT_COUNT,
+  CLARITY_RAW_NEAR_LOCK_RAW_DOMAIN_RATIO,
+  CLARITY_RAW_NEAR_LOCK_RIGHT_COUNT,
+  CLARITY_RAW_NEAR_LOCK_SAMPLE_COUNT,
   CLARITY_RAW_SOURCE_BLOB,
   CLARITY_RAW_SOURCE_COMMIT,
   CLARITY_RAW_STEER_RATIO,
+  CLARITY_RAW_SYNCED_CSV_SHA256,
+  CLARITY_RAW_TAIL_CACHE_META_SHA256,
+  CLARITY_RAW_TAIL_CACHE_SHA256,
+  CLARITY_RAW_TAIL_SEGMENTS,
   GENERIC_OUTER_ANGLE_DEG,
   MANUAL_CENTER_DEFAULT,
   MANUAL_FINAL_DEFAULT,
   SteerRatioMode,
   SteerRatioResolver,
+  clarity_raw_domain_ratio_at,
+  clarity_raw_steer_ratio_at,
 )
 
 
-RAW_ANGLES = (
+ORIGINAL_54F_RAW_ANGLES = (
   0.0, 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5,
   57.5, 62.5, 67.5, 72.5, 77.5, 82.5, 87.5, 92.5, 107.5, 182.5, 217.5, 247.5,
 )
-RAW_RATIOS = (
+ORIGINAL_54F_RAW_DOMAIN_RATIOS = (
   19.679678, 19.679678, 20.665984, 19.948804, 19.330348, 19.362985,
   19.307147, 19.150893, 18.394874, 18.300584, 18.578655, 18.087309,
   17.979249, 18.036352, 17.710230, 17.497041, 17.279111, 17.025118,
@@ -63,25 +77,106 @@ def resolver(mode, *, fingerprint="HONDA_CLARITY", firmware="39990-TRW-A020", ra
   return SteerRatioResolver(car(fingerprint, firmware, ratio), FakeParams(mode, center, final))
 
 
-def test_raw_profile_is_the_literal_audited_csv_data():
+def test_raw_profile_preserves_every_legacy_literal_and_appends_only_the_audited_tail_anchor():
   assert CLARITY_RAW_SOURCE_COMMIT == "54f74ae3e5973aa681904780f8cac140870a2b5f"
   assert CLARITY_RAW_SOURCE_BLOB == "8a96cab2b8d5fcfa055709e997bea38e3f5724b0"
-  assert CLARITY_RAW_ANGLE_BP == RAW_ANGLES
-  assert CLARITY_RAW_STEER_RATIO == RAW_RATIOS
+  assert CLARITY_RAW_ANGLE_BP[:-1] == ORIGINAL_54F_RAW_ANGLES
+  assert CLARITY_RAW_STEER_RATIO[:-1] == ORIGINAL_54F_RAW_DOMAIN_RATIOS
+  assert CLARITY_RAW_ANGLE_BP[-1] == CLARITY_RAW_NEAR_LOCK_ANGLE_DEG
+  assert CLARITY_RAW_STEER_RATIO[-1] == CLARITY_RAW_NEAR_LOCK_RAW_DOMAIN_RATIO
   assert CLARITY_RAW_STEER_RATIO[2] > CLARITY_RAW_STEER_RATIO[1]
   assert CLARITY_RAW_STEER_RATIO[10] > CLARITY_RAW_STEER_RATIO[9]
+  assert CLARITY_RAW_NEAR_LOCK_ANGLE_DEG == 435.7
+  assert CLARITY_RAW_NEAR_LOCK_RAW_DOMAIN_RATIO == 15.435171905851
+
+
+def test_raw_tail_provenance_and_bilateral_counts_are_pinned():
+  assert CLARITY_RAW_SYNCED_CSV_SHA256 == "861D8E00B286D5412C6C6D3908564789270A2026EC824EB6F49BD11793D96672"
+  assert CLARITY_RAW_EXTRACTOR_SHA256 == "5CE250872F7607409E3562FECC323CC1FF69F3F20351F46BA72FA5887A7185C6"
+  assert CLARITY_RAW_TAIL_CACHE_SHA256 == "1A633B31B91EDFFF9CE9D4F83B240566F21476B028D02960E7B14E44839E725B"
+  assert CLARITY_RAW_TAIL_CACHE_META_SHA256 == "FAC9AB6F9C4E4DDACDBFC43911F7694DD8E7B07759C8C150F6F4DA12DBAF1CAE"
+  assert CLARITY_RAW_TAIL_SEGMENTS == (
+    "0000007e--d4a413c4c4--296",
+    "00000080--ddc219bb73--4",
+    "00000081--49da42be4e--18",
+    "0000008a--91b97700bb--5",
+    "0000008a--91b97700bb--6",
+  )
+  assert CLARITY_RAW_NEAR_LOCK_SAMPLE_COUNT == 825
+  assert CLARITY_RAW_NEAR_LOCK_LEFT_COUNT == 598
+  assert CLARITY_RAW_NEAR_LOCK_RIGHT_COUNT == 227
+  assert CLARITY_RAW_NEAR_LOCK_LEFT_COUNT + CLARITY_RAW_NEAR_LOCK_RIGHT_COUNT == CLARITY_RAW_NEAR_LOCK_SAMPLE_COUNT
+
+
+def test_raw_curve_ships_complete_provenance_evidence():
+  evidence_path = Path(__file__).with_name("CLARITY_RAW_STEER_RATIO_EVIDENCE.md")
+  evidence = evidence_path.read_text(encoding="utf-8")
+  expected_evidence = (
+    "861D8E00B286D5412C6C6D3908564789270A2026EC824EB6F49BD11793D96672",
+    "5CE250872F7607409E3562FECC323CC1FF69F3F20351F46BA72FA5887A7185C6",
+    "1A633B31B91EDFFF9CE9D4F83B240566F21476B028D02960E7B14E44839E725B",
+    "FAC9AB6F9C4E4DDACDBFC43911F7694DD8E7B07759C8C150F6F4DA12DBAF1CAE",
+    "0000007e--d4a413c4c4--296",
+    "00000080--ddc219bb73--4",
+    "00000081--49da42be4e--18",
+    "0000008a--91b97700bb--5",
+    "0000008a--91b97700bb--6",
+    "pose_ok",
+    "calibrationValid",
+    "posenetOK",
+    "7a9ad65863b713a525bebd932ee87e41448ccf57",
+  )
+  assert all(item in evidence for item in expected_evidence)
+
+
+def _vehicle_model_ratio(angle_deg, raw_domain_ratio):
+  if angle_deg == 0.0:
+    return raw_domain_ratio
+  theta_rad = math.radians(angle_deg)
+  return theta_rad / math.tan(theta_rad / raw_domain_ratio)
 
 
 @pytest.mark.parametrize("angle, expected", [
-  (-500.0, RAW_RATIOS[-1]),
-  (0.0, RAW_RATIOS[0]),
-  (1.0, RAW_RATIOS[0]),
-  (7.5, RAW_RATIOS[2]),
-  (250.0, RAW_RATIOS[-1]),
+  (-500.0, 14.165673460789899),
+  (0.0, ORIGINAL_54F_RAW_DOMAIN_RATIOS[0]),
+  (247.5, 14.870103435525325),
+  (433.8, 14.17519860618587),
+  (435.7, 14.165673460789899),
+  (500.0, 14.165673460789899),
 ])
-def test_raw_uses_absolute_measured_angle_and_endpoint_clamps(angle, expected):
+def test_raw_interpolates_atan_domain_first_converts_for_vehicle_model_and_clamps_angle(angle, expected):
   selection = resolver(SteerRatioMode.NRDR_RAW)
   assert selection.effective_ratio(angle) == pytest.approx(expected)
+
+
+def test_raw_midpoint_conversion_uses_interpolated_raw_value_not_interpolated_effective_ratio():
+  angle = 433.8
+  raw_domain_ratio = 15.279368 + (15.435171905851 - 15.279368) * (angle - 247.5) / (435.7 - 247.5)
+  expected = _vehicle_model_ratio(angle, raw_domain_ratio)
+  assert raw_domain_ratio == pytest.approx(15.433598965249955)
+  assert clarity_raw_steer_ratio_at(angle) == pytest.approx(expected)
+  assert clarity_raw_steer_ratio_at(-angle) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("angle", (0.0, 7.5, 247.5, 433.8, 435.7, 1000.0, math.inf))
+def test_raw_curve_is_symmetric_finite_and_clamps_at_near_lock(angle):
+  assert clarity_raw_domain_ratio_at(angle) == pytest.approx(clarity_raw_domain_ratio_at(-angle))
+  positive = clarity_raw_steer_ratio_at(angle)
+  assert positive == pytest.approx(clarity_raw_steer_ratio_at(-angle))
+  assert math.isfinite(positive)
+  if angle >= CLARITY_RAW_NEAR_LOCK_ANGLE_DEG:
+    assert positive == pytest.approx(clarity_raw_steer_ratio_at(CLARITY_RAW_NEAR_LOCK_ANGLE_DEG))
+
+
+def test_raw_nan_falls_back_to_zero_angle_limit():
+  assert clarity_raw_domain_ratio_at(math.nan) == pytest.approx(ORIGINAL_54F_RAW_DOMAIN_RATIOS[0])
+  assert clarity_raw_steer_ratio_at(math.nan) == pytest.approx(ORIGINAL_54F_RAW_DOMAIN_RATIOS[0])
+
+
+def test_raw_near_lock_is_not_the_old_247_point_hold_or_direct_fit_value():
+  assert clarity_raw_steer_ratio_at(435.7) == pytest.approx(14.165673460789899)
+  assert clarity_raw_steer_ratio_at(435.7) != pytest.approx(14.870103435525325)
+  assert clarity_raw_steer_ratio_at(435.7) != pytest.approx(14.074514584823627)
 
 
 def test_raw_is_clarity_only_and_never_borrows_family_data():
@@ -230,6 +325,23 @@ def test_current_and_desired_geometry_round_trip_with_offset_and_roll(mode):
   desired_no_offset = selection.desired_angle_no_offset(VM, measured, 15.0, roll, current)
 
   assert desired_no_offset + angle_offset == pytest.approx(measured)
+
+
+@pytest.mark.parametrize("measured", (-500.0, -435.7, -433.8, 433.8, 435.7, 500.0))
+def test_raw_near_lock_controller_geometry_round_trips_and_stays_finite(measured):
+  selection = resolver(SteerRatioMode.NRDR_RAW)
+  VM = FakeVehicleModel(selection.cp_steer_ratio)
+  angle_offset = 1.7
+  roll = 0.035
+
+  current = selection.calc_curvature(VM, measured, angle_offset, 12.0, roll)
+  desired_no_offset = selection.desired_angle_no_offset(VM, measured, 12.0, roll, current)
+
+  assert math.isfinite(current)
+  assert math.isfinite(desired_no_offset)
+  assert desired_no_offset + angle_offset == pytest.approx(measured, abs=1e-8)
+  assert selection.effective_ratio(measured) == pytest.approx(clarity_raw_steer_ratio_at(measured))
+  assert VM.sR == pytest.approx(selection.cp_steer_ratio)
 
 
 def test_active_changes_latch_mode_and_both_manual_values_until_disengagement():

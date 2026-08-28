@@ -12,8 +12,15 @@ from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
 from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
+  CLARITY_RAW_NEAR_LOCK_ANGLE_DEG,
+  CLARITY_RAW_NEAR_LOCK_LEFT_COUNT,
+  CLARITY_RAW_NEAR_LOCK_RIGHT_COUNT,
+  CLARITY_RAW_NEAR_LOCK_SAMPLE_COUNT,
+  CLARITY_RAW_SOURCE_BLOB,
+  CLARITY_RAW_SOURCE_COMMIT,
   SteerRatioMode,
   SteerRatioResolver,
+  clarity_raw_steer_ratio_at,
   parse_steer_ratio_mode,
 )
 
@@ -138,9 +145,17 @@ class CarTuneReporter:
       return f"Comma learner scalar | CP {base:g} until first valid sample, then holds last good value through validity flickers"
     if mode is SteerRatioMode.NRDR_RAW:
       if selection.available:
+        old_tail_effective = clarity_raw_steer_ratio_at(247.5)
+        near_lock_effective = clarity_raw_steer_ratio_at(CLARITY_RAW_NEAR_LOCK_ANGLE_DEG)
         return " ".join((
-          "NRDR Raw | non-monotonic Clarity bin medians | linear between retained centers (including data gaps) |",
-          "after 247.5 deg holds 15.279368 | no smoothing or lane fade",
+          "NRDR Raw | original non-monotonic Clarity atan-domain medians preserved |",
+          f"bilateral {CLARITY_RAW_NEAR_LOCK_ANGLE_DEG:g} deg anchor",
+          f"n={CLARITY_RAW_NEAR_LOCK_SAMPLE_COUNT}",
+          f"L/R={CLARITY_RAW_NEAR_LOCK_LEFT_COUNT}/{CLARITY_RAW_NEAR_LOCK_RIGHT_COUNT} |",
+          "interpolate raw, then VehicleModel conversion |",
+          f"effective 247.5={old_tail_effective:.6f}, {CLARITY_RAW_NEAR_LOCK_ANGLE_DEG:g}={near_lock_effective:.6f} |",
+          f"clamps at {CLARITY_RAW_NEAR_LOCK_ANGLE_DEG:g} deg | no smoothing or lane fade |",
+          f"source {CLARITY_RAW_SOURCE_COMMIT}@{CLARITY_RAW_SOURCE_BLOB} + audited bilateral tail",
         ))
       return f"NRDR Raw unavailable for {CP.carFingerprint} -> CP static {base:g}"
     if mode is SteerRatioMode.FIRMWARE:

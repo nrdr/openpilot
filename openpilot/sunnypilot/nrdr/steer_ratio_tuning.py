@@ -17,22 +17,67 @@ GENERIC_OUTER_ANGLE_DEG = 250.0
 MIN_STEER_RATIO = 8.0
 MAX_STEER_RATIO = 25.0
 
-# Literal medians from the Clarity road-learning CSV in nrdr/openpilot commit
+# Literal atan-domain medians from the Clarity road-learning CSV in nrdr/openpilot commit
 # 54f74ae3e5973aa681904780f8cac140870a2b5f (blob
 # 8a96cab2b8d5fcfa055709e997bea38e3f5724b0). These are intentionally not smoothed or forced to be
-# monotonic: NRDR Raw means the measured data, including its local rises.
+# monotonic: NRDR Raw means the measured data, including its local rises. The final 435.7-degree
+# value is a bilateral near-lock anchor extracted with the same geometry estimator from the audited
+# synchronized cache. Runtime interpolates these raw estimator values before converting them to the
+# effective scalar expected by VehicleModel.
 CLARITY_RAW_SOURCE_COMMIT = "54f74ae3e5973aa681904780f8cac140870a2b5f"
 CLARITY_RAW_SOURCE_BLOB = "8a96cab2b8d5fcfa055709e997bea38e3f5724b0"
+CLARITY_RAW_SYNCED_CSV_SHA256 = "861D8E00B286D5412C6C6D3908564789270A2026EC824EB6F49BD11793D96672"
+CLARITY_RAW_EXTRACTOR_SHA256 = "5CE250872F7607409E3562FECC323CC1FF69F3F20351F46BA72FA5887A7185C6"
+CLARITY_RAW_TAIL_CACHE_SHA256 = "1A633B31B91EDFFF9CE9D4F83B240566F21476B028D02960E7B14E44839E725B"
+CLARITY_RAW_TAIL_CACHE_META_SHA256 = "FAC9AB6F9C4E4DDACDBFC43911F7694DD8E7B07759C8C150F6F4DA12DBAF1CAE"
+CLARITY_RAW_TAIL_SEGMENTS = (
+  "0000007e--d4a413c4c4--296",
+  "00000080--ddc219bb73--4",
+  "00000081--49da42be4e--18",
+  "0000008a--91b97700bb--5",
+  "0000008a--91b97700bb--6",
+)
+CLARITY_RAW_NEAR_LOCK_ANGLE_DEG = 435.7
+CLARITY_RAW_NEAR_LOCK_RAW_DOMAIN_RATIO = 15.435171905851
+CLARITY_RAW_NEAR_LOCK_SAMPLE_COUNT = 825
+CLARITY_RAW_NEAR_LOCK_LEFT_COUNT = 598
+CLARITY_RAW_NEAR_LOCK_RIGHT_COUNT = 227
 CLARITY_RAW_ANGLE_BP = (
   0.0, 2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5,
   57.5, 62.5, 67.5, 72.5, 77.5, 82.5, 87.5, 92.5, 107.5, 182.5, 217.5, 247.5,
+  CLARITY_RAW_NEAR_LOCK_ANGLE_DEG,
 )
 CLARITY_RAW_STEER_RATIO = (
   19.679678, 19.679678, 20.665984, 19.948804, 19.330348, 19.362985,
   19.307147, 19.150893, 18.394874, 18.300584, 18.578655, 18.087309,
   17.979249, 18.036352, 17.710230, 17.497041, 17.279111, 17.025118,
   17.088272, 16.797072, 16.530043, 15.739778, 15.319622, 15.279368,
+  CLARITY_RAW_NEAR_LOCK_RAW_DOMAIN_RATIO,
 )
+
+
+def _clarity_raw_clamped_angle_deg(measured_angle_deg: float) -> float:
+  angle_deg = abs(float(measured_angle_deg))
+  if math.isnan(angle_deg):
+    return 0.0
+  return min(angle_deg, CLARITY_RAW_ANGLE_BP[-1])
+
+
+def clarity_raw_domain_ratio_at(measured_angle_deg: float) -> float:
+  """Interpolate the archived theta/atan(wheel-angle) ratio domain."""
+  clamped_angle_deg = _clarity_raw_clamped_angle_deg(measured_angle_deg)
+  return float(np.interp(clamped_angle_deg, CLARITY_RAW_ANGLE_BP, CLARITY_RAW_STEER_RATIO))
+
+
+def clarity_raw_steer_ratio_at(measured_angle_deg: float) -> float:
+  """Convert the interpolated logged atan-domain ratio into VehicleModel's scalar domain."""
+  clamped_angle_deg = _clarity_raw_clamped_angle_deg(measured_angle_deg)
+  raw_domain_ratio = clarity_raw_domain_ratio_at(clamped_angle_deg)
+  if clamped_angle_deg == 0.0:
+    return raw_domain_ratio
+
+  theta_rad = math.radians(clamped_angle_deg)
+  return theta_rad / math.tan(theta_rad / raw_domain_ratio)
 
 
 class SteerRatioMode(IntEnum):
@@ -181,7 +226,7 @@ class SteerRatioResolver:
     if self.mode is SteerRatioMode.NRDR_RAW:
       if not self.available:
         return self.cp_steer_ratio
-      return float(np.interp(abs(measured_angle_deg), CLARITY_RAW_ANGLE_BP, CLARITY_RAW_STEER_RATIO))
+      return clarity_raw_steer_ratio_at(measured_angle_deg)
     if self.mode is SteerRatioMode.FIRMWARE:
       return self.cp_steer_ratio
     if not self.available:
