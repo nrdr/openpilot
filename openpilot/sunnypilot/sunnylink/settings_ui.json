@@ -583,8 +583,8 @@
               "key": "NrdrHandcraftedLateralTune",
               "widget": "toggle",
               "title": "Handcrafted Lateral Tuning",
-              "description": "Off by default. Enable this to load the Clarity-derived, road-tested PID profile with this vehicle's own steering geometry and lock conflicting controls.",
-              "details": "Loads the shared versioned Honda profile with model-locked steering geometry, predictive stiction, controller helpers, steering filters, and fixed live delay. Exact Pop and Off-Policy artifacts use the road-tested legacy dual-BP curve. Exact Deep-RL artifacts, and unclassified models when this car's EPS firmware is mapped, use the raw firmware VGR at every steering angle with no high-angle handoff or lane-change ratio fade. Unclassified models without an exact EPS map keep openpilot's stock VehicleModel. Leave this off for manual tuning.",
+              "description": "Off by default. Enable this to load the Clarity-derived, road-tested lateral controller profile and lock the controls that profile owns.",
+              "details": "Loads the shared versioned Honda PID/feedforward profile with predictive stiction, controller helpers, steering filters, and fixed live delay. Steer ratio is intentionally independent; choose its source in Steer Ratio Tuning. Leave this off to tune the controller values manually.",
               "visibility": [
                 {
                   "type": "capability",
@@ -673,33 +673,6 @@
                   "title": "Helpers"
                 },
                 {
-                  "key": "NrdrLearnSteerRatio",
-                  "widget": "toggle",
-                  "title": "Learn Steer Ratio (Auto)",
-                  "description": "Uses openpilot's learned scalar on normal cars. Supported mapped Hondas use their configured On-Center anchor.",
-                  "details": "When ON, cars outside NRDR's active model/firmware steering policy use openpilot's live-learned steer ratio. A mapped Honda in raw-firmware mode keeps its configured On-Center anchor authoritative, avoiding double-counting the rack's variable geometry. Model-locked legacy artifacts use the configured center-to-outer curve.",
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
                   "key": "NrdrLearnStiffness",
                   "widget": "toggle",
                   "title": "Learn Tire Stiffness (Auto)",
@@ -755,6 +728,105 @@
               ]
             },
             {
+              "id": "nrdr_steer_ratio_tuning",
+              "label": "Steer Ratio Tuning",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "NrdrSteerRatioMode",
+                  "widget": "multiple_button",
+                  "title": "Steer Ratio Source",
+                  "description": "Choose exactly one source. Manual uses the two overrides below; unavailable vehicle-specific modes safely fall back to the car's stock ratio.",
+                  "details": "Comma starts from the car's stock ratio, then holds its last validated learned value through brief learner dropouts. nrdr Raw preserves the non-monotonic audited Clarity bin medians, linearly interpolates between retained bin centers (including unsampled gaps), and holds 15.279368 after 247.5 degrees. Firmware uses an exact EPS firmware map and the car's stock ratio as its fixed anchor. Changes are locked while driving and take effect together.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Manual"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Comma Learner"
+                    },
+                    {
+                      "value": 2,
+                      "label": "nrdr Learner",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_raw_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "value": 3,
+                      "label": "Firmware",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_firmware_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrSteerRatioManualCenter",
+                  "widget": "option",
+                  "title": "Manual Override On-Center Ratio",
+                  "description": "Steering ratio near the center of the wheel. Lower values ask for a sharper turn. Default 15.38.",
+                  "min": 8.0,
+                  "max": 25.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "param",
+                      "key": "NrdrSteerRatioMode",
+                      "equals": 0
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_manual_steer_ratio_available",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrSteerRatioManualFinal",
+                  "widget": "option",
+                  "title": "Manual Override Final Ratio",
+                  "description": "Steering ratio at large wheel angles. Lower values ask for a sharper turn. Default 10.93.",
+                  "min": 8.0,
+                  "max": 25.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "param",
+                      "key": "NrdrSteerRatioMode",
+                      "equals": 0
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_manual_steer_ratio_available",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
               "id": "nrdr_pidf_ground",
               "label": "Controller Tuning Dungeon",
               "trigger_key": null,
@@ -765,635 +837,6 @@
                   "title": "StarPilot PID Additions",
                   "description": "Adds the borrowed StarPilot turn-in / unwind / per-direction output scaling, not built for Honda.",
                   "details": "The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base.",
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrSteerRatioCenterClarity",
-                  "widget": "option",
-                  "title": "On-Center Steer Ratio",
-                  "description": "Directly sets the Clarity's steer ratio at zero steering-wheel angle. Default 18.50.",
-                  "details": "This is the static center anchor for Clarity's exact firmware VGR and the starting point of model-locked legacy dual-BP. Raw-firmware mode follows the extracted EPS map at every angle and does not blend toward the Outer Steer Ratio.",
-                  "min": 8.0,
-                  "max": 25.0,
-                  "step": 0.01,
-                  "visibility": [
-                    {
-                      "type": "capability",
-                      "field": "car_fingerprint",
-                      "equals": "HONDA_CLARITY"
-                    },
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "capability",
-                          "field": "nrdr_steer_ratio_policy",
-                          "equals": "legacy_dual_bp"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "nrdr_firmware_vgr_available",
-                          "equals": true
-                        }
-                      ]
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not_engaged"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrSteerRatioOuterClarity",
-                  "widget": "option",
-                  "title": "Outer Steer Ratio",
-                  "description": "Directly sets the Clarity's high-angle steer ratio. Default 12.72.",
-                  "details": "This is used only by model-locked legacy dual-BP; its outer endpoint is reached at 250 degrees and held beyond it, and it supplies the starting anchor for the optional 1.5-second legacy lane-change fade.",
-                  "min": 8.0,
-                  "max": 25.0,
-                  "step": 0.01,
-                  "visibility": [
-                    {
-                      "type": "capability",
-                      "field": "car_fingerprint",
-                      "equals": "HONDA_CLARITY"
-                    },
-                    {
-                      "type": "capability",
-                      "field": "nrdr_steer_ratio_policy",
-                      "equals": "legacy_dual_bp"
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not_engaged"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrSteerRatioCenterCivic",
-                  "widget": "option",
-                  "title": "On-Center Steer Ratio",
-                  "description": "Directly sets the 10th-gen Civic's steer ratio at zero steering-wheel angle. Default 17.24.",
-                  "details": "This is the static center anchor for the Civic's exact firmware VGR and the starting point of model-locked legacy dual-BP. Raw-firmware mode follows the extracted EPS map at every angle and does not blend toward the Outer Steer Ratio.",
-                  "min": 8.0,
-                  "max": 25.0,
-                  "step": 0.01,
-                  "visibility": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CIVIC"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CIVIC_BOSCH"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CIVIC_BOSCH_DIESEL"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "capability",
-                          "field": "nrdr_steer_ratio_policy",
-                          "equals": "legacy_dual_bp"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "nrdr_firmware_vgr_available",
-                          "equals": true
-                        }
-                      ]
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not_engaged"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrSteerRatioOuterCivic",
-                  "widget": "option",
-                  "title": "Outer Steer Ratio",
-                  "description": "Directly sets the 10th-gen Civic's high-angle steer ratio. Default 10.93.",
-                  "details": "This is used only by model-locked legacy dual-BP; it is the Civic curve's high-angle endpoint and supplies the starting anchor for the optional 1.5-second legacy lane-change fade.",
-                  "min": 8.0,
-                  "max": 25.0,
-                  "step": 0.01,
-                  "visibility": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CIVIC"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CIVIC_BOSCH"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CIVIC_BOSCH_DIESEL"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "capability",
-                      "field": "nrdr_steer_ratio_policy",
-                      "equals": "legacy_dual_bp"
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not_engaged"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrSteerRatioCenterAccord",
-                  "widget": "option",
-                  "title": "On-Center Steer Ratio",
-                  "description": "Directly sets the 10th-gen Accord's steer ratio at zero steering-wheel angle. Default 18.31.",
-                  "details": "This is the starting point of model-locked legacy dual-BP. Raw-firmware or unclassified models use it only when the Accord has an exact mapped EPS VGR; otherwise openpilot's stock VehicleModel remains untouched.",
-                  "min": 8.0,
-                  "max": 25.0,
-                  "step": 0.01,
-                  "visibility": [
-                    {
-                      "type": "capability",
-                      "field": "car_fingerprint",
-                      "equals": "HONDA_ACCORD"
-                    },
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "capability",
-                          "field": "nrdr_steer_ratio_policy",
-                          "equals": "legacy_dual_bp"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "nrdr_firmware_vgr_available",
-                          "equals": true
-                        }
-                      ]
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not_engaged"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrSteerRatioOuterAccord",
-                  "widget": "option",
-                  "title": "Outer Steer Ratio",
-                  "description": "Directly sets the 10th-gen Accord's high-angle steer ratio. Default 11.82.",
-                  "details": "This is used only by model-locked legacy dual-BP; it is the Accord curve's high-angle endpoint and supplies the starting anchor for the optional 1.5-second legacy lane-change fade.",
-                  "min": 8.0,
-                  "max": 25.0,
-                  "step": 0.01,
-                  "visibility": [
-                    {
-                      "type": "capability",
-                      "field": "car_fingerprint",
-                      "equals": "HONDA_ACCORD"
-                    },
-                    {
-                      "type": "capability",
-                      "field": "nrdr_steer_ratio_policy",
-                      "equals": "legacy_dual_bp"
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not_engaged"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrSteerRatioCenterCrv5g",
-                  "widget": "option",
-                  "title": "On-Center Steer Ratio",
-                  "description": "Directly sets the 5th-gen CR-V's steer ratio at zero steering-wheel angle. Default 17.94.",
-                  "details": "This is the static center anchor when exact CR-V firmware VGR is recognized and the starting point of model-locked legacy dual-BP. Raw-firmware mode follows the extracted EPS map at every angle and does not blend toward the Outer Steer Ratio.",
-                  "min": 8.0,
-                  "max": 25.0,
-                  "step": 0.01,
-                  "visibility": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CRV_5G"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CRV_HYBRID"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "capability",
-                          "field": "nrdr_steer_ratio_policy",
-                          "equals": "legacy_dual_bp"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "nrdr_firmware_vgr_available",
-                          "equals": true
-                        }
-                      ]
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not_engaged"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrSteerRatioOuterCrv5g",
-                  "widget": "option",
-                  "title": "Outer Steer Ratio",
-                  "description": "Directly sets the 5th-gen CR-V's high-angle steer ratio. Default 12.30.",
-                  "details": "This is used only by model-locked legacy dual-BP; it is the CR-V curve's high-angle endpoint and supplies the starting anchor for the optional 1.5-second legacy lane-change fade.",
-                  "min": 8.0,
-                  "max": 25.0,
-                  "step": 0.01,
-                  "visibility": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CRV_5G"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CRV_HYBRID"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "capability",
-                      "field": "nrdr_steer_ratio_policy",
-                      "equals": "legacy_dual_bp"
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not_engaged"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrSteerRatioCenterInsight",
-                  "widget": "option",
-                  "title": "On-Center Steer Ratio",
-                  "description": "Directly sets the 3rd-gen Insight's steer ratio at zero steering-wheel angle. Default 16.82.",
-                  "details": "This is the static center anchor for the Insight's exact firmware VGR and the starting point of model-locked legacy dual-BP. Raw-firmware mode follows the extracted EPS map at every angle and does not blend toward the Outer Steer Ratio.",
-                  "min": 8.0,
-                  "max": 25.0,
-                  "step": 0.01,
-                  "visibility": [
-                    {
-                      "type": "capability",
-                      "field": "car_fingerprint",
-                      "equals": "HONDA_INSIGHT"
-                    },
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "capability",
-                          "field": "nrdr_steer_ratio_policy",
-                          "equals": "legacy_dual_bp"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "nrdr_firmware_vgr_available",
-                          "equals": true
-                        }
-                      ]
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not_engaged"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrSteerRatioOuterInsight",
-                  "widget": "option",
-                  "title": "Outer Steer Ratio",
-                  "description": "Directly sets the 3rd-gen Insight's high-angle steer ratio. Default 12.58.",
-                  "details": "This is used only by model-locked legacy dual-BP; it is the Insight curve's high-angle endpoint and supplies the starting anchor for the optional 1.5-second legacy lane-change fade.",
-                  "min": 8.0,
-                  "max": 25.0,
-                  "step": 0.01,
-                  "visibility": [
-                    {
-                      "type": "capability",
-                      "field": "car_fingerprint",
-                      "equals": "HONDA_INSIGHT"
-                    },
-                    {
-                      "type": "capability",
-                      "field": "nrdr_steer_ratio_policy",
-                      "equals": "legacy_dual_bp"
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "param",
-                          "key": "NrdrHandcraftedLateralTune",
-                          "equals": false
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "capability",
-                            "field": "has_handcrafted_lateral_profile",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not_engaged"
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrLaneChangeEndpointSteerRatio",
-                  "widget": "toggle",
-                  "title": "Start Lane Changes at Outer SR",
-                  "description": "In model-locked legacy dual-BP mode, starts at the Outer Steer Ratio and fades to the normal legacy curve over 1.5 seconds. Default ON.",
-                  "details": "This setting has no effect for pure-firmware or unclassified models. In legacy mode the fade starts only when the planner enters lane-change-starting, so pre-lane-change waiting does not consume it. Once started, the fade continues through finishing or completion without a ratio jump. This reacts to the planner state, not blinkers alone.",
-                  "visibility": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CLARITY"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CIVIC"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CIVIC_BOSCH"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CIVIC_BOSCH_DIESEL"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_ACCORD"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CRV_5G"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_CRV_HYBRID"
-                        },
-                        {
-                          "type": "capability",
-                          "field": "car_fingerprint",
-                          "equals": "HONDA_INSIGHT"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "capability",
-                      "field": "nrdr_steer_ratio_policy",
-                      "equals": "legacy_dual_bp"
-                    }
-                  ],
                   "enablement": [
                     {
                       "type": "any",

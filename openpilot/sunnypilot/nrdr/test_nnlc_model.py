@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from openpilot.cereal import custom, log
+from openpilot.cereal import log
 from opendbc.car.car_helpers import interfaces
 from opendbc.car.structs import CarParams, car
 from opendbc.car.honda.values import CAR as HONDA
@@ -19,26 +19,13 @@ from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 from openpilot.sunnypilot.nrdr.latcontrol_clarity_hybrid import LatControlClarityHybrid, clarity_nnlc_blend_target
-from openpilot.sunnypilot.nrdr.live_params import reset_live_params_for_tests
-from openpilot.sunnypilot.nrdr.model_policy import (
-  LEGACY_DUAL_BP_ARTIFACT_SHA256S,
-  PURE_FIRMWARE_VGR_ARTIFACT_SHA256S,
-  SteerRatioModelPolicy,
-)
+from openpilot.sunnypilot.nrdr.live_params import get_live_params, reset_live_params_for_tests
 from openpilot.sunnypilot.nrdr.nnlc_model import get_forced_nnlc_model
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import SteerRatioMode
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 
 CLARITY_MODEL_SHA256 = "4f2e92c085c5eeebb7c6714e4733ea7b71c1e69c7de7776a2bff6def12ce0134"
-
-
-def _active_model_bundle(artifact_sha256: str) -> dict:
-  bundle = custom.ModelManagerSP.ModelBundle.new_message()
-  bundle.minimumSelectorVersion = 18
-  bundle.models = [custom.ModelManagerSP.Model.new_message()]
-  bundle.models[0].artifact.downloadUri.sha256 = artifact_sha256
-  return bundle.to_dict()
-
 
 @pytest.fixture(autouse=True)
 def reset_live_params():
@@ -71,7 +58,7 @@ class TestNNTorqueModel:
     params = Params()
     keys = ("EnforceTorqueControl", "NeuralNetworkLateralControl", "NrdrNnlcEnabled",
             "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain",
-            "ModelManager_ActiveBundle")
+            "NrdrSteerRatioMode")
     previous = {key: params.get(key) for key in keys}
     try:
       params.put_bool("EnforceTorqueControl", False, block=True)
@@ -81,7 +68,7 @@ class TestNNTorqueModel:
       params.put("NrdrNnlcKpGain", 100, block=True)
       params.put("NrdrNnlcKfGain", 50, block=True)
       params.put("NrdrNnlcKiGain", 10, block=True)
-      params.put("ModelManager_ActiveBundle", _active_model_bundle(next(iter(LEGACY_DUAL_BP_ARTIFACT_SHA256S))), block=True)
+      params.put("NrdrSteerRatioMode", SteerRatioMode.NRDR_RAW.value, block=True)
 
       CarInterface = interfaces[HONDA.HONDA_CLARITY]
       CP = CarInterface.get_non_essential_params(HONDA.HONDA_CLARITY)
@@ -107,10 +94,9 @@ class TestNNTorqueModel:
       assert isinstance(controller.torque_controller, LatControlTorqueV0)
       pid_controller = controller.pid_controller.nrdr_controller
       assert pid_controller is not None
-      assert pid_controller.sr_profile is not None
-      assert pid_controller.vgr_profile is not None
-      assert pid_controller.vgr_profile.name == "Clarity TRW-A020"
-      assert pid_controller.model_sr_policy is SteerRatioModelPolicy.LEGACY_DUAL_BP
+      assert pid_controller.steer_ratio_resolver.mode is SteerRatioMode.NRDR_RAW
+      assert pid_controller.steer_ratio_resolver.available
+      assert not pid_controller.firmware_vgr_selected
       assert list(pid_controller.pid._k_p[0]) == [0.0]
       assert list(pid_controller.pid._k_p[1]) == pytest.approx([0.03])
       assert list(pid_controller.pid._k_i[0]) == [0.0]
@@ -150,14 +136,15 @@ class TestNNTorqueModel:
       controller.extension.nrdr.refresh()
       assert controller.extension.enabled
 
-      # PID runs first even while Torque/NNLC is the serialized tuning type, so
-      # its Clarity endpoint curve is also used for NNLC's actual-curvature measurement.
+      # PID runs first even while Torque/NNLC is the serialized tuning type. The
+      # shared raw resolver supplies the same measured-angle geometry to both paths.
       CS = car.CarState.new_message()
       CS.steeringAngleDeg = 100.0
       VM = VehicleModel(CP)
       vehicle_params = log.VehicleParameters.new_message()
       controller.update(False, CS, VM, vehicle_params, False, 0.0, None, False, 0.2)
-      assert abs(VM.sR - 16.188) < 1e-6
+      assert pid_controller.steer_ratio_resolver.effective_ratio(100.0) == pytest.approx(16.6635575)
+      assert VM.sR == pytest.approx(CP.steerRatio)
 
       # Exercise the real PID interpolation while active. The hybrid previously
       # passed this test only because inactive control never called PIDController.update().
@@ -168,13 +155,14 @@ class TestNNTorqueModel:
       CS.vEgo = 10.0 * CV.MPH_TO_MS
       controller.update(True, CS, VM, vehicle_params, False, 0.0, None, False, 0.2)
 
-      # Model policy is resolved once with the controller. Selecting a pure-firmware
-      # artifact applies only to the newly constructed controller and makes Clarity PID-only.
-      params.put("ModelManager_ActiveBundle", _active_model_bundle(next(iter(PURE_FIRMWARE_VGR_ARTIFACT_SHA256S))), block=True)
-      assert pid_controller.model_sr_policy is SteerRatioModelPolicy.LEGACY_DUAL_BP
+      # Firmware mode is explicit and independent of the model artifact. A new
+      # controller sees the refreshed atomic setting and makes Clarity PID-only.
+      params.put("NrdrSteerRatioMode", SteerRatioMode.FIRMWARE.value, block=True)
+      get_live_params().refresh_all()
+      assert pid_controller.steer_ratio_resolver.mode is SteerRatioMode.NRDR_RAW
       firmware_controller = controls_ext.initialize_lateral_control(object(), CI, DT_CTRL)
       firmware_pid = firmware_controller.pid_controller.nrdr_controller
-      assert firmware_pid.model_sr_policy is SteerRatioModelPolicy.PURE_FIRMWARE_VGR
+      assert firmware_pid.steer_ratio_resolver.mode is SteerRatioMode.FIRMWARE
       assert firmware_pid.firmware_vgr_selected
       firmware_controller.nnlc_blend = 1.0
       firmware_controller.extension._pid.i = 0.2

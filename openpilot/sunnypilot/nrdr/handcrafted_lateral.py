@@ -1,9 +1,6 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoint_profile
-
-
 type ParamValue = bool | int | float
 
 
@@ -34,8 +31,6 @@ HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS = (
 
 HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
   ("NrdrStarPilotPid", False),
-  ("NrdrLaneChangeEndpointSteerRatio", True),
-  ("NrdrLearnSteerRatio", False),
   ("NrdrLearnStiffness", True),
   ("NrdrLearnAngleOffset", True),
   ("LatPScaleLowSpeed", 100),
@@ -77,14 +72,11 @@ HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
 
 
 def _build_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
-  steer_ratio = get_steer_ratio_endpoint_profile(fingerprint)
-  if steer_ratio is None:
-    raise ValueError(f"missing steer-ratio profile for {fingerprint}")
   return HandcraftedLateralProfile(
-    name="Honda Clarity-Derived Road-Tested 2026-08-21",
+    name="Honda Clarity-Derived Road-Tested 2026-08-28 (steer ratio independent)",
     fingerprint=fingerprint,
-    version=14,
-    values=steer_ratio.param_values + HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
+    version=15,
+    values=HONDA_TORQUE_MOD_HANDCRAFTED_VALUES,
   )
 
 
@@ -93,7 +85,9 @@ HANDCRAFTED_LATERAL_PROFILES = {
   for fingerprint in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS
 }
 
-CLARITY_ROAD_TESTED_2026_08_21 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
+CLARITY_ROAD_TESTED_2026_08_28 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
+# Kept as an import-compatible name for older tools. The profile itself is v15.
+CLARITY_ROAD_TESTED_2026_08_21 = CLARITY_ROAD_TESTED_2026_08_28
 
 
 def _params_or_default(params: ParamsLike | None) -> ParamsLike:

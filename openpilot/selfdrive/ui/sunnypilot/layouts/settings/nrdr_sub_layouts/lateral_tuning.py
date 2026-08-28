@@ -321,10 +321,9 @@ class LateralTuningLayout(Widget):
   def _initialize_items(self):
     self._handcrafted_tune = toggle_item_sp(
       title=lambda: tr("Handcrafted Lateral Tuning"),
-      description=lambda: tr("Off by default. Enable this to load the Clarity-derived, road-tested PID profile with this vehicle's own steering geometry: " +
-                             "exact Pop/Off-Policy artifacts use legacy dual-BP, while exact Deep-RL artifacts use the raw firmware " +
-                             "VGR at every angle. Unclassified models use raw firmware VGR when mapped or stock geometry when not. " +
-                             "Conflicting tuning controls are locked while enabled."),
+      description=lambda: tr("Off by default. Enable this to load NRDR's Clarity-derived, road-tested controller settings. " +
+                             "Steer Ratio Tuning is separate, so you can choose Manual, Comma, NRDR Raw, or Firmware geometry " +
+                             "without this profile changing it. Other controller settings are locked while enabled."),
       param="NrdrHandcraftedLateralTune",
     )
 

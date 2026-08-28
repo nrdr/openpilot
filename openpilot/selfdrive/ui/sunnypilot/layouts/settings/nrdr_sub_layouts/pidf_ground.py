@@ -4,67 +4,38 @@ import pyray as rl
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
-from openpilot.sunnypilot.nrdr.model_policy import (
-  SteerRatioModelPolicy,
-  classify_steer_ratio_model,
-)
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
-  STEER_RATIO_ENDPOINT_PROFILES,
-  get_steer_ratio_endpoint_profile,
-)
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import SteerRatioMode, parse_steer_ratio_mode
+from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.steer_ratio_tuning import SteerRatioTuningLayout
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
-from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp, toggle_item_sp, LineSeparatorSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import option_item_sp, simple_button_item_sp, toggle_item_sp, LineSeparatorSP
 
 
 class PidfGroundLayout(Widget):
   def __init__(self, back_btn_callback: Callable):
     super().__init__()
+    self._show_steer_ratio = False
     self._back_button = NavButton(tr("Back"))
     self._back_button.set_click_callback(back_btn_callback)
+    self._steer_ratio_layout = SteerRatioTuningLayout(self._hide_steer_ratio)
 
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
+    self._steer_ratio_button = simple_button_item_sp(
+      button_text=lambda: tr("Steer Ratio Tuning"),
+      button_width=800,
+      callback=self._show_steer_ratio_layout,
+    )
     self._starpilot = toggle_item_sp(
       title=tr("StarPilot PID Additions"),
       description=tr("The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) " +
                      "not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. " +
                      "Turn on to A/B it against the raw base."),
       param="NrdrStarPilotPid",
-    )
-
-    self._sr_endpoint_controls = []
-    for profile in STEER_RATIO_ENDPOINT_PROFILES:
-      center = option_item_sp(
-        param=profile.center_param,
-        title=lambda profile=profile: tr(f"On-Center Steer Ratio (Default: {profile.center_default:.2f})"),
-        min_value=800, max_value=2500, value_change_step=1,
-        description=lambda: tr("Sets the steer ratio at zero steering-wheel angle. It is the static center anchor for the " +
-                               "exact firmware EPS map and the starting value of the legacy center-to-outer curve."),
-        label_callback=lambda value: f"{value / 100:.2f}",
-        use_float_scaling=True,
-      )
-      outer = option_item_sp(
-        param=profile.outer_param,
-        title=lambda profile=profile: tr(f"Outer Steer Ratio (Default: {profile.outer_default:.2f})"),
-        min_value=800, max_value=2500, value_change_step=1,
-        description=lambda: tr("Sets the high-angle endpoint used only by model-locked legacy dual-BP mode and the start of " +
-                               "its optional 1.5-second lane-change fade."),
-        label_callback=lambda value: f"{value / 100:.2f}",
-        use_float_scaling=True,
-      )
-      self._sr_endpoint_controls.append((profile, center, outer))
-
-    self._lane_change_endpoint_sr = toggle_item_sp(
-      title=tr("Start Lane Changes at Outer SR (Default: ON)"),
-      description=tr("For model-locked legacy dual-BP models, begin at this car's Outer Steer Ratio when the planner starts " +
-                     "a lane change, then fade to the normal legacy curve over 1.5 seconds. Pre-lane-change waiting does not " +
-                     "consume the fade. Pure firmware and unclassified models never apply this fade."),
-      param="NrdrLaneChangeEndpointSteerRatio",
     )
 
     self._lat_p_low = option_item_sp(
@@ -236,10 +207,9 @@ class PidfGroundLayout(Widget):
     )
 
     return [
-      self._starpilot,
+      self._steer_ratio_button,
       LineSeparatorSP(40),
-      *(control for _, center, outer in self._sr_endpoint_controls for control in (center, outer)),
-      self._lane_change_endpoint_sr,
+      self._starpilot,
       LineSeparatorSP(40),
       self._lat_p_low,
       self._lat_i_low,
@@ -272,21 +242,12 @@ class PidfGroundLayout(Widget):
     super()._update_state()
     fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
     editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
-    active_sr_profile = get_steer_ratio_endpoint_profile(fingerprint)
-    model_sr_policy = classify_steer_ratio_model(ui_state.active_bundle)
-    legacy_dual_bp_active = model_sr_policy is SteerRatioModelPolicy.LEGACY_DUAL_BP
+    mode = parse_steer_ratio_mode(ui_state.params.get("NrdrSteerRatioMode", return_default=True))
     firmware_vgr_active = bool(
-      ui_state.CP is not None and get_honda_vgr_profile(ui_state.CP) is not None and
-      not legacy_dual_bp_active
+      mode is SteerRatioMode.FIRMWARE and ui_state.CP is not None and get_honda_vgr_profile(ui_state.CP) is not None
     )
-    sr_controls = [control for _, center, outer in self._sr_endpoint_controls for control in (center, outer)]
-    for profile, center, outer in self._sr_endpoint_controls:
-      active = profile == active_sr_profile
-      center.set_visible(active and (legacy_dual_bp_active or firmware_vgr_active))
-      outer.set_visible(active and legacy_dual_bp_active)
-    self._lane_change_endpoint_sr.set_visible(active_sr_profile is not None and legacy_dual_bp_active)
     for item in (
-      self._starpilot, *sr_controls, self._lane_change_endpoint_sr,
+      self._starpilot,
       self._lat_p_low, self._lat_i_low, self._lat_f_low,
       self._lat_p_standard, self._lat_i_standard, self._lat_f_standard,
       self._lat_p_highway, self._lat_i_highway, self._lat_f_highway,
@@ -295,9 +256,6 @@ class PidfGroundLayout(Widget):
       self._lat_stiction,
     ):
       item.action_item.set_enabled(editable)
-
-    for item in sr_controls:
-      item.action_item.set_enabled(editable and not ui_state.engaged)
 
     for item in (self._nnlc_enabled, self._nnlc_activation_speed, self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain):
       item.action_item.set_enabled(editable and not firmware_vgr_active)
@@ -309,10 +267,21 @@ class PidfGroundLayout(Widget):
     self._nnlc_ki_gain.set_visible(nnlc_enabled)
 
   def _render(self, rect):
+    if self._show_steer_ratio:
+      self._steer_ratio_layout.render(rect)
+      return
     self._back_button.set_position(self._rect.x, self._rect.y + 20)
     self._back_button.render()
     content_rect = rl.Rectangle(rect.x, rect.y + self._back_button.rect.height + 40, rect.width, rect.height - self._back_button.rect.height - 40)
     self._scroller.render(content_rect)
 
   def show_event(self):
+    self._show_steer_ratio = False
     self._scroller.show_event()
+
+  def _show_steer_ratio_layout(self):
+    self._show_steer_ratio = True
+    self._steer_ratio_layout.show_event()
+
+  def _hide_steer_ratio(self):
+    self._show_steer_ratio = False

@@ -46,9 +46,16 @@ from openpilot.sunnypilot.nrdr.sr_correction_analysis import (
 MPS_TO_MPH = 2.236936
 SEGMENT_DIR_RE = re.compile(r"^(.*)--(\d+)$")
 SETTINGS_KEYS = (
-  "NrdrLearnSteerRatio",
   "NrdrLearnStiffness",
   "NrdrLearnAngleOffset",
+  "NrdrSteerRatioMode",
+  "NrdrSteerRatioManualCenter",
+  "NrdrSteerRatioManualFinal",
+  "NrdrCurvServo",
+  "NrdrCurvatureTrim",
+  "NrdrNnlcEnabled",
+  # Legacy-only route signature context; current runtime never reads these.
+  "NrdrLearnSteerRatio",
   "NrdrLaneChangeEndpointSteerRatio",
   "NrdrSteerRatioCenterClarity",
   "NrdrSteerRatioOuterClarity",
@@ -63,9 +70,6 @@ SETTINGS_KEYS = (
   "NrdrSteerRatioMin",
   "NrdrSteerRatioMax",
   "NrdrSteerRatioOffset",
-  "NrdrCurvServo",
-  "NrdrCurvatureTrim",
-  "NrdrNnlcEnabled",
 )
 REJECTION_COLUMNS = (
   "stale state",

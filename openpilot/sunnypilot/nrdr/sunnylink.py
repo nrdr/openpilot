@@ -1,13 +1,16 @@
 from pathlib import Path
 
-from openpilot.common.params import Params, UnknownKeyName
-from openpilot.common.hardware.hw import Paths
-
-
 UNREGISTERED = "UnregisteredDevice"
+ONROAD_BLOCKED_PARAMS = {
+  "LongitudinalPersonality",
+  "NrdrSteerRatioMode",
+  "NrdrSteerRatioManualCenter",
+  "NrdrSteerRatioManualFinal",
+}
 
 
 def _identity_path() -> Path:
+  from openpilot.common.hardware.hw import Paths
   return Path(Paths.persist_root()) / "comma" / "sunnylink_dongle_id"
 
 
@@ -37,10 +40,11 @@ def persist_dongle_id(dongle_id) -> None:
 
 
 def allow_param_write(key: str, onroad: bool) -> bool:
-  return not onroad or key != "LongitudinalPersonality"
+  return not onroad or key not in ONROAD_BLOCKED_PARAMS
 
 
 def inject_car_tune_details(schema: dict, walk) -> None:
+  from openpilot.common.params import Params, UnknownKeyName
   try:
     details = Params().get("NrdrCarTuneDetails")
   except UnknownKeyName:

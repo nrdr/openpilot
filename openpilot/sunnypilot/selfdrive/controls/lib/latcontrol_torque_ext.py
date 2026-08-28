@@ -31,7 +31,7 @@ class LatControlTorqueExt(NeuralNetworkLateralControl, LatControlTorqueExtOverri
     self._steer_limited_by_safety = steer_limited_by_safety
     self._output_torque = output_torque
 
-    self.update_calculations(CS, VM, desired_lateral_accel)
+    self.update_calculations(CS, VM, desired_lateral_accel, params.angleOffsetDeg)
     self.update_jerk_aware_torque_control(CS, roll_compensation, gravity_adjusted_lateral_accel)
     self.update_neural_network_feedforward(CS, params, calibrated_pose)
 

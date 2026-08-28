@@ -30,7 +30,13 @@ class LatControlPID(LatControl):
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
 
-    angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+    steer_ratio_resolver = getattr(VM, "nrdr_steer_ratio_resolver", None)
+    if steer_ratio_resolver is not None:
+      angle_steers_des_no_offset = steer_ratio_resolver.desired_angle_no_offset(
+        VM, CS.steeringAngleDeg, CS.vEgo, params.roll, desired_curvature, params,
+      )
+    else:
+      angle_steers_des_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
     angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
     error = angle_steers_des - CS.steeringAngleDeg
 

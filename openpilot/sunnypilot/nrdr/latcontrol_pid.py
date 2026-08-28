@@ -1,5 +1,3 @@
-import math
-
 import numpy as np
 
 from openpilot.cereal import log
@@ -8,20 +6,15 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.pid import PIDController
 from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
-from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile, normalize_honda_eps_firmware
+from openpilot.sunnypilot.nrdr.honda_vgr import normalize_honda_eps_firmware
 from openpilot.sunnypilot.nrdr.lat_stiction import LatStiction
 from openpilot.sunnypilot.nrdr.live_params import get_live_params
-from openpilot.sunnypilot.nrdr.model_policy import (
-  SteerRatioModelPolicy,
-  classify_steer_ratio_model,
-)
-from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.nrdr.tune_learner import TuneLearner
 from openpilot.sunnypilot.nrdr.params import read_bool, read_float
 from openpilot.sunnypilot.nrdr.phase_detector import phase_with_latch
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import (
-  LaneChangeSteerRatioFade,
-  get_steer_ratio_endpoint_profile,
+  SteerRatioResolver,
+  get_steer_ratio_metadata,
 )
 
 
@@ -107,7 +100,7 @@ class NrdrLatControlPID(LatControl):
   def supports(CP, CP_SP) -> bool:
     fingerprint = str(CP.carFingerprint)
     eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
-    return eps_modified or get_steer_ratio_endpoint_profile(fingerprint) is not None
+    return eps_modified or get_steer_ratio_metadata(fingerprint) is not None
 
   def __init__(self, CP, CP_SP, CI, dt):
     super().__init__(CP, CP_SP, CI, dt)
@@ -124,12 +117,7 @@ class NrdrLatControlPID(LatControl):
     self.is_eps_modified = bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value)
     self.dt = dt
     self.params = get_live_params()
-    self.sr_profile = get_steer_ratio_endpoint_profile(str(CP.carFingerprint))
-    self.vgr_profile = get_honda_vgr_profile(CP)
-    self.sr_values = list(self.sr_profile.default_values) if self.sr_profile else None
-    self.model_sr_policy = classify_steer_ratio_model(get_active_bundle())
-    self.lane_change_endpoint_sr = read_bool(self.params, "NrdrLaneChangeEndpointSteerRatio", True)
-    self.lane_change_sr_fade = LaneChangeSteerRatioFade(dt)
+    self.steer_ratio_resolver = SteerRatioResolver(CP, self.params.snapshot)
     self.center_boost_magnitude = 0.5
     self.center_boost_threshold = 3.0
     self.center_boost_min_speed = 50.0
@@ -167,36 +155,19 @@ class NrdrLatControlPID(LatControl):
 
   @property
   def firmware_vgr_selected(self) -> bool:
-    return self.sr_profile is not None and self.vgr_profile is not None and \
-      self.model_sr_policy is not SteerRatioModelPolicy.LEGACY_DUAL_BP
+    return self.steer_ratio_resolver.firmware_vgr_selected
 
-  @property
-  def legacy_dual_bp_selected(self) -> bool:
-    return self.sr_profile is not None and self.model_sr_policy is SteerRatioModelPolicy.LEGACY_DUAL_BP
+  def _active_steer_ratio_resolver(self, VM) -> SteerRatioResolver:
+    resolver = getattr(VM, "nrdr_steer_ratio_resolver", None)
+    if resolver is not None:
+      self.steer_ratio_resolver = resolver
+    return self.steer_ratio_resolver
 
   def _desired_angles(self, VM, CS, params, desired_curvature):
-    lane_change_endpoint_enabled = self.legacy_dual_bp_selected and self.lane_change_endpoint_sr
-    if not lane_change_endpoint_enabled:
-      self.lane_change_sr_fade.reset()
-    lane_change_weight = self.lane_change_sr_fade.update(self._lane_change_starting()) if lane_change_endpoint_enabled else 0.0
-
-    if self.firmware_vgr_selected:
-      center_ratio = self.sr_values[0]
-      previous_ratio = VM.sR
-      try:
-        VM.sR = center_ratio
-        linear_angle = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
-      finally:
-        VM.sR = previous_ratio
-      angle_no_offset = self.vgr_profile.linear_to_physical(linear_angle)
-    elif self.legacy_dual_bp_selected:
-      normal_ratio = float(np.interp(abs(CS.steeringAngleDeg), self.sr_profile.breakpoints, self.sr_values))
-      VM.sR = normal_ratio + lane_change_weight * (self.sr_values[-1] - normal_ratio)
-      angle_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
-    else:
-      # Unknown model with no exact EPS map keeps openpilot's stock VehicleModel
-      # ratio. Do not guess a model correction or silently select dual-BP.
-      angle_no_offset = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+    resolver = self._active_steer_ratio_resolver(VM)
+    angle_no_offset = resolver.desired_angle_no_offset(
+      VM, CS.steeringAngleDeg, CS.vEgo, params.roll, desired_curvature, params,
+    )
     return angle_no_offset, angle_no_offset + params.angleOffsetDeg
 
   def _reset(self, desired_angle: float) -> None:
@@ -206,7 +177,6 @@ class NrdrLatControlPID(LatControl):
     self.previous_output = 0.0
     self.previous_desired_angle = desired_angle
     self.previous_saturated = False
-    self.lane_change_sr_fade.reset()
     self.stiction.reset()
 
   def _feedforward(self, CS, desired_angle: float) -> float:
@@ -247,9 +217,6 @@ class NrdrLatControlPID(LatControl):
     self.injection_test = read_bool(snapshot, "HondaInjectionTest")
     self.starpilot = read_bool(snapshot, "NrdrStarPilotPid")
     self.stiction_enabled = read_bool(snapshot, "NrdrLatStiction")
-    if self.sr_profile is not None:
-      self.sr_values[:] = [read_float(snapshot, key, default, 8.0, 25.0) for key, default in self.sr_profile.param_values]
-      self.lane_change_endpoint_sr = read_bool(snapshot, "NrdrLaneChangeEndpointSteerRatio", True)
     self.settings_generation = snapshot.generation
 
   def _scaled_pid_output(self, CS, desired_angle: float, angle_delta: float, phase: float) -> float:
@@ -286,6 +253,10 @@ class NrdrLatControlPID(LatControl):
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
              calibrated_pose, curvature_limited, lat_delay):
+    resolver = self._active_steer_ratio_resolver(VM)
+    if resolver is self.steer_ratio_resolver and not hasattr(VM, "nrdr_steer_ratio_resolver"):
+      resolver.refresh(self.params.snapshot, active)
+      resolver.update_comma_ratio(params, bool(getattr(params, "valid", True)))
     pid_log = log.ControlsState.LateralPIDState.new_message()
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)

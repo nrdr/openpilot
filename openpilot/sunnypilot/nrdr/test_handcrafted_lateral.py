@@ -1,14 +1,11 @@
-import pytest
-
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
-  CLARITY_ROAD_TESTED_2026_08_21,
+  CLARITY_ROAD_TESTED_2026_08_28,
   HANDCRAFTED_LATERAL_PROFILES,
   HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS,
   apply_handcrafted_lateral_profile,
   get_handcrafted_lateral_profile,
   is_handcrafted_lateral_enabled,
 )
-from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_endpoint_profile
 
 
 EXPECTED_FINGERPRINTS = (
@@ -21,20 +18,8 @@ EXPECTED_FINGERPRINTS = (
   "HONDA_INSIGHT",
 )
 
-EXPECTED_GEOMETRY = (
-  ("HONDA_ACCORD", "NrdrSteerRatioCenterAccord", 18.31, "NrdrSteerRatioOuterAccord", 11.82, 2.30 * 250.0 / 2.41),
-  ("HONDA_CIVIC", "NrdrSteerRatioCenterCivic", 17.24, "NrdrSteerRatioOuterCivic", 10.93, 2.22 * 250.0 / 2.41),
-  ("HONDA_CIVIC_BOSCH", "NrdrSteerRatioCenterCivic", 17.24, "NrdrSteerRatioOuterCivic", 10.93, 2.22 * 250.0 / 2.41),
-  ("HONDA_CIVIC_BOSCH_DIESEL", "NrdrSteerRatioCenterCivic", 17.24, "NrdrSteerRatioOuterCivic", 10.93, 2.22 * 250.0 / 2.41),
-  ("HONDA_CLARITY", "NrdrSteerRatioCenterClarity", 18.50, "NrdrSteerRatioOuterClarity", 12.72, 250.0),
-  ("HONDA_CRV_5G", "NrdrSteerRatioCenterCrv5g", 17.94, "NrdrSteerRatioOuterCrv5g", 12.30, 2.30 * 250.0 / 2.41),
-  ("HONDA_INSIGHT", "NrdrSteerRatioCenterInsight", 16.82, "NrdrSteerRatioOuterInsight", 12.58, 2.54 * 250.0 / 2.41),
-)
-
 EXPECTED_C4_SHARED_VALUES = {
   "NrdrStarPilotPid": False,
-  "NrdrLaneChangeEndpointSteerRatio": True,
-  "NrdrLearnSteerRatio": False,
   "NrdrLearnStiffness": True,
   "NrdrLearnAngleOffset": True,
   "LatPScaleLowSpeed": 100,
@@ -99,47 +84,26 @@ def test_torque_mod_profiles_are_versioned_and_fingerprint_scoped():
     profile = get_handcrafted_lateral_profile(fingerprint)
     assert profile is HANDCRAFTED_LATERAL_PROFILES[fingerprint]
     assert profile.fingerprint == fingerprint
-    assert profile.version == 14
-    assert "2026-08-21" in profile.name
+    assert profile.version == 15
+    assert "2026-08-28" in profile.name
+    assert "steer ratio independent" in profile.name
   assert get_handcrafted_lateral_profile("HONDA_CIVIC_2022") is None
   assert get_handcrafted_lateral_profile("HONDA_CRV_HYBRID") is None
 
 
-@pytest.mark.parametrize(
-  ("fingerprint", "center_param", "center", "outer_param", "outer", "outer_angle"),
-  EXPECTED_GEOMETRY,
-)
-def test_profile_keeps_each_cars_mechanical_steer_ratio_geometry(
-  fingerprint, center_param, center, outer_param, outer, outer_angle,
-):
-  profile = get_handcrafted_lateral_profile(fingerprint)
-  steer_ratio = get_steer_ratio_endpoint_profile(fingerprint)
-  values = dict(profile.values)
-
-  assert steer_ratio.center_param == center_param
-  assert steer_ratio.outer_param == outer_param
-  assert steer_ratio.center_default == center
-  assert steer_ratio.outer_default == outer
-  assert steer_ratio.outer_angle == pytest.approx(outer_angle)
-  assert values[center_param] == center
-  assert values[outer_param] == outer
-
-  endpoint_keys = {
-    endpoint_key
-    for configured in EXPECTED_GEOMETRY
-    for endpoint_key in (configured[1], configured[3])
-  }
-  assert set(values) & endpoint_keys == {center_param, outer_param}
+def test_profiles_do_not_own_steer_ratio_mode_or_values():
+  for fingerprint in EXPECTED_FINGERPRINTS:
+    keys = {key for key, _ in get_handcrafted_lateral_profile(fingerprint).values}
+    assert "NrdrSteerRatioMode" not in keys
+    assert "NrdrLearnSteerRatio" not in keys
+    assert "NrdrLaneChangeEndpointSteerRatio" not in keys
+    assert not any(key.startswith(("NrdrSteerRatioCenter", "NrdrSteerRatioOuter")) for key in keys)
 
 
 def test_all_profiles_share_the_exact_winning_c4_live_tune():
   for fingerprint in EXPECTED_FINGERPRINTS:
     profile = get_handcrafted_lateral_profile(fingerprint)
-    steer_ratio = get_steer_ratio_endpoint_profile(fingerprint)
     values = dict(profile.values)
-    values.pop(steer_ratio.center_param)
-    values.pop(steer_ratio.outer_param)
-
     assert values == EXPECTED_C4_SHARED_VALUES
     assert "HondaStoppingDecelRate" not in values
     assert {key for key in values if key.startswith("NrdrNnlc")} == {"NrdrNnlcEnabled"}
@@ -224,12 +188,11 @@ def test_profile_can_be_disabled_and_never_affects_other_fingerprints():
 
 
 def test_profile_preserves_the_current_road_tested_choices():
-  values = dict(CLARITY_ROAD_TESTED_2026_08_21.values)
-  clarity_sr = get_steer_ratio_endpoint_profile("HONDA_CLARITY")
-  assert values[clarity_sr.center_param] == 18.50
-  assert values[clarity_sr.outer_param] == 12.72
+  values = dict(CLARITY_ROAD_TESTED_2026_08_28.values)
   assert "NrdrLegacyDualBpSteerRatio" not in values
-  assert values["NrdrLaneChangeEndpointSteerRatio"] is True
+  assert "NrdrSteerRatioMode" not in values
+  assert "NrdrLearnSteerRatio" not in values
+  assert "NrdrLaneChangeEndpointSteerRatio" not in values
   assert "NrdrSteerRatioOffset" not in values
   assert values["HondaCenterScale"] == 1.0
   assert values["HondaCenterBoostThreshold"] == 3.0
@@ -250,9 +213,3 @@ def test_profile_preserves_the_current_road_tested_choices():
   assert "HondaStoppingDecelRate" not in values
   assert values["LagdToggle"] is False
   assert values["LagdToggleDelay"] == 0.5
-
-  for fingerprint in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS:
-    sr_profile = get_steer_ratio_endpoint_profile(fingerprint)
-    profile_values = dict(HANDCRAFTED_LATERAL_PROFILES[fingerprint].values)
-    assert profile_values[sr_profile.center_param] == sr_profile.center_default
-    assert profile_values[sr_profile.outer_param] == sr_profile.outer_default

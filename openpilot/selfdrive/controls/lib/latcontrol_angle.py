@@ -21,7 +21,13 @@ class LatControlAngle(LatControl):
       angle_steers_des = float(CS.steeringAngleDeg)
     else:
       angle_log.active = True
-      angle_steers_des = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
+      steer_ratio_resolver = getattr(VM, "nrdr_steer_ratio_resolver", None)
+      if steer_ratio_resolver is not None:
+        angle_steers_des = steer_ratio_resolver.desired_angle_no_offset(
+          VM, CS.steeringAngleDeg, CS.vEgo, params.roll, desired_curvature, params,
+        )
+      else:
+        angle_steers_des = math.degrees(VM.get_steer_from_curvature(-desired_curvature, CS.vEgo, params.roll))
       angle_steers_des += params.angleOffsetDeg
 
     if self.use_steer_limited_by_safety:

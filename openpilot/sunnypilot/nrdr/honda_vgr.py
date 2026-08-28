@@ -144,7 +144,7 @@ def normalize_honda_eps_firmware(version) -> str:
 
 
 def get_honda_vgr_profile(CP) -> HondaVgrProfile | None:
-  if str(getattr(CP, "brand", "")) != "honda":
+  if str(getattr(CP, "brand", "")).lower() != "honda":
     return None
   fingerprint = str(getattr(CP, "carFingerprint", ""))
   for firmware in getattr(CP, "carFw", ()):

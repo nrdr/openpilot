@@ -61,6 +61,9 @@ class Controls(ControlsExt):
 
     self.LoC = LongControl(self.CP, self.CP_SP)
     self.VM = VehicleModel(self.CP)
+    self.VM.nrdr_steer_ratio_resolver = self.steer_ratio_resolver
+    if hasattr(self.VM, "sr_curve"):
+      self.VM.sr_curve = None
     self.LaC: LatControl
     if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       self.LaC = LatControlAngle(self.CP, self.CP_SP, self.CI, DT_CTRL)
@@ -86,13 +89,23 @@ class Controls(ControlsExt):
     if self.sm.updated["lateralDelay"]:
       self.lat_delay = get_lat_delay(self.params, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay)
 
+    # Resolve lateral activation before geometry so steer-ratio mode and manual
+    # values can be latched for both current and desired curvature together.
+    standstill = abs(CS.vEgo) <= max(self.CP.minSteerSpeed, 0.3) or CS.standstill
+    _lat_active = self.get_lat_active(self.sm)
+    lat_active = _lat_active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
+                 (not standstill or self.CP.steerAtStandstill)
+
     # Update VehicleModel
     lp = self.sm['vehicleParameters']
-    x, sr, angle_offset = vehicle_model_params(self, lp)
-    self.VM.update_params(x, sr)
-
-    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - angle_offset)
-    self.curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
+    x, _, angle_offset = vehicle_model_params(self, lp)
+    self.steer_ratio_resolver.refresh(self.nrdr_live_params.snapshot, lat_active)
+    self.steer_ratio_resolver.update_comma_ratio(lp, self.sm.valid['vehicleParameters'])
+    steer_ratio = self.steer_ratio_resolver.effective_ratio(CS.steeringAngleDeg)
+    self.VM.update_params(x, steer_ratio)
+    self.curvature = self.steer_ratio_resolver.calc_curvature(
+      self.VM, CS.steeringAngleDeg, angle_offset, CS.vEgo, lp.roll, lp,
+    )
 
     # Update Torque Params
     if self.CP.lateralTuning.which() == 'torque':
@@ -116,14 +129,7 @@ class Controls(ControlsExt):
     CC = car.CarControl.new_message()
     CC.enabled = self.sm['selfdriveState'].enabled
 
-    # Check which actuators can be enabled
-    standstill = abs(CS.vEgo) <= max(self.CP.minSteerSpeed, 0.3) or CS.standstill
-
-    # Get which state to use for active lateral control
-    _lat_active = self.get_lat_active(self.sm)
-
-    CC.latActive = _lat_active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
-                   (not standstill or self.CP.steerAtStandstill)
+    CC.latActive = lat_active
     CC.longActive = CC.enabled and allow_longitudinal(CS, self.CI.DRIVABLE_GEARS, self.CP.brand) and \
                     not any(e.overrideLongitudinal for e in self.sm['onroadEvents']) and \
                     (self.CP.openpilotLongitudinalControl or not self.CP_SP.pcmCruiseSpeed)

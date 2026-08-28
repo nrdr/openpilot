@@ -378,11 +378,6 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
 
 class TestNrdrSteerRatioMode(OpenpilotTestCase):
   HANDCRAFTED_LOCKED_KEYS = (
-    "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
-    "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
-    "NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord",
-    "NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g",
-    "NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight",
     "NrdrLatStiction",
     "HondaCenterScale",
     "NrdrDriverOverrideThreshold",
@@ -405,13 +400,8 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert "enable this" in description
     assert "leave this off" in description
     assert "clarity-derived" in description
-    assert "pop" in description and "off-policy" in description
-    assert "deep-rl" in description
-    assert "raw firmware vgr at every" in description
-    assert "stock vehiclemodel" in description
-    assert "70 degrees" not in description and "90 degrees" not in description
     assert "predictive stiction" in description
-    assert "vehicle's own steering geometry" in description
+    assert "steer ratio is intentionally independent" in description
 
   @parameterized.expand(HANDCRAFTED_LOCKED_KEYS, names=["key"])
   def test_winning_profile_controls_are_locked_while_handcrafted_is_on(self, schema, key):
@@ -419,55 +409,49 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert item is not None
     assert "NrdrHandcraftedLateralTune" in json.dumps(item.get("enablement") or [])
 
-  def test_deprecated_manual_legacy_toggle_is_not_exposed(self, schema):
-    assert _find_item(schema, "NrdrLegacyDualBpSteerRatio") is None
-
   @parameterized.expand([
+    "NrdrLearnSteerRatio", "NrdrLegacyDualBpSteerRatio", "NrdrLaneChangeEndpointSteerRatio",
     "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
     "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
     "NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord",
     "NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g",
     "NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight",
   ], names=["key"])
-  def test_steer_ratio_endpoints_cannot_change_while_engaged(self, schema, key):
+  def test_legacy_steer_ratio_controls_are_not_exposed(self, schema, key):
+    assert _find_item(schema, key) is None
+
+  def test_atomic_mode_and_manual_pair_are_grouped(self, schema):
+    section = _find_section(schema, "steering", "nrdr")
+    panel = next(sub_panel for sub_panel in section["sub_panels"] if sub_panel["id"] == "nrdr_steer_ratio_tuning")
+    assert panel["label"] == "Steer Ratio Tuning"
+    assert [item["key"] for item in panel["items"]] == [
+      "NrdrSteerRatioMode", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
+    ]
+
+  def test_mode_selector_has_all_four_sources_and_availability_guards(self, schema):
+    item = _find_item(schema, "NrdrSteerRatioMode")
+    assert item["widget"] == "multiple_button"
+    assert [(option["value"], option["label"]) for option in item["options"]] == [
+      (0, "Manual"), (1, "Comma Learner"), (2, "nrdr Learner"), (3, "Firmware"),
+    ]
+    assert "offroad_only" in json.dumps(item["enablement"])
+    assert "nrdr_raw_steer_ratio_available" in json.dumps(item["options"][2]["enablement"])
+    assert "nrdr_firmware_steer_ratio_available" in json.dumps(item["options"][3]["enablement"])
+
+  @parameterized.expand([
+    ("NrdrSteerRatioManualCenter", "Manual Override On-Center Ratio", 15.38),
+    ("NrdrSteerRatioManualFinal", "Manual Override Final Ratio", 10.93),
+  ], names=["key", "title", "default"])
+  def test_manual_controls_are_locked_to_manual_mode(self, schema, key, title, default):
     item = _find_item(schema, key)
-    assert item is not None
-    assert "not_engaged" in json.dumps(item.get("enablement") or [])
-
-  def test_endpoint_visibility_matches_effective_model_policy(self, schema):
-    center = _find_item(schema, "NrdrSteerRatioCenterClarity")
-    outer = _find_item(schema, "NrdrSteerRatioOuterClarity")
-    lane_fade = _find_item(schema, "NrdrLaneChangeEndpointSteerRatio")
-    center_visibility = json.dumps(center.get("visibility") or [])
-    outer_visibility = json.dumps(outer.get("visibility") or [])
-    lane_visibility = json.dumps(lane_fade.get("visibility") or [])
-
-    assert "nrdr_firmware_vgr_available" in center_visibility
-    assert "nrdr_steer_ratio_policy" in center_visibility
-    assert "legacy_dual_bp" in center_visibility
-    assert "nrdr_firmware_vgr_available" not in outer_visibility
-    assert "nrdr_steer_ratio_policy" in outer_visibility and "legacy_dual_bp" in outer_visibility
-    assert "nrdr_steer_ratio_policy" in lane_visibility and "legacy_dual_bp" in lane_visibility
-
-    combined_copy = " ".join(
-      f"{item.get('description', '')} {item.get('details', '')}" for item in (center, outer, lane_fade)
-    ).lower()
-    assert "at every angle" in combined_copy
-    assert "70-to-90" not in combined_copy and "70 to 90" not in combined_copy
-
-  def test_lane_change_outer_sr_copy_matches_timed_fade_behavior(self, schema):
-    item = _find_item(schema, "NrdrLaneChangeEndpointSteerRatio")
-    sunnylink_copy = f"{item.get('title', '')} {item.get('description', '')} {item.get('details', '')}".lower()
-    repo_root = Path(__file__).parents[4]
-    native_copy = (repo_root / "openpilot" / "selfdrive" / "ui" / "sunnypilot" / "layouts" / "settings" /
-                   "nrdr_sub_layouts" / "pidf_ground.py").read_text(encoding="utf-8").lower()
-
-    for phrase in ("outer steer ratio", "1.5 seconds", "pre-lane-change waiting does not consume"):
-      assert phrase in sunnylink_copy
-      assert phrase in native_copy
-    for stale_phrase in ("complete active lane change", "entire maneuver", "resumes only after"):
-      assert stale_phrase not in sunnylink_copy
-      assert stale_phrase not in native_copy
+    assert item["title"] == title
+    assert (item["min"], item["max"], item["step"]) == (8.0, 25.0, 0.01)
+    assert f"Default {default:.2f}" in item["description"]
+    rules = json.dumps(item["enablement"])
+    assert "offroad_only" in rules
+    assert "NrdrSteerRatioMode" in rules and '"equals": 0' in rules
+    assert "nrdr_manual_steer_ratio_available" in rules
+    assert "NrdrHandcraftedLateralTune" not in rules
 
 
 class TestNotEngagedReplacement(OpenpilotTestCase):

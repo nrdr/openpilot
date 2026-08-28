@@ -27,8 +27,8 @@ class ReviewedModelArtifact:
   policy: SteerRatioModelPolicy
 
 
-# This is an immutable review ledger, not a manifest matcher. Names and source refs
-# identify what humans reviewed; only artifact_sha256 is consulted at runtime.
+# This is an immutable historical review ledger used only by offline attribution.
+# New runtime steer-ratio selection is independent of model artifacts.
 REVIEWED_MODEL_ARTIFACTS = (
   ReviewedModelArtifact(
     "Off Policy Model", "d90758cfaecb2cf13d9098c6aade37e68d6034d2",

@@ -10,8 +10,10 @@ from lateral_attribution import (
   is_fresh,
   lane_observation,
   logged_steer_ratio_model_policy,
+  parse_steer_ratio_mode,
   summarize_controls,
 )
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import SteerRatioMode
 from openpilot.sunnypilot.nrdr.model_policy import SteerRatioModelPolicy
 
 
@@ -57,22 +59,27 @@ def test_clarity_exact_firmware_vgr_remains_pid_when_nnlc_toggle_is_on():
   assert reading.kind == "clarityPidWrappedInTorqueState"
 
 
+@pytest.mark.parametrize(("logged_value", "expected"), (
+  ("0", SteerRatioMode.MANUAL),
+  (b"1", SteerRatioMode.COMMA),
+  ("2", SteerRatioMode.NRDR_RAW),
+  (3, SteerRatioMode.FIRMWARE),
+  ("invalid", SteerRatioMode.MANUAL),
+  (None, SteerRatioMode.MANUAL),
+))
+def test_logged_mode_uses_atomic_enum_and_corruption_falls_back_manual(logged_value, expected):
+  assert parse_steer_ratio_mode(logged_value) is expected
+
+
 @pytest.mark.parametrize(("artifact_sha256", "expected"), (
   ("c48899574c1303e47ca2a6f80113876ca5eb749c4a75c89b53cc8029bb3bb710",
    SteerRatioModelPolicy.LEGACY_DUAL_BP),
   ("92d06467e4de97c40ffdc366e385a4f5897f36fc8ea632bd9bed113a3083fea8",
    SteerRatioModelPolicy.PURE_FIRMWARE_VGR),
 ))
-def test_logged_bundle_uses_exact_artifact_policy(artifact_sha256, expected):
-  raw_bundle = json.dumps({
-    "models": [{"artifact": {"downloadUri": {"sha256": artifact_sha256}}}],
-  })
+def test_pre_redesign_logs_keep_historical_artifact_policy_label(artifact_sha256, expected):
+  raw_bundle = json.dumps({"models": [{"artifact": {"downloadUri": {"sha256": artifact_sha256}}}]})
   assert logged_steer_ratio_model_policy(raw_bundle) is expected
-
-
-@pytest.mark.parametrize("raw_bundle", (None, "", "{malformed", json.dumps({"models": []})))
-def test_logged_missing_or_malformed_bundle_is_unknown(raw_bundle):
-  assert logged_steer_ratio_model_policy(raw_bundle) is SteerRatioModelPolicy.UNKNOWN
 
 
 def test_freshness_rejects_future_and_stale_timestamps():

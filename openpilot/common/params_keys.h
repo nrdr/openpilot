@@ -314,6 +314,11 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"HondaNotchEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaNotchFreq", {PERSISTENT | BACKUP, FLOAT, "7.5"}},
     {"HondaNotchQ", {PERSISTENT | BACKUP, FLOAT, "1.5"}},
+    {"NrdrSteerRatioMode", {PERSISTENT | BACKUP, INT, "0"}},
+    {"NrdrSteerRatioManualCenter", {PERSISTENT | BACKUP, FLOAT, "15.38"}},
+    {"NrdrSteerRatioManualFinal", {PERSISTENT | BACKUP, FLOAT, "10.93"}},
+    // Legacy steer-ratio tombstones. Keep these registered for migration and
+    // downgrade compatibility; active code must use the three keys above.
     {"NrdrLearnSteerRatio", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrSteerRatioCenterClarity", {PERSISTENT | BACKUP, FLOAT, "18.50"}},
     {"NrdrSteerRatioOuterClarity", {PERSISTENT | BACKUP, FLOAT, "12.72"}},

@@ -35,12 +35,19 @@ Start with a baseline and dial in how the steering handles straight roads and cu
    - **Tuning direction**: If the car drifts on straight highways but handles curves perfectly, raise this towards **`0.7`** to lock in the center.
 
 > [!NOTE]
-> **Lateral defaults to PID-tune-only.** The live lateral learners
-> (`NrdrLearnSteerRatio`, `NrdrLearnStiffness`, `NrdrLearnAngleOffset`) and the
-> torque low-pass filter (`HondaTorqueLowPassFilter`) now default **OFF**, so the
-> PID tune (`LatPidTuneScale` / `HondaPidTuneScale`) is the only thing shaping
-> lateral control out of the box. Enable the learners/LPF manually once the base
-> tune feels dialed in.
+> **Steer ratio is selected separately from PID tuning.** Open **Controller
+> Tuning Dungeon → Steer Ratio Tuning** to choose Comma learning, NRDR Raw,
+> Firmware, or the two Manual endpoints. All three source switches OFF means
+> Manual (`15.38` on-center and `10.93` final by default). Tire-stiffness and
+> angle-offset learning remain on the Vehicle Model & Learning page.
+
+For audit work, NRDR Raw is the exact Clarity table from commit
+`54f74ae3e5973aa681904780f8cac140870a2b5f`, blob
+`8a96cab2b8d5fcfa055709e997bea38e3f5724b0`. Runtime preserves its
+non-monotonic bin medians, linearly interpolates between retained bin centers
+(including unsampled gaps), and clamps to `15.279368` after `247.5°`. Firmware
+mode uses the exact recognized Table-A rack shape as a relative map and keeps
+`CP.steerRatio` as the immutable absolute anchor.
 
 ---
 

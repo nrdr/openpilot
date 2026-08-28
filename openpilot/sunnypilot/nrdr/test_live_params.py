@@ -120,14 +120,21 @@ def test_personality_pid_scales_and_learning_gate_publish_atomically():
   assert "HondaLiveLearningGas" in matching_groups[0].keys
 
 
-def test_deprecated_steer_ratio_mode_is_not_polled_by_controller():
+def test_steer_ratio_mode_and_manual_pair_publish_as_one_snapshot():
   control_keys = {key for group in CONTROL_GROUPS for key in group.keys}
+  sr_groups = [group for group in CONTROL_GROUPS if "NrdrSteerRatioMode" in group.keys]
+  assert len(sr_groups) == 1
+  assert sr_groups[0].keys == (
+    "NrdrSteerRatioMode", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
+  )
   assert "NrdrLegacyDualBpSteerRatio" not in control_keys
+  assert "NrdrLearnSteerRatio" not in control_keys
+  assert "NrdrLaneChangeEndpointSteerRatio" not in control_keys
+  assert not any(key.startswith(("NrdrSteerRatioCenter", "NrdrSteerRatioOuter")) for key in control_keys)
 
 
 def test_learning_toggles_preserve_typed_boolean_values():
   values = {
-    "NrdrLearnSteerRatio": False,
     "NrdrLearnStiffness": True,
     "NrdrLearnAngleOffset": False,
   }
@@ -136,7 +143,6 @@ def test_learning_toggles_preserve_typed_boolean_values():
 
   refresh_live_parameter_settings(controls, None)
 
-  assert not controls.learn_steer_ratio
   assert controls.learn_stiffness
   assert not controls.learn_angle_offset
 

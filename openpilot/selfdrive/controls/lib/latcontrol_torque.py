@@ -69,13 +69,24 @@ class LatControlTorque(LatControl):
 
     pid_log = log.ControlsState.LateralTorqueState.new_message()
     pid_log.version = VERSION
-    measured_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
+    steer_ratio_resolver = getattr(VM, "nrdr_steer_ratio_resolver", None)
+    if steer_ratio_resolver is not None:
+      measured_curvature = steer_ratio_resolver.calc_curvature(
+        VM, CS.steeringAngleDeg, params.angleOffsetDeg, CS.vEgo, params.roll,
+      )
+    else:
+      measured_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
     measurement = measured_curvature * CS.vEgo ** 2
     future_desired_lateral_accel = desired_curvature * CS.vEgo ** 2
     self.lat_accel_request_buffer.append(future_desired_lateral_accel)
 
     roll_compensation = params.roll * ACCELERATION_DUE_TO_GRAVITY
-    curvature_deadzone = abs(VM.calc_curvature(math.radians(self.steering_angle_deadzone_deg), CS.vEgo, 0.0))
+    if steer_ratio_resolver is not None:
+      curvature_deadzone = steer_ratio_resolver.curvature_deadzone(
+        VM, CS.steeringAngleDeg, self.steering_angle_deadzone_deg, CS.vEgo, params.angleOffsetDeg,
+      )
+    else:
+      curvature_deadzone = abs(VM.calc_curvature(math.radians(self.steering_angle_deadzone_deg), CS.vEgo, 0.0))
     lateral_accel_deadzone = curvature_deadzone * CS.vEgo ** 2
 
     delay_frames = int(np.clip(lat_delay / self.dt + 1, 1, self.lat_accel_request_buffer_len))

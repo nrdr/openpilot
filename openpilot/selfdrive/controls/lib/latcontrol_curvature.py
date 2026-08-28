@@ -28,7 +28,13 @@ class LatControlCurvature(LatControl):
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, calibrated_pose, curvature_limited, lat_delay):
     curvature_log = log.ControlsState.LateralCurvatureState.new_message()
-    actual_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
+    steer_ratio_resolver = getattr(VM, "nrdr_steer_ratio_resolver", None)
+    if steer_ratio_resolver is not None:
+      actual_curvature = steer_ratio_resolver.calc_curvature(
+        VM, CS.steeringAngleDeg, params.angleOffsetDeg, CS.vEgo, params.roll,
+      )
+    else:
+      actual_curvature = -VM.calc_curvature(math.radians(CS.steeringAngleDeg - params.angleOffsetDeg), CS.vEgo, params.roll)
     error = desired_curvature - actual_curvature
 
     if not active:

@@ -16,6 +16,21 @@ ONROAD_BRIGHTNESS_TIMER_MIGRATION_VERSION: str = "1.0"
 ONROAD_BRIGHTNESS_TIMER_VALUES = {0: 3, 1: 5, 2: 7, 3: 10, 4: 15, 5: 30, **{i: (i - 5) * 60 for i in range(6, 16)}}
 VALID_TIMER_VALUES = set(ONROAD_BRIGHTNESS_TIMER_VALUES.values())
 
+_NRDR_STEER_RATIO_MANUAL_DEFAULTS = (15.38, 10.93)
+
+# These old keys are tombstones after the steer-ratio mode migration. They are
+# read here only to preserve an existing owner's tune for the attached car.
+_NRDR_LEGACY_STEER_RATIO_ENDPOINTS = {
+  "HONDA_CLARITY": ("NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity"),
+  "HONDA_CIVIC": ("NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic"),
+  "HONDA_CIVIC_BOSCH": ("NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic"),
+  "HONDA_CIVIC_BOSCH_DIESEL": ("NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic"),
+  "HONDA_ACCORD": ("NrdrSteerRatioCenterAccord", "NrdrSteerRatioOuterAccord"),
+  "HONDA_CRV_5G": ("NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g"),
+  "HONDA_CRV_HYBRID": ("NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g"),
+  "HONDA_INSIGHT": ("NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight"),
+}
+
 
 def _resolve_brand(_params) -> str:
   bundle = _params.get("CarPlatformBundle")
@@ -35,6 +50,85 @@ def _resolve_brand(_params) -> str:
   except Exception as e:
     cloudlog.exception(f"params_migration: failed to resolve brand from CarParamsPersistent: {e}")
     return ""
+
+
+def _resolve_car_fingerprint(_params) -> str:
+  """Resolve only an exact attached platform; an unknown identity stays unknown."""
+  try:
+    bundle = _params.get("CarPlatformBundle")
+    if isinstance(bundle, dict) and bundle.get("platform"):
+      return str(bundle["platform"])
+  except Exception as e:
+    cloudlog.exception(f"params_migration: failed to resolve CarPlatformBundle platform: {e}")
+
+  for key in ("CarParamsPersistent", "CarParams"):
+    try:
+      CP_bytes = _params.get(key)
+    except Exception as e:
+      cloudlog.exception(f"params_migration: failed to read {key}: {e}")
+      continue
+    if CP_bytes is None:
+      continue
+    try:
+      from openpilot.cereal import messaging  # lazy: avoids heavy import at module level
+      from opendbc.car.structs import car
+      return str(messaging.log_from_bytes(CP_bytes, car.CarParams).carFingerprint)
+    except Exception as e:
+      cloudlog.exception(f"params_migration: failed to resolve fingerprint from {key}: {e}")
+  return ""
+
+
+def _legacy_bool(_params, key: str) -> bool:
+  try:
+    value = _params.get(key)
+  except Exception:
+    return False
+  if isinstance(value, bytes):
+    return value.strip().lower() not in (b"", b"0", b"false")
+  if isinstance(value, str):
+    return value.strip().lower() not in ("", "0", "false")
+  return bool(value)
+
+
+def _migrate_nrdr_steer_ratio_mode(_params) -> None:
+  """Create the atomic mode/manual contract without replacing new-format values."""
+  try:
+    old_mode = _params.get("NrdrSteerRatioMode")
+    old_center = _params.get("NrdrSteerRatioManualCenter")
+    old_final = _params.get("NrdrSteerRatioManualFinal")
+    if old_mode is not None and old_center is not None and old_final is not None:
+      return
+
+    fingerprint = _resolve_car_fingerprint(_params) if old_center is None or old_final is None else ""
+    center, final = _NRDR_STEER_RATIO_MANUAL_DEFAULTS
+    if legacy := _NRDR_LEGACY_STEER_RATIO_ENDPOINTS.get(fingerprint):
+      center_key, final_key = legacy
+      # Registry defaults are not evidence that an owner chose the legacy tune.
+      # Preserve only values which were actually persisted before this migration.
+      legacy_center = _params.get(center_key)
+      legacy_final = _params.get(final_key)
+      center = center if legacy_center is None else legacy_center
+      final = final if legacy_final is None else legacy_final
+
+    # Each key is independently guarded so an interrupted migration can be
+    # retried safely and a user-entered new-format value is never overwritten.
+    migrated = []
+    if old_center is None:
+      _params.put("NrdrSteerRatioManualCenter", center, block=True)
+      migrated.append("center")
+    if old_final is None:
+      _params.put("NrdrSteerRatioManualFinal", final, block=True)
+      migrated.append("final")
+    if old_mode is None:
+      mode = 1 if _legacy_bool(_params, "NrdrLearnSteerRatio") else 0
+      _params.put("NrdrSteerRatioMode", mode, block=True)
+      migrated.append("mode")
+
+    cloudlog.info(
+      f"params_migration: initialized nrdr steer-ratio {','.join(migrated)} for {fingerprint or 'unknown platform'}"
+    )
+  except Exception as e:
+    cloudlog.exception(f"Error migrating nrdr steer-ratio settings: {e}")
 
 
 def _migrate_car_platform_bundle(_params):
@@ -117,6 +211,10 @@ def run_migration(_params):
       cloudlog.exception(f"Error migrating OnroadScreenOffTimer: {e}")
 
   _migrate_car_platform_bundle(_params)
+
+  # Replace the legacy boolean + per-family endpoint matrix with one atomic
+  # mode and one global manual pair, preserving an attached car's old values.
+  _migrate_nrdr_steer_ratio_mode(_params)
 
   # seed TeslaMadsScreenButton for existing Tesla installs
   _migrate_tesla_mads_screen_button(_params)

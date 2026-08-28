@@ -7,6 +7,22 @@ from openpilot.sunnypilot.nrdr.car_tune_report import CarTuneReporter, _longitud
 
 class TestCarTuneReporter(unittest.TestCase):
 
+  class FakeParams:
+    def __init__(self, values):
+      self.values = values
+
+    def get(self, key, return_default=False):
+      return self.values.get(key)
+
+  def test_raw_mode_requires_exact_honda_brand_and_clarity_fingerprint(self):
+    reporter = CarTuneReporter(self.FakeParams({"NrdrSteerRatioMode": 2}))
+    malformed = SimpleNamespace(brand="toyota", carFingerprint="HONDA_CLARITY", steerRatio=16.5)
+
+    self.assertEqual(
+      reporter._steer_ratio_info(malformed),
+      "NRDR Raw unavailable for HONDA_CLARITY -> CP static 16.5",
+    )
+
   def test_static_pid_base_is_reported_for_all_speeds(self):
     pid = SimpleNamespace(kpV=[0.03], kiV=[0.01], kf=0.000012, kfV=[])
     CP = SimpleNamespace(lateralTuning=SimpleNamespace(which=lambda: "pid", pid=pid))

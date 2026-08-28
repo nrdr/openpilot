@@ -16,12 +16,12 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import get_handcrafted_lateral_profile
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
-from openpilot.sunnypilot.nrdr.model_policy import classify_steer_ratio_model
+from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_metadata
 
 
 # Wire-protocol version for the capabilities payload. Bump on breaking changes
 # only; additive fields are backward-compatible and do not require a bump.
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 
 # All capability fields that rules may reference.
 # Non-boolean fields must have defaults in CAPABILITY_DEFAULTS.
@@ -47,8 +47,9 @@ CAPABILITY_FIELDS = (
   "subaru_has_sng",
   "hyundai_alpha_long_available",
   "has_handcrafted_lateral_profile",
-  "nrdr_steer_ratio_policy",
-  "nrdr_firmware_vgr_available",
+  "nrdr_manual_steer_ratio_available",
+  "nrdr_raw_steer_ratio_available",
+  "nrdr_firmware_steer_ratio_available",
 )
 
 CAPABILITY_LABELS: dict[str, str] = {
@@ -73,8 +74,9 @@ CAPABILITY_LABELS: dict[str, str] = {
   "subaru_has_sng": "Subaru Stop-and-Go available",
   "hyundai_alpha_long_available": "Hyundai Alpha Longitudinal available",
   "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
-  "nrdr_steer_ratio_policy": "NRDR model-locked steer-ratio policy",
-  "nrdr_firmware_vgr_available": "Exact NRDR firmware VGR available",
+  "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio tuning available",
+  "nrdr_raw_steer_ratio_available": "NRDR raw road-learned steer-ratio data available",
+  "nrdr_firmware_steer_ratio_available": "Exact NRDR firmware steer-ratio map available",
 }
 
 # Explicit defaults for non-boolean capability fields
@@ -84,7 +86,6 @@ CAPABILITY_DEFAULTS: dict[str, bool | str | int] = {
   "steer_control_type": "",
   "device_type": "",
   "protocol_version": PROTOCOL_VERSION,
-  "nrdr_steer_ratio_policy": "unknown",
 }
 
 
@@ -144,7 +145,6 @@ def generate_capabilities(params: Params | None = None) -> dict:
   caps["is_sp_release"] = params.get_bool("IsReleaseSpBranch")
   caps["is_development"] = params.get_bool("IsDevelopmentBranch")
   caps["stock_longitudinal"] = params.get_bool("ToyotaEnforceStockLongitudinal")
-  caps["nrdr_steer_ratio_policy"] = classify_steer_ratio_model(params.get("ModelManager_ActiveBundle")).value
 
   bundle = params.get("CarPlatformBundle")
   bundle_brand = _bundle_field(bundle, "brand")
@@ -193,8 +193,11 @@ def generate_capabilities(params: Params | None = None) -> dict:
       cloudlog.exception("capabilities: failed to deserialize CarParamsSPPersistent")
 
   _resolve_brand_capabilities(caps, bundle_platform, CP)
-  caps["has_handcrafted_lateral_profile"] = get_handcrafted_lateral_profile(caps["car_fingerprint"] or bundle_platform) is not None
-  caps["nrdr_firmware_vgr_available"] = CP is not None and get_honda_vgr_profile(CP) is not None
+  fingerprint = caps["car_fingerprint"] or bundle_platform
+  caps["has_handcrafted_lateral_profile"] = get_handcrafted_lateral_profile(fingerprint) is not None
+  caps["nrdr_manual_steer_ratio_available"] = str(caps["brand"]).lower() == "honda" and get_steer_ratio_metadata(fingerprint) is not None
+  caps["nrdr_raw_steer_ratio_available"] = str(caps["brand"]).lower() == "honda" and fingerprint == "HONDA_CLARITY"
+  caps["nrdr_firmware_steer_ratio_available"] = CP is not None and get_honda_vgr_profile(CP) is not None
 
   return caps
 

@@ -110,13 +110,19 @@ class LatControlTorqueExtBase:
 
     return _value
 
-  def update_calculations(self, CS, VM, desired_lateral_accel):
+  def update_calculations(self, CS, VM, desired_lateral_accel, angle_offset_deg: float):
     self.actual_lateral_jerk = 0.0
     self.lateral_jerk_setpoint = 0.0
     self.lateral_jerk_measurement = 0.0
     self.lookahead_lateral_jerk = 0.0
 
-    actual_curvature_rate = -VM.calc_curvature(math.radians(CS.steeringRateDeg), CS.vEgo, 0.0)
+    steer_ratio_resolver = getattr(VM, "nrdr_steer_ratio_resolver", None)
+    if steer_ratio_resolver is not None:
+      actual_curvature_rate = steer_ratio_resolver.measured_curvature_rate(
+        VM, CS.steeringAngleDeg, CS.steeringRateDeg, CS.vEgo, self.lac_torque.dt, angle_offset_deg,
+      )
+    else:
+      actual_curvature_rate = -VM.calc_curvature(math.radians(CS.steeringRateDeg), CS.vEgo, 0.0)
     self.actual_lateral_jerk = actual_curvature_rate * CS.vEgo ** 2
 
     if self.model_valid:
