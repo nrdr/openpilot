@@ -19,7 +19,7 @@ def _expand_rwd_alias(argument: str) -> list[str]:
     if not normalized.startswith(prefix):
       continue
     canonical = EPS_DIR / "rwd" / normalized.removeprefix(prefix)
-    matches = sorted(glob.glob(str(canonical)))
+    matches = sorted(glob.glob(str(canonical), recursive=True))
     return matches or [str(canonical)]
   return [argument]
 

@@ -21,7 +21,7 @@ openpilot/nrdr/tools/eps/
   check_rwd.py      offline .rwd checksum validator (stdlib only)
   eps-diag.py       EPS CAN liveness/diagnostic (sniff, UDS ping, part number)
   rwd_format/       vendored Python-3 .rwd container parser (0x5A/0x31)
-  rwd/              checksum-validated firmware images + upstreaming guidelines
+  rwd/              curated nested firmware library + hashes/safety catalog
 ```
 
 The normal commands run from the **openpilot repository root**. The small root
@@ -32,12 +32,18 @@ launchers, but contain no flashing implementation or firmware.
 ## Guided flash (recommended)
 
 `flash.py` walks the whole thing for you: reads the car's current EPS firmware
-and lists only the `.rwd` images compatible with it (with their checksum status),
-lets you pick one, auto-detects the EPS CAN bus via a live UDS probe of the
-selected image's address (asks if more than one bus responds), offers a dry run,
-and only flashes after you confirm. If nothing matches your EPS (or the car isn't
-fingerprinted yet) it asks before listing all images. Images that fail validation
-are flagged and flashed with `--skip-checksum` (with an extra warning).
+and searches an explicit 15-file menu containing the seven Proper Torque Mod
+images and eight clearly labelled stock recovery images. It lists only choices
+compatible with the detected EPS (with checksum status), lets you pick one,
+auto-detects the EPS CAN bus via a live UDS probe of the selected image's address
+(asks if more than one bus responds), offers a dry run, and only flashes after
+you confirm. If nothing matches your EPS (or the car isn't fingerprinted yet),
+it asks before listing all curated choices. Nested category paths are shown so
+similar filenames cannot be mistaken for one another.
+
+Legacy/testing images, the T6Z offline reference, TVA x31 files, the
+extensionless Pilot WIP, and raw binaries are intentionally absent from the
+guided menu. See `rwd/README.md` before using anything outside that menu.
 
 ```bash
 python3 flash.py                 # auto-detect bus (fallback default 1)
@@ -65,14 +71,19 @@ command yourself.
 1. Make sure the comma power is connected to the car's OBD2 port.
 2. With the car **OFF**, stop openpilot over SSH:
    ```
-   pkill -f openpilot
+   sudo systemctl stop comma
+   tmux kill-session -t comma 2>/dev/null || true
+   systemctl is-active comma
    ```
+   Do not continue if the final command reports `active`, `activating`,
+   `deactivating`, or `reloading`. Do not use `pkill -f openpilot`; a command
+   path containing `openpilot` can make it kill the flashing helper itself.
 3. Put the car in full **accessory mode** (ignition ON, engine OFF). Turn off the
    A/C to avoid draining the battery.
 4. **Dry run first** — validates the image and walks the UDS/security flow but
    aborts *before* any mutating action (`eps-update.py` defaults to bus **1**):
    ```
-   python3 eps-update.py rwd/REPLACE_WITH_YOUR_FIRMWARE.rwd -b 1
+   python3 eps-update.py "rwd/MODEL/CATEGORY/REPLACE_WITH_YOUR_FIRMWARE.rwd" -b 1
    ```
    When it aborts before performing mutating actions, that's your sign it's ready.
    **Note:** some cars lock security access after a dry run. If the real flash
@@ -81,14 +92,14 @@ command yourself.
    [Security-access lockout](#security-access-lockout-nrc-0x37) below.
 5. **Flash for real** once you're committed:
    ```
-   python3 eps-update.py rwd/REPLACE_WITH_YOUR_FIRMWARE.rwd -b 1 --danger
+   python3 eps-update.py "rwd/MODEL/CATEGORY/REPLACE_WITH_YOUR_FIRMWARE.rwd" -b 1 --danger
    ```
    You'll see warnings/errors on the dash while it flashes — that's normal. When
    it reaches "Resetting ECU" with no traceback, turn the car off. Done.
 
 Example:
 ```
-python3 eps-update.py rwd/39990-TLA-A040-linear-max.rwd -b 1 --danger
+python3 eps-update.py "rwd/39990-TLA-A040 - (Honda_CRV_5G)/Proper Torque Mod/39990-TLA-A040_Clarity_FF_tune_telemety_8cf8e537.rwd" -b 1 --danger
 ```
 
 `eps-update.py` is the power-user flasher: you pass `-b` explicitly (default **1**).
@@ -102,10 +113,11 @@ If a run dies with:
 NegativeResponseError: SECURITY_ACCESS - required time delay not expired
 ```
 
-the image and the CAN setup are fine — reading the software ID and entering the
-extended session already succeeded. The EPS is refusing to hand out an unlock
-seed because its security-access delay timer is running (typically a settling
-window enforced after power-up).
+the EPS responded far enough to report its security-access delay. That confirms
+this stage of communication only; it does **not** prove that the selected image
+matches the vehicle or that the full CAN/power setup is safe for flashing. The
+EPS is refusing to hand out an unlock seed because its delay timer is running
+(typically a settling window enforced after power-up).
 
 **You do not need any flags for this.** A normal `flash.py` run already retries:
 `eps-update.py` re-requests the seed every 10s for up to 120s and reports how long
@@ -114,7 +126,8 @@ the dry run simply asks whether to keep waiting another 5 minutes:
 
 ```
 The EPS security-access delay hasn't cleared after 120s.
-This is the ECU's delay timer, not a bad image — waiting is the fix.
+The ECU reported its delay timer. Waiting may clear this response;
+it does not prove image compatibility.
 Keep waiting another 300s? [Y/n]:
 ```
 
@@ -140,8 +153,10 @@ python3 eps-update.py rwd/SOME_FIRMWARE.rwd -b 1 --skip-checksum --danger
 ```
 
 ## Verify it worked
-Turn the car back on and move the wheel by hand — any power-steering assist means
-the flash succeeded. To confirm over CAN:
+Turn the car back on and move the wheel by hand. Basic power-steering assist
+only shows that the EPS is responding enough to provide assist; it does **not**
+prove that the image, calibration, or safety behavior is correct. Confirm over
+CAN and check that the reported part number is the one you expected:
 ```
 python3 eps-diag.py          # checks buses 0 and 1 by default
 python3 eps-diag.py -b 1     # pin to one bus
@@ -152,12 +167,17 @@ available. For recovery it points you back to `flash.py` and choosing the **stoc
 image for your EPS (it does not invent a specific `.rwd` filename).
 
 ## If a flash fails / crashes
-Don't panic — **the EPS is not permanently bricked.** The flash erases before it
-writes, so a crash mid-flash leaves the EPS erased: no power-steering assist until
-it's flashed properly. Just run the same `--danger` command again (or retry from
-`flash.py`'s failure menu); you may need to power-cycle the car and/or the comma a
-few times before it lets you redo a failed flash. Keep a verified `stock` `.rwd`
-on hand as the recovery image.
+A failed or interrupted flash can leave the car without power-steering assist.
+Do not drive it in that state. Recovery may be possible, but permanent EPS
+damage or a nonrecoverable brick remains possible; repeated flashing is not a
+guaranteed fix.
+
+Only retry with a verified, compatible image after diagnosing why the first run
+failed, confirming stable vehicle power, checking the Panda/CAN connection, and
+following a recovery procedure known to apply to that exact EPS. Keep the
+verified stock image for that EPS available before starting any flash. If the
+failure mode or compatibility is uncertain, stop and get experienced help
+instead of guessing with `--danger`.
 
 For an image that is not tracked in this repository, flash from a persistent
 copy under `/data/media/0/`. The updater may delete untracked files from
@@ -166,12 +186,12 @@ workflow.
 
 ## Validate an image offline
 ```
-python3 check_rwd.py rwd/39990-TLA-A040-linear-max.rwd
-python3 check_rwd.py rwd/*.rwd
+python3 check_rwd.py "rwd/39990-TBA-C120/Proper Torque Mod/39990-TBA,C120-PTM.rwd"
+python3 check_rwd.py "rwd/**/*.rwd"  # includes unsupported x31 references; overall nonzero is expected
 ```
 
-See `rwd/README.md` for the firmware images and upstreaming guidelines (a mod may
-only be added alongside a verified stock recovery image).
+See `rwd/README.md` for the complete catalog, guided/reference boundaries,
+source archive hash, missing slots, and rules for adding another image.
 
 `rwd/SHA256SUMS` records every shipped image. The validation test requires the
 manifest and directory to contain the same exact filenames and bytes.

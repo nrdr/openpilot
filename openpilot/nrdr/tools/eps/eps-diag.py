@@ -242,8 +242,8 @@ DIAGNOSIS: EPS is not responding at all on the checked bus(es).
     1. Confirm ignition is ON (not just ACC) — some Bosch EPS needs full ON
     2. Re-run without --bus to check buses 0 and 1
     3. Run a full scan:  python3 eps-diag.py --scan
-    4. If completely unresponsive, the EPS may need a bench flash via OBD2
-       with the ECU powered independently from the car battery.
+    4. If completely unresponsive, stop. Any bench recovery requires an
+       EPS-specific verified procedure, experienced help, and stable power.
 """)
     return
 
@@ -255,17 +255,19 @@ DIAGNOSIS: EPS is broadcasting CAN frames but not responding to UDS.
 """)
   else:
     print("""
-DIAGNOSIS: EPS is responding — try the flash again.
-  The previous timeout may have been transient.
+DIAGNOSIS: EPS is responding to diagnostics.
+  That proves basic liveness only. It does not prove the previous image was
+  compatible or that another flash attempt is safe.
 """)
 
   if detected_eps:
     print(f"  Detected EPS: {detected_eps}")
-  print("""  Next step: python3 flash.py
-  For recovery, choose the stock image matching your EPS part number
-  (not a modified/linear-max image). flash.py will list compatible options.
-  Manual path: re-run eps-update.py with the same .rwd you were already using
-  (or the matching stock image) and --danger.
+  print("""  Before any recovery attempt, identify the exact EPS/software part number,
+  diagnose the original failure, and confirm stable vehicle power and CAN/Panda.
+  If you have a verified matching stock image and a recovery procedure known to
+  apply to this EPS, python3 flash.py can show the reviewed candidates.
+  Do not blindly reuse the previous .rwd or add --danger; a wrong image may have
+  caused the failure. If compatibility is uncertain, get experienced help.
 """)
 
 
