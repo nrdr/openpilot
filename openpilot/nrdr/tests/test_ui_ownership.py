@@ -66,6 +66,16 @@ UI_PRODUCTION_IMPORTS = {
 
 
 class TestUiOwnership(unittest.TestCase):
+  def test_lateral_tuning_routes_all_feedforward_outputs_through_decimal_formatters(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    source = (repository_root / "openpilot/nrdr/ui/settings/lateral_tuning.py").read_text(encoding="utf-8")
+
+    self.assertIn("self._fmt_decimal_vals(pid.kfV)", source)
+    self.assertIn("self._fmt_decimal(pid.kf)", source)
+    self.assertIn("self._fmt_decimal(lt_deprecated.kf)", source)
+    self.assertNotIn("float(pid.kf):g", source)
+    self.assertNotIn("float(lt_deprecated.kf):g", source)
+
   def test_framework_settings_entrypoint_uses_canonical_layout(self):
     repository_root = Path(__file__).resolve().parents[3]
     source = (repository_root / "openpilot/selfdrive/ui/sunnypilot/layouts/settings/settings.py").read_text(encoding="utf-8")

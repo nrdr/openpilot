@@ -12,7 +12,7 @@ Raw param dump: `/tmp/nrdr_tune_snapshot.txt` on the device (copy off before reb
 
 ## 1. The "before" tune (what produced the −417° roundabout runaway)
 
-**Base PID (from the car, `NrdrCarTuneInfo`):** kp `0.03` · ki `0.01` · kf `1.2e-5`
+**Base PID (from the car, `NrdrCarTuneInfo`):** kp `0.03` · ki `0.01` · kf `0.000012`
 Learned `steerRatio ≈ 17.3` (Clarity nominal 16.5 → **+5%, normal, not a factor**).
 
 | Band | P | I | F |

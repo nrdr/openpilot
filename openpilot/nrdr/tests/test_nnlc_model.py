@@ -179,7 +179,7 @@ class TestNNTorqueModel:
       assert list(pid_controller.pid._k_p[1]) == pytest.approx([0.03])
       assert list(pid_controller.pid._k_i[0]) == [0.0]
       assert list(pid_controller.pid._k_i[1]) == pytest.approx([0.01])
-      assert pid_controller.ff_factor == pytest.approx(1.2e-5, abs=1e-12)
+      assert pid_controller.ff_factor == pytest.approx(0.000012, abs=1e-12)
       assert pid_controller.kf_bp == []
       assert pid_controller.kf_v == []
       assert controller.extension.enabled

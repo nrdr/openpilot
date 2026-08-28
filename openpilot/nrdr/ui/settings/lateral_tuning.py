@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 from collections.abc import Callable
+from decimal import Decimal
 from enum import IntEnum
 import pyray as rl
 
@@ -195,6 +196,15 @@ class LateralTuningLayout(Widget):
     return ", ".join(f"{float(v):g}" for v in vals)
 
   @staticmethod
+  def _fmt_decimal(value) -> str:
+    number = Decimal(f"{float(value):g}")
+    return "0" if number == 0 else format(number, "f")
+
+  @classmethod
+  def _fmt_decimal_vals(cls, vals) -> str:
+    return ", ".join(cls._fmt_decimal(value) for value in vals)
+
+  @staticmethod
   def _fmt_bp_mph(bps) -> str:
     return ", ".join(f"{float(v) * 2.23694:.0f}" for v in bps)
 
@@ -252,9 +262,9 @@ class LateralTuningLayout(Widget):
         lines.append(f"kp: [{self._fmt_vals(pid.kpV)}] @ [{self._fmt_bp_mph(pid.kpBP)}] mph")
         lines.append(f"ki: [{self._fmt_vals(pid.kiV)}] @ [{self._fmt_bp_mph(pid.kiBP)}] mph")
         if len(pid.kfV):
-          lines.append(f"kf: [{self._fmt_vals(pid.kfV)}] @ [{self._fmt_bp_mph(pid.kfBP)}] mph")
+          lines.append(f"kf: [{self._fmt_decimal_vals(pid.kfV)}] @ [{self._fmt_bp_mph(pid.kfBP)}] mph")
         else:
-          lines.append(f"kf: {float(pid.kf):g}")
+          lines.append(f"kf: {self._fmt_decimal(pid.kf)}")
       else:
         lines.append(tr("Lateral tuning type: {} (not PID)").format(CP.lateralTuning.which()))
     except Exception:
@@ -267,7 +277,7 @@ class LateralTuningLayout(Widget):
       lines.append("<b>" + tr("LONGITUDINAL PID") + "</b>")
       lines.append(f"kp: [{self._fmt_vals(lt_deprecated.kpV)}] @ [{self._fmt_bp_mph(lt_deprecated.kpBP)}] mph")
       lines.append(f"ki: [{self._fmt_vals(lt.kiV)}] @ [{self._fmt_bp_mph(lt.kiBP)}] mph")
-      lines.append(f"kf: {float(lt_deprecated.kf):g}")
+      lines.append(f"kf: {self._fmt_decimal(lt_deprecated.kf)}")
     except Exception:
       lines.append(tr("Longitudinal tuning: unavailable"))
     lines.append("")
