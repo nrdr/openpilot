@@ -4,15 +4,6 @@ UNREGISTERED = "UnregisteredDevice"
 ONROAD_BLOCKED_PARAMS = {
   "LongitudinalPersonality",
   "NrdrHandcraftedLateralTune",
-  "NrdrSteerRatioMode",
-  "NrdrSteerRatioManualCenter",
-  "NrdrSteerRatioManualFinal",
-  "NrdrInterpolatedTorquePifBlend",
-  "NrdrInterpolatedTorqueShare",
-  "NrdrInterpolatedTorqueLatAccelFactor",
-  "NrdrInterpolatedTorqueFriction",
-  "NrdrInterpolatedTorqueFrictionStandard",
-  "NrdrInterpolatedTorqueFrictionHighway",
 }
 
 

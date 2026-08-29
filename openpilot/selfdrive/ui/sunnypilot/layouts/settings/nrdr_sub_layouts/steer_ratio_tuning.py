@@ -24,10 +24,8 @@ class SteerRatioTuningLayout(Widget):
     self._mode = SteerRatioMode.MANUAL
     self._comma = toggle_item_sp(
       title=lambda: tr("Use Comma Steer Ratio Learner"),
-      description=lambda: tr(" ".join((
-        "Uses comma's one learned steering ratio. It starts from the car's stock number, then holds the last good learned",
-        "number if the learner briefly becomes unavailable.",
-      ))),
+      description=lambda: tr("Uses comma's one learned steering ratio. It starts from the car's stock number, then holds the " +
+                             "last good learned number if the learner briefly becomes unavailable.") + " " + self._latch_notice(),
       callback=lambda enabled: self._set_mode(SteerRatioMode.COMMA, enabled),
     )
     self._nrdr_raw = toggle_item_sp(
@@ -75,8 +73,6 @@ class SteerRatioTuningLayout(Widget):
     ], line_separator=False, spacing=0)
 
   def _set_mode(self, selected: SteerRatioMode, enabled: bool) -> None:
-    if ui_state.engaged:
-      return
     current = parse_steer_ratio_mode(ui_state.params.get("NrdrSteerRatioMode", return_default=True))
     mode = selected if enabled else SteerRatioMode.MANUAL if current is selected else current
     ui_state.params.put("NrdrSteerRatioMode", int(mode))
@@ -97,19 +93,24 @@ class SteerRatioTuningLayout(Widget):
     return ui_state.CP is not None and str(ui_state.CP.brand).lower() == "honda" and \
       get_steer_ratio_metadata(ui_state.CP.carFingerprint) is not None
 
+  @staticmethod
+  def _latch_notice() -> str:
+    return tr("Changes made while engaged activate on the next disengage/re-engage. If already disengaged, wait up to 10 seconds " +
+              "for settings to sync before engaging.")
+
   def _manual_center_description(self) -> str:
     if not self._manual_available():
       return tr("Unavailable for this car. Its stock steer ratio stays unchanged.")
     return tr(
       "Controls steering near the middle. A bigger number asks for more steering-wheel movement; a smaller number asks for less."
-    )
+    ) + " " + self._latch_notice()
 
   def _manual_final_description(self) -> str:
     if not self._manual_available():
       return tr("Unavailable for this car. Its stock steer ratio stays unchanged.")
     return tr(
       "Controls steering farther into a turn. NRDR smoothly moves from the on-center number to this final number."
-    )
+    ) + " " + self._latch_notice()
 
   def _raw_description(self) -> str:
     if not self._raw_available():
@@ -117,14 +118,14 @@ class SteerRatioTuningLayout(Widget):
     return tr(" ".join((
       "Uses NRDR's fixed curve made directly from logged Clarity steering angles. It does not learn while you drive.",
       "The audited curve now reaches its 435.7° near-lock point instead of holding the 247.5° point through the rest of the rack.",
-    )))
+    ))) + " " + self._latch_notice()
 
   def _firmware_description(self) -> str:
     if not self._firmware_available():
       return tr("Unavailable because this car's exact EPS firmware map was not recognized. Stock geometry is used safely instead.")
     return tr(
       "Uses the variable steering shape read from this car's exact EPS firmware. The car's normal steer ratio stays as the anchor."
-    )
+    ) + " " + self._latch_notice()
 
   def _sync_switches(self) -> None:
     for mode, item in self._mode_items.items():
@@ -135,7 +136,6 @@ class SteerRatioTuningLayout(Widget):
     self._mode = parse_steer_ratio_mode(ui_state.params.get("NrdrSteerRatioMode", return_default=True))
     self._sync_switches()
 
-    locked = ui_state.engaged
     availability = {
       SteerRatioMode.COMMA: True,
       SteerRatioMode.NRDR_RAW: self._raw_available(),
@@ -143,12 +143,12 @@ class SteerRatioTuningLayout(Widget):
     }
     for mode, item in self._mode_items.items():
       selected = self._mode is mode
-      # Keep an unavailable selected switch usable while disengaged so the user
+      # Keep an unavailable selected switch usable so the user
       # can always turn it back off.
-      enabled = not locked and (selected or (self._mode is SteerRatioMode.MANUAL and availability[mode]))
+      enabled = selected or (self._mode is SteerRatioMode.MANUAL and availability[mode])
       item.action_item.set_enabled(enabled)
 
-    manual_enabled = not locked and self._mode is SteerRatioMode.MANUAL and self._manual_available()
+    manual_enabled = self._mode is SteerRatioMode.MANUAL and self._manual_available()
     self._manual_center.action_item.set_enabled(manual_enabled)
     self._manual_final.action_item.set_enabled(manual_enabled)
 

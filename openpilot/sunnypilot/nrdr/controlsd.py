@@ -1,11 +1,21 @@
-from openpilot.sunnypilot.nrdr.live_params import get_live_params
+from openpilot.sunnypilot.nrdr.live_params import ENGAGEMENT_LATCHED_LATERAL_GROUPS, get_live_params
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import SteerRatioResolver
 
 
 def initialize_live_parameter_settings(controls) -> None:
   controls.nrdr_live_params = get_live_params()
+  controls.nrdr_lateral_active = False
   controls.steer_ratio_resolver = SteerRatioResolver(controls.CP, controls.nrdr_live_params.snapshot)
   refresh_live_parameter_settings(controls, None)
+
+
+def refresh_engagement_latches(controls, lateral_active: bool) -> bool:
+  """Synchronously refresh the nine latched tuning Params once, only on disengagement."""
+  falling_edge = controls.nrdr_lateral_active and not lateral_active
+  controls.nrdr_lateral_active = lateral_active
+  if not falling_edge:
+    return False
+  return controls.nrdr_live_params.refresh_groups_atomic(ENGAGEMENT_LATCHED_LATERAL_GROUPS)
 
 
 def refresh_live_parameter_settings(controls, _params) -> None:

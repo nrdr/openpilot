@@ -10,6 +10,9 @@ This is the technical provenance and fallback contract behind the four user-faci
 
 The three values are read as one snapshot. Controls latch the complete selection while lateral control is active, so the
 measured-curvature and desired-angle paths cannot observe different modes or endpoints in one active interval.
+Edits may be saved while lateral control is active. The nine steer-ratio and Torque/PIF settings are refreshed together on the
+next disengagement and become effective on re-engagement. If they are edited while already disengaged, allow up to 10 seconds
+for the normal background parameter refresh before engaging.
 
 ## Mode semantics
 

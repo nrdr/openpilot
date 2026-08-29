@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-def test_local_interpolated_torque_controls_have_shared_support_and_engagement_gate():
+def test_local_interpolated_torque_controls_have_shared_support_and_allow_onroad_saves():
   root = Path(__file__).resolve().parents[3]
   source = (
     root / "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/pidf_ground.py"
@@ -18,7 +18,8 @@ def test_local_interpolated_torque_controls_have_shared_support_and_engagement_g
     assert f'param="{key}"' in source
 
   assert "is_interpolated_torque_pif_supported(ui_state.CP, ui_state.CP_SP)" in source
-  assert "interpolated_supported and not ui_state.engaged" in source
+  assert "interpolated_unlocked = interpolated_supported" in source
+  assert "interpolated_supported and not ui_state.engaged" not in source
   assert "item.set_visible(interpolated_supported)" in source
   assert "interpolated_unlocked and interpolated_enabled" in source
   assert "not firmware_vgr_active and not interpolated_enabled" in source
@@ -28,7 +29,9 @@ def test_local_interpolated_torque_controls_have_shared_support_and_engagement_g
   assert "Torque state holds until yaw returns" in source
   assert "angle is not substituted" in source
   assert "historically road-proven on Honda" in source
-  assert "All six settings stay fixed for one" in source
+  assert "Changes made while engaged save" in source
+  assert "next disengage/re-engage" in source
+  assert "wait up to 10 seconds" in source
   assert "It scales Torque error and feedforward, but not any friction band" in source
   assert 'tr("Low-Speed Torque Friction (Below 25mph)")' in source
   assert 'tr("Standard-Speed Torque Friction (25-50mph)")' in source

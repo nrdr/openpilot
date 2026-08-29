@@ -3,8 +3,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from openpilot.sunnypilot.nrdr.controlsd import refresh_live_parameter_settings
-from openpilot.sunnypilot.nrdr.live_params import CONTROL_GROUPS, PLANNER_GROUPS, LiveParams, ParamGroup, REFRESH_PERIOD
+from openpilot.sunnypilot.nrdr.controlsd import refresh_engagement_latches, refresh_live_parameter_settings
+from openpilot.sunnypilot.nrdr.live_params import (
+  CONTROL_GROUPS,
+  ENGAGEMENT_LATCHED_LATERAL_GROUPS,
+  ENGAGEMENT_LATCHED_LATERAL_KEYS,
+  PLANNER_GROUPS,
+  LiveParams,
+  ParamGroup,
+  REFRESH_PERIOD,
+)
 
 
 class RecordingParams:
@@ -144,6 +152,111 @@ def test_interpolated_torque_controls_publish_as_one_snapshot():
     "NrdrInterpolatedTorqueFrictionStandard",
     "NrdrInterpolatedTorqueFrictionHighway",
   )
+
+
+def test_engagement_latch_refresh_is_exactly_nine_keys_and_atomic_on_failure():
+  keys = tuple(key for group in ENGAGEMENT_LATCHED_LATERAL_GROUPS for key in group.keys)
+  assert len(keys) == len(set(keys)) == 9
+  assert ENGAGEMENT_LATCHED_LATERAL_KEYS == frozenset(keys)
+  params = RecordingParams(dict.fromkeys(keys, b"1"))
+  reader = LiveParams(ENGAGEMENT_LATCHED_LATERAL_GROUPS, params=params, start_worker=False)
+  initial = reader.snapshot
+  initial_generation = reader.generation
+
+  params.values = dict.fromkeys(keys, b"2")
+  params.fail_keys.add("NrdrSteerRatioManualCenter")
+  params.reads.clear()
+  assert not reader.refresh_groups_atomic(ENGAGEMENT_LATCHED_LATERAL_GROUPS)
+  assert reader.snapshot is initial
+  assert reader.generation == initial_generation
+  assert all(value == b"1" for value in reader.snapshot.values.values())
+
+  params.fail_keys.clear()
+  params.reads.clear()
+  assert reader.refresh_groups_atomic(ENGAGEMENT_LATCHED_LATERAL_GROUPS)
+  assert [key for key, _ in params.reads] == list(keys)
+  assert reader.generation == initial_generation + 1
+  assert all(value == b"2" for value in reader.snapshot.values.values())
+
+  unchanged = reader.snapshot
+  assert reader.refresh_groups_atomic(ENGAGEMENT_LATCHED_LATERAL_GROUPS)
+  assert reader.snapshot is unchanged
+
+  with pytest.raises(ValueError, match="must belong"):
+    reader.refresh_groups_atomic((ParamGroup(("not-owned",)),))
+
+
+def test_engagement_latch_refresh_reads_only_once_on_falling_edge():
+  keys = tuple(key for group in ENGAGEMENT_LATCHED_LATERAL_GROUPS for key in group.keys)
+  params = RecordingParams(dict.fromkeys(keys, b"1"))
+  reader = LiveParams(ENGAGEMENT_LATCHED_LATERAL_GROUPS, params=params, start_worker=False)
+  controls = SimpleNamespace(nrdr_live_params=reader, nrdr_lateral_active=False)
+  params.reads.clear()
+
+  assert not refresh_engagement_latches(controls, False)
+  assert not refresh_engagement_latches(controls, True)
+  assert not refresh_engagement_latches(controls, True)
+  assert params.reads == []
+
+  params.values = dict.fromkeys(keys, b"2")
+  assert refresh_engagement_latches(controls, False)
+  assert [key for key, _ in params.reads] == list(keys)
+  read_count = len(params.reads)
+  assert not refresh_engagement_latches(controls, False)
+  assert len(params.reads) == read_count
+
+
+def test_engaged_edit_activates_on_immediate_disengage_reengage():
+  values = {
+    "NrdrInterpolatedTorquePifBlend": True,
+    "NrdrInterpolatedTorqueShare": 25,
+    "NrdrInterpolatedTorqueLatAccelFactor": 6.0,
+    "NrdrInterpolatedTorqueFriction": 0.4,
+    "NrdrInterpolatedTorqueFrictionStandard": 0.5,
+    "NrdrInterpolatedTorqueFrictionHighway": 0.6,
+    "NrdrSteerRatioMode": 0,
+    "NrdrSteerRatioManualCenter": 15.38,
+    "NrdrSteerRatioManualFinal": 10.93,
+  }
+  params = RecordingParams(values.copy())
+  reader = LiveParams(ENGAGEMENT_LATCHED_LATERAL_GROUPS, params=params, start_worker=False)
+  controls = SimpleNamespace(nrdr_live_params=reader, nrdr_lateral_active=False)
+  keys = tuple(key for group in ENGAGEMENT_LATCHED_LATERAL_GROUPS for key in group.keys)
+
+  class EngagementLatch:
+    def __init__(self):
+      self.was_active = False
+      self.values = None
+
+    def update(self, active):
+      if active and not self.was_active:
+        self.values = tuple(reader.snapshot.get(key) for key in keys)
+      self.was_active = active
+
+  latch = EngagementLatch()
+
+  assert not refresh_engagement_latches(controls, True)
+  latch.update(True)
+  assert latch.values[keys.index("NrdrInterpolatedTorqueShare")] == 25
+
+  params.values.update({
+    "NrdrInterpolatedTorqueShare": 75,
+    "NrdrInterpolatedTorqueFrictionStandard": 0.10,
+    "NrdrInterpolatedTorqueFrictionHighway": 0.06,
+    "NrdrSteerRatioMode": 3,
+  })
+  assert not refresh_engagement_latches(controls, True)
+  latch.update(True)
+  assert latch.values[keys.index("NrdrInterpolatedTorqueShare")] == 25
+
+  assert refresh_engagement_latches(controls, False)
+  latch.update(False)
+  assert not refresh_engagement_latches(controls, True)
+  latch.update(True)
+  assert latch.values[keys.index("NrdrInterpolatedTorqueShare")] == 75
+  assert latch.values[keys.index("NrdrInterpolatedTorqueFrictionStandard")] == 0.10
+  assert latch.values[keys.index("NrdrInterpolatedTorqueFrictionHighway")] == 0.06
+  assert latch.values[keys.index("NrdrSteerRatioMode")] == 3
 
 
 def test_learning_toggles_preserve_typed_boolean_values():

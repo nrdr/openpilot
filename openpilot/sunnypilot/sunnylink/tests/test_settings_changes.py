@@ -438,11 +438,13 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert [(option["value"], option["label"]) for option in item["options"]] == [
       (0, "Manual"), (1, "Comma Learner"), (2, "nrdr Learner"), (3, "Firmware"),
     ]
-    assert "offroad_only" in json.dumps(item["enablement"])
+    assert "offroad_only" not in json.dumps(item.get("enablement") or [])
     assert "nrdr_raw_steer_ratio_available" in json.dumps(item["options"][2]["enablement"])
     assert "nrdr_firmware_steer_ratio_available" in json.dumps(item["options"][3]["enablement"])
     assert "435.7 degrees" in item["details"]
     assert "no longer holds the 247.5-degree point" in item["details"]
+    assert "next disengage/re-engage" in item["details"]
+    assert "wait up to 10 seconds" in item["details"]
 
   @parameterized.expand([
     ("NrdrSteerRatioManualCenter", "Manual Override On-Center Ratio", 15.38),
@@ -454,7 +456,7 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert (item["min"], item["max"], item["step"]) == (8.0, 25.0, 0.01)
     assert f"Default {default:.2f}" in item["description"]
     rules = json.dumps(item["enablement"])
-    assert "offroad_only" in rules
+    assert "offroad_only" not in rules
     assert "NrdrSteerRatioMode" in rules and '"equals": 0' in rules
     assert "nrdr_manual_steer_ratio_available" in rules
     assert "NrdrHandcraftedLateralTune" not in rules
@@ -491,8 +493,10 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     assert "every torque state holds" in copy
     assert "angle is not substituted" in copy
     assert "all six settings" in copy
+    assert "next disengage/re-engage" in copy
+    assert "wait up to 10 seconds" in copy
     rules = json.dumps(item["enablement"])
-    assert "offroad_only" in rules
+    assert "offroad_only" not in rules
     assert "nrdr_interpolated_torque_pif_blend_available" in rules
 
   @parameterized.expand([
@@ -507,7 +511,7 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     assert item["title"] == title
     assert (item["min"], item["max"], item["step"]) == (minimum, maximum, step)
     rules = json.dumps(item["enablement"])
-    assert "offroad_only" in rules
+    assert "offroad_only" not in rules
     assert "nrdr_interpolated_torque_pif_blend_available" in rules
     assert "NrdrInterpolatedTorquePifBlend" in rules
     assert "NrdrHandcraftedLateralTune" not in rules

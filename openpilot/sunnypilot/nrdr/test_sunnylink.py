@@ -1,9 +1,9 @@
 from openpilot.sunnypilot.nrdr.sunnylink import allow_param_write
 
 
-def test_steer_ratio_contract_cannot_be_written_onroad():
+def test_steer_ratio_contract_can_be_saved_onroad_for_next_engagement():
   for key in ("NrdrSteerRatioMode", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal"):
-    assert not allow_param_write(key, onroad=True)
+    assert allow_param_write(key, onroad=True)
     assert allow_param_write(key, onroad=False)
 
 
@@ -12,7 +12,7 @@ def test_unrelated_param_write_policy_is_unchanged():
   assert not allow_param_write("LongitudinalPersonality", onroad=True)
 
 
-def test_interpolated_torque_group_cannot_be_written_onroad():
+def test_interpolated_torque_group_can_be_saved_onroad_for_next_engagement():
   for key in (
     "NrdrInterpolatedTorquePifBlend",
     "NrdrInterpolatedTorqueShare",
@@ -21,7 +21,7 @@ def test_interpolated_torque_group_cannot_be_written_onroad():
     "NrdrInterpolatedTorqueFrictionStandard",
     "NrdrInterpolatedTorqueFrictionHighway",
   ):
-    assert not allow_param_write(key, onroad=True)
+    assert allow_param_write(key, onroad=True)
     assert allow_param_write(key, onroad=False)
 
 

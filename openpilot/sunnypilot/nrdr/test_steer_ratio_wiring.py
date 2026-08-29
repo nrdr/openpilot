@@ -13,9 +13,11 @@ def test_controlsd_latches_once_and_shares_resolver_with_vehicle_model():
   assert "self.VM.nrdr_steer_ratio_resolver = self.steer_ratio_resolver" in controls
   assert "self.VM.sr_curve = None" in controls
   assert "self.steer_ratio_resolver.refresh(self.nrdr_live_params.snapshot, lat_active)" in controls
+  assert "refresh_engagement_latches(self, lat_active)" in controls
   assert "self.steer_ratio_resolver.update_comma_ratio(lp, self.sm.valid['vehicleParameters'])" in controls
   assert "steer_ratio = self.steer_ratio_resolver.effective_ratio(CS.steeringAngleDeg)" in controls
-  assert controls.index("self.steer_ratio_resolver.refresh") < controls.index("self.curvature = self.steer_ratio_resolver.calc_curvature")
+  assert controls.index("refresh_engagement_latches(self, lat_active)") < controls.index("self.steer_ratio_resolver.refresh") \
+    < controls.index("self.curvature = self.steer_ratio_resolver.calc_curvature")
 
 
 def test_every_lateral_geometry_seam_delegates_to_shared_resolver():
@@ -75,7 +77,7 @@ def test_control_loops_never_write_mode_or_manual_params():
     assert '.put_bool("NrdrSteerRatio' not in contents, path
 
 
-def test_native_ui_uses_exact_titles_atomic_enum_and_engaged_guard():
+def test_native_ui_uses_exact_titles_atomic_enum_and_allows_onroad_saves():
   page = source("openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/steer_ratio_tuning.py")
   for title in (
     "Use Comma Steer Ratio Learner",
@@ -85,7 +87,8 @@ def test_native_ui_uses_exact_titles_atomic_enum_and_engaged_guard():
     "Manual Override Final Ratio",
   ):
     assert title in page
-  assert "if ui_state.engaged:\n      return" in page
+  assert "if ui_state.engaged:\n      return" not in page
+  assert "locked = ui_state.engaged" not in page
   assert 'ui_state.params.put("NrdrSteerRatioMode", int(mode))' in page
   assert 'param="NrdrSteerRatioManualCenter"' in page
   assert 'param="NrdrSteerRatioManualFinal"' in page

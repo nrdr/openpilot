@@ -24,7 +24,7 @@ from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose, gate_cal
 
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
-from openpilot.sunnypilot.nrdr.controlsd import apply_hud_lead, stopping_inputs, vehicle_model_params
+from openpilot.sunnypilot.nrdr.controlsd import apply_hud_lead, refresh_engagement_latches, stopping_inputs, vehicle_model_params
 from openpilot.sunnypilot.nrdr.events import allow_longitudinal
 
 State = log.SelfdriveState.OpenpilotState
@@ -109,6 +109,11 @@ class Controls(ControlsExt):
     _lat_active = self.get_lat_active(self.sm)
     lat_active = _lat_active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
                  (not standstill or self.CP.steerAtStandstill)
+
+    # Publish the two coherent Torque/PIF + steer-ratio groups once on the
+    # inactive edge. The next engagement captures saved onroad edits without
+    # synchronous parameter I/O while lateral control is active.
+    refresh_engagement_latches(self, lat_active)
 
     # Update VehicleModel
     lp = self.sm['vehicleParameters']

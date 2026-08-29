@@ -404,6 +404,10 @@ def test_all_six_values_latch_for_engagement_then_classic_resets_inactive():
   assert not controller.interpolated_torque_pif_effective
   assert classic.reset_count >= 2
 
+  controller._update_interpolated_torque_latch(True)
+  assert not controller.interpolated_torque_pif_effective
+  assert controller._interpolated_torque_settings == InterpolatedTorqueSettings(False, 0.99, 9.0, 0.9, 0.8, 0.7)
+
 
 def test_master_off_keeps_classic_candidate_inactive_and_resets_its_state():
   classic = ResetSpy()

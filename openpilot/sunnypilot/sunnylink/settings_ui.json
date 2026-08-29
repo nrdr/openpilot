@@ -697,7 +697,7 @@
                   "widget": "multiple_button",
                   "title": "Steer Ratio Source",
                   "description": "Choose exactly one source. Manual uses the two overrides below; unavailable vehicle-specific modes safely fall back to the car's stock ratio.",
-                  "details": "Comma starts from the car's stock ratio, then holds its last validated learned value through brief learner dropouts. nrdr Raw uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact EPS firmware map and the car's stock ratio as its fixed anchor. Changes are locked while driving and take effect together.",
+                  "details": "Comma starts from the car's stock ratio, then holds its last validated learned value through brief learner dropouts. nrdr Raw uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact EPS firmware map and the car's stock ratio as its fixed anchor. Changes made while engaged save immediately and activate together on the next disengage/re-engage. If lateral control is already disengaged, wait up to 10 seconds for the saved settings to sync before engaging.",
                   "options": [
                     {
                       "value": 0,
@@ -729,11 +729,6 @@
                         }
                       ]
                     }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "offroad_only"
-                    }
                   ]
                 },
                 {
@@ -745,9 +740,6 @@
                   "max": 25.0,
                   "step": 0.01,
                   "enablement": [
-                    {
-                      "type": "offroad_only"
-                    },
                     {
                       "type": "param",
                       "key": "NrdrSteerRatioMode",
@@ -769,9 +761,6 @@
                   "max": 25.0,
                   "step": 0.01,
                   "enablement": [
-                    {
-                      "type": "offroad_only"
-                    },
                     {
                       "type": "param",
                       "key": "NrdrSteerRatioMode",
@@ -796,11 +785,8 @@
                   "widget": "toggle",
                   "title": "Interpolated Torque/PIF Blend",
                   "description": "Mixes the complete steering-angle P/I/F answer with a separate classic Torque answer. OFF leaves P/I/F exactly as it is.",
-                  "details": "The Torque side follows f13's generic yaw-feedback branch, which was not historically road-proven on Honda. It uses steering-angle geometry through 2 m/s, blends to calibrated yaw response from 2\u20135 m/s, and uses yaw from 5 m/s up. Whenever yaw is required above 2 m/s but is missing, stale, invalid, or non-finite, the final command temporarily returns to exact P/I/F and every Torque state holds until valid yaw returns; angle is not substituted. This makes one weighted final command; it does not stack two commands. All six settings stay fixed for one engagement. On Clarity, NNLC stays configured but is bypassed and reset while this blend is active.",
+                  "details": "The Torque side follows f13's generic yaw-feedback branch, which was not historically road-proven on Honda. It uses steering-angle geometry through 2 m/s, blends to calibrated yaw response from 2\u20135 m/s, and uses yaw from 5 m/s up. Whenever yaw is required above 2 m/s but is missing, stale, invalid, or non-finite, the final command temporarily returns to exact P/I/F and every Torque state holds until valid yaw returns; angle is not substituted. This makes one weighted final command; it does not stack two commands. All six settings made while engaged save immediately, stay fixed for the current engagement, and activate together on the next disengage/re-engage. If lateral control is already disengaged, wait up to 10 seconds for the saved settings to sync before engaging. On Clarity, NNLC stays configured but is bypassed and reset while this blend is active.",
                   "enablement": [
-                    {
-                      "type": "offroad_only"
-                    },
                     {
                       "type": "capability",
                       "field": "nrdr_interpolated_torque_pif_blend_available",
@@ -819,9 +805,6 @@
                   "step": 1,
                   "unit": "% Torque",
                   "enablement": [
-                    {
-                      "type": "offroad_only"
-                    },
                     {
                       "type": "capability",
                       "field": "nrdr_interpolated_torque_pif_blend_available",
@@ -846,9 +829,6 @@
                   "unit": "m/s\u00b2",
                   "enablement": [
                     {
-                      "type": "offroad_only"
-                    },
-                    {
                       "type": "capability",
                       "field": "nrdr_interpolated_torque_pif_blend_available",
                       "equals": true
@@ -870,9 +850,6 @@
                   "max": 1.0,
                   "step": 0.01,
                   "enablement": [
-                    {
-                      "type": "offroad_only"
-                    },
                     {
                       "type": "capability",
                       "field": "nrdr_interpolated_torque_pif_blend_available",
@@ -896,9 +873,6 @@
                   "step": 0.01,
                   "enablement": [
                     {
-                      "type": "offroad_only"
-                    },
-                    {
                       "type": "capability",
                       "field": "nrdr_interpolated_torque_pif_blend_available",
                       "equals": true
@@ -920,9 +894,6 @@
                   "max": 1.0,
                   "step": 0.01,
                   "enablement": [
-                    {
-                      "type": "offroad_only"
-                    },
                     {
                       "type": "capability",
                       "field": "nrdr_interpolated_torque_pif_blend_available",
