@@ -442,37 +442,45 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
 
 
 class TestNrdrSteerRatioMode(OpenpilotTestCase):
-  HANDCRAFTED_LOCKED_KEYS = (
-    "NrdrLatStiction",
-    "HondaCenterScale",
-    "NrdrDriverOverrideThreshold",
-    "NrdrOverrideThresholdCenterBoost",
-    "HondaOverrideFadeDownSecs",
-    "HondaOverrideFadeUpSecs",
-    "NrdrNnlcEnabled",
+  FORMER_HANDCRAFTED_LOCKED_KEYS = (
+    "NrdrLearnStiffness", "NrdrLearnAngleOffset", "NrdrStarPilotPid",
+    "LatPScaleLowSpeed", "LatIScaleLowSpeed", "LatFScaleLowSpeed",
+    "LatPScaleStandard", "LatIScaleStandard", "LatFScaleStandard",
+    "LatPScaleHighway", "LatIScaleHighway", "LatFScaleHighway",
+    "NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed",
+    "HondaCenterScale", "HondaCenterBoostThreshold", "HondaCenterBoostMinSpeed",
+    "NrdrLatStiction", "NrdrNnlcEnabled",
+    "NrdrIncreaseOverrideTolerance", "NrdrDriverOverrideThreshold", "NrdrOverrideThresholdCenterBoost",
+    "HondaDriverAssistDuringOverride", "HondaOverrideFadeDownSecs", "HondaOverrideFadeUpSecs", "HondaOverrideTorqueScale",
+    "HondaTorqueLowPassFilter", "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",
+    "HondaSteerDeltaLimiter", "HondaSteerDeltaUp", "HondaSteerDeltaDown",
+    "LagdToggle", "LagdToggleDelay",
   )
 
-  def test_handcrafted_profile_is_first_and_documents_winning_behavior(self, schema):
+  def test_handcrafted_profile_is_first_and_documents_one_shot_behavior(self, schema):
     section = _find_section(schema, "steering", "nrdr")
     assert section is not None
     assert section["items"][0]["key"] == "NrdrHandcraftedLateralTune"
 
     item = section["items"][0]
     assert item.get("widget") == "toggle"
+    assert item["title"] == "Apply Handcrafted Lateral Profile"
     assert "offroad_only" in _flatten_rule_types(item.get("enablement"))
+    assert _references_capability_field(item.get("visibility"), "has_handcrafted_lateral_profile")
     description = f"{item.get('description', '')} {item.get('details', '')}".lower()
-    assert "off by default" in description
-    assert "enable this" in description
-    assert "leave this off" in description
-    assert "clarity-derived" in description
-    assert "predictive stiction" in description
-    assert "steer ratio is intentionally independent" in description
+    assert "one-shot apply command" in description
+    assert "turns this switch back off" in description
+    assert "every value verifies" in description
+    assert "wait a few seconds" in description
+    assert "refresh" in description
+    assert "manually editable" in description
+    assert "never restored or overwritten" in description
 
-  @parameterized.expand(HANDCRAFTED_LOCKED_KEYS, names=["key"])
-  def test_winning_profile_controls_are_locked_while_handcrafted_is_on(self, schema, key):
+  @parameterized.expand(FORMER_HANDCRAFTED_LOCKED_KEYS, names=["key"])
+  def test_one_shot_profile_never_locks_formerly_owned_controls(self, schema, key):
     item = _find_item(schema, key)
     assert item is not None
-    assert "NrdrHandcraftedLateralTune" in json.dumps(item.get("enablement") or [])
+    assert "NrdrHandcraftedLateralTune" not in json.dumps(item.get("enablement") or [])
 
   @parameterized.expand([
     "NrdrLearnSteerRatio", "NrdrLegacyDualBpSteerRatio", "NrdrLaneChangeEndpointSteerRatio",

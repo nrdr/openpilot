@@ -23,7 +23,7 @@ from openpilot.selfdrive.car.cruise import VCruiseHelper
 from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_capnp
 
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
-from openpilot.nrdr.params import restore_handcrafted_lateral_profile
+from openpilot.nrdr.params import HandcraftedLateralUnsafeStateError, consume_handcrafted_lateral_request
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 
@@ -119,7 +119,21 @@ class Car:
       self.CP = self.CI.CP
       self.CP_SP = self.CI.CP_SP
 
-      restore_handcrafted_lateral_profile(self.CP.carFingerprint, self.params)
+      # A legacy persisted true value is one durable pending command. Complete
+      # it after exact CP/CP_SP identification and before controller startup;
+      # request=false is a strict no-op and never restores manual edits.
+      if self.params.get_bool("NrdrHandcraftedLateralTune"):
+        try:
+          consume_handcrafted_lateral_request(self.CP, self.CP_SP, self.params, startup=True)
+        except HandcraftedLateralUnsafeStateError:
+          # An ordinary interrupted apply can continue only after the blend is
+          # verified OFF and the request is verified pending. If either proof
+          # fails, abort before FirmwareQueryDone/controller construction.
+          raise
+        except Exception:
+          # Never turn an unsupported or interrupted one-shot request into an
+          # ignition boot loop. The durable true request remains for offroad.
+          cloudlog.exception("car: handcrafted lateral apply failed; request retained")
 
       # continue onto next fingerprinting step in pandad
       self.params.put_bool("FirmwareQueryDone", True, block=True)

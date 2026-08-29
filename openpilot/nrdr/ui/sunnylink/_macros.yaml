@@ -1,8 +1,4 @@
 # Canonical NRDR rule fragments merged into Sunnylink's framework macros.
 macros:
-  handcrafted_lateral_unlocked:
-    - type: any
-      conditions:
-        - {type: param, key: NrdrHandcraftedLateralTune, equals: false}
-        - type: not
-          condition: {type: capability, field: has_handcrafted_lateral_profile, equals: true}
+  handcrafted_apply_offroad:
+    - $ref: '#/macros/offroad'

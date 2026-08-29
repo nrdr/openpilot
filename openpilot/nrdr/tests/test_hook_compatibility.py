@@ -42,7 +42,6 @@ LEGACY_HOOK_EXPORTS = {
       "apply_cruise_preferences",
       "apply_speed_limit_preferences",
       "apply_chevron_preference",
-      "apply_handcrafted_delay_controls",
       "hide_global_controller_settings",
     ),
   ),

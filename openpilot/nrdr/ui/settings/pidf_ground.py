@@ -4,7 +4,6 @@ import pyray as rl
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params import (
   NrdrParamKey,
-  is_handcrafted_lateral_enabled,
 )
 from openpilot.nrdr.ui.native_param_controls import option_item_from_metadata
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
@@ -237,8 +236,6 @@ class PidfGroundLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
-    fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
-    editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
     try:
       firmware_mode = SteerRatioMode(int(ui_state.params.get("NrdrSteerRatioMode"))) is SteerRatioMode.FIRMWARE
     except (TypeError, ValueError):
@@ -261,19 +258,8 @@ class PidfGroundLayout(Widget):
     for item in interpolated_children:
       item.set_visible(interpolated_supported)
       item.action_item.set_enabled(interpolated_enabled and not ui_state.engaged)
-    for item in (
-      self._starpilot,
-      self._lat_p_low, self._lat_i_low, self._lat_f_low,
-      self._lat_p_standard, self._lat_i_standard, self._lat_f_standard,
-      self._lat_p_highway, self._lat_i_highway, self._lat_f_highway,
-      self._rate_damping, self._rate_damping_fade_speed,
-      self._center_scale, self._center_boost_threshold, self._center_boost_min_speed,
-      self._lat_stiction,
-    ):
-      item.action_item.set_enabled(editable)
-
     for item in (self._nnlc_enabled, self._nnlc_activation_speed, self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain):
-      item.action_item.set_enabled(editable and not firmware_vgr_active and not interpolated_enabled)
+      item.action_item.set_enabled(not firmware_vgr_active and not interpolated_enabled)
 
     nnlc_enabled = self._nnlc_enabled.action_item.get_state()
     self._nnlc_activation_speed.set_visible(nnlc_enabled)

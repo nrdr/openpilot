@@ -31,10 +31,6 @@ class UiDescriptionSource(StrEnum):
   DETAILS = "details"
 
 
-class UiEditPolicy(StrEnum):
-  HANDCRAFTED_LATERAL_UNLOCKED = "handcrafted_lateral_unlocked"
-
-
 class UiRemoteWritePolicy(StrEnum):
   """Server-side road-state policy, separate from frontend enablement."""
 
@@ -67,7 +63,7 @@ class ParamUiMetadata:
   details: str | None
   native_description_source: UiDescriptionSource
   numeric: NumericUiMetadata
-  edit_policies: tuple[UiEditPolicy, ...]
+  edit_policies: tuple[str, ...]
   remote_write_policy: UiRemoteWritePolicy
 
   @property
@@ -86,9 +82,6 @@ _PERCENT_SCALE: Final = NumericUiMetadata(
   unit="%",
   display_suffix="%",
 )
-_HANDCRAFTED_UNLOCKED: Final = (UiEditPolicy.HANDCRAFTED_LATERAL_UNLOCKED,)
-
-
 NRDR_UI_METADATA: Final = (
   ParamUiMetadata(
     key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR,
@@ -109,7 +102,7 @@ NRDR_UI_METADATA: Final = (
     key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
     widget=UiWidget.OPTION,
     title=tr_noop("Low-Speed Torque Friction (Below 25mph)"),
-    native_title=tr_noop("Low-Speed Torque Friction (Below 25mph) (Default: 0.50)"),
+    native_title=tr_noop("Low-Speed Torque Friction (Below 25mph) (Default: 0.12)"),
     description=tr_noop("Sets direct normalized steering torque for the legacy torque half below 25 mph."),
     details=tr_noop(
       "Helps the legacy torque half overcome rack friction. A ±1 mph handoff blends this value smoothly into Standard from " +
@@ -124,7 +117,7 @@ NRDR_UI_METADATA: Final = (
     key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD,
     widget=UiWidget.OPTION,
     title=tr_noop("Standard-Speed Torque Friction (25-50mph)"),
-    native_title=tr_noop("Standard-Speed Torque Friction (25-50mph) (Default: 0.50)"),
+    native_title=tr_noop("Standard-Speed Torque Friction (25-50mph) (Default: 0.10)"),
     description=tr_noop("Sets direct normalized steering torque for the legacy torque half between 25 and 50 mph."),
     details=tr_noop(
       "Helps the legacy torque half overcome rack friction. ±1 mph handoffs blend Low into this value from 24-26 mph and this " +
@@ -139,7 +132,7 @@ NRDR_UI_METADATA: Final = (
     key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY,
     widget=UiWidget.OPTION,
     title=tr_noop("Highway Torque Friction (50mph+)"),
-    native_title=tr_noop("Highway Torque Friction (50mph+) (Default: 0.50)"),
+    native_title=tr_noop("Highway Torque Friction (50mph+) (Default: 0.06)"),
     description=tr_noop("Sets direct normalized steering torque for the legacy torque half above 50 mph."),
     details=tr_noop(
       "Helps the legacy torque half overcome rack friction. A ±1 mph handoff blends Standard smoothly into this value from " +
@@ -159,7 +152,7 @@ NRDR_UI_METADATA: Final = (
     details=tr_noop("Scales the proportional (P) term below 25 mph. Higher = more error correction (tighter, can cut corners); lower = looser with wider swings."),  # noqa: E501
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=_PERCENT_SCALE,
-    edit_policies=_HANDCRAFTED_UNLOCKED,
+    edit_policies=(),
     remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
   ),
   ParamUiMetadata(
@@ -171,7 +164,7 @@ NRDR_UI_METADATA: Final = (
     details=tr_noop("Scales the integral (I) term below 25 mph. Builds correction over time to erase steady-state error; too high oscillates."),
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=_PERCENT_SCALE,
-    edit_policies=_HANDCRAFTED_UNLOCKED,
+    edit_policies=(),
     remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
   ),
   ParamUiMetadata(
@@ -183,7 +176,7 @@ NRDR_UI_METADATA: Final = (
     details=None,
     native_description_source=UiDescriptionSource.DESCRIPTION,
     numeric=_PERCENT_SCALE,
-    edit_policies=_HANDCRAFTED_UNLOCKED,
+    edit_policies=(),
     remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
   ),
   ParamUiMetadata(
@@ -195,7 +188,7 @@ NRDR_UI_METADATA: Final = (
     details=None,
     native_description_source=UiDescriptionSource.DESCRIPTION,
     numeric=_PERCENT_SCALE,
-    edit_policies=_HANDCRAFTED_UNLOCKED,
+    edit_policies=(),
     remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
   ),
   ParamUiMetadata(
@@ -207,7 +200,7 @@ NRDR_UI_METADATA: Final = (
     details=None,
     native_description_source=UiDescriptionSource.DESCRIPTION,
     numeric=_PERCENT_SCALE,
-    edit_policies=_HANDCRAFTED_UNLOCKED,
+    edit_policies=(),
     remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
   ),
   ParamUiMetadata(
@@ -219,7 +212,7 @@ NRDR_UI_METADATA: Final = (
     details=None,
     native_description_source=UiDescriptionSource.DESCRIPTION,
     numeric=_PERCENT_SCALE,
-    edit_policies=_HANDCRAFTED_UNLOCKED,
+    edit_policies=(),
     remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
   ),
 )
@@ -293,7 +286,6 @@ __all__ = (
   "NumericUiMetadata",
   "ParamUiMetadata",
   "UiDescriptionSource",
-  "UiEditPolicy",
   "UiRemoteWritePolicy",
   "UiWidget",
   "get_ui_metadata",

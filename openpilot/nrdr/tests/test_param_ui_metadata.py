@@ -10,7 +10,6 @@ from openpilot.nrdr.params import (
   NRDR_UI_METADATA_BY_KEY,
   NrdrParamKey,
   UiDescriptionSource,
-  UiEditPolicy,
   UiRemoteWritePolicy,
   get_ui_metadata,
   validate_ui_metadata,
@@ -117,7 +116,7 @@ class TestParamUiMetadata(unittest.TestCase):
         self.assertEqual(profile[key.value], 100)
         self.assertIs(get_ui_metadata(key), NRDR_UI_METADATA_BY_KEY[key.value])
 
-  def test_interpolated_torque_metadata_preserves_locked_ranges_and_defaults(self):
+  def test_interpolated_torque_metadata_preserves_ranges_and_reviewed_defaults(self):
     laf = get_native_option_spec(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR)
     self.assertEqual((laf.min_value, laf.max_value, laf.value_change_step), (10, 1000, 10))
     self.assertEqual(laf.format_label(500), "5.0 m/s²")
@@ -125,18 +124,19 @@ class TestParamUiMetadata(unittest.TestCase):
 
     self.assertEqual(PARAM_SPECS_BY_KEY[laf.param].default, "5.0")
     expected_titles = (
-      "Low-Speed Torque Friction (Below 25mph) (Default: 0.50)",
-      "Standard-Speed Torque Friction (25-50mph) (Default: 0.50)",
-      "Highway Torque Friction (50mph+) (Default: 0.50)",
+      "Low-Speed Torque Friction (Below 25mph) (Default: 0.12)",
+      "Standard-Speed Torque Friction (25-50mph) (Default: 0.10)",
+      "Highway Torque Friction (50mph+) (Default: 0.06)",
     )
-    for key, expected_title in zip(FRICTION_KEYS, expected_titles, strict=True):
+    expected_defaults = ("0.12", "0.10", "0.06")
+    for key, expected_title, expected_default in zip(FRICTION_KEYS, expected_titles, expected_defaults, strict=True):
       with self.subTest(key=key.value):
         friction = get_native_option_spec(key)
         self.assertEqual((friction.min_value, friction.max_value, friction.value_change_step), (0, 100, 1))
         self.assertEqual(friction.format_label(50), "0.50")
         self.assertTrue(friction.use_float_scaling)
         self.assertEqual(friction.title, expected_title)
-        self.assertEqual(PARAM_SPECS_BY_KEY[friction.param].default, "0.50")
+        self.assertEqual(PARAM_SPECS_BY_KEY[friction.param].default, expected_default)
 
   def test_native_adapter_reproduces_exact_option_specs(self):
     for key in EXPECTED_KEYS:
@@ -153,7 +153,6 @@ class TestParamUiMetadata(unittest.TestCase):
         self.assertEqual(native.format_label(500), "500%")
 
   def test_sunnylink_adapter_reproduces_exact_fields(self):
-    enablement = [{"$ref": "#/macros/handcrafted_lateral_unlocked"}]
     for key in EXPECTED_KEYS:
       with self.subTest(key=key.value):
         title, description, details = EXPECTED_SUNNYLINK_COPY[key.value]
@@ -165,7 +164,6 @@ class TestParamUiMetadata(unittest.TestCase):
           "max": 500,
           "step": 5,
           "unit": "%",
-          "enablement": enablement,
         }
         if details is not None:
           expected["details"] = details
@@ -185,7 +183,7 @@ class TestParamUiMetadata(unittest.TestCase):
     for key in EXPECTED_KEYS:
       with self.subTest(key=key.value):
         metadata = get_ui_metadata(key)
-        self.assertEqual(metadata.edit_policies, (UiEditPolicy.HANDCRAFTED_LATERAL_UNLOCKED,))
+        self.assertEqual(metadata.edit_policies, ())
         self.assertIs(metadata.remote_write_policy, UiRemoteWritePolicy.ANY_ROAD_STATE)
     for key in INTERPOLATED_KEYS:
       with self.subTest(key=key.value):

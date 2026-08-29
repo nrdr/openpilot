@@ -34,6 +34,7 @@ def run(params, reporter_factory) -> None:
         interval = SSH_KEY_REFRESH_INTERVAL_S if refreshed else SSH_KEY_REFRESH_RETRY_S
         next_ssh_key_refresh = now + interval
 
+      reporter.consume_handcrafted_request()
       reporter.publish()
       if params.get_bool("NrdrRemoteForceUpdate"):
         params.put_bool("NrdrRemoteForceUpdate", False)

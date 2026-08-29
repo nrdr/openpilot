@@ -12,7 +12,7 @@ from opendbc.car.car_helpers import interfaces
 from opendbc.car.structs import car
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.nrdr.params import get_handcrafted_lateral_profile
+from openpilot.nrdr.params import handcrafted_lateral_profile_supported
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
@@ -24,7 +24,7 @@ from openpilot.system.ui.widgets.list_view import (BUTTON_BORDER_RADIUS, BUTTON_
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.html_render import HtmlModalSP
-from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, simple_button_item_sp, toggle_item_sp
+from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, simple_button_item_sp
 from openpilot.nrdr.ui.settings.pidf_ground import PidfGroundLayout
 from openpilot.nrdr.ui.settings.vehicle_model_learning import VehicleModelLearningLayout
 from openpilot.nrdr.ui.settings.override_tuning import OverrideTuningLayout
@@ -330,12 +330,11 @@ class LateralTuningLayout(Widget):
     return [self._tune_report_item, self._pid_tune_info_item]
 
   def _initialize_items(self):
-    self._handcrafted_tune = toggle_item_sp(
-      title=lambda: tr("Handcrafted Lateral Tuning"),
-      description=lambda: tr("Off by default. Loads the Clarity-derived, road-tested controller gains and filters. " +
-                             "Steer-ratio mode is chosen separately and is never changed by this profile. " +
-                             "Other controller controls are locked while enabled."),
-      param="NrdrHandcraftedLateralTune",
+    self._handcrafted_tune = button_item(
+      lambda: tr("Apply Handcrafted Lateral Profile"),
+      lambda: tr("WAIT") if ui_state.params.get_bool("NrdrHandcraftedLateralTune") else tr("APPLY"),
+      self._handcrafted_description,
+      callback=self._on_handcrafted_apply,
     )
 
     self._vehicle_model_button = simple_button_item_sp(
@@ -371,12 +370,31 @@ class LateralTuningLayout(Widget):
       self._steer_filters_button,
     ]
 
+  @staticmethod
+  def _handcrafted_description():
+    description = tr(
+      "Applies the current reviewed profile once and turns the request back off only after every value verifies. " +
+      "All tuning controls remain editable, and later manual edits persist until you deliberately apply again."
+    )
+    status = ui_state.params.get("NrdrCarHandcraftedInfo")
+    return description if not status else f"{description}<br><br>{tr('Status')}: {status}"
+
+  @staticmethod
+  def _on_handcrafted_apply():
+    if ui_state.is_offroad() and ui_state.CP is not None and \
+        handcrafted_lateral_profile_supported(ui_state.CP, ui_state.CP_SP):
+      ui_state.params.put_bool("NrdrHandcraftedLateralTune", True, block=True)
+
   def _update_state(self):
     super()._update_state()
     self._poll_tune_report_scan()
-    fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
-    self._handcrafted_tune.set_visible(get_handcrafted_lateral_profile(fingerprint) is not None)
-    self._handcrafted_tune.action_item.set_enabled(ui_state.is_offroad())
+    supported = (
+      ui_state.CP is not None and
+      handcrafted_lateral_profile_supported(ui_state.CP, ui_state.CP_SP)
+    )
+    pending = ui_state.params.get_bool("NrdrHandcraftedLateralTune")
+    self._handcrafted_tune.set_visible(supported)
+    self._handcrafted_tune.action_item.set_enabled(supported and ui_state.is_offroad() and not pending)
 
   def _render(self, rect):
     if self._current_panel == LateralPanel.VEHICLE_MODEL:

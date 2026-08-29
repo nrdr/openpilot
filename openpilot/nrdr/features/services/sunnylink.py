@@ -10,6 +10,7 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
   "NrdrSteerRatioMode",
   "NrdrSteerRatioManualCenter",
   "NrdrSteerRatioManualFinal",
+  "NrdrHandcraftedLateralTune",
   "NrdrInterpolatedTorquePifBlend",
   "NrdrInterpolatedTorqueShare",
   "NrdrInterpolatedTorqueLatAccelFactor",

@@ -79,15 +79,19 @@ class FakeCloudlog:
 
 
 class FakeParams:
-  def __init__(self, values=None, *, get_errors=(), put_errors=()):
+  def __init__(self, values=None, *, get_errors=(), put_errors=(), silent_puts=(), corrupt_readbacks=None):
     self.values = dict(values or {})
     self.get_errors = set(get_errors)
     self.put_errors = set(put_errors)
+    self.silent_puts = set(silent_puts)
+    self.corrupt_readbacks = dict(corrupt_readbacks or {})
     self.calls = []
 
   def get(self, key):
     if key in self.get_errors:
       raise RuntimeError(f"get failed: {key}")
+    if key in self.corrupt_readbacks and any(call[1] == key for call in self.calls):
+      return self.corrupt_readbacks.pop(key)
     return self.values.get(key)
 
   def put(self, key, value, *args, **kwargs):
@@ -100,6 +104,8 @@ class FakeParams:
     self.calls.append((setter, key, value, args, kwargs))
     if key in self.put_errors:
       raise RuntimeError(f"put failed: {key}")
+    if key in self.silent_puts:
+      return
     self.values[key] = value
 
 
@@ -168,9 +174,9 @@ class TestParamDefaults(unittest.TestCase):
     self.assertEqual(params.values["NrdrSteerRatioMode"], 0)
     self.assertEqual(params.values["NrdrSteerRatioManualCenter"], 15.38)
     self.assertEqual(params.values["NrdrSteerRatioManualFinal"], 10.93)
-    self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.50)
-    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.50)
-    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.50)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.12)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.10)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.06)
 
     forced = {
       "EnforceTorqueControl": False,
@@ -186,8 +192,8 @@ class TestParamDefaults(unittest.TestCase):
 
     expected_keys = (
       ["NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal", "NrdrSteerRatioMode"]
-      + ["NrdrInterpolatedTorqueFriction", "NrdrInterpolatedTorqueFrictionStandard",
-         "NrdrInterpolatedTorqueFrictionHighway"]
+      + ["NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway",
+         "NrdrInterpolatedTorqueFriction"]
       + [key for key in EXPECTED_BOOL_DEFAULTS if key != "QuietMode"]
       + [key for key in EXPECTED_VALUE_DEFAULTS if key != "LaneTurnValue"]
       + list(forced)
@@ -302,26 +308,106 @@ class TestParamDefaults(unittest.TestCase):
     self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.12)
     self.assertEqual([call[1] for call in params.calls], ["NrdrInterpolatedTorqueFrictionHighway"])
 
-  def test_friction_migration_seeds_low_before_dependent_bands_and_retries_after_failure(self):
+  def test_fresh_friction_migration_seeds_low_last_and_retries_low_only(self):
     params = FakeParams(put_errors={"NrdrInterpolatedTorqueFriction"})
 
     self.defaults._migrate_interpolated_torque_friction(params)
 
-    self.assertEqual([call[1] for call in params.calls], ["NrdrInterpolatedTorqueFriction"])
-    self.assertNotIn("NrdrInterpolatedTorqueFrictionStandard", params.values)
-    self.assertNotIn("NrdrInterpolatedTorqueFrictionHighway", params.values)
+    self.assertEqual([call[1] for call in params.calls], [
+      "NrdrInterpolatedTorqueFrictionStandard",
+      "NrdrInterpolatedTorqueFrictionHighway",
+      "NrdrInterpolatedTorqueFriction",
+    ])
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.10)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.06)
+    self.assertNotIn("NrdrInterpolatedTorqueFriction", params.values)
 
     params.put_errors.clear()
     params.calls.clear()
     self.defaults._migrate_interpolated_torque_friction(params)
 
-    self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.50)
-    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.50)
-    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.50)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.12)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.10)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.06)
+    self.assertEqual([call[1] for call in params.calls], ["NrdrInterpolatedTorqueFriction"])
+
+  def test_fresh_friction_band_failures_retry_without_collapsing_split(self):
+    for failed_key, first_success in (
+      ("NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway"),
+      ("NrdrInterpolatedTorqueFrictionHighway", "NrdrInterpolatedTorqueFrictionStandard"),
+    ):
+      with self.subTest(failed_key=failed_key):
+        params = FakeParams(put_errors={failed_key})
+        self.defaults._migrate_interpolated_torque_friction(params)
+        self.assertNotIn("NrdrInterpolatedTorqueFriction", params.values)
+        self.assertIn(first_success, params.values)
+
+        params.put_errors.clear()
+        params.calls.clear()
+        self.defaults._migrate_interpolated_torque_friction(params)
+        self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.12)
+        self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.10)
+        self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.06)
+        self.assertEqual([call[1] for call in params.calls], [failed_key, "NrdrInterpolatedTorqueFriction"])
+
+  def test_fresh_silent_split_write_never_commits_low_and_retries_safely(self):
+    for failed_key, successful_key in (
+      ("NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway"),
+      ("NrdrInterpolatedTorqueFrictionHighway", "NrdrInterpolatedTorqueFrictionStandard"),
+    ):
+      with self.subTest(failed_key=failed_key):
+        params = FakeParams(silent_puts={failed_key})
+        self.defaults._migrate_interpolated_torque_friction(params)
+        self.assertNotIn(failed_key, params.values)
+        self.assertIn(successful_key, params.values)
+        self.assertNotIn("NrdrInterpolatedTorqueFriction", params.values)
+
+        params.silent_puts.clear()
+        params.calls.clear()
+        self.defaults._migrate_interpolated_torque_friction(params)
+        self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.12)
+        self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.10)
+        self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.06)
+
+  def test_corrupt_typed_readback_prevents_fresh_low_commit(self):
+    standard = "NrdrInterpolatedTorqueFrictionStandard"
+    params = FakeParams(corrupt_readbacks={standard: 10})
+
+    self.defaults._migrate_interpolated_torque_friction(params)
+
+    self.assertEqual(params.values[standard], 0.10)
+    self.assertNotIn("NrdrInterpolatedTorqueFriction", params.values)
+    self.assertTrue(self.cloudlog.exceptions)
+
+    params.calls.clear()
+    self.defaults._migrate_interpolated_torque_friction(params)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.12)
+
+  def test_legacy_silent_copy_retries_only_that_missing_band(self):
+    standard = "NrdrInterpolatedTorqueFrictionStandard"
+    params = FakeParams(
+      {"NrdrInterpolatedTorqueFriction": 0.12},
+      silent_puts={standard},
+    )
+
+    self.defaults._migrate_interpolated_torque_friction(params)
+    self.assertNotIn(standard, params.values)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.12)
+
+    params.silent_puts.clear()
+    params.calls.clear()
+    self.defaults._migrate_interpolated_torque_friction(params)
+    self.assertEqual(params.values[standard], 0.12)
+    self.assertEqual([call[1] for call in params.calls], [standard])
+
+  def test_fresh_partial_split_is_preserved_and_only_missing_values_are_seeded(self):
+    params = FakeParams({"NrdrInterpolatedTorqueFrictionStandard": 0.08})
+    self.defaults._migrate_interpolated_torque_friction(params)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.08)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionHighway"], 0.06)
+    self.assertEqual(params.values["NrdrInterpolatedTorqueFriction"], 0.12)
     self.assertEqual([call[1] for call in params.calls], [
-      "NrdrInterpolatedTorqueFriction",
-      "NrdrInterpolatedTorqueFrictionStandard",
-      "NrdrInterpolatedTorqueFrictionHighway",
+      "NrdrInterpolatedTorqueFrictionHighway", "NrdrInterpolatedTorqueFriction",
     ])
 
   def test_one_failed_friction_band_does_not_block_the_other_and_retries_only_missing(self):

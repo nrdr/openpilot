@@ -8,7 +8,6 @@ from openpilot.nrdr.ui.settings_policy import (
   apply_cruise_preferences,
   apply_speed_limit_preferences,
   apply_chevron_preference,
-  apply_handcrafted_delay_controls,
   hide_global_controller_settings,
 )
 
@@ -21,6 +20,5 @@ __all__ = (
   "apply_cruise_preferences",
   "apply_speed_limit_preferences",
   "apply_chevron_preference",
-  "apply_handcrafted_delay_controls",
   "hide_global_controller_settings",
 )

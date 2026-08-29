@@ -8,7 +8,7 @@ from openpilot.common.hardware import HARDWARE
 
 
 STEER_RATIO_MANUAL_DEFAULTS = (15.38, 10.93)
-INTERPOLATED_TORQUE_FRICTION_DEFAULT = 0.50
+INTERPOLATED_TORQUE_FRICTION_DEFAULTS = (0.12, 0.10, 0.06)
 
 # Legacy endpoint Params remain registered only so this one-time migration can
 # preserve an existing owner's tune. They have no runtime consumers afterward.
@@ -162,7 +162,7 @@ def _migrate_steer_ratio_settings(params: Params) -> None:
 
 
 def _migrate_interpolated_torque_friction(params: Params) -> None:
-  """Split the original friction tune without changing its effective value."""
+  """Seed fresh split defaults or preserve a durable legacy Low tune."""
   low_key = "NrdrInterpolatedTorqueFriction"
   new_keys = (
     "NrdrInterpolatedTorqueFrictionStandard",
@@ -175,22 +175,39 @@ def _migrate_interpolated_torque_friction(params: Params) -> None:
     cloudlog.exception("failed to inspect interpolated torque friction migration state")
     return
 
-  if low is None:
-    if not _write(params, low_key, INTERPOLATED_TORQUE_FRICTION_DEFAULT, params.put, block=True):
-      return
+  def write_verified(key: str, value: float) -> bool:
+    """Make the migration discriminator depend on a durable, typed readback."""
     try:
-      low = params.get(low_key)
+      params.put(key, value, block=True)
+      readback = params.get(key)
+      if type(readback) is not type(value) or readback != value:
+        raise ValueError(f"unexpected readback for {key}: {readback!r}")
+      return True
     except Exception:
-      cloudlog.exception("failed to read interpolated torque friction migration source")
-      return
-    if low is None:
-      return
+      cloudlog.exception("failed to initialize and verify nrdr param %s", key)
+      return False
 
-  # Each new band is independently guarded and copied from the durable Low
-  # value. Interrupted boots retry only missing bands and never overwrite a tune.
+  if low is None:
+    # Low is the durable migration discriminator. On a fresh install, write the
+    # distinct dependent bands first and Low last. An interruption therefore
+    # cannot make the next boot mistake a half-seeded fresh tune for a legacy
+    # single-value tune and collapse it to .12/.12/.12.
+    standard_ok = not missing[new_keys[0]] or write_verified(
+      new_keys[0], INTERPOLATED_TORQUE_FRICTION_DEFAULTS[1]
+    )
+    highway_ok = not missing[new_keys[1]] or write_verified(
+      new_keys[1], INTERPOLATED_TORQUE_FRICTION_DEFAULTS[2]
+    )
+    if standard_ok and highway_ok:
+      write_verified(low_key, INTERPOLATED_TORQUE_FRICTION_DEFAULTS[0])
+    return
+
+  # Low existed before inspection, so this is an upgrade from the original
+  # single-value tune. Copy its exact value only into missing bands. Existing
+  # partial values are never overwritten, and each failed band retries alone.
   for key in new_keys:
     if missing[key]:
-      _write(params, key, low, params.put, block=True)
+      write_verified(key, low)
 
 
 def apply_defaults(params: Params) -> None:

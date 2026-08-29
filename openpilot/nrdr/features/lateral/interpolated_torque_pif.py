@@ -23,7 +23,11 @@ LEGACY_TORQUE_YAW_BLEND_X = (2.0, 5.0)
 
 DEFAULT_TORQUE_SHARE_PERCENT = 50.0
 DEFAULT_LAT_ACCEL_FACTOR = 5.0
-DEFAULT_FRICTION = 0.5
+DEFAULT_FRICTION_LOW = 0.12
+DEFAULT_FRICTION_STANDARD = 0.10
+DEFAULT_FRICTION_HIGHWAY = 0.06
+# Compatibility name for the original single Low-speed setting.
+DEFAULT_FRICTION = DEFAULT_FRICTION_LOW
 FRICTION_LOW_STANDARD_TRANSITION_MPH = 25.0
 FRICTION_STANDARD_HIGHWAY_TRANSITION_MPH = 50.0
 FRICTION_TRANSITION_HALF_WIDTH_MPH = 1.0
@@ -34,9 +38,9 @@ class InterpolatedTorquePifSettings:
   enabled: bool = False
   torque_share: float = DEFAULT_TORQUE_SHARE_PERCENT / 100.0
   lat_accel_factor: float = DEFAULT_LAT_ACCEL_FACTOR
-  friction_low: float = DEFAULT_FRICTION
-  friction_standard: float = DEFAULT_FRICTION
-  friction_highway: float = DEFAULT_FRICTION
+  friction_low: float = DEFAULT_FRICTION_LOW
+  friction_standard: float = DEFAULT_FRICTION_STANDARD
+  friction_highway: float = DEFAULT_FRICTION_HIGHWAY
 
   @property
   def friction(self) -> float:
@@ -120,21 +124,21 @@ def resolve_interpolated_torque_pif_settings(settings, supported: bool) -> Inter
     friction_low=read_float(
       settings,
       NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
-      DEFAULT_FRICTION,
+      DEFAULT_FRICTION_LOW,
       0.0,
       1.0,
     ),
     friction_standard=read_float(
       settings,
       NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD,
-      DEFAULT_FRICTION,
+      DEFAULT_FRICTION_STANDARD,
       0.0,
       1.0,
     ),
     friction_highway=read_float(
       settings,
       NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY,
-      DEFAULT_FRICTION,
+      DEFAULT_FRICTION_HIGHWAY,
       0.0,
       1.0,
     ),

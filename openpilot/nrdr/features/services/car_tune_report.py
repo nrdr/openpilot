@@ -5,9 +5,8 @@ from opendbc.car.structs import car
 from opendbc.car.car_helpers import interfaces
 from openpilot.common.swaglog import cloudlog
 from openpilot.nrdr.params import (
-  apply_handcrafted_lateral_profile,
-  get_handcrafted_lateral_profile,
-  is_handcrafted_lateral_enabled,
+  consume_handcrafted_lateral_request,
+  handcrafted_lateral_profile_status,
 )
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   SteerRatioMode,
@@ -167,8 +166,7 @@ class CarTuneReporter:
     return (f"{prefix} | {selection.firmware_profile.name} relative Table-A shape | " +
             f"immutable CP center anchor {selection.cp_ratio:g} | no lane fade")
 
-  def _controller_info(self, controller: str, handcrafted_enabled: bool, profile,
-                       steer_ratio: SteerRatioSelection) -> str:
+  def _controller_info(self, controller: str, steer_ratio: SteerRatioSelection) -> str:
     if controller == "PID/NNLC":
       if steer_ratio.firmware_vgr_selected:
         nnlc = "PID only | NNLC unavailable in firmware EPS mode"
@@ -177,26 +175,16 @@ class CarTuneReporter:
           else "PID only | NNLC disabled"
     else:
       nnlc = controller
-    return f"Handcrafted v{profile.version} | {nnlc}" if handcrafted_enabled else nnlc
+    return nnlc
 
   def _build(self, CP) -> dict[str, str]:
-    changed = apply_handcrafted_lateral_profile(CP.carFingerprint, self.params)
-    if changed:
-      cloudlog.warning({
-        "event": "handcrafted lateral profile restored offroad",
-        "carFingerprint": str(CP.carFingerprint),
-        "changedParams": changed,
-      })
-
     eps = self._eps_firmware(CP)
     eps_short = eps.rsplit(",", 1)[-1].strip() if "," in eps else eps
     interceptor = self._gas_interceptor()
     controller = self._controller_name(CP)
     steer_ratio_selection = resolve_steer_ratio_selection(CP, self.params)
-    profile = get_handcrafted_lateral_profile(CP.carFingerprint)
-    handcrafted_enabled = is_handcrafted_lateral_enabled(CP.carFingerprint, self.params)
-    handcrafted = f"{profile.name} (v{profile.version})" if handcrafted_enabled and profile is not None else "OFF"
-    controller_info = self._controller_info(controller, handcrafted_enabled, profile, steer_ratio_selection)
+    handcrafted = handcrafted_lateral_profile_status(CP, self._cp_sp(), self.params)
+    controller_info = self._controller_info(controller, steer_ratio_selection)
     interpolated, interpolated_enabled = self._interpolated_torque_pif_info(CP)
     if interpolated_enabled:
       controller_info += f" | {interpolated}"
@@ -279,6 +267,29 @@ class CarTuneReporter:
       f"Wheelbase: {float(CP.wheelbase):g} m | mass: {float(CP.mass):.0f} kg",
     ))
     return rows
+
+  def consume_handcrafted_request(self) -> None:
+    """Complete one pending offroad request; never reconcile a completed profile."""
+    if not self.params.get_bool("NrdrHandcraftedLateralTune") or not self.params.get_bool("IsOffroad"):
+      return
+    try:
+      cp_bytes = self.params.get("CarParamsPersistent") or self.params.get("CarParams")
+      cp_sp = self._cp_sp()
+      if not cp_bytes:
+        return
+      with car.CarParams.from_bytes(cp_bytes) as CP:
+        fingerprint = str(CP.carFingerprint)
+        written = consume_handcrafted_lateral_request(CP, cp_sp, self.params)
+      if not written:
+        return
+      cloudlog.warning({
+        "event": "handcrafted lateral profile applied once",
+        "carFingerprint": fingerprint,
+        "writtenParams": written,
+      })
+    except Exception:
+      # The durable request intentionally stays true for the next safe retry.
+      cloudlog.exception("nrdr_remoted: handcrafted lateral apply failed; request retained")
 
   def publish(self) -> None:
     try:

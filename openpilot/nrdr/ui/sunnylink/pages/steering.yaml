@@ -8,13 +8,13 @@ sections:
     items:
     - key: NrdrHandcraftedLateralTune
       widget: toggle
-      title: Handcrafted Lateral Tuning
-      description: Off by default. Enable this to load the Clarity-derived, road-tested lateral controller profile and lock the controls that profile owns.
-      details: Loads the shared versioned Honda PID/feedforward profile with predictive stiction, controller helpers, steering filters, and fixed live delay. Steer ratio is intentionally independent; choose its source in Steer Ratio Tuning. Leave this off to tune the controller values manually.
+      title: Apply Handcrafted Lateral Profile
+      description: Flip ON to request the current reviewed profile once. The device turns this switch back OFF only after every value verifies.
+      details: This is a one-shot apply command, not a mode. Wait a few seconds after flipping it ON, then refresh this page. Every tuning control remains manually editable immediately afterward, and later edits are never restored or overwritten by the profile.
       visibility:
       - {type: capability, field: has_handcrafted_lateral_profile, equals: true}
       enablement:
-      - $ref: '#/macros/offroad'
+      - $ref: '#/macros/handcrafted_apply_offroad'
     sub_panels:
     - id: nrdr_vehicle_model_learning
       label: Vehicle Model & Learning
@@ -65,15 +65,11 @@ sections:
         widget: toggle
         title: Learn Tire Stiffness (Auto)
         description: When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0.
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
       - key: NrdrLearnAngleOffset
         widget: toggle
         title: Learn Angle Offset (Auto)
         description: When ON (Auto), uses the live-learned steering angle offset; OFF uses a static 0.0 offset.
         details: When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side.
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
     - id: nrdr_pidf_ground
       label: Controller Tuning Dungeon
       trigger_key: null
@@ -126,8 +122,6 @@ sections:
           - $ref: '#/macros/offroad'
       - key: NrdrStarPilotPid
         widget: toggle
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: StarPilot PID Additions
         description: Adds the borrowed StarPilot turn-in / unwind / per-direction output scaling, not built for Honda.
         details: The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base.
@@ -137,8 +131,6 @@ sections:
         widget: option
       - key: LatFScaleLowSpeed
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Low Speed Feedforward Scale (Below 25mph)
         description: Scales the feedforward (kf) term below 25 mph (100% = tuned value).
         details: Scales the feedforward (kf) term below 25 mph. Follows the commanded angle rather than error, adding authority without amplifying noise. 100% = tuned value (static).
@@ -152,8 +144,6 @@ sections:
         widget: option
       - key: LatFScaleStandard
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Standard Speed Feedforward Scale (25-50mph)
         description: Scales the feedforward (kf) term between 25 and 50 mph (100% = tuned value).
         min: 0
@@ -166,8 +156,6 @@ sections:
         widget: option
       - key: LatFScaleHighway
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Highway Feedforward Scale (50mph+)
         description: Scales the feedforward (kf) term above 50 mph (100% = tuned value).
         min: 0
@@ -176,8 +164,6 @@ sections:
         unit: '%'
       - key: NrdrLatRateDamping
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Rate Damping (D) Strength
         description: Adds a damping (D) term opposing wheel speed to flatten low-speed oscillation; 0 = off.
         details: The derivative term openpilot normally can't use. Adds torque opposing how fast the wheel is moving, which damps the low-speed oscillation plain P can't (the wheel is torque-commanded, so P alone rings). Relies on a clean steering-rate signal and a low-lag EPS - which this car has. 0 = off. Raise until the low-speed wobble flattens; too high makes turn-in feel heavy.
@@ -187,8 +173,6 @@ sections:
         unit: '%'
       - key: NrdrLatRateDampingFadeSpeed
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Rate Damping Fade-Out Speed
         description: Speed at which rate damping tapers to zero (strongest at a standstill).
         details: Speed at which rate damping tapers to zero. Damping is strongest at a standstill and gone by this speed, where tire self-aligning torque resumes damping the steering itself. Keeps the D term out of your highway feel.
@@ -198,8 +182,6 @@ sections:
         unit: mph
       - key: HondaCenterScale
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Center Boost
         description: Extra proportional (P) error correction near center; 0.50 is a 50% P boost.
         details: Multiplies only the proportional term near center. Integral, feedforward, and damping keep their normal values. Available at every speed above the minimum, including the highway.
@@ -208,8 +190,6 @@ sections:
         step: 0.01
       - key: HondaCenterBoostThreshold
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Center Boost Threshold (deg)
         description: How centered should the steering wheel be when center boost is actually active?
         min: 0.0
@@ -218,8 +198,6 @@ sections:
         unit: deg
       - key: HondaCenterBoostMinSpeed
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Center Boost Minimum Speed
         description: Below this speed center boost is disabled; there is no upper-speed cutoff.
         details: Below this speed center boost is disabled. Above the short ramp it remains fully available, including on the highway.
@@ -229,15 +207,12 @@ sections:
         unit: mph
       - key: NrdrLatStiction
         widget: toggle
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Predictive Lateral Stiction
         description: Tapers torque before a stable steering target, then holds it until another correction is needed.
         details: PID remains the normal throw. A predictive capture stage can only reduce torque as the wheel closes on a stable target, then freezes the captured output until error, relative motion, drift, or a decisive corrective torque reversal requires reacquisition. It operates at every speed and immediately bypasses for driver input, lane changes, steering faults, or control limits. Default is OFF.
       - key: NrdrNnlcEnabled
         widget: toggle
         enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         - type: not
           condition: {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
         title: Enable Neural Network Lateral Model (NNLC)
@@ -353,15 +328,11 @@ sections:
       items:
       - key: NrdrIncreaseOverrideTolerance
         widget: toggle
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Increase Driver Override Hysteresis
         description: Reduces false driver override detections on sensitive Honda EPS by doubling the override threshold below.
         details: Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below.
       - key: NrdrDriverOverrideThreshold
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Driver Override Threshold
         description: Raw steering torque reading above which you count as steering (override); default 1400.
         details: Raw steering torque sensor reading above which you are considered to be steering (driver override). On cars with a different stock threshold, this value is applied proportionally so 1200 still represents the stock threshold.
@@ -370,8 +341,6 @@ sections:
         step: 100
       - key: NrdrOverrideThresholdCenterBoost
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Override Threshold Center Boost
         description: Lower override threshold used within the Center Boost band; set equal to Driver Override Threshold to disable.
         details: When the wheel is within the Center Boost degree band (on a straight), this lower override threshold applies instead of the one above - so you can override easily on straights while curves keep the higher threshold and do not drop torque from a false override. Set equal to Driver Override Threshold to disable.
@@ -380,15 +349,11 @@ sections:
         step: 100
       - key: HondaDriverAssistDuringOverride
         widget: toggle
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Pass-through assist torque on override
         description: Resets the EPS lane-assist state so the final override feels like normal driving after fade completes.
         details: When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling.
       - key: HondaOverrideFadeDownSecs
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Override Torque Fade Down
         description: Controls how quickly steering torque fades out when driver override begins.
         min: 0.0
@@ -397,8 +362,6 @@ sections:
         unit: second
       - key: HondaOverrideFadeUpSecs
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Override Torque Fade Up
         description: Controls how quickly steering torque fades back in after driver override ends.
         min: 0.0
@@ -407,8 +370,6 @@ sections:
         unit: second
       - key: HondaOverrideTorqueScale
         widget: option
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Override Torque Retain
         description: Controls how much openpilot steering torque remains when the override has gone past Override Torque Fade Down.
         min: 0
@@ -421,8 +382,6 @@ sections:
       items:
       - key: HondaTorqueLowPassFilter
         widget: toggle
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Low Pass Filter (tau)
         description: Smooths steering response at the cost of adding lag; tune to the least amount before oscillation.
         details: Filter that smooths steering response at the cost of adding lag. Tune to the least amount possible before oscillations begin. Live tests show that going above 0.1 tau rapidly increases the possibility of lag-induced oscillations.
@@ -434,7 +393,6 @@ sections:
         max: 5.0
         step: 0.01
         enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         - type: param
           key: HondaTorqueLowPassFilter
           equals: true
@@ -446,7 +404,6 @@ sections:
         max: 5.0
         step: 0.01
         enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         - type: param
           key: HondaTorqueLowPassFilter
           equals: true
@@ -458,14 +415,11 @@ sections:
         max: 5.0
         step: 0.01
         enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         - type: param
           key: HondaTorqueLowPassFilter
           equals: true
       - key: HondaSteerDeltaLimiter
         widget: toggle
-        enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         title: Legacy Steer Delta Rate Limiter
         description: Limits how quickly requested steering torque can rise or fall.
         details: Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass filter.
@@ -477,7 +431,6 @@ sections:
         max: 100.0
         step: 0.1
         enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         - type: param
           key: HondaSteerDeltaLimiter
           equals: true
@@ -489,7 +442,6 @@ sections:
         max: 100.0
         step: 0.1
         enablement:
-        - $ref: '#/macros/handcrafted_lateral_unlocked'
         - type: param
           key: HondaSteerDeltaLimiter
           equals: true

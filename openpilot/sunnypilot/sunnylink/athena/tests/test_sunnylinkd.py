@@ -142,3 +142,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
     ):
       assert not allow_param_write(key, onroad=True)
       assert allow_param_write(key, onroad=False)
+
+  def test_handcrafted_apply_command_is_server_enforced_offroad_only(self):
+    assert not allow_param_write("NrdrHandcraftedLateralTune", onroad=True)
+    assert allow_param_write("NrdrHandcraftedLateralTune", onroad=False)

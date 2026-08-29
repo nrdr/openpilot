@@ -87,15 +87,16 @@ install_module("openpilot.common.params", Params=DummyParams, UnknownKeyName=Unk
 install_module("openpilot.common.swaglog", cloudlog=cloudlog)
 install_module("openpilot.common.version", sunnylink_consent_version="1", terms_version="1", terms_version_sp="1", training_version="1")
 install_module("openpilot.cereal", package=True, custom=types.SimpleNamespace(), messaging=types.SimpleNamespace())
-install_module("openpilot.nrdr.params", apply_handcrafted_lateral_profile=lambda *args: None,
-               get_handcrafted_lateral_profile=lambda *args: None,
-               is_handcrafted_lateral_enabled=lambda *args: False)
+install_module("openpilot.nrdr.params", consume_handcrafted_lateral_request=lambda *args, **kwargs: [],
+               handcrafted_lateral_profile_status=lambda *args, **kwargs: "Not applied")
 install_module("openpilot.sunnypilot.selfdrive.car.opendbc_config", build_sunnypilot_car_config=lambda *args, **kwargs: None)
 install_module("openpilot.nrdr.features.lateral", package=True)
 install_module("openpilot.nrdr.features.lateral.model_policy", SteerRatioModelResolution=dummy_type,
                SteerRatioModelPolicy=types.SimpleNamespace(LEGACY_DUAL_BP=object(), PURE_FIRMWARE_VGR=object()),
                resolve_steer_ratio_model=lambda *args: None)
 install_module("openpilot.nrdr.features.lateral.honda_vgr", get_honda_vgr_profile=lambda *args: None)
+install_module("openpilot.nrdr.features.lateral.interpolated_torque_pif",
+               supports_interpolated_torque_pif=lambda *args: False)
 install_module("openpilot.nrdr.features.lateral.steer_ratio_tuning", SteerRatioMode=dummy_type,
                SteerRatioSelection=dummy_type, resolve_steer_ratio_selection=lambda *args: None)
 install_module("openpilot.sunnypilot.models.helpers", get_active_bundle=lambda *args: None)
@@ -268,6 +269,9 @@ class Reporter:
   def __init__(self, params):
     events.append("reporter")
 
+  def consume_handcrafted_request(self):
+    events.append("consume_handcrafted")
+
   def publish(self):
     events.append("publish")
 
@@ -288,7 +292,7 @@ try:
 except StopLoop:
   pass
 
-assert events == ["actions", "reporter", "status:idle", "refresh", "publish", "sleep:2.0"], events
+assert events == ["actions", "reporter", "status:idle", "refresh", "consume_handcrafted", "publish", "sleep:2.0"], events
 '''
     subprocess.run([sys.executable, "-c", script], cwd=self.repository_root, env=environment, check=True)
 

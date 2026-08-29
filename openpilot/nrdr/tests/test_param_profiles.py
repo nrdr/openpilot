@@ -1,4 +1,3 @@
-from collections import Counter
 from importlib import import_module
 import os
 from pathlib import Path
@@ -8,6 +7,8 @@ import unittest
 
 from openpilot.nrdr.params.generated.keys import NrdrParamKey
 from openpilot.nrdr.params.profiles import (
+  CLARITY_CURRENT_LATERAL_2026_08_28,
+  CLARITY_HANDCRAFTED_LATERAL_VALUES_V17,
   CLARITY_ROAD_TESTED_2026_08_21,
   HANDCRAFTED_EXTERNAL_PARAM_KEYS,
   HANDCRAFTED_LATERAL_PROFILES,
@@ -16,10 +17,11 @@ from openpilot.nrdr.params.profiles import (
   HandcraftedLateralProfile,
   ProfileParamStore,
   ProfileValue,
-  apply_handcrafted_lateral_profile,
+  consume_handcrafted_lateral_request,
   get_handcrafted_lateral_profile,
+  handcrafted_lateral_profile_supported,
 )
-from openpilot.nrdr.params.specs import PARAM_SPECS_BY_KEY, ParamFlag, ParamOwner, ParamType
+from openpilot.nrdr.params.specs import PARAM_SPECS_BY_KEY, ParamFlag, ParamLifecycle
 
 
 EXPECTED_HANDCRAFTED_FINGERPRINTS = (
@@ -32,156 +34,54 @@ EXPECTED_HANDCRAFTED_FINGERPRINTS = (
   "HONDA_INSIGHT",
 )
 
-EXPECTED_REGISTRY_OVERRIDES = {
-  "NrdrLatRateDamping",
-  "HondaCenterScale",
-  "NrdrLatStiction",
-  "NrdrTuneLearner",
-  "NrdrTuneLearnerStrength",
-  "NrdrTuneLearnerRate",
-  "NrdrDriverOverrideThreshold",
-  "NrdrOverrideThresholdCenterBoost",
-  "HondaDriverAssistDuringOverride",
-  "HondaOverrideFadeDownSecs",
-  "HondaOverrideFadeUpSecs",
-  "HondaTorqueLowPassFilter",
-  "HondaSteerDeltaUp",
-  "HondaSteerDeltaDown",
-}
-
-BORROWED_DEFAULTS = {
-  "LagdToggle": True,
-  "LagdToggleDelay": 0.2,
-}
-
-
-def _typed_default(key: str):
-  spec = PARAM_SPECS_BY_KEY[key]
-  assert spec.default is not None
-  if spec.param_type is ParamType.BOOL:
-    return spec.default == "1"
-  if spec.param_type is ParamType.INT:
-    return int(spec.default)
-  if spec.param_type is ParamType.FLOAT:
-    return float(spec.default)
-  raise AssertionError(f"unexpected profile parameter type for {key}: {spec.param_type}")
-
-
-class RegistryDefaultParams:
-  def __init__(self):
-    self.values = {NrdrParamKey.NRDR_HANDCRAFTED_LATERAL_TUNE.value: True}
-    self.writes = []
-
-  def get_bool(self, key):
-    return bool(self.values.get(key, False))
-
-  def get(self, key, return_default=False):
-    if key in self.values:
-      return self.values[key]
-    if not return_default:
-      return None
-    if key in BORROWED_DEFAULTS:
-      return BORROWED_DEFAULTS[key]
-    return _typed_default(key)
-
-  def put_bool(self, key, value, block=False):
-    self.values[key] = bool(value)
-    self.writes.append(("put_bool", key, bool(value), block))
-
-  def put(self, key, value, block=False):
-    self.values[key] = value
-    self.writes.append(("put", key, value, block))
-
 
 class TestParamProfiles(unittest.TestCase):
-  def test_profile_shape_order_types_and_ownership(self) -> None:
+  def test_profile_shapes_types_and_registry_ownership(self) -> None:
     self.assertEqual(HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS, EXPECTED_HANDCRAFTED_FINGERPRINTS)
     self.assertEqual(tuple(HANDCRAFTED_LATERAL_PROFILES), EXPECTED_HANDCRAFTED_FINGERPRINTS)
     self.assertEqual(len(HONDA_TORQUE_MOD_HANDCRAFTED_VALUES), 38)
-    self.assertEqual(HANDCRAFTED_EXTERNAL_PARAM_KEYS, frozenset(BORROWED_DEFAULTS))
-
-    all_values = {
-      key: value
-      for profile in HANDCRAFTED_LATERAL_PROFILES.values()
-      for key, value in profile.values
-    }
-    self.assertEqual(len(all_values), 38)
-    self.assertTrue(all(type(key) is str for key in all_values))
-    self.assertEqual(
-      Counter("bool" if isinstance(value, bool) else type(value).__name__ for value in all_values.values()),
-      Counter({"int": 17, "bool": 11, "float": 10}),
-    )
-
-    owned_keys = set(all_values) - HANDCRAFTED_EXTERNAL_PARAM_KEYS
-    self.assertEqual(len(owned_keys), 36)
-    self.assertTrue(owned_keys <= {key.value for key in NrdrParamKey})
-    self.assertTrue(all(PARAM_SPECS_BY_KEY[key].flags == (ParamFlag.PERSISTENT, ParamFlag.BACKUP)
-                        for key in owned_keys))
-    self.assertEqual(
-      Counter(PARAM_SPECS_BY_KEY[key].owner for key in owned_keys),
-      Counter({ParamOwner.LATERAL: 22, ParamOwner.HONDA: 14}),
-    )
+    self.assertEqual(len(CLARITY_HANDCRAFTED_LATERAL_VALUES_V17), 47)
+    self.assertEqual(HANDCRAFTED_EXTERNAL_PARAM_KEYS, frozenset(("LagdToggle", "LagdToggleDelay")))
 
     for fingerprint, profile in HANDCRAFTED_LATERAL_PROFILES.items():
-      self.assertEqual(len(profile.values), 38)
-      self.assertEqual(len(dict(profile.values)), 38)
-      self.assertEqual(profile.values, HONDA_TORQUE_MOD_HANDCRAFTED_VALUES)
-      self.assertFalse(any("SteerRatio" in key for key in dict(profile.values)))
-      self.assertEqual(profile.version, 15)
-      self.assertEqual(profile.fingerprint, fingerprint)
+      expected = CLARITY_HANDCRAFTED_LATERAL_VALUES_V17 if fingerprint == "HONDA_CLARITY" else HONDA_TORQUE_MOD_HANDCRAFTED_VALUES
+      self.assertEqual(profile.values, expected)
+      self.assertEqual(len(profile.values), len(dict(profile.values)))
+      self.assertTrue(all(type(key) is str for key, _ in profile.values))
+      for key, value in profile.values:
+        self.assertIn(type(value), (bool, int, float))
+        if key in HANDCRAFTED_EXTERNAL_PARAM_KEYS:
+          continue
+        self.assertIn(key, {item.value for item in NrdrParamKey})
+        self.assertEqual(PARAM_SPECS_BY_KEY[key].flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
 
-    self.assertIs(CLARITY_ROAD_TESTED_2026_08_21, HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"])
+    self.assertIs(CLARITY_CURRENT_LATERAL_2026_08_28, HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"])
+    self.assertIs(CLARITY_ROAD_TESTED_2026_08_21, CLARITY_CURRENT_LATERAL_2026_08_28)
     self.assertIsNone(get_handcrafted_lateral_profile("HONDA_CRV_HYBRID"))
 
-  def test_registry_and_profile_defaults_remain_distinct_layers(self) -> None:
-    profile_values = {
-      key: value
-      for profile in HANDCRAFTED_LATERAL_PROFILES.values()
-      for key, value in profile.values
-      if key not in HANDCRAFTED_EXTERNAL_PARAM_KEYS
-    }
-    differing = {key for key, value in profile_values.items() if _typed_default(key) != value}
-    self.assertEqual(differing, EXPECTED_REGISTRY_OVERRIDES)
-
-  def test_reconciliation_uses_typed_ordered_blocking_writes_and_is_idempotent(self) -> None:
-    params = RegistryDefaultParams()
-    profile = get_handcrafted_lateral_profile("HONDA_CLARITY")
-    expected_changed = [
-      key for key, value in profile.values
-      if (BORROWED_DEFAULTS.get(key, _typed_default(key) if key not in BORROWED_DEFAULTS else None)) != value
-    ]
-
-    changed = apply_handcrafted_lateral_profile("HONDA_CLARITY", params, block=True)
-    self.assertEqual(changed, expected_changed)
-    self.assertEqual(len(changed), 16)
-    self.assertEqual(set(changed), EXPECTED_REGISTRY_OVERRIDES | HANDCRAFTED_EXTERNAL_PARAM_KEYS)
-    self.assertEqual([write[1] for write in params.writes], changed)
-    self.assertTrue(all(write[3] is True for write in params.writes))
-
-    values = dict(profile.values)
-    for method, key, value, _ in params.writes:
-      self.assertEqual(method, "put_bool" if isinstance(values[key], bool) else "put")
-      self.assertEqual(value, values[key])
-
-    self.assertEqual(apply_handcrafted_lateral_profile("HONDA_CLARITY", params, block=True), [])
-    self.assertEqual(len(params.writes), 16)
+  def test_command_and_friction_registry_contract(self) -> None:
+    command = PARAM_SPECS_BY_KEY["NrdrHandcraftedLateralTune"]
+    self.assertEqual(command.lifecycle, ParamLifecycle.COMMAND)
+    self.assertEqual(command.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
+    self.assertEqual(command.default, "0")
+    self.assertEqual(PARAM_SPECS_BY_KEY["NrdrInterpolatedTorqueFriction"].default, "0.12")
+    self.assertEqual(PARAM_SPECS_BY_KEY["NrdrInterpolatedTorqueFrictionStandard"].default, "0.10")
+    self.assertEqual(PARAM_SPECS_BY_KEY["NrdrInterpolatedTorqueFrictionHighway"].default, "0.06")
 
   def test_legacy_modules_reexport_the_canonical_objects(self) -> None:
-    legacy_handcrafted = import_module("openpilot.sunnypilot.nrdr.handcrafted_lateral")
+    legacy = import_module("openpilot.sunnypilot.nrdr.handcrafted_lateral")
     params_api = import_module("openpilot.nrdr.params")
-
-    self.assertIs(legacy_handcrafted.HandcraftedLateralProfile, HandcraftedLateralProfile)
-    self.assertIs(legacy_handcrafted.ProfileParamStore, ProfileParamStore)
-    self.assertIs(legacy_handcrafted.ParamsLike, ProfileParamStore)
-    self.assertIs(legacy_handcrafted.ProfileValue, ProfileValue)
-    self.assertIs(legacy_handcrafted.ParamValue, ProfileValue)
-    self.assertIs(legacy_handcrafted.HANDCRAFTED_LATERAL_PROFILES, HANDCRAFTED_LATERAL_PROFILES)
-    self.assertIs(legacy_handcrafted.CLARITY_ROAD_TESTED_2026_08_21, CLARITY_ROAD_TESTED_2026_08_21)
-    self.assertIs(legacy_handcrafted.get_handcrafted_lateral_profile, get_handcrafted_lateral_profile)
-    self.assertIs(legacy_handcrafted.apply_handcrafted_lateral_profile, apply_handcrafted_lateral_profile)
-    for module in (legacy_handcrafted, params_api):
-      self.assertFalse(hasattr(module, "get_steer_ratio_endpoint_profile"))
-      self.assertFalse(hasattr(module, "STEER_RATIO_ENDPOINT_PROFILES"))
+    self.assertIs(legacy.HandcraftedLateralProfile, HandcraftedLateralProfile)
+    self.assertIs(legacy.ProfileParamStore, ProfileParamStore)
+    self.assertIs(legacy.ParamsLike, ProfileParamStore)
+    self.assertIs(legacy.ProfileValue, ProfileValue)
+    self.assertIs(legacy.ParamValue, ProfileValue)
+    self.assertIs(legacy.consume_handcrafted_lateral_request, consume_handcrafted_lateral_request)
+    self.assertIs(legacy.handcrafted_lateral_profile_supported, handcrafted_lateral_profile_supported)
+    self.assertIs(params_api.consume_handcrafted_lateral_request, consume_handcrafted_lateral_request)
+    for module in (legacy, params_api):
+      self.assertFalse(hasattr(module, "apply_handcrafted_lateral_profile"))
+      self.assertFalse(hasattr(module, "restore_handcrafted_lateral_profile"))
 
   def test_direct_profile_import_has_no_runtime_params_dependency(self) -> None:
     repository_root = Path(__file__).resolve().parents[3]

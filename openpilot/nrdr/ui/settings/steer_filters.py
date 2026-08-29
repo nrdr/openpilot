@@ -1,8 +1,6 @@
 from collections.abc import Callable
 import pyray as rl
 
-from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.nrdr.params import is_handcrafted_lateral_enabled
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
@@ -106,14 +104,6 @@ class SteerFiltersLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
-
-    fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
-    editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
-    for item in (
-      self._low_pass_filter, self._lpf_tau_low, self._lpf_tau_standard, self._lpf_tau_highway,
-      self._steer_delta_limiter, self._steer_delta_up, self._steer_delta_down,
-    ):
-      item.action_item.set_enabled(editable)
 
     lpf_enabled = self._low_pass_filter.action_item.get_state()
     self._lpf_tau_low.set_visible(lpf_enabled)

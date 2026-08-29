@@ -50,7 +50,7 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
   def test_fragments_declare_exact_consumer_anchors(self):
     macros = _yaml_document("_macros.yaml")
     self.assertEqual(set(macros), {"macros"})
-    self.assertEqual(set(macros["macros"]), {"handcrafted_lateral_unlocked"})
+    self.assertEqual(set(macros["macros"]), {"handcrafted_apply_offroad"})
 
     expected_pages = {
       "pages/cruise.yaml": ("cruise", "smart_cruise", ["nrdr"]),
@@ -82,7 +82,7 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
 
     canonical_keys = set(canonical_references) & catalog_keys
     generated_nrdr_keys = set(generated_references) & catalog_keys
-    self.assertEqual(len(canonical_keys), 81)
+    self.assertEqual(len(canonical_keys), 87)
     self.assertEqual(canonical_keys, generated_nrdr_keys)
     self.assertEqual(set(canonical_references) - catalog_keys, set())
     retired_steer_ratio_keys = {

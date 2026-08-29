@@ -4,16 +4,11 @@ from __future__ import annotations
 
 import copy
 
-from openpilot.nrdr.params import NRDR_UI_METADATA_BY_KEY, UiEditPolicy, get_ui_metadata
+from openpilot.nrdr.params import NRDR_UI_METADATA_BY_KEY, get_ui_metadata
 
 
 class SunnylinkMetadataConflict(ValueError):
   pass
-
-
-_EDIT_POLICY_RULES = {
-  UiEditPolicy.HANDCRAFTED_LATERAL_UNLOCKED: {"$ref": "#/macros/handcrafted_lateral_unlocked"},
-}
 
 
 def sunnylink_fields_for_key(key: str) -> dict:
@@ -31,8 +26,6 @@ def sunnylink_fields_for_key(key: str) -> dict:
     fields["details"] = metadata.details
   if numeric.unit is not None:
     fields["unit"] = numeric.unit
-  if metadata.edit_policies:
-    fields["enablement"] = [copy.deepcopy(_EDIT_POLICY_RULES[policy]) for policy in metadata.edit_policies]
   return fields
 
 
