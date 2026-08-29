@@ -1,0 +1,66 @@
+from openpilot.cereal import log
+from openpilot.selfdrive.controls.lib.latcontrol import LatControl
+from openpilot.common.pid import PIDController
+from openpilot.nrdr.features.lateral.latcontrol_pid import NrdrLatControlPID
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import SteerRatioSelection
+
+
+class LatControlPID(LatControl):
+  def __init__(self, CP, CP_SP, CI, dt):
+    super().__init__(CP, CP_SP, CI, dt)
+    self.pid = PIDController((CP.lateralTuning.pid.kpBP, CP.lateralTuning.pid.kpV),
+                             (CP.lateralTuning.pid.kiBP, CP.lateralTuning.pid.kiV),
+                             pos_limit=self.steer_max, neg_limit=-self.steer_max)
+    self.ff_factor = CP.lateralTuning.pid.kf
+    self.get_steer_feedforward = CI.get_steer_feedforward_function()
+    self.nrdr_controller = NrdrLatControlPID(CP, CP_SP, CI, dt) if NrdrLatControlPID.supports(CP, CP_SP) else None
+
+  def update_model_v2(self, model_v2):
+    if self.nrdr_controller is not None:
+      self.nrdr_controller.update_model_v2(model_v2)
+
+  def set_steer_ratio_selection(self, selection: SteerRatioSelection):
+    super().set_steer_ratio_selection(selection)
+    if self.nrdr_controller is not None:
+      self.nrdr_controller.set_steer_ratio_selection(selection)
+
+  def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, calibrated_pose, curvature_limited, lat_delay):
+    if self.nrdr_controller is not None:
+      return self.nrdr_controller.update(
+        active, CS, VM, params, steer_limited_by_safety, desired_curvature, calibrated_pose, curvature_limited, lat_delay,
+      )
+
+    pid_log = log.ControlsState.LateralPIDState.new_message()
+    pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
+    pid_log.steeringRateDeg = float(CS.steeringRateDeg)
+
+    angle_steers_des_no_offset = self.steer_ratio_selection.desired_angle_no_offset(
+      VM, CS.steeringAngleDeg, CS.vEgo, params.roll, desired_curvature,
+    )
+    angle_steers_des = angle_steers_des_no_offset + params.angleOffsetDeg
+    error = angle_steers_des - CS.steeringAngleDeg
+
+    pid_log.steeringAngleDesiredDeg = angle_steers_des
+    pid_log.angleError = error
+    if not active:
+      output_torque = 0.0
+      pid_log.active = False
+
+    else:
+      # offset does not contribute to resistive torque
+      ff = self.ff_factor * self.get_steer_feedforward(angle_steers_des_no_offset, CS.vEgo)
+      freeze_integrator = steer_limited_by_safety or CS.steeringPressed or CS.vEgo < 5
+
+      output_torque = self.pid.update(error,
+                                feedforward=ff,
+                                speed=CS.vEgo,
+                                freeze_integrator=freeze_integrator)
+
+      pid_log.active = True
+      pid_log.p = float(self.pid.p)
+      pid_log.i = float(self.pid.i)
+      pid_log.f = float(self.pid.f)
+      pid_log.output = float(output_torque)
+      pid_log.saturated = bool(self._check_saturation(self.steer_max - abs(output_torque) < 1e-3, CS, steer_limited_by_safety, curvature_limited))
+
+    return output_torque, angle_steers_des, pid_log

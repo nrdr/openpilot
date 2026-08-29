@@ -1,0 +1,18 @@
+# Canonical NRDR items merged into the Sunnylink host page.
+page_id: device
+section_id: general
+after_item: OnroadUploads
+items:
+  - key: DisablePowerDown
+    widget: toggle
+    title: Prevent Automatic Shutdown
+    description: Prevents openpilot's automatic offroad shutdowns after the vehicle is turned off.
+    details: When enabled, this bypasses the Max Time Offroad timer and its low-voltage and estimated-battery safeguards, and can drain the vehicle battery. When disabled, those safeguards resume after a 60-second grace period. Manual Power Off still works.
+    enablement:
+    - $ref: '#/macros/offroad'
+extend_enablement:
+  - item_key: MaxTimeOffroad
+    conditions:
+      - type: param
+        key: DisablePowerDown
+        equals: false
