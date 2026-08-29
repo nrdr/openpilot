@@ -14,7 +14,7 @@ from opendbc.sunnypilot.car.tesla.values import TeslaFlagsSP
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import get_handcrafted_lateral_profile
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import handcrafted_lateral_profile_supported
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
 from openpilot.sunnypilot.nrdr.interpolated_torque import is_interpolated_torque_pif_supported
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import get_steer_ratio_metadata
@@ -198,7 +198,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
 
   _resolve_brand_capabilities(caps, bundle_platform, CP)
   fingerprint = caps["car_fingerprint"] or bundle_platform
-  caps["has_handcrafted_lateral_profile"] = get_handcrafted_lateral_profile(fingerprint) is not None
+  caps["has_handcrafted_lateral_profile"] = handcrafted_lateral_profile_supported(CP or fingerprint, CP_SP)
   caps["nrdr_manual_steer_ratio_available"] = str(caps["brand"]).lower() == "honda" and get_steer_ratio_metadata(fingerprint) is not None
   caps["nrdr_raw_steer_ratio_available"] = str(caps["brand"]).lower() == "honda" and fingerprint == "HONDA_CLARITY"
   caps["nrdr_firmware_steer_ratio_available"] = CP is not None and get_honda_vgr_profile(CP) is not None

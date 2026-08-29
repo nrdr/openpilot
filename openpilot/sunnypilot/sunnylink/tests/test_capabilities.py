@@ -112,6 +112,33 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
     assert model_caps["nrdr_manual_steer_ratio_available"] is True
     assert model_caps["nrdr_raw_steer_ratio_available"] is True
     assert model_caps["nrdr_firmware_steer_ratio_available"] is False
+    assert model_caps["has_handcrafted_lateral_profile"] is False
+
+  def test_clarity_handcrafted_capability_requires_exact_firmware_and_modified_controller(self, params):
+    CP = car.CarParams.new_message()
+    CP.brand = "honda"
+    CP.carFingerprint = "HONDA_CLARITY"
+    CP.lateralTuning.init("torque")
+    firmware = CP.init("carFw", 1)
+    firmware[0].ecu = "eps"
+    firmware[0].fwVersion = b"39990-TRW-A020"
+    CP_SP = custom.CarParamsSP.new_message()
+    CP_SP.flags = HondaFlagsSP.EPS_MODIFIED.value
+
+    params.put("CarParamsPersistent", CP.to_bytes(), block=True)
+    params.put("CarParamsSPPersistent", CP_SP.to_bytes(), block=True)
+    caps = generate_capabilities(params)
+    assert caps["nrdr_firmware_steer_ratio_available"] is True
+    assert caps["nrdr_interpolated_torque_pif_blend_available"] is True
+    assert caps["has_handcrafted_lateral_profile"] is True
+
+    firmware[0].fwVersion = b"39990-TRW-A021"
+    params.put("CarParamsPersistent", CP.to_bytes(), block=True)
+    assert generate_capabilities(params)["has_handcrafted_lateral_profile"] is False
+
+  def test_legacy_handcrafted_bundle_remains_available_without_clarity_extensions(self, params):
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_ACCORD"}, block=True)
+    assert generate_capabilities(params)["has_handcrafted_lateral_profile"] is True
 
   def test_honda_looking_fingerprint_on_other_brand_is_unavailable(self, params):
     params.put("CarPlatformBundle", {"brand": "toyota", "platform": "HONDA_CLARITY"}, block=True)

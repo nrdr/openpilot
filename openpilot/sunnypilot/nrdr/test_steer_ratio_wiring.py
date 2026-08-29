@@ -111,3 +111,23 @@ def test_handcrafted_profile_and_dungeon_have_no_retired_sr_ownership():
       "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
     ):
       assert retired not in contents, (path, retired)
+
+
+def test_handcrafted_native_control_is_a_durable_one_shot_without_ui_locks():
+  page = source("openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/lateral_tuning.py")
+  assert 'tr("Apply Handcrafted Lateral Profile")' in page
+  assert 'tr("WAIT") if ui_state.params.get_bool("NrdrHandcraftedLateralTune") else tr("APPLY")' in page
+  assert 'ui_state.params.put_bool("NrdrHandcraftedLateralTune", True, block=True)' in page
+  assert "handcrafted_lateral_profile_supported(ui_state.CP, ui_state.CP_SP)" in page
+  assert "supported and ui_state.is_offroad() and not pending" in page
+  assert "manual changes persist" in page
+
+  for path in (
+    "openpilot/selfdrive/ui/sunnypilot/layouts/settings/models.py",
+    "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/override_tuning.py",
+    "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/pidf_ground.py",
+    "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/steer_filters.py",
+    "openpilot/selfdrive/ui/sunnypilot/layouts/settings/nrdr_sub_layouts/vehicle_model_learning.py",
+    "openpilot/sunnypilot/nrdr/settings.py",
+  ):
+    assert "NrdrHandcraftedLateralTune" not in source(path), path

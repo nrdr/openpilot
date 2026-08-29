@@ -3,7 +3,6 @@ import pyray as rl
 
 from openpilot.cereal import log
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
@@ -92,10 +91,6 @@ class VehicleModelLearningLayout(Widget):
   def _update_state(self):
     super()._update_state()
     self._refresh_live_params()
-    fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
-    editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
-    for item in (self._learn_stiffness, self._learn_angle_offset):
-      item.action_item.set_enabled(editable)
 
   def _render(self, rect):
     self._back_button.set_position(self._rect.x, self._rect.y + 20)

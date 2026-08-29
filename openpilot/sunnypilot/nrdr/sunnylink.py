@@ -3,6 +3,7 @@ from pathlib import Path
 UNREGISTERED = "UnregisteredDevice"
 ONROAD_BLOCKED_PARAMS = {
   "LongitudinalPersonality",
+  "NrdrHandcraftedLateralTune",
   "NrdrSteerRatioMode",
   "NrdrSteerRatioManualCenter",
   "NrdrSteerRatioManualFinal",

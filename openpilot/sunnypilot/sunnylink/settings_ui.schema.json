@@ -322,8 +322,8 @@
           "description": "Display label for the sub-panel header."
         },
         "trigger_key": {
-          "type": "string",
-          "description": "The param key that triggers opening this sub-panel."
+          "type": ["string", "null"],
+          "description": "The param key that triggers opening this sub-panel, or null for navigation-only panels."
         },
         "trigger_condition": {
           "$ref": "#/$defs/Rule",

@@ -49,6 +49,50 @@ class FailOnceParams(FakeParams):
     super().put(key, value, block=block)
 
 
+class FailAfterPutOnceParams(FakeParams):
+  def __init__(self, values=None, *, fail_key):
+    super().__init__(values)
+    self.fail_key = fail_key
+    self.failed = False
+
+  def put(self, key, value, *, block=False):
+    super().put(key, value, block=block)
+    if key == self.fail_key and not self.failed:
+      self.failed = True
+      raise RuntimeError(f"simulated post-write interruption for {key}")
+
+
+class SilentPutOnceParams(FakeParams):
+  def __init__(self, values=None, *, fail_key):
+    super().__init__(values)
+    self.fail_key = fail_key
+    self.failed = False
+
+  def put(self, key, value, *, block=False):
+    if key == self.fail_key and not self.failed:
+      assert block
+      self.failed = True
+      return
+    super().put(key, value, block=block)
+
+
+class WrongTypeReadbackOnceParams(FakeParams):
+  class FloatAlias(float):
+    pass
+
+  def __init__(self, values=None, *, corrupt_key):
+    super().__init__(values)
+    self.corrupt_key = corrupt_key
+    self.corrupted = False
+
+  def get(self, key, *, return_default=False, **kwargs):
+    value = super().get(key, return_default=return_default, **kwargs)
+    if key == self.corrupt_key and value is not None and not self.corrupted:
+      self.corrupted = True
+      return self.FloatAlias(value)
+    return value
+
+
 def test_nrdr_steer_ratio_migration_preserves_attached_family_values():
   params = FakeParams({
     "CarPlatformBundle": {"platform": "HONDA_CLARITY"},
@@ -139,16 +183,19 @@ def test_nrdr_steer_ratio_migration_retries_an_interrupted_manual_pair_before_mo
   assert params.puts[-1] == ("NrdrSteerRatioMode", 1)
 
 
-def test_interpolated_torque_friction_migration_seeds_all_missing_bands_from_default_low():
+def test_interpolated_torque_friction_migration_seeds_fresh_split_defaults_with_low_last():
   params = FakeParams()
 
   params_migration._migrate_interpolated_torque_friction(params)
 
   assert params.puts == [
-    ("NrdrInterpolatedTorqueFriction", 0.50),
-    ("NrdrInterpolatedTorqueFrictionStandard", 0.50),
-    ("NrdrInterpolatedTorqueFrictionHighway", 0.50),
+    ("NrdrInterpolatedTorqueFrictionStandard", 0.10),
+    ("NrdrInterpolatedTorqueFrictionHighway", 0.06),
+    ("NrdrInterpolatedTorqueFriction", 0.12),
   ]
+  first_puts = list(params.puts)
+  params_migration._migrate_interpolated_torque_friction(params)
+  assert params.puts == first_puts
 
 
 def test_interpolated_torque_friction_migration_preserves_legacy_tune_in_new_bands():
@@ -181,20 +228,76 @@ def test_interpolated_torque_friction_migration_never_overwrites_present_bands_a
   assert params.puts == first_puts
 
 
-def test_interpolated_torque_friction_migration_stops_dependents_when_low_seed_is_interrupted():
-  params = FailOnceParams(fail_key="NrdrInterpolatedTorqueFriction")
+@pytest.mark.parametrize("fail_key", (
+  "NrdrInterpolatedTorqueFrictionStandard",
+  "NrdrInterpolatedTorqueFrictionHighway",
+  "NrdrInterpolatedTorqueFriction",
+))
+def test_fresh_friction_migration_retries_after_each_durable_write_without_collapsing_bands(fail_key):
+  params = FailAfterPutOnceParams(fail_key=fail_key)
+
+  params_migration._migrate_interpolated_torque_friction(params)
+  params_migration._migrate_interpolated_torque_friction(params)
+
+  assert params.values["NrdrInterpolatedTorqueFriction"] == 0.12
+  assert params.values["NrdrInterpolatedTorqueFrictionStandard"] == 0.10
+  assert params.values["NrdrInterpolatedTorqueFrictionHighway"] == 0.06
+  assert sum(key == "NrdrInterpolatedTorqueFrictionStandard" for key, _ in params.puts) == 1
+  assert sum(key == "NrdrInterpolatedTorqueFrictionHighway" for key, _ in params.puts) == 1
+  assert sum(key == "NrdrInterpolatedTorqueFriction" for key, _ in params.puts) == 1
+
+
+def test_fresh_friction_migration_attempts_splits_independently_and_low_remains_discriminator():
+  params = FailOnceParams(fail_key="NrdrInterpolatedTorqueFrictionStandard")
+
+  params_migration._migrate_interpolated_torque_friction(params)
+  assert "NrdrInterpolatedTorqueFrictionStandard" not in params.values
+  assert params.values["NrdrInterpolatedTorqueFrictionHighway"] == 0.06
+  assert "NrdrInterpolatedTorqueFriction" not in params.values
+
+  params_migration._migrate_interpolated_torque_friction(params)
+  assert params.values["NrdrInterpolatedTorqueFrictionStandard"] == 0.10
+  assert params.values["NrdrInterpolatedTorqueFrictionHighway"] == 0.06
+  assert params.values["NrdrInterpolatedTorqueFriction"] == 0.12
+
+
+@pytest.mark.parametrize("fail_key", (
+  "NrdrInterpolatedTorqueFrictionStandard",
+  "NrdrInterpolatedTorqueFrictionHighway",
+  "NrdrInterpolatedTorqueFriction",
+))
+def test_fresh_friction_migration_retries_silent_writes_before_low_discriminator(fail_key):
+  params = SilentPutOnceParams(fail_key=fail_key)
+
+  params_migration._migrate_interpolated_torque_friction(params)
+  assert "NrdrInterpolatedTorqueFriction" not in params.values
+
+  params_migration._migrate_interpolated_torque_friction(params)
+  assert params.values["NrdrInterpolatedTorqueFriction"] == 0.12
+  assert params.values["NrdrInterpolatedTorqueFrictionStandard"] == 0.10
+  assert params.values["NrdrInterpolatedTorqueFrictionHighway"] == 0.06
+
+
+def test_fresh_friction_migration_requires_exact_readback_type_before_low_discriminator():
+  params = WrongTypeReadbackOnceParams(corrupt_key="NrdrInterpolatedTorqueFrictionStandard")
+
+  params_migration._migrate_interpolated_torque_friction(params)
+  assert "NrdrInterpolatedTorqueFriction" not in params.values
+  assert type(params.values["NrdrInterpolatedTorqueFrictionStandard"]) is float
+  assert params.values["NrdrInterpolatedTorqueFrictionHighway"] == 0.06
+
+  params_migration._migrate_interpolated_torque_friction(params)
+  assert params.values["NrdrInterpolatedTorqueFriction"] == 0.12
+
+
+def test_fresh_partial_split_values_are_preserved_and_only_missing_values_are_seeded():
+  params = FakeParams({"NrdrInterpolatedTorqueFrictionStandard": 0.34})
 
   params_migration._migrate_interpolated_torque_friction(params)
 
-  assert not params.values
-  assert not params.puts
-
-  params_migration._migrate_interpolated_torque_friction(params)
-  assert params.puts == [
-    ("NrdrInterpolatedTorqueFriction", 0.50),
-    ("NrdrInterpolatedTorqueFrictionStandard", 0.50),
-    ("NrdrInterpolatedTorqueFrictionHighway", 0.50),
-  ]
+  assert params.values["NrdrInterpolatedTorqueFrictionStandard"] == 0.34
+  assert params.values["NrdrInterpolatedTorqueFrictionHighway"] == 0.06
+  assert params.values["NrdrInterpolatedTorqueFriction"] == 0.12
 
 
 def test_interpolated_torque_friction_migration_independently_retries_interrupted_band():

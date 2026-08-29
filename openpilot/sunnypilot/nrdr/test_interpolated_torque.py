@@ -8,6 +8,8 @@ from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.constants import CV
 from openpilot.sunnypilot.nrdr.interpolated_torque import (
   FRICTION_DEFAULT,
+  FRICTION_HIGHWAY_DEFAULT,
+  FRICTION_STANDARD_DEFAULT,
   InterpolatedTorqueSettings,
   LegacyTorqueController,
   LegacyPIDController,
@@ -54,7 +56,7 @@ def _cp_sp(modified=True):
 def test_settings_defaults_bounds_and_friction_independence():
   defaults = settings_from_params(FakeParams())
   assert defaults == InterpolatedTorqueSettings(
-    False, 0.5, 5.0, FRICTION_DEFAULT, FRICTION_DEFAULT, FRICTION_DEFAULT,
+    False, 0.5, 5.0, FRICTION_DEFAULT, FRICTION_STANDARD_DEFAULT, FRICTION_HIGHWAY_DEFAULT,
   )
   assert defaults.friction == defaults.friction_low
 

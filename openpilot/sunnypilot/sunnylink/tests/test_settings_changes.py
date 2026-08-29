@@ -26,6 +26,7 @@ from openpilot.common.parameterized import parameterized
 if sys.platform == "win32":
   hardware_module = ModuleType("openpilot.common.hardware")
   hardware_module.PC = True
+  hardware_module.COMMA_HARDWARE = False
   hardware_module.HARDWARE = SimpleNamespace(get_device_type=lambda: "pc")
   sys.modules.setdefault("openpilot.common.hardware", hardware_module)
   hardware_hw_module = ModuleType("openpilot.common.hardware.hw")
@@ -377,7 +378,7 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
 
 
 class TestNrdrSteerRatioMode(OpenpilotTestCase):
-  HANDCRAFTED_LOCKED_KEYS = (
+  FORMERLY_HANDCRAFTED_LOCKED_KEYS = (
     "NrdrLatStiction",
     "HondaCenterScale",
     "NrdrDriverOverrideThreshold",
@@ -387,7 +388,7 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     "NrdrNnlcEnabled",
   )
 
-  def test_handcrafted_profile_is_first_and_documents_winning_behavior(self, schema):
+  def test_handcrafted_profile_is_first_and_documents_one_shot_behavior(self, schema):
     section = _find_section(schema, "steering", "nrdr")
     assert section is not None
     assert section["items"][0]["key"] == "NrdrHandcraftedLateralTune"
@@ -395,19 +396,22 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     item = section["items"][0]
     assert item.get("widget") == "toggle"
     assert "offroad_only" in _flatten_rule_types(item.get("enablement"))
+    assert "has_handcrafted_lateral_profile" in json.dumps(item.get("visibility") or [])
     description = f"{item.get('description', '')} {item.get('details', '')}".lower()
-    assert "off by default" in description
-    assert "enable this" in description
-    assert "leave this off" in description
-    assert "clarity-derived" in description
-    assert "predictive stiction" in description
-    assert "steer ratio is intentionally independent" in description
+    assert "turn on once" in description
+    assert "turn off automatically" in description
+    assert "refresh" in description
+    assert "durable one-shot command" in description
+    assert "not a mode or a lock" in description
+    assert "manual edits" in description and "persist" in description
+    assert "failed or incomplete" in description and "offroad retry" in description
+    assert "clarity v17" in description and "firmware steer-ratio" in description
 
-  @parameterized.expand(HANDCRAFTED_LOCKED_KEYS, names=["key"])
-  def test_winning_profile_controls_are_locked_while_handcrafted_is_on(self, schema, key):
+  @parameterized.expand(FORMERLY_HANDCRAFTED_LOCKED_KEYS, names=["key"])
+  def test_manual_controls_are_never_locked_by_one_shot_request(self, schema, key):
     item = _find_item(schema, key)
     assert item is not None
-    assert "NrdrHandcraftedLateralTune" in json.dumps(item.get("enablement") or [])
+    assert "NrdrHandcraftedLateralTune" not in json.dumps(item.get("enablement") or [])
 
   @parameterized.expand([
     "NrdrLearnSteerRatio", "NrdrLegacyDualBpSteerRatio", "NrdrLaneChangeEndpointSteerRatio",
@@ -525,6 +529,16 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     assert "24–26 mph" in _find_item(schema, "NrdrInterpolatedTorqueFriction")["details"]
     assert "26–49 mph" in _find_item(schema, "NrdrInterpolatedTorqueFrictionStandard")["details"]
     assert "49–51 mph" in _find_item(schema, "NrdrInterpolatedTorqueFrictionHighway")["details"]
+
+  @parameterized.expand([
+    ("NrdrInterpolatedTorqueFriction", "0.12"),
+    ("NrdrInterpolatedTorqueFrictionStandard", "0.10"),
+    ("NrdrInterpolatedTorqueFrictionHighway", "0.06"),
+  ], names=["key", "default"])
+  def test_friction_copy_matches_fresh_runtime_defaults(self, schema, key, default):
+    item = _find_item(schema, key)
+    copy = f"{item.get('description', '')} {item.get('details', '')}"
+    assert f"Default {default}" in copy
 
   def test_nnlc_stays_configured_but_is_disabled_while_supported_blend_is_on(self, schema):
     nnlc = _find_item(schema, "NrdrNnlcEnabled")

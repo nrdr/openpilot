@@ -33,6 +33,9 @@ def test_local_interpolated_torque_controls_have_shared_support_and_engagement_g
   assert 'tr("Low-Speed Torque Friction (Below 25mph)")' in source
   assert 'tr("Standard-Speed Torque Friction (25-50mph)")' in source
   assert 'tr("Highway Torque Friction (50mph+)")' in source
+  assert "Default 0.12" in source
+  assert "Default 0.10" in source
+  assert "Default 0.06" in source
   assert "24-26 mph (±1 mph around 25)" in source
   assert "fully active from 26-49 mph" in source
   assert "49-51 mph (±1 mph around 50)" in source

@@ -5,9 +5,7 @@ from opendbc.car.structs import car
 from opendbc.car.car_helpers import interfaces
 from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
-  apply_handcrafted_lateral_profile,
-  get_handcrafted_lateral_profile,
-  is_handcrafted_lateral_enabled,
+  handcrafted_lateral_profile_status,
 )
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
 from openpilot.sunnypilot.nrdr.interpolated_torque import (
@@ -206,7 +204,7 @@ class CarTuneReporter:
     final = selection.settings.manual_final
     return f"Manual | {center:.2f} center -> {final:.2f} final by {outer_angle:.1f} deg | no lane fade"
 
-  def _controller_info(self, CP, controller: str, handcrafted_enabled: bool, profile) -> str:
+  def _controller_info(self, CP, controller: str) -> str:
     if controller == "PID/NNLC":
       firmware_pid_only = self._steer_ratio_mode() is SteerRatioMode.FIRMWARE and get_honda_vgr_profile(CP) is not None
       if firmware_pid_only:
@@ -216,27 +214,17 @@ class CarTuneReporter:
           else "PID only | NNLC disabled"
     else:
       nnlc = controller
-    return f"Handcrafted v{profile.version} | {nnlc}" if handcrafted_enabled else nnlc
+    return nnlc
 
   def _build(self, CP) -> dict[str, str]:
-    changed = apply_handcrafted_lateral_profile(CP.carFingerprint, self.params)
-    if changed:
-      cloudlog.warning({
-        "event": "handcrafted lateral profile restored offroad",
-        "carFingerprint": str(CP.carFingerprint),
-        "changedParams": changed,
-      })
-
     eps = self._eps_firmware(CP)
     eps_short = eps.rsplit(",", 1)[-1].strip() if "," in eps else eps
     interceptor = self._gas_interceptor()
     CP_SP = self._car_params_sp()
     controller = self._controller_name(CP)
     model = get_active_bundle(self.params)
-    profile = get_handcrafted_lateral_profile(CP.carFingerprint)
-    handcrafted_enabled = is_handcrafted_lateral_enabled(CP.carFingerprint, self.params)
-    handcrafted = f"{profile.name} (v{profile.version})" if handcrafted_enabled and profile is not None else "OFF"
-    controller_info = self._controller_info(CP, controller, handcrafted_enabled, profile)
+    handcrafted = handcrafted_lateral_profile_status(CP, CP_SP, self.params)
+    controller_info = self._controller_info(CP, controller)
     interpolated_torque = self._interpolated_torque_info(CP, CP_SP)
     controller_info = f"{controller_info} | Torque/PIF blend: {interpolated_torque}"
 

@@ -131,9 +131,9 @@ class TestParams(OpenpilotTestCase):
     assert self.params.get_default_value("NrdrInterpolatedTorquePifBlend") is False
     assert self.params.get_default_value("NrdrInterpolatedTorqueShare") == 50
     assert self.params.get_default_value("NrdrInterpolatedTorqueLatAccelFactor") == 5.0
-    assert self.params.get_default_value("NrdrInterpolatedTorqueFriction") == 0.5
-    assert self.params.get_default_value("NrdrInterpolatedTorqueFrictionStandard") == 0.5
-    assert self.params.get_default_value("NrdrInterpolatedTorqueFrictionHighway") == 0.5
+    assert self.params.get_default_value("NrdrInterpolatedTorqueFriction") == 0.12
+    assert self.params.get_default_value("NrdrInterpolatedTorqueFrictionStandard") == 0.10
+    assert self.params.get_default_value("NrdrInterpolatedTorqueFrictionHighway") == 0.06
     assert self.params.get_default_value("HondaPidFriction") == 0.0
 
   def test_params_get_type(self):

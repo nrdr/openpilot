@@ -20,7 +20,9 @@ _NRDR_STEER_RATIO_MANUAL_DEFAULTS = (15.38, 10.93)
 _NRDR_INTERPOLATED_TORQUE_FRICTION_LOW = "NrdrInterpolatedTorqueFriction"
 _NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD = "NrdrInterpolatedTorqueFrictionStandard"
 _NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY = "NrdrInterpolatedTorqueFrictionHighway"
-_NRDR_INTERPOLATED_TORQUE_FRICTION_DEFAULT = 0.50
+_NRDR_INTERPOLATED_TORQUE_FRICTION_LOW_DEFAULT = 0.12
+_NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD_DEFAULT = 0.10
+_NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY_DEFAULT = 0.06
 
 # These old keys are tombstones after the steer-ratio mode migration. They are
 # read here only to preserve an existing owner's tune for the attached car.
@@ -136,7 +138,7 @@ def _migrate_nrdr_steer_ratio_mode(_params) -> None:
 
 
 def _migrate_interpolated_torque_friction(_params) -> None:
-  """Split legacy friction into three bands without changing an existing tune."""
+  """Seed fresh split defaults or preserve an existing legacy Low tune."""
   try:
     low = _params.get(_NRDR_INTERPOLATED_TORQUE_FRICTION_LOW)
     standard = _params.get(_NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD)
@@ -145,34 +147,48 @@ def _migrate_interpolated_torque_friction(_params) -> None:
     cloudlog.exception(f"Error reading interpolated Torque friction settings for migration: {e}")
     return
 
-  if low is None:
+  def write_verified(key: str, value: float, label: str) -> bool:
     try:
-      _params.put(
-        _NRDR_INTERPOLATED_TORQUE_FRICTION_LOW,
-        _NRDR_INTERPOLATED_TORQUE_FRICTION_DEFAULT,
-        block=True,
-      )
-      low = _params.get(_NRDR_INTERPOLATED_TORQUE_FRICTION_LOW)
+      _params.put(key, value, block=True)
+      readback = _params.get(key)
+      if type(readback) is not type(value) or readback != value:
+        cloudlog.error(f"Interpolated Torque friction migration could not verify {label}-speed value")
+        return False
+      return True
     except Exception as e:
-      cloudlog.exception(f"Error seeding low-speed interpolated Torque friction: {e}")
-      return
-    if low is None:
-      cloudlog.error("Interpolated Torque friction migration could not read back the low-speed value")
-      return
+      cloudlog.exception(f"Error seeding {label}-speed interpolated Torque friction: {e}")
+      return False
+
+  if low is None:
+    # Low is the durable discriminator between a fresh install and an upgrade.
+    # Seed/verify the split bands independently, then write Low LAST. An
+    # interrupted retry therefore cannot misclassify a fresh split as a legacy
+    # Low-only tune and collapse it to .12/.12/.12.
+    standard_ready = standard is not None or write_verified(
+      _NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD,
+      _NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD_DEFAULT,
+      "standard",
+    )
+    highway_ready = highway is not None or write_verified(
+      _NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY,
+      _NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY_DEFAULT,
+      "highway",
+    )
+    if standard_ready and highway_ready and write_verified(
+      _NRDR_INTERPOLATED_TORQUE_FRICTION_LOW,
+      _NRDR_INTERPOLATED_TORQUE_FRICTION_LOW_DEFAULT,
+      "low",
+    ):
+      cloudlog.info("params_migration: initialized fresh interpolated Torque friction defaults 0.12/0.10/0.06")
+    return
 
   migrated = []
-  for key, value, label in (
+  for key, current, label in (
     (_NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD, standard, "standard"),
     (_NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY, highway, "highway"),
   ):
-    if value is not None:
-      continue
-    try:
-      _params.put(key, low, block=True)
+    if current is None and write_verified(key, low, label):
       migrated.append(label)
-    except Exception as e:
-      cloudlog.exception(f"Error seeding {label}-speed interpolated Torque friction: {e}")
-
   if migrated:
     cloudlog.info(
       f"params_migration: initialized interpolated Torque friction {','.join(migrated)} from low-speed value {low}"

@@ -72,14 +72,5 @@ def apply_chevron_preference(control, state, value):
   control.action_item.set_enabled(state.is_offroad())
 
 
-def apply_handcrafted_delay_controls(layout, state):
-  from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
-
-  fingerprint = str(state.CP.carFingerprint) if state.CP is not None else ""
-  enabled = not is_handcrafted_lateral_enabled(fingerprint, state.params)
-  layout.lagd_toggle.action_item.set_enabled(enabled)
-  layout.delay_control.action_item.set_enabled(enabled)
-
-
 def hide_global_controller_settings(items):
   return items[:-5]

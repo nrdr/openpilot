@@ -23,3 +23,8 @@ def test_interpolated_torque_group_cannot_be_written_onroad():
   ):
     assert not allow_param_write(key, onroad=True)
     assert allow_param_write(key, onroad=False)
+
+
+def test_handcrafted_one_shot_command_cannot_be_written_onroad():
+  assert not allow_param_write("NrdrHandcraftedLateralTune", onroad=True)
+  assert allow_param_write("NrdrHandcraftedLateralTune", onroad=False)

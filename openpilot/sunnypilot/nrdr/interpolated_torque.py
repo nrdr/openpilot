@@ -27,7 +27,11 @@ PARAM_KEYS = (
 
 TORQUE_SHARE_DEFAULT = 50.0
 LAT_ACCEL_FACTOR_DEFAULT = 5.0
-FRICTION_DEFAULT = 0.50
+FRICTION_LOW_DEFAULT = 0.12
+FRICTION_STANDARD_DEFAULT = 0.10
+FRICTION_HIGHWAY_DEFAULT = 0.06
+# Compatibility name for callers which still mean the legacy/low band.
+FRICTION_DEFAULT = FRICTION_LOW_DEFAULT
 FRICTION_LOW_STANDARD_TRANSITION_MPH = 25.0
 FRICTION_STANDARD_HIGHWAY_TRANSITION_MPH = 50.0
 FRICTION_TRANSITION_HALF_WIDTH_MPH = 1.0
@@ -46,9 +50,9 @@ class InterpolatedTorqueSettings:
   enabled: bool = False
   torque_share: float = TORQUE_SHARE_DEFAULT / 100.0
   lat_accel_factor: float = LAT_ACCEL_FACTOR_DEFAULT
-  friction_low: float = FRICTION_DEFAULT
-  friction_standard: float = FRICTION_DEFAULT
-  friction_highway: float = FRICTION_DEFAULT
+  friction_low: float = FRICTION_LOW_DEFAULT
+  friction_standard: float = FRICTION_STANDARD_DEFAULT
+  friction_highway: float = FRICTION_HIGHWAY_DEFAULT
 
   @property
   def friction(self) -> float:
@@ -132,9 +136,9 @@ def settings_from_params(params) -> InterpolatedTorqueSettings:
     enabled=read_bool(params, PARAM_BLEND),
     torque_share=read_float(params, PARAM_TORQUE_SHARE, TORQUE_SHARE_DEFAULT, 0.0, 100.0) / 100.0,
     lat_accel_factor=read_float(params, PARAM_LAT_ACCEL_FACTOR, LAT_ACCEL_FACTOR_DEFAULT, 0.1, 10.0),
-    friction_low=read_float(params, PARAM_FRICTION, FRICTION_DEFAULT, 0.0, 1.0),
-    friction_standard=read_float(params, PARAM_FRICTION_STANDARD, FRICTION_DEFAULT, 0.0, 1.0),
-    friction_highway=read_float(params, PARAM_FRICTION_HIGHWAY, FRICTION_DEFAULT, 0.0, 1.0),
+    friction_low=read_float(params, PARAM_FRICTION, FRICTION_LOW_DEFAULT, 0.0, 1.0),
+    friction_standard=read_float(params, PARAM_FRICTION_STANDARD, FRICTION_STANDARD_DEFAULT, 0.0, 1.0),
+    friction_highway=read_float(params, PARAM_FRICTION_HIGHWAY, FRICTION_HIGHWAY_DEFAULT, 0.0, 1.0),
   )
 
 

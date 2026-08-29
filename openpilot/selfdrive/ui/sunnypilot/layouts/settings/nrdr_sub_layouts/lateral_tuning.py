@@ -12,7 +12,7 @@ from opendbc.car.car_helpers import interfaces
 from opendbc.car.structs import car
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import get_handcrafted_lateral_profile
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import handcrafted_lateral_profile_supported
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget, DialogResult
@@ -23,7 +23,7 @@ from openpilot.system.ui.widgets.list_view import (BUTTON_BORDER_RADIUS, BUTTON_
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.html_render import HtmlModalSP
-from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, simple_button_item_sp, toggle_item_sp
+from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, simple_button_item_sp
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.pidf_ground import PidfGroundLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.vehicle_model_learning import VehicleModelLearningLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.override_tuning import OverrideTuningLayout
@@ -291,6 +291,19 @@ class LateralTuningLayout(Widget):
   def _show_pid_tune_info(self):
     gui_app.push_widget(HtmlModalSP(text=self._build_pid_tune_info()))
 
+  def _on_handcrafted_apply(self):
+    if not ui_state.is_offroad() or not handcrafted_lateral_profile_supported(ui_state.CP, ui_state.CP_SP):
+      return
+    ui_state.params.put_bool("NrdrHandcraftedLateralTune", True, block=True)
+
+  @staticmethod
+  def _handcrafted_description() -> str:
+    status = str(ui_state.params.get("NrdrCarHandcraftedInfo") or tr("Not applied yet."))
+    return tr(
+      "Apply NRDR's versioned road-tested profile once. The device verifies every value, then the request turns off automatically. " +
+      "After it finishes, every tuning control remains editable and manual changes persist."
+    ) + "<br><br>" + tr("Status: {}").format(status)
+
   def _initialize_vehicle_items(self):
     self._tune_report_item = ListItem(
       title=lambda: tr("Run Tune Report Scan"),
@@ -319,12 +332,11 @@ class LateralTuningLayout(Widget):
     return [self._tune_report_item, self._pid_tune_info_item]
 
   def _initialize_items(self):
-    self._handcrafted_tune = toggle_item_sp(
-      title=lambda: tr("Handcrafted Lateral Tuning"),
-      description=lambda: tr("Off by default. Enable this to load NRDR's Clarity-derived, road-tested controller settings. " +
-                             "Steer Ratio Tuning is separate, so you can choose Manual, Comma, NRDR Raw, or Firmware geometry " +
-                             "without this profile changing it. Other controller settings are locked while enabled."),
-      param="NrdrHandcraftedLateralTune",
+    self._handcrafted_apply = button_item(
+      lambda: tr("Apply Handcrafted Lateral Profile"),
+      lambda: tr("WAIT") if ui_state.params.get_bool("NrdrHandcraftedLateralTune") else tr("APPLY"),
+      self._handcrafted_description,
+      callback=self._on_handcrafted_apply,
     )
 
     self._vehicle_model_button = simple_button_item_sp(
@@ -349,7 +361,7 @@ class LateralTuningLayout(Widget):
       callback=lambda: self._set_panel(LateralPanel.STEER_FILTERS),
     )
     return [
-      self._handcrafted_tune,
+      self._handcrafted_apply,
       LineSeparatorSP(40),
       self._vehicle_model_button,
       LineSeparatorSP(40),
@@ -363,9 +375,10 @@ class LateralTuningLayout(Widget):
   def _update_state(self):
     super()._update_state()
     self._poll_tune_report_scan()
-    fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
-    self._handcrafted_tune.set_visible(get_handcrafted_lateral_profile(fingerprint) is not None)
-    self._handcrafted_tune.action_item.set_enabled(ui_state.is_offroad())
+    supported = handcrafted_lateral_profile_supported(ui_state.CP, ui_state.CP_SP)
+    pending = ui_state.params.get_bool("NrdrHandcraftedLateralTune")
+    self._handcrafted_apply.set_visible(supported)
+    self._handcrafted_apply.action_item.set_enabled(supported and ui_state.is_offroad() and not pending)
 
   def _render(self, rect):
     if self._current_panel == LateralPanel.VEHICLE_MODEL:

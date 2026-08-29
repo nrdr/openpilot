@@ -2,7 +2,6 @@ from collections.abc import Callable
 import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import is_handcrafted_lateral_enabled
 from openpilot.sunnypilot.nrdr.honda_vgr import get_honda_vgr_profile
 from openpilot.sunnypilot.nrdr.interpolated_torque import is_interpolated_torque_pif_supported
 from openpilot.sunnypilot.nrdr.steer_ratio_tuning import SteerRatioMode, parse_steer_ratio_mode
@@ -143,7 +142,7 @@ class PidfGroundLayout(Widget):
       min_value=0, max_value=100, value_change_step=1,
       description=lambda: tr("Direct classic-Torque friction for low speed. It is independent of the lateral acceleration factor. " +
                              "The low-to-standard handoff blends smoothly from 24-26 mph (±1 mph around 25). All three friction " +
-                             "values latch for the whole engagement. Default 0.50; too much can make small corrections jumpy."),
+                             "values latch for the whole engagement. Default 0.12; too much can make small corrections jumpy."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -153,7 +152,7 @@ class PidfGroundLayout(Widget):
       min_value=0, max_value=100, value_change_step=1,
       description=lambda: tr("Direct classic-Torque friction for standard speed, independent of the lateral acceleration factor. " +
                              "It is fully active from 26-49 mph, with smooth ±1 mph handoffs around 25 and 50 mph. All three " +
-                             "friction values latch for the whole engagement. Default 0.50."),
+                             "friction values latch for the whole engagement. Default 0.10."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -163,7 +162,7 @@ class PidfGroundLayout(Widget):
       min_value=0, max_value=100, value_change_step=1,
       description=lambda: tr("Direct classic-Torque friction for highway speed, independent of the lateral acceleration factor. " +
                              "The standard-to-highway handoff blends smoothly from 49-51 mph (±1 mph around 50). All three friction " +
-                             "values latch for the whole engagement. Default 0.50."),
+                             "values latch for the whole engagement. Default 0.06."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -309,8 +308,6 @@ class PidfGroundLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
-    fingerprint = str(ui_state.CP.carFingerprint) if ui_state.CP is not None else ""
-    editable = not is_handcrafted_lateral_enabled(fingerprint, ui_state.params)
     mode = parse_steer_ratio_mode(ui_state.params.get("NrdrSteerRatioMode", return_default=True))
     firmware_vgr_active = bool(
       mode is SteerRatioMode.FIRMWARE and ui_state.CP is not None and get_honda_vgr_profile(ui_state.CP) is not None
@@ -336,19 +333,8 @@ class PidfGroundLayout(Widget):
       self._interpolated_torque_friction_highway,
     ):
       item.action_item.set_enabled(interpolated_unlocked and interpolated_enabled)
-    for item in (
-      self._starpilot,
-      self._lat_p_low, self._lat_i_low, self._lat_f_low,
-      self._lat_p_standard, self._lat_i_standard, self._lat_f_standard,
-      self._lat_p_highway, self._lat_i_highway, self._lat_f_highway,
-      self._rate_damping, self._rate_damping_fade_speed,
-      self._center_scale, self._center_boost_threshold, self._center_boost_min_speed,
-      self._lat_stiction,
-    ):
-      item.action_item.set_enabled(editable)
-
     for item in (self._nnlc_enabled, self._nnlc_activation_speed, self._nnlc_kp_gain, self._nnlc_kf_gain, self._nnlc_ki_gain):
-      item.action_item.set_enabled(editable and not firmware_vgr_active and not interpolated_enabled)
+      item.action_item.set_enabled(not firmware_vgr_active and not interpolated_enabled)
 
     nnlc_enabled = self._nnlc_enabled.action_item.get_state()
     self._nnlc_activation_speed.set_visible(nnlc_enabled)

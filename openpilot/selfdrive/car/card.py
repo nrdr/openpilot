@@ -23,7 +23,10 @@ from openpilot.selfdrive.car.cruise import VCruiseHelper
 from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_capnp
 
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import restore_handcrafted_lateral_profile
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
+  HandcraftedLateralUnsafeStateError,
+  consume_handcrafted_lateral_request,
+)
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 
 REPLAY = "REPLAY" in os.environ
@@ -117,7 +120,17 @@ class Car:
       self.CP = self.CI.CP
       self.CP_SP = self.CI.CP_SP
 
-      restore_handcrafted_lateral_profile(self.CP.carFingerprint, self.params)
+      try:
+        consume_handcrafted_lateral_request(self.CP, self.CP_SP, self.params, startup=True)
+      except HandcraftedLateralUnsafeStateError:
+        # Do not construct a controller when a failed profile apply could not
+        # prove the Torque/PIF master OFF and its retry request durable.
+        cloudlog.exception("card: handcrafted lateral safe-state cleanup failed; aborting startup")
+        raise
+      except Exception:
+        # A durable request remains true for a later offroad retry. Fingerprint
+        # completion must never be held hostage by a profile write failure.
+        cloudlog.exception("card: one-shot handcrafted lateral apply failed; request retained")
 
       # continue onto next fingerprinting step in pandad
       self.params.put_bool("FirmwareQueryDone", True, block=True)

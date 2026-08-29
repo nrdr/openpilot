@@ -142,7 +142,7 @@ class TestCarTuneReporter(unittest.TestCase):
     report = reporter._interpolated_torque_info(CP, CP_SP)
     self.assertIn("OFF | Torque 0% / P/I/F 100% | P/I/F unchanged", report)
     self.assertIn("stored next engagement", report)
-    self.assertIn("friction Low 0.50 / Standard 0.50 / Highway 0.50", report)
+    self.assertIn("friction Low 0.12 / Standard 0.10 / Highway 0.06", report)
 
   def test_unavailable_request_reports_effective_pif_and_stored_values(self):
     reporter = CarTuneReporter(self.FakeParams({
