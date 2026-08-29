@@ -7,16 +7,7 @@ from openpilot.common.hardware.hw import Paths
 UNREGISTERED = "UnregisteredDevice"
 ONROAD_WRITE_BLOCKLIST = frozenset((
   "LongitudinalPersonality",
-  "NrdrSteerRatioMode",
-  "NrdrSteerRatioManualCenter",
-  "NrdrSteerRatioManualFinal",
   "NrdrHandcraftedLateralTune",
-  "NrdrInterpolatedTorquePifBlend",
-  "NrdrInterpolatedTorqueShare",
-  "NrdrInterpolatedTorqueLatAccelFactor",
-  "NrdrInterpolatedTorqueFriction",
-  "NrdrInterpolatedTorqueFrictionStandard",
-  "NrdrInterpolatedTorqueFrictionHighway",
 ))
 
 

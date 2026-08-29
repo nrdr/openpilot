@@ -5,6 +5,7 @@ import pytest
 
 from openpilot.nrdr.hooks.controlsd import refresh_live_parameter_settings
 from openpilot.nrdr.params import CONTROL_GROUPS, PLANNER_GROUPS, LiveParams, ParamGroup, REFRESH_PERIOD
+from openpilot.nrdr.params.snapshots import ENGAGEMENT_LATCHED_LATERAL_GROUPS, ENGAGEMENT_LATCHED_LATERAL_KEYS
 
 
 class RecordingParams:
@@ -112,6 +113,36 @@ def test_interpolated_torque_settings_publish_together():
 
   assert len(matching) == 1
   assert set(matching[0].keys) == keys
+
+
+def test_engagement_latched_groups_force_refresh_all_or_nothing():
+  assert ENGAGEMENT_LATCHED_LATERAL_KEYS == {
+    "NrdrSteerRatioMode",
+    "NrdrSteerRatioManualCenter",
+    "NrdrSteerRatioManualFinal",
+    "NrdrInterpolatedTorquePifBlend",
+    "NrdrInterpolatedTorqueShare",
+    "NrdrInterpolatedTorqueLatAccelFactor",
+    "NrdrInterpolatedTorqueFriction",
+    "NrdrInterpolatedTorqueFrictionStandard",
+    "NrdrInterpolatedTorqueFrictionHighway",
+  }
+  initial_values = dict.fromkeys(ENGAGEMENT_LATCHED_LATERAL_KEYS, b"old")
+  params = RecordingParams(dict(initial_values))
+  reader = LiveParams(ENGAGEMENT_LATCHED_LATERAL_GROUPS, params=params, start_worker=False)
+  initial = reader.snapshot
+  params.values.update({key: f"new-{index}".encode() for index, key in enumerate(ENGAGEMENT_LATCHED_LATERAL_KEYS)})
+  params.fail_keys.add("NrdrInterpolatedTorqueFrictionHighway")
+
+  assert not reader.refresh_groups_atomic(ENGAGEMENT_LATCHED_LATERAL_GROUPS)
+  assert reader.snapshot is initial
+  assert dict(reader.snapshot.values) == initial_values
+
+  params.fail_keys.clear()
+  assert reader.refresh_groups_atomic(ENGAGEMENT_LATCHED_LATERAL_GROUPS)
+  assert reader.snapshot is not initial
+  assert dict(reader.snapshot.values) == params.values
+  assert reader.generation == initial.generation + 1
 
 
 def test_roen_setting_reaches_control_and_planner_snapshots():

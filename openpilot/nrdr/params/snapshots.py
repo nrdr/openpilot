@@ -32,6 +32,28 @@ class ParamSnapshot:
     return _bool_value(self.values.get(key))
 
 
+STEER_RATIO_PARAM_GROUP = ParamGroup((
+  "NrdrSteerRatioMode",
+  "NrdrSteerRatioManualCenter",
+  "NrdrSteerRatioManualFinal",
+))
+INTERPOLATED_TORQUE_PIF_PARAM_GROUP = ParamGroup((
+  "NrdrInterpolatedTorquePifBlend",
+  "NrdrInterpolatedTorqueShare",
+  "NrdrInterpolatedTorqueLatAccelFactor",
+  "NrdrInterpolatedTorqueFriction",
+  "NrdrInterpolatedTorqueFrictionStandard",
+  "NrdrInterpolatedTorqueFrictionHighway",
+))
+ENGAGEMENT_LATCHED_LATERAL_GROUPS = (
+  STEER_RATIO_PARAM_GROUP,
+  INTERPOLATED_TORQUE_PIF_PARAM_GROUP,
+)
+ENGAGEMENT_LATCHED_LATERAL_KEYS = frozenset(
+  key for group in ENGAGEMENT_LATCHED_LATERAL_GROUPS for key in group.keys
+)
+
+
 CONTROL_GROUPS = (
   ParamGroup(("LatPScaleLowSpeed", "LatPScaleStandard", "LatPScaleHighway",
               "LatIScaleLowSpeed", "LatIScaleStandard", "LatIScaleHighway",
@@ -41,12 +63,10 @@ CONTROL_GROUPS = (
   ParamGroup(("HondaInjectionTest", "NrdrStarPilotPid", "NrdrLatStiction")),
   # Mode and both manual endpoints are deliberately one atomic snapshot. A
   # latched resolver consumes this group so geometry cannot half-update.
-  ParamGroup(("NrdrSteerRatioMode", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal")),
+  STEER_RATIO_PARAM_GROUP,
   # The controller latches this complete tuple at an inactive boundary. Keep
   # it isolated so a polling generation can never expose a mixed blend.
-  ParamGroup(("NrdrInterpolatedTorquePifBlend", "NrdrInterpolatedTorqueShare",
-              "NrdrInterpolatedTorqueLatAccelFactor", "NrdrInterpolatedTorqueFriction",
-              "NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway")),
+  INTERPOLATED_TORQUE_PIF_PARAM_GROUP,
   ParamGroup(("NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate", "NrdrTuneLearnerReset")),
   ParamGroup(("NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain")),
   ParamGroup(("LongPidTuneScaleAggressive", "LongPidTuneScaleStandard", "LongPidTuneScaleRelaxed",
@@ -128,6 +148,19 @@ class LiveParams:
           return False
       self._publish(values)
       self._slot = 0
+      return True
+
+  def refresh_groups_atomic(self, groups: tuple[ParamGroup, ...]) -> bool:
+    """Synchronously publish selected groups together, or retain the prior snapshot."""
+    if any(group not in self._groups for group in groups):
+      raise ValueError("every refreshed parameter group must belong to this LiveParams instance")
+    with self._poll_lock:
+      values = dict(self._snapshot.values)
+      for group in groups:
+        if not self._read_group(group, values):
+          return False
+      if values != self._snapshot.values:
+        self._publish(values)
       return True
 
   def poll_once(self) -> bool:

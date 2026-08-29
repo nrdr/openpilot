@@ -1,6 +1,7 @@
 import math
 
 from openpilot.nrdr.params import get_live_params
+from openpilot.nrdr.params.snapshots import ENGAGEMENT_LATCHED_LATERAL_GROUPS
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   SteerRatioModeLatch,
   resolve_steer_ratio_selection,
@@ -12,6 +13,7 @@ def initialize_live_parameter_settings(controls) -> None:
   controls.steer_ratio_latch = SteerRatioModeLatch(
     resolve_steer_ratio_selection(controls.CP, controls.nrdr_live_params.snapshot),
   )
+  controls.nrdr_lateral_settings_active = False
   controls.nrdr_last_valid_comma_ratio = max(float(controls.CP.steerRatio), 0.1)
   refresh_live_parameter_settings(controls, None)
 
@@ -55,6 +57,14 @@ def vehicle_model_params(controls, live_params) -> tuple[float, float, float]:
 
 def vehicle_model_state(controls, live_params, CS, lat_active: bool) -> tuple[float, float, float, float]:
   """Return one latched geometry view for both measured and desired curvature paths."""
+  was_active = bool(getattr(controls, "nrdr_lateral_settings_active", False))
+  if was_active and not lat_active:
+    # All nine controller/geometry values are reread once, together, only
+    # after lateral control becomes inactive. Engaged writes therefore reach
+    # the immediately following engagement without any active-loop Params IO.
+    controls.nrdr_live_params.refresh_groups_atomic(ENGAGEMENT_LATCHED_LATERAL_GROUPS)
+  controls.nrdr_lateral_settings_active = bool(lat_active)
+
   candidate = resolve_steer_ratio_selection(controls.CP, controls.nrdr_live_params.snapshot)
   selection = controls.steer_ratio_latch.update(candidate, lat_active)
   if hasattr(controls.LaC, "set_steer_ratio_selection"):

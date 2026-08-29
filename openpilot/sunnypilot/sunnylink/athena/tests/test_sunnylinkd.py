@@ -6,7 +6,7 @@ See the LICENSE.md file in the root directory for more details.
 """
 from openpilot.sunnypilot.sunnylink.athena import sunnylinkd
 from openpilot.common.test import OpenpilotTestCase
-from openpilot.nrdr.features.services.sunnylink import allow_param_write
+from openpilot.nrdr.features.services.sunnylink import ONROAD_WRITE_BLOCKLIST, allow_param_write
 
 
 class TestSunnylinkdMethods(OpenpilotTestCase):
@@ -90,22 +90,23 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     assert self.saved_params == [("SpeedLimitOffset", "10", False)]
 
-  def test_saveParams_blocks_complete_steer_ratio_snapshot_onroad(self):
+  def test_saveParams_allows_complete_steer_ratio_snapshot_onroad(self):
     self.fake_params.offroad = False
 
-    sunnylinkd.saveParams({
+    values = {
       "NrdrSteerRatioMode": "2",
       "NrdrSteerRatioManualCenter": "15.38",
       "NrdrSteerRatioManualFinal": "10.93",
       "SpeedLimitOffset": "10",
-    })
+    }
+    sunnylinkd.saveParams(values)
 
-    assert self.saved_params == [("SpeedLimitOffset", "10", False)]
+    assert self.saved_params == [(key, value, False) for key, value in values.items()]
 
-  def test_saveParams_blocks_complete_interpolated_torque_snapshot_onroad(self):
+  def test_saveParams_allows_complete_interpolated_torque_snapshot_onroad(self):
     self.fake_params.offroad = False
 
-    sunnylinkd.saveParams({
+    values = {
       "NrdrInterpolatedTorquePifBlend": "1",
       "NrdrInterpolatedTorqueShare": "60",
       "NrdrInterpolatedTorqueLatAccelFactor": "5.0",
@@ -113,9 +114,10 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "NrdrInterpolatedTorqueFrictionStandard": "0.30",
       "NrdrInterpolatedTorqueFrictionHighway": "0.12",
       "SpeedLimitOffset": "10",
-    })
+    }
+    sunnylinkd.saveParams(values)
 
-    assert self.saved_params == [("SpeedLimitOffset", "10", False)]
+    assert self.saved_params == [(key, value, False) for key, value in values.items()]
 
   def test_saveParams_allows_complete_interpolated_torque_snapshot_offroad(self):
     values = {
@@ -131,8 +133,11 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     assert self.saved_params == [(key, value, False) for key, value in values.items()]
 
-  def test_interpolated_torque_write_policy_is_server_enforced(self):
+  def test_latched_lateral_write_policy_allows_onroad_saves(self):
     for key in (
+      "NrdrSteerRatioMode",
+      "NrdrSteerRatioManualCenter",
+      "NrdrSteerRatioManualFinal",
       "NrdrInterpolatedTorquePifBlend",
       "NrdrInterpolatedTorqueShare",
       "NrdrInterpolatedTorqueLatAccelFactor",
@@ -140,8 +145,11 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "NrdrInterpolatedTorqueFrictionStandard",
       "NrdrInterpolatedTorqueFrictionHighway",
     ):
-      assert not allow_param_write(key, onroad=True)
+      assert allow_param_write(key, onroad=True)
       assert allow_param_write(key, onroad=False)
+
+  def test_handcrafted_is_the_only_nrdr_onroad_blocked_key(self):
+    assert ONROAD_WRITE_BLOCKLIST == frozenset(("LongitudinalPersonality", "NrdrHandcraftedLateralTune"))
 
   def test_handcrafted_apply_command_is_server_enforced_offroad_only(self):
     assert not allow_param_write("NrdrHandcraftedLateralTune", onroad=True)

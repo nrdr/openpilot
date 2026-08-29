@@ -78,16 +78,15 @@ sections:
         widget: toggle
         title: Interpolated Torque/PIF Blend
         description: Blend angle-feedback P/I/F with the generic f13 legacy torque controller.
-        details: The final request is Torque share times the f13de17 generic torque controller plus the remaining share times today's complete P/I/F controller. Torque uses angle feedback through 2 m/s, transitions from angle to calibrated yaw over 2-5 m/s, and uses calibrated yaw at 5 m/s and above. If required yaw is invalid, stale, missing, or non-finite, Torque does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F. This generic yaw branch was not historically road-proven on Honda. All six settings are frozen while engaged, and Clarity NNLC is bypassed and reset.
+        details: The final request is Torque share times the f13de17 generic torque controller plus the remaining share times today's complete P/I/F controller. Torque uses angle feedback through 2 m/s, transitions from angle to calibrated yaw over 2-5 m/s, and uses calibrated yaw at 5 m/s and above. If required yaw is invalid, stale, missing, or non-finite, Torque does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F. This generic yaw branch was not historically road-proven on Honda. You can save all six settings while driving; edits made while engaged apply together after the next disengage and re-engage. If already disengaged, wait up to 10 seconds for settings to sync before engaging. Clarity NNLC is bypassed and reset.
         enablement:
         - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
-        - $ref: '#/macros/offroad'
         sub_items:
         - key: NrdrInterpolatedTorqueShare
           widget: option
           title: Torque / P/I/F Share
           description: Splits the final steering request between both complete controllers. Torque X% / P/I/F (100-X)%; default is 50% / 50%.
-          details: The two shares always add to 100%. Changes are accepted only while disengaged and take effect on the next engagement.
+          details: The two shares always add to 100%. You can save changes while engaged; the complete six-setting snapshot takes effect after the next disengage and re-engage.
           min: 0
           max: 100
           step: 1
@@ -95,31 +94,26 @@ sections:
           enablement:
           - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
           - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
-          - $ref: '#/macros/offroad'
         - key: NrdrInterpolatedTorqueLatAccelFactor
           widget: option
           enablement:
           - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
           - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
-          - $ref: '#/macros/offroad'
         - key: NrdrInterpolatedTorqueFriction
           widget: option
           enablement:
           - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
           - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
-          - $ref: '#/macros/offroad'
         - key: NrdrInterpolatedTorqueFrictionStandard
           widget: option
           enablement:
           - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
           - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
-          - $ref: '#/macros/offroad'
         - key: NrdrInterpolatedTorqueFrictionHighway
           widget: option
           enablement:
           - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
           - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
-          - $ref: '#/macros/offroad'
       - key: NrdrStarPilotPid
         widget: toggle
         title: StarPilot PID Additions
@@ -283,7 +277,7 @@ sections:
         widget: multiple_button
         title: Steer Ratio Mode
         description: Choose exactly one geometry source. Manual is the same as turning all three in-car switches off.
-        details: Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. If an exact NRDR, firmware, or manual source is unavailable, the device safely uses the stock car ratio and reports that fallback.
+        details: Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. If an exact NRDR, firmware, or manual source is unavailable, the device safely uses the stock car ratio and reports that fallback. You can save the mode and manual endpoints while driving; edits made while engaged apply together after the next disengage and re-engage. If already disengaged, wait up to 10 seconds for settings to sync before engaging.
         options:
         - value: 0
           label: Manual
@@ -297,8 +291,6 @@ sections:
           label: Firmware
           enablement:
           - {type: capability, field: nrdr_firmware_steer_ratio_available, equals: true}
-        enablement:
-        - $ref: '#/macros/offroad'
       - key: NrdrSteerRatioManualCenter
         widget: option
         title: Manual Override On-Center Ratio
@@ -307,7 +299,6 @@ sections:
         max: 25.0
         step: 0.01
         enablement:
-        - $ref: '#/macros/offroad'
         - {type: param, key: NrdrSteerRatioMode, equals: 0}
         - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
       - key: NrdrSteerRatioManualFinal
@@ -319,7 +310,6 @@ sections:
         max: 25.0
         step: 0.01
         enablement:
-        - $ref: '#/macros/offroad'
         - {type: param, key: NrdrSteerRatioMode, equals: 0}
         - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
     - id: nrdr_override

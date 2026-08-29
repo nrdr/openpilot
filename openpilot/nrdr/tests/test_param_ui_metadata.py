@@ -189,7 +189,7 @@ class TestParamUiMetadata(unittest.TestCase):
       with self.subTest(key=key.value):
         metadata = get_ui_metadata(key)
         self.assertEqual(metadata.edit_policies, ())
-        self.assertIs(metadata.remote_write_policy, UiRemoteWritePolicy.OFFROAD_ONLY)
+        self.assertIs(metadata.remote_write_policy, UiRemoteWritePolicy.ANY_ROAD_STATE)
     self.assertIs(get_ui_metadata("LatPScaleLowSpeed").native_description_source, UiDescriptionSource.DETAILS)
     self.assertIs(get_ui_metadata("LatPScaleStandard").native_description_source, UiDescriptionSource.DESCRIPTION)
 

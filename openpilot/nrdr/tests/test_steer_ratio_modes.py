@@ -11,6 +11,7 @@ from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   resolve_steer_ratio_selection,
 )
 from openpilot.nrdr.hooks.controlsd import vehicle_model_state
+from openpilot.nrdr.params.snapshots import ENGAGEMENT_LATCHED_LATERAL_GROUPS
 
 
 ORIGINAL_54F_RAW_ANGLES = (
@@ -157,11 +158,26 @@ class CaptureController:
     self.selection = selection
 
 
+class RefreshingSnapshot:
+  def __init__(self, snapshot):
+    self.snapshot = snapshot
+    self.pending_snapshot = None
+    self.refresh_calls = []
+
+  def refresh_groups_atomic(self, groups):
+    self.refresh_calls.append(groups)
+    if self.pending_snapshot is not None:
+      self.snapshot = self.pending_snapshot
+      self.pending_snapshot = None
+    return True
+
+
 def control_fixture(initial_settings, *, sm_valid=True):
   snapshot = initial_settings
+  live_settings = RefreshingSnapshot(snapshot)
   controls = SimpleNamespace(
     CP=cp(),
-    nrdr_live_params=SimpleNamespace(snapshot=snapshot),
+    nrdr_live_params=live_settings,
     learn_stiffness=False,
     learn_angle_offset=False,
     LaC=CaptureController(),
@@ -221,6 +237,22 @@ def test_current_and_desired_paths_share_one_latched_selection_frame():
   _, changed, _, _ = vehicle_model_state(controls, live, CS, False)
   assert changed == pytest.approx(8.0)
   assert controls.LaC.selection is not selection
+
+
+def test_settings_force_refresh_only_on_falling_edge_and_apply_next_engagement():
+  live = SimpleNamespace(steerRatio=17.0, steerRatioValid=True, stiffnessFactor=1.0, angleOffsetDeg=0.0)
+  CS = SimpleNamespace(steeringAngleDeg=0.0)
+  controls = control_fixture(settings(mode=0, center=15.38, final=10.93))
+
+  assert vehicle_model_state(controls, live, CS, True)[1] == pytest.approx(15.38)
+  controls.nrdr_live_params.pending_snapshot = settings(mode=0, center=8.0, final=8.0)
+  assert vehicle_model_state(controls, live, CS, True)[1] == pytest.approx(15.38)
+  assert controls.nrdr_live_params.refresh_calls == []
+
+  assert vehicle_model_state(controls, live, CS, False)[1] == pytest.approx(8.0)
+  assert controls.nrdr_live_params.refresh_calls == [ENGAGEMENT_LATCHED_LATERAL_GROUPS]
+  assert vehicle_model_state(controls, live, CS, True)[1] == pytest.approx(8.0)
+  assert controls.nrdr_live_params.refresh_calls == [ENGAGEMENT_LATCHED_LATERAL_GROUPS]
 
 
 class LinearVehicleModel:

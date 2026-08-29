@@ -96,7 +96,7 @@ NRDR_UI_METADATA: Final = (
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=NumericUiMetadata(minimum=0.1, maximum=10.0, step=0.1, unit="m/s²", display_precision=1, display_suffix=" m/s²"),
     edit_policies=(),
-    remote_write_policy=UiRemoteWritePolicy.OFFROAD_ONLY,
+    remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
   ),
   ParamUiMetadata(
     key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
@@ -111,7 +111,7 @@ NRDR_UI_METADATA: Final = (
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
     edit_policies=(),
-    remote_write_policy=UiRemoteWritePolicy.OFFROAD_ONLY,
+    remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
   ),
   ParamUiMetadata(
     key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD,
@@ -126,7 +126,7 @@ NRDR_UI_METADATA: Final = (
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
     edit_policies=(),
-    remote_write_policy=UiRemoteWritePolicy.OFFROAD_ONLY,
+    remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
   ),
   ParamUiMetadata(
     key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY,
@@ -141,7 +141,7 @@ NRDR_UI_METADATA: Final = (
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
     edit_policies=(),
-    remote_write_policy=UiRemoteWritePolicy.OFFROAD_ONLY,
+    remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
   ),
   ParamUiMetadata(
     key=NrdrParamKey.LAT_P_SCALE_LOW_SPEED,

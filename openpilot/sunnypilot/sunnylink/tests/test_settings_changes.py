@@ -392,7 +392,7 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     "NrdrInterpolatedTorqueFrictionHighway",
   )
 
-  def test_master_and_complete_tuple_are_offroad_capability_gated(self, schema):
+  def test_master_and_complete_tuple_are_onroad_editable_and_capability_gated(self, schema):
     master = _find_item(schema, self.KEYS[0])
     assert master is not None
     assert master["title"] == "Interpolated Torque/PIF Blend"
@@ -401,13 +401,15 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     assert "final request temporarily returns to 100% P/I/F" in master["details"]
     assert "does not reuse angle or update its controller state" in master["details"]
     assert "not historically road-proven on Honda" in master["details"]
-    assert "All six settings are frozen while engaged" in master["details"]
+    assert "save all six settings while driving" in master["details"]
+    assert "next disengage and re-engage" in master["details"]
+    assert "already disengaged, wait up to 10 seconds" in master["details"]
     assert "NNLC is bypassed and reset" in master["details"]
     assert [item["key"] for item in master["sub_items"]] == list(self.KEYS[1:])
 
     for item in (master, *master["sub_items"]):
       rules = item.get("enablement")
-      assert "offroad_only" in _flatten_rule_types(rules)
+      assert "offroad_only" not in _flatten_rule_types(rules)
       assert _references_capability_field(rules, "nrdr_interpolated_torque_pif_blend_available")
 
     for item in master["sub_items"]:
@@ -507,7 +509,9 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert [(option["value"], option["label"]) for option in item["options"]] == [
       (0, "Manual"), (1, "Comma Learner"), (2, "nrdr Learner"), (3, "Firmware"),
     ]
-    assert "offroad_only" in json.dumps(item["enablement"])
+    assert "offroad_only" not in json.dumps(item.get("enablement") or [])
+    assert "next disengage and re-engage" in item["details"]
+    assert "already disengaged, wait up to 10 seconds" in item["details"]
     assert "nrdr_raw_steer_ratio_available" in json.dumps(item["options"][2]["enablement"])
     assert "nrdr_firmware_steer_ratio_available" in json.dumps(item["options"][3]["enablement"])
 
@@ -515,13 +519,13 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     ("NrdrSteerRatioManualCenter", "Manual Override On-Center Ratio", 15.38),
     ("NrdrSteerRatioManualFinal", "Manual Override Final Ratio", 10.93),
   ], names=["key", "title", "default"])
-  def test_manual_controls_are_locked_to_manual_mode(self, schema, key, title, default):
+  def test_manual_controls_are_onroad_editable_in_manual_mode(self, schema, key, title, default):
     item = _find_item(schema, key)
     assert item["title"] == title
     assert (item["min"], item["max"], item["step"]) == (8.0, 25.0, 0.01)
     assert f"Default {default:.2f}" in item["description"]
     rules = json.dumps(item["enablement"])
-    assert "offroad_only" in rules
+    assert "offroad_only" not in rules
     assert "NrdrSteerRatioMode" in rules and '"equals": 0' in rules
     assert "nrdr_manual_steer_ratio_available" in rules
     assert "NrdrHandcraftedLateralTune" not in rules

@@ -32,7 +32,8 @@ class SteerRatioTuningLayout(Widget):
         SteerRatioMode.COMMA,
         "Use Comma Steer Ratio Learner",
         "Uses Comma's last valid learned steer ratio as one number at every wheel angle. " +
-        "It holds the last good value through brief message dropouts.",
+        "It holds the last good value through brief message dropouts. Changes saved while engaged apply after the next disengage and re-engage. " +
+        "If already disengaged, wait up to 10 seconds for settings to sync before engaging.",
       ),
       SteerRatioMode.NRDR_RAW: self._mode_item(
         SteerRatioMode.NRDR_RAW,
@@ -40,12 +41,14 @@ class SteerRatioTuningLayout(Widget):
         "Uses NRDR's fixed curve made directly from logged steering angles. It does not learn while you drive. " +
         "The audited Clarity curve now reaches its 435.7-degree near-lock anchor instead of holding the " +
         "247.5-degree point through the rest of the rack. " +
-        "This is available only when NRDR has an exact audited curve for your car.",
+        "This is available only when NRDR has an exact audited curve for your car. Changes saved while engaged apply after the next " +
+        "disengage and re-engage; if already disengaged, wait up to 10 seconds before engaging.",
       ),
       SteerRatioMode.FIRMWARE: self._mode_item(
         SteerRatioMode.FIRMWARE,
         "Use Firmware Steer Ratio",
-        "Uses the exact shape stored in a recognized EPS firmware file, anchored to your car's stock center ratio.",
+        "Uses the exact shape stored in a recognized EPS firmware file, anchored to your car's stock center ratio. Changes saved while " +
+        "engaged apply after the next disengage and re-engage; if already disengaged, wait up to 10 seconds before engaging.",
       ),
     }
 
@@ -56,7 +59,7 @@ class SteerRatioTuningLayout(Widget):
       max_value=2500,
       value_change_step=1,
       description=lambda: tr("The ratio used with the wheel straight ahead. A bigger number asks for more steering-wheel movement " +
-                             "for the same planned curve; a smaller number asks for less."),
+                             "for the same planned curve; a smaller number asks for less. Saved changes use the same engagement latch as the mode."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -66,7 +69,8 @@ class SteerRatioTuningLayout(Widget):
       min_value=800,
       max_value=2500,
       value_change_step=1,
-      description=lambda: tr("The ratio used near the end of the steering wheel's travel. NRDR blends smoothly between the two manual numbers."),
+      description=lambda: tr("The ratio used near the end of the steering wheel's travel. NRDR blends smoothly between the two manual numbers. " +
+                             "Saved changes use the same engagement latch as the mode."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -115,8 +119,6 @@ class SteerRatioTuningLayout(Widget):
     )
 
   def _set_mode(self, mode: SteerRatioMode, state: bool) -> None:
-    if ui_state.engaged:
-      return
     current = self._current_mode()
     new_mode = mode if state else SteerRatioMode.MANUAL if current is mode else current
     ui_state.params.put("NrdrSteerRatioMode", int(new_mode))
@@ -142,10 +144,10 @@ class SteerRatioTuningLayout(Widget):
       selected = mode is item_mode
       item.action_item.set_state(selected)
       # With a mode selected, only its own switch remains clickable so turning
-      # it off returns to Manual. Geometry writes are locked while engaged.
-      item.action_item.set_enabled(not ui_state.engaged and (selected or (mode is SteerRatioMode.MANUAL and available[item_mode])))
+      # it off returns to Manual. Runtime geometry remains engagement-latched.
+      item.action_item.set_enabled(selected or (mode is SteerRatioMode.MANUAL and available[item_mode]))
 
-    manual_enabled = not ui_state.engaged and mode is SteerRatioMode.MANUAL and manual_available
+    manual_enabled = mode is SteerRatioMode.MANUAL and manual_available
     self._manual_center.action_item.set_enabled(manual_enabled)
     self._manual_final.action_item.set_enabled(manual_enabled)
 

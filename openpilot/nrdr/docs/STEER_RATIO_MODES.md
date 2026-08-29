@@ -8,7 +8,7 @@ This is the technical provenance and fallback contract behind the four user-faci
 - `NrdrSteerRatioManualCenter`: global manual center value, default `15.38`.
 - `NrdrSteerRatioManualFinal`: global manual final value, default `10.93`.
 
-The three values are read in one snapshot. Controls latch the complete resolved selection while lateral control is active, so measured-curvature and PID desired-angle paths cannot observe different modes or endpoints in one active interval.
+The three values are read in one snapshot. Controls latch the complete resolved selection while lateral control is active, so measured-curvature and PID desired-angle paths cannot observe different modes or endpoints in one active interval. Values may be saved onroad. An edit made while engaged is force-refreshed atomically at disengagement and applies on the immediately following engagement; when already disengaged, allow up to 10 seconds for the background snapshot to sync before engaging.
 
 ## Mode semantics
 
