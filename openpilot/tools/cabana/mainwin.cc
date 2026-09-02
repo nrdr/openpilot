@@ -19,9 +19,11 @@
 
 #include "json11/json11.hpp"
 #include "tools/cabana/commands.h"
+#include "tools/cabana/settingsdialog.h"
 #include "tools/cabana/streamselector.h"
 #include "tools/cabana/tools/findsignal.h"
 #include "tools/cabana/utils/export.h"
+#include "tools/cabana/utils/qtutil.h"
 #include "tools/replay/py_downloader.h"
 #include "tools/replay/util.h"
 
@@ -357,6 +359,9 @@ void MainWindow::startStream(AbstractStream *stream, QString dbc_file) {
   delete video_splitter;
 
   can = stream;  // take ownership
+  stream_connections_.push_back(can->error.connect([this](const std::string &msg) {
+    QMessageBox::warning(this, tr("Error"), QString::fromStdString(msg));
+  }));
   can->start();
 
   loadFile(dbc_file);
@@ -561,7 +566,7 @@ void MainWindow::updateDownloadProgress(uint64_t cur, uint64_t total, bool succe
 }
 
 void MainWindow::updateStatus() {
-  status_label->setText(tr("Cached Minutes:%1 FPS:%2").arg(settings.max_cached_minutes).arg(settings.fps));
+  status_label->setText(tr("Cached Minutes:%1").arg(settings.max_cached_minutes));
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
@@ -617,7 +622,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 }
 
 void MainWindow::setOption() {
-  SettingsDlg dlg(this);
+  SettingsDialog dlg(this);
   dlg.exec();
 }
 
