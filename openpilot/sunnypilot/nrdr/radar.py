@@ -241,3 +241,18 @@ class NrdrRadar:
     elif not lead_dict.get("present", False) or self.prev_lead_track_ids[lead_index] not in tracks:
       self.prev_lead_track_ids[lead_index] = -1
       self._reset_preferred_stale_evidence(lead_index)
+
+  def strict_fcw_authority(self, lead_index: int, lead_dict: dict[str, Any], lead_prob: float) -> bool:
+    try:
+      lead_prob = float(lead_prob)
+      track_id = int(lead_dict.get("radarTrackId", -1))
+    except (TypeError, ValueError):
+      return False
+    if not self.active or not math.isfinite(lead_prob) or lead_prob <= 0.9:
+      return False
+    return (lead_dict.get("present", False) and lead_dict.get("radar", False) and
+            track_id >= 0 and self.strict_match_track_ids[lead_index] == track_id)
+
+  def set_fcw_authority(self, radar_state, lead_dicts, lead_probs) -> None:
+    radar_state.leadOne.deprecated.fcw = self.strict_fcw_authority(0, lead_dicts[0], lead_probs[0])
+    radar_state.leadTwo.deprecated.fcw = self.strict_fcw_authority(1, lead_dicts[1], lead_probs[1])

@@ -288,6 +288,10 @@ class RadarD:
       )
       self.radar_state.leadOne = lead_one
       self.radar_state.leadTwo = lead_two
+      self.nrdr.set_fcw_authority(
+        self.radar_state, (lead_one, lead_two),
+        (self.lead_prob_filters[0].x, self.lead_prob_filters[1].x),
+      )
 
   def publish(self, pm: messaging.PubMaster):
     assert self.radar_state is not None

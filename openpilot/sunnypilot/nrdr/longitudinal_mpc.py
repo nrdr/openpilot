@@ -16,6 +16,11 @@ BRAKE_ENGAGE_DELAY = 0.3
 BRAKE_RELEASE_TIME = 0.5
 MIN_TRACK_AGE = 0.5
 LEAD_ACCEL_TAU_NORMALIZER = 1.5
+BOSCH_RAW_MLT_MIN_DISTANCE = 12.0
+BOSCH_RAW_MLT_MAX_TTC = 5.0
+BOSCH_FCW_MIN_MODEL_PROB = 0.9
+BOSCH_FCW_MIN_CLOSING_SPEED = 0.5
+BOSCH_FCW_MAX_TTC = 4.0
 
 PERSONALITY_NAMES = {
   0: "aggressive",
@@ -66,7 +71,7 @@ def _brake_gate(accel: float, accel_tau: float, threshold: float) -> tuple[bool,
 class NrdrLongitudinalMpc:
   def __init__(self, dt: float, time_indices: np.ndarray, time_diffs: np.ndarray,
                cruise_min_accel: float, cruise_max_accel: float, min_lead_factor: float,
-               accel_min: float, log_fn=None):
+               accel_min: float, log_fn=None, honda_bosch_a_radar: bool = False):
     self.dt = dt
     self.time_indices = time_indices
     self.time_diffs = time_diffs
@@ -74,6 +79,7 @@ class NrdrLongitudinalMpc:
     self.cruise_max_accel = cruise_max_accel
     self.min_lead_factor = min_lead_factor
     self.accel_min = accel_min
+    self.honda_bosch_a_radar = bool(honda_bosch_a_radar)
     self.lead_time_indices = np.asarray(ModelConstants.LEAD_T_IDXS)
     self.tune = LongTune(log_fn=log_fn)
     self.reset()
@@ -102,11 +108,89 @@ class NrdrLongitudinalMpc:
   def t_follow(self, personality, default: float) -> float:
     return PERSONALITY_T_FOLLOW.get(_personality_name(personality), default)
 
-  def _lead_trajectory(self, model_lead, radar_lead, slot: int, v_ego: float) -> np.ndarray:
+  def _bosch_raw_mlt_fallback(self, radar_lead, v_ego: float) -> bool:
+    if not (self.honda_bosch_a_radar and radar_lead.present and getattr(radar_lead, "radar", False)):
+      return False
+    distance = float(radar_lead.dRel)
+    raw_velocity = float(radar_lead.vLead)
+    if not (math.isfinite(distance) and math.isfinite(raw_velocity)):
+      return True
+    closing_speed = max(0.0, float(v_ego) - raw_velocity)
+    ttc = distance / max(closing_speed, 1e-3) if closing_speed > 0.1 else math.inf
+    return distance <= BOSCH_RAW_MLT_MIN_DISTANCE or ttc <= BOSCH_RAW_MLT_MAX_TTC
+
+  def _bosch_model_horizon_valid(self, model_lead, radar_lead, v_ego: float) -> bool:
+    try:
+      probability = float(model_lead.prob)
+      distance = float(radar_lead.dRel)
+      raw_velocity = float(radar_lead.vLead)
+      model_x = np.asarray(model_lead.x, dtype=np.float64)
+      model_v = np.asarray(model_lead.v, dtype=np.float64)
+      v_ego = float(v_ego)
+    except (AttributeError, TypeError, ValueError):
+      return False
+    return (math.isfinite(probability) and probability > 0.5 and
+            math.isfinite(distance) and math.isfinite(raw_velocity) and math.isfinite(v_ego) and
+            model_x.shape == self.lead_time_indices.shape and model_v.shape == self.lead_time_indices.shape and
+            np.all(np.isfinite(model_x)) and np.all(np.isfinite(model_v)))
+
+  def _finite_raw_fallback(self, raw_fallback, radar_lead, v_ego: float) -> np.ndarray:
+    if raw_fallback is not None:
+      try:
+        candidate = np.asarray(raw_fallback, dtype=np.float64)
+      except (TypeError, ValueError):
+        candidate = np.empty((0, 2), dtype=np.float64)
+      if candidate.shape == (len(self.time_indices), 2) and np.all(np.isfinite(candidate)):
+        return candidate
+
+    try:
+      distance = float(getattr(radar_lead, "dRel", 0.0))
+      raw_velocity = float(getattr(radar_lead, "vLead", 0.0))
+      v_ego = float(v_ego)
+    except (TypeError, ValueError):
+      distance, raw_velocity, v_ego = 0.0, 0.0, 0.0
+    distance = max(0.0, distance) if math.isfinite(distance) else 0.0
+    raw_velocity = max(0.0, raw_velocity) if math.isfinite(raw_velocity) else 0.0
+    v_ego = max(0.0, v_ego) if math.isfinite(v_ego) else 0.0
+    lead_x = distance + raw_velocity * self.lead_time_indices
+    lead_v = np.full_like(self.lead_time_indices, raw_velocity)
+    return self._to_mpc_trajectory(lead_x, lead_v, v_ego)
+
+  def fcw_authorized(self, lead, v_ego: float) -> bool:
+    if not self.honda_bosch_a_radar:
+      return True
+    if lead is None or not getattr(lead, "present", False) or not getattr(lead, "radar", False):
+      return False
+    try:
+      model_probability = float(getattr(lead, "modelProb", 0.0))
+      distance = float(getattr(lead, "dRel", 0.0))
+      raw_velocity = float(getattr(lead, "vLead", 0.0))
+      v_ego = float(v_ego)
+    except (TypeError, ValueError):
+      return False
+    if (not all(math.isfinite(value) for value in (model_probability, distance, raw_velocity, v_ego)) or
+        model_probability <= BOSCH_FCW_MIN_MODEL_PROB):
+      return False
+    deprecated = getattr(lead, "deprecated", None)
+    if not bool(getattr(deprecated, "fcw", False)):
+      return False
+    closing_speed = max(0.0, v_ego - raw_velocity)
+    if closing_speed < BOSCH_FCW_MIN_CLOSING_SPEED:
+      return False
+    ttc = max(0.0, distance) / max(closing_speed, 1e-3)
+    return ttc < BOSCH_FCW_MAX_TTC
+
+  def _lead_trajectory(self, model_lead, radar_lead, slot: int, v_ego: float,
+                       raw_fallback: np.ndarray | None = None) -> np.ndarray:
     if not radar_lead.present:
       lead_x = 50.0 + (v_ego + 10.0) * self.lead_time_indices
       lead_v = np.full_like(self.lead_time_indices, v_ego + 10.0)
       return self._to_mpc_trajectory(lead_x, lead_v, v_ego)
+
+    if self.honda_bosch_a_radar and getattr(radar_lead, "radar", False):
+      if (not self._bosch_model_horizon_valid(model_lead, radar_lead, v_ego) or
+          self._bosch_raw_mlt_fallback(radar_lead, v_ego)):
+        return self._finite_raw_fallback(raw_fallback, radar_lead, v_ego)
 
     settings = self.tune.lead_consumption
     distance = float(radar_lead.dRel)
@@ -201,12 +285,13 @@ class NrdrLongitudinalMpc:
     return max(comfort_brake, self.effective_brakes[slot])
 
   def prepare(self, v_cruise: float, model, radar_state, personality, v_ego: float,
-              base_t_follow: float) -> MpcPolicyResult:
+              base_t_follow: float, raw_lead_trajectories=None) -> MpcPolicyResult:
     self.tune.refresh()
     t_follow = max(0.9, base_t_follow + self.tune.t_follow_offset(_personality_name(personality)))
     model_leads = model.leadsV3
-    lead_0 = self._lead_trajectory(model_leads[0], radar_state.leadOne, 0, v_ego)
-    lead_1 = self._lead_trajectory(model_leads[1], radar_state.leadTwo, 1, v_ego)
+    raw_lead_trajectories = (None, None) if raw_lead_trajectories is None else raw_lead_trajectories
+    lead_0 = self._lead_trajectory(model_leads[0], radar_state.leadOne, 0, v_ego, raw_lead_trajectories[0])
+    lead_1 = self._lead_trajectory(model_leads[1], radar_state.leadTwo, 1, v_ego, raw_lead_trajectories[1])
     comfort_brake = self.tune.comfort_brake
 
     brake_0 = self._effective_brake(radar_state.leadOne, comfort_brake, 0)

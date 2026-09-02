@@ -17,6 +17,7 @@ from openpilot.common.swaglog import cloudlog
 
 from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP
 from openpilot.sunnypilot.nrdr.longitudinal_planner import NrdrLongitudinalPlanner
+from openpilot.sunnypilot.nrdr.radar import is_honda_bosch_a_radar
 
 A_CRUISE_MAX_VALS = [1.6, 1.2, 0.8, 0.6]
 A_CRUISE_MAX_BP = [0., 10.0, 25., 40.]
@@ -73,7 +74,8 @@ def get_cruise_accel(e2e, v_cruise, v_ego, a_cruise_prev, angle_steers, CP, dt, 
 class LongitudinalPlanner(LongitudinalPlannerSP):
   def __init__(self, CP, CP_SP, init_v=0.0, init_a=0.0, dt=DT_MDL):
     self.CP = CP
-    self.mpc = LongitudinalMpc(dt=dt)
+    self.honda_bosch_a_radar = is_honda_bosch_a_radar(CP)
+    self.mpc = LongitudinalMpc(dt=dt, honda_bosch_a_radar=self.honda_bosch_a_radar)
     self.nrdr = NrdrLongitudinalPlanner(CP, CP_SP, self.mpc.tune)
     LongitudinalPlannerSP.__init__(self, self.CP, CP_SP, self.mpc)
     self.fcw = False
@@ -156,7 +158,8 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.j_desired_trajectory = np.interp(CONTROL_N_T_IDX, T_IDXS_MPC[:-1], self.mpc.j_solution)
 
     # TODO counter is only needed because radar is glitchy, remove once radar is gone
-    self.fcw = self.mpc.crash_cnt > 2 and not sm['carState'].standstill
+    self.fcw = (self.mpc.crash_cnt > 2 and not sm['carState'].standstill and
+                self.mpc.nrdr.fcw_authorized(sm['radarState'].leadOne, v_ego))
     if self.fcw:
       cloudlog.info("FCW triggered")
 
