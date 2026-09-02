@@ -14,8 +14,6 @@ class NrdrParamKey(StrEnum):
   REMOTE_ACCESS_PIN_ITERATIONS = "RemoteAccessPinIterations"
   LIVE_VIEW_ENABLED = "LiveViewEnabled"
   LIVE_VIEW = "LiveView"
-  USB_GPU_COMPILED = "UsbGpuCompiled"
-  USB_GPU_PRESENT = "UsbGpuPresent"
   LAT_P_SCALE_LOW_SPEED = "LatPScaleLowSpeed"
   LAT_P_SCALE_STANDARD = "LatPScaleStandard"
   LAT_P_SCALE_HIGHWAY = "LatPScaleHighway"
@@ -147,8 +145,6 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.REMOTE_ACCESS_PIN_ITERATIONS,
   NrdrParamKey.LIVE_VIEW_ENABLED,
   NrdrParamKey.LIVE_VIEW,
-  NrdrParamKey.USB_GPU_COMPILED,
-  NrdrParamKey.USB_GPU_PRESENT,
   NrdrParamKey.LAT_P_SCALE_LOW_SPEED,
   NrdrParamKey.LAT_P_SCALE_STANDARD,
   NrdrParamKey.LAT_P_SCALE_HIGHWAY,

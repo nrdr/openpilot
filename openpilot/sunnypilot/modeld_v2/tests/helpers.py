@@ -37,7 +37,7 @@ class DummyModel:
 
 
 class DummyBundle:
-  def __init__(self, is_20hz=False, models=None, generation=10):
+  def __init__(self, is_20hz=False, models=None, generation=10, is_big=False):
     self.overrides = [DummyOverride('lat', '.1'), DummyOverride('long', '.3')]
     self.generation = generation
     self.is20hz = is_20hz
@@ -190,8 +190,8 @@ def tmp_path():
 
 def patch_modeld(monkeypatch):
   def _patch(bundle):
-    monkeypatch.setattr(helpers, 'get_active_bundle', lambda params=None: bundle)
-    monkeypatch.setattr(modeld_module, 'get_active_bundle', lambda params=None: bundle)
+    monkeypatch.setattr(helpers, 'get_active_bundle', lambda params=None, *, chestnut=None: bundle)
+    monkeypatch.setattr(modeld_module, 'get_active_bundle', lambda params=None, *, chestnut=None: bundle)
 
   return _patch
 

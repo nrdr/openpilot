@@ -8,8 +8,6 @@
     {"RemoteAccessPinIterations", {PERSISTENT, INT, "150000"}},
     {"LiveViewEnabled", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"LiveView", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},
-    {"UsbGpuCompiled", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},
-    {"UsbGpuPresent", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},
     {"LatPScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},
     {"LatPScaleStandard", {PERSISTENT | BACKUP, INT, "100"}},
     {"LatPScaleHighway", {PERSISTENT | BACKUP, INT, "100"}},

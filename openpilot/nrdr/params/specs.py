@@ -103,9 +103,6 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("RemoteAccessPinIterations", ParamType.INT, (P,), "150000", ParamLifecycle.STATE, ParamOwner.REMOTE),
   _added("LiveViewEnabled", ParamType.BOOL, PB, "1", owner=ParamOwner.REMOTE),
   _added("LiveView", ParamType.BOOL, (M, O), lifecycle=ParamLifecycle.TRANSIENT, owner=ParamOwner.REMOTE),
-  _added("UsbGpuCompiled", ParamType.BOOL, (M, O), lifecycle=ParamLifecycle.STATUS, owner=ParamOwner.MODEL),
-  _added("UsbGpuPresent", ParamType.BOOL, (M, O), lifecycle=ParamLifecycle.STATUS, owner=ParamOwner.MODEL),
-
   _added("LatPScaleLowSpeed", ParamType.INT, PB, "100", owner=ParamOwner.LATERAL),
   _added("LatPScaleStandard", ParamType.INT, PB, "100", owner=ParamOwner.LATERAL),
   _added("LatPScaleHighway", ParamType.INT, PB, "100", owner=ParamOwner.LATERAL),
