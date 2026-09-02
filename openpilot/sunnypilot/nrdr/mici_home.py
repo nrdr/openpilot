@@ -115,8 +115,7 @@ class NrdrMiciHome:
         home._date_label.render()
 
     home._experimental_icon.set_visible(ui_state.experimental_mode)
-    home._egpu_icon.set_visible(ui_state.usbgpu and ui_state.usbgpu_compiled)
-    home._egpu_icon_gray.set_visible(ui_state.usbgpu and not ui_state.usbgpu_compiled)
+    home._set_chestnut_visibility()
     home._mic_icon.set_visible(ui_state.recording_audio)
     home._body_icon.set_visible(bool(ui_state.is_body))
 
