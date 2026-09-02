@@ -25,6 +25,7 @@ class CivicBoschTrack:
   def __init__(self, identifier: int, v_lead: float, kalman_params):
     self.identifier = identifier
     self.cnt = 0
+    self.measured_sweep_count = 0
     self.unmeasured_cnt = 0
     self.v_ego = 0.0
     self.measured = False
@@ -62,6 +63,7 @@ class CivicBoschTrack:
     self.vLeadK = float(self.kf.x[0][0])
     self.aLeadK = float(self.kf.x[1][0])
     if measured:
+      self.measured_sweep_count += 1
       if abs(self.aLeadK) < 0.5:
         self.aLeadTau.x = ACCEL_TAU
       else:
