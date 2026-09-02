@@ -24,6 +24,17 @@ ALERT_MARGIN = 18
 ALERT_FONT_SMALL = 66 - 50
 ALERT_FONT_BIG = 88 - 40
 
+SPEED_LIMIT_ALERT_EVENTS = frozenset({
+  "speedLimitActive",
+  "speedLimitChanged",
+  "speedLimitPending",
+  "speedLimitPreActive",
+})
+SPEED_LIMIT_ALERT_FONT_MIN = 36
+SPEED_LIMIT_ALERT_SMALL_FONT_MIN = 24
+SPEED_LIMIT_ALERT_FONT_STEP = 2
+SPEED_LIMIT_ALERT_VERTICAL_INSET = 12
+
 SELFDRIVE_STATE_TIMEOUT = 5  # Seconds
 SELFDRIVE_UNRESPONSIVE_TIMEOUT = 10  # Seconds
 
@@ -65,6 +76,28 @@ class Alert:
   status: int = 0
   visual_alert: int = car.CarControl.HUDControl.VisualAlert.none
   alert_type: str = ""
+
+
+def _fit_speed_limit_alert_fonts(event_name: str, font_size: int, small_font_size: int | None,
+                                 available_height: float, measure_height) -> tuple[int, int | None]:
+  """Reduce only speed-limit alert text until the complete block fits the mici viewport."""
+  if event_name not in SPEED_LIMIT_ALERT_EVENTS:
+    return font_size, small_font_size
+
+  content_height = max(1.0, available_height - 2 * SPEED_LIMIT_ALERT_VERTICAL_INSET)
+  while measure_height(font_size, small_font_size) > content_height:
+    next_font_size = max(SPEED_LIMIT_ALERT_FONT_MIN, font_size - SPEED_LIMIT_ALERT_FONT_STEP)
+    next_small_font_size = (max(SPEED_LIMIT_ALERT_SMALL_FONT_MIN, small_font_size - SPEED_LIMIT_ALERT_FONT_STEP)
+                            if small_font_size is not None else None)
+    if (next_font_size, next_small_font_size) == (font_size, small_font_size):
+      break
+    font_size, small_font_size = next_font_size, next_small_font_size
+
+  return font_size, small_font_size
+
+
+def _remaining_text_height(text_y: float, text_height: float, next_line_y: float) -> float:
+  return max(0.0, text_y + text_height - next_line_y)
 
 
 # Pre-defined alert instances
@@ -307,6 +340,7 @@ class AlertRenderer(Widget, SpeedLimitAlertRenderer):
 
   def _draw_text(self, alert: Alert, alert_layout: AlertLayout) -> None:
     icon_side = alert_layout.icon.side if alert_layout.icon is not None else None
+    event_name = alert.alert_type.split('/')[0] if alert.alert_type else ''
 
     # TODO: hack
     alert_text1 = alert.text1.lower().replace('calibrating: ', 'calibrating:\n')
@@ -321,21 +355,6 @@ class AlertRenderer(Widget, SpeedLimitAlertRenderer):
     if icon_side is not None:
       font_size -= 10
 
-    color = rl.Color(255, 255, 255, int(255 * 0.9 * self._alpha_filter.x))
-
-    text1_y_offset = 11 if font_size >= 70 else 4
-    text_rect1 = rl.Rectangle(
-      alert_layout.text_rect.x,
-      alert_layout.text_rect.y - text1_y_offset,
-      alert_layout.text_rect.width,
-      alert_layout.text_rect.height,
-    )
-    self._alert_text1_label.set_text(alert_text1)
-    self._alert_text1_label.set_text_color(color)
-    self._alert_text1_label.set_font_size(font_size)
-    self._alert_text1_label.set_alignment(rl.GuiTextAlignment.TEXT_ALIGN_LEFT if icon_side != 'left' else rl.GuiTextAlignment.TEXT_ALIGN_RIGHT)
-    self._alert_text1_label.render(text_rect1)
-
     alert_text2 = alert.text2.lower()
 
     # randomize chars and length for testing
@@ -345,24 +364,60 @@ class AlertRenderer(Widget, SpeedLimitAlertRenderer):
         self._text_gen_time = time.monotonic()
       alert_text2 = self._alert_text2_gen or alert_text2
 
+    if len(alert_text2) > 24:
+      small_font_size = 32
+    elif len(alert_text2) > 18:
+      small_font_size = 36
+    else:
+      small_font_size = 40
+
+    self._alert_text1_label.set_text(alert_text1)
+    self._alert_text2_label.set_text(alert_text2)
+
+    def measure_block_height(candidate_font_size: int, candidate_small_font_size: int | None) -> float:
+      self._alert_text1_label.set_font_size(candidate_font_size)
+      main_height = self._alert_text1_label.get_content_height(int(alert_layout.text_rect.width))
+      text1_y_offset = 11 if candidate_font_size >= 70 else 4
+      block_height = main_height - text1_y_offset
+      if alert_text2 and candidate_small_font_size is not None:
+        self._alert_text2_label.set_font_size(candidate_small_font_size)
+        block_height += self._alert_text2_label.get_content_height(int(alert_layout.text_rect.width)) - 4
+      return block_height
+
+    font_size, fitted_small_font_size = _fit_speed_limit_alert_fonts(
+      event_name,
+      font_size,
+      small_font_size if alert_text2 else None,
+      alert_layout.text_rect.height,
+      measure_block_height,
+    )
+    if fitted_small_font_size is not None:
+      small_font_size = fitted_small_font_size
+
+    color = rl.Color(255, 255, 255, int(255 * 0.9 * self._alpha_filter.x))
+    text1_y_offset = 11 if font_size >= 70 else 4
+    text_rect1 = rl.Rectangle(
+      alert_layout.text_rect.x,
+      alert_layout.text_rect.y - text1_y_offset,
+      alert_layout.text_rect.width,
+      alert_layout.text_rect.height,
+    )
+    self._alert_text1_label.set_text_color(color)
+    self._alert_text1_label.set_font_size(font_size)
+    self._alert_text1_label.set_alignment(rl.GuiTextAlignment.TEXT_ALIGN_LEFT if icon_side != 'left' else rl.GuiTextAlignment.TEXT_ALIGN_RIGHT)
+    self._alert_text1_label.render(text_rect1)
+
     if alert_text2:
       last_line_h = self._alert_text1_label.rect.y + self._alert_text1_label.get_content_height(int(alert_layout.text_rect.width))
       last_line_h -= 4
-      if len(alert_text2) > 24:
-        small_font_size = 32
-      elif len(alert_text2) > 18:
-        small_font_size = 36
-      else:
-        small_font_size = 40
       text_rect2 = rl.Rectangle(
         alert_layout.text_rect.x,
         last_line_h,
         alert_layout.text_rect.width,
-        alert_layout.text_rect.height - last_line_h
+        _remaining_text_height(alert_layout.text_rect.y, alert_layout.text_rect.height, last_line_h),
       )
       color = rl.Color(255, 255, 255, int(255 * 0.65 * self._alpha_filter.x))
 
-      self._alert_text2_label.set_text(alert_text2)
       self._alert_text2_label.set_text_color(color)
       self._alert_text2_label.set_font_size(small_font_size)
       self._alert_text2_label.set_alignment(rl.GuiTextAlignment.TEXT_ALIGN_LEFT if icon_side != 'left' else rl.GuiTextAlignment.TEXT_ALIGN_RIGHT)
