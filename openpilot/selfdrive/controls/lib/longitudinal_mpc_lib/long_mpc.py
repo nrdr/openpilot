@@ -217,10 +217,11 @@ def gen_long_ocp():
 
 
 class LongitudinalMpc:
-  def __init__(self, dt=DT_MDL):
+  def __init__(self, dt=DT_MDL, honda_bosch_a_radar: bool = False):
     self.dt = dt
     self.nrdr = NrdrLongitudinalMpc(
       dt, T_IDXS, T_DIFFS, ACCEL_MIN, ACCEL_MAX, MIN_X_LEAD_FACTOR, ACCEL_MIN, cloudlog.warning,
+      honda_bosch_a_radar=honda_bosch_a_radar,
     )
     self.tune = self.nrdr.tune
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
@@ -339,7 +340,8 @@ class LongitudinalMpc:
     if model is not None:
       cruise_target = v_ego if v_cruise is None else v_cruise
       result = self.nrdr.prepare(cruise_target, model, radarstate, personality, v_ego,
-                                 self.nrdr.t_follow(personality, t_follow))
+                                 self.nrdr.t_follow(personality, t_follow),
+                                 raw_lead_trajectories=(lead_xv_0, lead_xv_1))
       lead_xv_0, lead_xv_1 = result.lead_0, result.lead_1
       self.status = result.status
       t_follow = result.t_follow
@@ -365,7 +367,7 @@ class LongitudinalMpc:
 
     self.run()
     if (np.any(lead_xv_0[FCW_IDXS,0] - self.x_sol[FCW_IDXS,0] < CRASH_DISTANCE) and
-            lead_probability > 0.9):
+            lead_probability > 0.9 and self.nrdr.fcw_authorized(radarstate.leadOne, v_ego)):
       self.crash_cnt += 1
     else:
       self.crash_cnt = 0

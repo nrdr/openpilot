@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from opendbc.car.honda.values import CAR as HONDA_CAR, HONDA_BOSCH_A
+from openpilot.cereal import log
 from openpilot.nrdr.features.radar.radar import (
   HONDA_BOSCH_A_LOW_SPEED_MIN_SWEEPS,
   NrdrRadar,
@@ -247,11 +248,65 @@ def test_recorded_strict_match_identity_distinguishes_relaxed_continuity():
   lead = make_model_lead(40.0, v_ego=20.0)
   radar.record_lead(0, {7: track}, lead, 20.0, True, 0.99, track.get_RadarState(0.99))
   assert radar.strict_match_track_ids[0] == 7
+  assert radar.strict_fcw_authority(0, track.get_RadarState(0.99), 0.99)
 
   track.yRel = 1.4
   radar.record_lead(0, {7: track}, lead, 20.0, True, 0.99, track.get_RadarState(0.99))
   assert radar.prev_lead_track_ids[0] == 7
   assert radar.strict_match_track_ids[0] == -1
+  assert not radar.strict_fcw_authority(0, track.get_RadarState(0.99), 0.99)
+
+
+def test_fcw_authority_requires_strict_radar_lead_and_high_model_probability():
+  radar = make_radar()
+  track = make_positioned_track(7, 20.0, 3)
+  state = track.get_RadarState(0.99)
+  radar.strict_match_track_ids[0] = 7
+  assert radar.strict_fcw_authority(0, state, 0.99)
+  assert not radar.strict_fcw_authority(0, state, 0.9)
+  assert not radar.strict_fcw_authority(1, state, 0.99)
+  assert not radar.strict_fcw_authority(0, {**state, "radar": False}, 0.99)
+  assert not radar.strict_fcw_authority(0, state, math.nan)
+  assert not make_radar(fingerprint=HONDA_CAR.HONDA_CIVIC).strict_fcw_authority(0, state, 0.99)
+
+
+def test_deprecated_fcw_authority_round_trips_and_false_preserves_generic_encoding():
+  strict = log.RadarState.new_message()
+  strict.leadOne.present = True
+  strict.leadOne.deprecated.fcw = True
+  with log.RadarState.from_bytes(strict.to_bytes()) as restored:
+    assert restored.leadOne.present
+    assert restored.leadOne.deprecated.fcw
+
+  implicit_false = log.RadarState.new_message()
+  implicit_false.leadOne.present = True
+  explicit_false = log.RadarState.new_message()
+  explicit_false.leadOne.present = True
+  explicit_false.leadOne.deprecated.fcw = False
+  assert explicit_false.to_bytes() == implicit_false.to_bytes()
+
+
+def test_radar_state_producer_sets_deprecated_fcw_only_for_current_strict_match():
+  radar = make_radar()
+  strict_track = make_positioned_track(7, 20.0, 3, y_rel=0.2, v_ego=8.0, v_rel=-6.0)
+  relaxed_track = make_positioned_track(8, 20.0, 3, y_rel=1.4, v_ego=8.0, v_rel=-6.0)
+  model = make_model_lead(20.0, v_ego=2.0)
+  strict_state = strict_track.get_RadarState(0.99)
+  relaxed_state = relaxed_track.get_RadarState(0.99)
+  radar.record_lead(0, {7: strict_track}, model, 8.0, True, 0.99, strict_state)
+  radar.record_lead(1, {8: relaxed_track}, model, 8.0, True, 0.99, relaxed_state)
+
+  radar_state = log.RadarState.new_message()
+  radar_state.leadOne = strict_state
+  radar_state.leadTwo = relaxed_state
+  radar.set_fcw_authority(radar_state, (strict_state, relaxed_state), (0.99, 0.99))
+  assert radar_state.leadOne.deprecated.fcw
+  assert not radar_state.leadTwo.deprecated.fcw
+
+  radar.record_lead(0, {}, model, 8.0, True, 0.99, {"present": False})
+  radar_state.leadOne.deprecated.fcw = True
+  radar.set_fcw_authority(radar_state, ({"present": False}, relaxed_state), (0.99, 0.99))
+  assert not radar_state.leadOne.deprecated.fcw
 
 
 def test_challenger_staleness_clears_after_two_cycles():
