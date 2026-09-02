@@ -157,10 +157,14 @@ def get_RadarState_from_vision(lead_msg: capnp._DynamicStructReader, v_ego: floa
 
 def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], lead_msg: capnp._DynamicStructReader,
              model_v_ego: float, lead_prob: float, CP: structs.CarParams, CP_SP: structs.CarParamsSP,
-             low_speed_override: bool = True) -> dict[str, Any]:
+             low_speed_override: bool = True, nrdr_radar: NrdrRadar | None = None,
+             lead_index: int = 0) -> dict[str, Any]:
   # Determine leads, this is where the essential logic happens
   if len(tracks) > 0 and ready and lead_prob > .5:
-    track = match_vision_to_track(v_ego, lead_msg, tracks)
+    if nrdr_radar is not None and nrdr_radar.active:
+      track = nrdr_radar.associate_model_lead(lead_index, tracks, lead_msg, v_ego)
+    else:
+      track = match_vision_to_track(v_ego, lead_msg, tracks)
   else:
     track = None
 
@@ -171,7 +175,7 @@ def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], lead_msg: capn
   elif (track is None) and ready and (lead_prob > .5):
     lead_dict = get_RadarState_from_vision(lead_msg, v_ego, model_v_ego, lead_prob)
 
-  if low_speed_override:
+  if low_speed_override and not (nrdr_radar is not None and nrdr_radar.active):
     low_speed_tracks = [c for c in tracks.values() if c.potential_low_speed_lead(v_ego)]
     if len(low_speed_tracks) > 0:
       closest_track = min(low_speed_tracks, key=lambda c: c.dRel)
@@ -179,6 +183,11 @@ def get_lead(v_ego: float, ready: bool, tracks: dict[int, Track], lead_msg: capn
       # Only choose new track if it is actually closer than the previous one
       if (not lead_dict['present']) or (closest_track.dRel < lead_dict['dRel']):
         lead_dict = closest_track.get_RadarState()
+
+  if nrdr_radar is not None:
+    lead_dict = nrdr_radar.select_lead(
+      lead_index, tracks, lead_msg, v_ego, ready, lead_prob, lead_dict, low_speed_override,
+    )
 
   return lead_dict
 
@@ -259,10 +268,26 @@ class RadarD:
         else:
           self.lead_prob_filters[i].update(lead_prob)
 
-      self.radar_state.leadOne = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, self.lead_prob_filters[0].x,
-                                          self.CP, self.CP_SP, low_speed_override=True)
-      self.radar_state.leadTwo = get_lead(self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, self.lead_prob_filters[1].x,
-                                          self.CP, self.CP_SP, low_speed_override=False)
+        self.nrdr.update_preferred_staleness(
+          i, self.tracks, leads_v3[i], self.v_ego, self.ready, self.lead_prob_filters[i].x,
+        )
+
+      lead_one = get_lead(
+        self.v_ego, self.ready, self.tracks, leads_v3[0], model_v_ego, self.lead_prob_filters[0].x,
+        self.CP, self.CP_SP, low_speed_override=True, nrdr_radar=self.nrdr, lead_index=0,
+      )
+      lead_two = get_lead(
+        self.v_ego, self.ready, self.tracks, leads_v3[1], model_v_ego, self.lead_prob_filters[1].x,
+        self.CP, self.CP_SP, low_speed_override=False, nrdr_radar=self.nrdr, lead_index=1,
+      )
+      self.nrdr.record_lead(
+        0, self.tracks, leads_v3[0], self.v_ego, self.ready, self.lead_prob_filters[0].x, lead_one,
+      )
+      self.nrdr.record_lead(
+        1, self.tracks, leads_v3[1], self.v_ego, self.ready, self.lead_prob_filters[1].x, lead_two,
+      )
+      self.radar_state.leadOne = lead_one
+      self.radar_state.leadTwo = lead_two
 
   def publish(self, pm: messaging.PubMaster):
     assert self.radar_state is not None
