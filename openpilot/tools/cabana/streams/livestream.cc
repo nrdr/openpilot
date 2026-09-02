@@ -9,6 +9,7 @@
 
 #include "common/timing.h"
 #include "common/util.h"
+#include "tools/cabana/settings.h"
 
 struct LiveStream::Logger {
   Logger() : start_ts(seconds_since_epoch()), segment_num(-1) {}
@@ -21,12 +22,9 @@ struct LiveStream::Logger {
       localtime_r(&start_time, &local_time);
       std::ostringstream date;
       date << std::put_time(&local_time, "%Y-%m-%d--%H-%M-%S");
-      QString dir = QString("%1/%2--%3")
-                        .arg(QString::fromStdString(settings.log_path))
-                        .arg(QString::fromStdString(date.str()))
-                        .arg(n);
-      util::create_directories(dir.toStdString(), 0755);
-      fs.reset(new std::ofstream((dir + "/rlog").toStdString(), std::ios::binary | std::ios::out));
+      std::string dir = settings.log_path + "/" + date.str() + "--" + std::to_string(n);
+      util::create_directories(dir, 0755);
+      fs.reset(new std::ofstream(dir + "/rlog", std::ios::binary | std::ios::out));
     }
 
     auto bytes = data.asBytes();
@@ -50,7 +48,6 @@ LiveStream::~LiveStream() {
 
 void LiveStream::start() {
   begin_date_time = std::chrono::system_clock::now();
-  fps_ = settings.fps;
   exit_ = false;
   stream_thread = std::thread(&LiveStream::streamThread, this);
   update_thread = std::thread(&LiveStream::updateThread, this);
@@ -64,7 +61,7 @@ void LiveStream::stop() {
 
 void LiveStream::updateThread() {
   while (!exit_) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000 / fps_));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000 / STREAM_UPDATE_FPS));
     // coalesce: skip the request if the main thread hasn't processed the previous one yet.
     if (!update_pending_.exchange(true)) {
       requestUpdateLastMessages();
@@ -92,7 +89,6 @@ void LiveStream::handleEvent(kj::ArrayPtr<capnp::word> data) {
 // called on the main thread via requestUpdateLastMessages()
 void LiveStream::updateLastMessages() {
   update_pending_ = false;
-  fps_ = settings.fps;
   {
     // merge events received from live stream thread.
     std::lock_guard lk(lock);

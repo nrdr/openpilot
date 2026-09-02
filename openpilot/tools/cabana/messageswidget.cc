@@ -195,7 +195,7 @@ QVariant MessageListModel::data(const QModelIndex &index, int role) const {
     switch (index.column()) {
       case Column::NAME: return item.name;
       case Column::SOURCE: return item.id.source != INVALID_SOURCE ? QString::number(item.id.source) : NA;
-      case Column::ADDRESS: return toHexString(item.id.address);
+      case Column::ADDRESS: return QString::fromStdString(utils::toHexString(item.id.address));
       case Column::NODE: return item.node;
       case Column::FREQ: return item.id.source != INVALID_SOURCE ? getFreq(can->lastMessage(item.id).freq) : NA;
       case Column::COUNT: return item.id.source != INVALID_SOURCE ? QString::number(can->lastMessage(item.id).count) : NA;
@@ -288,7 +288,7 @@ bool MessageListModel::match(const MessageListModel::Item &item) {
         match = parseRange(txt, item.id.source);
         break;
       case Column::ADDRESS:
-        match = toHexString(item.id.address).contains(txt, Qt::CaseInsensitive);
+        match = QString::fromStdString(utils::toHexString(item.id.address)).contains(txt, Qt::CaseInsensitive);
         match = match || parseRange(txt, item.id.address, 16);
         break;
       case Column::NODE:
@@ -301,7 +301,7 @@ bool MessageListModel::match(const MessageListModel::Item &item) {
         match = parseRange(txt, data.count);
         break;
       case Column::DATA:
-        match = utils::toHex(data.dat).contains(txt, Qt::CaseInsensitive);
+        match = QString::fromStdString(utils::toHex(data.dat)).contains(txt, Qt::CaseInsensitive);
         break;
     }
   }
@@ -345,7 +345,7 @@ bool MessageListModel::filterAndSort() {
 
 void MessageListModel::msgsReceived(const std::set<MessageId> *new_msgs, bool has_new_ids) {
   if (has_new_ids || ((filters_.count(Column::FREQ) || filters_.count(Column::COUNT) || filters_.count(Column::DATA)) &&
-                      ++sort_threshold_ == settings.fps)) {
+                      ++sort_threshold_ == STREAM_UPDATE_FPS)) {
     sort_threshold_ = 0;
     if (filterAndSort()) return;
   }
