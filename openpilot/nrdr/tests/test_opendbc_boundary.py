@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, get_ident
 import unittest
+from unittest.mock import patch
 
 from opendbc.car.honda.interface import CarInterface as HondaCarInterface
 from opendbc.car.honda.values import CAR as HONDA
@@ -45,6 +46,8 @@ class FakeParams:
     self.defaults = {str(key): value for key, value in (defaults or HOST_STARTUP_DEFAULTS).items()}
     self.unknown = {str(key) for key in unknown}
     self.fail_keys = set()
+    self.fail_writes = set()
+    self.noop_writes = set()
     self.reads = []
     self.writes = []
     self.write_event = Event()
@@ -67,9 +70,12 @@ class FakeParams:
     key = str(key)
     if key in self.unknown:
       raise UnknownKeyName(key)
-    self.values[key] = value
+    if key in self.fail_writes:
+      raise OSError(key)
     self.writes.append((key, value, block, get_ident()))
     self.write_event.set()
+    if key not in self.noop_writes:
+      self.values[key] = value
 
 
 class TestOpendbcBoundary(unittest.TestCase):
@@ -113,6 +119,7 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertTrue(set(HOST_STARTUP_DEFAULTS).isdisjoint(set(NrdrHondaParamKey)))
     self.assertSetEqual(set(NrdrHondaParamKey), set(grouped_keys) | {
       NrdrHondaParamKey.HONDA_BOSCH_A_RADAR,
+      OpendbcParamKey.HONDA_GAS_ALPHA,
       OpendbcParamKey.HONDA_GAS_FACTOR,
       OpendbcParamKey.HONDA_WIND_FACTOR,
     })
@@ -307,30 +314,192 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertEqual(provider.load_longitudinal_factors("HONDA_CLARITY"), (1.6, 0.6))
     self.assertEqual(provider.load_longitudinal_factors("HONDA_CIVIC"), (1.0, 1.0))
 
+  def test_gas_alpha_loading_is_fingerprint_safe_finite_and_clamped(self):
+    metadata_path = self.tmp_path / "meta.json"
+    metadata_path.write_text(json.dumps({"car_fingerprint": "HONDA_CLARITY", "learn_version": 2}), encoding="utf-8")
+    params = FakeParams(values={
+      OpendbcParamKey.HONDA_GAS_ALPHA: 0.2,
+      OpendbcParamKey.HONDA_GAS_FACTOR: 1.0,
+      OpendbcParamKey.HONDA_WIND_FACTOR: 1.0,
+    })
+    provider = HondaParamsProvider(params, start_worker=False, metadata_path=metadata_path)
+
+    self.assertEqual(provider.load_gas_alpha("HONDA_CLARITY"), 0.2)
+    self.assertEqual(provider.load_gas_alpha("HONDA_CIVIC"), 0.0)
+    for raw, expected in ((-1.0, 0.0), (1.0, 0.4), (float("nan"), 0.0), (float("inf"), 0.0), ("bad", 0.0)):
+      with self.subTest(raw=raw):
+        params.values[str(OpendbcParamKey.HONDA_GAS_ALPHA)] = raw
+        self.assertEqual(provider.load_gas_alpha("HONDA_CLARITY"), expected)
+
+  def test_longitudinal_metadata_shape_and_version_are_strict(self):
+    metadata_path = self.tmp_path / "meta.json"
+    params = FakeParams(values={
+      OpendbcParamKey.HONDA_GAS_ALPHA: 0.2,
+      OpendbcParamKey.HONDA_GAS_FACTOR: 1.2,
+      OpendbcParamKey.HONDA_WIND_FACTOR: 0.8,
+    })
+    provider = HondaParamsProvider(params, start_worker=False, metadata_path=metadata_path)
+
+    def assert_defaults():
+      self.assertEqual(provider.load_gas_alpha("HONDA_CLARITY"), 0.0)
+      self.assertEqual(provider.load_longitudinal_factors("HONDA_CLARITY"), (1.0, 1.0))
+
+    for malformed in ([], None, "metadata", 1, True):
+      with self.subTest(malformed=malformed):
+        metadata_path.write_text(json.dumps(malformed), encoding="utf-8")
+        assert_defaults()
+
+    provider._write_longitudinal_state(0.2, 1.2, 0.8, "HONDA_CLARITY")
+    valid = json.loads(metadata_path.read_text(encoding="utf-8"))
+    invalid_envelopes = (
+      {**valid, "state_digest_version": True},
+      {key: value for key, value in valid.items() if key != "state_digest_version"},
+      {"car_fingerprint": "HONDA_CLARITY", "learn_version": 2, "pending": False},
+      {**valid, "unexpected": True},
+    )
+    for metadata in invalid_envelopes:
+      with self.subTest(metadata=metadata):
+        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+        assert_defaults()
+
+  def test_committed_state_is_indivisible_when_any_value_is_missing_or_corrupt(self):
+    params = FakeParams()
+    metadata_path = self.tmp_path / "meta.json"
+    provider = HondaParamsProvider(params, start_worker=False, metadata_path=metadata_path)
+    expected = {
+      OpendbcParamKey.HONDA_GAS_ALPHA: 0.2,
+      OpendbcParamKey.HONDA_GAS_FACTOR: 1.2,
+      OpendbcParamKey.HONDA_WIND_FACTOR: 0.8,
+    }
+    for key, valid in expected.items():
+      for invalid in (None, "corrupt", float("nan"), float("inf"), valid + 0.01):
+        with self.subTest(key=key, invalid=invalid):
+          provider._write_longitudinal_state(0.2, 1.2, 0.8, "HONDA_CLARITY")
+          if invalid is None:
+            params.values.pop(str(key))
+          else:
+            params.values[str(key)] = invalid
+          self.assertEqual(provider.load_gas_alpha("HONDA_CLARITY"), 0.0)
+          self.assertEqual(provider.load_longitudinal_factors("HONDA_CLARITY"), (1.0, 1.0))
+
   def test_factor_persistence_runs_off_controller_thread(self):
     params = FakeParams()
     metadata_path = self.tmp_path / "meta.json"
     provider = HondaParamsProvider(params, refresh_period=1000.0, start_worker=True, metadata_path=metadata_path)
     caller_thread = get_ident()
     try:
-      provider.persist_longitudinal_factors(1.2, 0.8, "HONDA_CLARITY")
+      provider.persist_longitudinal_state(0.2, 1.2, 0.8, "HONDA_CLARITY")
       self.assertTrue(params.write_event.wait(1.0))
       for _ in range(100):
-        if len(params.writes) >= 2 and metadata_path.exists():
-          break
+        if len(params.writes) >= 3 and metadata_path.exists():
+          metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+          if metadata.get("pending") is False:
+            break
         Event().wait(0.01)
 
-      self.assertEqual([(key, value, block) for key, value, block, _ in params.writes[-2:]], [
+      self.assertEqual([(key, value, block) for key, value, block, _ in params.writes[-3:]], [
+        (str(OpendbcParamKey.HONDA_GAS_ALPHA), 0.2, True),
         (str(OpendbcParamKey.HONDA_GAS_FACTOR), 1.2, True),
         (str(OpendbcParamKey.HONDA_WIND_FACTOR), 0.8, True),
       ])
-      self.assertTrue(all(thread_id != caller_thread for *_, thread_id in params.writes[-2:]))
-      self.assertEqual(json.loads(metadata_path.read_text(encoding="utf-8")), {
-        "car_fingerprint": "HONDA_CLARITY",
-        "learn_version": 2,
-      })
+      self.assertTrue(all(thread_id != caller_thread for *_, thread_id in params.writes[-3:]))
+      metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+      self.assertEqual(metadata["car_fingerprint"], "HONDA_CLARITY")
+      self.assertEqual(metadata["learn_version"], 2)
+      self.assertEqual(metadata["state_digest_version"], 1)
+      self.assertIs(metadata["pending"], False)
+      self.assertEqual(provider.load_gas_alpha("HONDA_CLARITY"), 0.2)
+      self.assertEqual(provider.load_longitudinal_factors("HONDA_CLARITY"), (1.2, 0.8))
     finally:
       provider.close()
+
+  def test_persistence_rejects_invalid_state_without_queueing_or_writing(self):
+    params = FakeParams()
+    provider = HondaParamsProvider(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+
+    for values in ((float("nan"), 1.0, 1.0), (0.1, float("inf"), 1.0), (0.1, 1.0, "bad")):
+      with self.subTest(values=values):
+        provider.persist_longitudinal_state(*values, "HONDA_CLARITY")
+    provider.persist_longitudinal_state(0.1, 1.0, 1.0, "")
+
+    self.assertTrue(provider._write_queue.empty())
+    self.assertEqual(params.writes, [])
+
+  def test_legacy_partial_param_writes_fail_closed_and_retry_atomically(self):
+    write_keys = (
+      OpendbcParamKey.HONDA_GAS_ALPHA,
+      OpendbcParamKey.HONDA_GAS_FACTOR,
+      OpendbcParamKey.HONDA_WIND_FACTOR,
+    )
+    for fail_key in write_keys:
+      with self.subTest(fail_key=fail_key):
+        metadata_path = self.tmp_path / f"{fail_key}.json"
+        metadata_path.write_text(json.dumps({"car_fingerprint": "HONDA_CLARITY", "learn_version": 2}), encoding="utf-8")
+        params = FakeParams(values={
+          OpendbcParamKey.HONDA_GAS_ALPHA: 0.1,
+          OpendbcParamKey.HONDA_GAS_FACTOR: 1.1,
+          OpendbcParamKey.HONDA_WIND_FACTOR: 0.9,
+        })
+        params.fail_writes.add(str(fail_key))
+        provider = HondaParamsProvider(params, start_worker=False, metadata_path=metadata_path)
+
+        provider._write_longitudinal_state(0.3, 1.3, 0.7, "HONDA_CLARITY")
+
+        self.assertIs(json.loads(metadata_path.read_text(encoding="utf-8"))["pending"], True)
+        self.assertEqual(provider.load_gas_alpha("HONDA_CLARITY"), 0.0)
+        self.assertEqual(provider.load_longitudinal_factors("HONDA_CLARITY"), (1.0, 1.0))
+
+        params.fail_writes.clear()
+        provider._write_longitudinal_state(0.3, 1.3, 0.7, "HONDA_CLARITY")
+        self.assertIs(json.loads(metadata_path.read_text(encoding="utf-8"))["pending"], False)
+        self.assertEqual(provider.load_gas_alpha("HONDA_CLARITY"), 0.3)
+        self.assertEqual(provider.load_longitudinal_factors("HONDA_CLARITY"), (1.3, 0.7))
+
+  def test_metadata_failures_cannot_publish_a_mixed_longitudinal_state(self):
+    metadata_path = self.tmp_path / "meta.json"
+    metadata_path.write_text(json.dumps({"car_fingerprint": "HONDA_CLARITY", "learn_version": 2}), encoding="utf-8")
+    params = FakeParams(values={
+      OpendbcParamKey.HONDA_GAS_ALPHA: 0.1,
+      OpendbcParamKey.HONDA_GAS_FACTOR: 1.1,
+      OpendbcParamKey.HONDA_WIND_FACTOR: 0.9,
+    })
+    provider = HondaParamsProvider(params, start_worker=False, metadata_path=metadata_path)
+
+    with patch.object(provider, "_commit_longitudinal_metadata", return_value=False):
+      provider._write_longitudinal_state(0.3, 1.3, 0.7, "HONDA_CLARITY")
+    self.assertEqual(params.writes, [])
+
+    original_commit = provider._commit_longitudinal_metadata
+    commits = 0
+
+    def fail_final_commit(metadata):
+      nonlocal commits
+      commits += 1
+      return original_commit(metadata) if commits == 1 else False
+
+    with patch.object(provider, "_commit_longitudinal_metadata", side_effect=fail_final_commit):
+      provider._write_longitudinal_state(0.3, 1.3, 0.7, "HONDA_CLARITY")
+    self.assertIs(json.loads(metadata_path.read_text(encoding="utf-8"))["pending"], True)
+    self.assertEqual(provider.load_gas_alpha("HONDA_CLARITY"), 0.0)
+    self.assertEqual(provider.load_longitudinal_factors("HONDA_CLARITY"), (1.0, 1.0))
+
+  def test_blocking_param_noop_is_detected_by_typed_readback(self):
+    for noop_key in (
+      OpendbcParamKey.HONDA_GAS_ALPHA,
+      OpendbcParamKey.HONDA_GAS_FACTOR,
+      OpendbcParamKey.HONDA_WIND_FACTOR,
+    ):
+      with self.subTest(noop_key=noop_key):
+        metadata_path = self.tmp_path / f"noop-{noop_key}.json"
+        params = FakeParams(values={noop_key: 0.0})
+        params.noop_writes.add(str(noop_key))
+        provider = HondaParamsProvider(params, start_worker=False, metadata_path=metadata_path)
+
+        provider._write_longitudinal_state(0.3, 1.3, 0.7, "HONDA_CLARITY")
+
+        self.assertIs(json.loads(metadata_path.read_text(encoding="utf-8"))["pending"], True)
+        self.assertEqual(provider.load_gas_alpha("HONDA_CLARITY"), 0.0)
+        self.assertEqual(provider.load_longitudinal_factors("HONDA_CLARITY"), (1.0, 1.0))
 
   def test_opendbc_and_all_production_callers_use_only_the_typed_boundary(self):
     repository_root = Path(__file__).resolve().parents[3]

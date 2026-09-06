@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+import hashlib
 import json
 import math
 import os
@@ -24,12 +25,20 @@ FAST_REFRESH_PERIOD = 0.25
 LEARNER_META_PATH = Path("/data/honda_learner_meta.json")
 LONG_FACTOR_MIN = 0.6
 LONG_FACTOR_MAX = 1.6
+GAS_ALPHA_MIN = 0.0
+GAS_ALPHA_MAX = 0.4
+LONG_STATE_DIGEST_VERSION = 1
+LONG_STATE_LEGACY_METADATA_KEYS = frozenset(("car_fingerprint", "learn_version"))
+LONG_STATE_METADATA_KEYS = LONG_STATE_LEGACY_METADATA_KEYS | frozenset((
+  "longitudinal_state_sha256", "pending", "state_digest_version",
+))
 
 
 class NrdrHondaParamKey(StrEnum):
   """NRDR-owned Honda keys consumed across the openpilot-to-opendbc boundary."""
 
   HONDA_BOSCH_A_RADAR = NrdrParamKey.HONDA_BOSCH_A_RADAR
+  HONDA_GAS_ALPHA = "HondaGasAlphaParams"
   HONDA_GAS_FACTOR = "HondaGasFactorParams"
   HONDA_WIND_FACTOR = "HondaWindFactorParams"
   HONDA_OVERRIDE_FADE_DOWN_SECS = NrdrParamKey.HONDA_OVERRIDE_FADE_DOWN_SECS
@@ -110,6 +119,11 @@ FAST_PARAM_GROUP = (OpendbcParamKey.NRDR_HUD_SUB_MODE_UNTIL,)
 _UNKNOWN = object()
 
 
+def _longitudinal_value_digest(*values: float) -> str:
+  payload = "|".join(format(float(value), ".17g") for value in values).encode("ascii")
+  return hashlib.sha256(payload).hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class _RawSnapshot:
   generation: int
@@ -175,7 +189,7 @@ class HondaParamsProvider:
     self._stop = Event()
     self._poll_thread: Thread | None = None
     self._write_thread: Thread | None = None
-    self._write_queue: Queue[tuple[float, float, str] | None] = Queue()
+    self._write_queue: Queue[tuple[float, float, float, str] | None] = Queue()
     self._live_learning_default = True
     self._tuning_cache: HondaLiveTuning | None = None
     self._workers_enabled = start_worker
@@ -273,30 +287,85 @@ class HondaParamsProvider:
       return True
 
   def load_longitudinal_factors(self, car_fingerprint: str) -> tuple[float, float]:
+    _, gas, wind = self._load_longitudinal_state(car_fingerprint)
+    return gas, wind
+
+  def load_gas_alpha(self, car_fingerprint: str) -> float:
+    alpha, _, _ = self._load_longitudinal_state(car_fingerprint)
+    return alpha
+
+  def _load_longitudinal_state(self, car_fingerprint: str) -> tuple[float, float, float]:
+    default = (GAS_ALPHA_MIN, 1.0, 1.0)
     try:
+      metadata = json.loads(self._metadata_path.read_text(encoding="utf-8"))
+      if not isinstance(metadata, Mapping):
+        return default
+      if metadata.get("car_fingerprint") != car_fingerprint or metadata.get("learn_version") != LEARN_VERSION:
+        return default
+
+      digest_version = metadata.get("state_digest_version")
+      if digest_version is None:
+        if frozenset(metadata) != LONG_STATE_LEGACY_METADATA_KEYS:
+          return default
+      elif (type(digest_version) is not int or digest_version != LONG_STATE_DIGEST_VERSION or
+            frozenset(metadata) != LONG_STATE_METADATA_KEYS or metadata.get("pending") is not False):
+        return default
+
+      raw_alpha = _read_param(self._params, OpendbcParamKey.HONDA_GAS_ALPHA)
       raw_gas = _read_param(self._params, OpendbcParamKey.HONDA_GAS_FACTOR)
       raw_wind = _read_param(self._params, OpendbcParamKey.HONDA_WIND_FACTOR)
       if raw_gas is _UNKNOWN or raw_wind is _UNKNOWN or raw_gas is None or raw_wind is None:
-        return 1.0, 1.0
+        return default
 
-      metadata = json.loads(self._metadata_path.read_text(encoding="utf-8"))
-      if metadata.get("car_fingerprint") != car_fingerprint or metadata.get("learn_version") != LEARN_VERSION:
-        return 1.0, 1.0
+      if type(digest_version) is int and digest_version == LONG_STATE_DIGEST_VERSION:
+        if raw_alpha is _UNKNOWN or raw_alpha is None:
+          return default
 
+      alpha = (
+        GAS_ALPHA_MIN if raw_alpha is _UNKNOWN or raw_alpha is None else
+        float(raw_alpha.decode("utf-8") if isinstance(raw_alpha, bytes) else raw_alpha)
+      )
       gas = float(raw_gas.decode("utf-8") if isinstance(raw_gas, bytes) else raw_gas)
       wind = float(raw_wind.decode("utf-8") if isinstance(raw_wind, bytes) else raw_wind)
-      if not math.isfinite(gas) or not math.isfinite(wind):
-        return 1.0, 1.0
+      if not all(math.isfinite(value) for value in (alpha, gas, wind)):
+        return default
+
+      # An intent commit always precedes Param writes. Re-reading metadata closes
+      # the race where a legacy reader saw old metadata immediately before that
+      # transition and would otherwise accept a partially written state.
+      committed_metadata = json.loads(self._metadata_path.read_text(encoding="utf-8"))
+      if not isinstance(committed_metadata, Mapping) or committed_metadata != metadata:
+        return default
+      if type(digest_version) is int and digest_version == LONG_STATE_DIGEST_VERSION:
+        expected = metadata.get("longitudinal_state_sha256")
+        if not isinstance(expected, str) or expected != _longitudinal_value_digest(alpha, gas, wind):
+          return default
       return (
+        min(GAS_ALPHA_MAX, max(GAS_ALPHA_MIN, alpha)),
         min(LONG_FACTOR_MAX, max(LONG_FACTOR_MIN, gas)),
         min(LONG_FACTOR_MAX, max(LONG_FACTOR_MIN, wind)),
       )
     except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
-      return 1.0, 1.0
+      return default
+
+  def persist_longitudinal_state(self, gas_alpha: float, gas_factor: float, wind_factor: float,
+                                 car_fingerprint: str) -> None:
+    try:
+      values = tuple(float(value) for value in (gas_alpha, gas_factor, wind_factor))
+    except (TypeError, ValueError):
+      return
+    if not car_fingerprint or not all(math.isfinite(value) for value in values):
+      return
+
+    gas_alpha = min(GAS_ALPHA_MAX, max(GAS_ALPHA_MIN, values[0]))
+    gas_factor = min(LONG_FACTOR_MAX, max(LONG_FACTOR_MIN, values[1]))
+    wind_factor = min(LONG_FACTOR_MAX, max(LONG_FACTOR_MIN, values[2]))
+    self._start_workers()
+    self._write_queue.put((gas_alpha, gas_factor, wind_factor, car_fingerprint))
 
   def persist_longitudinal_factors(self, gas_factor: float, wind_factor: float, car_fingerprint: str) -> None:
-    self._start_workers()
-    self._write_queue.put((float(gas_factor), float(wind_factor), car_fingerprint))
+    """Compatibility shim for callers predating gas-alpha persistence."""
+    self.persist_longitudinal_state(self.load_gas_alpha(car_fingerprint), gas_factor, wind_factor, car_fingerprint)
 
   def _start_workers(self) -> None:
     if not self._workers_enabled or self._workers_started:
@@ -355,22 +424,68 @@ class HondaParamsProvider:
           pending = newer
       except Empty:
         pass
-      self._write_longitudinal_factors(*pending)
+      self._write_longitudinal_state(*pending)
 
-  def _write_longitudinal_factors(self, gas_factor: float, wind_factor: float, car_fingerprint: str) -> None:
-    self._params.put(str(OpendbcParamKey.HONDA_GAS_FACTOR), gas_factor, block=True)
-    self._params.put(str(OpendbcParamKey.HONDA_WIND_FACTOR), wind_factor, block=True)
+  def _write_longitudinal_state(self, gas_alpha: float, gas_factor: float, wind_factor: float,
+                                car_fingerprint: str) -> None:
+    metadata = {
+      "car_fingerprint": car_fingerprint,
+      "learn_version": LEARN_VERSION,
+      "longitudinal_state_sha256": _longitudinal_value_digest(gas_alpha, gas_factor, wind_factor),
+      "pending": True,
+      "state_digest_version": LONG_STATE_DIGEST_VERSION,
+    }
+    if not self._commit_longitudinal_metadata(metadata):
+      return
+
+    try:
+      self._params.put(str(OpendbcParamKey.HONDA_GAS_ALPHA), gas_alpha, block=True)
+      self._params.put(str(OpendbcParamKey.HONDA_GAS_FACTOR), gas_factor, block=True)
+      self._params.put(str(OpendbcParamKey.HONDA_WIND_FACTOR), wind_factor, block=True)
+    except Exception:
+      return
+
+    try:
+      persisted = tuple(
+        float(raw.decode("utf-8") if isinstance(raw, bytes) else raw)
+        for raw in (
+          _read_param(self._params, OpendbcParamKey.HONDA_GAS_ALPHA),
+          _read_param(self._params, OpendbcParamKey.HONDA_GAS_FACTOR),
+          _read_param(self._params, OpendbcParamKey.HONDA_WIND_FACTOR),
+        )
+      )
+    except (AttributeError, TypeError, ValueError):
+      return
+    if not all(math.isfinite(value) for value in persisted):
+      return
+    if _longitudinal_value_digest(*persisted) != metadata["longitudinal_state_sha256"]:
+      return
+
+    self._commit_longitudinal_metadata({**metadata, "pending": False})
+
+  def _commit_longitudinal_metadata(self, metadata: Mapping[str, Any]) -> bool:
     temporary_path = self._metadata_path.with_suffix(self._metadata_path.suffix + ".tmp")
     try:
       temporary_path.parent.mkdir(parents=True, exist_ok=True)
       with temporary_path.open("w", encoding="utf-8") as file:
-        json.dump({"car_fingerprint": car_fingerprint, "learn_version": LEARN_VERSION}, file, sort_keys=True)
+        json.dump(metadata, file, sort_keys=True)
         file.write("\n")
         file.flush()
         os.fsync(file.fileno())
       temporary_path.replace(self._metadata_path)
+      if hasattr(os, "O_DIRECTORY"):
+        directory_fd = os.open(temporary_path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+          os.fsync(directory_fd)
+        finally:
+          os.close(directory_fd)
+      return True
     except OSError:
-      pass
+      try:
+        temporary_path.unlink(missing_ok=True)
+      except OSError:
+        pass
+      return False
 
   @staticmethod
   def _drop_realtime() -> None:
