@@ -24,12 +24,13 @@ ALERT_MARGIN = 18
 ALERT_FONT_SMALL = 66 - 50
 ALERT_FONT_BIG = 88 - 40
 
-SPEED_LIMIT_ALERT_EVENTS = frozenset({
-  "speedLimitActive",
-  "speedLimitChanged",
-  "speedLimitPending",
-  "speedLimitPreActive",
-})
+SPEED_LIMIT_ALERT_FONT_CAPS = {
+  "speedLimitActive": (44, 28),
+  "speedLimitChanged": (44, None),
+  "speedLimitPending": (44, 28),
+  "speedLimitPreActive": (36, None),
+}
+SPEED_LIMIT_ALERT_EVENTS = frozenset(SPEED_LIMIT_ALERT_FONT_CAPS)
 SPEED_LIMIT_ALERT_FONT_MIN = 36
 SPEED_LIMIT_ALERT_SMALL_FONT_MIN = 24
 SPEED_LIMIT_ALERT_FONT_STEP = 2
@@ -80,14 +81,21 @@ class Alert:
 
 def _fit_speed_limit_alert_fonts(event_name: str, font_size: int, small_font_size: int | None,
                                  available_height: float, measure_height) -> tuple[int, int | None]:
-  """Reduce only speed-limit alert text until the complete block fits the mici viewport."""
+  """Apply mici speed-limit design caps, then reduce until the complete block fits."""
   if event_name not in SPEED_LIMIT_ALERT_EVENTS:
     return font_size, small_font_size
 
+  font_size_cap, small_font_size_cap = SPEED_LIMIT_ALERT_FONT_CAPS[event_name]
+  font_size = min(font_size, font_size_cap)
+  if small_font_size is not None and small_font_size_cap is not None:
+    small_font_size = min(small_font_size, small_font_size_cap)
+
+  font_size_floor = min(SPEED_LIMIT_ALERT_FONT_MIN, font_size)
+  small_font_size_floor = min(SPEED_LIMIT_ALERT_SMALL_FONT_MIN, small_font_size) if small_font_size is not None else None
   content_height = max(1.0, available_height - 2 * SPEED_LIMIT_ALERT_VERTICAL_INSET)
   while measure_height(font_size, small_font_size) > content_height:
-    next_font_size = max(SPEED_LIMIT_ALERT_FONT_MIN, font_size - SPEED_LIMIT_ALERT_FONT_STEP)
-    next_small_font_size = (max(SPEED_LIMIT_ALERT_SMALL_FONT_MIN, small_font_size - SPEED_LIMIT_ALERT_FONT_STEP)
+    next_font_size = max(font_size_floor, font_size - SPEED_LIMIT_ALERT_FONT_STEP)
+    next_small_font_size = (max(small_font_size_floor, small_font_size - SPEED_LIMIT_ALERT_FONT_STEP)
                             if small_font_size is not None else None)
     if (next_font_size, next_small_font_size) == (font_size, small_font_size):
       break

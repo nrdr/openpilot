@@ -7,6 +7,7 @@ import pytest
 ALERT_RENDERER = Path(__file__).parents[1] / "onroad" / "alert_renderer.py"
 HELPER_NAMES = {
   "SPEED_LIMIT_ALERT_EVENTS",
+  "SPEED_LIMIT_ALERT_FONT_CAPS",
   "SPEED_LIMIT_ALERT_FONT_MIN",
   "SPEED_LIMIT_ALERT_SMALL_FONT_MIN",
   "SPEED_LIMIT_ALERT_FONT_STEP",
@@ -33,53 +34,59 @@ def _load_layout_helper():
 
 _HELPER = _load_layout_helper()
 SPEED_LIMIT_ALERT_EVENTS = _HELPER["SPEED_LIMIT_ALERT_EVENTS"]
+SPEED_LIMIT_ALERT_FONT_CAPS = _HELPER["SPEED_LIMIT_ALERT_FONT_CAPS"]
 SPEED_LIMIT_ALERT_VERTICAL_INSET = _HELPER["SPEED_LIMIT_ALERT_VERTICAL_INSET"]
 _fit_speed_limit_alert_fonts = _HELPER["_fit_speed_limit_alert_fonts"]
 _remaining_text_height = _HELPER["_remaining_text_height"]
 
 
 @pytest.mark.parametrize(
-  ("event_name", "message", "font_size", "small_font_size", "measured_heights", "expected"),
+  ("event_name", "message", "text_width", "font_size", "small_font_size", "measured_heights", "expected"),
   (
     (
       "speedLimitPreActive",
       "press distance button to accept 50 km/h speed limit",
+      354,
       44,
       None,
-      {(44, None): 244.6, (42, None): 195.6},
-      (42, None),
+      {(36, None): 102.404},
+      (36, None),
     ),
     (
       "speedLimitActive",
       "automatically changing max speed / the new speed limit has been applied.",
+      458,
       54,
       32,
-      {(54, 32): 217.5, (52, 30): 207.5},
-      (52, 30),
+      {(44, 28): 140.164},
+      (44, 28),
     ),
     (
       "speedLimitPending",
       "automatically changing max speed / the last known speed limit has been applied.",
+      458,
       54,
       32,
-      {(54, 32): 217.5, (52, 30): 207.5},
-      (52, 30),
+      {(44, 28): 140.164},
+      (44, 28),
     ),
     (
       "speedLimitChanged",
       "set speed changed",
+      458,
       54,
       None,
-      {(54, None): 107.1},
-      (54, None),
+      {(44, None): 47.040},
+      (44, None),
     ),
   ),
 )
-def test_speed_limit_alert_fonts_fit_mici_measurements(event_name, message, font_size, small_font_size,
+def test_speed_limit_alert_fonts_fit_mici_measurements(event_name, message, text_width, font_size, small_font_size,
                                                        measured_heights, expected):
-  # Measurements reproduce the shipped 476x240 mici renderer with its 354px
-  # icon-aware confirmation width and 458px notification width.
+  # UnifiedLabel measurements use the shipped Inter fonts and the 476x240
+  # mici renderer's 354px icon-aware or 458px ordinary text width.
   assert message
+  assert text_width in (354, 458)
   available_height = 240
   fitted = _fit_speed_limit_alert_fonts(
     event_name,
@@ -94,12 +101,13 @@ def test_speed_limit_alert_fonts_fit_mici_measurements(event_name, message, font
 
 
 def test_speed_limit_alert_event_scope_is_exact():
-  assert SPEED_LIMIT_ALERT_EVENTS == {
-    "speedLimitActive",
-    "speedLimitChanged",
-    "speedLimitPending",
-    "speedLimitPreActive",
+  assert SPEED_LIMIT_ALERT_FONT_CAPS == {
+    "speedLimitActive": (44, 28),
+    "speedLimitChanged": (44, None),
+    "speedLimitPending": (44, 28),
+    "speedLimitPreActive": (36, None),
   }
+  assert SPEED_LIMIT_ALERT_EVENTS == frozenset(SPEED_LIMIT_ALERT_FONT_CAPS)
 
 
 def test_ordinary_alert_font_sizes_and_measurement_path_are_untouched():
@@ -109,8 +117,13 @@ def test_ordinary_alert_font_sizes_and_measurement_path_are_untouched():
   assert _fit_speed_limit_alert_fonts("controlsMismatch", 54, 32, 240, should_not_measure) == (54, 32)
 
 
-def test_speed_limit_alert_keeps_existing_sizes_when_the_viewport_is_roomy():
-  assert _fit_speed_limit_alert_fonts("speedLimitActive", 54, 32, 300, lambda *_: 217.5) == (54, 32)
+def test_speed_limit_alert_keeps_design_cap_when_the_viewport_is_roomy():
+  assert _fit_speed_limit_alert_fonts("speedLimitActive", 54, 32, 300, lambda *_: 140.164) == (44, 28)
+
+
+def test_speed_limit_alert_does_not_increase_sizes_already_below_the_cap():
+  assert _fit_speed_limit_alert_fonts("speedLimitActive", 42, 26, 300, lambda *_: 120) == (42, 26)
+  assert _fit_speed_limit_alert_fonts("speedLimitActive", 32, 20, 100, lambda *_: 1000) == (32, 20)
 
 
 def test_speed_limit_alert_font_fit_stops_at_readable_floors():
