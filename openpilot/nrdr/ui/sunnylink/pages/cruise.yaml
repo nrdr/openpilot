@@ -38,6 +38,11 @@ sections:
         title: Roen Nidec Acceleration Limits
         description: Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.
         details: Enabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas.
+      - key: NrdrPersonalityAccelProfiles
+        widget: toggle
+        title: Acceleration Follows Driving Personality
+        description: Uses Sunny's final Vibe-era positive-acceleration curves with an NRDR-specific personality mapping.
+        details: Disabled by default. NRDR maps Aggressive to Sport, Standard to Normal, and Relaxed or Econ to Eco; historical Sunny kept the acceleration selector separate. The profile never raises acceleration or changes lead/model braking calculations, dedicated launch assist, or braking limits. Changing the distance setting also changes cruise and catch-up response. Roen remains the separate Honda Nidec authority envelope.
       - key: HondaBoschARadar
         widget: toggle
         title: Honda Bosch-A Radar (experimental)

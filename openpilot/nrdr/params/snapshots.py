@@ -78,7 +78,7 @@ CONTROL_GROUPS = (
 
 PLANNER_GROUPS = (
   ParamGroup(("HondaVEgoStopping", "NrdrCruiseMismatchCorrection", "NrdrCruiseOverspeedAllowance",
-              "NrdrRoenAccelerationLimits")),
+              "NrdrRoenAccelerationLimits", "NrdrPersonalityAccelProfiles")),
 )
 
 

@@ -18,24 +18,34 @@ from specs import (
   PARAM_SPECS_BY_KEY,
   ParamFlag,
   ParamLifecycle,
+  ParamOwner,
+  ParamType,
   RegistryAction,
   validate_catalog,
 )
 
 
-REGISTRY_METADATA_SHA256 = "c2e2bfa6f3e288ce1a32d5fd602262f8b0416348626e16439f8a60899162c09b"
+REGISTRY_METADATA_SHA256 = "7f07d45030606fa4a44861d070e3200a5ffa69e38171b96b6eb19dcd456d9b30"
 
 
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 129)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 128)
+    self.assertEqual(len(PARAM_SPECS), 130)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 129)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
 
     metadata = "\n".join(f"{spec.action.value}|{spec.key}|{spec.cpp_attributes}" for spec in PARAM_SPECS) + "\n"
     self.assertEqual(sha256(metadata.encode()).hexdigest(), REGISTRY_METADATA_SHA256)
+
+  def test_personality_accel_profile_setting_is_default_off_and_persistent(self) -> None:
+    spec = PARAM_SPECS_BY_KEY["NrdrPersonalityAccelProfiles"]
+    self.assertIs(spec.param_type, ParamType.BOOL)
+    self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
+    self.assertEqual(spec.default, "0")
+    self.assertIs(spec.lifecycle, ParamLifecycle.SETTING)
+    self.assertIs(spec.owner, ParamOwner.LONGITUDINAL)
 
   def test_existing_key_override_is_not_generated_as_an_addition(self) -> None:
     override = OVERRIDDEN_PARAM_SPECS[0]

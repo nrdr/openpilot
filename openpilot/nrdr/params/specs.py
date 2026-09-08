@@ -117,6 +117,7 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("LongPidTuneScaleStandard", ParamType.INT, PB, "100", owner=ParamOwner.LONGITUDINAL),
   _added("LongPidTuneScaleRelaxed", ParamType.INT, PB, "80", owner=ParamOwner.LONGITUDINAL),
   _added("LongPidTuneScaleEcon", ParamType.INT, PB, "50", owner=ParamOwner.LONGITUDINAL),
+  _added("NrdrPersonalityAccelProfiles", ParamType.BOOL, PB, "0", owner=ParamOwner.LONGITUDINAL),
   _added("NrdrCruiseMismatchCorrection", ParamType.FLOAT, PB, "100", owner=ParamOwner.LONGITUDINAL),
   _added("NrdrCruiseOverspeedAllowance", ParamType.INT, PB, "0", owner=ParamOwner.LONGITUDINAL),
   _added("HondaCenterScale", ParamType.FLOAT, PB, "0.5", owner=ParamOwner.HONDA),

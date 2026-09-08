@@ -319,6 +319,7 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
   @parameterized.expand([
     ("NrdrHondaFullBrakeAuthority", "toggle"),
     ("NrdrRoenAccelerationLimits", "toggle"),
+    ("NrdrPersonalityAccelProfiles", "toggle"),
     ("NrdrCruiseOverspeedAllowance", "option"),
   ], names=["key", "widget"])
   def test_options_are_independent_of_live_learning_gas(self, schema, key, widget):
@@ -335,8 +336,14 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
 
   def test_longitudinal_default_descriptions(self, schema):
     roen = _find_item(schema, "NrdrRoenAccelerationLimits")
+    personality_profiles = _find_item(schema, "NrdrPersonalityAccelProfiles")
     live_gas = _find_item(schema, "HondaLiveLearningGas")
     assert "Enabled by default" in roen.get("details", "")
+    assert "Disabled by default" in personality_profiles.get("details", "")
+    assert "never raises acceleration" in personality_profiles.get("details", "")
+    assert "lead/model braking calculations" in personality_profiles.get("details", "")
+    assert "braking limits" in personality_profiles.get("details", "")
+    assert "Roen remains the separate" in personality_profiles.get("details", "")
     assert "default OFF when a gas pedal interceptor is detected" in live_gas.get("details", "")
     assert "selection is preserved" in live_gas.get("details", "")
 

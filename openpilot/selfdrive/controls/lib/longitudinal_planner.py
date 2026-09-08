@@ -54,7 +54,7 @@ def limit_accel_in_turns(v_ego, angle_steers, a_target, CP, min_lat_accel=0.0):
 
 
 def get_cruise_accel(e2e, v_cruise, v_ego, a_cruise_prev, angle_steers, CP, dt, accel_coast, allow_throttle,
-                     max_accel_override=None, min_lat_accel=0.0):
+                     max_accel_override=None, min_lat_accel=0.0, positive_accel_ceiling=None):
   max_accel = ACCEL_MAX if e2e else (get_max_accel(v_ego) if max_accel_override is None else max_accel_override)
 
   if not e2e:
@@ -65,6 +65,13 @@ def get_cruise_accel(e2e, v_cruise, v_ego, a_cruise_prev, angle_steers, CP, dt, 
       max_accel = min(max_accel, coast_limit)
 
   target_accel = np.clip(v_cruise - v_ego, A_CRUISE_MIN, max_accel)
+  if not e2e and target_accel > 0.0 and positive_accel_ceiling is not None:
+    try:
+      ceiling = float(positive_accel_ceiling)
+    except (OverflowError, TypeError, ValueError):
+      ceiling = math.nan
+    if np.isfinite(ceiling):
+      target_accel = min(target_accel, max(0.0, ceiling))
   j_cruise = np.interp(v_ego, A_CRUISE_MAX_BP, J_CRUISE_VALS)
   target_accel = float(np.clip(target_accel, a_cruise_prev - j_cruise * dt, a_cruise_prev + j_cruise * dt))
 
@@ -177,12 +184,14 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     )
 
     is_e2e = self.is_e2e(sm)
+    personality = sm['selfdriveState'].personality
 
     self.a_cruise = get_cruise_accel(is_e2e, v_cruise, v_ego,
                                      self.a_cruise, steer_angle_without_offset, self.CP, self.dt,
                                      accel_coast, self.allow_throttle,
                                      max_accel_override=self.nrdr.max_accel(v_ego),
-                                     min_lat_accel=self.nrdr.turn_accel_threshold())
+                                     min_lat_accel=self.nrdr.turn_accel_threshold(),
+                                     positive_accel_ceiling=self.nrdr.personality_accel_ceiling(v_ego, personality))
     cruise_should_stop = bool(v_ego < self.nrdr.v_ego_stopping and self.a_cruise < 0.1)
 
     candidates = [(output_a_target_mpc, self.mpc.source, output_should_stop_mpc),
