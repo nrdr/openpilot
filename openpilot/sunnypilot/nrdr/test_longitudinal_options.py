@@ -1,8 +1,10 @@
 import ast
+import math
 from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
 
+import numpy as np
 import pytest
 
 
@@ -37,7 +39,9 @@ if sys.platform == "win32":
   sys.modules.setdefault("openpilot.cereal.messaging", messaging_module)
 
 from opendbc.car.honda.values import HondaFlags
+from openpilot.cereal import log
 from openpilot.common.pid import PIDController
+from openpilot.sunnypilot.nrdr import longitudinal_planner as longitudinal_planner_module
 from openpilot.sunnypilot.nrdr.longcontrol import (
   LONG_PID_SCALE_DEFAULTS,
   LONG_PID_SCALE_EPSILON,
@@ -48,7 +52,27 @@ from openpilot.sunnypilot.nrdr.longcontrol import (
   longitudinal_pid_gains,
   scaled_pid_limits,
 )
-from openpilot.sunnypilot.nrdr.longitudinal_planner import NrdrLongitudinalPlanner, apply_cruise_overspeed_allowance
+from openpilot.sunnypilot.nrdr.longitudinal_planner import (
+  SUNNY_ACCEL_PROFILE_BP,
+  SUNNY_ACCEL_PROFILE_ECO,
+  SUNNY_ACCEL_PROFILE_NORMAL,
+  SUNNY_ACCEL_PROFILE_SPORT,
+  NrdrLongitudinalPlanner,
+  apply_cruise_overspeed_allowance,
+  sunny_personality_accel_max,
+)
+
+
+LONGITUDINAL_PERSONALITIES = (
+  log.LongitudinalPersonality.aggressive,
+  log.LongitudinalPersonality.standard,
+  log.LongitudinalPersonality.relaxed,
+  log.LongitudinalPersonality.econ,
+)
+VIBE_PROFILE_BP = (0.0, 4.0, 6.0, 9.0, 16.0, 25.0, 30.0, 55.0)
+VIBE_PROFILE_ECO = (2.0, 1.99, 1.88, 1.10, 0.50, 0.292, 0.15, 0.10)
+VIBE_PROFILE_NORMAL = (2.0, 2.0, 1.94, 1.22, 0.635, 0.33, 0.20, 0.16)
+VIBE_PROFILE_SPORT = (2.0, 2.0, 2.0, 1.85, 0.80, 0.54, 0.32, 0.22)
 
 
 def _long_control(*, enabled: bool, nidec: bool = True, gas_interceptor: bool = True, brand: str = "honda"):
@@ -248,12 +272,14 @@ def test_on_device_longitudinal_items_follow_toggle_then_option_order():
   ]
 
 
-def _planner(*, enabled: bool, nidec: bool = True, gas_interceptor: bool = True, brand: str = "honda"):
+def _planner(*, enabled: bool, nidec: bool = True, gas_interceptor: bool = True, brand: str = "honda",
+             personality_profiles: bool = False, cruise_scale: float = 1.0):
   planner = NrdrLongitudinalPlanner.__new__(NrdrLongitudinalPlanner)
   planner.roen_acceleration_limits = enabled
+  planner.personality_accel_profiles = personality_profiles
   planner.CP = SimpleNamespace(brand=brand, flags=HondaFlags.NIDEC if nidec else 0)
   planner.CP_SP = SimpleNamespace(enableGasInterceptor=gas_interceptor)
-  planner.tune = SimpleNamespace(a_cruise_max_scale=1.0)
+  planner.tune = SimpleNamespace(a_cruise_max_scale=cruise_scale)
   return planner
 
 
@@ -269,6 +295,289 @@ def test_roen_planner_gates_and_turn_threshold():
   assert _planner(enabled=True, brand="other").max_accel(0.0) == 2.0
   assert _planner(enabled=True).turn_accel_threshold() == 1.3
   assert _planner(enabled=False).turn_accel_threshold() == 0.0
+
+
+@pytest.mark.parametrize(
+  ("personality", "profile"),
+  (
+    (log.LongitudinalPersonality.aggressive, VIBE_PROFILE_SPORT),
+    (log.LongitudinalPersonality.standard, VIBE_PROFILE_NORMAL),
+    (log.LongitudinalPersonality.relaxed, VIBE_PROFILE_ECO),
+    (log.LongitudinalPersonality.econ, VIBE_PROFILE_ECO),
+  ),
+)
+def test_sunny_personality_profiles_match_final_vibe_breakpoints(personality, profile):
+  assert SUNNY_ACCEL_PROFILE_BP == VIBE_PROFILE_BP
+  assert SUNNY_ACCEL_PROFILE_ECO == VIBE_PROFILE_ECO
+  assert SUNNY_ACCEL_PROFILE_NORMAL == VIBE_PROFILE_NORMAL
+  assert SUNNY_ACCEL_PROFILE_SPORT == VIBE_PROFILE_SPORT
+  actual = [sunny_personality_accel_max(speed, personality) for speed in VIBE_PROFILE_BP]
+  assert actual == pytest.approx(profile)
+  assert [sunny_personality_accel_max(speed, SimpleNamespace(raw=personality)) for speed in VIBE_PROFILE_BP] == pytest.approx(profile)
+
+
+def test_sunny_personality_profile_interpolation_is_ordered_and_endpoint_saturating():
+  speeds = np.linspace(-5.0, 70.0, 301)
+  eco = np.asarray([sunny_personality_accel_max(speed, log.LongitudinalPersonality.econ) for speed in speeds])
+  relaxed = np.asarray([sunny_personality_accel_max(speed, log.LongitudinalPersonality.relaxed) for speed in speeds])
+  normal = np.asarray([sunny_personality_accel_max(speed, log.LongitudinalPersonality.standard) for speed in speeds])
+  sport = np.asarray([sunny_personality_accel_max(speed, log.LongitudinalPersonality.aggressive) for speed in speeds])
+
+  assert eco == pytest.approx(relaxed)
+  assert np.all(sport >= normal)
+  assert np.all(normal >= eco)
+  assert sport[0] == sport[20] == VIBE_PROFILE_SPORT[0]
+  assert sport[-1] == VIBE_PROFILE_SPORT[-1]
+
+
+@pytest.mark.parametrize(
+  ("personality", "profile"),
+  (
+    (log.LongitudinalPersonality.aggressive, VIBE_PROFILE_SPORT),
+    (log.LongitudinalPersonality.standard, VIBE_PROFILE_NORMAL),
+    (log.LongitudinalPersonality.relaxed, VIBE_PROFILE_ECO),
+  ),
+)
+def test_sunny_personality_profile_uses_linear_interpolation_between_every_breakpoint(personality, profile):
+  for left, right, left_value, right_value in zip(
+    VIBE_PROFILE_BP[:-1], VIBE_PROFILE_BP[1:], profile[:-1], profile[1:], strict=True,
+  ):
+    midpoint = (left + right) / 2.0
+    assert sunny_personality_accel_max(midpoint, personality) == pytest.approx((left_value + right_value) / 2.0)
+
+
+@pytest.mark.parametrize("personality", (-1, 4, None, True, 0.5, "unknown", float("inf"), SimpleNamespace(raw=9)))
+def test_invalid_accel_personality_falls_back_to_standard(personality):
+  for speed in VIBE_PROFILE_BP:
+    assert sunny_personality_accel_max(speed, personality) == pytest.approx(
+      sunny_personality_accel_max(speed, log.LongitudinalPersonality.standard),
+    )
+
+
+@pytest.mark.parametrize("speed", (
+  None, True, "unknown", float("nan"), float("inf"), float("-inf"),
+  pytest.param(10 ** 10_000, id="overflowing-int"),
+))
+def test_nonfinite_or_malformed_speed_disables_profile_ceiling(speed):
+  assert sunny_personality_accel_max(speed, log.LongitudinalPersonality.aggressive) is None
+
+
+@pytest.mark.parametrize("enabled", (False, True))
+@pytest.mark.parametrize("speed", (0.0, 4.0, 12.5, 25.0, 55.0))
+@pytest.mark.parametrize("personality", LONGITUDINAL_PERSONALITIES)
+def test_disabled_personality_profiles_are_exact_existing_platform_parity(enabled, speed, personality):
+  planner = _planner(enabled=enabled, personality_profiles=False)
+  assert planner.personality_accel_ceiling(speed, personality) is None
+
+
+def test_personality_profile_setting_refreshes_from_planner_snapshot_and_defaults_off(monkeypatch):
+  planner = NrdrLongitudinalPlanner.__new__(NrdrLongitudinalPlanner)
+  planner.CP = SimpleNamespace(deprecated=SimpleNamespace(vEgoStopping=0.5))
+  snapshot = SimpleNamespace(generation=7)
+  planner.params = SimpleNamespace(snapshot=snapshot)
+  bool_values = {}
+  seen_bool_keys = []
+
+  monkeypatch.setattr(longitudinal_planner_module, "read_float", lambda _snapshot, _key, default, *_bounds: default)
+
+  def fake_read_bool(_snapshot, key, default):
+    seen_bool_keys.append(key)
+    return bool_values.get(key, default)
+
+  monkeypatch.setattr(longitudinal_planner_module, "read_bool", fake_read_bool)
+
+  planner._refresh_settings()
+  assert planner.personality_accel_profiles is False
+  assert "NrdrPersonalityAccelProfiles" in seen_bool_keys
+
+  bool_values["NrdrPersonalityAccelProfiles"] = True
+  snapshot.generation = 8
+  planner._refresh_settings()
+  assert planner.personality_accel_profiles is True
+  assert planner.settings_generation == 8
+
+
+@pytest.mark.parametrize("enabled", (False, True))
+@pytest.mark.parametrize("scale", (0.0, 0.5, 1.0, 3.0))
+@pytest.mark.parametrize("speed", (0.0, 4.0, 9.0, 16.0, 40.0, 55.0))
+@pytest.mark.parametrize("personality", LONGITUDINAL_PERSONALITIES)
+def test_personality_profile_can_only_lower_existing_cruise_ceiling(enabled, scale, speed, personality):
+  planner = _planner(enabled=enabled, personality_profiles=True, cruise_scale=scale)
+  platform_max = planner.max_accel(speed)
+  profile_max = sunny_personality_accel_max(speed, personality)
+  assert planner.personality_accel_ceiling(speed, personality) == pytest.approx(profile_max)
+  assert min(platform_max, planner.personality_accel_ceiling(speed, personality)) <= platform_max
+
+
+def test_profile_setting_never_changes_roen_turn_or_global_accel_envelopes():
+  planner = _planner(enabled=True, personality_profiles=True)
+  assert planner.max_accel(0.0) == 4.0
+  assert planner.turn_accel_threshold() == 1.3
+  assert planner.personality_accel_ceiling(0.0, log.LongitudinalPersonality.relaxed) == 2.0
+
+
+def test_core_planner_applies_profile_only_to_positive_cruise_ceiling():
+  planner_path = Path(__file__).parents[2] / "selfdrive" / "controls" / "lib" / "longitudinal_planner.py"
+  tree = ast.parse(planner_path.read_text(encoding="utf-8"))
+  cruise_calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                  and isinstance(node.func, ast.Name) and node.func.id == "get_cruise_accel"]
+  assert len(cruise_calls) == 1
+  keywords = {keyword.arg: keyword.value for keyword in cruise_calls[0].keywords}
+  max_override = keywords["max_accel_override"]
+  turn_threshold = keywords["min_lat_accel"]
+  positive_ceiling = keywords["positive_accel_ceiling"]
+  assert isinstance(max_override, ast.Call) and isinstance(max_override.func, ast.Attribute)
+  assert max_override.func.attr == "max_accel"
+  assert isinstance(turn_threshold, ast.Call) and isinstance(turn_threshold.func, ast.Attribute)
+  assert turn_threshold.func.attr == "turn_accel_threshold"
+  assert isinstance(positive_ceiling, ast.Call) and isinstance(positive_ceiling.func, ast.Attribute)
+  assert positive_ceiling.func.attr == "personality_accel_ceiling"
+
+  platform_max_calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Attribute) and node.func.attr == "max_accel"]
+  assert len(platform_max_calls) == 2
+  accel_clip_assignments = [node for node in ast.walk(tree) if isinstance(node, ast.Assign)
+                            and any(isinstance(target, ast.Name) and target.id == "accel_clip" for target in node.targets)
+                            and isinstance(node.value, ast.List)]
+  assert len(accel_clip_assignments) == 1
+  assert {id(call) for call in platform_max_calls} == {id(max_override), id(accel_clip_assignments[0].value.elts[1])}
+
+  profile_calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+                   and isinstance(node.func, ast.Attribute) and node.func.attr == "personality_accel_ceiling"]
+  assert profile_calls == [positive_ceiling]
+  assert ast.dump(positive_ceiling.args[1]) == ast.dump(ast.parse("personality", mode="eval").body)
+
+
+def _load_core_cruise_accel():
+  planner_path = Path(__file__).parents[2] / "selfdrive" / "controls" / "lib" / "longitudinal_planner.py"
+  tree = ast.parse(planner_path.read_text(encoding="utf-8"))
+  required_assignments = {
+    "A_CRUISE_MAX_VALS", "A_CRUISE_MAX_BP", "J_CRUISE_VALS", "A_CRUISE_MIN",
+    "MIN_ALLOW_THROTTLE_SPEED", "_A_TOTAL_MAX_V", "_A_TOTAL_MAX_BP",
+  }
+  required_functions = {"get_max_accel", "limit_accel_in_turns", "get_cruise_accel"}
+  nodes = [
+    node for node in tree.body
+    if (isinstance(node, (ast.Assign, ast.AnnAssign))
+        and any(isinstance(target, ast.Name) and target.id in required_assignments
+                for target in (node.targets if isinstance(node, ast.Assign) else [node.target])))
+    or (isinstance(node, ast.FunctionDef) and node.name in required_functions)
+  ]
+  namespace = {
+    "math": math,
+    "np": np,
+    "CV": SimpleNamespace(DEG_TO_RAD=math.pi / 180.0),
+    "ACCEL_MIN": -3.5,
+    "ACCEL_MAX": 2.0,
+  }
+  exec(compile(ast.Module(body=nodes, type_ignores=[]), planner_path, "exec"), namespace)
+  return namespace["get_cruise_accel"]
+
+
+def test_personality_accel_profile_param_is_default_off_persistent_backup_bool():
+  params_header = Path(__file__).parents[2] / "common" / "params_keys.h"
+  source = params_header.read_text(encoding="utf-8")
+  expected = '{"NrdrPersonalityAccelProfiles", {PERSISTENT | BACKUP, BOOL, "0"}}'
+  assert source.count(expected) == 1
+
+
+def test_personality_ceiling_changes_positive_acc_only_and_preserves_braking():
+  get_cruise_accel = _load_core_cruise_accel()
+  cp = SimpleNamespace(steerRatio=15.0, wheelbase=2.7)
+  common = {
+    "e2e": False, "v_ego": 10.0, "angle_steers": 0.0, "CP": cp, "dt": 0.05,
+    "accel_coast": -0.3, "allow_throttle": True,
+  }
+
+  braking_original = get_cruise_accel(v_cruise=5.0, a_cruise_prev=-0.5, max_accel_override=2.0, **common)
+  braking_profiled = get_cruise_accel(v_cruise=5.0, a_cruise_prev=-0.5, max_accel_override=2.0,
+                                      positive_accel_ceiling=0.2, **common)
+  accelerating_original = get_cruise_accel(v_cruise=20.0, a_cruise_prev=0.5, max_accel_override=2.0, **common)
+  accelerating_profiled = get_cruise_accel(v_cruise=20.0, a_cruise_prev=0.5, max_accel_override=2.0,
+                                           positive_accel_ceiling=0.2, **common)
+
+  assert braking_original < 0.0
+  assert braking_profiled == braking_original
+  assert accelerating_profiled < accelerating_original
+
+
+def test_personality_ceiling_preserves_no_throttle_coast_braking_exactly():
+  get_cruise_accel = _load_core_cruise_accel()
+  common = {
+    "e2e": False, "v_cruise": 4.85, "v_ego": 4.9, "a_cruise_prev": -0.15,
+    "angle_steers": 0.0, "CP": SimpleNamespace(steerRatio=15.0, wheelbase=2.7), "dt": 0.05,
+    "accel_coast": -0.3, "allow_throttle": False, "max_accel_override": 4.0,
+    "min_lat_accel": 1.3,
+  }
+  original = get_cruise_accel(positive_accel_ceiling=None, **common)
+  profiled = get_cruise_accel(positive_accel_ceiling=1.97, **common)
+
+  assert original == pytest.approx(-0.1280000000000001)
+  assert profiled == original
+
+
+@pytest.mark.parametrize("platform_max", (1.6, 4.0), ids=("standard-platform", "roen"))
+@pytest.mark.parametrize("allow_throttle", (False, True))
+@pytest.mark.parametrize("v_ego", (2.5, 3.0, 4.0, 4.9, 5.0))
+@pytest.mark.parametrize("accel_coast", (-0.6, -0.3, 0.2))
+@pytest.mark.parametrize("angle_steers", (0.0, 30.0))
+def test_personality_ceiling_is_exact_noop_for_all_negative_cruise_targets(
+  platform_max, allow_throttle, v_ego, accel_coast, angle_steers,
+):
+  get_cruise_accel = _load_core_cruise_accel()
+  common = {
+    "e2e": False, "v_cruise": v_ego - 0.05, "v_ego": v_ego, "a_cruise_prev": -0.15,
+    "angle_steers": angle_steers, "CP": SimpleNamespace(steerRatio=15.0, wheelbase=2.7), "dt": 0.05,
+    "accel_coast": accel_coast, "allow_throttle": allow_throttle, "max_accel_override": platform_max,
+    "min_lat_accel": 1.3,
+  }
+  baseline = get_cruise_accel(positive_accel_ceiling=None, **common)
+  profiled = get_cruise_accel(positive_accel_ceiling=0.1, **common)
+
+  assert baseline <= 0.0
+  assert profiled == baseline
+
+
+def test_personality_ceiling_transition_keeps_existing_positive_jerk_slew():
+  get_cruise_accel = _load_core_cruise_accel()
+  v_ego = 10.0
+  previous_accel = 1.0
+  dt = 0.05
+  profiled = get_cruise_accel(
+    e2e=False, v_cruise=20.0, v_ego=v_ego, a_cruise_prev=previous_accel,
+    angle_steers=0.0, CP=SimpleNamespace(steerRatio=15.0, wheelbase=2.7), dt=dt,
+    accel_coast=-0.3, allow_throttle=True, max_accel_override=2.0,
+    min_lat_accel=0.0, positive_accel_ceiling=0.1,
+  )
+  jerk_limit = float(np.interp(v_ego, (0.0, 10.0, 25.0, 40.0), (1.6, 1.2, 0.8, 0.6))) * dt
+
+  assert profiled == pytest.approx(previous_accel - jerk_limit)
+  assert abs(profiled - previous_accel) == pytest.approx(jerk_limit)
+
+
+@pytest.mark.parametrize("ceiling", (None, "invalid", float("nan"), float("inf"), float("-inf")))
+def test_invalid_positive_ceiling_preserves_existing_cruise_result(ceiling):
+  get_cruise_accel = _load_core_cruise_accel()
+  common = {
+    "e2e": False, "v_cruise": 20.0, "v_ego": 10.0, "a_cruise_prev": 0.5,
+    "angle_steers": 0.0, "CP": SimpleNamespace(steerRatio=15.0, wheelbase=2.7), "dt": 0.05,
+    "accel_coast": -0.3, "allow_throttle": True, "max_accel_override": 2.0, "min_lat_accel": 0.0,
+  }
+  assert get_cruise_accel(positive_accel_ceiling=ceiling, **common) == get_cruise_accel(
+    positive_accel_ceiling=None, **common,
+  )
+
+
+def test_e2e_cruise_path_ignores_personality_max_override():
+  get_cruise_accel = _load_core_cruise_accel()
+  cp = SimpleNamespace(steerRatio=15.0, wheelbase=2.7)
+  common = {
+    "e2e": True, "v_cruise": 20.0, "v_ego": 10.0, "a_cruise_prev": 0.5,
+    "angle_steers": 0.0, "CP": cp, "dt": 0.05, "accel_coast": -0.3, "allow_throttle": True,
+  }
+  assert get_cruise_accel(max_accel_override=0.05, positive_accel_ceiling=0.01, **common) == get_cruise_accel(
+    max_accel_override=None, positive_accel_ceiling=None, **common,
+  )
 
 
 def test_zero_overspeed_allowance_is_exact_noop():

@@ -314,6 +314,7 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
   @parameterized.expand([
     ("NrdrHondaFullBrakeAuthority", "toggle"),
     ("NrdrRoenAccelerationLimits", "toggle"),
+    ("NrdrPersonalityAccelProfiles", "toggle"),
     ("NrdrCruiseOverspeedAllowance", "option"),
   ], names=["key", "widget"])
   def test_options_are_independent_of_live_learning_gas(self, schema, key, widget):
@@ -334,6 +335,23 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     assert "Enabled by default" in roen.get("details", "")
     assert "default OFF when a gas pedal interceptor is detected" in live_gas.get("details", "")
     assert "selection is preserved" in live_gas.get("details", "")
+
+  def test_personality_acceleration_profile_scope_and_provenance(self, schema):
+    item = _find_item(schema, "NrdrPersonalityAccelProfiles")
+    assert item is not None
+    copy = f"{item.get('description', '')} {item.get('details', '')}".lower()
+    for phrase in (
+      "disabled by default",
+      "final vibe-era positive-acceleration curves",
+      "nrdr maps aggressive to sport",
+      "historical sunny kept the acceleration selector separate",
+      "never raises acceleration",
+      "lead/model braking calculations",
+      "dedicated launch assist",
+      "changing the distance setting",
+      "roen remains the separate honda nidec authority envelope",
+    ):
+      assert phrase in copy
 
   def test_honda_bosch_a_radar_scope_is_explicit(self, schema):
     radar = _find_item(schema, "HondaBoschARadar")

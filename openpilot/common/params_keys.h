@@ -398,6 +398,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"NrdrHondaEcuMatchedLong", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrHondaFullBrakeAuthority", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrRoenAccelerationLimits", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrPersonalityAccelProfiles", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaInjectionTest", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaAltDashboardSpeed", {PERSISTENT | BACKUP, INT, "0"}},
     {"HondaAltDashboardDistance", {PERSISTENT | BACKUP, INT, "0"}},

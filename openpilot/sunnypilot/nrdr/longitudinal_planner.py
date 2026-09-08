@@ -2,6 +2,7 @@ import numpy as np
 
 from opendbc.car.honda.values import HondaFlags
 from opendbc.car.interfaces import ACCEL_MAX
+from openpilot.cereal import log
 from openpilot.common.constants import CV
 from openpilot.selfdrive.car.cruise import V_CRUISE_MAX
 from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan
@@ -20,6 +21,47 @@ CRUISE_OVERSPEED_DRIVING_BUFFER = 0.5
 ROEN_ACCEL_BP = (0.0, 5.0, 20.0)
 ROEN_PLANNER_ACCEL = (4.0, 4.0, 2.0)
 ROEN_TURN_ACCEL_THRESHOLD = 1.3
+# Positive-acceleration profiles from Sunny's final Vibe-era implementation
+# (feat/vibe-controller@6b103588). Sunny kept its acceleration selector
+# separate; NRDR deliberately maps the existing driving personality when the
+# new opt-in setting is enabled.
+SUNNY_ACCEL_PROFILE_BP = (0.0, 4.0, 6.0, 9.0, 16.0, 25.0, 30.0, 55.0)
+SUNNY_ACCEL_PROFILE_ECO = (2.0, 1.99, 1.88, 1.10, 0.50, 0.292, 0.15, 0.10)
+SUNNY_ACCEL_PROFILE_NORMAL = (2.0, 2.0, 1.94, 1.22, 0.635, 0.33, 0.20, 0.16)
+SUNNY_ACCEL_PROFILE_SPORT = (2.0, 2.0, 2.0, 1.85, 0.80, 0.54, 0.32, 0.22)
+SUNNY_ACCEL_PROFILES_BY_PERSONALITY = (
+  SUNNY_ACCEL_PROFILE_SPORT,
+  SUNNY_ACCEL_PROFILE_NORMAL,
+  SUNNY_ACCEL_PROFILE_ECO,
+  SUNNY_ACCEL_PROFILE_ECO,
+)
+
+
+def _personality_index(personality) -> int:
+  raw = getattr(personality, "raw", personality)
+  if isinstance(raw, bool):
+    return int(log.LongitudinalPersonality.standard)
+  try:
+    index = int(raw)
+    if float(raw) != index:
+      raise ValueError
+  except (OverflowError, TypeError, ValueError):
+    return int(log.LongitudinalPersonality.standard)
+  return index if 0 <= index < len(SUNNY_ACCEL_PROFILES_BY_PERSONALITY) else int(log.LongitudinalPersonality.standard)
+
+
+def sunny_personality_accel_max(v_ego: float, personality) -> float | None:
+  """Return Sunny's historical positive ceiling using NRDR's opt-in personality mapping."""
+  if isinstance(v_ego, bool):
+    return None
+  try:
+    speed = float(v_ego)
+  except (OverflowError, TypeError, ValueError):
+    return None
+  if not np.isfinite(speed):
+    return None
+  profile = SUNNY_ACCEL_PROFILES_BY_PERSONALITY[_personality_index(personality)]
+  return float(np.interp(max(0.0, speed), SUNNY_ACCEL_PROFILE_BP, profile))
 
 
 def apply_cruise_overspeed_allowance(target: float, selected_target: float, set_speed: float,
@@ -42,6 +84,7 @@ class NrdrLongitudinalPlanner:
     self.cruise_scale = 1.0
     self.cruise_overspeed_allowance = 0.0
     self.roen_acceleration_limits = True
+    self.personality_accel_profiles = False
     self.launch_armed = False
     self._refresh_settings()
 
@@ -55,6 +98,7 @@ class NrdrLongitudinalPlanner:
     self.cruise_scale = read_float(snapshot, "NrdrCruiseMismatchCorrection", 100.0, 95.0, 105.0) / 100.0
     self.cruise_overspeed_allowance = read_float(snapshot, "NrdrCruiseOverspeedAllowance", 0.0, 0.0, 10.0) * CV.MPH_TO_MS
     self.roen_acceleration_limits = read_bool(snapshot, "NrdrRoenAccelerationLimits", True)
+    self.personality_accel_profiles = read_bool(snapshot, "NrdrPersonalityAccelProfiles", False)
     self.settings_generation = snapshot.generation
 
   @property
@@ -67,6 +111,12 @@ class NrdrLongitudinalPlanner:
       return float(np.interp(v_ego, ROEN_ACCEL_BP, ROEN_PLANNER_ACCEL))
     values = np.minimum(np.asarray(CRUISE_ACCEL_VALUES) * self.tune.a_cruise_max_scale, ACCEL_MAX)
     return float(np.interp(v_ego, (0.0, 10.0, 25.0, 40.0), values))
+
+  def personality_accel_ceiling(self, v_ego: float, personality) -> float | None:
+    """Return the optional positive cruise/ACC ceiling without changing platform, coast, or braking limits."""
+    if not self.personality_accel_profiles:
+      return None
+    return sunny_personality_accel_max(v_ego, personality)
 
   def turn_accel_threshold(self) -> float:
     return ROEN_TURN_ACCEL_THRESHOLD if self.roen_enabled else 0.0
