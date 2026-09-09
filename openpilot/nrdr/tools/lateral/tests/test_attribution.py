@@ -6,9 +6,15 @@ import pytest
 from openpilot.nrdr.tools.lateral.attribution import (
   _logged_firmware_vgr_pid_only,
   ControlSample,
+  Context,
+  DelaySample,
+  LaneSample,
+  ScanResult,
+  build_report,
   classify_attribution,
   extract_controller_reading,
   is_fresh,
+  lane_centering_enabled_cohorts,
   lane_observation,
   logged_steer_ratio_mode,
   summarize_controls,
@@ -126,14 +132,65 @@ def test_lane_confidence_gate_rejects_weak_lines():
   assert rejection == "lane confidence"
 
 
-def _control_sample(phase: str, yaw_ratio: float = 0.98) -> ControlSample:
+def _control_sample(phase: str, yaw_ratio: float = 0.98, route: str = "route", cohort: str = "cohort") -> ControlSample:
   desired_angle = 15.0
   steering_rate = {"turn-in": 3.0, "steady": 0.0, "unwind": -3.0}[phase]
   return ControlSample(
-    "route", "cohort", 1.0, "clarityPidWrappedInTorqueState", 25.0,
+    route, cohort, 1.0, "clarityPidWrappedInTorqueState", 25.0,
     desired_angle, 14.0, steering_rate, 0.002, 0.002, yaw_ratio * 0.002,
     0.10, 0.03, 0.04, 0.17, False, True,
   )
+
+
+def test_report_excludes_lane_centering_cohorts_from_tune_attribution():
+  result = ScanResult(files_read=2)
+  result.controls.extend(_control_sample("turn-in", route="plain-route", cohort="plain") for _ in range(40))
+  result.controls.extend(_control_sample("turn-in", route="lane-route-a", cohort="lane") for _ in range(20))
+  result.controls.extend(_control_sample("turn-in", route="lane-route-b", cohort="lane") for _ in range(20))
+  result.lanes = [
+    LaneSample("plain-route", "plain", 1.0, 10.0, 0.12, 3.6, 0.9, 0.1, 0.1, "high", "right", 25.0, 15.0),
+    LaneSample("lane-route-c", "lane", 1.0, 10.0, 0.30, 3.6, 0.9, 0.1, 0.1, "high", "right", 25.0, 15.0),
+  ]
+  result.delays = [
+    DelaySample("plain-route", "plain", 0.20, 0.19, 0.01, "valid"),
+    DelaySample("lane-route-d", "lane", 0.45, 0.44, 0.01, "excluded"),
+  ]
+  result.lane_attempts[("plain", 10.0, "right", 5.0, 65.0, 3.0, 45.0)] = 1
+  result.lane_attempts[("lane", 10.0, "right", 5.0, 65.0, 3.0, 45.0)] = 100
+  result.contexts = {
+    "plain": Context("plain-route", settings={"LaneCentering": "0"}),
+    "lane": Context("lane-route-b", settings={"LaneCentering": "1"}),
+  }
+
+  report = build_report(result, min_samples=30, speed_edges_mph=(5.0, 65.0), angle_edges_deg=(3.0, 45.0))
+
+  assert report["controller"]["active_hands_off_samples"] == 40
+  assert report["input"]["routes"] == ["plain-route"]
+  assert report["input"]["excluded_lane_centering_cohorts"] == [
+    {
+      "cohort": "lane",
+      "routes": ["lane-route-a", "lane-route-b", "lane-route-c", "lane-route-d"],
+      "reason": "LaneCentering enabled",
+    },
+  ]
+  assert len(report["lane_placement"]) == 1
+  assert report["lane_placement"][0]["attempted_frames"] == 1
+  assert report["lane_placement"][0]["accepted_frames"] == 1
+  assert report["live_delay"]["samples"] == 1
+  assert report["live_delay"]["statuses"] == {"valid": 1}
+
+
+@pytest.mark.parametrize(("settings", "expected"), (
+  ({}, set()),
+  ({"LaneCentering": "0"}, set()),
+  ({"LaneCentering": "false"}, set()),
+  ({"LaneCentering": " 1"}, set()),
+  ({"LaneCentering": "1"}, {"lane"}),
+  ({"LaneCentering": "malformed"}, set()),
+))
+def test_lane_centering_cohort_exclusion_matches_runtime_get_bool(settings, expected):
+  result = ScanResult(contexts={"lane": Context("lane-route", settings=settings)})
+  assert lane_centering_enabled_cohorts(result) == expected
 
 
 def test_summary_reports_tracking_and_p_i_feedforward_contributions():

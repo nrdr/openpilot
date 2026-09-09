@@ -29,10 +29,10 @@ def _model(left=-1.8, right=1.8, model_y=0.0, lane_prob=0.9, lane_std=0.1, path_
   )
 
 
-def _update(controller, model, *, offset=0.0, authority=1.0, enabled=True, active=True, valid=True, speed=_V_EGO,
-            pause_on_signal=False, turn_signal_active=False):
-  return controller.update(0.0, model, speed, enabled, offset, authority, active, valid,
-                           pause_on_signal, turn_signal_active)
+def _update(controller, model, *, model_curvature=0.0, offset=0.0, authority=1.0, enabled=True, active=True, valid=True, speed=_V_EGO,
+            pause_on_signal=False, turn_signal_active=False, driver_override=False):
+  return controller.update(model_curvature, model, speed, enabled, offset, authority, active, valid,
+                           pause_on_signal, turn_signal_active, driver_override)
 
 
 def _converge(model, *, offset=0.0, authority=1.0):
@@ -72,6 +72,15 @@ class TestLaneCentering(OpenpilotTestCase):
     controller, _ = _converge(model, authority=0.0)
     signaled = _update(controller, model, authority=0.0, turn_signal_active=True)
     assert abs(signaled - output) < 1e-7
+
+  def test_driver_override_resets_and_reacquires_smoothly(self):
+    model = _model(left=-1.5, right=2.1)
+    controller, centered = _converge(model, authority=0.0)
+    model_curvature = 0.0013
+
+    assert _update(controller, model, model_curvature=model_curvature, authority=0.0, driver_override=True) == model_curvature
+    reacquiring = _update(controller, model, model_curvature=model_curvature, authority=0.0)
+    assert model_curvature < reacquiring < model_curvature + centered
 
   @parameterized.expand([
     ("prob", np.nan),

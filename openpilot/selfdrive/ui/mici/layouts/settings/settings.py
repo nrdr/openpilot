@@ -7,6 +7,7 @@ from openpilot.selfdrive.ui.mici.layouts.settings.device import DeviceLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.developer import DeveloperLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.software import SoftwareLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.firehose import FirehoseLayout
+from openpilot.selfdrive.ui.mici.layouts.settings.lane_centering import LaneCenteringLayoutMici
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 
 
@@ -23,6 +24,10 @@ class SettingsLayout(NavScroller):
     toggles_panel = TogglesLayoutMici()
     toggles_btn = SettingsBigButton("toggles", "", gui_app.texture("icons_mici/settings.png", 64, 64))
     toggles_btn.set_click_callback(lambda: gui_app.push_widget(toggles_panel))
+
+    lane_centering_panel = LaneCenteringLayoutMici()
+    lane_centering_btn = SettingsBigButton("lane centering", "", gui_app.texture("icons_mici/settings/device/lkas.png", 72, 58))
+    lane_centering_btn.set_click_callback(lambda: gui_app.push_widget(lane_centering_panel))
 
     network_panel = NetworkLayoutMici()
     network_btn = SettingsBigButton("network", "", gui_app.texture("icons_mici/settings/network/wifi_strength_full.png", 76, 56))
@@ -46,6 +51,7 @@ class SettingsLayout(NavScroller):
 
     self._scroller.add_widgets([
       toggles_btn,
+      lane_centering_btn,
       network_btn,
       device_btn,
       software_btn,

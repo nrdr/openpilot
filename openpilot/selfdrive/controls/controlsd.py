@@ -178,7 +178,8 @@ class Controls(ControlsExt):
       CC.latActive,
       bool(self.sm.all_checks(['modelV2'])),
       self.lane_centering_pause_on_signal,
-      bool(CS.leftBlinker or CS.rightBlinker))
+      bool(CS.leftBlinker or CS.rightBlinker),
+      bool(CS.steeringPressed))
 
     self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll)
     lat_delay = self.lat_delay + LAT_SMOOTH_SECONDS

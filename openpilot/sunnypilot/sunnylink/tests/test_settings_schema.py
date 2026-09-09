@@ -246,7 +246,7 @@ class TestRuleWellFormedness(OpenpilotTestCase):
 class TestKnownPanels(OpenpilotTestCase):
   def test_expected_panels_exist(self, schema):
     panel_ids = {p["id"] for p in schema["panels"]}
-    expected = {"steering", "cruise", "display", "visuals", "device", "software", "developer"}
+    expected = {"steering", "cruise", "display", "visuals", "device", "software", "developer", "lane_centering"}
     assert expected.issubset(panel_ids), f"Missing panels: {expected - panel_ids}"
 
   def test_mads_sub_panel_exists(self, schema):

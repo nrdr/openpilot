@@ -32,7 +32,7 @@ class LaneCenteringController:
     self._correction = 0.0
 
   def update(self, model_curvature, model_v2, v_ego, enabled, offset, e2e_authority, lat_active, model_valid,
-             pause_on_signal=False, turn_signal_active=False) -> float:
+             pause_on_signal=False, turn_signal_active=False, driver_override=False) -> float:
     model_curvature = float(model_curvature)
 
     try:
@@ -48,6 +48,10 @@ class LaneCenteringController:
       return model_curvature
 
     if not model_valid or not enabled or not lat_active or v_ego < _MIN_V_EGO:
+      self.reset()
+      return model_curvature
+
+    if driver_override:
       self.reset()
       return model_curvature
 

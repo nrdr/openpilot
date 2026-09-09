@@ -90,6 +90,31 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     assert self.saved_params == [("SpeedLimitOffset", "10", False)]
 
+  def test_saveParams_blocks_lane_centering_stack_onroad(self):
+    self.fake_params.offroad = False
+    lane_centering = {
+      "LaneCentering": "1",
+      "LaneCenteringPauseOnSignal": "0",
+      "LaneCenterOffset": "0.12",
+      "LaneCenteringE2EAuthority": "0.45",
+    }
+
+    sunnylinkd.saveParams({**lane_centering, "SpeedLimitOffset": "10"})
+
+    assert self.saved_params == [("SpeedLimitOffset", "10", False)]
+
+  def test_saveParams_allows_lane_centering_stack_offroad(self):
+    lane_centering = {
+      "LaneCentering": "1",
+      "LaneCenteringPauseOnSignal": "0",
+      "LaneCenterOffset": "0.12",
+      "LaneCenteringE2EAuthority": "0.45",
+    }
+
+    sunnylinkd.saveParams(lane_centering)
+
+    assert self.saved_params == [(key, value, False) for key, value in lane_centering.items()]
+
   def test_saveParams_allows_complete_steer_ratio_snapshot_onroad(self):
     self.fake_params.offroad = False
 
@@ -148,8 +173,15 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       assert allow_param_write(key, onroad=True)
       assert allow_param_write(key, onroad=False)
 
-  def test_handcrafted_is_the_only_nrdr_onroad_blocked_key(self):
-    assert ONROAD_WRITE_BLOCKLIST == frozenset(("LongitudinalPersonality", "NrdrHandcraftedLateralTune"))
+  def test_onroad_blocklist_is_exact(self):
+    assert ONROAD_WRITE_BLOCKLIST == frozenset((
+      "LaneCentering",
+      "LaneCenteringE2EAuthority",
+      "LaneCenteringPauseOnSignal",
+      "LaneCenterOffset",
+      "LongitudinalPersonality",
+      "NrdrHandcraftedLateralTune",
+    ))
 
   def test_handcrafted_apply_command_is_server_enforced_offroad_only(self):
     assert not allow_param_write("NrdrHandcraftedLateralTune", onroad=True)
