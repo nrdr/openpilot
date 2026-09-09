@@ -21,19 +21,19 @@ CRUISE_OVERSPEED_DRIVING_BUFFER = 0.5
 ROEN_ACCEL_BP = (0.0, 5.0, 20.0)
 ROEN_PLANNER_ACCEL = (4.0, 4.0, 2.0)
 ROEN_TURN_ACCEL_THRESHOLD = 1.3
-# Positive-acceleration profiles from Sunny's final Vibe-era implementation
-# (feat/vibe-controller@6b103588). Sunny kept its acceleration selector
-# separate; NRDR deliberately maps the existing driving personality when the
-# new opt-in setting is enabled.
-SUNNY_ACCEL_PROFILE_BP = (0.0, 4.0, 6.0, 9.0, 16.0, 25.0, 30.0, 55.0)
-SUNNY_ACCEL_PROFILE_ECO = (2.0, 1.99, 1.88, 1.10, 0.50, 0.292, 0.15, 0.10)
-SUNNY_ACCEL_PROFILE_NORMAL = (2.0, 2.0, 1.94, 1.22, 0.635, 0.33, 0.20, 0.16)
-SUNNY_ACCEL_PROFILE_SPORT = (2.0, 2.0, 2.0, 1.85, 0.80, 0.54, 0.32, 0.22)
-SUNNY_ACCEL_PROFILES_BY_PERSONALITY = (
-  SUNNY_ACCEL_PROFILE_SPORT,
-  SUNNY_ACCEL_PROFILE_NORMAL,
-  SUNNY_ACCEL_PROFILE_ECO,
-  SUNNY_ACCEL_PROFILE_ECO,
+# Positive-only acceleration ceilings from Sunny's C3 implementation
+# (e8df8fad). C3 used a separate selector; NRDR's deliberately monotonic
+# mapping keeps distance bar 1 on the stock platform ceiling and assigns bars
+# 2 through 4 to C3 Sport, Normal, and Eco respectively.
+C3_ACCEL_PROFILE_BP = (0.0, 1.0, 6.0, 8.0, 11.0, 15.0, 20.0, 25.0, 30.0, 55.0)
+C3_ACCEL_PROFILE_NORMAL = (2.5, 2.5, 2.5, 1.70, 1.05, 0.81, 0.625, 0.42, 0.348, 0.12)
+C3_ACCEL_PROFILE_ECO = (2.0, 2.0, 2.0, 1.4, 0.80, 0.68, 0.53, 0.32, 0.20, 0.085)
+C3_ACCEL_PROFILE_SPORT = (3.5, 3.5, 2.8, 2.4, 1.4, 1.0, 0.89, 0.75, 0.50, 0.2)
+C3_ACCEL_PROFILES_BY_PERSONALITY = (
+  None,
+  C3_ACCEL_PROFILE_SPORT,
+  C3_ACCEL_PROFILE_NORMAL,
+  C3_ACCEL_PROFILE_ECO,
 )
 
 
@@ -47,11 +47,14 @@ def _personality_index(personality) -> int:
       raise ValueError
   except (OverflowError, TypeError, ValueError):
     return int(log.LongitudinalPersonality.standard)
-  return index if 0 <= index < len(SUNNY_ACCEL_PROFILES_BY_PERSONALITY) else int(log.LongitudinalPersonality.standard)
+  return index if 0 <= index < len(C3_ACCEL_PROFILES_BY_PERSONALITY) else int(log.LongitudinalPersonality.standard)
 
 
-def sunny_personality_accel_max(v_ego: float, personality) -> float | None:
-  """Return Sunny's historical positive ceiling using NRDR's opt-in personality mapping."""
+def c3_personality_accel_max(v_ego: float, personality) -> float | None:
+  """Return the C3 positive ceiling mapped to NRDR's four distance bars."""
+  profile = C3_ACCEL_PROFILES_BY_PERSONALITY[_personality_index(personality)]
+  if profile is None:
+    return None
   if isinstance(v_ego, bool):
     return None
   try:
@@ -60,8 +63,7 @@ def sunny_personality_accel_max(v_ego: float, personality) -> float | None:
     return None
   if not np.isfinite(speed):
     return None
-  profile = SUNNY_ACCEL_PROFILES_BY_PERSONALITY[_personality_index(personality)]
-  return float(np.interp(max(0.0, speed), SUNNY_ACCEL_PROFILE_BP, profile))
+  return float(np.interp(max(0.0, speed), C3_ACCEL_PROFILE_BP, profile))
 
 
 def apply_cruise_overspeed_allowance(target: float, selected_target: float, set_speed: float,
@@ -84,7 +86,6 @@ class NrdrLongitudinalPlanner:
     self.cruise_scale = 1.0
     self.cruise_overspeed_allowance = 0.0
     self.roen_acceleration_limits = True
-    self.personality_accel_profiles = False
     self.launch_armed = False
     self._refresh_settings()
 
@@ -98,7 +99,6 @@ class NrdrLongitudinalPlanner:
     self.cruise_scale = read_float(snapshot, "NrdrCruiseMismatchCorrection", 100.0, 95.0, 105.0) / 100.0
     self.cruise_overspeed_allowance = read_float(snapshot, "NrdrCruiseOverspeedAllowance", 0.0, 0.0, 10.0) * CV.MPH_TO_MS
     self.roen_acceleration_limits = read_bool(snapshot, "NrdrRoenAccelerationLimits", True)
-    self.personality_accel_profiles = read_bool(snapshot, "NrdrPersonalityAccelProfiles", False)
     self.settings_generation = snapshot.generation
 
   @property
@@ -113,10 +113,8 @@ class NrdrLongitudinalPlanner:
     return float(np.interp(v_ego, (0.0, 10.0, 25.0, 40.0), values))
 
   def personality_accel_ceiling(self, v_ego: float, personality) -> float | None:
-    """Return the optional positive cruise/ACC ceiling without changing platform, coast, or braking limits."""
-    if not self.personality_accel_profiles:
-      return None
-    return sunny_personality_accel_max(v_ego, personality)
+    """Return the C3 positive cruise/ACC ceiling without changing platform, coast, or braking limits."""
+    return c3_personality_accel_max(v_ego, personality)
 
   def turn_accel_threshold(self) -> float:
     return ROEN_TURN_ACCEL_THRESHOLD if self.roen_enabled else 0.0

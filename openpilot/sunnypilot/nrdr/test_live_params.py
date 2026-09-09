@@ -114,11 +114,11 @@ def test_roen_setting_reaches_control_and_planner_snapshots():
   assert "NrdrRoenAccelerationLimits" in planner_keys
 
 
-def test_personality_accel_profiles_reach_only_the_planner_snapshot():
+def test_retired_personality_profile_toggle_reaches_no_live_snapshot():
   control_keys = {key for group in CONTROL_GROUPS for key in group.keys}
   planner_keys = {key for group in PLANNER_GROUPS for key in group.keys}
   assert "NrdrPersonalityAccelProfiles" not in control_keys
-  assert "NrdrPersonalityAccelProfiles" in planner_keys
+  assert "NrdrPersonalityAccelProfiles" not in planner_keys
 
 
 def test_personality_pid_scales_and_learning_gate_publish_atomically():
