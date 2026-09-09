@@ -82,10 +82,11 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
 
     canonical_keys = set(canonical_references) & catalog_keys
     generated_nrdr_keys = set(generated_references) & catalog_keys
-    self.assertEqual(len(canonical_keys), 88)
+    self.assertEqual(len(canonical_keys), 87)
     self.assertEqual(canonical_keys, generated_nrdr_keys)
     self.assertEqual(set(canonical_references) - catalog_keys, set())
-    retired_steer_ratio_keys = {
+    retired_setting_keys = {
+      "NrdrPersonalityAccelProfiles",
       "NrdrLearnSteerRatio", "NrdrLaneChangeEndpointSteerRatio",
       "NrdrSteerRatioCenterClarity", "NrdrSteerRatioOuterClarity",
       "NrdrSteerRatioCenterCivic", "NrdrSteerRatioOuterCivic",
@@ -93,7 +94,7 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
       "NrdrSteerRatioCenterCrv5g", "NrdrSteerRatioOuterCrv5g",
       "NrdrSteerRatioCenterInsight", "NrdrSteerRatioOuterInsight",
     }
-    self.assertFalse(retired_steer_ratio_keys & canonical_keys)
+    self.assertFalse(retired_setting_keys & canonical_keys)
 
   def test_consumer_sources_do_not_redeclare_canonical_nrdr_keys(self):
     canonical_references: list[str] = []

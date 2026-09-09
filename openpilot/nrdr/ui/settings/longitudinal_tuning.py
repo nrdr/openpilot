@@ -108,16 +108,6 @@ class LongitudinalTuningLayout(Widget):
       ),
     )
 
-    self._personality_accel_profiles = toggle_item_sp(
-      param="NrdrPersonalityAccelProfiles",
-      title=lambda: tr("Acceleration Follows Driving Personality (Default: OFF)"),
-      description=lambda: tr(
-        "Uses Sunny's final Vibe-era positive-acceleration curves with an NRDR-specific mapping: Aggressive uses Sport, Standard " +
-        "uses Normal, and Relaxed or Econ use Eco. It never raises acceleration or changes lead/model braking calculations, " +
-        "dedicated launch assist, or braking limits. Changing the distance setting also changes cruise and catch-up response."
-      ),
-    )
-
     self._cruise_overspeed_allowance = option_item_sp(
       param="NrdrCruiseOverspeedAllowance",
       title=lambda: tr("Set-Speed Overshoot Allowance (Default: 0 mph)"),
@@ -238,7 +228,6 @@ class LongitudinalTuningLayout(Widget):
       self._ecu_matched_long,
       self._full_brake_authority,
       self._roen_acceleration_limits,
-      self._personality_accel_profiles,
       self._radar_tryout,
       self._dashboard_variant,
       LineSeparatorSP(40),

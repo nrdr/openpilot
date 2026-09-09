@@ -39,12 +39,12 @@ class TestParamCatalog(unittest.TestCase):
     metadata = "\n".join(f"{spec.action.value}|{spec.key}|{spec.cpp_attributes}" for spec in PARAM_SPECS) + "\n"
     self.assertEqual(sha256(metadata.encode()).hexdigest(), REGISTRY_METADATA_SHA256)
 
-  def test_personality_accel_profile_setting_is_default_off_and_persistent(self) -> None:
+  def test_personality_accel_profile_param_is_a_persistent_ignored_tombstone(self) -> None:
     spec = PARAM_SPECS_BY_KEY["NrdrPersonalityAccelProfiles"]
     self.assertIs(spec.param_type, ParamType.BOOL)
     self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
     self.assertEqual(spec.default, "0")
-    self.assertIs(spec.lifecycle, ParamLifecycle.SETTING)
+    self.assertIs(spec.lifecycle, ParamLifecycle.TOMBSTONE)
     self.assertIs(spec.owner, ParamOwner.LONGITUDINAL)
 
   def test_existing_key_override_is_not_generated_as_an_addition(self) -> None:
@@ -70,6 +70,7 @@ class TestParamCatalog(unittest.TestCase):
         "NrdrLaneChangeEndpointSteerRatio",
         "NrdrLearnSteerRatio",
         "NrdrLegacyDualBpSteerRatio",
+        "NrdrPersonalityAccelProfiles",
         "NrdrSteerRatioCenterAccord",
         "NrdrSteerRatioCenterCivic",
         "NrdrSteerRatioCenterClarity",

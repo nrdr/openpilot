@@ -117,7 +117,10 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("LongPidTuneScaleStandard", ParamType.INT, PB, "100", owner=ParamOwner.LONGITUDINAL),
   _added("LongPidTuneScaleRelaxed", ParamType.INT, PB, "80", owner=ParamOwner.LONGITUDINAL),
   _added("LongPidTuneScaleEcon", ParamType.INT, PB, "50", owner=ParamOwner.LONGITUDINAL),
-  _added("NrdrPersonalityAccelProfiles", ParamType.BOOL, PB, "0", owner=ParamOwner.LONGITUDINAL),
+  # Compatibility tombstone: acceleration profiles now follow the four
+  # distance personalities unconditionally. Preserve the key so downgrades and
+  # backed-up stale values remain harmless instead of becoming unknown.
+  _added("NrdrPersonalityAccelProfiles", ParamType.BOOL, PB, "0", ParamLifecycle.TOMBSTONE, ParamOwner.LONGITUDINAL),
   _added("NrdrCruiseMismatchCorrection", ParamType.FLOAT, PB, "100", owner=ParamOwner.LONGITUDINAL),
   _added("NrdrCruiseOverspeedAllowance", ParamType.INT, PB, "0", owner=ParamOwner.LONGITUDINAL),
   _added("HondaCenterScale", ParamType.FLOAT, PB, "0.5", owner=ParamOwner.HONDA),
