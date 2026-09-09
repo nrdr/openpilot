@@ -2,6 +2,10 @@ from pathlib import Path
 
 UNREGISTERED = "UnregisteredDevice"
 ONROAD_BLOCKED_PARAMS = {
+  "LaneCentering",
+  "LaneCenteringE2EAuthority",
+  "LaneCenteringPauseOnSignal",
+  "LaneCenterOffset",
   "LongitudinalPersonality",
   "NrdrHandcraftedLateralTune",
 }

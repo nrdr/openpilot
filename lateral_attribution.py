@@ -208,6 +208,26 @@ def param_bool(settings: dict[str, str], key: str) -> bool | None:
   return settings[key].strip().lower() not in ("", "0", "false", "off", "no")
 
 
+def lane_centering_enabled_cohorts(result: ScanResult) -> set[str]:
+  """Cohorts with lane-centering-modified curvature are not controller-tune evidence."""
+  return {
+    cohort for cohort, context in result.contexts.items()
+    if context.settings.get("LaneCentering") == "1"
+  }
+
+
+def _routes_for_cohort(result: ScanResult, cohort: str) -> list[str]:
+  routes = {
+    sample.route
+    for samples in (result.controls, result.lanes, result.delays)
+    for sample in samples
+    if sample.cohort == cohort
+  }
+  if (context := result.contexts.get(cohort)) is not None:
+    routes.add(context.route)
+  return sorted(routes)
+
+
 def logged_steer_ratio_model_policy(raw_bundle: str | None) -> SteerRatioModelPolicy:
   """Decode only historical logs written before the explicit mode enum."""
   try:
@@ -942,14 +962,20 @@ def classify_attribution(overall: dict, bins: Sequence[dict], lane_rows: Sequenc
 def build_report(result: ScanResult, min_samples: int = 30,
                  speed_edges_mph: Sequence[float] = SPEED_EDGES_MPH,
                  angle_edges_deg: Sequence[float] = ANGLE_EDGES_DEG) -> dict:
-  controls = [sample for sample in result.controls if not sample.saturated]
+  excluded_cohorts = lane_centering_enabled_cohorts(result)
+  included_controls = [sample for sample in result.controls if sample.cohort not in excluded_cohorts]
+  included_lanes = [sample for sample in result.lanes if sample.cohort not in excluded_cohorts]
+  included_delays = [sample for sample in result.delays if sample.cohort not in excluded_cohorts]
+  included_attempts = Counter({key: count for key, count in result.lane_attempts.items() if key[0] not in excluded_cohorts})
+
+  controls = [sample for sample in included_controls if not sample.saturated]
   valid_controls = [sample for sample in controls if sample.params_valid]
   primary_controls = valid_controls if len(valid_controls) >= max(min_samples, len(controls) // 2) else controls
   overall, bins = summarize_controls(primary_controls, min_samples, speed_edges_mph, angle_edges_deg)
-  lanes = summarize_lanes(result.lanes, result.lane_attempts)
-  delay = summarize_delay(result.delays)
-  matched = strict_matched_evidence(primary_controls, result.lanes, result.lane_attempts, min_samples)
-  cohorts = sorted({sample.cohort for sample in result.controls} | {sample.cohort for sample in result.lanes})
+  lanes = summarize_lanes(included_lanes, included_attempts)
+  delay = summarize_delay(included_delays)
+  matched = strict_matched_evidence(primary_controls, included_lanes, included_attempts, min_samples)
+  cohorts = sorted({sample.cohort for sample in included_controls} | {sample.cohort for sample in included_lanes})
   contexts = []
   for cohort in cohorts:
     context = result.contexts.get(cohort)
@@ -975,14 +1001,18 @@ def build_report(result: ScanResult, min_samples: int = 30,
     "input": {
       "files_read": result.files_read,
       "files_failed": result.files_failed,
-      "routes": sorted({sample.route for sample in result.controls} | {sample.route for sample in result.lanes}),
+      "routes": sorted({sample.route for sample in included_controls} | {sample.route for sample in included_lanes}),
       "cohorts": contexts,
+      "excluded_lane_centering_cohorts": [
+        {"cohort": cohort, "routes": _routes_for_cohort(result, cohort), "reason": "LaneCentering enabled"}
+        for cohort in sorted(excluded_cohorts)
+      ],
       "errors": result.errors,
       "complete": not result.incomplete_sources and bool(primary_controls),
       "incomplete_sources": result.incomplete_sources,
     },
     "controller": {
-      "active_hands_off_samples": len(result.controls),
+      "active_hands_off_samples": len(included_controls),
       "non_saturated_samples": len(controls),
       "primary_params_valid_samples": len(valid_controls),
       "summary": overall,
@@ -1007,6 +1037,8 @@ def print_report(report: dict) -> None:
   print("\nLateral attribution (read-only, observational)")
   file_summary = f"{input_data['files_read']}/{input_data['files_failed']}"
   print(f"  files read/failed: {file_summary} | routes: {len(input_data['routes'])} | cohorts: {len(input_data['cohorts'])}")
+  if input_data["excluded_lane_centering_cohorts"]:
+    print(f"  excluded lane-centering cohorts: {len(input_data['excluded_lane_centering_cohorts'])}")
   if not input_data["complete"]:
     print(f"  INCOMPLETE: missing required services or usable controller samples: {input_data['incomplete_sources']}")
   print(f"  controller samples: {controller['active_hands_off_samples']} active hands-off, {controller['non_saturated_samples']} non-saturated")
