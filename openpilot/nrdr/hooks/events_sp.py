@@ -10,7 +10,7 @@ def speed_limit_pre_active_alert(CP, CS, sm, metric, soft_disable_time, personal
   speed = round(speed_limit * speed_conv)
   unit = "km/h" if metric else "mph"
   return Alert(
-    f"Press distance button to accept {speed} {unit} speed limit", "",
+    f"Press distance button to accept {speed} {unit}", "",
     log.SelfdriveState.AlertStatus.normal, log.SelfdriveState.AlertSize.small,
     Priority.LOW, car.CarControl.HUDControl.VisualAlert.none,
     custom.SelfdriveStateSP.AudibleAlert.promptSingleLow, .1,

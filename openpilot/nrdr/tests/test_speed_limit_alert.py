@@ -19,6 +19,6 @@ def test_speed_limit_confirmation_prompt_uses_distance_button(metric, speed, exp
 
   alert = speed_limit_pre_active_alert(None, None, sm, metric, 0, None)
 
-  assert alert.alert_text_1 == f"Press distance button to accept {expected} speed limit"
+  assert alert.alert_text_1 == f"Press distance button to accept {expected}"
   assert "+" not in alert.alert_text_1
   assert "Press -" not in alert.alert_text_1

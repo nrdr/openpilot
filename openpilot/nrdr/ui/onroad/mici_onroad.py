@@ -1,6 +1,7 @@
 import pyray as rl
 
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
+from openpilot.selfdrive.ui.mici.onroad.alert_renderer import SPEED_LIMIT_ALERT_EVENTS
 from openpilot.selfdrive.ui.mici.onroad.augmented_road_view import AugmentedRoadView
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall, draw_circle_gradient
 from openpilot.selfdrive.ui.mici.onroad.driver_state import DriverStateRenderer
@@ -20,6 +21,11 @@ from openpilot.system.ui.widgets import Widget
 
 
 __all__ = ("NrdrAugmentedRoadView", "NrdrConfidenceBall", "NrdrDriverStateRenderer", "StripDevUiRenderer")
+
+
+def _confidence_ball_visible(alert_type: str) -> bool:
+  event_name = alert_type.split('/', maxsplit=1)[0] if alert_type else ''
+  return event_name not in SPEED_LIMIT_ALERT_EVENTS
 
 
 class NrdrConfidenceBall(ConfidenceBall):
@@ -128,5 +134,8 @@ class NrdrAugmentedRoadView(AugmentedRoadView):
     self._strip_dev_ui = StripDevUiRenderer()
 
   def _render(self, rect):
+    alert_to_render, _ = self._alert_renderer.will_render() if ui_state.started else (None, True)
+    alert_type = alert_to_render.alert_type if alert_to_render is not None else ''
+    self._confidence_ball.set_visible(_confidence_ball_visible(alert_type))
     super()._render(rect)
     self._strip_dev_ui.render(self.rect)
