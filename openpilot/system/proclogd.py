@@ -122,26 +122,24 @@ class SmapsData(TypedDict):
 
 
 _SMAPS_KEYS = {b'Pss:', b'Pss_Anon:', b'Pss_Shmem:'}
+_EMPTY_SMAPS: SmapsData = {'pss': 0, 'pss_anon': 0, 'pss_shmem': 0}
 
-# smaps_rollup (kernel 4.14+) is ideal but missing on some BSP kernels;
-# fall back to per-VMA smaps (any kernel). Pss_Anon/Pss_Shmem only in 5.x+.
-_smaps_path: str | None = None  # auto-detected on first call
-
-# per-VMA smaps is expensive (kernel walks page tables for every VMA).
-# cache results and only refresh every N cycles to keep CPU low.
+# smaps_rollup is cheap enough to sample periodically. Never fall back to the
+# per-VMA smaps file: on kernels without rollup support that page-table walk can
+# block long enough to disturb time-critical publishers.
 _smaps_cache: dict[int, SmapsData] = {}
 _smaps_cycle = 0
 _SMAPS_EVERY = 20  # refresh every 20th cycle (40s at 0.5Hz)
 
 
 def _read_smaps(pid: int) -> SmapsData:
-  global _smaps_path
+  path = f'/proc/{pid}/smaps_rollup'
   try:
-    if _smaps_path is None:
-      _smaps_path = 'smaps_rollup' if os.path.exists(f'/proc/{pid}/smaps_rollup') else 'smaps'
+    if not os.path.exists(path):
+      return _EMPTY_SMAPS.copy()
 
-    result: SmapsData = {'pss': 0, 'pss_anon': 0, 'pss_shmem': 0}
-    with open(f'/proc/{pid}/{_smaps_path}', 'rb') as f:
+    result = _EMPTY_SMAPS.copy()
+    with open(path, 'rb') as f:
       for line in f:
         parts = line.split()
         if len(parts) >= 2 and parts[0] in _SMAPS_KEYS:
@@ -154,14 +152,14 @@ def _read_smaps(pid: int) -> SmapsData:
             result['pss_shmem'] += val
     return result
   except (FileNotFoundError, PermissionError, ProcessLookupError, OSError):
-    return {'pss': 0, 'pss_anon': 0, 'pss_shmem': 0}
+    return _EMPTY_SMAPS.copy()
 
 
 def _get_smaps_cached(pid: int) -> SmapsData:
-  """Return cached smaps data, refreshing every _SMAPS_EVERY cycles."""
+  """Return cached rollup data, refreshing every _SMAPS_EVERY cycles."""
   if _smaps_cycle == 0 or pid not in _smaps_cache:
     _smaps_cache[pid] = _read_smaps(pid)
-  return _smaps_cache.get(pid, {'pss': 0, 'pss_anon': 0, 'pss_shmem': 0})
+  return _smaps_cache.get(pid, _EMPTY_SMAPS)
 
 
 class ProcExtra(TypedDict):
@@ -270,7 +268,6 @@ def build_proc_log_message(msg) -> None:
 
   global _smaps_cycle
   _smaps_cycle = (_smaps_cycle + 1) % _SMAPS_EVERY
-
 
 def main() -> NoReturn:
   pm = messaging.PubMaster(['procLog'])
