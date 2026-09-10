@@ -117,6 +117,8 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("LongPidTuneScaleStandard", ParamType.INT, PB, "100", owner=ParamOwner.LONGITUDINAL),
   _added("LongPidTuneScaleRelaxed", ParamType.INT, PB, "80", owner=ParamOwner.LONGITUDINAL),
   _added("LongPidTuneScaleEcon", ParamType.INT, PB, "50", owner=ParamOwner.LONGITUDINAL),
+  # Canonical whole mph. Runtime converts this value with CV.MPH_TO_MS.
+  _added("LaneCenteringMinSpeed", ParamType.INT, PB, "50", owner=ParamOwner.LATERAL),
   # Compatibility tombstone: acceleration profiles now follow the four
   # distance personalities unconditionally. Preserve the key so downgrades and
   # backed-up stale values remain harmless instead of becoming unknown.

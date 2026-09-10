@@ -51,6 +51,7 @@ RELEVANT_PARAMS = (
   "LagdToggleDelay",
   "LaneCentering",
   "LaneCenteringE2EAuthority",
+  "LaneCenteringMinSpeed",
   "LaneCenteringPauseOnSignal",
   "LaneCenterOffset",
   "NeuralNetworkLateralControl",

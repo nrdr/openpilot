@@ -3,6 +3,11 @@
 from collections.abc import Callable
 
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.controls.lib.lane_centering import (
+  LANE_CENTERING_MIN_SPEED_MAX_MPH,
+  LANE_CENTERING_MIN_SPEED_MIN_MPH,
+  lane_centering_min_speed_mph,
+)
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.lib.styles import style
 from openpilot.system.ui.sunnypilot.widgets.list_view import ListItemSP, toggle_item_sp
@@ -14,8 +19,9 @@ from openpilot.system.ui.widgets.scroller_tici import Scroller
 class _GuardedOptionControlSP(OptionControlSP):
   """Option control that rechecks its write gate at the mutation boundary."""
 
-  def __init__(self, *args, write_allowed: Callable[[], bool], **kwargs):
+  def __init__(self, *args, write_allowed: Callable[[], bool], value_normalizer: Callable[[object], float] | None = None, **kwargs):
     self._write_allowed = write_allowed
+    self._value_normalizer = value_normalizer
     super().__init__(*args, **kwargs)
 
   def set_value(self, value: int):
@@ -25,6 +31,8 @@ class _GuardedOptionControlSP(OptionControlSP):
   def refresh_from_param(self) -> None:
     try:
       value = self.params.get(self.param_key, return_default=True)
+      if self._value_normalizer is not None:
+        value = self._value_normalizer(value)
       candidate = int(float(value) * 100.0) if self.use_float_scaling else int(value)
     except (TypeError, ValueError):
       return
@@ -50,6 +58,16 @@ class LaneCenteringLayout(Widget):
       enabled=self._settings_writable,
       callback=self._on_pause_on_signal,
     )
+    self._minimum_speed_control = self._option_item(
+      title=tr("Minimum Lane Centering Speed"),
+      description=tr("Arm lane centering at this speed. Once active, it releases smoothly 3 mph below the selected speed, bounded by the " +
+                     "5 m/s controller floor."),
+      param="LaneCenteringMinSpeed",
+      min_value=LANE_CENTERING_MIN_SPEED_MIN_MPH,
+      max_value=LANE_CENTERING_MIN_SPEED_MAX_MPH,
+      label_callback=lambda value: f"{value} mph",
+      value_normalizer=lane_centering_min_speed_mph,
+    )
     self._center_offset_control = self._option_item(
       title=tr("Center Offset"),
       description=tr("Shift the target left or right of the detected lane center. The controller reduces the offset in a narrow lane."),
@@ -73,6 +91,7 @@ class LaneCenteringLayout(Widget):
 
     self._scroller = Scroller([
       self._lane_centering_toggle,
+      self._minimum_speed_control,
       self._pause_on_signal_toggle,
       self._center_offset_control,
       self._model_authority_control,
@@ -87,7 +106,8 @@ class LaneCenteringLayout(Widget):
 
   def _option_item(self, title: str, description: str, param: str, min_value: int, max_value: int,
                    value_change_step: int = 1, use_float_scaling: bool = False,
-                   label_callback: Callable[[int], str] | None = None) -> ListItemSP:
+                   label_callback: Callable[[int], str] | None = None,
+                   value_normalizer: Callable[[object], float] | None = None) -> ListItemSP:
     action = _GuardedOptionControlSP(
       param,
       min_value,
@@ -98,6 +118,7 @@ class LaneCenteringLayout(Widget):
       label_width=style.BUTTON_ACTION_WIDTH,
       label_callback=label_callback,
       write_allowed=self._settings_writable,
+      value_normalizer=value_normalizer,
     )
     return ListItemSP(title=title, description=description, action_item=action)
 
@@ -118,6 +139,7 @@ class LaneCenteringLayout(Widget):
     self._lane_centering_toggle.action_item.set_state(ui_state.params.get_bool("LaneCentering"))
     self._pause_on_signal_toggle.action_item.set_state(
       bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)))
+    self._minimum_speed_control.action_item.refresh_from_param()
     self._center_offset_control.action_item.refresh_from_param()
     self._model_authority_control.action_item.refresh_from_param()
 

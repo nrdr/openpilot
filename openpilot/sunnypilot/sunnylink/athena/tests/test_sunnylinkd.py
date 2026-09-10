@@ -94,6 +94,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
     self.fake_params.offroad = False
     lane_centering = {
       "LaneCentering": "1",
+      "LaneCenteringMinSpeed": "50",
       "LaneCenteringPauseOnSignal": "0",
       "LaneCenterOffset": "0.12",
       "LaneCenteringE2EAuthority": "0.45",
@@ -106,6 +107,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
   def test_saveParams_allows_lane_centering_stack_offroad(self):
     lane_centering = {
       "LaneCentering": "1",
+      "LaneCenteringMinSpeed": "50",
       "LaneCenteringPauseOnSignal": "0",
       "LaneCenterOffset": "0.12",
       "LaneCenteringE2EAuthority": "0.45",
@@ -177,6 +179,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
     assert ONROAD_WRITE_BLOCKLIST == frozenset((
       "LaneCentering",
       "LaneCenteringE2EAuthority",
+      "LaneCenteringMinSpeed",
       "LaneCenteringPauseOnSignal",
       "LaneCenterOffset",
       "LongitudinalPersonality",

@@ -8,6 +8,7 @@ UNREGISTERED = "UnregisteredDevice"
 ONROAD_WRITE_BLOCKLIST = frozenset((
   "LaneCentering",
   "LaneCenteringE2EAuthority",
+  "LaneCenteringMinSpeed",
   "LaneCenteringPauseOnSignal",
   "LaneCenterOffset",
   "LongitudinalPersonality",

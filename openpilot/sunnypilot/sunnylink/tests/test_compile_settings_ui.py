@@ -311,10 +311,11 @@ class TestExtensionMerge(OpenpilotTestCase):
 class TestCompiledShape(OpenpilotTestCase):
   def test_panels_present(self, compiled):
     assert isinstance(compiled["panels"], list)
-    assert len(compiled["panels"]) == 10
+    assert len(compiled["panels"]) == 9
     panel_ids = {p["id"] for p in compiled["panels"]}
-    assert {"steering", "cruise", "display", "visuals", "toggles", "lane_centering",
+    assert {"steering", "cruise", "display", "visuals", "toggles",
             "device", "software", "developer", "models"} <= panel_ids
+    assert "lane_centering" not in panel_ids
 
   def test_vehicle_settings_consistent_shape(self, compiled):
     """Each brand in vehicle_settings must have {title, description, items}."""
@@ -351,8 +352,8 @@ class TestSourceTreeIntegrity(OpenpilotTestCase):
     pages_dir = os.path.join(DEFAULT_SRC, "pages")
     assert os.path.isdir(pages_dir), "pages/ directory missing"
     page_files = sorted(fn for fn in os.listdir(pages_dir) if fn.endswith(".yaml"))
-    # 10 panels + 1 vehicle = 11
-    assert len(page_files) == 11, f"expected 11 pages, found {len(page_files)}: {page_files}"
+    # 9 panels + 1 vehicle = 10
+    assert len(page_files) == 10, f"expected 10 pages, found {len(page_files)}: {page_files}"
 
   def test_every_page_has_id(self):
     pages_dir = os.path.join(DEFAULT_SRC, "pages")

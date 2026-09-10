@@ -5,8 +5,11 @@ from openpilot.selfdrive.ui.layouts.settings.common import (
   LANE_CENTER_OFFSET_VALUES,
   LANE_CENTERING_E2E_AUTHORITY_LABELS,
   LANE_CENTERING_E2E_AUTHORITY_VALUES,
+  LANE_CENTERING_MIN_SPEED_LABELS,
+  LANE_CENTERING_MIN_SPEED_VALUES,
   closest_value_index,
 )
+from openpilot.selfdrive.controls.lib.lane_centering import lane_centering_min_speed_mph
 from openpilot.selfdrive.ui.mici.widgets.button import BigMultiToggle, BigToggle
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets.scroller import NavScroller
@@ -27,6 +30,12 @@ class LaneCenteringLayoutMici(NavScroller):
       initial_state=bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)),
       toggle_callback=self._on_pause_on_signal,
     )
+    self._minimum_speed_toggle = BigMultiToggle(
+      "minimum speed",
+      list(LANE_CENTERING_MIN_SPEED_LABELS),
+      select_callback=self._on_minimum_speed,
+      font_size=40,
+    )
     self._center_offset_toggle = BigMultiToggle(
       "center offset",
       list(LANE_CENTER_OFFSET_LABELS),
@@ -41,11 +50,12 @@ class LaneCenteringLayoutMici(NavScroller):
     )
 
     self._lane_centering_toggle.set_enabled(self._write_allowed)
-    for item in (self._pause_on_signal_toggle, self._center_offset_toggle, self._model_authority_toggle):
+    for item in (self._minimum_speed_toggle, self._pause_on_signal_toggle, self._center_offset_toggle, self._model_authority_toggle):
       item.set_enabled(self._settings_writable)
 
     self._scroller.add_widgets([
       self._lane_centering_toggle,
+      self._minimum_speed_toggle,
       self._pause_on_signal_toggle,
       self._center_offset_toggle,
       self._model_authority_toggle,
@@ -71,6 +81,12 @@ class LaneCenteringLayoutMici(NavScroller):
       return
     ui_state.params.put_bool("LaneCenteringPauseOnSignal", state, block=True)
 
+  def _on_minimum_speed(self, value: str) -> None:
+    if not self._settings_writable():
+      self._refresh()
+      return
+    ui_state.params.put("LaneCenteringMinSpeed", LANE_CENTERING_MIN_SPEED_VALUES[LANE_CENTERING_MIN_SPEED_LABELS.index(value)], block=True)
+
   def _on_center_offset(self, value: str) -> None:
     if not self._settings_writable():
       self._refresh()
@@ -88,6 +104,10 @@ class LaneCenteringLayoutMici(NavScroller):
     self._lane_centering_toggle.set_checked(ui_state.params.get_bool("LaneCentering"))
     self._pause_on_signal_toggle.set_checked(
       bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)))
+    self._minimum_speed_toggle.set_value(
+      LANE_CENTERING_MIN_SPEED_LABELS[closest_value_index(
+        LANE_CENTERING_MIN_SPEED_VALUES,
+        lane_centering_min_speed_mph(ui_state.params.get("LaneCenteringMinSpeed", return_default=True)))])
     self._center_offset_toggle.set_value(
       LANE_CENTER_OFFSET_LABELS[closest_value_index(
         LANE_CENTER_OFFSET_VALUES, ui_state.params.get("LaneCenterOffset", return_default=True))])

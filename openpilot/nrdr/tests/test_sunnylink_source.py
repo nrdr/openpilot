@@ -14,6 +14,12 @@ from openpilot.nrdr.ui.sunnylink import ITEM_SOURCE_FILES, MACRO_SOURCE, PAGE_SO
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 HOST_SOURCE_ROOT = REPOSITORY_ROOT / "openpilot" / "sunnypilot" / "sunnylink" / "settings_ui_src"
 GENERATED_SCHEMA = REPOSITORY_ROOT / "openpilot" / "sunnypilot" / "sunnylink" / "settings_ui.json"
+INHERITED_LANE_CENTERING_KEYS = {
+  "LaneCentering",
+  "LaneCenteringE2EAuthority",
+  "LaneCenteringPauseOnSignal",
+  "LaneCenterOffset",
+}
 EXPECTED_SOURCE_FILES = (
   "_macros.yaml",
   "items/device.yaml",
@@ -82,9 +88,9 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
 
     canonical_keys = set(canonical_references) & catalog_keys
     generated_nrdr_keys = set(generated_references) & catalog_keys
-    self.assertEqual(len(canonical_keys), 87)
+    self.assertEqual(len(canonical_keys), 88)
     self.assertEqual(canonical_keys, generated_nrdr_keys)
-    self.assertEqual(set(canonical_references) - catalog_keys, set())
+    self.assertEqual(set(canonical_references) - catalog_keys, INHERITED_LANE_CENTERING_KEYS)
     retired_setting_keys = {
       "NrdrPersonalityAccelProfiles",
       "NrdrLearnSteerRatio", "NrdrLaneChangeEndpointSteerRatio",

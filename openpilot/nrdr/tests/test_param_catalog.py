@@ -25,14 +25,14 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "7f07d45030606fa4a44861d070e3200a5ffa69e38171b96b6eb19dcd456d9b30"
+REGISTRY_METADATA_SHA256 = "78cdc94fab6573d676204fa0d3311eb38ad4d1a534df67f8abfd28239cfca7b4"
 
 
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 130)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 129)
+    self.assertEqual(len(PARAM_SPECS), 131)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 130)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
 
@@ -46,6 +46,14 @@ class TestParamCatalog(unittest.TestCase):
     self.assertEqual(spec.default, "0")
     self.assertIs(spec.lifecycle, ParamLifecycle.TOMBSTONE)
     self.assertIs(spec.owner, ParamOwner.LONGITUDINAL)
+
+  def test_lane_centering_min_speed_is_canonical_mph_setting(self) -> None:
+    spec = PARAM_SPECS_BY_KEY["LaneCenteringMinSpeed"]
+    self.assertIs(spec.param_type, ParamType.INT)
+    self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
+    self.assertEqual(spec.default, "50")
+    self.assertIs(spec.lifecycle, ParamLifecycle.SETTING)
+    self.assertIs(spec.owner, ParamOwner.LATERAL)
 
   def test_existing_key_override_is_not_generated_as_an_addition(self) -> None:
     override = OVERRIDDEN_PARAM_SPECS[0]
