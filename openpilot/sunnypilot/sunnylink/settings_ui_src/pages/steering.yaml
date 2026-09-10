@@ -341,48 +341,6 @@ sections:
       title: Learn Angle Offset (Auto)
       description: When ON (Auto), uses the live-learned steering angle offset; OFF uses a static 0.0 offset.
       details: When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side.
-  - id: nrdr_steer_ratio_tuning
-    label: Steer Ratio Tuning
-    trigger_key: null
-    items:
-    - key: NrdrSteerRatioMode
-      widget: multiple_button
-      title: Steer Ratio Source
-      description: Choose exactly one source. Manual uses the two overrides below; unavailable vehicle-specific modes safely fall back to the car's stock ratio.
-      details: Comma starts from the car's stock ratio, then holds its last validated learned value through brief learner dropouts. nrdr Raw uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact EPS firmware map and the car's stock ratio as its fixed anchor. Changes made while engaged save immediately and activate together on the next disengage/re-engage. If lateral control is already disengaged, wait up to 10 seconds for the saved settings to sync before engaging.
-      options:
-      - value: 0
-        label: Manual
-      - value: 1
-        label: Comma Learner
-      - value: 2
-        label: nrdr Learner
-        enablement:
-        - {type: capability, field: nrdr_raw_steer_ratio_available, equals: true}
-      - value: 3
-        label: Firmware
-        enablement:
-        - {type: capability, field: nrdr_firmware_steer_ratio_available, equals: true}
-    - key: NrdrSteerRatioManualCenter
-      widget: option
-      title: Manual Override On-Center Ratio
-      description: Steering ratio near the center of the wheel. Lower values ask for a sharper turn. Default 15.38.
-      min: 8.0
-      max: 25.0
-      step: 0.01
-      enablement:
-      - {type: param, key: NrdrSteerRatioMode, equals: 0}
-      - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
-    - key: NrdrSteerRatioManualFinal
-      widget: option
-      title: Manual Override Final Ratio
-      description: Steering ratio at large wheel angles. Lower values ask for a sharper turn. Default 10.93.
-      min: 8.0
-      max: 25.0
-      step: 0.01
-      enablement:
-      - {type: param, key: NrdrSteerRatioMode, equals: 0}
-      - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
   - id: nrdr_pidf_ground
     label: Controller Tuning Dungeon
     trigger_key: null
@@ -664,6 +622,104 @@ sections:
             conditions:
             - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
             - {type: param, key: NrdrInterpolatedTorquePifBlend, equals: true}
+  - id: nrdr_lane_centering_stack
+    label: Lane Centering Stack
+    trigger_key: null
+    items:
+    - key: LaneCentering
+      widget: toggle
+      title: Enable Lane Centering
+      description: Disabled by default. Enable confidence-gated lane centering for the next drive.
+      details: Biases the model curvature toward the center of two confident lane lines while preserving the normal curvature and jerk limits.
+      enablement:
+      - $ref: '#/macros/offroad'
+      - $ref: '#/macros/not_engaged'
+    - key: LaneCenteringMinSpeed
+      widget: option
+      title: Minimum Lane Centering Speed
+      description: Arms at this speed and releases smoothly 3 mph below it, bounded by the 5 m/s controller floor.
+      details: Existing enabled installs adopt the new 50 mph minimum after updating, which only removes lower-speed authority.
+      min: 12
+      max: 100
+      step: 1
+      unit: mph
+      enablement:
+      - $ref: '#/macros/offroad'
+      - $ref: '#/macros/not_engaged'
+      - {type: param, key: LaneCentering, equals: true}
+    - key: LaneCenteringPauseOnSignal
+      widget: toggle
+      title: Pause on Turn Signal
+      description: Smoothly release the lane-centering correction while either turn signal is active.
+      enablement:
+      - $ref: '#/macros/offroad'
+      - $ref: '#/macros/not_engaged'
+      - {type: param, key: LaneCentering, equals: true}
+    - key: LaneCenterOffset
+      widget: option
+      title: Center Offset
+      description: Shift the target left or right of the detected lane center. The controller reduces the offset in a narrow lane.
+      min: -0.3
+      max: 0.3
+      step: 0.01
+      unit: meters
+      enablement:
+      - $ref: '#/macros/offroad'
+      - $ref: '#/macros/not_engaged'
+      - {type: param, key: LaneCentering, equals: true}
+    - key: LaneCenteringE2EAuthority
+      widget: option
+      title: Model Path Authority
+      description: Allow a confident model path to reduce the lane-line correction when the paths disagree. 1.0 gives the model full authority; 0.0 retains the full lane-line correction.
+      min: 0.0
+      max: 1.0
+      step: 0.05
+      enablement:
+      - $ref: '#/macros/offroad'
+      - $ref: '#/macros/not_engaged'
+      - {type: param, key: LaneCentering, equals: true}
+  - id: nrdr_steer_ratio_tuning
+    label: Steer Ratio Tuning
+    trigger_key: null
+    items:
+    - key: NrdrSteerRatioMode
+      widget: multiple_button
+      title: Steer Ratio Source
+      description: Choose exactly one source. Manual uses the two overrides below; unavailable vehicle-specific modes safely fall back to the car's stock ratio.
+      details: Comma starts from the car's stock ratio, then holds its last validated learned value through brief learner dropouts. nrdr Raw uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact EPS firmware map and the car's stock ratio as its fixed anchor. Changes made while engaged save immediately and activate together on the next disengage/re-engage. If lateral control is already disengaged, wait up to 10 seconds for the saved settings to sync before engaging.
+      options:
+      - value: 0
+        label: Manual
+      - value: 1
+        label: Comma Learner
+      - value: 2
+        label: nrdr Learner
+        enablement:
+        - {type: capability, field: nrdr_raw_steer_ratio_available, equals: true}
+      - value: 3
+        label: Firmware
+        enablement:
+        - {type: capability, field: nrdr_firmware_steer_ratio_available, equals: true}
+    - key: NrdrSteerRatioManualCenter
+      widget: option
+      title: Manual Override On-Center Ratio
+      description: Steering ratio near the center of the wheel. Lower values ask for a sharper turn. Default 15.38.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+      enablement:
+      - {type: param, key: NrdrSteerRatioMode, equals: 0}
+      - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
+    - key: NrdrSteerRatioManualFinal
+      widget: option
+      title: Manual Override Final Ratio
+      description: Steering ratio at large wheel angles. Lower values ask for a sharper turn. Default 10.93.
+      min: 8.0
+      max: 25.0
+      step: 0.01
+      enablement:
+      - {type: param, key: NrdrSteerRatioMode, equals: 0}
+      - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
   - id: nrdr_override
     label: Override Tuning
     trigger_key: null

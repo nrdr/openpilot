@@ -210,6 +210,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"IsReleaseSpBranch", {CLEAR_ON_MANAGER_START, BOOL}},
     {"LaneCentering", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"LaneCenteringE2EAuthority", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
+    // Canonical whole mph. Runtime converts this value with CV.MPH_TO_MS.
+    {"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "50"}},
     {"LaneCenteringPauseOnSignal", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"LaneCenterOffset", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
     {"LastGPSPositionLLK", {PERSISTENT, STRING}},

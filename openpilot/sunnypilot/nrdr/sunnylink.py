@@ -4,6 +4,7 @@ UNREGISTERED = "UnregisteredDevice"
 ONROAD_BLOCKED_PARAMS = {
   "LaneCentering",
   "LaneCenteringE2EAuthority",
+  "LaneCenteringMinSpeed",
   "LaneCenteringPauseOnSignal",
   "LaneCenterOffset",
   "LongitudinalPersonality",

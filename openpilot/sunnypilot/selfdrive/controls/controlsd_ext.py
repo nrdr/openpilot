@@ -61,6 +61,7 @@ class ControlsExt(ModelStateBase):
 
   def update_lane_centering_params(self) -> None:
     self.lane_centering_enabled = self.params.get_bool("LaneCentering")
+    self.lane_centering_min_speed_mph = self.params.get("LaneCenteringMinSpeed", return_default=True)
     self.lane_centering_pause_on_signal = bool(self.params.get("LaneCenteringPauseOnSignal", return_default=True))
     self.lane_centering_e2e_authority = float(self.params.get("LaneCenteringE2EAuthority", return_default=True))
     self.lane_center_offset = float(self.params.get("LaneCenterOffset", return_default=True))

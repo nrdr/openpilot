@@ -1,11 +1,16 @@
 from openpilot.cereal import log
 import numpy as np
 
+from openpilot.common.constants import CV
 from openpilot.common.realtime import DT_CTRL
 from openpilot.selfdrive.controls.lib.drive_helpers import smooth_value
 
 
 _MIN_V_EGO = 5.0
+LANE_CENTERING_MIN_SPEED_DEFAULT_MPH = 50
+LANE_CENTERING_MIN_SPEED_MIN_MPH = 12
+LANE_CENTERING_MIN_SPEED_MAX_MPH = 100
+LANE_CENTERING_SPEED_HYSTERESIS_MPH = 3
 _MIN_LANE_PROB = 0.6
 _MAX_LANE_STD = 0.3
 _MIN_LANE_WIDTH = 2.6
@@ -17,6 +22,7 @@ _MAX_GAIN = 0.30
 _SMOOTH_TAU = 0.4
 _SIGNAL_RELEASE_TAU = 0.20
 _CONFIDENCE_RELEASE_TAU = 0.20
+_SPEED_RELEASE_TAU = 0.20
 _CENTER_ERROR_DEADBAND = 0.08
 
 _E2E_MAX_PATH_STD = 0.35
@@ -24,14 +30,35 @@ _E2E_BREAK_IN_START = 0.15
 _E2E_BREAK_IN_FULL = 0.50
 
 
+def lane_centering_min_speed_mph(value) -> float:
+  """Return the valid canonical-mph lane-centering arm speed, failing closed to 50 mph."""
+  try:
+    speed_mph = float(value)
+  except (OverflowError, TypeError, ValueError):
+    return float(LANE_CENTERING_MIN_SPEED_DEFAULT_MPH)
+  if (not np.isfinite(speed_mph) or not speed_mph.is_integer()
+      or not LANE_CENTERING_MIN_SPEED_MIN_MPH <= speed_mph <= LANE_CENTERING_MIN_SPEED_MAX_MPH):
+    return float(LANE_CENTERING_MIN_SPEED_DEFAULT_MPH)
+  return speed_mph
+
+
+def lane_centering_speed_thresholds(value) -> tuple[float, float]:
+  arm_mph = lane_centering_min_speed_mph(value)
+  arm_speed = max(_MIN_V_EGO, arm_mph * CV.MPH_TO_MS)
+  release_speed = max(_MIN_V_EGO, (arm_mph - LANE_CENTERING_SPEED_HYSTERESIS_MPH) * CV.MPH_TO_MS)
+  return arm_speed, release_speed
+
+
 class LaneCenteringController:
   def __init__(self) -> None:
     self._correction = 0.0
+    self._speed_armed = False
 
   def reset(self) -> None:
     self._correction = 0.0
+    self._speed_armed = False
 
-  def update(self, model_curvature, model_v2, v_ego, enabled, offset, e2e_authority, lat_active, model_valid,
+  def update(self, model_curvature, model_v2, v_ego, min_speed_mph, enabled, offset, e2e_authority, lat_active, model_valid,
              pause_on_signal=False, turn_signal_active=False, driver_override=False) -> float:
     model_curvature = float(model_curvature)
 
@@ -55,10 +82,6 @@ class LaneCenteringController:
       self.reset()
       return model_curvature
 
-    if pause_on_signal and turn_signal_active:
-      self._correction = float(smooth_value(0.0, self._correction, _SIGNAL_RELEASE_TAU, dt=DT_CTRL))
-      return model_curvature + self._correction
-
     try:
       if model_v2.meta.laneChangeState != log.LaneChangeState.off:
         self.reset()
@@ -66,6 +89,20 @@ class LaneCenteringController:
     except (AttributeError, TypeError, ValueError):
       self.reset()
       return model_curvature
+
+    arm_speed, release_speed = lane_centering_speed_thresholds(min_speed_mph)
+    if self._speed_armed and v_ego < release_speed:
+      self._speed_armed = False
+    if not self._speed_armed:
+      if v_ego >= arm_speed:
+        self._speed_armed = True
+      else:
+        self._correction = float(smooth_value(0.0, self._correction, _SPEED_RELEASE_TAU, dt=DT_CTRL))
+        return model_curvature + self._correction
+
+    if pause_on_signal and turn_signal_active:
+      self._correction = float(smooth_value(0.0, self._correction, _SIGNAL_RELEASE_TAU, dt=DT_CTRL))
+      return model_curvature + self._correction
 
     valid, raw_correction = self._raw_correction(
       model_v2,

@@ -16,12 +16,13 @@ def test_lane_centering_stack_is_the_complete_additional_onroad_block():
   assert ONROAD_BLOCKED_PARAMS == {
     "LaneCentering",
     "LaneCenteringE2EAuthority",
+    "LaneCenteringMinSpeed",
     "LaneCenteringPauseOnSignal",
     "LaneCenterOffset",
     "LongitudinalPersonality",
     "NrdrHandcraftedLateralTune",
   }
-  for key in ("LaneCentering", "LaneCenteringE2EAuthority", "LaneCenteringPauseOnSignal", "LaneCenterOffset"):
+  for key in ("LaneCentering", "LaneCenteringE2EAuthority", "LaneCenteringMinSpeed", "LaneCenteringPauseOnSignal", "LaneCenterOffset"):
     assert not allow_param_write(key, onroad=True)
     assert allow_param_write(key, onroad=False)
 

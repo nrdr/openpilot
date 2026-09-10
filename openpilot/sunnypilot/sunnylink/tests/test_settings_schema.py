@@ -246,13 +246,27 @@ class TestRuleWellFormedness(OpenpilotTestCase):
 class TestKnownPanels(OpenpilotTestCase):
   def test_expected_panels_exist(self, schema):
     panel_ids = {p["id"] for p in schema["panels"]}
-    expected = {"steering", "cruise", "display", "visuals", "device", "software", "developer", "lane_centering"}
+    expected = {"steering", "cruise", "display", "visuals", "device", "software", "developer"}
     assert expected.issubset(panel_ids), f"Missing panels: {expected - panel_ids}"
+    assert "lane_centering" not in panel_ids
 
   def test_mads_sub_panel_exists(self, schema):
     steering = next(p for p in schema["panels"] if p["id"] == "steering")
     sub_ids = {sp["id"] for sp in _iter_all_sub_panels(steering)}
     assert "mads_settings" in sub_ids
+
+  def test_lane_centering_stack_is_nested_in_nrdr_lateral_tuning(self, schema):
+    steering = next(p for p in schema["panels"] if p["id"] == "steering")
+    nrdr = next(section for section in steering["sections"] if section["id"] == "nrdr")
+    lane_centering = [panel for panel in nrdr["sub_panels"] if panel["id"] == "nrdr_lane_centering_stack"]
+    assert len(lane_centering) == 1
+    assert [item["key"] for item in lane_centering[0]["items"]] == [
+      "LaneCentering",
+      "LaneCenteringMinSpeed",
+      "LaneCenteringPauseOnSignal",
+      "LaneCenterOffset",
+      "LaneCenteringE2EAuthority",
+    ]
 
   def test_nrdr_vehicle_model_learning_contains_tune_summary(self, schema):
     steering = next(p for p in schema["panels"] if p["id"] == "steering")
