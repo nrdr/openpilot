@@ -38,8 +38,9 @@ def _consume_handcrafted_request(params: Params) -> list[str]:
     with car.CarParams.from_bytes(cp_bytes) as CP:
       return consume_handcrafted_lateral_request(CP, CP_SP, params)
   except Exception:
-    # The command stays true; keep every other remoted action and the pure
-    # reporter alive while the next safe offroad retry waits.
+    # I/O/verification failures retain the durable request for a safe retry;
+    # identity and capability deferrals return quietly above. Keep every other
+    # remoted action and the pure reporter alive.
     cloudlog.exception("nrdr_remoted: handcrafted lateral apply failed; request retained")
     return []
 

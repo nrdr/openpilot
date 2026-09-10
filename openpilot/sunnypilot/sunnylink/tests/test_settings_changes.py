@@ -60,6 +60,7 @@ from openpilot.sunnypilot.sunnylink.tools.generate_settings_schema import (
   generate_schema,
 )
 from openpilot.common.test import OpenpilotTestCase
+from openpilot.sunnypilot.nrdr.sunnylink import HONDA_TUNING_WRITE_KEYS
 
 
 SCHEMA_VALIDATOR_PATH = os.path.join(os.path.dirname(DEFINITION_PATH), "settings_ui.schema.json")
@@ -107,6 +108,19 @@ def _find_section(schema: dict[str, Any], panel_id: str, section_id: str) -> dic
   return None
 
 
+def _collect_keys(node: Any) -> list[str]:
+  keys: list[str] = []
+  if isinstance(node, dict):
+    if isinstance(node.get("key"), str):
+      keys.append(node["key"])
+    for value in node.values():
+      keys.extend(_collect_keys(value))
+  elif isinstance(node, list):
+    for value in node:
+      keys.extend(_collect_keys(value))
+  return keys
+
+
 def _flatten_rule_types(rules: list[dict[str, Any]] | None) -> set[str]:
   out: set[str] = set()
 
@@ -143,6 +157,43 @@ def _references_capability_field(rules: list[dict[str, Any]] | None, field: str)
 
 def schema():
   return generate_schema()
+
+
+class TestNrdrHondaVehicleBoundary(OpenpilotTestCase):
+  def test_honda_only_groups_share_exact_ui_and_backend_vehicle_boundary(self, schema):
+    capability_rule = {"type": "capability", "field": "nrdr_honda_tuning_available", "equals": True}
+    expected_sub_panels = {
+      "nrdr_pidf_ground",
+      "nrdr_steer_ratio_tuning",
+      "nrdr_override",
+      "nrdr_steer_filters",
+    }
+    nrdr = _find_section(schema, "steering", "nrdr")
+    assert nrdr is not None
+    panels = {panel["id"]: panel for panel in nrdr["sub_panels"]}
+    assert expected_sub_panels <= panels.keys()
+    for panel_id in expected_sub_panels:
+      assert panels[panel_id]["trigger_condition"] == capability_rule
+
+    special = _find_section(schema, "steering", "nrdr_special")
+    assert special is not None
+    assert special["visibility"] == [capability_rule]
+    party = next(panel for panel in special["sub_panels"] if panel["id"] == "nrdr_party_tricks")
+
+    ui_keys = []
+    for panel_id in sorted(expected_sub_panels):
+      ui_keys.extend(_collect_keys(panels[panel_id]))
+    ui_keys.extend(_collect_keys(party))
+    assert len(HONDA_TUNING_WRITE_KEYS) == 51
+    assert set(ui_keys) == HONDA_TUNING_WRITE_KEYS
+    assert {"LaneCentering", "NrdrLearnStiffness"}.isdisjoint(HONDA_TUNING_WRITE_KEYS)
+
+  def test_host_torque_control_keeps_interface_capability_gate(self, schema):
+    torque = _find_section(schema, "steering", "torque")
+    assert torque is not None
+    assert torque["enablement"] == [
+      {"type": "capability", "field": "torque_allowed", "equals": True},
+    ]
 
 
 class TestMadsBrandGates(OpenpilotTestCase):

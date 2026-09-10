@@ -11,6 +11,66 @@ ONROAD_BLOCKED_PARAMS = {
   "NrdrHandcraftedLateralTune",
 }
 
+# These controls are surfaced only for an exact, confirmed Honda CP. Keeping
+# the server-side set co-located with the admission policy prevents a stale or
+# custom remote client from bypassing the vehicle-aware UI.
+HONDA_TUNING_WRITE_KEYS = frozenset((
+  # Controller Tuning Dungeon.
+  "NrdrInterpolatedTorquePifBlend",
+  "NrdrInterpolatedTorqueShare",
+  "NrdrInterpolatedTorqueLatAccelFactor",
+  "NrdrInterpolatedTorqueFriction",
+  "NrdrInterpolatedTorqueFrictionStandard",
+  "NrdrInterpolatedTorqueFrictionHighway",
+  "NrdrStarPilotPid",
+  "LatPScaleLowSpeed",
+  "LatIScaleLowSpeed",
+  "LatFScaleLowSpeed",
+  "LatPScaleStandard",
+  "LatIScaleStandard",
+  "LatFScaleStandard",
+  "LatPScaleHighway",
+  "LatIScaleHighway",
+  "LatFScaleHighway",
+  "NrdrLatRateDamping",
+  "NrdrLatRateDampingFadeSpeed",
+  "HondaCenterScale",
+  "HondaCenterBoostThreshold",
+  "HondaCenterBoostMinSpeed",
+  "NrdrLatStiction",
+  "NrdrNnlcEnabled",
+  "NrdrNnlcActivationSpeed",
+  "NrdrNnlcKpGain",
+  "NrdrNnlcKfGain",
+  "NrdrNnlcKiGain",
+  # Steer ratio, override, and steering filters.
+  "NrdrSteerRatioMode",
+  "NrdrSteerRatioManualCenter",
+  "NrdrSteerRatioManualFinal",
+  "NrdrIncreaseOverrideTolerance",
+  "NrdrDriverOverrideThreshold",
+  "NrdrOverrideThresholdCenterBoost",
+  "HondaDriverAssistDuringOverride",
+  "HondaOverrideFadeDownSecs",
+  "HondaOverrideFadeUpSecs",
+  "HondaOverrideTorqueScale",
+  "HondaTorqueLowPassFilter",
+  "HondaLpfTauLowSpeed",
+  "HondaLpfTauStandard",
+  "HondaLpfTauHighway",
+  "HondaSteerDeltaLimiter",
+  "HondaSteerDeltaUp",
+  "HondaSteerDeltaDown",
+  # Special.
+  "HondaInjectionTest",
+  "HondaAltDashboardSpeed",
+  "HondaAltDashboardDistance",
+  "NrdrClearDashFaults",
+  "HondaSpoofCameraMessages",
+  "NrdrCruiseButtonSubMode",
+  "NrdrCruiseButtonSubModeSecs",
+))
+
 
 def _identity_path() -> Path:
   from openpilot.common.hardware.hw import Paths
@@ -42,8 +102,21 @@ def persist_dongle_id(dongle_id) -> None:
     pass
 
 
-def allow_param_write(key: str, onroad: bool) -> bool:
-  return not onroad or key not in ONROAD_BLOCKED_PARAMS
+def allow_param_write(key: str, onroad: bool, *, handcrafted_profile_available: bool | None = None,
+                      honda_tuning_available: bool | None = None,
+                      requested_bool: bool | None = None) -> bool:
+  if onroad and key in ONROAD_BLOCKED_PARAMS:
+    return False
+  if key == "NrdrHandcraftedLateralTune":
+    # A false write lets the user cancel an existing command. Enabling is
+    # admitted only when current CP/CP_SP and any selected platform agree that
+    # this exact vehicle has a reviewed profile. None is fail-closed.
+    return requested_bool is False or (
+      requested_bool is True and handcrafted_profile_available is True
+    )
+  if key in HONDA_TUNING_WRITE_KEYS:
+    return honda_tuning_available is True
+  return True
 
 
 def inject_car_tune_details(schema: dict, walk) -> None:

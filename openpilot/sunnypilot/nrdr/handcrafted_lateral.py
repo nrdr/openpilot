@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
@@ -17,6 +18,7 @@ STEER_RATIO_MODE_PARAM = "NrdrSteerRatioMode"
 class ParamsLike(Protocol):
   def get_bool(self, key: str) -> bool: ...
   def get(self, key: str, *, return_default: bool = False): ...
+  def get_param_path(self, key: str = "") -> str: ...
   def put_bool(self, key: str, value: bool, *, block: bool = False): ...
   def put(self, key: str, value: ParamValue | str, *, block: bool = False): ...
 
@@ -203,15 +205,42 @@ def _supports_interpolated_controller(CP, CP_SP) -> bool:
   return tuning == "pid" or (_fingerprint(CP) == CLARITY_FINGERPRINT and tuning == "torque")
 
 
-def handcrafted_lateral_profile_supported(CP, CP_SP) -> bool:
-  """Use one conservative support gate in runtime, native UI, and SunnyLink."""
-  fingerprint = _fingerprint(CP)
-  if get_handcrafted_lateral_profile(fingerprint) is None:
-    return False
-  if fingerprint != CLARITY_FINGERPRINT:
-    return True
+def confirmed_vehicle_identity(CP, fingerprint: str | None = None,
+                               brand: str | None = None, *,
+                               selection_present: bool | None = None) -> tuple[str, str] | None:
+  """Resolve authoritative CP identity only when any selected car agrees."""
   if CP is None or isinstance(CP, str):
+    return None
+  detected_fingerprint = str(getattr(CP, "carFingerprint", "") or "")
+  detected_brand = str(getattr(CP, "brand", "") or "").lower()
+  selected_fingerprint = str(fingerprint or "")
+  selected_brand = str(brand or "").lower()
+  if selection_present is None:
+    selection_present = fingerprint is not None or brand is not None
+  if not detected_fingerprint or not detected_brand:
+    return None
+  if selection_present:
+    if not selected_fingerprint or not selected_brand:
+      return None
+    if selected_fingerprint != detected_fingerprint or selected_brand != detected_brand:
+      return None
+  return detected_fingerprint, detected_brand
+
+
+def handcrafted_lateral_profile_supported(CP, CP_SP, fingerprint: str | None = None,
+                                           brand: str | None = None, *,
+                                           selection_present: bool | None = None) -> bool:
+  """Use one conservative support gate in runtime, native UI, and SunnyLink."""
+  identity = confirmed_vehicle_identity(
+    CP, fingerprint, brand, selection_present=selection_present,
+  )
+  if identity is None:
     return False
+  resolved_fingerprint, resolved_brand = identity
+  if resolved_brand != "honda" or get_handcrafted_lateral_profile(resolved_fingerprint) is None:
+    return False
+  if resolved_fingerprint != CLARITY_FINGERPRINT:
+    return True
   return get_honda_vgr_profile(CP) is not None and _supports_interpolated_controller(CP, CP_SP)
 
 
@@ -235,6 +264,24 @@ def _verify_value(params: ParamsLike, key: str, expected) -> None:
 def _put_verified(params: ParamsLike, key: str, value: ParamValue | str) -> None:
   _put_typed(params, key, value)
   _verify_value(params, key, value)
+
+
+def get_selected_car_identity(params: ParamsLike) -> tuple[bool, str, str]:
+  """Return physical selection presence plus a complete parsed identity.
+
+  A malformed JSON value can decode to None just like a missing Param. In that
+  case the physical file decides whether CP-only fallback is permitted.
+  """
+  bundle = params.get("CarPlatformBundle")
+  present = bundle is not None
+  if bundle is None:
+    try:
+      present = Path(params.get_param_path("CarPlatformBundle")).is_file()
+    except (AttributeError, OSError, TypeError, ValueError):
+      present = False
+  if isinstance(bundle, dict):
+    return present, str(bundle.get("platform") or ""), str(bundle.get("brand") or "")
+  return present, "", ""
 
 
 def _profile_label(profile: HandcraftedLateralProfile) -> str:
@@ -338,18 +385,36 @@ def _consume_legacy_profile(profile: HandcraftedLateralProfile, params: ParamsLi
 
 
 def consume_handcrafted_lateral_request(CP, CP_SP, params: ParamsLike | None = None, *, startup: bool = False) -> list[str]:
-  """Consume one durable apply request; never enforce a profile continuously."""
+  """Consume one durable apply request; never enforce a profile continuously.
+
+  A request for a positively identified Toyota-family vehicle without a reviewed
+  profile is terminally cleared without touching tune values. Unknown vehicle
+  identity and transient validation failures remain pending for a safe retry.
+  """
   params = _params_or_default(params)
   if not params.get_bool(HANDCRAFTED_REQUEST_PARAM):
     return []
   if not startup and not params.get_bool("IsOffroad"):
     return []
 
-  profile = get_handcrafted_lateral_profile(_fingerprint(CP))
-  if profile is None or not handcrafted_lateral_profile_supported(CP, CP_SP):
-    raise HandcraftedLateralUnavailableError(
-      f"handcrafted lateral profile unavailable for detected car/EPS: {_fingerprint(CP) or 'unknown'}"
-    )
+  selection_present, selected_fingerprint, selected_brand = get_selected_car_identity(params)
+  identity = confirmed_vehicle_identity(
+    CP, selected_fingerprint, selected_brand, selection_present=selection_present,
+  )
+  if identity is None:
+    return []
+  fingerprint, detected_brand = identity
+  profile = get_handcrafted_lateral_profile(fingerprint)
+  if profile is None:
+    # This terminal consume is deliberately limited to the Toyota family seen
+    # in current, authoritative CP. Unknown identity and unreviewed Honda
+    # variants keep the user's request for a future supported context.
+    if detected_brand != "toyota":
+      return []
+    _put_verified(params, HANDCRAFTED_REQUEST_PARAM, False)
+    return []
+  if not handcrafted_lateral_profile_supported(CP, CP_SP):
+    return []
 
   if profile.fingerprint == CLARITY_FINGERPRINT:
     return _consume_clarity_profile(profile, params)

@@ -128,8 +128,9 @@ class Car:
         cloudlog.exception("card: handcrafted lateral safe-state cleanup failed; aborting startup")
         raise
       except Exception:
-        # A durable request remains true for a later offroad retry. Fingerprint
-        # completion must never be held hostage by a profile write failure.
+        # Identity/capability deferrals are quiet no-ops. An exception here
+        # means the durable request remains true for an offroad retry, while
+        # fingerprint completion must not be held hostage by a write failure.
         cloudlog.exception("card: one-shot handcrafted lateral apply failed; request retained")
 
       # continue onto next fingerprinting step in pandad

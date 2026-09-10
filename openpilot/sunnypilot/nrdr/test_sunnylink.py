@@ -1,10 +1,11 @@
-from openpilot.sunnypilot.nrdr.sunnylink import ONROAD_BLOCKED_PARAMS, allow_param_write
+from openpilot.sunnypilot.nrdr.sunnylink import HONDA_TUNING_WRITE_KEYS, ONROAD_BLOCKED_PARAMS, allow_param_write
 
 
 def test_steer_ratio_contract_can_be_saved_onroad_for_next_engagement():
   for key in ("NrdrSteerRatioMode", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal"):
-    assert allow_param_write(key, onroad=True)
-    assert allow_param_write(key, onroad=False)
+    assert allow_param_write(key, onroad=True, honda_tuning_available=True)
+    assert allow_param_write(key, onroad=False, honda_tuning_available=True)
+    assert not allow_param_write(key, onroad=False, honda_tuning_available=False)
 
 
 def test_unrelated_param_write_policy_is_unchanged():
@@ -36,10 +37,25 @@ def test_interpolated_torque_group_can_be_saved_onroad_for_next_engagement():
     "NrdrInterpolatedTorqueFrictionStandard",
     "NrdrInterpolatedTorqueFrictionHighway",
   ):
-    assert allow_param_write(key, onroad=True)
-    assert allow_param_write(key, onroad=False)
+    assert allow_param_write(key, onroad=True, honda_tuning_available=True)
+    assert allow_param_write(key, onroad=False, honda_tuning_available=True)
+    assert not allow_param_write(key, onroad=False, honda_tuning_available=False)
 
 
-def test_handcrafted_one_shot_command_cannot_be_written_onroad():
-  assert not allow_param_write("NrdrHandcraftedLateralTune", onroad=True)
-  assert allow_param_write("NrdrHandcraftedLateralTune", onroad=False)
+def test_handcrafted_one_shot_command_requires_offroad_confirmed_profile_or_cancel():
+  key = "NrdrHandcraftedLateralTune"
+  assert not allow_param_write(key, onroad=True, handcrafted_profile_available=True, requested_bool=True)
+  assert not allow_param_write(key, onroad=True, handcrafted_profile_available=False, requested_bool=False)
+  assert allow_param_write(key, onroad=False, handcrafted_profile_available=True, requested_bool=True)
+  assert not allow_param_write(key, onroad=False, handcrafted_profile_available=False, requested_bool=True)
+  assert allow_param_write(key, onroad=False, handcrafted_profile_available=False, requested_bool=False)
+
+
+def test_honda_tuning_write_cohort_is_exact_and_fail_closed():
+  assert len(HONDA_TUNING_WRITE_KEYS) == 51
+  assert {"LaneCentering", "NrdrLearnStiffness"}.isdisjoint(HONDA_TUNING_WRITE_KEYS)
+  for key in HONDA_TUNING_WRITE_KEYS:
+    assert allow_param_write(key, onroad=False, honda_tuning_available=True)
+    assert allow_param_write(key, onroad=True, honda_tuning_available=True)
+    assert not allow_param_write(key, onroad=False, honda_tuning_available=False)
+    assert not allow_param_write(key, onroad=False, honda_tuning_available=None)

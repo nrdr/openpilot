@@ -12,11 +12,12 @@ from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
   HANDCRAFTED_REQUEST_PARAM,
   HANDCRAFTED_STATUS_PARAM,
   HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS,
-  HandcraftedLateralUnavailableError,
   HandcraftedLateralUnsafeStateError,
   STEER_RATIO_MODE_PARAM,
+  confirmed_vehicle_identity,
   consume_handcrafted_lateral_request,
   get_handcrafted_lateral_profile,
+  get_selected_car_identity,
   handcrafted_lateral_profile_status,
   handcrafted_lateral_profile_supported,
 )
@@ -204,7 +205,11 @@ def clarity_context(*, firmware=b"39990-TRW-A020", modified=True, tuning="torque
 
 
 def legacy_context(fingerprint="HONDA_ACCORD"):
-  return SimpleNamespace(carFingerprint=fingerprint), None
+  return SimpleNamespace(brand="honda", carFingerprint=fingerprint), None
+
+
+def vehicle_context(fingerprint, *, brand="toyota"):
+  return SimpleNamespace(brand=brand, carFingerprint=fingerprint)
 
 
 def requested_params(cls=FakeParams, **kwargs):
@@ -250,8 +255,28 @@ def test_clarity_support_requires_exact_firmware_map_modified_eps_and_supported_
   assert not handcrafted_lateral_profile_supported(*clarity_context(modified=False))
   assert not handcrafted_lateral_profile_supported(*clarity_context(tuning="indi"))
   assert not handcrafted_lateral_profile_supported("HONDA_CLARITY", None)
-  assert handcrafted_lateral_profile_supported("HONDA_ACCORD", None)
+  assert handcrafted_lateral_profile_supported(vehicle_context("HONDA_ACCORD", brand="honda"), None)
   assert not handcrafted_lateral_profile_supported("HONDA_CIVIC_2022", None)
+  assert not handcrafted_lateral_profile_supported(
+    vehicle_context("HONDA_ACCORD", brand="honda"), None, "LEXUS_ES_TSS2", "toyota",
+  )
+  assert not handcrafted_lateral_profile_supported(
+    vehicle_context("HONDA_ACCORD", brand="honda"), None, "HONDA_ACCORD", "toyota",
+  )
+
+
+def test_confirmed_vehicle_identity_requires_live_cp_and_exact_selection_match():
+  honda = vehicle_context("HONDA_ACCORD", brand="honda")
+  assert confirmed_vehicle_identity(honda) == ("HONDA_ACCORD", "honda")
+  assert confirmed_vehicle_identity(honda, "HONDA_ACCORD", "honda") == ("HONDA_ACCORD", "honda")
+  assert confirmed_vehicle_identity(None, "HONDA_ACCORD", "honda") is None
+  assert confirmed_vehicle_identity(honda, "LEXUS_ES_TSS2", "toyota") is None
+  assert confirmed_vehicle_identity(honda, "HONDA_ACCORD", "toyota") is None
+  assert confirmed_vehicle_identity(honda, "", "", selection_present=True) is None
+  assert confirmed_vehicle_identity(honda, "", "", selection_present=False) == ("HONDA_ACCORD", "honda")
+  assert confirmed_vehicle_identity(vehicle_context("", brand="honda")) is None
+  assert confirmed_vehicle_identity(vehicle_context("HONDA_ACCORD", brand="")) is None
+  assert confirmed_vehicle_identity(vehicle_context("HYUNDAI_SONATA", brand="hyundai")) == ("HYUNDAI_SONATA", "hyundai")
 
 
 def test_no_request_or_onroad_request_never_writes():
@@ -264,6 +289,147 @@ def test_no_request_or_onroad_request_never_writes():
   assert consume_handcrafted_lateral_request(CP, CP_SP, onroad) == []
   assert onroad.get_bool(HANDCRAFTED_REQUEST_PARAM)
   assert onroad.writes == []
+
+
+@pytest.mark.parametrize(("fingerprint", "startup", "offroad"), (
+  ("LEXUS_ES_TSS2", False, True),
+  ("LEXUS_ES_TSS2", True, False),
+  ("TOYOTA_CAMRY_TSS2", False, True),
+))
+def test_confirmed_unsupported_vehicle_terminally_clears_only_request(fingerprint, startup, offroad):
+  protected = {
+    "HondaCenterScale": 0.37,
+    "NrdrStarPilotPid": True,
+    HANDCRAFTED_STATUS_PARAM: "Last applied: preserved marker",
+    "ParamsVersion": 41,
+  }
+  params = FakeParams({
+    **protected,
+    HANDCRAFTED_REQUEST_PARAM: True,
+    "IsOffroad": offroad,
+    "CarPlatformBundle": {"brand": "toyota", "platform": fingerprint},
+  })
+
+  assert consume_handcrafted_lateral_request(
+    vehicle_context(fingerprint), None, params, startup=startup,
+  ) == []
+
+  assert params.values[HANDCRAFTED_REQUEST_PARAM] is False
+  assert {key: params.values[key] for key in protected} == protected
+  assert params.writes == [(HANDCRAFTED_REQUEST_PARAM, False, "bool", True)]
+
+
+def test_confirmed_unsupported_cp_is_sufficient_without_a_selection_bundle():
+  params = requested_params()
+  params.values["HondaCenterScale"] = 0.37
+
+  assert consume_handcrafted_lateral_request(vehicle_context("LEXUS_ES_TSS2"), None, params) == []
+
+  assert params.values[HANDCRAFTED_REQUEST_PARAM] is False
+  assert params.values["HondaCenterScale"] == 0.37
+  assert params.writes == [(HANDCRAFTED_REQUEST_PARAM, False, "bool", True)]
+
+
+@pytest.mark.parametrize(("CP", "bundle"), (
+  (None, {"brand": "toyota", "platform": "LEXUS_ES_TSS2"}),
+  (vehicle_context("LEXUS_ES_TSS2"), {"brand": "honda", "platform": "HONDA_CLARITY"}),
+  (clarity_context()[0], {"brand": "toyota", "platform": "LEXUS_ES_TSS2"}),
+  (clarity_context()[0], {"brand": "toyota", "platform": "HONDA_CLARITY"}),
+  (vehicle_context("LEXUS_ES_TSS2"), {}),
+  (vehicle_context("LEXUS_ES_TSS2"), {"brand": "toyota"}),
+  (vehicle_context("LEXUS_ES_TSS2"), {"platform": "LEXUS_ES_TSS2"}),
+  (vehicle_context("LEXUS_ES_TSS2"), ["toyota", "LEXUS_ES_TSS2"]),
+))
+def test_unknown_or_mismatched_identity_preserves_pending_intent_without_writes(CP, bundle):
+  params = requested_params()
+  params.values.update({
+    "CarPlatformBundle": bundle,
+    "HondaCenterScale": 0.37,
+    HANDCRAFTED_STATUS_PARAM: "Last applied: preserved marker",
+  })
+
+  assert consume_handcrafted_lateral_request(CP, None, params, startup=True) == []
+
+  assert params.values[HANDCRAFTED_REQUEST_PARAM] is True
+  assert params.values["HondaCenterScale"] == 0.37
+  assert params.values[HANDCRAFTED_STATUS_PARAM] == "Last applied: preserved marker"
+  assert params.values["ParamsVersion"] == 7
+  assert params.writes == []
+
+
+def test_physically_present_null_selection_is_invalid_not_cp_fallback(tmp_path):
+  bundle_path = tmp_path / "CarPlatformBundle"
+  bundle_path.write_text("null", encoding="utf-8")
+
+  class NullBundleParams(FakeParams):
+    def get_param_path(self, key=""):
+      assert key == "CarPlatformBundle"
+      return str(bundle_path)
+
+  params = NullBundleParams({
+    HANDCRAFTED_REQUEST_PARAM: True,
+    "IsOffroad": True,
+    "ParamsVersion": 7,
+    "CarPlatformBundle": None,
+  })
+
+  assert get_selected_car_identity(params) == (True, "", "")
+  assert consume_handcrafted_lateral_request(vehicle_context("LEXUS_ES_TSS2"), None, params) == []
+  assert params.values[HANDCRAFTED_REQUEST_PARAM] is True
+  assert params.writes == []
+
+
+def test_unreviewed_honda_and_transient_clarity_capability_remain_pending_silently():
+  cases = (
+    (vehicle_context("HONDA_CIVIC_2022", brand="honda"), None),
+    (clarity_context(firmware=b"39990-TRW-A021")[0], clarity_context()[1]),
+    (clarity_context()[0], None),
+  )
+  for CP, CP_SP in cases:
+    params = requested_params()
+    assert consume_handcrafted_lateral_request(CP, CP_SP, params, startup=True) == []
+    assert params.values[HANDCRAFTED_REQUEST_PARAM] is True
+    assert params.writes == []
+
+
+def test_repeated_unsupported_toyota_boot_is_a_single_terminal_clear_without_retry():
+  params = requested_params()
+  params.values["HondaCenterScale"] = 0.37
+  CP = vehicle_context("LEXUS_ES_TSS2")
+
+  assert consume_handcrafted_lateral_request(CP, None, params, startup=True) == []
+  assert consume_handcrafted_lateral_request(CP, None, params, startup=True) == []
+
+  assert params.writes == [(HANDCRAFTED_REQUEST_PARAM, False, "bool", True)]
+  assert params.values["HondaCenterScale"] == 0.37
+
+
+def test_terminal_clear_write_failure_never_falls_through_to_tune_writes():
+  params = requested_params(fail_key=HANDCRAFTED_REQUEST_PARAM)
+  params.values["HondaCenterScale"] = 0.37
+
+  with pytest.raises(RuntimeError, match="interrupted"):
+    consume_handcrafted_lateral_request(vehicle_context("LEXUS_ES_TSS2"), None, params)
+
+  assert params.values[HANDCRAFTED_REQUEST_PARAM] is True
+  assert params.values["HondaCenterScale"] == 0.37
+  assert params.values["ParamsVersion"] == 7
+  assert params.writes == []
+
+
+def test_terminal_clear_readback_failure_never_falls_through_to_tune_writes():
+  params = SilentWriteOnceParams(
+    {HANDCRAFTED_REQUEST_PARAM: True, "IsOffroad": True, "ParamsVersion": 7, "HondaCenterScale": 0.37},
+    silent_key=HANDCRAFTED_REQUEST_PARAM,
+  )
+
+  with pytest.raises(RuntimeError, match="readback mismatch"):
+    consume_handcrafted_lateral_request(vehicle_context("LEXUS_ES_TSS2"), None, params)
+
+  assert params.values[HANDCRAFTED_REQUEST_PARAM] is True
+  assert params.values["HondaCenterScale"] == 0.37
+  assert params.values["ParamsVersion"] == 7
+  assert params.writes == []
 
 
 def test_clarity_one_shot_uses_fail_safe_blocking_order_and_verified_finalization():
@@ -506,8 +672,7 @@ def test_status_is_pure_and_preserves_last_success_across_pending_failure_versio
 def test_unsupported_request_remains_durable_and_legacy_profiles_apply_without_clarity_extensions():
   CP, CP_SP = clarity_context(modified=False)
   unsupported = requested_params()
-  with pytest.raises(HandcraftedLateralUnavailableError):
-    consume_handcrafted_lateral_request(CP, CP_SP, unsupported)
+  assert consume_handcrafted_lateral_request(CP, CP_SP, unsupported) == []
   assert unsupported.get_bool(HANDCRAFTED_REQUEST_PARAM)
   assert unsupported.writes == []
 
@@ -542,3 +707,24 @@ def test_card_startup_is_the_only_explicit_non_offroad_consumer_exception():
   assert "request retained" in remoted
   assert "handcrafted_lateral_profile_status(CP, CP_SP, self.params)" in reporter
   assert "consume_handcrafted_lateral_request" not in reporter
+
+
+def test_native_ui_fail_closed_hides_honda_only_groups_and_special_page():
+  root = Path("openpilot")
+  lateral = (root / "selfdrive" / "ui" / "sunnypilot" / "layouts" / "settings" /
+             "nrdr_sub_layouts" / "lateral_tuning.py").read_text(encoding="utf-8")
+  layout = (root / "selfdrive" / "ui" / "sunnypilot" / "layouts" / "settings" /
+            "nrdr.py").read_text(encoding="utf-8")
+
+  assert "get_selected_car_identity(ui_state.params)" in lateral
+  assert "selection_present=selection_present" in lateral
+  assert 'identity is not None and identity[1] == "honda"' in lateral
+  assert "HONDA_ONLY_LATERAL_PANELS" in lateral
+  for panel in ("PIDF", "OVERRIDE", "STEER_FILTERS"):
+    assert f"LateralPanel.{panel}" in lateral
+  assert "for item in self._honda_only_items:" in lateral
+  assert "if self._current_panel in HONDA_ONLY_LATERAL_PANELS and not honda_available:" in lateral
+  assert "self._handcrafted_apply.set_visible(False)" in lateral
+  assert "self._honda_only_items = (self._party_tricks_separator, self._party_tricks_button)" in layout
+  assert layout.count("for item in self._honda_only_items:") == 2
+  assert "panel == PanelType.PARTY_TRICKS and not honda_tuning_available()" in layout

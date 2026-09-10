@@ -12,7 +12,11 @@ from opendbc.car.car_helpers import interfaces
 from opendbc.car.structs import car
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.sunnypilot.nrdr.handcrafted_lateral import handcrafted_lateral_profile_supported
+from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
+  confirmed_vehicle_identity,
+  get_selected_car_identity,
+  handcrafted_lateral_profile_supported,
+)
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget, DialogResult
@@ -41,6 +45,22 @@ class LateralPanel(IntEnum):
   PIDF = 2
   OVERRIDE = 3
   STEER_FILTERS = 4
+
+
+HONDA_ONLY_LATERAL_PANELS = frozenset((
+  LateralPanel.PIDF,
+  LateralPanel.OVERRIDE,
+  LateralPanel.STEER_FILTERS,
+))
+
+
+def honda_tuning_available() -> bool:
+  """Require live CP to agree with any manually selected Honda platform."""
+  selection_present, selected_fingerprint, selected_brand = get_selected_car_identity(ui_state.params)
+  identity = confirmed_vehicle_identity(
+    ui_state.CP, selected_fingerprint, selected_brand, selection_present=selection_present,
+  )
+  return identity is not None and identity[1] == "honda"
 
 
 class _TuneReportAction(ItemAction):
@@ -103,7 +123,7 @@ class LateralTuningLayout(Widget):
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _set_panel(self, panel: LateralPanel):
-    self._current_panel = panel
+    self._current_panel = LateralPanel.HUB if panel in HONDA_ONLY_LATERAL_PANELS and not honda_tuning_available() else panel
 
   def _scanning(self) -> bool:
     return self._scan_proc is not None
@@ -291,8 +311,16 @@ class LateralTuningLayout(Widget):
   def _show_pid_tune_info(self):
     gui_app.push_widget(HtmlModalSP(text=self._build_pid_tune_info()))
 
+  @staticmethod
+  def _handcrafted_supported():
+    selection_present, selected_fingerprint, selected_brand = get_selected_car_identity(ui_state.params)
+    return handcrafted_lateral_profile_supported(
+      ui_state.CP, ui_state.CP_SP, selected_fingerprint, selected_brand,
+      selection_present=selection_present,
+    )
+
   def _on_handcrafted_apply(self):
-    if not ui_state.is_offroad() or not handcrafted_lateral_profile_supported(ui_state.CP, ui_state.CP_SP):
+    if not ui_state.is_offroad() or not self._handcrafted_supported():
       return
     ui_state.params.put_bool("NrdrHandcraftedLateralTune", True, block=True)
 
@@ -338,6 +366,8 @@ class LateralTuningLayout(Widget):
       self._handcrafted_description,
       callback=self._on_handcrafted_apply,
     )
+    # Stay hidden until live CP/CP_SP proves this exact vehicle is supported.
+    self._handcrafted_apply.set_visible(False)
 
     self._vehicle_model_button = simple_button_item_sp(
       button_text=lambda: tr("Vehicle Model & Learning"),
@@ -360,10 +390,7 @@ class LateralTuningLayout(Widget):
       button_width=800,
       callback=lambda: self._set_panel(LateralPanel.STEER_FILTERS),
     )
-    return [
-      self._handcrafted_apply,
-      LineSeparatorSP(40),
-      self._vehicle_model_button,
+    self._honda_only_items = [
       LineSeparatorSP(40),
       self._pidf_button,
       LineSeparatorSP(40),
@@ -371,11 +398,24 @@ class LateralTuningLayout(Widget):
       LineSeparatorSP(40),
       self._steer_filters_button,
     ]
+    for item in self._honda_only_items:
+      item.set_visible(False)
+    return [
+      self._handcrafted_apply,
+      LineSeparatorSP(40),
+      self._vehicle_model_button,
+      *self._honda_only_items,
+    ]
 
   def _update_state(self):
     super()._update_state()
     self._poll_tune_report_scan()
-    supported = handcrafted_lateral_profile_supported(ui_state.CP, ui_state.CP_SP)
+    honda_available = honda_tuning_available()
+    for item in self._honda_only_items:
+      item.set_visible(honda_available)
+    if self._current_panel in HONDA_ONLY_LATERAL_PANELS and not honda_available:
+      self._current_panel = LateralPanel.HUB
+    supported = self._handcrafted_supported()
     pending = ui_state.params.get_bool("NrdrHandcraftedLateralTune")
     self._handcrafted_apply.set_visible(supported)
     self._handcrafted_apply.action_item.set_enabled(supported and ui_state.is_offroad() and not pending)
