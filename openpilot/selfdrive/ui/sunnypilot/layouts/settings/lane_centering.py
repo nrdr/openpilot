@@ -45,15 +45,15 @@ class LaneCenteringLayout(Widget):
 
     self._lane_centering_toggle = toggle_item_sp(
       title=tr("Enable Lane Centering"),
-      description=tr("Bias the model curvature toward the center of two confident lane lines. The correction remains subject to the normal " +
-                     "curvature and jerk limits."),
+      description=tr("Bias the model path toward the center of two confident lane boundaries while preserving the normal curvature and jerk " +
+                     "limits. It waits when either boundary is uncertain and makes no correction while the model path is already centered."),
       initial_state=ui_state.params.get_bool("LaneCentering"),
       enabled=self._write_allowed,
       callback=self._on_lane_centering,
     )
     self._pause_on_signal_toggle = toggle_item_sp(
       title=tr("Pause on Turn Signal"),
-      description=tr("Smoothly release the lane-centering correction while either turn signal is active."),
+      description=tr("Fade out the correction while a turn signal is active. Once a lane-change maneuver begins, the correction stops immediately."),
       initial_state=bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)),
       enabled=self._settings_writable,
       callback=self._on_pause_on_signal,
@@ -149,3 +149,6 @@ class LaneCenteringLayout(Widget):
   def show_event(self):
     self._refresh()
     self._scroller.show_event()
+
+  def hide_event(self):
+    self._scroller.hide_event()

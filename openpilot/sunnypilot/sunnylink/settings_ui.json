@@ -1164,7 +1164,7 @@
                   "widget": "toggle",
                   "title": "Enable Lane Centering",
                   "description": "Disabled by default. Enable confidence-gated lane centering for the next drive.",
-                  "details": "Biases the model curvature toward the center of two confident lane lines while preserving the normal curvature and jerk limits.",
+                  "details": "Biases the model path toward the center of two confident lane boundaries while preserving the normal curvature and jerk limits. It waits when either boundary is uncertain and makes no correction while the model path is already centered.",
                   "enablement": [
                     {
                       "type": "offroad_only"
@@ -1202,7 +1202,7 @@
                   "key": "LaneCenteringPauseOnSignal",
                   "widget": "toggle",
                   "title": "Pause on Turn Signal",
-                  "description": "Smoothly release the lane-centering correction while either turn signal is active.",
+                  "description": "Fade out the correction while a turn signal is active. Once a lane-change maneuver begins, the correction stops immediately.",
                   "enablement": [
                     {
                       "type": "offroad_only"

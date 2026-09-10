@@ -7,7 +7,6 @@ from openpilot.selfdrive.ui.mici.layouts.settings.device import DeviceLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.developer import DeveloperLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.software import SoftwareLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.firehose import FirehoseLayout
-from openpilot.selfdrive.ui.mici.layouts.settings.lane_centering import LaneCenteringLayoutMici
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 
 
@@ -21,43 +20,40 @@ class SettingsLayout(NavScroller):
     super().__init__()
     self._params = Params()
 
-    toggles_panel = TogglesLayoutMici()
-    toggles_btn = SettingsBigButton("toggles", "", gui_app.texture("icons_mici/settings.png", 64, 64))
-    toggles_btn.set_click_callback(lambda: gui_app.push_widget(toggles_panel))
+    self._toggles_panel = TogglesLayoutMici()
+    self._toggles_btn = SettingsBigButton("toggles", "", gui_app.texture("icons_mici/settings.png", 64, 64))
+    self._toggles_btn.set_click_callback(lambda: gui_app.push_widget(self._toggles_panel))
 
-    lane_centering_panel = LaneCenteringLayoutMici()
-    lane_centering_btn = SettingsBigButton("lane centering", "", gui_app.texture("icons_mici/settings/device/lkas.png", 72, 58))
-    lane_centering_btn.set_click_callback(lambda: gui_app.push_widget(lane_centering_panel))
+    self._network_panel = NetworkLayoutMici()
+    self._network_btn = SettingsBigButton("network", "", gui_app.texture("icons_mici/settings/network/wifi_strength_full.png", 76, 56))
+    self._network_btn.set_click_callback(lambda: gui_app.push_widget(self._network_panel))
 
-    network_panel = NetworkLayoutMici()
-    network_btn = SettingsBigButton("network", "", gui_app.texture("icons_mici/settings/network/wifi_strength_full.png", 76, 56))
-    network_btn.set_click_callback(lambda: gui_app.push_widget(network_panel))
+    self._device_panel = DeviceLayoutMici()
+    self._device_btn = SettingsBigButton("device", "", gui_app.texture("icons_mici/settings/device_icon.png", 72, 58))
+    self._device_btn.set_click_callback(lambda: gui_app.push_widget(self._device_panel))
 
-    device_panel = DeviceLayoutMici()
-    device_btn = SettingsBigButton("device", "", gui_app.texture("icons_mici/settings/device_icon.png", 72, 58))
-    device_btn.set_click_callback(lambda: gui_app.push_widget(device_panel))
+    self._software_panel = SoftwareLayoutMici()
+    self._software_btn = SettingsBigButton("software", "", gui_app.texture("icons_mici/settings/software.png", 64, 75))
+    self._software_btn.set_click_callback(lambda: gui_app.push_widget(self._software_panel))
 
-    software_panel = SoftwareLayoutMici()
-    software_btn = SettingsBigButton("software", "", gui_app.texture("icons_mici/settings/software.png", 64, 75))
-    software_btn.set_click_callback(lambda: gui_app.push_widget(software_panel))
+    self._developer_panel = DeveloperLayoutMici()
+    self._developer_btn = SettingsBigButton("developer", "", gui_app.texture("icons_mici/settings/developer_icon.png", 64, 60))
+    self._developer_btn.set_click_callback(lambda: gui_app.push_widget(self._developer_panel))
 
-    developer_panel = DeveloperLayoutMici()
-    developer_btn = SettingsBigButton("developer", "", gui_app.texture("icons_mici/settings/developer_icon.png", 64, 60))
-    developer_btn.set_click_callback(lambda: gui_app.push_widget(developer_panel))
+    self._firehose_panel = FirehoseLayout()
+    self._firehose_btn = SettingsBigButton("firehose", "", gui_app.texture("icons_mici/settings/firehose.png", 52, 62))
+    self._firehose_btn.set_click_callback(lambda: gui_app.push_widget(self._firehose_panel))
 
-    firehose_panel = FirehoseLayout()
-    firehose_btn = SettingsBigButton("firehose", "", gui_app.texture("icons_mici/settings/firehose.png", 52, 62))
-    firehose_btn.set_click_callback(lambda: gui_app.push_widget(firehose_panel))
+    self._pair_btn = PairBigButton()
 
     self._scroller.add_widgets([
-      toggles_btn,
-      lane_centering_btn,
-      network_btn,
-      device_btn,
-      software_btn,
-      PairBigButton(),
-      firehose_btn,
-      developer_btn,
+      self._toggles_btn,
+      self._network_btn,
+      self._device_btn,
+      self._software_btn,
+      self._pair_btn,
+      self._firehose_btn,
+      self._developer_btn,
     ])
 
     self._font_medium = gui_app.font(FontWeight.MEDIUM)

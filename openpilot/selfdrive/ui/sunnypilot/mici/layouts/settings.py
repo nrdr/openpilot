@@ -30,11 +30,15 @@ class SunnylinkBigButton(SettingsBigButton):
 
 
 class SettingsLayoutSP(OP.SettingsLayout):
+  @staticmethod
+  def _insert_after(items, anchor, item):
+    items.insert(items.index(anchor) + 1, item)
+
   def __init__(self):
     OP.SettingsLayout.__init__(self)
 
-    device_panel = DeviceLayoutMiciSP()
-    self._scroller._items[2].set_click_callback(lambda: gui_app.push_widget(device_panel))
+    self._device_panel = DeviceLayoutMiciSP()
+    self._device_btn.set_click_callback(lambda: gui_app.push_widget(self._device_panel))
 
     self.icon_offroad_enable = gui_app.texture("../../sunnypilot/selfdrive/assets/icons_mici/always_offroad.png", BIG_ICON_SIZE,
                                                BIG_ICON_SIZE)
@@ -66,14 +70,12 @@ class SettingsLayoutSP(OP.SettingsLayout):
 
     items = self._scroller._items.copy()
 
-    items.insert(1, models_btn)
-    items.insert(5, sunnylink_btn)
+    self._insert_after(items, self._toggles_btn, models_btn)
+    self._insert_after(items, self._software_btn, sunnylink_btn)
 
-    # front slots (only one ever visible at a time): exit-always-offroad, then enable-onroad
-    items.insert(0, self._enable_offroad_btn_onroad)
-    items.insert(0, self._disable_offroad_btn)
-    # end slot: enable-offroad (right of developer)
-    items.append(self._enable_offroad_btn_offroad)
+    # Front slots (only one ever visible at a time): exit-always-offroad, then enable-onroad.
+    # The offroad enable button remains the final item, independent of the named settings in between.
+    items = [self._disable_offroad_btn, self._enable_offroad_btn_onroad, *items, self._enable_offroad_btn_offroad]
 
     self._scroller._items.clear()
     for item in items:

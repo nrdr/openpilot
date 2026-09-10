@@ -12,6 +12,7 @@ from opendbc.car.car_helpers import interfaces
 from opendbc.car.structs import car
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.sunnypilot.layouts.settings.lane_centering import LaneCenteringLayout
 from openpilot.sunnypilot.nrdr.handcrafted_lateral import (
   confirmed_vehicle_identity,
   get_selected_car_identity,
@@ -45,6 +46,7 @@ class LateralPanel(IntEnum):
   PIDF = 2
   OVERRIDE = 3
   STEER_FILTERS = 4
+  LANE_CENTERING = 5
 
 
 HONDA_ONLY_LATERAL_PANELS = frozenset((
@@ -110,6 +112,7 @@ class LateralTuningLayout(Widget):
     self._scan_fh = None
 
     self._current_panel = LateralPanel.HUB
+    self._shown = False
     vehicle_items = self._initialize_vehicle_items()
     self._vehicle_model_layout = VehicleModelLearningLayout(
       lambda: self._set_panel(LateralPanel.HUB),
@@ -118,12 +121,35 @@ class LateralTuningLayout(Widget):
     self._pidf_layout = PidfGroundLayout(lambda: self._set_panel(LateralPanel.HUB))
     self._override_layout = OverrideTuningLayout(lambda: self._set_panel(LateralPanel.HUB))
     self._steer_filters_layout = SteerFiltersLayout(lambda: self._set_panel(LateralPanel.HUB))
+    self._lane_centering_layout = LaneCenteringLayout()
+    self._lane_centering_back_button = NavButton(tr("Back"))
+    self._lane_centering_back_button.set_click_callback(lambda: self._set_panel(LateralPanel.HUB))
 
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
+  def _panel_widget(self, panel: LateralPanel) -> Widget:
+    if panel == LateralPanel.VEHICLE_MODEL:
+      return self._vehicle_model_layout
+    if panel == LateralPanel.PIDF:
+      return self._pidf_layout
+    if panel == LateralPanel.OVERRIDE:
+      return self._override_layout
+    if panel == LateralPanel.STEER_FILTERS:
+      return self._steer_filters_layout
+    if panel == LateralPanel.LANE_CENTERING:
+      return self._lane_centering_layout
+    return self._scroller
+
   def _set_panel(self, panel: LateralPanel):
-    self._current_panel = LateralPanel.HUB if panel in HONDA_ONLY_LATERAL_PANELS and not honda_tuning_available() else panel
+    next_panel = LateralPanel.HUB if panel in HONDA_ONLY_LATERAL_PANELS and not honda_tuning_available() else panel
+    if next_panel == self._current_panel:
+      return
+    if self._shown:
+      self._panel_widget(self._current_panel).hide_event()
+    self._current_panel = next_panel
+    if self._shown:
+      self._panel_widget(self._current_panel).show_event()
 
   def _scanning(self) -> bool:
     return self._scan_proc is not None
@@ -374,6 +400,11 @@ class LateralTuningLayout(Widget):
       button_width=800,
       callback=lambda: self._set_panel(LateralPanel.VEHICLE_MODEL),
     )
+    self._lane_centering_button = simple_button_item_sp(
+      button_text=lambda: tr("Lane Centering"),
+      button_width=800,
+      callback=lambda: self._set_panel(LateralPanel.LANE_CENTERING),
+    )
 
     self._pidf_button = simple_button_item_sp(
       button_text=lambda: tr("Controller Tuning Dungeon"),
@@ -404,6 +435,8 @@ class LateralTuningLayout(Widget):
       self._handcrafted_apply,
       LineSeparatorSP(40),
       self._vehicle_model_button,
+      LineSeparatorSP(40),
+      self._lane_centering_button,
       *self._honda_only_items,
     ]
 
@@ -414,7 +447,7 @@ class LateralTuningLayout(Widget):
     for item in self._honda_only_items:
       item.set_visible(honda_available)
     if self._current_panel in HONDA_ONLY_LATERAL_PANELS and not honda_available:
-      self._current_panel = LateralPanel.HUB
+      self._set_panel(LateralPanel.HUB)
     supported = self._handcrafted_supported()
     pending = ui_state.params.get_bool("NrdrHandcraftedLateralTune")
     self._handcrafted_apply.set_visible(supported)
@@ -433,11 +466,31 @@ class LateralTuningLayout(Widget):
     if self._current_panel == LateralPanel.STEER_FILTERS:
       self._steer_filters_layout.render(rect)
       return
+    if self._current_panel == LateralPanel.LANE_CENTERING:
+      self._lane_centering_back_button.set_position(self._rect.x, self._rect.y + 20)
+      self._lane_centering_back_button.render()
+      content_rect = rl.Rectangle(
+        rect.x,
+        rect.y + self._lane_centering_back_button.rect.height + 40,
+        rect.width,
+        rect.height - self._lane_centering_back_button.rect.height - 40,
+      )
+      self._lane_centering_layout.render(content_rect)
+      return
     self._back_button.set_position(self._rect.x, self._rect.y + 20)
     self._back_button.render()
     content_rect = rl.Rectangle(rect.x, rect.y + self._back_button.rect.height + 40, rect.width, rect.height - self._back_button.rect.height - 40)
     self._scroller.render(content_rect)
 
   def show_event(self):
-    self._set_panel(LateralPanel.HUB)
-    self._scroller.show_event()
+    if self._shown:
+      return
+    self._current_panel = LateralPanel.HUB
+    self._shown = True
+    self._panel_widget(self._current_panel).show_event()
+
+  def hide_event(self):
+    if self._shown:
+      self._panel_widget(self._current_panel).hide_event()
+    self._shown = False
+    self._current_panel = LateralPanel.HUB
