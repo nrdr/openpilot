@@ -1,0 +1,38 @@
+"""Compatibility exports for canonical NRDR longitudinal MPC policy."""
+
+from openpilot.nrdr.features.longitudinal.longitudinal_mpc import (
+  BRAKE_ENGAGE_DELAY,
+  BRAKE_PERSISTENCE,
+  BRAKE_RELEASE_TIME,
+  CROSSFADE_FRAMES,
+  CRUISE_MAX_ACCEL,
+  LEAD_ACCEL_FILTER_TAU,
+  LEAD_ACCEL_TAU_MAX,
+  LEAD_ACCEL_TAU_NORMALIZER,
+  MAX_EFFECTIVE_BRAKE,
+  MIN_TRACK_AGE,
+  PERSONALITY_JERK,
+  PERSONALITY_NAMES,
+  PERSONALITY_T_FOLLOW,
+  MpcPolicyResult,
+  NrdrLongitudinalMpc,
+)
+
+
+__all__ = (
+  "BRAKE_ENGAGE_DELAY",
+  "BRAKE_PERSISTENCE",
+  "BRAKE_RELEASE_TIME",
+  "CROSSFADE_FRAMES",
+  "CRUISE_MAX_ACCEL",
+  "LEAD_ACCEL_FILTER_TAU",
+  "LEAD_ACCEL_TAU_MAX",
+  "LEAD_ACCEL_TAU_NORMALIZER",
+  "MAX_EFFECTIVE_BRAKE",
+  "MIN_TRACK_AGE",
+  "PERSONALITY_JERK",
+  "PERSONALITY_NAMES",
+  "PERSONALITY_T_FOLLOW",
+  "MpcPolicyResult",
+  "NrdrLongitudinalMpc",
+)
