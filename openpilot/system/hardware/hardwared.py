@@ -39,6 +39,8 @@ TEMP_TAU = 5.   # 5s time constant
 DISCONNECT_TIMEOUT = 5.  # wait 5 seconds before going offroad after disconnect so you get an alert
 PANDA_STATES_TIMEOUT = round(1000 / SERVICE_LIST['pandaStates'].frequency * 1.5)  # 1.5x the expected pandaState frequency
 ONROAD_CYCLE_TIME = 1  # seconds to wait offroad after requesting an onroad cycle
+SLOW_HARDWARE_STAGE_SECONDS = 0.20
+SLOW_HARDWARE_STAGE_LOG_INTERVAL = 10.0
 
 class Chestnut:
   # flash offroad, modeld ignores chestnut until the product string matches
@@ -115,6 +117,20 @@ def set_offroad_alert_if_changed(offroad_alert: str, show_alert: bool, extra_tex
   prev_offroad_states[offroad_alert] = (show_alert, extra_text)
   set_offroad_alert(offroad_alert, show_alert, extra_text)
 
+
+def log_slow_hardware_stage(thread: str, stage: str, stage_started: float, last_logged: dict[str, float],
+                            onroad: bool | None, frame: int) -> float:
+  """Report synchronous hardware-loop stalls without weakening deviceState liveness checks."""
+  now = time.monotonic()
+  duration = now - stage_started
+  last_log = last_logged.get(stage)
+  if duration >= SLOW_HARDWARE_STAGE_SECONDS and (last_log is None or now - last_log >= SLOW_HARDWARE_STAGE_LOG_INTERVAL):
+    last_logged[stage] = now
+    cloudlog.event("hardwared slow stage", thread=thread, stage=stage, duration=duration,
+                   onroad=onroad, frame=frame, error=True)
+  return time.monotonic()
+
+
 def touch_thread(end_event):
   count = 0
 
@@ -155,9 +171,12 @@ def hw_state_thread(end_event, hw_queue):
   count = 0
   prev_hw_state = None
   prev_usb_topology = set()
+  last_slow_stage_log: dict[str, float] = {}
 
   while not end_event.is_set():
+    stage_started = time.monotonic()
     usb_topology = get_usb_topology()
+    stage_started = log_slow_hardware_stage("hw_state", "usb_topology", stage_started, last_slow_stage_log, None, count)
     usb_changed = usb_topology != prev_usb_topology
 
     # these are expensive calls. update every 10s or when USB devices change
@@ -165,20 +184,36 @@ def hw_state_thread(end_event, hw_queue):
       prev_usb_topology = usb_topology
       try:
         network_type = HARDWARE.get_network_type()
+        stage_started = log_slow_hardware_stage("hw_state", "network_type", stage_started, last_slow_stage_log, None, count)
+
         modem_temps = HARDWARE.get_modem_temperatures()
+        stage_started = log_slow_hardware_stage("hw_state", "modem_temperatures", stage_started, last_slow_stage_log, None, count)
         if len(modem_temps) == 0 and prev_hw_state is not None:
           modem_temps = prev_hw_state.modem_temps
 
         tx, rx = HARDWARE.get_modem_data_usage()
+        stage_started = log_slow_hardware_stage("hw_state", "modem_data_usage", stage_started, last_slow_stage_log, None, count)
+
+        network_info = HARDWARE.get_network_info()
+        stage_started = log_slow_hardware_stage("hw_state", "network_info", stage_started, last_slow_stage_log, None, count)
+
+        network_strength = HARDWARE.get_network_strength(network_type)
+        stage_started = log_slow_hardware_stage("hw_state", "network_strength", stage_started, last_slow_stage_log, None, count)
+
+        network_metered = HARDWARE.get_network_metered(network_type)
+        stage_started = log_slow_hardware_stage("hw_state", "network_metered", stage_started, last_slow_stage_log, None, count)
+
+        usb_state = get_usb_state()
+        stage_started = log_slow_hardware_stage("hw_state", "usb_state", stage_started, last_slow_stage_log, None, count)
 
         hw_state = HardwareState(
           network_type=network_type,
-          network_info=HARDWARE.get_network_info(),
-          network_strength=HARDWARE.get_network_strength(network_type),
+          network_info=network_info,
+          network_strength=network_strength,
           network_stats={'wwanTx': tx, 'wwanRx': rx},
-          network_metered=HARDWARE.get_network_metered(network_type),
+          network_metered=network_metered,
           modem_temps=modem_temps,
-          usb_state=get_usb_state(),
+          usb_state=usb_state,
         )
 
         try:
@@ -187,6 +222,7 @@ def hw_state_thread(end_event, hw_queue):
           pass
 
         prev_hw_state = hw_state
+        log_slow_hardware_stage("hw_state", "queue", stage_started, last_slow_stage_log, None, count)
       except Exception:
         cloudlog.exception("Error getting hardware state")
 
@@ -248,9 +284,13 @@ def hardware_thread(end_event, hw_queue) -> None:
   chestnut = Chestnut()
   chestnut_status = ChestnutStatus()
   branch = get_short_branch()
+  last_slow_stage_log: dict[str, float] = {}
 
   while not end_event.is_set():
+    stage_started = time.monotonic()
     sm.update(PANDA_STATES_TIMEOUT)
+    stage_started = log_slow_hardware_stage("main", "panda_poll", stage_started, last_slow_stage_log,
+                                            started_ts is not None, sm.frame)
 
     pandaStates = sm['pandaStates']
     peripheralState = sm['peripheralState']
@@ -277,6 +317,8 @@ def hardware_thread(end_event, hw_queue) -> None:
 
     # Run at 2Hz, plus either edge of ignition
     ign_edge = (started_ts is not None) != all(onroad_conditions.values())
+    stage_started = log_slow_hardware_stage("main", "panda_state", stage_started, last_slow_stage_log,
+                                            started_ts is not None, sm.frame)
     if (sm.frame % round(SERVICE_LIST['pandaStates'].frequency * DT_HW) != 0) and not ign_edge:
       continue
 
@@ -295,6 +337,8 @@ def hardware_thread(end_event, hw_queue) -> None:
     online_cpu_usage = [int(round(n)) for n in system_stats.cpu_usage_percent()]
     offline_cpu_usage = [0., ] * (len(msg.deviceState.cpuTempC) - len(online_cpu_usage))
     msg.deviceState.cpuUsagePercent = online_cpu_usage + offline_cpu_usage
+    stage_started = log_slow_hardware_stage("main", "device_telemetry", stage_started, last_slow_stage_log,
+                                            started_ts is not None, sm.frame)
 
     msg.deviceState.networkType = last_hw_state.network_type
     msg.deviceState.networkMetered = last_hw_state.network_metered
@@ -314,6 +358,8 @@ def hardware_thread(end_event, hw_queue) -> None:
     chestnut_status.update(started_ts is None, branch, last_hw_state.usb_state, chestnut.failed,
                            params.get_bool("ChestnutLoading"), params.get("ChestnutActive"),
                            chestnut_state if chestnut_valid else None, set_offroad_alert_if_changed)
+    stage_started = log_slow_hardware_stage("main", "display_usb_chestnut", stage_started, last_slow_stage_log,
+                                            started_ts is not None, sm.frame)
     # this subset is only used for offroad
     temp_sources = [
       msg.deviceState.memoryTempC,
@@ -341,6 +387,9 @@ def hardware_thread(end_event, hw_queue) -> None:
         thermal_status = list(THERMAL_BANDS.keys())[band_idx - 1]
       elif current_band.max_temp is not None and all_comp_temp > current_band.max_temp:
         thermal_status = list(THERMAL_BANDS.keys())[band_idx + 1]
+
+    stage_started = log_slow_hardware_stage("main", "thermal", stage_started, last_slow_stage_log,
+                                            started_ts is not None, sm.frame)
 
     # **** starting logic ****
 
@@ -382,6 +431,8 @@ def hardware_thread(end_event, hw_queue) -> None:
     extra_text = f"{offroad_comp_temp:.1f}C"
     show_alert = (not onroad_conditions["device_temp_good"] or not startup_conditions["device_temp_engageable"]) and onroad_conditions["ignition"]
     set_offroad_alert_if_changed("Offroad_TemperatureTooHigh", show_alert, extra_text=extra_text)
+    stage_started = log_slow_hardware_stage("main", "startup_policy", stage_started, last_slow_stage_log,
+                                            started_ts is not None, sm.frame)
 
     if show_alert:
       msg.deviceState.fanSpeedPercentDesired = 100
@@ -406,6 +457,9 @@ def hardware_thread(end_event, hw_queue) -> None:
           kmsg.write(f"<3>[hardware] engaged: {engaged}\n")
       except Exception:
         pass
+
+    stage_started = log_slow_hardware_stage("main", "engagement", stage_started, last_slow_stage_log,
+                                            started_ts is not None, sm.frame)
 
     should_pwrsave = not onroad_conditions["ignition"] and msg.deviceState.screenBrightnessPercent < 1e-3
     if should_pwrsave != pwrsave or (count == 0):
@@ -463,7 +517,11 @@ def hardware_thread(end_event, hw_queue) -> None:
       msg.deviceState.lastAthenaPingTime = last_ping
 
     msg.deviceState.thermalStatus = thermal_status
+    stage_started = log_slow_hardware_stage("main", "power", stage_started, last_slow_stage_log,
+                                            started_ts is not None, sm.frame)
     pm.send("deviceState", msg)
+    stage_started = log_slow_hardware_stage("main", "publish", stage_started, last_slow_stage_log,
+                                            started_ts is not None, sm.frame)
 
     statlog.gauge("free_space_percent", msg.deviceState.freeSpacePercent)
     statlog.gauge("gpu_usage_percent", msg.deviceState.gpuUsagePercent)
@@ -514,6 +572,9 @@ def hardware_thread(end_event, hw_queue) -> None:
     if (count % int(60. / DT_HW)) == 0:
       params.put("UptimeOffroad", uptime_offroad, block=True)
       params.put("UptimeOnroad", uptime_onroad, block=True)
+
+    log_slow_hardware_stage("main", "post_publish", stage_started, last_slow_stage_log,
+                            started_ts is not None, sm.frame)
 
     count += 1
     should_start_prev = should_start
