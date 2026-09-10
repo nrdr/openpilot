@@ -1,6 +1,7 @@
 """Compatibility exports for the canonical NRDR Sunnylink service helpers."""
 
 from openpilot.nrdr.features.services.sunnylink import (
+  HONDA_TUNING_WRITE_KEYS,
   ONROAD_WRITE_BLOCKLIST,
   UNREGISTERED,
   _identity_path,
@@ -12,6 +13,7 @@ from openpilot.nrdr.features.services.sunnylink import (
 
 
 __all__ = (
+  "HONDA_TUNING_WRITE_KEYS",
   "ONROAD_WRITE_BLOCKLIST",
   "UNREGISTERED",
   "_identity_path",

@@ -131,8 +131,9 @@ class Car:
           # fails, abort before FirmwareQueryDone/controller construction.
           raise
         except Exception:
-          # Never turn an unsupported or interrupted one-shot request into an
-          # ignition boot loop. The durable true request remains for offroad.
+          # Never turn an interrupted one-shot request into an ignition boot
+          # loop. Identity/capability deferrals are quiet no-ops; an exception
+          # here means the durable true request remains for an offroad retry.
           cloudlog.exception("car: handcrafted lateral apply failed; request retained")
 
       # continue onto next fingerprinting step in pandad

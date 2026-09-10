@@ -691,6 +691,11 @@
               "id": "nrdr_pidf_ground",
               "label": "Controller Tuning Dungeon",
               "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_honda_tuning_available",
+                "equals": true
+              },
               "items": [
                 {
                   "key": "NrdrInterpolatedTorquePifBlend",
@@ -1215,6 +1220,11 @@
               "id": "nrdr_steer_ratio_tuning",
               "label": "Steer Ratio Tuning",
               "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_honda_tuning_available",
+                "equals": true
+              },
               "items": [
                 {
                   "key": "NrdrSteerRatioMode",
@@ -1304,6 +1314,11 @@
               "id": "nrdr_override",
               "label": "Override Tuning",
               "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_honda_tuning_available",
+                "equals": true
+              },
               "items": [
                 {
                   "key": "NrdrIncreaseOverrideTolerance",
@@ -1375,6 +1390,11 @@
               "id": "nrdr_steer_filters",
               "label": "Steer Filters",
               "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_honda_tuning_available",
+                "equals": true
+              },
               "items": [
                 {
                   "key": "HondaTorqueLowPassFilter",
@@ -1478,6 +1498,13 @@
           "id": "nrdr_special",
           "title": "nrdr Special",
           "description": "Dashboard, diagnostics, and special features.",
+          "visibility": [
+            {
+              "type": "capability",
+              "field": "nrdr_honda_tuning_available",
+              "equals": true
+            }
+          ],
           "items": [],
           "sub_panels": [
             {

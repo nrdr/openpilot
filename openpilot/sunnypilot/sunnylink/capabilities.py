@@ -14,7 +14,7 @@ from opendbc.sunnypilot.car.tesla.values import TeslaFlagsSP
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
-from openpilot.nrdr.params import handcrafted_lateral_profile_supported
+from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
 from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import RAW_STEER_RATIO_PROFILES, get_steer_ratio_metadata
@@ -48,6 +48,7 @@ CAPABILITY_FIELDS = (
   "subaru_has_sng",
   "hyundai_alpha_long_available",
   "has_handcrafted_lateral_profile",
+  "nrdr_honda_tuning_available",
   "nrdr_manual_steer_ratio_available",
   "nrdr_raw_steer_ratio_available",
   "nrdr_firmware_steer_ratio_available",
@@ -76,6 +77,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "subaru_has_sng": "Subaru Stop-and-Go available",
   "hyundai_alpha_long_available": "Hyundai Alpha Longitudinal available",
   "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
+  "nrdr_honda_tuning_available": "Confirmed Honda-specific NRDR tuning available",
   "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio geometry available",
   "nrdr_raw_steer_ratio_available": "Exact audited NRDR raw steer-ratio curve available",
   "nrdr_firmware_steer_ratio_available": "Exact NRDR firmware steer-ratio geometry available",
@@ -93,7 +95,7 @@ CAPABILITY_DEFAULTS: dict[str, bool | str | int] = {
 
 
 def _bundle_field(bundle: dict | None, key: str) -> str:
-  return bundle.get(key, "") if isinstance(bundle, dict) else ""
+  return str(bundle.get(key) or "") if isinstance(bundle, dict) else ""
 
 
 def _resolve_brand_capabilities(caps: dict, bundle_platform: str, CP) -> None:
@@ -151,6 +153,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
   bundle = params.get("CarPlatformBundle")
   bundle_brand = _bundle_field(bundle, "brand")
   bundle_platform = _bundle_field(bundle, "platform")
+  selection_present, selected_fingerprint, selected_brand = get_selected_car_identity(params)
 
   # Bundle-first brand resolution; CP is fallback only.
   if bundle_brand:
@@ -196,8 +199,17 @@ def generate_capabilities(params: Params | None = None) -> dict:
       cloudlog.exception("capabilities: failed to deserialize CarParamsSPPersistent")
 
   _resolve_brand_capabilities(caps, bundle_platform, CP)
-  fingerprint = caps["car_fingerprint"] or bundle_platform
-  caps["has_handcrafted_lateral_profile"] = handcrafted_lateral_profile_supported(CP, CP_SP, fingerprint)
+  confirmed_identity = confirmed_vehicle_identity(
+    CP, selected_fingerprint, selected_brand, selection_present=selection_present,
+  )
+  caps["nrdr_honda_tuning_available"] = confirmed_identity is not None and confirmed_identity[1] == "honda"
+  # A selected platform and deserialized CP must agree before exposing a
+  # vehicle-scoped apply command. A stale CP from the previous car cannot make
+  # the command appear for a newly selected unsupported vehicle.
+  fingerprint = bundle_platform or caps["car_fingerprint"]
+  caps["has_handcrafted_lateral_profile"] = handcrafted_lateral_profile_supported(
+    CP, CP_SP, selected_fingerprint, selected_brand, selection_present=selection_present,
+  )
   is_honda = caps["brand"] == "honda"
   caps["nrdr_manual_steer_ratio_available"] = is_honda and get_steer_ratio_metadata(fingerprint) is not None
   caps["nrdr_raw_steer_ratio_available"] = is_honda and fingerprint in RAW_STEER_RATIO_PROFILES

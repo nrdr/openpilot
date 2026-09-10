@@ -4,9 +4,19 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
+import base64
+import gzip
+
 from openpilot.sunnypilot.sunnylink.athena import sunnylinkd
 from openpilot.common.test import OpenpilotTestCase
-from openpilot.nrdr.features.services.sunnylink import ONROAD_WRITE_BLOCKLIST, allow_param_write
+from openpilot.nrdr.features.services.sunnylink import HONDA_TUNING_WRITE_KEYS, ONROAD_WRITE_BLOCKLIST, allow_param_write
+
+
+def remote_value(value: str, *, compression: bool = False) -> str:
+  raw = value.encode()
+  if compression:
+    raw = gzip.compress(raw)
+  return base64.b64encode(raw).decode()
 
 
 class TestSunnylinkdMethods(OpenpilotTestCase):
@@ -16,6 +26,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     self.original_save = sunnylinkd.save_param_from_base64_encoded_string
     self.original_params = sunnylinkd.params
+    self.original_generate_capabilities = sunnylinkd.generate_capabilities
 
     class FakeParams:
       offroad = True
@@ -33,6 +44,10 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     self.fake_params = FakeParams()
     sunnylinkd.params = self.fake_params
+    sunnylinkd.generate_capabilities = lambda _: {
+      "has_handcrafted_lateral_profile": True,
+      "nrdr_honda_tuning_available": True,
+    }
 
     def mock_save_param(key, value, compression=False):
       self.saved_params.append((key, value, compression))
@@ -42,6 +57,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
   def teardown_method(self):
     sunnylinkd.save_param_from_base64_encoded_string = self.original_save  # ty: ignore[invalid-assignment]
     sunnylinkd.params = self.original_params
+    sunnylinkd.generate_capabilities = self.original_generate_capabilities
 
   def test_saveParams_blocked(self):
     blocked_params = {
@@ -172,8 +188,28 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "NrdrInterpolatedTorqueFrictionStandard",
       "NrdrInterpolatedTorqueFrictionHighway",
     ):
-      assert allow_param_write(key, onroad=True)
-      assert allow_param_write(key, onroad=False)
+      assert allow_param_write(key, onroad=True, honda_tuning_available=True)
+      assert allow_param_write(key, onroad=False, honda_tuning_available=True)
+
+  def test_honda_tuning_cohort_is_fail_closed_for_every_remote_write(self):
+    assert len(HONDA_TUNING_WRITE_KEYS) == 51
+    for key in HONDA_TUNING_WRITE_KEYS:
+      assert allow_param_write(key, onroad=False, honda_tuning_available=True)
+      assert allow_param_write(key, onroad=True, honda_tuning_available=True)
+      assert not allow_param_write(key, onroad=False, honda_tuning_available=False)
+      assert not allow_param_write(key, onroad=False, honda_tuning_available=None)
+
+  def test_saveParams_rejects_honda_tuning_for_confirmed_non_honda(self):
+    sunnylinkd.generate_capabilities = lambda _: {
+      "has_handcrafted_lateral_profile": False,
+      "nrdr_honda_tuning_available": False,
+    }
+    values = dict.fromkeys(HONDA_TUNING_WRITE_KEYS, "unchanged")
+    values["SpeedLimitOffset"] = "10"
+
+    sunnylinkd.saveParams(values)
+
+    assert self.saved_params == [("SpeedLimitOffset", "10", False)]
 
   def test_onroad_blocklist_is_exact(self):
     assert ONROAD_WRITE_BLOCKLIST == frozenset((
@@ -186,6 +222,54 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "NrdrHandcraftedLateralTune",
     ))
 
-  def test_handcrafted_apply_command_is_server_enforced_offroad_only(self):
-    assert not allow_param_write("NrdrHandcraftedLateralTune", onroad=True)
-    assert allow_param_write("NrdrHandcraftedLateralTune", onroad=False)
+  def test_handcrafted_apply_command_is_server_enforced_by_road_and_vehicle(self):
+    key = "NrdrHandcraftedLateralTune"
+    assert not allow_param_write(key, onroad=True, handcrafted_profile_available=True, requested_bool=True)
+    assert not allow_param_write(key, onroad=True, handcrafted_profile_available=False, requested_bool=False)
+    assert allow_param_write(key, onroad=False, handcrafted_profile_available=True, requested_bool=True)
+    assert not allow_param_write(key, onroad=False, handcrafted_profile_available=False, requested_bool=True)
+    assert not allow_param_write(key, onroad=False, handcrafted_profile_available=None, requested_bool=True)
+    assert allow_param_write(key, onroad=False, handcrafted_profile_available=False, requested_bool=False)
+    assert not allow_param_write(key, onroad=False, handcrafted_profile_available=True, requested_bool=None)
+
+  def test_saveParams_accepts_supported_handcrafted_request_offroad(self):
+    encoded = remote_value("1")
+
+    sunnylinkd.saveParams({"NrdrHandcraftedLateralTune": encoded})
+
+    assert self.saved_params == [("NrdrHandcraftedLateralTune", encoded, False)]
+
+  def test_saveParams_rejects_unsupported_handcrafted_enable_but_allows_cancel(self):
+    sunnylinkd.generate_capabilities = lambda _: {
+      "has_handcrafted_lateral_profile": False,
+      "nrdr_honda_tuning_available": False,
+    }
+    enabled = remote_value("true")
+    disabled = remote_value("false")
+
+    sunnylinkd.saveParams({"NrdrHandcraftedLateralTune": enabled})
+    assert self.saved_params == []
+
+    sunnylinkd.saveParams({"NrdrHandcraftedLateralTune": disabled})
+    assert self.saved_params == [("NrdrHandcraftedLateralTune", disabled, False)]
+
+  def test_saveParams_fails_closed_on_unknown_capability_or_malformed_bool(self):
+    key = "NrdrHandcraftedLateralTune"
+    sunnylinkd.generate_capabilities = lambda _: {}
+    sunnylinkd.saveParams({key: remote_value("1")})
+    sunnylinkd.generate_capabilities = lambda _: {
+      "has_handcrafted_lateral_profile": True,
+      "nrdr_honda_tuning_available": True,
+    }
+    sunnylinkd.saveParams({key: remote_value("not-a-bool")})
+    sunnylinkd.saveParams({key: "%%%not-base64%%%"})
+
+    assert self.saved_params == []
+
+  def test_saveParams_enforces_vehicle_policy_for_compressed_values(self):
+    key = "NrdrHandcraftedLateralTune"
+    encoded = remote_value("yes", compression=True)
+
+    sunnylinkd.saveParams({key: encoded}, compression=True)
+
+    assert self.saved_params == [(key, encoded, True)]

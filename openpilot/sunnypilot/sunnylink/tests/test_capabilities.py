@@ -13,6 +13,7 @@ the same commit so the bump shows up in code review.
 from __future__ import annotations
 
 
+from opendbc.car.structs import car
 from openpilot.common.params import Params
 from openpilot.sunnypilot.sunnylink.capabilities import (
   CAPABILITY_DEFAULTS,
@@ -34,6 +35,13 @@ def caps():
 
 def params():
   return Params()
+
+
+def put_car_params(params, fingerprint: str, brand: str) -> None:
+  CP = car.CarParams.new_message()
+  CP.carFingerprint = fingerprint
+  CP.brand = brand
+  params.put("CarParamsPersistent", CP.to_bytes(), block=True)
 
 
 class TestProtocolVersion(OpenpilotTestCase):
@@ -73,6 +81,43 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
 
   def test_handcrafted_lateral_profile_default_false(self, caps):
     assert caps["has_handcrafted_lateral_profile"] is False
+
+  def test_handcrafted_profile_requires_confirmed_matching_car_params(self, params):
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CIVIC"}, block=True)
+    assert generate_capabilities(params)["has_handcrafted_lateral_profile"] is False
+    assert generate_capabilities(params)["nrdr_honda_tuning_available"] is False
+
+    put_car_params(params, "HONDA_CIVIC", "honda")
+    caps = generate_capabilities(params)
+    assert caps["has_handcrafted_lateral_profile"] is True
+    assert caps["nrdr_honda_tuning_available"] is True
+
+  def test_handcrafted_profile_rejects_stale_or_cross_brand_identity(self, params):
+    put_car_params(params, "HONDA_CIVIC", "honda")
+    params.put("CarPlatformBundle", {"brand": "toyota", "platform": "LEXUS_ES_TSS2"}, block=True)
+    caps = generate_capabilities(params)
+    assert caps["has_handcrafted_lateral_profile"] is False
+    assert caps["nrdr_honda_tuning_available"] is False
+
+  def test_present_partial_or_non_mapping_selection_never_falls_back_to_stale_honda_cp(self, params):
+    put_car_params(params, "HONDA_CIVIC", "honda")
+    for bundle in ({}, {"brand": "honda"}, {"platform": "HONDA_CIVIC"}, ["honda", "HONDA_CIVIC"]):
+      params.put("CarPlatformBundle", bundle, block=True)
+      caps = generate_capabilities(params)
+      assert caps["has_handcrafted_lateral_profile"] is False
+      assert caps["nrdr_honda_tuning_available"] is False
+
+    params.put("CarPlatformBundle", {"brand": "toyota", "platform": "HONDA_CIVIC"}, block=True)
+    caps = generate_capabilities(params)
+    assert caps["has_handcrafted_lateral_profile"] is False
+    assert caps["nrdr_honda_tuning_available"] is False
+
+  def test_confirmed_unsupported_toyota_never_exposes_handcrafted_profile(self, params):
+    put_car_params(params, "LEXUS_ES_TSS2", "toyota")
+    params.put("CarPlatformBundle", {"brand": "toyota", "platform": "LEXUS_ES_TSS2"}, block=True)
+    caps = generate_capabilities(params)
+    assert caps["has_handcrafted_lateral_profile"] is False
+    assert caps["nrdr_honda_tuning_available"] is False
 
   def test_nrdr_steer_ratio_availability_fields_present(self):
     assert "nrdr_manual_steer_ratio_available" in CAPABILITY_FIELDS

@@ -10,8 +10,10 @@ from openpilot.nrdr.params import (
   HANDCRAFTED_LATERAL_PROFILES,
   HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS,
   HandcraftedLateralUnsafeStateError,
+  confirmed_vehicle_identity,
   consume_handcrafted_lateral_request,
   get_handcrafted_lateral_profile,
+  get_selected_car_identity,
   handcrafted_lateral_profile_status,
   handcrafted_lateral_profile_supported,
   handcrafted_lateral_success_marker,
@@ -137,6 +139,10 @@ def clarity_cp_sp(*, modified=True):
   return SimpleNamespace(flags=HondaFlagsSP.EPS_MODIFIED.value if modified else 0)
 
 
+def vehicle_cp(fingerprint, *, brand="toyota"):
+  return SimpleNamespace(brand=brand, carFingerprint=fingerprint)
+
+
 def pending_params(values=None, **kwargs):
   return FakeParams({
     "NrdrHandcraftedLateralTune": True,
@@ -164,7 +170,7 @@ def test_clarity_v17_is_exact_47_key_reviewed_oracle():
   assert len(profile.values) == 47
   assert dict(profile.values) == EXPECTED_CLARITY_V17
   source = Path(__file__).parents[1] / "params" / "profiles.py"
-  provenance = source.read_text()
+  provenance = source.read_text(encoding="utf-8")
   assert "d9bea117c3ef7a30c8f67c809b386f35e89fd2ba1158dbe7cb30b1b6ded5c97a" in provenance
   assert "bd8b0ebfc10342ff6405c50659eeb24645439d4f06ea4a145ca25dfa998a8e3d" in provenance
 
@@ -187,8 +193,29 @@ def test_shared_support_predicate_requires_exact_clarity_eps_and_modified_flag()
   assert not handcrafted_lateral_profile_supported(clarity_cp(firmware=False), clarity_cp_sp())
   assert not handcrafted_lateral_profile_supported(clarity_cp(), clarity_cp_sp(modified=False))
   assert not handcrafted_lateral_profile_supported(None, None, "HONDA_CLARITY")
-  assert handcrafted_lateral_profile_supported(None, None, "HONDA_CIVIC")
+  assert not handcrafted_lateral_profile_supported(None, None, "HONDA_CIVIC")
+  assert handcrafted_lateral_profile_supported(vehicle_cp("HONDA_CIVIC", brand="honda"), None)
   assert not handcrafted_lateral_profile_supported(None, None, "HONDA_CIVIC_2022")
+  assert not handcrafted_lateral_profile_supported(
+    vehicle_cp("HONDA_CIVIC", brand="honda"), None, "LEXUS_ES_TSS2", "toyota",
+  )
+  assert not handcrafted_lateral_profile_supported(
+    vehicle_cp("HONDA_CIVIC", brand="honda"), None, "HONDA_CIVIC", "toyota",
+  )
+
+
+def test_confirmed_vehicle_identity_requires_live_cp_and_exact_selection_match():
+  honda = vehicle_cp("HONDA_CIVIC", brand="honda")
+  assert confirmed_vehicle_identity(honda) == ("HONDA_CIVIC", "honda")
+  assert confirmed_vehicle_identity(honda, "HONDA_CIVIC", "honda") == ("HONDA_CIVIC", "honda")
+  assert confirmed_vehicle_identity(None, "HONDA_CIVIC", "honda") is None
+  assert confirmed_vehicle_identity(honda, "LEXUS_ES_TSS2", "toyota") is None
+  assert confirmed_vehicle_identity(honda, "HONDA_CIVIC", "toyota") is None
+  assert confirmed_vehicle_identity(honda, "", "", selection_present=True) is None
+  assert confirmed_vehicle_identity(honda, "", "", selection_present=False) == ("HONDA_CIVIC", "honda")
+  assert confirmed_vehicle_identity(vehicle_cp("", brand="honda")) is None
+  assert confirmed_vehicle_identity(vehicle_cp("HONDA_CIVIC", brand="")) is None
+  assert confirmed_vehicle_identity(vehicle_cp("HYUNDAI_SONATA", brand="hyundai")) == ("HYUNDAI_SONATA", "hyundai")
 
 
 def test_success_is_blocking_ordered_verified_versioned_and_auto_clears():
@@ -214,6 +241,131 @@ def test_request_is_never_consumed_onroad():
   assert consume_handcrafted_lateral_request(clarity_cp(), clarity_cp_sp(), params) == []
   assert params.values["NrdrHandcraftedLateralTune"] is True
   assert params.calls == []
+
+
+@pytest.mark.parametrize(("fingerprint", "startup", "offroad"), (
+  ("LEXUS_ES_TSS2", False, True),
+  ("LEXUS_ES_TSS2", True, False),
+  ("TOYOTA_CAMRY_TSS2", False, True),
+))
+def test_confirmed_unsupported_vehicle_terminally_clears_only_request(fingerprint, startup, offroad):
+  protected = {
+    "HondaCenterScale": 0.37,
+    "NrdrStarPilotPid": True,
+    "NrdrCarHandcraftedInfo": "Last applied: preserved marker",
+    "ParamsVersion": 41,
+  }
+  params = pending_params({
+    **protected,
+    "IsOffroad": offroad,
+    "CarPlatformBundle": {"brand": "toyota", "platform": fingerprint},
+  })
+
+  assert consume_handcrafted_lateral_request(
+    vehicle_cp(fingerprint), None, params, startup=startup,
+  ) == []
+
+  assert params.values["NrdrHandcraftedLateralTune"] is False
+  assert {key: params.values[key] for key in protected} == protected
+  assert params.calls == [("put_bool", "NrdrHandcraftedLateralTune", False, True)]
+
+
+def test_confirmed_unsupported_cp_is_sufficient_without_a_selection_bundle():
+  params = pending_params({"HondaCenterScale": 0.37})
+
+  assert consume_handcrafted_lateral_request(vehicle_cp("LEXUS_ES_TSS2"), None, params) == []
+
+  assert params.values["NrdrHandcraftedLateralTune"] is False
+  assert params.values["HondaCenterScale"] == 0.37
+  assert params.calls == [("put_bool", "NrdrHandcraftedLateralTune", False, True)]
+
+
+@pytest.mark.parametrize(("CP", "bundle"), (
+  (None, {"brand": "toyota", "platform": "LEXUS_ES_TSS2"}),
+  (vehicle_cp("LEXUS_ES_TSS2"), {"brand": "honda", "platform": "HONDA_CLARITY"}),
+  (clarity_cp(), {"brand": "toyota", "platform": "LEXUS_ES_TSS2"}),
+  (clarity_cp(), {"brand": "toyota", "platform": "HONDA_CLARITY"}),
+  (vehicle_cp("LEXUS_ES_TSS2"), {}),
+  (vehicle_cp("LEXUS_ES_TSS2"), {"brand": "toyota"}),
+  (vehicle_cp("LEXUS_ES_TSS2"), {"platform": "LEXUS_ES_TSS2"}),
+  (vehicle_cp("LEXUS_ES_TSS2"), ["toyota", "LEXUS_ES_TSS2"]),
+))
+def test_unknown_or_mismatched_identity_preserves_pending_intent_without_writes(CP, bundle):
+  params = pending_params({
+    "CarPlatformBundle": bundle,
+    "HondaCenterScale": 0.37,
+    "NrdrCarHandcraftedInfo": "Last applied: preserved marker",
+  })
+
+  assert consume_handcrafted_lateral_request(CP, None, params, startup=True) == []
+
+  assert params.values["NrdrHandcraftedLateralTune"] is True
+  assert params.values["HondaCenterScale"] == 0.37
+  assert params.values["NrdrCarHandcraftedInfo"] == "Last applied: preserved marker"
+  assert params.values["ParamsVersion"] == 5
+  assert params.calls == []
+
+
+def test_physically_present_null_selection_is_invalid_not_cp_fallback(tmp_path):
+  bundle_path = tmp_path / "CarPlatformBundle"
+  bundle_path.write_text("null", encoding="utf-8")
+
+  class NullBundleParams(FakeParams):
+    def get_param_path(self, key=""):
+      assert key == "CarPlatformBundle"
+      return str(bundle_path)
+
+  params = NullBundleParams({
+    "NrdrHandcraftedLateralTune": True,
+    "IsOffroad": True,
+    "ParamsVersion": 5,
+    "CarPlatformBundle": None,
+  })
+
+  assert get_selected_car_identity(params) == (True, "", "")
+  assert consume_handcrafted_lateral_request(vehicle_cp("LEXUS_ES_TSS2"), None, params) == []
+  assert params.values["NrdrHandcraftedLateralTune"] is True
+  assert params.calls == []
+
+
+def test_unreviewed_honda_and_transient_clarity_capability_remain_pending_silently():
+  cases = (
+    (vehicle_cp("HONDA_CIVIC_2022", brand="honda"), None),
+    (clarity_cp(firmware=False), clarity_cp_sp()),
+    (clarity_cp(), None),
+  )
+  for CP, CP_SP in cases:
+    params = pending_params()
+    assert consume_handcrafted_lateral_request(CP, CP_SP, params, startup=True) == []
+    assert params.values["NrdrHandcraftedLateralTune"] is True
+    assert params.calls == []
+
+
+def test_repeated_unsupported_toyota_boot_is_a_single_terminal_clear_without_retry():
+  params = pending_params({"HondaCenterScale": 0.37})
+  CP = vehicle_cp("LEXUS_ES_TSS2")
+
+  assert consume_handcrafted_lateral_request(CP, None, params, startup=True) == []
+  assert consume_handcrafted_lateral_request(CP, None, params, startup=True) == []
+
+  assert params.calls == [("put_bool", "NrdrHandcraftedLateralTune", False, True)]
+  assert params.values["HondaCenterScale"] == 0.37
+
+
+@pytest.mark.parametrize("failure", ("write", "readback"))
+def test_terminal_clear_failure_never_falls_through_to_tune_writes(failure):
+  kwargs = {"fail_on_call": 0} if failure == "write" else {
+    "silent_puts": {"NrdrHandcraftedLateralTune"},
+  }
+  params = pending_params({"HondaCenterScale": 0.37}, **kwargs)
+
+  with pytest.raises((OSError, RuntimeError)):
+    consume_handcrafted_lateral_request(vehicle_cp("LEXUS_ES_TSS2"), None, params)
+
+  assert params.values["NrdrHandcraftedLateralTune"] is True
+  assert params.values["HondaCenterScale"] == 0.37
+  assert params.values["ParamsVersion"] == 5
+  assert params.calls == [("put_bool", "NrdrHandcraftedLateralTune", False, True)]
 
 
 @pytest.mark.parametrize("failure_index", (0, 1, 12, 37, 46, 48, 49, 50))
@@ -417,15 +569,19 @@ def test_v16_success_marker_is_preserved_until_v17_is_applied():
 
 def test_native_apply_callback_is_a_durable_blocking_command():
   source = Path(__file__).parents[1] / "ui" / "settings" / "lateral_tuning.py"
-  text = source.read_text()
+  text = source.read_text(encoding="utf-8")
   assert 'tr("Apply Handcrafted Lateral Profile")' in text
   assert 'put_bool("NrdrHandcraftedLateralTune", True, block=True)' in text
+  assert 'self._handcrafted_tune.set_visible(False)' in text
+  assert "get_selected_car_identity(ui_state.params)" in text
+  assert "selection_present=selection_present" in text
+  assert 'put_bool("NrdrHandcraftedLateralTune", False' not in text
 
 
 def test_reporter_card_and_settings_have_no_persistent_restore_or_lock_path():
   root = Path(__file__).parents[2]
   reporter_path = root / "nrdr" / "features" / "services" / "car_tune_report.py"
-  tree = ast.parse(reporter_path.read_text())
+  tree = ast.parse(reporter_path.read_text(encoding="utf-8"))
   build = next(node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "_build")
   build_calls = {node.func.id for node in ast.walk(build) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}
   assert "consume_handcrafted_lateral_request" not in build_calls
@@ -437,7 +593,7 @@ def test_reporter_card_and_settings_have_no_persistent_restore_or_lock_path():
     for node in ast.walk(consume)
   )
 
-  card = (root / "selfdrive" / "car" / "card.py").read_text()
+  card = (root / "selfdrive" / "car" / "card.py").read_text(encoding="utf-8")
   assert "restore_handcrafted_lateral_profile" not in card
   assert "consume_handcrafted_lateral_request(self.CP, self.CP_SP, self.params, startup=True)" in card
   assert "handcrafted lateral apply failed; request retained" in card
@@ -463,5 +619,37 @@ def test_reporter_card_and_settings_have_no_persistent_restore_or_lock_path():
     "nrdr/ui/settings/steer_filters.py",
     "selfdrive/ui/sunnypilot/layouts/settings/models.py",
   ):
-    source = (root / relative).read_text()
+    source = (root / relative).read_text(encoding="utf-8")
     assert "NrdrHandcraftedLateralTune" not in source
+
+
+def test_native_ui_fail_closed_hides_honda_only_groups_and_special_page():
+  root = Path(__file__).parents[2]
+  lateral = (root / "nrdr" / "ui" / "settings" / "lateral_tuning.py").read_text(encoding="utf-8")
+  layout = (root / "nrdr" / "ui" / "settings" / "layout.py").read_text(encoding="utf-8")
+
+  assert "get_selected_car_identity(ui_state.params)" in lateral
+  assert "selection_present=selection_present" in lateral
+  assert 'identity is not None and identity[1] == "honda"' in lateral
+  assert "HONDA_ONLY_LATERAL_PANELS" in lateral
+  for panel in ("PIDF", "STEER_RATIO", "OVERRIDE", "STEER_FILTERS"):
+    assert f"LateralPanel.{panel}" in lateral
+  assert "for item in self._honda_only_items:" in lateral
+  assert "if self._current_panel in HONDA_ONLY_LATERAL_PANELS and not honda_available:" in lateral
+  lateral_tree = ast.parse(lateral)
+  honda_items = next(
+    node for node in ast.walk(lateral_tree)
+    if isinstance(node, ast.Assign) and any(
+      isinstance(target, ast.Attribute) and target.attr == "_honda_only_items"
+      for target in node.targets
+    )
+  )
+  honda_buttons = {
+    node.attr for node in honda_items.value.elts
+    if isinstance(node, ast.Attribute)
+  }
+  assert honda_buttons == {"_pidf_button", "_override_button", "_steer_filters_button"}
+  assert "_vehicle_model_button" not in honda_buttons
+  assert "self._honda_only_items = (self._party_tricks_separator, self._party_tricks_button)" in layout
+  assert layout.count("for item in self._honda_only_items:") == 2
+  assert "panel == PanelType.PARTY_TRICKS and not honda_tuning_available()" in layout

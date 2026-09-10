@@ -34,7 +34,7 @@ from openpilot.sunnypilot.sunnylink.api import SunnylinkApi
 from openpilot.sunnypilot.sunnylink.utils import sunnylink_need_register, sunnylink_ready, get_param_as_byte, save_param_from_base64_encoded_string
 from openpilot.sunnypilot.sunnylink.capabilities import generate_capabilities, CAPABILITY_LABELS
 from openpilot.sunnypilot.sunnylink.tools.generate_settings_schema import generate_schema
-from openpilot.nrdr.features.services.sunnylink import allow_param_write
+from openpilot.nrdr.features.services.sunnylink import HONDA_TUNING_WRITE_KEYS, allow_param_write
 
 SUNNYLINK_ATHENA_HOST = os.getenv('SUNNYLINK_ATHENA_HOST', 'wss://athena.sunnylink.ai')
 HANDLER_THREADS = int(os.getenv('HANDLER_THREADS', "4"))
@@ -234,15 +234,51 @@ def getParams(params_keys: list[str], compression: bool = False) -> str | dict[s
     raise
 
 
+def _vehicle_tuning_capabilities() -> dict:
+  """Fail-closed vehicle capabilities for NRDR's remote tuning controls."""
+  try:
+    return generate_capabilities(params)
+  except Exception:
+    cloudlog.exception("sunnylinkd.saveParams.capabilities.exception")
+    return {}
+
+
+def _remote_bool_value(value: str, compression: bool) -> bool | None:
+  try:
+    raw = base64.b64decode(value, validate=True)
+    if compression:
+      raw = gzip.decompress(raw)
+    decoded = raw.decode("utf-8").lower()
+    if decoded in ("true", "1", "yes"):
+      return True
+    if decoded in ("false", "0", "no"):
+      return False
+    return None
+  except Exception:
+    return None
+
+
 @dispatcher.add_method
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
   onroad = not params.get_bool("IsOffroad")
+  vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {"NrdrHandcraftedLateralTune"}
+  capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
+  handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
+  honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
   for key, value in params_to_update.items():
     # disallow modifications to blocked parameters
     if key in BLOCKED_PARAMS:
       cloudlog.warning(f"sunnylinkd.saveParams.blocked: Attempted to modify blocked parameter '{key}'")
       continue
-    if not allow_param_write(key, onroad):
+    requested_bool = _remote_bool_value(value, compression) \
+      if key == "NrdrHandcraftedLateralTune" else None
+    if not allow_param_write(
+      key, onroad,
+      handcrafted_profile_available=handcrafted_available,
+      honda_tuning_available=honda_tuning_available,
+      requested_bool=requested_bool,
+    ):
+      cloudlog.warning(f"sunnylinkd.saveParams.policy: Attempted to modify unavailable parameter '{key}'")
       continue
 
     try:

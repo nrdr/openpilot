@@ -288,7 +288,8 @@ class CarTuneReporter:
         "writtenParams": written,
       })
     except Exception:
-      # The durable request intentionally stays true for the next safe retry.
+      # I/O/verification failures retain the durable request for a safe retry;
+      # identity and capability deferrals return quietly above.
       cloudlog.exception("nrdr_remoted: handcrafted lateral apply failed; request retained")
 
   def publish(self) -> None:

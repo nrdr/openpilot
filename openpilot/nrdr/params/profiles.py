@@ -6,6 +6,7 @@ functions that need them.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 from openpilot.nrdr.params.generated.keys import NrdrParamKey
@@ -17,6 +18,7 @@ type ProfileValue = bool | int | float
 class ProfileParamStore(Protocol):
   def get_bool(self, key: str) -> bool: ...
   def get(self, key: str, *, return_default: bool = False): ...
+  def get_param_path(self, key: str = "") -> str: ...
   def put_bool(self, key: str, value: bool, *, block: bool = False): ...
   def put(self, key: str, value, *, block: bool = False): ...
 
@@ -197,20 +199,48 @@ def get_handcrafted_lateral_profile(fingerprint: str) -> HandcraftedLateralProfi
   return HANDCRAFTED_LATERAL_PROFILES.get(str(fingerprint))
 
 
-def handcrafted_lateral_profile_supported(CP, CP_SP, fingerprint: str | None = None) -> bool:
-  """Return whether the detected car can safely consume its reviewed profile."""
-  fingerprint = str(fingerprint or getattr(CP, "carFingerprint", ""))
-  if get_handcrafted_lateral_profile(fingerprint) is None:
+def confirmed_vehicle_identity(CP, fingerprint: str | None = None,
+                               brand: str | None = None, *,
+                               selection_present: bool | None = None) -> tuple[str, str] | None:
+  """Resolve authoritative CP identity only when any selected car agrees."""
+  if CP is None:
+    return None
+  detected_fingerprint = str(getattr(CP, "carFingerprint", "") or "")
+  detected_brand = str(getattr(CP, "brand", "") or "").lower()
+  selected_fingerprint = str(fingerprint or "")
+  selected_brand = str(brand or "").lower()
+  if selection_present is None:
+    selection_present = fingerprint is not None or brand is not None
+  if not detected_fingerprint or not detected_brand:
+    return None
+  if selection_present:
+    if not selected_fingerprint or not selected_brand:
+      return None
+    if selected_fingerprint != detected_fingerprint or selected_brand != detected_brand:
+      return None
+  return detected_fingerprint, detected_brand
+
+
+def handcrafted_lateral_profile_supported(CP, CP_SP, fingerprint: str | None = None,
+                                           brand: str | None = None, *,
+                                           selection_present: bool | None = None) -> bool:
+  """Return whether confirmed vehicle identity can consume its reviewed profile."""
+  identity = confirmed_vehicle_identity(
+    CP, fingerprint, brand, selection_present=selection_present,
+  )
+  if identity is None:
     return False
-  if fingerprint != "HONDA_CLARITY":
+  resolved_fingerprint, resolved_brand = identity
+  if resolved_brand != "honda" or get_handcrafted_lateral_profile(resolved_fingerprint) is None:
+    return False
+  if resolved_fingerprint != "HONDA_CLARITY":
     return True
 
   from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
   from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
   if CP is None or CP_SP is None or get_honda_vgr_profile(CP) is None:
     return False
-  if str(getattr(CP, "brand", "")).lower() != "honda" or \
-      not bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value):
+  if not bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value):
     return False
   try:
     lateral_kind = CP.lateralTuning.which()
@@ -287,6 +317,24 @@ def _put_verified(params: ProfileParamStore, key: str, value: ProfileValue) -> N
   _verify_typed(params, key, value)
 
 
+def get_selected_car_identity(params: ProfileParamStore) -> tuple[bool, str, str]:
+  """Return physical selection presence plus a complete parsed identity.
+
+  A malformed JSON value can decode to None just like a missing Param. In that
+  case the physical file decides whether CP-only fallback is permitted.
+  """
+  bundle = params.get("CarPlatformBundle")
+  present = bundle is not None
+  if bundle is None:
+    try:
+      present = Path(params.get_param_path("CarPlatformBundle")).is_file()
+    except (AttributeError, OSError, TypeError, ValueError):
+      present = False
+  if isinstance(bundle, dict):
+    return present, str(bundle.get("platform") or ""), str(bundle.get("brand") or "")
+  return present, "", ""
+
+
 def _ordered_profile_writes(profile: HandcraftedLateralProfile) -> tuple[tuple[str, ProfileValue], ...]:
   if profile.fingerprint != "HONDA_CLARITY":
     return profile.values
@@ -329,10 +377,11 @@ def consume_handcrafted_lateral_request(CP, CP_SP, params: ProfileParamStore | N
                                         *, startup: bool = False) -> list[str]:
   """Consume one pending apply request only after every value verifies exactly.
 
-  The durable BOOL remains true after any interruption or validation failure, so
-  the next offroad poll or car startup can safely retry the deterministic write
-  sequence. A false request is a strict no-op: this function never reconciles a
-  completed profile.
+  A request for a positively identified Toyota-family vehicle without a reviewed
+  profile is terminally cleared without touching tune values. Unknown vehicle
+  identity and transient validation failures remain pending, so a later offroad
+  poll or car startup can safely retry. A false request is a strict no-op: this
+  function never reconciles a completed profile.
   """
   params = _params_or_default(params)
   if not params.get_bool(_REQUEST_KEY):
@@ -340,12 +389,27 @@ def consume_handcrafted_lateral_request(CP, CP_SP, params: ProfileParamStore | N
   if not startup and not params.get_bool("IsOffroad"):
     return []
 
-  fingerprint = str(getattr(CP, "carFingerprint", ""))
+  selection_present, selected_fingerprint, selected_brand = get_selected_car_identity(params)
+  identity = confirmed_vehicle_identity(
+    CP, selected_fingerprint, selected_brand, selection_present=selection_present,
+  )
+  if identity is None:
+    return []
+  fingerprint, detected_brand = identity
   profile = get_handcrafted_lateral_profile(fingerprint)
-  if profile is None or not handcrafted_lateral_profile_supported(CP, CP_SP):
-    raise HandcraftedLateralUnavailableError(
-      f"handcrafted lateral profile unavailable for detected car/EPS: {fingerprint or 'unknown'}"
-    )
+  if profile is None:
+    # This terminal consume is deliberately limited to the Toyota family seen
+    # in current, authoritative CP. Unknown/malformed identity and unreviewed
+    # Honda variants keep the user's request for a future supported context.
+    if detected_brand != "toyota":
+      return []
+    # A resolved unsupported vehicle can never satisfy this one-shot command.
+    # Consume only the command itself; every tune and success marker remains
+    # byte-for-byte under the user's control.
+    _put_verified(params, _REQUEST_KEY, False)
+    return []
+  if not handcrafted_lateral_profile_supported(CP, CP_SP):
+    return []
 
   try:
     ordered = _ordered_profile_writes(profile)
@@ -410,6 +474,8 @@ __all__ = (
   "ProfileParamStore",
   "ProfileValue",
   "consume_handcrafted_lateral_request",
+  "confirmed_vehicle_identity",
+  "get_selected_car_identity",
   "get_handcrafted_lateral_profile",
   "handcrafted_lateral_profile_matches",
   "handcrafted_lateral_profile_status",

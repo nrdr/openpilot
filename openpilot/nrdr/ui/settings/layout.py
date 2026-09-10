@@ -4,7 +4,7 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.widgets.list_view import simple_button_item_sp, LineSeparatorSP
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets import Widget
-from openpilot.nrdr.ui.settings.lateral_tuning import LateralTuningLayout
+from openpilot.nrdr.ui.settings.lateral_tuning import LateralTuningLayout, honda_tuning_available
 from openpilot.nrdr.ui.settings.longitudinal_tuning import LongitudinalTuningLayout
 from openpilot.nrdr.ui.settings.party_tricks import PartyTricksLayout
 
@@ -44,17 +44,28 @@ class NrdrLayout(Widget):
       button_width=800,
       callback=lambda: self._set_current_panel(PanelType.PARTY_TRICKS),
     )
+    self._party_tricks_separator = LineSeparatorSP(40)
+    self._honda_only_items = (self._party_tricks_separator, self._party_tricks_button)
+    for item in self._honda_only_items:
+      item.set_visible(False)
 
     return [
       self._lateral_button,
       LineSeparatorSP(40),
       self._longitudinal_button,
-      LineSeparatorSP(40),
-      self._party_tricks_button,
+      *self._honda_only_items,
     ]
 
   def _set_current_panel(self, panel: PanelType):
-    self._current_panel = panel
+    self._current_panel = PanelType.NRDR if panel == PanelType.PARTY_TRICKS and not honda_tuning_available() else panel
+
+  def _update_state(self):
+    super()._update_state()
+    honda_available = honda_tuning_available()
+    for item in self._honda_only_items:
+      item.set_visible(honda_available)
+    if self._current_panel == PanelType.PARTY_TRICKS and not honda_available:
+      self._current_panel = PanelType.NRDR
 
   def _render(self, rect):
     if self._current_panel == PanelType.LATERAL:

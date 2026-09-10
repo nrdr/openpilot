@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,7 @@ from openpilot.nrdr.ui.sunnylink import ITEM_SOURCE_FILES, MACRO_SOURCE, PAGE_SO
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 HOST_SOURCE_ROOT = REPOSITORY_ROOT / "openpilot" / "sunnypilot" / "sunnylink" / "settings_ui_src"
 GENERATED_SCHEMA = REPOSITORY_ROOT / "openpilot" / "sunnypilot" / "sunnylink" / "settings_ui.json"
+SUNNYLINK_POLICY_SOURCE = REPOSITORY_ROOT / "openpilot" / "nrdr" / "features" / "services" / "sunnylink.py"
 INHERITED_LANE_CENTERING_KEYS = {
   "LaneCentering",
   "LaneCenteringE2EAuthority",
@@ -42,6 +44,19 @@ def _collect_keys(node, keys: list[str]) -> None:
 
 def _yaml_document(relative_path: str) -> dict:
   return yaml.safe_load((SOURCE_ROOT / relative_path).read_text(encoding="utf-8"))
+
+
+def _honda_tuning_write_keys() -> frozenset[str]:
+  tree = ast.parse(SUNNYLINK_POLICY_SOURCE.read_text(encoding="utf-8"))
+  assignment = next(
+    node for node in tree.body
+    if isinstance(node, ast.Assign) and any(
+      isinstance(target, ast.Name) and target.id == "HONDA_TUNING_WRITE_KEYS"
+      for target in node.targets
+    )
+  )
+  assert isinstance(assignment.value, ast.Call) and len(assignment.value.args) == 1
+  return frozenset(ast.literal_eval(assignment.value.args[0]))
 
 
 class TestSunnylinkSourceOwnership(unittest.TestCase):
@@ -145,6 +160,48 @@ assert SOURCE_ROOT.is_dir()
 assert "openpilot.sunnypilot.sunnylink.tools.compile_settings_ui" not in sys.modules
 """
     subprocess.run([sys.executable, "-c", script], cwd=REPOSITORY_ROOT, env=environment, check=True)
+
+  def test_honda_only_groups_share_exact_ui_and_backend_vehicle_boundary(self):
+    capability_rule = {"type": "capability", "field": "nrdr_honda_tuning_available", "equals": True}
+    expected_sub_panels = {
+      "nrdr_pidf_ground",
+      "nrdr_steer_ratio_tuning",
+      "nrdr_override",
+      "nrdr_steer_filters",
+    }
+
+    source = _yaml_document("pages/steering.yaml")
+    source_sections = {section["id"]: section for section in source["sections"]}
+    source_nrdr = source_sections["nrdr"]
+    source_panels = {panel["id"]: panel for panel in source_nrdr["sub_panels"]}
+    self.assertTrue(expected_sub_panels <= source_panels.keys())
+    for panel_id in expected_sub_panels:
+      self.assertEqual(source_panels[panel_id]["trigger_condition"], capability_rule)
+    self.assertEqual(source_sections["nrdr_special"]["visibility"], [capability_rule])
+
+    source_honda_keys: list[str] = []
+    for panel_id in (*sorted(expected_sub_panels), "nrdr_party_tricks"):
+      panel = source_panels.get(panel_id)
+      if panel is None:
+        panel = next(p for p in source_sections["nrdr_special"]["sub_panels"] if p["id"] == panel_id)
+      _collect_keys(panel, source_honda_keys)
+    honda_tuning_write_keys = _honda_tuning_write_keys()
+    self.assertEqual(set(source_honda_keys), honda_tuning_write_keys)
+    self.assertTrue({"LaneCentering", "NrdrLearnStiffness"}.isdisjoint(honda_tuning_write_keys))
+
+    generated = json.loads(GENERATED_SCHEMA.read_text(encoding="utf-8"))
+    steering = next(panel for panel in generated["panels"] if panel["id"] == "steering")
+    generated_sections = {section["id"]: section for section in steering["sections"]}
+    generated_panels = {panel["id"]: panel for panel in generated_sections["nrdr"]["sub_panels"]}
+    for panel_id in expected_sub_panels:
+      self.assertEqual(generated_panels[panel_id]["trigger_condition"], capability_rule)
+    self.assertEqual(generated_sections["nrdr_special"]["visibility"], [capability_rule])
+
+    host_steering = yaml.safe_load((HOST_SOURCE_ROOT / "pages" / "steering.yaml").read_text(encoding="utf-8"))
+    torque = next(section for section in host_steering["sections"] if section["id"] == "torque")
+    self.assertEqual(torque["enablement"], [
+      {"type": "capability", "field": "torque_allowed", "equals": True},
+    ])
 
 
 if __name__ == "__main__":
