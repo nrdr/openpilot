@@ -21,6 +21,7 @@ class NrdrLayout(Widget):
     super().__init__()
 
     self._current_panel = PanelType.NRDR
+    self._shown = False
     self._lateral_layout = LateralTuningLayout(lambda: self._set_current_panel(PanelType.NRDR))
     self._longitudinal_layout = LongitudinalTuningLayout(lambda: self._set_current_panel(PanelType.NRDR))
     self._party_tricks_layout = PartyTricksLayout(lambda: self._set_current_panel(PanelType.NRDR))
@@ -56,8 +57,24 @@ class NrdrLayout(Widget):
       *self._honda_only_items,
     ]
 
+  def _panel_widget(self, panel: PanelType) -> Widget:
+    if panel == PanelType.LATERAL:
+      return self._lateral_layout
+    if panel == PanelType.LONGITUDINAL:
+      return self._longitudinal_layout
+    if panel == PanelType.PARTY_TRICKS:
+      return self._party_tricks_layout
+    return self._scroller
+
   def _set_current_panel(self, panel: PanelType):
-    self._current_panel = PanelType.NRDR if panel == PanelType.PARTY_TRICKS and not honda_tuning_available() else panel
+    next_panel = PanelType.NRDR if panel == PanelType.PARTY_TRICKS and not honda_tuning_available() else panel
+    if next_panel == self._current_panel:
+      return
+    if self._shown:
+      self._panel_widget(self._current_panel).hide_event()
+    self._current_panel = next_panel
+    if self._shown:
+      self._panel_widget(self._current_panel).show_event()
 
   def _update_state(self):
     super()._update_state()
@@ -65,7 +82,7 @@ class NrdrLayout(Widget):
     for item in self._honda_only_items:
       item.set_visible(honda_available)
     if self._current_panel == PanelType.PARTY_TRICKS and not honda_available:
-      self._current_panel = PanelType.NRDR
+      self._set_current_panel(PanelType.NRDR)
 
   def _render(self, rect):
     if self._current_panel == PanelType.LATERAL:
@@ -78,5 +95,14 @@ class NrdrLayout(Widget):
       self._scroller.render(rect)
 
   def show_event(self):
-    self._set_current_panel(PanelType.NRDR)
-    self._scroller.show_event()
+    if self._shown:
+      return
+    self._current_panel = PanelType.NRDR
+    self._shown = True
+    self._panel_widget(self._current_panel).show_event()
+
+  def hide_event(self):
+    if self._shown:
+      self._panel_widget(self._current_panel).hide_event()
+    self._shown = False
+    self._current_panel = PanelType.NRDR

@@ -68,9 +68,13 @@ class TestLaneCenteringStack(unittest.TestCase):
           self.assertIn(key, source)
 
     tici_settings = (REPOSITORY_ROOT / "openpilot/selfdrive/ui/sunnypilot/layouts/settings/settings.py").read_text(encoding="utf-8")
+    nrdr_lateral = (REPOSITORY_ROOT / "openpilot/nrdr/ui/settings/lateral_tuning.py").read_text(encoding="utf-8")
     mici_settings = (REPOSITORY_ROOT / "openpilot/selfdrive/ui/mici/layouts/settings/settings.py").read_text(encoding="utf-8")
-    self.assertIn("LaneCenteringLayout()", tici_settings)
-    self.assertIn("LaneCenteringLayoutMici()", mici_settings)
+    mici_toggles = (REPOSITORY_ROOT / "openpilot/selfdrive/ui/mici/layouts/settings/toggles.py").read_text(encoding="utf-8")
+    self.assertNotIn("LaneCenteringLayout()", tici_settings)
+    self.assertIn("LaneCenteringLayout()", nrdr_lateral)
+    self.assertNotIn("LaneCenteringLayoutMici()", mici_settings)
+    self.assertIn("LaneCenteringLayoutMici()", mici_toggles)
 
   def test_local_write_callbacks_require_offroad_and_not_engaged(self) -> None:
     tici = TICI_PANEL.read_text(encoding="utf-8")
@@ -123,6 +127,10 @@ class TestLaneCenteringStack(unittest.TestCase):
       {"min": 12, "max": 100, "step": 1, "unit": "mph"},
     )
     self.assertIn("5 m/s controller floor", minimum_speed["description"])
+    self.assertIn("waits when either boundary is uncertain", items[0]["details"])
+    self.assertIn("makes no correction while the model path is already centered", items[0]["details"])
+    self.assertIn("lane-change maneuver begins", items[2]["description"])
+    self.assertIn("stops immediately", items[2]["description"])
 
     self.assertFalse(any(page["id"] == "lane_centering" for page in compiled["panels"]))
     compiled_steering = next(page for page in compiled["panels"] if page["id"] == "steering")
