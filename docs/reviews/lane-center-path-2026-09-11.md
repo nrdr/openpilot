@@ -46,6 +46,8 @@ Review also found an action-timing mismatch: the new correction fits current-fra
 
 Next gate: design and verify a delay-aware, sufficiently long post-actuation preview; account for model-variant timing; rerun closed-loop speed/delay/strength/confidence sweeps, then real-log replay and startup checks. No road qualification has been performed.
 
+An independent in-memory exploration covered speeds 12/20/30/40 m/s, delays 0.1–0.5 s, strengths 0.3/0.5/0.7/1.0, and initial positions +/-0.6 m. The unchanged prototype's worst excursion reached 6.246 m (40 m/s, 0.5 s delay, full strength). A longer preview or removal of the extra filter alone did not remain robust across the grid. Combining action-aligned post-actuation fitting with removal of the extra 0.4-second filter, while retaining the actual shared jerk limiter, kept excursion within the initial 0.600 m and worst final error within 0.0872 m in that simplified exploration. **That alternative was not applied to production code or the device.** It identifies the next architecture to validate; it does not turn the committed failing prototype into a passing or drive-ready build.
+
 ## Device state and preservation
 
 Only isolated test/replay artifacts were copied to `/tmp/codex-lane-path-validation.eYQL6l`; none were activated. No branch updates, live source edits, settings changes, reboots, CAN commands, or publishing were performed.
