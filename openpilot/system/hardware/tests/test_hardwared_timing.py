@@ -74,8 +74,22 @@ def test_slow_stage_event():
     "duration": pytest.approx(0.21),
     "onroad": True,
     "frame": 123,
-    "error": True,
   }
+
+
+def test_slow_stage_logging_failure_is_non_fatal():
+  log_slow_hardware_stage, monotonic, event = load_timing_helper()
+  last_logged: dict[str, float] = {}
+  monotonic.side_effect = [10.25, 10.26]
+  event.side_effect = RuntimeError("logger unavailable")
+
+  next_stage = log_slow_hardware_stage(
+    "main", "power", 10.0, last_logged, True, 123,
+  )
+
+  assert next_stage == 10.26
+  assert last_logged == {"power": 10.25}
+  event.assert_called_once()
 
 
 def test_slow_stage_rate_limit_is_per_stage():
@@ -109,11 +123,20 @@ def test_slow_stage_call_sites_cover_each_synchronous_group():
 
   assert stages == {
     "main": {
-      "panda_poll", "panda_state", "device_telemetry", "display_usb_chestnut", "thermal",
-      "startup_policy", "engagement", "power", "publish", "post_publish",
+      "panda_poll", "panda_state", "thermal_config", "device_type", "free_space_startup",
+      "display_usb_chestnut", "thermal", "connectivity_needed",
+      "disable_updates", "snooze_update", "excessive_actuation", "do_uninstall", "accepted_terms",
+      "accepted_terms_sp", "completed_training", "apply_startup_policy", "driver_view", "device_booted",
+      "offroad_mode", "tici_alert", "temperature_alert", "engagement", "power_save", "state_transition",
+      "runner_voltage", "power_monitor_calculate", "power_monitor_values", "cached_telemetry", "shutdown",
+      "device_state_fields", "publish", "post_publish",
     },
     "hw_state": {
       "usb_topology", "network_type", "modem_temperatures", "modem_data_usage", "network_info",
       "network_strength", "network_metered", "usb_state", "queue",
+    },
+    "noncritical": {
+      "params_init", "system_stats_init", "free_space", "memory_usage", "gpu_usage", "cpu_usage",
+      "current_power_draw", "som_power_draw", "last_athena_ping_time", "queue",
     },
   }
