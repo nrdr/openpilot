@@ -12,7 +12,7 @@ from openpilot.cereal import log, custom
 from opendbc.car import structs
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
-from openpilot.selfdrive.controls.lib.lane_centering import LaneCenteringController
+from openpilot.selfdrive.controls.lib.lane_centering import LaneCenteringController, lane_centering_strength
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
@@ -68,6 +68,7 @@ class ControlsExt(ModelStateBase):
     self.lane_centering_min_speed_mph = self.params.get("LaneCenteringMinSpeed", return_default=True)
     self.lane_centering_pause_on_signal = bool(self.params.get("LaneCenteringPauseOnSignal", return_default=True))
     self.lane_centering_e2e_authority = float(self.params.get("LaneCenteringE2EAuthority", return_default=True))
+    self.lane_centering_strength = lane_centering_strength(self.params.get("LaneCenteringStrength", return_default=True))
     self.lane_center_offset = float(self.params.get("LaneCenterOffset", return_default=True))
 
   def get_params_sp(self, sm: messaging.SubMaster) -> None:

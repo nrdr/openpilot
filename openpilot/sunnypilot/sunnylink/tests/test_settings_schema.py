@@ -265,6 +265,7 @@ class TestKnownPanels(OpenpilotTestCase):
       "LaneCenteringMinSpeed",
       "LaneCenteringPauseOnSignal",
       "LaneCenterOffset",
+      "LaneCenteringStrength",
       "LaneCenteringE2EAuthority",
     ]
 

@@ -53,6 +53,7 @@ RELEVANT_PARAMS = (
   "LaneCenteringE2EAuthority",
   "LaneCenteringMinSpeed",
   "LaneCenteringPauseOnSignal",
+  "LaneCenteringStrength",
   "LaneCenterOffset",
   "NeuralNetworkLateralControl",
   "NrdrHandcraftedLateralTune",

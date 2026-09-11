@@ -21,6 +21,7 @@ _MAX_OFFSET = 0.3
 _MIN_CENTER_TO_LINE = 1.1
 _MAX_RAW_CORRECTION = 0.004
 _MAX_GAIN = 0.30
+_MAX_FINAL_CORRECTION = _MAX_RAW_CORRECTION * _MAX_GAIN
 _SMOOTH_TAU = 0.4
 _SIGNAL_RELEASE_TAU = 0.20
 _CONFIDENCE_RELEASE_TAU = 0.20
@@ -30,6 +31,10 @@ _CENTER_ERROR_DEADBAND = 0.08
 _E2E_MAX_PATH_STD = 0.35
 _E2E_BREAK_IN_START = 0.15
 _E2E_BREAK_IN_FULL = 0.50
+
+LANE_CENTERING_STRENGTH_DEFAULT = _MAX_GAIN
+LANE_CENTERING_STRENGTH_MIN = 0.0
+LANE_CENTERING_STRENGTH_MAX = 1.0
 
 
 class LaneCenteringReason(StrEnum):
@@ -50,6 +55,7 @@ class LaneCenteringReason(StrEnum):
   CENTERED = "centered"
   MODEL_AUTHORITY = "modelAuthority"
   CORRECTING = "correcting"
+  ZERO_STRENGTH = "zeroStrength"
 
 
 class LaneCenteringDiagnostics:
@@ -96,6 +102,17 @@ def lane_centering_speed_thresholds(value) -> tuple[float, float]:
   return arm_speed, release_speed
 
 
+def lane_centering_strength(value) -> float:
+  """Return a bounded direct lane-centering strength, failing closed to the legacy 30% gain."""
+  try:
+    strength = float(value)
+  except (OverflowError, TypeError, ValueError):
+    return float(LANE_CENTERING_STRENGTH_DEFAULT)
+  if not np.isfinite(strength) or not LANE_CENTERING_STRENGTH_MIN <= strength <= LANE_CENTERING_STRENGTH_MAX:
+    return float(LANE_CENTERING_STRENGTH_DEFAULT)
+  return strength
+
+
 class LaneCenteringController:
   def __init__(self) -> None:
     self._correction = 0.0
@@ -121,7 +138,7 @@ class LaneCenteringController:
     self.diagnostics.correction_curvature = self._correction
     self.diagnostics.target_correction_curvature = target
 
-  def update(self, model_curvature, model_v2, v_ego, min_speed_mph, enabled, offset, e2e_authority, lat_active, model_valid,
+  def update(self, model_curvature, model_v2, v_ego, min_speed_mph, enabled, offset, e2e_authority, strength, lat_active, model_valid,
              pause_on_signal=False, turn_signal_active=False, driver_override=False) -> float:
     model_curvature = float(model_curvature)
     self._begin_diagnostics()
@@ -130,12 +147,14 @@ class LaneCenteringController:
       v_ego = float(v_ego)
       offset = float(offset)
       e2e_authority = float(e2e_authority)
+      strength = float(strength)
     except (TypeError, ValueError):
       self.reset()
       self._finish_diagnostics(LaneCenteringReason.INVALID_INPUT)
       return model_curvature
 
-    if not np.isfinite([v_ego, offset, e2e_authority]).all():
+    if (not np.isfinite([v_ego, offset, e2e_authority, strength]).all()
+        or not LANE_CENTERING_STRENGTH_MIN <= strength <= LANE_CENTERING_STRENGTH_MAX):
       self.reset()
       self._finish_diagnostics(LaneCenteringReason.INVALID_INPUT)
       return model_curvature
@@ -191,7 +210,10 @@ class LaneCenteringController:
       self._finish_diagnostics()
       return model_curvature + self._correction
 
-    target = float(np.clip(raw_correction, -_MAX_RAW_CORRECTION, _MAX_RAW_CORRECTION)) * _MAX_GAIN
+    bounded_raw_correction = float(np.clip(raw_correction, -_MAX_RAW_CORRECTION, _MAX_RAW_CORRECTION))
+    target = float(np.clip(bounded_raw_correction * strength, -_MAX_FINAL_CORRECTION, _MAX_FINAL_CORRECTION))
+    if strength == 0.0 and raw_correction != 0.0:
+      self.diagnostics.reason = LaneCenteringReason.ZERO_STRENGTH
     self._correction = float(smooth_value(target, self._correction, _SMOOTH_TAU, dt=DT_CTRL))
     self._finish_diagnostics(target=target, active=self.diagnostics.reason == LaneCenteringReason.CORRECTING and target != 0.0)
     return model_curvature + self._correction

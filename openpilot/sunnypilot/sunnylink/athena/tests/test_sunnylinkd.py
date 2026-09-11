@@ -113,6 +113,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "LaneCenteringMinSpeed": "50",
       "LaneCenteringPauseOnSignal": "0",
       "LaneCenterOffset": "0.12",
+      "LaneCenteringStrength": "0.30",
       "LaneCenteringE2EAuthority": "0.45",
     }
 
@@ -126,12 +127,27 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "LaneCenteringMinSpeed": "50",
       "LaneCenteringPauseOnSignal": "0",
       "LaneCenterOffset": "0.12",
+      "LaneCenteringStrength": "0.30",
       "LaneCenteringE2EAuthority": "0.45",
     }
 
     sunnylinkd.saveParams(lane_centering)
 
     assert self.saved_params == [(key, value, False) for key, value in lane_centering.items()]
+
+  def test_lane_centering_strength_is_vehicle_agnostic_but_still_offroad_only(self):
+    sunnylinkd.generate_capabilities = lambda _: {
+      "has_handcrafted_lateral_profile": False,
+      "nrdr_honda_tuning_available": False,
+    }
+
+    sunnylinkd.saveParams({"LaneCenteringStrength": "0.55"})
+    assert self.saved_params == [("LaneCenteringStrength", "0.55", False)]
+
+    self.saved_params.clear()
+    self.fake_params.offroad = False
+    sunnylinkd.saveParams({"LaneCenteringStrength": "0.60"})
+    assert self.saved_params == []
 
   def test_saveParams_allows_complete_steer_ratio_snapshot_onroad(self):
     self.fake_params.offroad = False
@@ -217,6 +233,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "LaneCenteringE2EAuthority",
       "LaneCenteringMinSpeed",
       "LaneCenteringPauseOnSignal",
+      "LaneCenteringStrength",
       "LaneCenterOffset",
       "LongitudinalPersonality",
       "NrdrHandcraftedLateralTune",

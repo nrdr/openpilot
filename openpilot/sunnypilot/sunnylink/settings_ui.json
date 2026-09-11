@@ -1193,11 +1193,34 @@
                   ]
                 },
                 {
+                  "key": "LaneCenteringStrength",
+                  "widget": "option",
+                  "title": "Lane-Centering Strength",
+                  "description": "Set the direct pull toward the detected lane center. 0.0 leaves the model path unchanged; 0.30 matches the previous behavior; 1.0 responds more strongly without raising the existing maximum correction ceiling.",
+                  "details": "This changes ordinary lane-center correction strength. It is separate from Model Break-In, which only reduces the correction during a large, confident model-path disagreement.",
+                  "min": 0.0,
+                  "max": 1.0,
+                  "step": 0.05,
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "not_engaged"
+                    },
+                    {
+                      "type": "param",
+                      "key": "LaneCentering",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
                   "key": "LaneCenteringE2EAuthority",
                   "widget": "option",
                   "title": "Model Break-In",
                   "description": "When a confident model path disagrees with lane center by more than 0.15 m, allow it to reduce the correction. At 1.0, the correction can reach zero by 0.50 m of disagreement; 0.0 never reduces it.",
-                  "details": "This conditional model break-in does not change ordinary lane-center correction strength and has no effect while the paths differ by 0.15 m or less.",
+                  "details": "This conditional model break-in is separate from direct lane-center strength and has no effect while the paths differ by 0.15 m or less.",
                   "min": 0.0,
                   "max": 1.0,
                   "step": 0.05,

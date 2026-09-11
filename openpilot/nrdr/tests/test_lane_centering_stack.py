@@ -27,6 +27,7 @@ LANE_CENTERING_KEYS = (
   "LaneCenteringMinSpeed",
   "LaneCenteringPauseOnSignal",
   "LaneCenterOffset",
+  "LaneCenteringStrength",
   "LaneCenteringE2EAuthority",
 )
 
@@ -58,6 +59,7 @@ class TestLaneCenteringStack(unittest.TestCase):
     generated = PARAM_INCLUDE.read_text(encoding="utf-8")
     self.assertNotIn('"LaneCenteringMinSpeed"', source)
     self.assertEqual(generated.count('{"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "50"}}'), 1)
+    self.assertEqual(generated.count('{"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.30"}}'), 1)
 
   def test_controls_are_rehomed_out_of_developer_pages(self) -> None:
     developer_sources = (
@@ -93,7 +95,7 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertEqual(tici.count("if not self._settings_writable():"), 1)
     self.assertIn("return ui_state.is_offroad() and not ui_state.engaged", mici)
     self.assertEqual(mici.count("if not self._write_allowed():"), 1)
-    self.assertEqual(mici.count("if not self._settings_writable():"), 4)
+    self.assertEqual(mici.count("if not self._settings_writable():"), 5)
     self.assertNotIn('param="LaneCentering"', tici)
 
   def test_sunnylink_stack_is_nested_under_nrdr_lateral_tuning(self) -> None:
@@ -140,9 +142,14 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertEqual(items[2]["title"], "Fade on Turn Signal")
     self.assertIn("always suspend", items[2]["description"])
     self.assertIn("regardless of this setting", items[2]["description"])
-    self.assertEqual(items[4]["title"], "Model Break-In")
-    self.assertIn("more than 0.15 m", items[4]["description"])
-    self.assertIn("zero by 0.50 m", items[4]["description"])
+    strength = items[4]
+    self.assertEqual(strength["title"], "Lane-Centering Strength")
+    self.assertEqual({field: strength[field] for field in ("min", "max", "step")}, {"min": 0.0, "max": 1.0, "step": 0.05})
+    self.assertIn("0.30 matches the previous behavior", strength["description"])
+    self.assertIn("without raising the existing maximum correction ceiling", strength["description"])
+    self.assertEqual(items[5]["title"], "Model Break-In")
+    self.assertIn("more than 0.15 m", items[5]["description"])
+    self.assertIn("zero by 0.50 m", items[5]["description"])
     lane_centering_copy = json.dumps(source_panel)
     self.assertNotIn("StarPilot", lane_centering_copy)
     self.assertNotIn("SPLC", lane_centering_copy)
@@ -174,7 +181,9 @@ class TestLaneCenteringStack(unittest.TestCase):
     controlsd = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/controlsd.py").read_text(encoding="utf-8")
     extension = (REPOSITORY_ROOT / "openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py").read_text(encoding="utf-8")
     self.assertEqual(extension.count('self.params.get("LaneCenteringMinSpeed", return_default=True)'), 1)
+    self.assertEqual(extension.count('self.params.get("LaneCenteringStrength", return_default=True)'), 1)
     self.assertEqual(controlsd.count("self.lane_centering_min_speed_mph"), 1)
+    self.assertEqual(controlsd.count("self.lane_centering_strength"), 1)
     tici = TICI_PANEL.read_text(encoding="utf-8")
     mici = MICI_PANEL.read_text(encoding="utf-8")
     self.assertIn("value_normalizer=lane_centering_min_speed_mph", tici)
@@ -185,6 +194,7 @@ class TestLaneCenteringStack(unittest.TestCase):
     generated = PARAM_INCLUDE.read_text(encoding="utf-8")
     self.assertIn('{"LaneCentering", {PERSISTENT | BACKUP, BOOL, "0"}}', source)
     self.assertIn('{"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "50"}}', generated)
+    self.assertIn('{"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.30"}}', generated)
     self.assertIn("Existing enabled installs adopt the new 50 mph minimum", NRDR_STEERING.read_text(encoding="utf-8"))
 
   def test_driver_override_is_wired_without_other_starpilot_controls(self) -> None:
@@ -224,6 +234,7 @@ class TestLaneCenteringStack(unittest.TestCase):
       "unavailable @0;", "disabled @1;", "lateralInactive @2;", "invalidInput @3;", "modelInvalid @4;",
       "driverOverride @5;", "laneChange @6;", "belowSpeed @7;", "turnSignalFade @8;", "laneDataInvalid @9;",
       "laneConfidenceLow @10;", "laneGeometryInvalid @11;", "centered @12;", "modelAuthority @13;", "correcting @14;",
+      "zeroStrength @15;",
     )
     for reason in expected_reasons:
       self.assertIn(reason, reason_block.group("body"))

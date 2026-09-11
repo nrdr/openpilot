@@ -176,6 +176,7 @@ class Controls(ControlsExt):
       self.lane_centering_enabled,
       self.lane_center_offset,
       self.lane_centering_e2e_authority,
+      self.lane_centering_strength,
       CC.latActive,
       bool(self.sm.all_checks(['modelV2'])),
       self.lane_centering_pause_on_signal,

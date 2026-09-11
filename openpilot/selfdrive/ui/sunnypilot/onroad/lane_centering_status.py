@@ -19,6 +19,7 @@ LANE_CENTERING_REASON_LABELS = {
   int(LaneCenteringReason.centered): "CTR",
   int(LaneCenteringReason.modelAuthority): "E2E",
   int(LaneCenteringReason.correcting): "ACT",
+  int(LaneCenteringReason.zeroStrength): "ZERO",
 }
 
 LANE_CENTERING_SUSPENDED_REASONS = {

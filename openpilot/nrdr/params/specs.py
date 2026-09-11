@@ -119,6 +119,8 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("LongPidTuneScaleEcon", ParamType.INT, PB, "50", owner=ParamOwner.LONGITUDINAL),
   # Canonical whole mph. Runtime converts this value with CV.MPH_TO_MS.
   _added("LaneCenteringMinSpeed", ParamType.INT, PB, "50", owner=ParamOwner.LATERAL),
+  # Direct 0.0-1.0 lane-center pull. 0.30 preserves the deployed StarPilot gain.
+  _added("LaneCenteringStrength", ParamType.FLOAT, PB, "0.30", owner=ParamOwner.LATERAL),
   # Compatibility tombstone: acceleration profiles now follow the four
   # distance personalities unconditionally. Preserve the key so downgrades and
   # backed-up stale values remain harmless instead of becoming unknown.

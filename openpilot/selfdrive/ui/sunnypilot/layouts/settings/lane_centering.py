@@ -7,6 +7,7 @@ from openpilot.selfdrive.controls.lib.lane_centering import (
   LANE_CENTERING_MIN_SPEED_MAX_MPH,
   LANE_CENTERING_MIN_SPEED_MIN_MPH,
   lane_centering_min_speed_mph,
+  lane_centering_strength,
 )
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.lib.styles import style
@@ -79,6 +80,18 @@ class LaneCenteringLayout(Widget):
       use_float_scaling=True,
       label_callback=lambda value: f"{value / 100:.2f} m",
     )
+    self._strength_control = self._option_item(
+      title=tr("Lane-Centering Strength"),
+      description=tr("Set the direct pull toward the detected lane center. 0% leaves the model path unchanged; 30% matches the previous " +
+                     "behavior; 100% responds more strongly without raising the existing maximum correction ceiling."),
+      param="LaneCenteringStrength",
+      min_value=0,
+      max_value=100,
+      value_change_step=5,
+      use_float_scaling=True,
+      label_callback=lambda value: f"{value}%",
+      value_normalizer=lane_centering_strength,
+    )
     self._model_authority_control = self._option_item(
       title=tr("Model Break-In"),
       description=tr("When a confident model path disagrees with lane center by more than 0.15 m, allow it to reduce the correction. At 100%, " +
@@ -96,6 +109,7 @@ class LaneCenteringLayout(Widget):
       self._minimum_speed_control,
       self._pause_on_signal_toggle,
       self._center_offset_control,
+      self._strength_control,
       self._model_authority_control,
     ], line_separator=True, spacing=0)
 
@@ -143,6 +157,7 @@ class LaneCenteringLayout(Widget):
       bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)))
     self._minimum_speed_control.action_item.refresh_from_param()
     self._center_offset_control.action_item.refresh_from_param()
+    self._strength_control.action_item.refresh_from_param()
     self._model_authority_control.action_item.refresh_from_param()
 
   def _render(self, rect):

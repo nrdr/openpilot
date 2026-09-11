@@ -194,8 +194,9 @@ def test_lane_centering_cohort_exclusion_matches_runtime_get_bool(settings, expe
   assert lane_centering_enabled_cohorts(result) == expected
 
 
-def test_lane_centering_min_speed_is_captured_for_attribution():
+def test_lane_centering_settings_are_captured_for_attribution():
   assert "LaneCenteringMinSpeed" in RELEVANT_PARAMS
+  assert "LaneCenteringStrength" in RELEVANT_PARAMS
 
 
 def test_summary_reports_tracking_and_p_i_feedforward_contributions():

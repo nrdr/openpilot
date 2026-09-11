@@ -23,6 +23,7 @@
     {"LongPidTuneScaleRelaxed", {PERSISTENT | BACKUP, INT, "80"}},
     {"LongPidTuneScaleEcon", {PERSISTENT | BACKUP, INT, "50"}},
     {"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "50"}},
+    {"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.30"}},
     {"NrdrPersonalityAccelProfiles", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}},
     {"NrdrCruiseOverspeedAllowance", {PERSISTENT | BACKUP, INT, "0"}},

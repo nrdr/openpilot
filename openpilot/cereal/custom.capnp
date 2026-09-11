@@ -503,6 +503,7 @@ struct LaneCenteringStateSP @0xcb9fd56c7057593a {
     centered @12;
     modelAuthority @13;
     correcting @14;
+    zeroStrength @15;
   }
 }
 

@@ -14,10 +14,14 @@ from openpilot.selfdrive.controls.lib.lane_centering import (
   LANE_CENTERING_MIN_SPEED_DEFAULT_MPH,
   LANE_CENTERING_MIN_SPEED_MAX_MPH,
   LANE_CENTERING_MIN_SPEED_MIN_MPH,
+  LANE_CENTERING_STRENGTH_DEFAULT,
+  LANE_CENTERING_STRENGTH_MAX,
+  LANE_CENTERING_STRENGTH_MIN,
   LaneCenteringController,
   LaneCenteringReason,
   lane_centering_min_speed_mph,
   lane_centering_speed_thresholds,
+  lane_centering_strength,
 )
 
 
@@ -43,17 +47,17 @@ def _model(left=-1.8, right=1.8, model_y=0.0, lane_prob=0.9, lane_std=0.1, path_
   )
 
 
-def _update(controller, model, *, model_curvature=0.0, offset=0.0, authority=1.0, min_speed_mph=50, enabled=True,
+def _update(controller, model, *, model_curvature=0.0, offset=0.0, authority=1.0, strength=0.30, min_speed_mph=50, enabled=True,
             active=True, valid=True, speed=_V_EGO, pause_on_signal=False, turn_signal_active=False, driver_override=False):
-  return controller.update(model_curvature, model, speed, min_speed_mph, enabled, offset, authority, active, valid,
+  return controller.update(model_curvature, model, speed, min_speed_mph, enabled, offset, authority, strength, active, valid,
                            pause_on_signal, turn_signal_active, driver_override)
 
 
-def _converge(model, *, offset=0.0, authority=1.0):
+def _converge(model, *, offset=0.0, authority=1.0, strength=0.30):
   controller = LaneCenteringController()
   output = 0.0
   for _ in range(300):
-    output = _update(controller, model, offset=offset, authority=authority)
+    output = _update(controller, model, offset=offset, authority=authority, strength=strength)
   return controller, output
 
 
@@ -75,6 +79,7 @@ class TestLaneCentering(OpenpilotTestCase):
       "centered",
       "modelAuthority",
       "correcting",
+      "zeroStrength",
     ]
     assert [reason.value for reason in LaneCenteringReason] == reason_values
     capnp_reason = custom.LaneCenteringStateSP.Reason
@@ -136,6 +141,35 @@ class TestLaneCentering(OpenpilotTestCase):
     minimum_arm, minimum_release = lane_centering_speed_thresholds(12)
     assert minimum_arm == 12.0 * CV.MPH_TO_MS
     assert minimum_release == 5.0
+
+  @parameterized.expand([
+    (None,),
+    ("",),
+    ("malformed",),
+    (10 ** 10000,),
+    (float("nan"),),
+    (float("inf"),),
+    (-0.01,),
+    (1.01,),
+  ])
+  def test_strength_invalid_values_fail_closed_to_legacy_default(self, value):
+    assert lane_centering_strength(value) == LANE_CENTERING_STRENGTH_DEFAULT
+
+  @parameterized.expand([
+    (0.0, LANE_CENTERING_STRENGTH_MIN),
+    (b"0.30", LANE_CENTERING_STRENGTH_DEFAULT),
+    (1.0, LANE_CENTERING_STRENGTH_MAX),
+  ])
+  def test_strength_exact_bounds_and_param_bytes_are_valid(self, value, expected):
+    assert lane_centering_strength(value) == expected
+
+  def test_malformed_runtime_strength_fails_closed_without_correction(self):
+    controller = LaneCenteringController()
+    model_curvature = 0.0013
+    assert _update(controller, _model(left=-1.5, right=2.1), model_curvature=model_curvature,
+                   authority=0.0, strength="malformed") == model_curvature
+    assert controller.diagnostics.reason == LaneCenteringReason.INVALID_INPUT
+    assert not controller.diagnostics.active
 
   def test_existing_enabled_install_with_missing_setting_adopts_default(self):
     model = _model(left=-1.5, right=2.1)
@@ -461,3 +495,45 @@ class TestLaneCentering(OpenpilotTestCase):
     _, steady = _converge(model, authority=0.0)
     assert 0.0 < first < steady
     assert np.isclose(steady, 0.004 * 0.30, atol=1e-6)
+
+  def test_strength_zero_is_exact_model_output(self):
+    model_curvature = -0.0017
+    controller = LaneCenteringController()
+    for _ in range(300):
+      output = _update(controller, _model(left=-1.0, right=2.6, path_std=0.6),
+                       model_curvature=model_curvature, authority=0.0, strength=0.0)
+      assert output == model_curvature
+    assert controller.diagnostics.reason == LaneCenteringReason.ZERO_STRENGTH
+    assert controller.diagnostics.correction_curvature == 0.0
+    assert controller.diagnostics.target_correction_curvature == 0.0
+    assert not controller.diagnostics.active
+
+  def test_strength_is_monotonic_and_preserves_existing_final_envelope(self):
+    model = _model(left=0.0, right=3.0, path_std=0.6)
+    outputs = [_converge(model, authority=0.0, strength=strength)[1] for strength in (0.0, 0.15, 0.30, 0.50, 1.0)]
+    assert outputs == sorted(outputs)
+    assert outputs[0] == 0.0
+    assert np.isclose(outputs[2], 0.004 * 0.30, atol=1e-6)
+    assert all(output <= 0.004 * 0.30 + 1e-12 for output in outputs)
+
+  def test_default_strength_target_is_bit_identical_to_legacy_expression(self):
+    rng = np.random.default_rng(0x1A2E)
+    samples = np.concatenate((
+      np.array([-1.0, -0.004, -0.004 + 1e-12, 0.0, 0.004 - 1e-12, 0.004, 1.0]),
+      rng.uniform(-0.02, 0.02, 10_000),
+    ))
+    for raw_correction in samples:
+      bounded = float(np.clip(raw_correction, -0.004, 0.004))
+      legacy = bounded * 0.30
+      strengthened = float(np.clip(bounded * LANE_CENTERING_STRENGTH_DEFAULT, -0.0012, 0.0012))
+      assert strengthened.hex() == legacy.hex()
+
+  def test_strength_changes_ordinary_error_where_model_break_in_is_flat(self):
+    # A 10 cm raw disagreement is below the 15 cm model break-in threshold,
+    # proving strength and Model Break-In are independent controls.
+    model = _model(left=-1.75, right=1.95, path_std=0.1)
+    low = _converge(model, authority=1.0, strength=0.30)[1]
+    high = _converge(model, authority=1.0, strength=1.0)[1]
+    no_break_in = _converge(model, authority=0.0, strength=1.0)[1]
+    assert 0.0 < low < high
+    assert high == no_break_in

@@ -10,6 +10,7 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
   "LaneCenteringE2EAuthority",
   "LaneCenteringMinSpeed",
   "LaneCenteringPauseOnSignal",
+  "LaneCenteringStrength",
   "LaneCenterOffset",
   "LongitudinalPersonality",
   "NrdrHandcraftedLateralTune",
