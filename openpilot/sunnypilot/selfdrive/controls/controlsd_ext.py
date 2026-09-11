@@ -22,6 +22,9 @@ from openpilot.nrdr.features.lateral.latcontrol_clarity_hybrid import LatControl
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 
+LANE_CENTERING_STATE_PUBLISH_INTERVAL = 10  # controlsd is 100 Hz; diagnostics are 10 Hz.
+
+
 class ControlsExt(ModelStateBase):
   def __init__(self, CP: structs.CarParams, params: Params):
     ModelStateBase.__init__(self)
@@ -32,6 +35,7 @@ class ControlsExt(ModelStateBase):
     self.blinker_pause_lateral = BlinkerPauseLateral()
 
     self.lane_centering = LaneCenteringController()
+    self._lane_centering_state_publish_frame = 0
     self.update_lane_centering_params()
 
     initialize_live_parameter_settings(self)
@@ -41,7 +45,7 @@ class ControlsExt(ModelStateBase):
     cloudlog.info("controlsd_ext got CarParamsSP")
 
     self.sm_services_ext = ['radarState', 'selfdriveStateSP']
-    self.pm_services_ext = ['carControlSP']
+    self.pm_services_ext = ['carControlSP', 'laneCenteringStateSP']
 
   def initialize_lateral_control(self, lac, CI, dt):
     if str(self.CP.carFingerprint) == "HONDA_CLARITY" and self.CP.lateralTuning.which() == 'torque':
@@ -127,6 +131,22 @@ class ControlsExt(ModelStateBase):
 
     return CC_SP
 
+  def lane_centering_state(self) -> custom.LaneCenteringStateSP:
+    state = custom.LaneCenteringStateSP.new_message()
+    source = self.lane_centering.diagnostics
+    state.reason = source.reason.value
+    state.speedArmed = source.speed_armed
+    state.active = source.active
+    state.correctionCurvature = source.correction_curvature
+    state.targetCorrectionCurvature = source.target_correction_curvature
+    state.centerError = source.center_error
+    state.effectiveCenterError = source.effective_center_error
+    state.laneWidth = source.lane_width
+    state.lookahead = source.lookahead
+    state.minLaneProbability = source.min_lane_probability
+    state.maxLaneStd = source.max_lane_std
+    return state
+
   @staticmethod
   def publish_ext(CC_SP: custom.CarControlSP, sm: messaging.SubMaster, pm: messaging.PubMaster) -> None:
     cc_sp_send = messaging.new_message('carControlSP')
@@ -135,6 +155,18 @@ class ControlsExt(ModelStateBase):
 
     pm.send('carControlSP', cc_sp_send)
 
+  @staticmethod
+  def publish_lane_centering_state(state: custom.LaneCenteringStateSP, pm: messaging.PubMaster) -> None:
+    state_send = messaging.new_message('laneCenteringStateSP')
+    state_send.valid = True
+    state_send.laneCenteringStateSP = state
+    pm.send('laneCenteringStateSP', state_send)
+
   def run_ext(self, sm: messaging.SubMaster, pm: messaging.PubMaster) -> None:
     CC_SP = self.state_control_ext(sm)
     self.publish_ext(CC_SP, sm, pm)
+    if self._lane_centering_state_publish_frame == 0:
+      self.publish_lane_centering_state(self.lane_centering_state(), pm)
+    self._lane_centering_state_publish_frame = (
+      self._lane_centering_state_publish_frame + 1
+    ) % LANE_CENTERING_STATE_PUBLISH_INTERVAL

@@ -11,6 +11,7 @@ from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui.elements import (
   DesiredLateralAccelElement,
   DesiredSteeringAngleElement,
   DesiredSteeringPIDElement,
+  LaneCenteringStatusElement,
   LeadSpeedElement,
   RelDistElement,
   SteeringAngleElement,
@@ -72,6 +73,7 @@ class StripDevUiRenderer(Widget):
     self.desired_lat_accel_elem = DesiredLateralAccelElement()
     self.rel_dist_elem = RelDistElement()
     self.lead_speed_elem = LeadSpeedElement()
+    self.lane_centering_elem = LaneCenteringStatusElement()
 
   def _desired(self, sm):
     which = sm['controlsState'].lateralControlState.which()
@@ -92,12 +94,14 @@ class StripDevUiRenderer(Widget):
     desired = self._desired(sm)
     distance = self.rel_dist_elem.update(sm, ui_state.is_metric)
     lead_speed = self.lead_speed_elem.update(sm, ui_state.is_metric)
+    lane_centering = self.lane_centering_elem.update(sm, ui_state.is_metric)
     distance_value = distance.value + distance.unit if distance.value != "-" else distance.value
     rows = (
       ("REAL", real.value, real.color),
       ("DESIRE", desired.value, desired.color),
       ("DIST", distance_value, distance.color),
       ("LSPD", lead_speed.value, lead_speed.color),
+      ("LCTR", lane_centering.value, lane_centering.color),
     )
 
     x = int(self._rect.x + self._rect.width - SIDE_PANEL_WIDTH / 2)

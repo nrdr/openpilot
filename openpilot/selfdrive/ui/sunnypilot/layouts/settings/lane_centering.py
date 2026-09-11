@@ -45,15 +45,17 @@ class LaneCenteringLayout(Widget):
 
     self._lane_centering_toggle = toggle_item_sp(
       title=tr("Enable Lane Centering"),
-      description=tr("Bias the model path toward the center of two confident lane boundaries while preserving the normal curvature and jerk " +
-                     "limits. It waits when either boundary is uncertain and makes no correction while the model path is already centered."),
+      description=tr("Add a bounded curvature correction toward the center of two confident lane boundaries while preserving the normal " +
+                     "curvature and jerk limits. It waits when either boundary is uncertain. When the model path is already centered, it " +
+                     "targets no new correction and fades any existing correction toward zero."),
       initial_state=ui_state.params.get_bool("LaneCentering"),
       enabled=self._write_allowed,
       callback=self._on_lane_centering,
     )
     self._pause_on_signal_toggle = toggle_item_sp(
-      title=tr("Pause on Turn Signal"),
-      description=tr("Fade out the correction while a turn signal is active. Once a lane-change maneuver begins, the correction stops immediately."),
+      title=tr("Fade on Turn Signal"),
+      description=tr("Fade out the correction while a turn signal is active. Lane-change maneuvers always suspend the correction immediately, " +
+                     "regardless of this setting."),
       initial_state=bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)),
       enabled=self._settings_writable,
       callback=self._on_pause_on_signal,
@@ -78,9 +80,9 @@ class LaneCenteringLayout(Widget):
       label_callback=lambda value: f"{value / 100:.2f} m",
     )
     self._model_authority_control = self._option_item(
-      title=tr("Model Path Authority"),
-      description=tr("Allow a confident model path to reduce the lane-line correction when the two paths disagree. 100% gives the model full " +
-                     "authority; 0% retains the full lane-line correction."),
+      title=tr("Model Break-In"),
+      description=tr("When a confident model path disagrees with lane center by more than 0.15 m, allow it to reduce the correction. At 100%, " +
+                     "the correction can reach zero by 0.50 m of disagreement; 0% never reduces it."),
       param="LaneCenteringE2EAuthority",
       min_value=0,
       max_value=100,

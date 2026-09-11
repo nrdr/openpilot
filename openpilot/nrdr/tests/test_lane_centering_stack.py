@@ -1,3 +1,4 @@
+import ast
 import json
 from pathlib import Path
 import re
@@ -13,6 +14,13 @@ TICI_PANEL = REPOSITORY_ROOT / "openpilot/selfdrive/ui/sunnypilot/layouts/settin
 MICI_PANEL = REPOSITORY_ROOT / "openpilot/selfdrive/ui/mici/layouts/settings/lane_centering.py"
 SUNNYLINK_ROOT = REPOSITORY_ROOT / "openpilot/sunnypilot/sunnylink"
 NRDR_STEERING = REPOSITORY_ROOT / "openpilot/nrdr/ui/sunnylink/pages/steering.yaml"
+CUSTOM_SCHEMA = REPOSITORY_ROOT / "openpilot/cereal/custom.capnp"
+LOG_SCHEMA = REPOSITORY_ROOT / "openpilot/cereal/log.capnp"
+SERVICES = REPOSITORY_ROOT / "openpilot/cereal/services.py"
+CARD = REPOSITORY_ROOT / "openpilot/selfdrive/car/card.py"
+DEVELOPER_ELEMENTS = REPOSITORY_ROOT / "openpilot/selfdrive/ui/sunnypilot/onroad/developer_ui/elements.py"
+STATUS_HELPER = REPOSITORY_ROOT / "openpilot/selfdrive/ui/sunnypilot/onroad/lane_centering_status.py"
+UI_STATE_SP = REPOSITORY_ROOT / "openpilot/selfdrive/ui/sunnypilot/ui_state.py"
 
 LANE_CENTERING_KEYS = (
   "LaneCentering",
@@ -128,9 +136,16 @@ class TestLaneCenteringStack(unittest.TestCase):
     )
     self.assertIn("5 m/s controller floor", minimum_speed["description"])
     self.assertIn("waits when either boundary is uncertain", items[0]["details"])
-    self.assertIn("makes no correction while the model path is already centered", items[0]["details"])
-    self.assertIn("lane-change maneuver begins", items[2]["description"])
-    self.assertIn("stops immediately", items[2]["description"])
+    self.assertIn("targets no new correction and fades any existing correction toward zero", items[0]["details"])
+    self.assertEqual(items[2]["title"], "Fade on Turn Signal")
+    self.assertIn("always suspend", items[2]["description"])
+    self.assertIn("regardless of this setting", items[2]["description"])
+    self.assertEqual(items[4]["title"], "Model Break-In")
+    self.assertIn("more than 0.15 m", items[4]["description"])
+    self.assertIn("zero by 0.50 m", items[4]["description"])
+    lane_centering_copy = json.dumps(source_panel)
+    self.assertNotIn("StarPilot", lane_centering_copy)
+    self.assertNotIn("SPLC", lane_centering_copy)
 
     self.assertFalse(any(page["id"] == "lane_centering" for page in compiled["panels"]))
     compiled_steering = next(page for page in compiled["panels"] if page["id"] == "steering")
@@ -179,6 +194,123 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertIn("if driver_override:", controller)
     for prohibited in ("left_only", "right_only", "visualizer", "turn_hold", "turn_lead", "lane_change_jerk"):
       self.assertNotIn(prohibited, controller)
+
+  def test_observability_uses_reserved_low_rate_service_outside_card(self) -> None:
+    schema = CUSTOM_SCHEMA.read_text(encoding="utf-8")
+    log_schema = LOG_SCHEMA.read_text(encoding="utf-8")
+    services = SERVICES.read_text(encoding="utf-8")
+    controller = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/lib/lane_centering.py").read_text(encoding="utf-8")
+    controlsd = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/controlsd.py").read_text(encoding="utf-8")
+    extension = (REPOSITORY_ROOT / "openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py").read_text(encoding="utf-8")
+    card = CARD.read_text(encoding="utf-8")
+    developer_elements = DEVELOPER_ELEMENTS.read_text(encoding="utf-8")
+    status_helper = STATUS_HELPER.read_text(encoding="utf-8")
+    ui_state = UI_STATE_SP.read_text(encoding="utf-8")
+
+    self.assertIn("struct LaneCenteringStateSP @0xcb9fd56c7057593a", schema)
+    self.assertNotIn("struct CustomReserved10 @0xcb9fd56c7057593a", schema)
+    self.assertIn("laneCenteringStateSP @136 :Custom.LaneCenteringStateSP;", log_schema)
+    self.assertNotIn("customReserved10 @136", log_schema)
+    self.assertIn('"laneCenteringStateSP": (True, 10., 1)', services)
+
+    car_control_block = re.search(r"struct CarControlSP .*?(?=struct BackupManagerSP)", schema, flags=re.DOTALL)
+    self.assertIsNotNone(car_control_block)
+    self.assertNotIn("LaneCentering", car_control_block.group())
+    self.assertNotIn("laneCenteringStateSP", card)
+
+    reason_block = re.search(r"enum Reason \{(?P<body>.*?)\n  \}", schema, flags=re.DOTALL)
+    self.assertIsNotNone(reason_block)
+    expected_reasons = (
+      "unavailable @0;", "disabled @1;", "lateralInactive @2;", "invalidInput @3;", "modelInvalid @4;",
+      "driverOverride @5;", "laneChange @6;", "belowSpeed @7;", "turnSignalFade @8;", "laneDataInvalid @9;",
+      "laneConfidenceLow @10;", "laneGeometryInvalid @11;", "centered @12;", "modelAuthority @13;", "correcting @14;",
+    )
+    for reason in expected_reasons:
+      self.assertIn(reason, reason_block.group("body"))
+
+    # New readers of old logs see ordinal zero, which must never claim active.
+    self.assertTrue(reason_block.group("body").lstrip().startswith("unavailable @0;"))
+    self.assertNotIn("diagnostics", controlsd)
+    self.assertIn("source = self.lane_centering.diagnostics", extension)
+    self.assertIn("LANE_CENTERING_STATE_PUBLISH_INTERVAL = 10", extension)
+    self.assertIn("def publish_lane_centering_state", extension)
+    self.assertLess(controlsd.index("self.publish(CC, lac_log)"), controlsd.index("self.run_ext(self.sm, self.pm)"))
+    self.assertLess(extension.index("self.publish_ext(CC_SP, sm, pm)"),
+                    extension.index("self.publish_lane_centering_state(self.lane_centering_state(), pm)"))
+    self.assertIn("class LaneCenteringDiagnostics", controller)
+    self.assertIn('"laneCenteringStateSP"', ui_state)
+    self.assertIn("class LaneCenteringStatusElement", developer_elements)
+    self.assertIn('getattr(reason, "raw", reason)', status_helper)
+    self.assertIn('return UiElement(value, "LANE CTR", "", color)', developer_elements)
+    status_source = developer_elements[developer_elements.index("class LaneCenteringStatusElement"):]
+    self.assertNotIn("callback", status_source)
+
+  def test_diagnostics_cannot_feed_control_branches_state_or_returns(self) -> None:
+    controller = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/lib/lane_centering.py").read_text(encoding="utf-8")
+    tree = ast.parse(controller)
+
+    for node in ast.walk(tree):
+      if isinstance(node, ast.If):
+        self.assertNotIn("diagnostics", ast.unparse(node.test))
+      elif isinstance(node, ast.Return) and node.value is not None:
+        self.assertNotIn("diagnostics", ast.unparse(node.value))
+      elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        writes_control_state = any(
+          isinstance(part, ast.Attribute) and part.attr in ("_correction", "_speed_armed")
+          for target in targets for part in ast.walk(target)
+        )
+        if writes_control_state:
+          self.assertNotIn("diagnostics", ast.unparse(node.value))
+
+  def test_lane_centering_publish_cadence_and_order(self) -> None:
+    extension = (REPOSITORY_ROOT / "openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py").read_text(encoding="utf-8")
+    tree = ast.parse(extension)
+    controls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "ControlsExt")
+    run_ext = next(node for node in controls.body if isinstance(node, ast.FunctionDef) and node.name == "run_ext")
+
+    # Execute the exact production method body in a dependency-free harness so
+    # this cadence regression also runs on hosts without the native msgq build.
+    for argument in (*run_ext.args.posonlyargs, *run_ext.args.args, *run_ext.args.kwonlyargs):
+      argument.annotation = None
+    run_ext.returns = None
+    harness = ast.ClassDef(
+      name="Harness",
+      bases=[],
+      keywords=[],
+      body=[run_ext],
+      decorator_list=[],
+    )
+    module = ast.fix_missing_locations(ast.Module(
+      body=[
+        ast.Assign(
+          targets=[ast.Name(id="LANE_CENTERING_STATE_PUBLISH_INTERVAL", ctx=ast.Store())],
+          value=ast.Constant(value=10),
+        ),
+        harness,
+      ],
+      type_ignores=[],
+    ))
+    namespace = {}
+    exec(compile(module, "controlsd_ext_run_ext", "exec"), namespace)
+
+    instance = namespace["Harness"]()
+    instance._lane_centering_state_publish_frame = 0
+    events = []
+    current_cycle = [0]
+    instance.state_control_ext = lambda sm: "car-control"
+    instance.publish_ext = lambda cc, sm, pm: events.append((current_cycle[0], "carControlSP"))
+    instance.lane_centering_state = lambda: "lane-centering"
+    instance.publish_lane_centering_state = lambda state, pm: events.append((current_cycle[0], "laneCenteringStateSP"))
+
+    for cycle in range(21):
+      current_cycle[0] = cycle
+      instance.run_ext(None, None)
+
+    self.assertEqual([cycle for cycle, service in events if service == "carControlSP"], list(range(21)))
+    self.assertEqual([cycle for cycle, service in events if service == "laneCenteringStateSP"], [0, 10, 20])
+    for cycle in (0, 10, 20):
+      self.assertLess(events.index((cycle, "carControlSP")), events.index((cycle, "laneCenteringStateSP")))
 
 
 if __name__ == "__main__":

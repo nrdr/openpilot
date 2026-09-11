@@ -2,14 +2,20 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from openpilot.cereal import custom
 from openpilot.common.constants import CV
 from openpilot.common.parameterized import parameterized
 from openpilot.common.test import OpenpilotTestCase
+from openpilot.selfdrive.ui.sunnypilot.onroad.lane_centering_status import (
+  LANE_CENTERING_REASON_LABELS,
+  lane_centering_reason_code,
+)
 from openpilot.selfdrive.controls.lib.lane_centering import (
   LANE_CENTERING_MIN_SPEED_DEFAULT_MPH,
   LANE_CENTERING_MIN_SPEED_MAX_MPH,
   LANE_CENTERING_MIN_SPEED_MIN_MPH,
   LaneCenteringController,
+  LaneCenteringReason,
   lane_centering_min_speed_mph,
   lane_centering_speed_thresholds,
 )
@@ -52,6 +58,51 @@ def _converge(model, *, offset=0.0, authority=1.0):
 
 
 class TestLaneCentering(OpenpilotTestCase):
+  def test_diagnostic_reason_values_are_stable(self):
+    reason_values = [
+      "unavailable",
+      "disabled",
+      "lateralInactive",
+      "invalidInput",
+      "modelInvalid",
+      "driverOverride",
+      "laneChange",
+      "belowSpeed",
+      "turnSignalFade",
+      "laneDataInvalid",
+      "laneConfidenceLow",
+      "laneGeometryInvalid",
+      "centered",
+      "modelAuthority",
+      "correcting",
+    ]
+    assert [reason.value for reason in LaneCenteringReason] == reason_values
+    capnp_reason = custom.LaneCenteringStateSP.Reason
+    assert [int(getattr(capnp_reason, name)) for name in reason_values] == list(range(len(reason_values)))
+
+  def test_diagnostics_capnp_roundtrip(self):
+    msg = custom.LaneCenteringStateSP.new_message()
+    msg.reason = LaneCenteringReason.CORRECTING.value
+    msg.speedArmed = True
+    msg.active = True
+    msg.correctionCurvature = 0.0002
+    msg.centerError = 0.17
+    msg.laneWidth = 3.6
+
+    with custom.LaneCenteringStateSP.from_bytes(msg.to_bytes()) as decoded:
+      assert decoded.reason == custom.LaneCenteringStateSP.Reason.correcting
+      assert decoded.speedArmed
+      assert decoded.active
+      assert np.isclose(decoded.correctionCurvature, 0.0002)
+      assert np.isclose(decoded.centerError, 0.17)
+      assert np.isclose(decoded.laneWidth, 3.6)
+
+      # Decoded pycapnp enums compare equal to their integer constant but do
+      # not share its hash. The production UI must normalize before lookup.
+      reason_code = lane_centering_reason_code(decoded.reason)
+      assert reason_code == int(custom.LaneCenteringStateSP.Reason.correcting)
+      assert LANE_CENTERING_REASON_LABELS[reason_code] == "ACT"
+
   @parameterized.expand([
     (None,),
     ("",),
@@ -112,6 +163,20 @@ class TestLaneCentering(OpenpilotTestCase):
   ])
   def test_hard_gates_are_noop(self, kwargs):
     assert _update(LaneCenteringController(), _model(left=-1.5, right=2.1), **kwargs) == 0.0
+
+  @parameterized.expand([
+    ({"enabled": False}, LaneCenteringReason.DISABLED),
+    ({"active": False}, LaneCenteringReason.LATERAL_INACTIVE),
+    ({"valid": False}, LaneCenteringReason.MODEL_INVALID),
+    ({"speed": 4.9}, LaneCenteringReason.BELOW_SPEED),
+    ({"driver_override": True}, LaneCenteringReason.DRIVER_OVERRIDE),
+  ])
+  def test_hard_gate_diagnostics(self, kwargs, expected_reason):
+    controller = LaneCenteringController()
+    assert _update(controller, _model(left=-1.5, right=2.1), **kwargs) == 0.0
+    assert controller.diagnostics.reason == expected_reason
+    assert not controller.diagnostics.speed_armed
+    assert not controller.diagnostics.active
 
   def test_lane_change_is_noop(self):
     assert _update(LaneCenteringController(), _model(left=-1.5, right=2.1, lane_change=1)) == 0.0
@@ -262,6 +327,9 @@ class TestLaneCentering(OpenpilotTestCase):
     controller, centered = _converge(model, authority=0.0)
     fading = _update(controller, model, authority=0.0, pause_on_signal=True, turn_signal_active=True)
     assert 0.0 < fading < centered
+    assert controller.diagnostics.reason == LaneCenteringReason.TURN_SIGNAL_FADE
+    assert controller.diagnostics.speed_armed
+    assert not controller.diagnostics.active
 
     for _ in range(300):
       fading = _update(controller, model, authority=0.0, pause_on_signal=True, turn_signal_active=True)
@@ -273,6 +341,15 @@ class TestLaneCentering(OpenpilotTestCase):
     controller, _ = _converge(model, authority=0.0)
     signaled = _update(controller, model, authority=0.0, turn_signal_active=True)
     assert abs(signaled - output) < 1e-7
+    assert controller.diagnostics.reason == LaneCenteringReason.CORRECTING
+    assert controller.diagnostics.active
+
+    # This setting controls only the early blinker fade. A model lane-change
+    # state always suspends lane centering so it cannot oppose the maneuver.
+    lane_change = _model(left=-1.5, right=2.1, lane_change=1)
+    assert _update(controller, lane_change, authority=0.0, turn_signal_active=True) == 0.0
+    assert controller.diagnostics.reason == LaneCenteringReason.LANE_CHANGE
+    assert not controller.diagnostics.active
 
   def test_driver_override_resets_and_reacquires_smoothly(self):
     model = _model(left=-1.5, right=2.1)
@@ -293,7 +370,10 @@ class TestLaneCentering(OpenpilotTestCase):
     model = _model(left=-1.5, right=2.1)
     values = model.laneLineProbs if field == "prob" else model.laneLineStds
     values[1] = value
-    assert _update(LaneCenteringController(), model) == 0.0
+    controller = LaneCenteringController()
+    assert _update(controller, model) == 0.0
+    expected = LaneCenteringReason.LANE_DATA_INVALID if not np.isfinite(value) else LaneCenteringReason.LANE_CONFIDENCE_LOW
+    assert controller.diagnostics.reason == expected
 
   def test_input_must_cover_lookahead(self):
     model = _model(left=-1.5, right=2.1)
@@ -302,14 +382,28 @@ class TestLaneCentering(OpenpilotTestCase):
     assert _update(LaneCenteringController(), model) == 0.0
 
   def test_lane_center_error_steers_toward_center(self):
-    _, right = _converge(_model(left=-1.5, right=2.1), authority=0.0)
+    controller, right = _converge(_model(left=-1.5, right=2.1), authority=0.0)
     _, left = _converge(_model(left=-2.1, right=1.5), authority=0.0)
     assert right > 0.0
     assert left < 0.0
+    diagnostics = controller.diagnostics
+    assert diagnostics.reason == LaneCenteringReason.CORRECTING
+    assert diagnostics.speed_armed
+    assert diagnostics.active
+    assert diagnostics.correction_curvature == right
+    assert diagnostics.target_correction_curvature > 0.0
+    assert np.isclose(diagnostics.center_error, 0.3)
+    assert np.isclose(diagnostics.effective_center_error, 0.22)
+    assert np.isclose(diagnostics.lane_width, 3.6)
+    assert np.isclose(diagnostics.lookahead, _V_EGO)
+    assert np.isclose(diagnostics.min_lane_probability, 0.9)
+    assert np.isclose(diagnostics.max_lane_std, 0.1)
 
   def test_small_center_error_does_not_chatter(self):
-    _, output = _converge(_model(left=-1.75, right=1.85), authority=0.0)
+    controller, output = _converge(_model(left=-1.75, right=1.85), authority=0.0)
     assert output == 0.0
+    assert controller.diagnostics.reason == LaneCenteringReason.CENTERED
+    assert not controller.diagnostics.active
 
   def test_offset_direction(self):
     _, right = _converge(_model(), offset=0.2, authority=0.0)
@@ -326,9 +420,11 @@ class TestLaneCentering(OpenpilotTestCase):
   def test_confident_e2e_path_can_fully_break_in(self):
     model = _model(left=-1.0, right=2.6, model_y=0.0, path_std=0.1)
     _, lane_authority = _converge(model, authority=0.0)
-    _, e2e_authority = _converge(model, authority=1.0)
+    controller, e2e_authority = _converge(model, authority=1.0)
     assert lane_authority > 0.0
     assert abs(e2e_authority) < 1e-9
+    assert controller.diagnostics.reason == LaneCenteringReason.MODEL_AUTHORITY
+    assert not controller.diagnostics.active
 
   def test_uncertain_e2e_path_does_not_break_in(self):
     model = _model(left=-1.0, right=2.6, model_y=0.0, path_std=0.6)

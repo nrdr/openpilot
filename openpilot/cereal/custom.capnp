@@ -471,7 +471,39 @@ struct ModelDataV2SP @0xa1680744031fdb2d {
   }
 }
 
-struct CustomReserved10 @0xcb9fd56c7057593a {
+struct LaneCenteringStateSP @0xcb9fd56c7057593a {
+  # Passive observability published after the actuation decision. This service
+  # is never consumed by card or a vehicle controller. `unavailable` is ordinal
+  # zero so new readers fail closed when decoding an older message or log.
+  reason @0 :Reason;                     # Dominant state or gate for this sampled control frame.
+  speedArmed @1 :Bool;                   # Controller's latched speed-arm state after this frame.
+  active @2 :Bool;                       # Actively targets a nonzero correction; false while fading.
+  correctionCurvature @3 :Float32;       # Filtered curvature currently added to the model command.
+  targetCorrectionCurvature @4 :Float32; # Bounded target before the temporal filter.
+  centerError @5 :Float32;               # Raw lateral target-minus-model error at lookahead, meters.
+  effectiveCenterError @6 :Float32;      # Error after deadband and model-authority reduction, meters.
+  laneWidth @7 :Float32;                 # Detected boundary separation at lookahead, meters.
+  lookahead @8 :Float32;                 # Evaluation distance, meters.
+  minLaneProbability @9 :Float32;        # Lower probability of the two selected boundaries.
+  maxLaneStd @10 :Float32;               # Higher standard deviation of the selected boundaries.
+
+  enum Reason {
+    unavailable @0;
+    disabled @1;
+    lateralInactive @2;
+    invalidInput @3;
+    modelInvalid @4;
+    driverOverride @5;
+    laneChange @6;
+    belowSpeed @7;
+    turnSignalFade @8;
+    laneDataInvalid @9;
+    laneConfidenceLow @10;
+    laneGeometryInvalid @11;
+    centered @12;
+    modelAuthority @13;
+    correcting @14;
+  }
 }
 
 struct CustomReserved11 @0xc2243c65e0340384 {

@@ -26,7 +26,7 @@ class LaneCenteringLayoutMici(NavScroller):
       toggle_callback=self._on_lane_centering,
     )
     self._pause_on_signal_toggle = BigToggle(
-      "pause on turn signal",
+      "fade on turn signal",
       initial_state=bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)),
       toggle_callback=self._on_pause_on_signal,
     )
@@ -43,7 +43,7 @@ class LaneCenteringLayoutMici(NavScroller):
       font_size=40,
     )
     self._model_authority_toggle = BigMultiToggle(
-      "model path authority",
+      "model break-in",
       list(LANE_CENTERING_E2E_AUTHORITY_LABELS),
       select_callback=self._on_model_authority,
       font_size=40,

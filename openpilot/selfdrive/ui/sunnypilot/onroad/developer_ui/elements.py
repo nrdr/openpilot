@@ -8,6 +8,12 @@ import pyray as rl
 from dataclasses import dataclass
 
 from openpilot.common.constants import CV
+from openpilot.selfdrive.ui.sunnypilot.onroad.lane_centering_status import (
+  LANE_CENTERING_REASON_LABELS,
+  LANE_CENTERING_SUSPENDED_REASONS,
+  LaneCenteringReason,
+  lane_centering_reason_code,
+)
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 
@@ -82,6 +88,29 @@ class LateralControlElement:
         color = rl.Color(255, 188, 0, 255)
 
     return color
+
+
+class LaneCenteringStatusElement:
+  """Read-only status for the passive lane-centering diagnostic message."""
+
+  def update(self, sm, is_metric: bool) -> UiElement:
+    del is_metric
+    if (sm.recv_frame["laneCenteringStateSP"] < ui_state.started_frame or
+        not sm.alive["laneCenteringStateSP"] or not sm.valid["laneCenteringStateSP"]):
+      return UiElement("--", "LANE CTR", "", rl.WHITE)
+
+    lane_centering = sm["laneCenteringStateSP"]
+    reason = lane_centering_reason_code(lane_centering.reason)
+    value = LANE_CENTERING_REASON_LABELS.get(reason, "--")
+    if lane_centering.active:
+      color = rl.Color(0, 255, 0, 255)
+    elif reason in LANE_CENTERING_SUSPENDED_REASONS:
+      color = rl.Color(255, 188, 0, 255)
+    elif reason == int(LaneCenteringReason.disabled):
+      color = rl.Color(145, 155, 149, 255)
+    else:
+      color = rl.WHITE
+    return UiElement(value, "LANE CTR", "", color)
 
 
 class RelDistElement(LeadInfoElement):

@@ -278,7 +278,7 @@ sections:
         widget: toggle
         title: Enable Lane Centering
         description: Disabled by default. Enable confidence-gated lane centering for the next drive.
-        details: Biases the model path toward the center of two confident lane boundaries while preserving the normal curvature and jerk limits. It waits when either boundary is uncertain and makes no correction while the model path is already centered.
+        details: Adds a bounded curvature correction toward the center of two confident lane boundaries while preserving the normal curvature and jerk limits. It waits when either boundary is uncertain. When the model path is already centered, it targets no new correction and fades any existing correction toward zero.
         enablement:
         - $ref: '#/macros/offroad'
         - $ref: '#/macros/not_engaged'
@@ -297,8 +297,8 @@ sections:
         - {type: param, key: LaneCentering, equals: true}
       - key: LaneCenteringPauseOnSignal
         widget: toggle
-        title: Pause on Turn Signal
-        description: Fade out the correction while a turn signal is active. Once a lane-change maneuver begins, the correction stops immediately.
+        title: Fade on Turn Signal
+        description: Fade out the correction while a turn signal is active. Lane-change maneuvers always suspend the correction immediately, regardless of this setting.
         enablement:
         - $ref: '#/macros/offroad'
         - $ref: '#/macros/not_engaged'
@@ -317,8 +317,9 @@ sections:
         - {type: param, key: LaneCentering, equals: true}
       - key: LaneCenteringE2EAuthority
         widget: option
-        title: Model Path Authority
-        description: Allow a confident model path to reduce the lane-line correction when the paths disagree. 1.0 gives the model full authority; 0.0 retains the full lane-line correction.
+        title: Model Break-In
+        description: When a confident model path disagrees with lane center by more than 0.15 m, allow it to reduce the correction. At 1.0, the correction can reach zero by 0.50 m of disagreement; 0.0 never reduces it.
+        details: This conditional model break-in does not change ordinary lane-center correction strength and has no effect while the paths differ by 0.15 m or less.
         min: 0.0
         max: 1.0
         step: 0.05
