@@ -177,11 +177,11 @@ class Controls(ControlsExt):
       self.lane_center_offset,
       self.lane_centering_e2e_authority,
       self.lane_centering_strength,
-      CC.latActive,
+      CC.latActive and not self.sm.valid['lateralManeuverPlan'],
       bool(self.sm.all_checks(['modelV2'])),
       self.lane_centering_pause_on_signal,
       bool(CS.leftBlinker or CS.rightBlinker),
-      bool(CS.steeringPressed))
+      bool(CS.steeringPressed), model_frame=self.sm.logMonoTime['modelV2'])
 
     self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll)
     lat_delay = self.lat_delay + LAT_SMOOTH_SECONDS

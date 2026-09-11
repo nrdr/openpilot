@@ -516,17 +516,20 @@ class TestLaneCentering(OpenpilotTestCase):
     assert np.isclose(outputs[2], 0.004 * 0.30, atol=1e-6)
     assert all(output <= 0.004 * 0.30 + 1e-12 for output in outputs)
 
-  def test_default_strength_target_is_bit_identical_to_legacy_expression(self):
+  def test_default_strength_target_preserves_raw_and_final_caps(self):
     rng = np.random.default_rng(0x1A2E)
     samples = np.concatenate((
       np.array([-1.0, -0.004, -0.004 + 1e-12, 0.0, 0.004 - 1e-12, 0.004, 1.0]),
       rng.uniform(-0.02, 0.02, 10_000),
     ))
+    controller = LaneCenteringController()
+    model = _model()
     for raw_correction in samples:
       bounded = float(np.clip(raw_correction, -0.004, 0.004))
       legacy = bounded * 0.30
-      strengthened = float(np.clip(bounded * LANE_CENTERING_STRENGTH_DEFAULT, -0.0012, 0.0012))
-      assert strengthened.hex() == legacy.hex()
+      controller._raw_correction = lambda *_: (True, float(raw_correction))
+      _update(controller, model, strength=LANE_CENTERING_STRENGTH_DEFAULT)
+      assert controller.diagnostics.target_correction_curvature.hex() == legacy.hex()
 
   def test_strength_changes_ordinary_error_where_model_break_in_is_flat(self):
     # A 10 cm raw disagreement is below the 15 cm model break-in threshold,

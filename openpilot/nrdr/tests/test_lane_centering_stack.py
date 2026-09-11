@@ -145,7 +145,8 @@ class TestLaneCenteringStack(unittest.TestCase):
     strength = items[4]
     self.assertEqual(strength["title"], "Lane-Centering Strength")
     self.assertEqual({field: strength[field] for field in ("min", "max", "step")}, {"min": 0.0, "max": 1.0, "step": 0.05})
-    self.assertIn("0.30 matches the previous behavior", strength["description"])
+    self.assertIn("0.30 is the default", strength["description"])
+    self.assertIn("1.0 requests the lane-center path", strength["description"])
     self.assertIn("without raising the existing maximum correction ceiling", strength["description"])
     self.assertEqual(items[5]["title"], "Model Break-In")
     self.assertIn("more than 0.15 m", items[5]["description"])
@@ -200,7 +201,8 @@ class TestLaneCenteringStack(unittest.TestCase):
   def test_driver_override_is_wired_without_other_starpilot_controls(self) -> None:
     controlsd = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/controlsd.py").read_text(encoding="utf-8")
     controller = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/lib/lane_centering.py").read_text(encoding="utf-8")
-    self.assertIn("bool(CS.steeringPressed))", controlsd)
+    self.assertIn("bool(CS.steeringPressed), model_frame=self.sm.logMonoTime['modelV2']", controlsd)
+    self.assertIn("CC.latActive and not self.sm.valid['lateralManeuverPlan']", controlsd)
     self.assertIn("if driver_override:", controller)
     for prohibited in ("left_only", "right_only", "visualizer", "turn_hold", "turn_lead", "lane_change_jerk"):
       self.assertNotIn(prohibited, controller)

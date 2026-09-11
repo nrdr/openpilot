@@ -46,8 +46,8 @@ class LaneCenteringLayout(Widget):
 
     self._lane_centering_toggle = toggle_item_sp(
       title=tr("Enable Lane Centering"),
-      description=tr("Add a bounded curvature correction toward the center of two confident lane boundaries while preserving the normal " +
-                     "curvature and jerk limits. It waits when either boundary is uncertain. When the model path is already centered, it " +
+      description=tr("Build a lane-center path from two confident boundaries and compare it with the model across the steering preview, " +
+                     "while preserving the normal curvature and jerk limits. It waits when either boundary is uncertain. When the model path is already centered, it " +
                      "targets no new correction and fades any existing correction toward zero."),
       initial_state=ui_state.params.get_bool("LaneCentering"),
       enabled=self._write_allowed,
@@ -82,8 +82,8 @@ class LaneCenteringLayout(Widget):
     )
     self._strength_control = self._option_item(
       title=tr("Lane-Centering Strength"),
-      description=tr("Set the direct pull toward the detected lane center. 0% leaves the model path unchanged; 30% matches the previous " +
-                     "behavior; 100% responds more strongly without raising the existing maximum correction ceiling."),
+      description=tr("Blend the model path toward the lane-center path. 0% uses the model path; 100% requests the lane-center path. " +
+                     "Confidence, Model Break-In, and the existing correction and steering limits still apply. 30% is the default."),
       param="LaneCenteringStrength",
       min_value=0,
       max_value=100,
