@@ -1,0 +1,46 @@
+name: Lane centering development checks
+
+on:
+  push:
+    branches: ['codex/lane-center-*']
+  pull_request:
+    paths:
+      - 'openpilot/selfdrive/controls/lib/lane_centering.py'
+      - 'openpilot/selfdrive/controls/controlsd.py'
+      - 'openpilot/selfdrive/controls/tests/test_lane_center*.py'
+      - 'openpilot/selfdrive/modeld/modeld.py'
+      - 'openpilot/sunnypilot/modeld_v2/modeld.py'
+      - 'openpilot/cereal/custom.capnp'
+      - 'openpilot/nrdr/tests/test_lane*.py'
+      - 'openpilot/nrdr/tests/test_model_timing_metadata.py'
+      - 'openpilot/nrdr/ui/sunnylink/pages/steering.yaml'
+      - '.github/workflows/lane-centering-development.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  numerical-and-wiring:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: false
+          lfs: false
+      - name: Install isolated test dependencies
+        run: |
+          python3 -m venv .lane-tests
+          .lane-tests/bin/python -m pip install numpy==2.5.2 pytest==9.1.1 PyYAML==6.0.3
+      - name: Check controller, delay response, metadata, and settings
+        run: |
+          .lane-tests/bin/python -m pytest -p no:cacheprovider \
+            openpilot/selfdrive/controls/tests/test_lane_center_path.py \
+            openpilot/nrdr/tests/test_lane_centering_stack.py \
+            openpilot/nrdr/tests/test_model_timing_metadata.py \
+            openpilot/nrdr/tests/test_lane_timing_consumer.py -q
+          .lane-tests/bin/python openpilot/sunnypilot/sunnylink/tools/compile_settings_ui.py --check
+      # Deliberately no build, release, device access, or branch mutation.

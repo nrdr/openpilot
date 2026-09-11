@@ -46,9 +46,9 @@ class LaneCenteringLayout(Widget):
 
     self._lane_centering_toggle = toggle_item_sp(
       title=tr("Enable Lane Centering"),
-      description=tr("Build a lane-center path from two confident boundaries and compare it with the model across the steering preview, " +
-                     "while preserving the normal curvature and jerk limits. It waits when either boundary is uncertain. When the model path is already centered, it " +
-                     "targets no new correction and fades any existing correction toward zero."),
+      description=tr("Development feature. Compare a lane-center path with the model after the steering action takes effect. " +
+                     "Requires two confident boundaries, matching model timing, and at least one second of valid post-action preview. " +
+                     "Unavailable or excessive timing (over 0.475 seconds) fades back to the model. Normal curvature and jerk limits remain in force."),
       initial_state=ui_state.params.get_bool("LaneCentering"),
       enabled=self._write_allowed,
       callback=self._on_lane_centering,

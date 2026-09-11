@@ -1115,8 +1115,8 @@
                   "key": "LaneCentering",
                   "widget": "toggle",
                   "title": "Enable Lane Centering",
-                  "description": "Disabled by default. Enable confidence-gated lane centering for the next drive.",
-                  "details": "Builds a lane-center path from two confident boundaries and compares it with the model across the steering preview. Checks the corridor farther ahead for diverging markings and smoothly reduces authority as confidence falls. It waits when either boundary is uncertain. When the model path is already centered, it targets no new correction and fades any existing correction toward zero. Normal curvature and jerk limits remain in force.",
+                  "description": "Disabled by default. Development-only, delay-aware lane centering; not road-validated.",
+                  "details": "Builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Requires matching model timing and at least one second of valid post-action preview. Unavailable or excessive timing (over 0.475 seconds) fades back to the model; TIME and SHORT diagnostics explain timing and preview gates. Checks the corridor farther ahead for diverging markings and reduces authority as confidence falls. When the paths agree, it requests no correction. The combined model and lane command still passes through the normal curvature and jerk limits.",
                   "enablement": [
                     {
                       "type": "offroad_only"

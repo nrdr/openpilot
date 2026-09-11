@@ -56,6 +56,8 @@ def main():
   parser.add_argument('--force-lateral', action='store_true', help='Offline sensitivity only; ignores recorded engagement')
   parser.add_argument('--min-speed-mph', type=int, default=50)
   parser.add_argument('--max-models', type=int, default=4000)
+  parser.add_argument('--assumed-action-time', type=float, default=None,
+                      help='Offline sensitivity only: explicit action time for legacy logs without matching timing metadata')
   args = parser.parse_args()
   guard = offroad_guard()
   candidate_class = load_candidate(args.candidate.resolve(strict=True))
@@ -111,7 +113,7 @@ def main():
               args.force_lateral or (lateral_active and fresh_lateral), bool(event.valid and fresh_state),
               pause_on_signal=True, turn_signal_active=bool(state.leftBlinker or state.rightBlinker),
               driver_override=bool(state.steeringPressed),
-              **({'model_frame': event.logMonoTime} if candidate else {}),
+              **({'model_frame': event.logMonoTime, 'action_time': args.assumed_action_time} if candidate else {}),
             )
             elapsed_us = (time.perf_counter_ns() - start) / 1000.0
             assert np.isfinite(output), f'Non-finite output in {key}'
@@ -135,6 +137,7 @@ def main():
     print(json.dumps(total[-1]), flush=True)
   guard()
   print(json.dumps({'status': 'completed', 'offline_only': True, 'forced_lateral': args.force_lateral,
+                    'assumed_action_time': args.assumed_action_time,
                     'min_speed_mph': args.min_speed_mph, 'logs': len(total)}))
 
 

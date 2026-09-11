@@ -1,64 +1,56 @@
-# Lane-center path prototype — deployment held
+# Delay-aware lane centering — development source only
 
-Status: **not drive-ready; not installed into the C4's running checkout; not published**.
-
+Branch: `codex/lane-center-path-20260911` in `nrdr/openpilot`.
 Base: `8c3e4c0e155ec8119a3dd6f5d4a600657451abe9`, the private C4 stability build.
-Working branch: `codex/lane-center-path-20260911`.
+
+**Not a road-qualified release. Not activated on the C4 or published to nightly.**
+The feature remains disabled by default; an existing enabled preference is preserved.
 
 ## Implemented
 
-- Fit a bounded curvature correction to lane-minus-model path error across 17 preview samples instead of one endpoint.
-- Require both lane boundaries; preserve the actual midpoint when their confidence differs.
-- Check width over multiple horizons, continuously weight confidence/uncertainty, and add confidence rearming hysteresis and filtered width history.
-- Cache geometry at model rate while retaining 100 Hz output smoothing and engagement/driver checks.
-- Preserve raw/final correction caps, downstream curvature limits, driver override, lane-change suspension, and model validity checks. Bypass this controller during lateral maneuver overrides.
-- Update the existing strength descriptions on-device and in Sunnylink without adding another toggle.
-- Add numerical tests and a read-only, off-road-guarded log replay tool.
+- Fit lane-minus-model path error across multiple samples using both confident boundaries. Coherent model/lane curves cancel.
+- Both model pipelines publish their actual steering-action time, including model-specific smoothing, and the exact matching model-message identity.
+- Accept only matching, valid timing. Missing, legacy, mismatched, invalid, or excessive timing fades out only the lane overlay. This is not a new global communication-health or engagement dependency.
+- Locate actuation using the model's position time/distance samples. Only absent/empty time arrays use the explicit constant-speed approximation; malformed nonempty arrays fail closed.
+- Fit the response 0.25–1.5 seconds after actuation, requiring at least one second of valid common preview. Never extrapolate beyond available lane/model coverage.
+- Remove the redundant 0.4-second feedback filter. The combined model and lane command still passes through the existing total-curvature jerk/acceleration limiter. Keep smooth release on confidence, timing, speed, and signal loss.
+- Preserve correction caps, driver override, lane-change suspension, both-boundary checks, and model validity checks. Bypass during lateral maneuver overrides. Zero strength clears residual correction even if timing disappears simultaneously.
+- Check corridor width across multiple horizons; weight confidence continuously and add rearming hysteresis. Width history affects confidence, not the lane midpoint.
+- Cache geometry at model rate. Add `TIME` and `SHORT` diagnostics without another settings toggle.
+- Add source-only GitHub numerical/wiring checks. They do not compile, release, mutate branches, or access devices.
 
-This adapts ideas from phr00t's legacy lane planner to the current action-based control stack. It is **not** a drop-in port of the legacy lateral MPC and does not promise exclusive lane-derived steering at 100% strength. Existing limits and Model Break-In still apply. Catpilot stabilization is out of scope.
+This adapts ideas from [phr00t's lane planner](https://github.com/phr00t/openpilot/blob/oldbranch/selfdrive/controls/lib/lane_planner.py) to the current action-based stack, not a drop-in port of the [legacy lateral MPC](https://github.com/phr00t/openpilot/blob/oldbranch/selfdrive/controls/lib/lateral_planner.py). At 100% strength, correction caps and Model Break-In still apply; this is not exclusive lane-derived steering or a promise of exact physical position. Catpilot stabilization is out of scope.
 
-References:
+## Restricted timing envelope
 
-- https://github.com/phr00t/openpilot/blob/oldbranch/selfdrive/controls/lib/lane_planner.py
-- https://github.com/phr00t/openpilot/blob/oldbranch/selfdrive/controls/lib/lateral_planner.py
+The published action-time ceiling is **0.475 seconds**, corresponding to the conservative synthetic test's 0.4-second physical delay plus 0.075-second perception/action timing. It is total published action time, not merely a user-entered software-delay setting.
 
-## Verification
+Above this limit, the overlay fades toward the original model command and shows `TIME`. Do not raise the limit without revalidating the closed loop. This guard does not repair combinations outside the supported range; it prevents the overlay from operating there.
 
-- Native controller regression suite on the C4, loading the candidate from an isolated temporary directory: **77 passed** using `unittest` and the installed cereal/native runtime.
-- Local settings/stack and new numerical suite: **36 passed, 1 failed, 20 subtests passed**. The failure remains enabled, with its original bounds.
-- Sunnylink generated metadata matches its source; Git whitespace check passes.
-- Offline replay of two local highway segments (routes `00000041--650904f9fd`, `0000004c--adbfcb4969`), 1,963 model frames total, maximum recorded speed approximately 29.1 m/s: finite outputs and correction-cap checks passed for strengths 0.3/1.0 and Model Break-In 0/1.
-- Replay forced lateral availability solely for offline sensitivity. It is not a closed-loop driving test. Replay-generated `modelInvalid` classifications include the harness's freshness rule and must not be interpreted as a diagnosis of the drive's communication alerts.
-- On that replay, candidate fresh-frame work was approximately 1.9–2.0 ms at p95, cached ticks approximately 0.19–0.20 ms; installed-controller ticks were approximately 1.3 ms. These are isolated off-road measurements, not whole-system scheduling certification.
+A 60-second simulation at 40 m/s, 0.5-second physical delay, and full strength retained an approximately 0.44 m side-to-side limit cycle despite passing the short test and respecting correction caps. That scenario remains an explicit opt-in, gate-bypassing extrapolation test with the original strict failure bound, not supported behavior.
 
-## Blocking result
+## Verification and limitations
 
-The synthetic straight-lane bicycle test starts 0.60 m from center, with perfect boundaries and no model break-in:
+- Combined local numerical, settings, and timing suite: **268 passed, 20 subtests passed, 2 skipped**. The two skips are the explicitly unsupported, opt-in mirrored half-second-delay extrapolations described above.
+- Native C4 runtime: **79 controller/schema checks passed** with candidate schemas/modules loaded from an isolated temporary directory, including actual Cap'n Proto timing serialization.
+- Supported long-duration numerical envelope: **36/36 cases passed** (60 seconds each): 40 m/s across 0.1–0.4-second physical delays, strengths 0.3/0.5/0.7/1, and both signs of initial offset; plus 12 and 25 m/s at 0.4-second delay/full strength/both signs.
+- The numerical harness uses ideal lane detection, a conservative 75 ms-old perception state, explicit actuation delay, and the actual shared curvature limiter. Its zero neural-model steering action and simplified bicycle dynamics do not prove compatibility with real learned steering, obstacle avoidance, tire/EPS response, or camera calibration.
+- Offline replay of two highway segments (1,963 model frames; maximum recorded speed about 29.1 m/s) passed finite-output and correction-cap checks at strengths 0.3/1 and Model Break-In 0/1.
+- Those legacy logs lack the new timing fields. Replay used an **explicit 0.275-second timing assumption** and forced lateral availability only for offline sensitivity. It does not verify actual steering response or the new live cross-message timing path.
+- Replay-generated `modelInvalid` classifications include the harness freshness rule and are not a diagnosis of the drive's communication alerts.
+- Candidate geometric work measured about 2.1–2.2 ms at p95 for new frames, 0.19–0.20 ms for cached ticks. These are isolated off-road measurements, not whole-system scheduling certification.
 
-| Strength | Actuation delay | Maximum absolute position | Final position at 12 s | Result |
-| --- | --- | --- | --- | --- |
-| 0.30 | 0.20 s | 0.600 m | -0.0969 m | Pass |
-| 1.00 | 0.40 s | 1.7074 m | -1.4988 m | **Fail** |
+Before deployment/release: hardware-in-loop or controlled-course validation, actual model-action interactions and message-skew checks, splits/poor markings/sharp or banked curves, and vehicle-specific Clarity/Lexus testing. The broader communication-alert investigation is separate and is **not claimed fixed** here. Existing nonfinite-base-action handling outside the overlay is also not reworked.
 
-The second case exceeds the unchanged 1.2 m excursion and 0.3 m final-error requirements. Although the simulation is simplified, growing lateral error is a reason to withhold deployment, not to weaken the test or suppress alerts.
+## Historical failure
 
-Review also found an action-timing mismatch: the new correction fits current-frame path error over roughly 0.25–1.0 seconds ahead, while standard modeld targets actuation at live delay plus `1.5 * DT_MDL` (currently 0.075 s). Some model variants add their own smoothing delay. The correction itself also has a 0.4-second filter. At larger delays, the fit can target a region the new steering action cannot affect.
+The first prototype (`0a4d79efe5`) passed existing tests but failed a 12-second delayed loop at 25 m/s, full strength, and 0.4-second actuation delay: 1.7074 m excursion and 1.4988 m final error. It was never activated. Temporal misalignment and the extra feedback filter motivated the revised architecture and longer tests.
 
-Next gate: design and verify a delay-aware, sufficiently long post-actuation preview; account for model-variant timing; rerun closed-loop speed/delay/strength/confidence sweeps, then real-log replay and startup checks. No road qualification has been performed.
-
-An independent in-memory exploration covered speeds 12/20/30/40 m/s, delays 0.1–0.5 s, strengths 0.3/0.5/0.7/1.0, and initial positions +/-0.6 m. The unchanged prototype's worst excursion reached 6.246 m (40 m/s, 0.5 s delay, full strength). A longer preview or removal of the extra filter alone did not remain robust across the grid. Combining action-aligned post-actuation fitting with removal of the extra 0.4-second filter, while retaining the actual shared jerk limiter, kept excursion within the initial 0.600 m and worst final error within 0.0872 m in that simplified exploration. **That alternative was not applied to production code or the device.** It identifies the next architecture to validate; it does not turn the committed failing prototype into a passing or drive-ready build.
-
-## Device state and preservation
-
-Only isolated test/replay artifacts were copied to `/tmp/codex-lane-path-validation.eYQL6l`; none were activated. No branch updates, live source edits, settings changes, reboots, CAN commands, or publishing were performed.
-
-Post-test read-only check: C4 still reports commit `8c3e4c0`, branch `nrdr-c4-stability-09.11.2026`, off-road, ignition false, Panda `noOutput`, and no required processes stopped. This is an off-road health snapshot, not confirmation that the previously reported on-road communication issue is resolved.
-
-Reproduce the local gate:
+## Reproduction
 
 ```text
-python -m pytest -p no:cacheprovider openpilot/nrdr/tests/test_lane_centering_stack.py openpilot/selfdrive/controls/tests/test_lane_center_path.py -q
+python -m pytest -p no:cacheprovider openpilot/selfdrive/controls/tests/test_lane_center_path.py openpilot/nrdr/tests/test_lane_centering_stack.py openpilot/nrdr/tests/test_model_timing_metadata.py openpilot/nrdr/tests/test_lane_timing_consumer.py -q
 python openpilot/sunnypilot/sunnylink/tools/compile_settings_ui.py --check
 ```
 
-The first command is intentionally red until the delayed-loop failure is fixed.
+Native checks use `openpilot/tools/diagnostics/lane_centering_native_check.py`; legacy-log sensitivity uses `lane_centering_replay.py`. Both require fresh off-road/no-output state. Neither changes the live checkout, installed branch, user settings, model files, safety configuration, or CAN outputs.

@@ -137,8 +137,10 @@ class TestLaneCenteringStack(unittest.TestCase):
       {"min": 12, "max": 100, "step": 1, "unit": "mph"},
     )
     self.assertIn("5 m/s controller floor", minimum_speed["description"])
-    self.assertIn("waits when either boundary is uncertain", items[0]["details"])
-    self.assertIn("targets no new correction and fades any existing correction toward zero", items[0]["details"])
+    self.assertIn("two confident boundaries", items[0]["details"])
+    self.assertIn("When the paths agree, it requests no correction", items[0]["details"])
+    self.assertIn("matching model timing", items[0]["details"])
+    self.assertIn("not road-validated", items[0]["description"])
     self.assertEqual(items[2]["title"], "Fade on Turn Signal")
     self.assertIn("always suspend", items[2]["description"])
     self.assertIn("regardless of this setting", items[2]["description"])

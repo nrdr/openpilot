@@ -6,6 +6,7 @@ from openpilot.cereal import custom
 from openpilot.common.constants import CV
 from openpilot.common.parameterized import parameterized
 from openpilot.common.test import OpenpilotTestCase
+from openpilot.selfdrive.controls.lib.drive_helpers import clip_curvature
 from openpilot.selfdrive.ui.sunnypilot.onroad.lane_centering_status import (
   LANE_CENTERING_REASON_LABELS,
   lane_centering_reason_code,
@@ -26,7 +27,7 @@ from openpilot.selfdrive.controls.lib.lane_centering import (
 
 
 _V_EGO = 55.0 * CV.MPH_TO_MS
-_XS = np.linspace(0.0, 50.0, 52)
+_XS = np.linspace(0.0, 100.0, 102)
 
 
 def _path(y, y_std=0.1):
@@ -48,9 +49,10 @@ def _model(left=-1.8, right=1.8, model_y=0.0, lane_prob=0.9, lane_std=0.1, path_
 
 
 def _update(controller, model, *, model_curvature=0.0, offset=0.0, authority=1.0, strength=0.30, min_speed_mph=50, enabled=True,
-            active=True, valid=True, speed=_V_EGO, pause_on_signal=False, turn_signal_active=False, driver_override=False):
+            active=True, valid=True, speed=_V_EGO, pause_on_signal=False, turn_signal_active=False, driver_override=False,
+            action_time=0.275):
   return controller.update(model_curvature, model, speed, min_speed_mph, enabled, offset, authority, strength, active, valid,
-                           pause_on_signal, turn_signal_active, driver_override)
+                           pause_on_signal, turn_signal_active, driver_override, action_time=action_time)
 
 
 def _converge(model, *, offset=0.0, authority=1.0, strength=0.30):
@@ -80,6 +82,8 @@ class TestLaneCentering(OpenpilotTestCase):
       "modelAuthority",
       "correcting",
       "zeroStrength",
+      "timingUnavailable",
+      "previewTooShort",
     ]
     assert [reason.value for reason in LaneCenteringReason] == reason_values
     capnp_reason = custom.LaneCenteringStateSP.Reason
@@ -385,14 +389,14 @@ class TestLaneCentering(OpenpilotTestCase):
     assert controller.diagnostics.reason == LaneCenteringReason.LANE_CHANGE
     assert not controller.diagnostics.active
 
-  def test_driver_override_resets_and_reacquires_smoothly(self):
+  def test_driver_override_resets_without_an_extra_feedback_filter(self):
     model = _model(left=-1.5, right=2.1)
     controller, centered = _converge(model, authority=0.0)
     model_curvature = 0.0013
 
     assert _update(controller, model, model_curvature=model_curvature, authority=0.0, driver_override=True) == model_curvature
     reacquiring = _update(controller, model, model_curvature=model_curvature, authority=0.0)
-    assert model_curvature < reacquiring < model_curvature + centered
+    assert np.isclose(reacquiring, model_curvature + centered)
 
   @parameterized.expand([
     ("prob", np.nan),
@@ -429,7 +433,7 @@ class TestLaneCentering(OpenpilotTestCase):
     assert np.isclose(diagnostics.center_error, 0.3)
     assert np.isclose(diagnostics.effective_center_error, 0.22)
     assert np.isclose(diagnostics.lane_width, 3.6)
-    assert np.isclose(diagnostics.lookahead, _V_EGO)
+    assert np.isclose(diagnostics.lookahead, _V_EGO * (0.275 + 1.5))
     assert np.isclose(diagnostics.min_lane_probability, 0.9)
     assert np.isclose(diagnostics.max_lane_std, 0.1)
 
@@ -488,13 +492,15 @@ class TestLaneCentering(OpenpilotTestCase):
       fading = _update(controller, _model(left=-1.5, right=2.1, lane_prob=0.2), authority=0.0)
     assert abs(fading) < 1e-6
 
-  def test_correction_is_smoothed_and_capped(self):
+  def test_combined_command_is_jerk_limited_without_an_extra_feedback_filter(self):
     controller = LaneCenteringController()
-    model = _model(left=0.0, right=3.0, path_std=0.6)
+    model = _model(left=0.0, right=3.0, model_y=-20.0, path_std=0.6)
     first = _update(controller, model, authority=0.0)
     _, steady = _converge(model, authority=0.0)
-    assert 0.0 < first < steady
+    assert first == steady
     assert np.isclose(steady, 0.004 * 0.30, atol=1e-6)
+    limited, _ = clip_curvature(_V_EGO, 0.0, first, 0.0)
+    assert 0.0 < limited < first
 
   def test_strength_zero_is_exact_model_output(self):
     model_curvature = -0.0017
@@ -509,7 +515,7 @@ class TestLaneCentering(OpenpilotTestCase):
     assert not controller.diagnostics.active
 
   def test_strength_is_monotonic_and_preserves_existing_final_envelope(self):
-    model = _model(left=0.0, right=3.0, path_std=0.6)
+    model = _model(left=0.0, right=3.0, model_y=-20.0, path_std=0.6)
     outputs = [_converge(model, authority=0.0, strength=strength)[1] for strength in (0.0, 0.15, 0.30, 0.50, 1.0)]
     assert outputs == sorted(outputs)
     assert outputs[0] == 0.0

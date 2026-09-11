@@ -463,6 +463,10 @@ struct ModelDataV2SP @0xa1680744031fdb2d {
   laneTurnDirection @0 :TurnDirection;
   leftLaneChangeEdgeBlock @1 :Bool;
   rightLaneChangeEdgeBlock @2 :Bool;
+  # Optional identity/timing metadata for joining this extension to modelV2.
+  # Scalar zero is the unavailable value when reading messages from older builds.
+  modelMonoTime @3 :UInt64;       # Exact logMonoTime of the corresponding modelV2 event.
+  lateralActionTime @4 :Float32;  # Seconds from the source vision frame to the lateral action target.
 
   enum TurnDirection {
     none @0;
@@ -504,6 +508,8 @@ struct LaneCenteringStateSP @0xcb9fd56c7057593a {
     modelAuthority @13;
     correcting @14;
     zeroStrength @15;
+    timingUnavailable @16;
+    previewTooShort @17;
   }
 }
 

@@ -24,13 +24,20 @@ _MIN_CENTER_TO_LINE = 1.1
 _MAX_RAW_CORRECTION = 0.004
 _MAX_GAIN = 0.30
 _MAX_FINAL_CORRECTION = _MAX_RAW_CORRECTION * _MAX_GAIN
-_SMOOTH_TAU = 0.4
 _SIGNAL_RELEASE_TAU = 0.20
 _CONFIDENCE_RELEASE_TAU = 0.20
 _SPEED_RELEASE_TAU = 0.20
 _CENTER_ERROR_DEADBAND = 0.08
 _PATH_SAMPLE_COUNT = 17
 _LANE_WIDTH_TAU = 3.0
+_POST_ACTION_PREVIEW = 1.5
+_MIN_POST_ACTION_PREVIEW = 1.0
+_PREVIEW_TIME_EPSILON = 1e-6
+_PREVIEW_START = 0.25
+# Initially restrict this development feature to the delay envelope exercised
+# by the long-duration closed-loop suite (0.4 s physical delay plus 0.075 s
+# model timing). Longer-delay cases exhibited persistent oscillation.
+_MAX_ACTION_TIME = 0.475
 
 _E2E_MAX_PATH_STD = 0.35
 _E2E_BREAK_IN_START = 0.15
@@ -60,6 +67,8 @@ class LaneCenteringReason(StrEnum):
   MODEL_AUTHORITY = "modelAuthority"
   CORRECTING = "correcting"
   ZERO_STRENGTH = "zeroStrength"
+  TIMING_UNAVAILABLE = "timingUnavailable"
+  PREVIEW_TOO_SHORT = "previewTooShort"
 
 
 class LaneCenteringDiagnostics:
@@ -117,6 +126,19 @@ def lane_centering_strength(value) -> float:
   return strength
 
 
+def lane_centering_action_time(model_mono_time, timing, valid: bool) -> float | None:
+  """Accept only exact-frame timing; old/absent metadata disables this overlay."""
+  try:
+    if not valid or model_mono_time <= 0 or timing.modelMonoTime != model_mono_time:
+      return None
+    action_time = float(timing.lateralActionTime)
+    if not np.isfinite(action_time) or not 0.0 < action_time <= _MAX_ACTION_TIME + 1e-6:
+      return None
+    return action_time
+  except (AttributeError, OverflowError, TypeError, ValueError):
+    return None
+
+
 class LaneCenteringController:
   def __init__(self) -> None:
     self._correction = 0.0
@@ -153,7 +175,7 @@ class LaneCenteringController:
     self.diagnostics.target_correction_curvature = target
 
   def update(self, model_curvature, model_v2, v_ego, min_speed_mph, enabled, offset, e2e_authority, strength, lat_active, model_valid,
-             pause_on_signal=False, turn_signal_active=False, driver_override=False, model_frame=None) -> float:
+             pause_on_signal=False, turn_signal_active=False, driver_override=False, model_frame=None, action_time=None) -> float:
     model_curvature = float(model_curvature)
     self._begin_diagnostics()
 
@@ -187,6 +209,13 @@ class LaneCenteringController:
       self._finish_diagnostics(LaneCenteringReason.DRIVER_OVERRIDE)
       return model_curvature
 
+    if strength == 0.0:
+      # Explicit model-only mode must not retain a residual lane correction,
+      # even while timing, confidence, or signal gates are unavailable.
+      self.reset()
+      self._finish_diagnostics(LaneCenteringReason.ZERO_STRENGTH)
+      return model_curvature
+
     try:
       if model_v2.meta.laneChangeState != log.LaneChangeState.off:
         self.reset()
@@ -213,16 +242,29 @@ class LaneCenteringController:
       self._finish_diagnostics(LaneCenteringReason.TURN_SIGNAL_FADE)
       return model_curvature + self._correction
 
+    try:
+      action_time = float(action_time)
+      timing_valid = np.isfinite(action_time) and 0.0 < action_time <= _MAX_ACTION_TIME + 1e-6
+    except (OverflowError, TypeError, ValueError):
+      timing_valid = False
+    if not timing_valid:
+      self._lanes_armed = False
+      self._lane_width_estimate = None
+      self._path_cache_key = None
+      self._correction = float(smooth_value(0.0, self._correction, _CONFIDENCE_RELEASE_TAU, dt=DT_CTRL))
+      self._finish_diagnostics(LaneCenteringReason.TIMING_UNAVAILABLE)
+      return model_curvature + self._correction
+
     # Freeze speed-dependent geometry for each 20 Hz model frame; only the
-    # output filter and engagement/driver gates run at the 100 Hz control rate.
-    cache_key = (model_frame, offset, e2e_authority)
+    # release filters and engagement/driver gates run at the 100 Hz control rate.
+    cache_key = (model_frame, offset, e2e_authority, action_time)
     if model_frame is None or cache_key != self._path_cache_key:
       path_dt = DT_CTRL if model_frame is None else DT_MDL
       if model_frame is not None and self._last_model_frame is not None:
         path_dt = float(np.clip((model_frame - self._last_model_frame) * 1e-9, DT_CTRL, 0.1))
       self._path_cache = self._raw_correction(
         model_v2, v_ego, float(np.clip(offset, -_MAX_OFFSET, _MAX_OFFSET)),
-        float(np.clip(e2e_authority, 0.0, 1.0)), path_dt,
+        float(np.clip(e2e_authority, 0.0, 1.0)), path_dt, action_time,
       )
       self._path_cache_key = cache_key
       self._last_model_frame = model_frame
@@ -244,9 +286,10 @@ class LaneCenteringController:
     # full-preview path difference into a bounded change to the modern action.
     bounded_correction = float(np.clip(raw_correction, -_MAX_RAW_CORRECTION, _MAX_RAW_CORRECTION))
     target = float(np.clip(bounded_correction * strength, -_MAX_FINAL_CORRECTION, _MAX_FINAL_CORRECTION))
-    if strength == 0.0 and raw_correction != 0.0:
-      self.diagnostics.reason = LaneCenteringReason.ZERO_STRENGTH
-    self._correction = float(smooth_value(target, self._correction, _SMOOTH_TAU, dt=DT_CTRL))
+    # Do not add another low-pass pole to this delayed feedback loop. The
+    # combined model + lane command MUST pass through controlsd.clip_curvature,
+    # which limits the final physical jerk/acceleration, including model motion.
+    self._correction = target
     self._finish_diagnostics(target=target, active=self.diagnostics.reason == LaneCenteringReason.CORRECTING and target != 0.0)
     return model_curvature + self._correction
 
@@ -260,7 +303,7 @@ class LaneCenteringController:
     return bool(x[0] <= distance <= x[-1])
 
   def _raw_correction(self, model_v2, v_ego: float, offset: float, e2e_authority: float,
-                      path_dt: float = DT_CTRL) -> tuple[bool, float]:
+                      path_dt: float = DT_CTRL, action_time: float = 0.275) -> tuple[bool, float]:
     try:
       lane_lines = model_v2.laneLines
       probs = np.asarray(model_v2.laneLineProbs, dtype=float)
@@ -296,17 +339,43 @@ class LaneCenteringController:
         self.diagnostics.reason = LaneCenteringReason.LANE_DATA_INVALID
         return False, 0.0
 
-      lookahead = float(np.clip(v_ego, 8.0, 35.0))
+      # Locate actuation in the same coordinate frame as the model's path.
+      # Nonempty malformed timing is invalid; only absent timing uses the
+      # constant-speed approximation needed by older model path formats.
+      pos_t = np.asarray(getattr(model_v2.position, 't', []), dtype=float)
+      common_end = min(left_x[-1], right_x[-1], pos_x[-1])
+      if pos_t.size:
+        if not self._valid_path(pos_t, pos_x):
+          self.diagnostics.reason = LaneCenteringReason.LANE_DATA_INVALID
+          return False, 0.0
+        if not self._covers(pos_t, action_time):
+          self.diagnostics.reason = LaneCenteringReason.PREVIEW_TOO_SHORT
+          return False, 0.0
+        action_x = float(np.interp(action_time, pos_t, pos_x))
+        end_time = min(action_time + _POST_ACTION_PREVIEW, float(np.interp(common_end, pos_x, pos_t)))
+        if end_time - action_time + _PREVIEW_TIME_EPSILON < _MIN_POST_ACTION_PREVIEW:
+          self.diagnostics.reason = LaneCenteringReason.PREVIEW_TOO_SHORT
+          return False, 0.0
+        path_x = np.interp(np.linspace(action_time + _PREVIEW_START, end_time, _PATH_SAMPLE_COUNT), pos_t, pos_x)
+        horizon = min(common_end, float(np.interp(end_time + 0.5, pos_t, pos_x)))
+      else:
+        action_x = v_ego * action_time
+        end_x = min(common_end, action_x + v_ego * _POST_ACTION_PREVIEW)
+        if end_x - action_x + v_ego * _PREVIEW_TIME_EPSILON < v_ego * _MIN_POST_ACTION_PREVIEW:
+          self.diagnostics.reason = LaneCenteringReason.PREVIEW_TOO_SHORT
+          return False, 0.0
+        path_x = np.linspace(action_x + v_ego * _PREVIEW_START, end_x, _PATH_SAMPLE_COUNT)
+        horizon = min(common_end, end_x + 0.5 * v_ego)
+      lookahead = float(path_x[-1])
       self.diagnostics.lookahead = lookahead
       corridor_start = max(0.0, left_x[0], right_x[0], pos_x[0])
-      if corridor_start > 0.25 * lookahead or not all(self._covers(x, lookahead) for x in (left_x, right_x, pos_x)):
+      if corridor_start > path_x[0] or not all(self._covers(x, lookahead) for x in (left_x, right_x, pos_x)):
         self.diagnostics.reason = LaneCenteringReason.LANE_DATA_INVALID
         return False, 0.0
 
       # Adapted from the multi-horizon corridor checks and confidence-weighted
       # lane path in phr00t/openpilot's oldbranch lane_planner. Keep current
       # finite/monotonic validation and never infer a lane from a missing side.
-      horizon = min(2.0 * lookahead, left_x[-1], right_x[-1], pos_x[-1])
       corridor_x = np.linspace(corridor_start, horizon, _PATH_SAMPLE_COUNT)
       corridor_widths = np.interp(corridor_x, right_x, right_y) - np.interp(corridor_x, left_x, left_y)
       width = float(np.interp(lookahead, corridor_x, corridor_widths))
@@ -333,7 +402,6 @@ class LaneCenteringController:
         self._lane_width_estimate = float(smooth_value(measured_width, self._lane_width_estimate, _LANE_WIDTH_TAU, dt=path_dt))
       confidence *= float(np.interp(abs(measured_width - self._lane_width_estimate), [0.2, 0.8], [1.0, 0.2]))
 
-      path_x = np.linspace(0.25 * lookahead, lookahead, _PATH_SAMPLE_COUNT)
       left = np.interp(path_x, left_x, left_y)
       right = np.interp(path_x, right_x, right_y)
       # Both boundaries remain required. Width history can soften confidence,
@@ -348,8 +416,9 @@ class LaneCenteringController:
       self.diagnostics.center_error = error
       # Fit lane-minus-model path error, not absolute camera-frame y. Shared
       # curve shape and coherent camera-frame motion then cancel exactly.
-      # This is the least-squares change to y = k*x^2/2 over the full preview.
-      basis = 0.5 * path_x ** 2
+      # The correction cannot affect the path before actuation. Fit its
+      # post-actuation response, rather than immediate curvature from x=0.
+      basis = 0.5 * (path_x - action_x) ** 2
       fit_weights = basis ** 2
       error_abs = float(np.sqrt(np.dot(fit_weights, path_errors ** 2) / np.sum(fit_weights)))
       bounded_errors = np.sign(path_errors) * np.maximum(np.abs(path_errors) - _CENTER_ERROR_DEADBAND, 0.0)
@@ -382,7 +451,7 @@ class LaneCenteringController:
       else:
         self.diagnostics.reason = LaneCenteringReason.CORRECTING
       return True, result
-    except (AttributeError, IndexError, OverflowError, TypeError, ValueError):
+    except (AttributeError, FloatingPointError, IndexError, OverflowError, TypeError, ValueError):
       self._lanes_armed = False
       self._lane_width_estimate = None
       self.diagnostics.reason = LaneCenteringReason.LANE_DATA_INVALID
