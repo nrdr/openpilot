@@ -1,9 +1,11 @@
 # Delay-aware lane centering — development source only
 
-Branch: `codex/lane-center-path-20260911` in `nrdr/openpilot`.
-Base: `8c3e4c0e155ec8119a3dd6f5d4a600657451abe9`, the private C4 stability build.
+Development branch: `nrdr-architecture-development` in `nrdr/openpilot`.
+Architecture base: `12c0427beb331411771d70070f436d63c10f2392`.
+The earlier C4 snapshot `8c3e4c0e155ec8119a3dd6f5d4a600657451abe9` added only lane-centering observability and bounded strength to that base. This work continues the same architecture history; the temporary feature/stability branch names are not deployment targets.
 
-**Not a road-qualified release. Not activated on the C4 or published to nightly.**
+**Not a road-qualified release. Not published to nightly.**
+The validation below was completed before activation. Verify an individual device's installed commit separately; a passing test or a published source branch is not proof of deployment.
 The feature remains disabled by default; an existing enabled preference is preserved.
 
 ## Implemented
@@ -31,7 +33,7 @@ A 60-second simulation at 40 m/s, 0.5-second physical delay, and full strength r
 
 ## Verification and limitations
 
-- Combined local numerical, settings, and timing suite: **268 passed, 20 subtests passed, 2 skipped**. The two skips are the explicitly unsupported, opt-in mirrored half-second-delay extrapolations described above.
+- Combined local numerical, settings, and timing suite: **269 passed, 20 subtests passed, 2 skipped**. The two skips are the explicitly unsupported, opt-in mirrored half-second-delay extrapolations described above.
 - Native C4 runtime: **79 controller/schema checks passed** with candidate schemas/modules loaded from an isolated temporary directory, including actual Cap'n Proto timing serialization.
 - Supported long-duration numerical envelope: **36/36 cases passed** (60 seconds each): 40 m/s across 0.1–0.4-second physical delays, strengths 0.3/0.5/0.7/1, and both signs of initial offset; plus 12 and 25 m/s at 0.4-second delay/full strength/both signs.
 - The numerical harness uses ideal lane detection, a conservative 75 ms-old perception state, explicit actuation delay, and the actual shared curvature limiter. Its zero neural-model steering action and simplified bicycle dynamics do not prove compatibility with real learned steering, obstacle avoidance, tire/EPS response, or camera calibration.

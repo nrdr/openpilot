@@ -2,7 +2,7 @@ name: Lane centering development checks
 
 on:
   push:
-    branches: ['codex/lane-center-*']
+    branches: ['nrdr-architecture-development']
   pull_request:
     paths:
       - 'openpilot/selfdrive/controls/lib/lane_centering.py'
