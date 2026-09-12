@@ -18,7 +18,7 @@ LANE_CENTERING_REASON_LABELS = {
   int(LaneCenteringReason.laneGeometryInvalid): "GEOM",
   int(LaneCenteringReason.centered): "CTR",
   int(LaneCenteringReason.modelAuthority): "E2E",
-  int(LaneCenteringReason.correcting): "ACT",
+  int(LaneCenteringReason.correcting): "ON",
   int(LaneCenteringReason.zeroStrength): "ZERO",
   int(LaneCenteringReason.timingUnavailable): "TIME",
   int(LaneCenteringReason.previewTooShort): "SHORT",

@@ -1,5 +1,7 @@
 # Delay-aware lane centering — development source only
 
+Historical review of the September 11 implementation. The [September 12 integration repair](lane-center-atomic-timing-2026-09-12.md) supersedes the separate-message timing contract and 0.475-second range described below. These earlier tests did not catch the producer's invalid-event flag and are not evidence that lane centering was active in the recorded drives.
+
 Development branch: `nrdr-architecture-development` in `nrdr/openpilot`.
 Architecture base: `12c0427beb331411771d70070f436d63c10f2392`.
 The earlier C4 snapshot `8c3e4c0e155ec8119a3dd6f5d4a600657451abe9` added only lane-centering observability and bounded strength to that base. This work continues the same architecture history; the temporary feature/stability branch names are not deployment targets.

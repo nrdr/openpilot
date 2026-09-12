@@ -75,6 +75,15 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
                                 shouldStop=bool(stop))
 
 
+def set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t: float) -> None:
+  """Attach action timing to modelV2 and its compatibility metadata event."""
+  action_time = float(lat_action_t)
+  modelv2_send.modelV2.action.lateralActionTime = action_time
+  mdv2sp_send.valid = modelv2_send.valid
+  mdv2sp_send.modelDataV2SP.modelMonoTime = modelv2_send.logMonoTime
+  mdv2sp_send.modelDataV2SP.lateralActionTime = action_time
+
+
 class ChestnutState:
   # only modeld can access chestnut
   def __init__(self, pm: PubMaster, big: bool):
@@ -472,8 +481,7 @@ def main(demo=False):
       r_lane_change_prob = desire_state[log.Desire.laneChangeRight]
       lane_change_prob = l_lane_change_prob + r_lane_change_prob
       mdv2sp_send = messaging.new_message('modelDataV2SP')
-      mdv2sp_send.modelDataV2SP.modelMonoTime = modelv2_send.logMonoTime
-      mdv2sp_send.modelDataV2SP.lateralActionTime = lat_action_t
+      set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t)
       left_edge, right_edge = RELC.update_and_fill(modelv2_send.modelV2, mdv2sp_send.modelDataV2SP, v_ego)
       DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob, left_edge, right_edge)
       modelv2_send.modelV2.meta.laneChangeState = DH.lane_change_state

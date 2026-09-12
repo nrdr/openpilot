@@ -104,6 +104,40 @@ Developers and reviewers can find the exact raw-data provenance and math in [the
 </details>
 
 <details>
+<summary><strong>Lane centering and the LCTR status</strong></summary>
+
+The C4's **LCTR** readout (shown as **LANE CTR** in the larger developer display) reports what the lane-centering correction is doing, not just whether its setting is enabled. **Green `ON` means it is requesting a nonzero correction.** The final steering limits still apply; this is not proof that the car is physically centered or that every requested correction reaches the steering rack.
+
+Lane centering adds a bounded correction to the model's steering request. Even at 100% strength, it does not replace the model with an unrestricted lane-only planner. Confidence checks, correction limits, driver override, lane-change handling, and the selected Model Break-In setting still apply.
+
+| Status | Meaning |
+| --- | --- |
+| `ON` | Actively requesting a lane-centering correction; green. |
+| `CTR` | The computed lane-centering correction is effectively zero; this does not confirm the car is physically centered. |
+| `SPD` | Below the configured activation speed, or waiting to reach it again after slowing down. |
+| `TIME` | Timing inside the model's steering action is missing, invalid, or outside the supported timing range. |
+| `SHORT` | Not enough usable lane/model preview remains after the expected steering-action time. |
+| `CONF` | Lane-boundary confidence is insufficient. |
+| `GEOM` | Lane width or corridor geometry failed validation. |
+| `DATA` | Required lane/path data is missing or malformed. |
+| `E2E` | Model Break-In is yielding fully to the model's path. |
+| `OVR` | Suspended because the driver is overriding steering. |
+| `LCHG` | Suspended for a lane change. |
+| `SIG` | Fading the correction out because a turn signal is active and Fade on Turn Signal is enabled. |
+| `LAT` | Lateral control is inactive. |
+| `OFF` | The lane-centering setting is disabled; gray. |
+| `ZERO` | Lane-centering strength is zero: model-only steering. |
+| `MOD` | The model input is not valid for lane centering. |
+| `BAD` | A required input or setting is invalid. |
+| `--` | Status is unavailable, stale, invalid, or unrecognized. |
+
+`OVR`, `LCHG`, and `SIG` are amber; the remaining inactive statuses are white except gray `OFF`. Some transitions fade an existing correction toward zero, so leaving green `ON` does not always mean the residual correction vanishes instantly. Only the first applicable reason is displayed: for example, speeding up can change `SPD` to `TIME` without introducing a new timing problem.
+
+**`TIME` does not itself block or disengage openpilot.** It fades out only the lane-centering correction and leaves the model-based steering path available. Timing now travels inside the model's steering action, so lane centering does not depend on receiving or matching a separate timing message. No additional timing setting is required. The controller looks farther ahead as delay increases and requires enough actual lane/model coverage for that preview; it never invents missing road geometry. The current development range extends through **0.875 seconds of total model-action timing**, including model smoothing and timing offsets—not just EPS delay. This includes the recorded approximately 0.545-second combination, but numerical tests are not proof of on-road steering quality. Older model publishers without the new action field remain unavailable instead of guessing a delay. See the [integration changes and validation limits](docs/reviews/lane-center-atomic-timing-2026-09-12.md).
+
+</details>
+
+<details>
 <summary><strong>Driver override and steering filters</strong></summary>
 
 - **Driver Override Threshold** decides how much driver torque means “the human is steering.” **Override Threshold Center Boost** can use a lower value near center. Raising either value delays the handoff to the driver.

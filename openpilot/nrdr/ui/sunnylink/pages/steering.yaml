@@ -278,7 +278,7 @@ sections:
         widget: toggle
         title: Enable Lane Centering
         description: Disabled by default. Development-only, delay-aware lane centering; not road-validated.
-        details: Builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Requires matching model timing and at least one second of valid post-action preview. Unavailable or excessive timing (over 0.475 seconds) fades back to the model; TIME and SHORT diagnostics explain timing and preview gates. Checks the corridor farther ahead for diverging markings and reduces authority as confidence falls. When the paths agree, it requests no correction. The combined model and lane command still passes through the normal curvature and jerk limits.
+        details: Builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Uses timing carried with the model action; no separate timing message or setting is needed. Looks farther ahead as delay increases and requires enough valid road preview. Missing timing, timing over 0.875 seconds, or short preview fades back to the model; TIME and SHORT explain these states. Checks the corridor farther ahead for diverging markings and reduces authority as confidence falls. When the paths agree, it requests no correction. The combined model and lane command still passes through the normal curvature and jerk limits.
         enablement:
         - $ref: '#/macros/offroad'
         - $ref: '#/macros/not_engaged'

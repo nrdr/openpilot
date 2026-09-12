@@ -2,6 +2,7 @@ import ast
 import json
 from pathlib import Path
 import re
+from types import SimpleNamespace
 import unittest
 
 import yaml
@@ -139,7 +140,8 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertIn("5 m/s controller floor", minimum_speed["description"])
     self.assertIn("two confident boundaries", items[0]["details"])
     self.assertIn("When the paths agree, it requests no correction", items[0]["details"])
-    self.assertIn("matching model timing", items[0]["details"])
+    self.assertIn("timing carried with the model action", items[0]["details"])
+    self.assertIn("no separate timing message", items[0]["details"])
     self.assertIn("not road-validated", items[0]["description"])
     self.assertEqual(items[2]["title"], "Fade on Turn Signal")
     self.assertIn("always suspend", items[2]["description"])
@@ -259,6 +261,57 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertIn('return UiElement(value, "LANE CTR", "", color)', developer_elements)
     status_source = developer_elements[developer_elements.index("class LaneCenteringStatusElement"):]
     self.assertNotIn("callback", status_source)
+
+  def test_status_labels_colors_and_readme(self) -> None:
+    # Execute the shared production status helper and renderer without native
+    # capnp/raylib dependencies, including the decoded-enum normalization path.
+    schema = CUSTOM_SCHEMA.read_text(encoding="utf-8")
+    reason_body = re.search(r"struct LaneCenteringStateSP .*?enum Reason \{(.*?)\n  \}", schema, re.DOTALL).group(1)
+    reasons = SimpleNamespace(**{name: int(value) for name, value in re.findall(r"(\w+)\s+@(\d+);", reason_body)})
+    namespace = {"custom": SimpleNamespace(LaneCenteringStateSP=SimpleNamespace(Reason=reasons))}
+    helper = ast.parse(STATUS_HELPER.read_text(encoding="utf-8"))
+    helper.body = [node for node in helper.body if not isinstance(node, (ast.Import, ast.ImportFrom))]
+    exec(compile(helper, str(STATUS_HELPER), "exec"), namespace)
+
+    white = (255, 255, 255, 255)
+    green = (0, 255, 0, 255)
+    amber = (255, 188, 0, 255)
+    gray = (145, 155, 149, 255)
+    namespace.update({
+      "rl": SimpleNamespace(Color=lambda *channels: channels, WHITE=white),
+      "ui_state": SimpleNamespace(started_frame=10),
+      "UiElement": lambda value, label, unit, color: SimpleNamespace(value=value, label=label, unit=unit, color=color),
+    })
+    tree = ast.parse(DEVELOPER_ELEMENTS.read_text(encoding="utf-8"))
+    renderer = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "LaneCenteringStatusElement")
+    exec(compile(ast.Module(body=[renderer], type_ignores=[]), str(DEVELOPER_ELEMENTS), "exec"), namespace)
+    element = namespace["LaneCenteringStatusElement"]()
+
+    class SubMasterHarness(dict):
+      recv_frame = {"laneCenteringStateSP": 10}
+      alive = {"laneCenteringStateSP": True}
+      valid = {"laneCenteringStateSP": True}
+
+    readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+    labels = namespace["LANE_CENTERING_REASON_LABELS"]
+    self.assertEqual(labels[reasons.correcting], "ON")
+    self.assertNotIn("ACT", labels.values())
+    for reason, label in labels.items():
+      with self.subTest(label=label):
+        active = reason == reasons.correcting
+        sm = SubMasterHarness(laneCenteringStateSP=SimpleNamespace(reason=SimpleNamespace(raw=reason), active=active))
+        rendered = element.update(sm, False)
+        expected_color = (green if active else amber if reason in (reasons.driverOverride, reasons.laneChange, reasons.turnSignalFade)
+                          else gray if reason == reasons.disabled else white)
+        self.assertEqual((rendered.value, rendered.color), (label, expected_color))
+        self.assertIn(f"| `{label}` |", readme)
+
+    for field, value in (("recv_frame", 9), ("alive", False), ("valid", False)):
+      with self.subTest(unavailable=field):
+        sm = SubMasterHarness(laneCenteringStateSP=SimpleNamespace(reason=reasons.correcting, active=True))
+        setattr(sm, field, {"laneCenteringStateSP": value})
+        rendered = element.update(sm, False)
+        self.assertEqual((rendered.value, rendered.color), ("--", white))
 
   def test_diagnostics_cannot_feed_control_branches_state_or_returns(self) -> None:
     controller = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/lib/lane_centering.py").read_text(encoding="utf-8")

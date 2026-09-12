@@ -110,7 +110,7 @@ class TestLaneCentering(OpenpilotTestCase):
       # not share its hash. The production UI must normalize before lookup.
       reason_code = lane_centering_reason_code(decoded.reason)
       assert reason_code == int(custom.LaneCenteringStateSP.Reason.correcting)
-      assert LANE_CENTERING_REASON_LABELS[reason_code] == "ACT"
+      assert LANE_CENTERING_REASON_LABELS[reason_code] == "ON"
 
   @parameterized.expand([
     (None,),

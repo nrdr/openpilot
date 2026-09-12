@@ -1158,6 +1158,7 @@ struct ModelDataV2 {
     desiredCurvature @0 :Float32;
     desiredAcceleration @1 :Float32;
     shouldStop @2 :Bool;
+    lateralActionTime @3 :Float32; # Seconds from the source vision frame to the lateral action target; zero means unavailable.
   }
 
   deprecated :group {

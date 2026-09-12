@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 from collections import deque
-import os
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -156,20 +155,14 @@ def _update(controller, model, **overrides) -> float:
   return controller.update(**arguments)
 
 
-def test_action_time_metadata_requires_an_exact_valid_model_frame():
-  timing = SimpleNamespace(modelMonoTime=123_000_000, lateralActionTime=0.275)
-  boundary_timing = SimpleNamespace(
-    modelMonoTime=123_000_000,
-    lateralActionTime=lane_centering._MAX_ACTION_TIME,
-  )
+def test_action_time_is_read_from_the_same_model_action():
+  model = SimpleNamespace(action=SimpleNamespace(lateralActionTime=0.275))
+  boundary_model = SimpleNamespace(action=SimpleNamespace(lateralActionTime=lane_centering._MAX_ACTION_TIME))
 
-  assert lane_centering.lane_centering_action_time(123_000_000, timing, True) == pytest.approx(0.275)
-  assert lane_centering.lane_centering_action_time(123_000_000, boundary_timing, True) == pytest.approx(
+  assert lane_centering.lane_centering_action_time(model) == pytest.approx(0.275)
+  assert lane_centering.lane_centering_action_time(boundary_model) == pytest.approx(
     lane_centering._MAX_ACTION_TIME,
   )
-  assert lane_centering.lane_centering_action_time(123_000_001, timing, True) is None
-  assert lane_centering.lane_centering_action_time(123_000_000, timing, False) is None
-  assert lane_centering.lane_centering_action_time(0, timing, True) is None
 
 
 @pytest.mark.parametrize(
@@ -178,13 +171,14 @@ def test_action_time_metadata_requires_an_exact_valid_model_frame():
   ids=["missing", "nonnumeric", "zero", "negative", "nan", "infinite", "above-envelope", "huge"],
 )
 def test_action_time_metadata_rejects_invalid_values(value):
-  timing = SimpleNamespace(modelMonoTime=123_000_000, lateralActionTime=value)
+  model = SimpleNamespace(action=SimpleNamespace(lateralActionTime=value))
 
-  assert lane_centering.lane_centering_action_time(123_000_000, timing, True) is None
+  assert lane_centering.lane_centering_action_time(model) is None
 
 
 def test_action_time_metadata_rejects_missing_fields():
-  assert lane_centering.lane_centering_action_time(123_000_000, SimpleNamespace(), True) is None
+  assert lane_centering.lane_centering_action_time(SimpleNamespace()) is None
+  assert lane_centering.lane_centering_action_time(SimpleNamespace(action=SimpleNamespace())) is None
 
 
 @pytest.mark.parametrize(
@@ -223,27 +217,29 @@ def test_missing_action_time_releases_an_existing_correction_smoothly():
   assert not controller.diagnostics.active
 
 
-def test_half_second_physical_delay_is_outside_gate_and_uses_pure_model_action():
+@pytest.mark.parametrize("action_time", [0.545, 0.575, 0.675, 0.875])
+def test_extended_action_time_uses_delay_scaled_preview(action_time):
   controller = lane_centering.LaneCenteringController()
   model_action = -0.0023
 
   result = _update(
     controller,
-    _model(center=0.45),
+    _model(center=0.45, x=np.linspace(0.0, 100.0, 201)),
     model_curvature=model_action,
-    action_time=0.500 + 0.075,
+    action_time=action_time,
   )
 
-  assert result == pytest.approx(model_action)
-  assert controller._correction == 0.0
-  assert controller.diagnostics.reason == lane_centering.LaneCenteringReason.TIMING_UNAVAILABLE
-  assert not controller.diagnostics.active
+  assert result > model_action
+  assert controller._correction > 0.0
+  assert controller.diagnostics.reason == lane_centering.LaneCenteringReason.CORRECTING
+  assert controller.diagnostics.active
+  assert controller.diagnostics.lookahead == pytest.approx(25.0 * (action_time + max(1.5, 3.0 * action_time)))
 
 
 def test_action_time_gate_accepts_boundary_fades_above_it_and_recovers_without_stale_cache():
   controller = lane_centering.LaneCenteringController()
-  right_model = _model(center=0.45)
-  left_model = _model(center=-0.45)
+  right_model = _model(center=0.45, x=np.linspace(0.0, 100.0, 201))
+  left_model = _model(center=-0.45, x=np.linspace(0.0, 100.0, 201))
   frame = 1_000_000_000
 
   accepted = _update(
@@ -431,6 +427,71 @@ def test_position_time_rejects_just_under_one_second_after_action():
 
   assert result == pytest.approx(0.0)
   assert controller.diagnostics.reason == lane_centering.LaneCenteringReason.PREVIEW_TOO_SHORT
+
+
+@pytest.mark.parametrize("action_time", [0.275, 0.475, 0.545, 0.575, 0.675, 0.875])
+@pytest.mark.parametrize("with_position_time", [False, True])
+@pytest.mark.parametrize("coverage_shortfall", [0.0, 2e-6])
+def test_delay_scaled_minimum_coverage_is_enforced(action_time, with_position_time, coverage_shortfall):
+  required_preview = max(1.0, 3.0 * action_time)
+  position_t = np.linspace(0.0, action_time + required_preview - coverage_shortfall, 141)
+  model = _model(x=25.0 * position_t, center=0.45,
+                 position_t=position_t if with_position_time else _MISSING)
+  controller = lane_centering.LaneCenteringController()
+
+  result = _update(controller, model, action_time=action_time)
+
+  if coverage_shortfall:
+    assert result == pytest.approx(0.0)
+    assert controller.diagnostics.reason == lane_centering.LaneCenteringReason.PREVIEW_TOO_SHORT
+  else:
+    assert result > 0.0
+    assert controller.diagnostics.reason == lane_centering.LaneCenteringReason.CORRECTING
+    assert controller.diagnostics.lookahead == pytest.approx(position_t[-1] * 25.0)
+
+
+@pytest.mark.parametrize("action_time", [0.545, 0.575, 0.675, 0.875])
+@pytest.mark.parametrize("with_position_time", [False, True])
+@pytest.mark.parametrize("short_lane", [False, True])
+def test_capped_long_delay_preview_fails_short_and_releases_smoothly(action_time, with_position_time, short_lane):
+  position_t = np.linspace(0.0, 4.5, 181)
+  healthy = _model(x=25.0 * position_t, center=0.45,
+                   position_t=position_t if with_position_time else _MISSING)
+  short_t = np.linspace(0.0, action_time + 1.5, 101)
+  if short_lane:
+    # A long model position path cannot make up for truncated lane coverage.
+    short_model = _model(x=25.0 * position_t, center=0.45,
+                         position_t=position_t if with_position_time else _MISSING)
+    short_model.laneLines[1] = _line(25.0 * short_t, 0.45 - 1.8)
+    short_model.laneLines[2] = _line(25.0 * short_t, 0.45 + 1.8)
+  else:
+    short_model = _model(x=25.0 * short_t, center=0.45,
+                         position_t=short_t if with_position_time else _MISSING)
+  controller = lane_centering.LaneCenteringController()
+  previous = _update(controller, healthy, action_time=action_time)
+  assert previous > 0.0
+
+  result = _update(controller, short_model, action_time=action_time)
+
+  assert result == pytest.approx(previous * np.exp(-0.01 / lane_centering._CONFIDENCE_RELEASE_TAU))
+  assert controller.diagnostics.reason == lane_centering.LaneCenteringReason.PREVIEW_TOO_SHORT
+  assert not controller.diagnostics.active
+
+
+@pytest.mark.parametrize("action_time", [1.0 / 3.0, 0.475, 0.5, 0.545, 0.575, 0.675])
+@pytest.mark.parametrize("with_position_time", [False, True])
+def test_delay_preview_has_no_command_step_at_timing_or_scaling_boundaries(action_time, with_position_time):
+  position_t = np.linspace(0.0, 4.5, 181)
+  model = _model(x=25.0 * position_t, center=0.45, model_path=lambda x: 0.002 * x,
+                 position_t=position_t if with_position_time else _MISSING)
+  controller = lane_centering.LaneCenteringController()
+  # Keep the same frame to also exercise timing-dependent cache invalidation.
+  outputs = [_update(controller, model, model_frame=1_000_000_000, action_time=action_time + delta)
+             for delta in np.linspace(-1e-4, 1e-4, 21)]
+
+  assert controller.diagnostics.reason == lane_centering.LaneCenteringReason.CORRECTING
+  assert np.isfinite(outputs).all()
+  assert np.max(np.abs(np.diff(outputs))) < 1e-7
 
 
 @pytest.mark.parametrize("offset_sign", [-1.0, 1.0])
@@ -832,17 +893,21 @@ def test_final_correction_never_exceeds_cap(correction_sign):
 
 def _simulate_straight_lane(*, strength: float, delay_s: float, speed: float = 25.0,
                             initial_offset: float = 0.60, duration_s: float = 12.0,
-                            conservative_model_age_s: float = 0.075, x_end: float | None = None):
+                            conservative_model_age_s: float = 0.075, x_end: float | None = None,
+                            with_position_time: bool = False):
   """Synthetic linear bicycle loop; a numerical guard, never road validation.
 
   ``delay_s`` is the physical controller-to-steering delay. For conservative
   temporal alignment, the model path uses a state ``conservative_model_age_s``
   old and the published action time is their sum. The default 75 ms covers the
   50 ms model frame plus the publisher's 25 ms midpoint allowance.
+  The pure transport delay does not model EPS/torque dynamics, model smoothing,
+  noisy lane estimates, slip, or road disturbances.
   """
   dt = 0.01
   action_time = delay_s + conservative_model_age_s
-  x_end = max(100.0, speed * (action_time + lane_centering._POST_ACTION_PREVIEW + 0.6)) if x_end is None else x_end
+  post_action_preview = max(lane_centering._POST_ACTION_PREVIEW, lane_centering._ACTION_PREVIEW_DELAY_SCALE * action_time)
+  x_end = max(100.0, speed * (action_time + post_action_preview + 0.6)) if x_end is None else x_end
   model_x = np.linspace(0.0, x_end, 161)
   lateral_position = initial_offset
   heading = 0.0
@@ -865,7 +930,8 @@ def _simulate_straight_lane(*, strength: float, delay_s: float, speed: float = 2
       history_times = np.asarray([sample[0] for sample in state_history])
       sampled_position = float(np.interp(sample_time, history_times, [sample[1] for sample in state_history]))
       sampled_heading = float(np.interp(sample_time, history_times, [sample[2] for sample in state_history]))
-      model = _model(x=model_x, model_path=lambda x: sampled_position + sampled_heading * x)
+      model = _model(x=model_x, model_path=lambda x: sampled_position + sampled_heading * x,
+                     position_t=model_x / speed if with_position_time else _MISSING)
 
     requested_curvature = _update(
       controller, model, strength=strength, model_frame=frame,
@@ -973,21 +1039,32 @@ def test_supported_delay_grid_remains_bounded_for_sixty_seconds(speed, delay_s, 
   assert np.max(np.abs(positions[-1000:])) < 0.30
 
 
-_RUN_HALF_SECOND_SOAK = os.getenv("RUN_LANE_CENTER_HALF_SECOND_SOAK") == "1"
-@pytest.mark.skipif(
-  not _RUN_HALF_SECOND_SOAK,
-  reason="opt-in half-second soak intentionally exceeds the supported action-time gate",
+_EXTENDED_ACTION_TIME_GRID = [
+  (speed, action_time, strength, initial_offset)
+  for speed in (12.0, 25.0, 40.0)
+  for action_time in (0.545, 0.575, 0.675, 0.875)
+  for strength in (0.30, 0.50, 0.70, 1.00)
+  for initial_offset in (-0.60, 0.60)
+]
+
+
+@pytest.mark.parametrize(
+  ("speed", "action_time", "strength", "initial_offset"),
+  _EXTENDED_ACTION_TIME_GRID,
+  ids=lambda value: f"{value:g}",
 )
-@pytest.mark.parametrize("initial_offset", [-0.60, 0.60], ids=["left", "right"])
-def test_exploratory_half_second_soak_retains_strict_bounds(monkeypatch, initial_offset):
-  """Retain the known failing criterion outside the 0.475 s production gate."""
-  monkeypatch.setattr(lane_centering, "_MAX_ACTION_TIME", np.inf)
+@pytest.mark.parametrize("minimum_coverage", [False, True], ids=["full-horizon", "minimum-horizon"])
+def test_extended_delay_grid_remains_bounded_for_sixty_seconds(speed, action_time, strength, initial_offset, minimum_coverage):
+  """A delayed straight-lane regression screen, not vehicle-level validation."""
+  required_preview = max(1.0, 3.0 * action_time)
   positions, commands = _simulate_straight_lane(
-    speed=40.0,
-    delay_s=0.50,
-    strength=1.00,
+    speed=speed,
+    delay_s=action_time - 0.075,
+    strength=strength,
     initial_offset=initial_offset,
     duration_s=60.0,
+    x_end=speed * (action_time + required_preview) if minimum_coverage else None,
+    with_position_time=minimum_coverage,
   )
   max_excursion = float(np.max(np.abs(positions)))
   final_tail_peak = float(np.max(np.abs(positions[-1000:])))

@@ -32,12 +32,12 @@ _PATH_SAMPLE_COUNT = 17
 _LANE_WIDTH_TAU = 3.0
 _POST_ACTION_PREVIEW = 1.5
 _MIN_POST_ACTION_PREVIEW = 1.0
+_ACTION_PREVIEW_DELAY_SCALE = 3.0
 _PREVIEW_TIME_EPSILON = 1e-6
 _PREVIEW_START = 0.25
-# Initially restrict this development feature to the delay envelope exercised
-# by the long-duration closed-loop suite (0.4 s physical delay plus 0.075 s
-# model timing). Longer-delay cases exhibited persistent oscillation.
-_MAX_ACTION_TIME = 0.475
+# Finite envelope exercised by the synthetic long-duration delay suite; this
+# is a numerical development guard, not evidence of vehicle-level stability.
+_MAX_ACTION_TIME = 0.875
 
 _E2E_MAX_PATH_STD = 0.35
 _E2E_BREAK_IN_START = 0.15
@@ -126,12 +126,10 @@ def lane_centering_strength(value) -> float:
   return strength
 
 
-def lane_centering_action_time(model_mono_time, timing, valid: bool) -> float | None:
-  """Accept only exact-frame timing; old/absent metadata disables this overlay."""
+def lane_centering_action_time(model_v2) -> float | None:
+  """Read timing atomically with the action; model validity is checked by the caller."""
   try:
-    if not valid or model_mono_time <= 0 or timing.modelMonoTime != model_mono_time:
-      return None
-    action_time = float(timing.lateralActionTime)
+    action_time = float(model_v2.action.lateralActionTime)
     if not np.isfinite(action_time) or not 0.0 < action_time <= _MAX_ACTION_TIME + 1e-6:
       return None
     return action_time
@@ -344,6 +342,14 @@ class LaneCenteringController:
       # constant-speed approximation needed by older model path formats.
       pos_t = np.asarray(getattr(model_v2.position, 't', []), dtype=float)
       common_end = min(left_x[-1], right_x[-1], pos_x[-1])
+      # A fixed preview raises feedback bandwidth relative to a longer action
+      # delay. Extend the same geometric fit instead of reducing the requested
+      # lane-path strength: its position gain falls roughly as 1 / preview**2.
+      # Require that delay-scaled horizon in the actual shared path coverage;
+      # silently clipping it back to a short preview defeats the delay margin.
+      delay_preview = _ACTION_PREVIEW_DELAY_SCALE * action_time
+      post_action_preview = max(_POST_ACTION_PREVIEW, delay_preview)
+      min_post_action_preview = max(_MIN_POST_ACTION_PREVIEW, delay_preview)
       if pos_t.size:
         if not self._valid_path(pos_t, pos_x):
           self.diagnostics.reason = LaneCenteringReason.LANE_DATA_INVALID
@@ -352,16 +358,16 @@ class LaneCenteringController:
           self.diagnostics.reason = LaneCenteringReason.PREVIEW_TOO_SHORT
           return False, 0.0
         action_x = float(np.interp(action_time, pos_t, pos_x))
-        end_time = min(action_time + _POST_ACTION_PREVIEW, float(np.interp(common_end, pos_x, pos_t)))
-        if end_time - action_time + _PREVIEW_TIME_EPSILON < _MIN_POST_ACTION_PREVIEW:
+        end_time = min(action_time + post_action_preview, float(np.interp(common_end, pos_x, pos_t)))
+        if end_time - action_time + _PREVIEW_TIME_EPSILON < min_post_action_preview:
           self.diagnostics.reason = LaneCenteringReason.PREVIEW_TOO_SHORT
           return False, 0.0
         path_x = np.interp(np.linspace(action_time + _PREVIEW_START, end_time, _PATH_SAMPLE_COUNT), pos_t, pos_x)
         horizon = min(common_end, float(np.interp(end_time + 0.5, pos_t, pos_x)))
       else:
         action_x = v_ego * action_time
-        end_x = min(common_end, action_x + v_ego * _POST_ACTION_PREVIEW)
-        if end_x - action_x + v_ego * _PREVIEW_TIME_EPSILON < v_ego * _MIN_POST_ACTION_PREVIEW:
+        end_x = min(common_end, action_x + v_ego * post_action_preview)
+        if end_x - action_x + v_ego * _PREVIEW_TIME_EPSILON < v_ego * min_post_action_preview:
           self.diagnostics.reason = LaneCenteringReason.PREVIEW_TOO_SHORT
           return False, 0.0
         path_x = np.linspace(action_x + v_ego * _PREVIEW_START, end_x, _PATH_SAMPLE_COUNT)

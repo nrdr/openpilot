@@ -48,9 +48,8 @@ class Controls(ControlsExt):
 
     self.sm = messaging.SubMaster(['lateralDelay', 'vehicleParameters', 'lateralTorqueParameters', 'modelV2', 'selfdriveState',
                                    'extrinsicsCalibration', 'deviceMotion', 'longitudinalPlan', 'lateralManeuverPlan', 'carState', 'carOutput',
-                                   'driverMonitoringState', 'onroadEvents', 'driverAssistance', 'modelDataV2SP'] + self.sm_services_ext,
-                                  poll='selfdriveState', ignore_alive=['modelDataV2SP'],
-                                  ignore_avg_freq=['modelDataV2SP'], ignore_valid=['modelDataV2SP'])
+                                   'driverMonitoringState', 'onroadEvents', 'driverAssistance'] + self.sm_services_ext,
+                                  poll='selfdriveState')
     self.pm = messaging.PubMaster(['carControl', 'controlsState'] + self.pm_services_ext)
 
     self.steer_limited_by_safety = False
@@ -184,9 +183,7 @@ class Controls(ControlsExt):
       self.lane_centering_pause_on_signal,
       bool(CS.leftBlinker or CS.rightBlinker),
       bool(CS.steeringPressed), model_frame=self.sm.logMonoTime['modelV2'],
-      action_time=lane_centering_action_time(
-        self.sm.logMonoTime['modelV2'], self.sm['modelDataV2SP'],
-        self.sm.seen['modelDataV2SP'] and self.sm.valid['modelDataV2SP']))
+      action_time=lane_centering_action_time(model_v2))
 
     self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll)
     lat_delay = self.lat_delay + LAT_SMOOTH_SECONDS
