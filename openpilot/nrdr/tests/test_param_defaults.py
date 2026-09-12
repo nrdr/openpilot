@@ -116,14 +116,14 @@ def _module(name, **attributes):
   return module
 
 
-def _load_defaults():
+def _load_defaults(device_type="pc"):
   cloudlog = FakeCloudlog()
   stubs = {
     "openpilot.common.params": _module("openpilot.common.params", Params=object),
     "openpilot.common.swaglog": _module("openpilot.common.swaglog", cloudlog=cloudlog),
     "openpilot.common.hardware": _module(
       "openpilot.common.hardware",
-      HARDWARE=SimpleNamespace(get_device_type=lambda: "pc"),
+      HARDWARE=SimpleNamespace(get_device_type=lambda: device_type),
     ),
   }
   spec = util.spec_from_file_location("_nrdr_param_defaults_under_test", DEFAULTS_PATH)
@@ -432,15 +432,50 @@ class TestParamDefaults(unittest.TestCase):
     self.assertEqual(params.values["NrdrInterpolatedTorqueFrictionStandard"], 0.12)
     self.assertEqual([call[1] for call in params.calls], ["NrdrInterpolatedTorqueFrictionStandard"])
 
-  def test_mici_omits_quiet_mode_seed(self):
-    self.defaults.HARDWARE = SimpleNamespace(get_device_type=lambda: "mici")
-    params = FakeParams()
+  def test_quiet_mode_default_is_hardware_independent_and_preserves_explicit_off(self):
+    for device_type in ("pc", "tici", "mici"):
+      with self.subTest(device_type=device_type, state="missing"):
+        defaults, _cloudlog = _load_defaults(device_type)
+        params = FakeParams()
 
+        _apply(defaults, params)
+
+        self.assertIs(params.values["QuietMode"], True)
+        self.assertEqual(
+          [call for call in params.calls if call[1] == "QuietMode"],
+          [("put_bool", "QuietMode", True, (), {"block": True})],
+        )
+
+      with self.subTest(device_type=device_type, state="explicit-off"):
+        defaults, _cloudlog = _load_defaults(device_type)
+        params = FakeParams({"QuietMode": False})
+
+        _apply(defaults, params)
+
+        self.assertIs(params.values["QuietMode"], False)
+        self.assertNotIn("QuietMode", [call[1] for call in params.calls])
+
+  def test_quiet_mode_is_persisted_before_generic_defaults(self):
+    class DeferredParams(FakeParams):
+      def __init__(self):
+        super().__init__()
+        self.pending = []
+
+      def _write(self, setter, key, value, args, kwargs):
+        if kwargs.get("block", False):
+          super()._write(setter, key, value, args, kwargs)
+        else:
+          self.pending.append((setter, key, value, args, kwargs))
+
+    params = DeferredParams()
     _apply(self.defaults, params)
 
-    self.assertNotIn("QuietMode", params.values)
-    self.assertNotIn("QuietMode", [call[1] for call in params.calls])
-    self.assertEqual(params.values["GsmMetered"], False)
+    # Mirror the manager's generic default fallback before queued writes finish.
+    if params.get("QuietMode") is None:
+      params.put_bool("QuietMode", False, block=True)
+
+    self.assertIs(params.get("QuietMode"), True)
+    self.assertFalse(any(call[1] == "QuietMode" for call in params.pending))
 
   def test_one_parameter_failure_does_not_stop_later_defaults(self):
     params = FakeParams(get_errors={"GsmMetered"}, put_errors={"RecordFront"})

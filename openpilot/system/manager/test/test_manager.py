@@ -57,8 +57,6 @@ class TestManager(OpenpilotTestCase):
       "CompletedSunnylinkConsentVersion": sunnylink_consent_version,
       "SunnylinkEnabled": True,
     })
-    if HARDWARE.get_device_type() == "mici":
-      nrdr_defaults.pop("QuietMode", None)
     for k in params.all_keys():
       default_value = params.get_default_value(k)
       expected_value = nrdr_defaults.get(k.decode("utf-8"), default_value)

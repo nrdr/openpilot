@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
-from openpilot.common.hardware import HARDWARE
 
 
 STEER_RATIO_MANUAL_DEFAULTS = (15.38, 10.93)
@@ -214,11 +213,9 @@ def apply_defaults(params: Params) -> None:
   _migrate_steer_ratio_settings(params)
   _migrate_interpolated_torque_friction(params)
 
-  bool_defaults = dict(BOOL_DEFAULTS)
-  if HARDWARE.get_device_type() == "mici":
-    bool_defaults.pop("QuietMode")
-  for key, value in bool_defaults.items():
-    _write(params, key, value, params.put_bool)
+  for key, value in BOOL_DEFAULTS.items():
+    # Persist QuietMode before manager's generic defaults can seed it as false.
+    _write(params, key, value, params.put_bool, block=key == "QuietMode")
 
   for key, value in VALUE_DEFAULTS.items():
     _write(params, key, value, params.put)

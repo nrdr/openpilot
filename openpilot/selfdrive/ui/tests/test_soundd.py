@@ -5,11 +5,40 @@ from openpilot.common.test import OpenpilotTestCase
 from openpilot.cereal import log, messaging
 from openpilot.cereal.messaging import SubMaster, PubMaster
 from openpilot.selfdrive.ui.soundd import SELFDRIVE_STATE_TIMEOUT, check_selfdrive_timeout_alert
+from openpilot.sunnypilot.selfdrive.ui.quiet_mode import ALERTS_ALWAYS_PLAY, QuietMode
 
 AudibleAlert = log.SelfdriveState.AudibleAlert
 
 
 class TestSoundd(OpenpilotTestCase):
+  def test_quiet_mode_preserves_critical_alerts(self):
+    quiet_mode = QuietMode.__new__(QuietMode)
+    quiet_mode.enabled = True
+
+    critical_alerts = {
+      AudibleAlert.warningSoft,
+      AudibleAlert.warningImmediate,
+      AudibleAlert.promptDistracted,
+      AudibleAlert.promptRepeat,
+    }
+    assert ALERTS_ALWAYS_PLAY == critical_alerts
+    assert all(quiet_mode.should_play_sound(alert) for alert in critical_alerts)
+
+    noncritical_alerts = {
+      AudibleAlert.engage,
+      AudibleAlert.disengage,
+      AudibleAlert.refuse,
+      AudibleAlert.prompt,
+      AudibleAlert.preAlert,
+      AudibleAlert.complete,
+    }
+    assert not any(quiet_mode.should_play_sound(alert) for alert in noncritical_alerts)
+    assert not quiet_mode.should_play_sound(AudibleAlert.none)
+
+    quiet_mode.enabled = False
+    assert all(quiet_mode.should_play_sound(alert) for alert in critical_alerts | noncritical_alerts)
+    assert not quiet_mode.should_play_sound(AudibleAlert.none)
+
   def test_check_selfdrive_timeout_alert(self, mocker):
     sm = SubMaster(['selfdriveState', 'selfdriveStateSP'])
     pm = PubMaster(['selfdriveState', 'selfdriveStateSP'])
