@@ -12,7 +12,9 @@ from opendbc.car.car_helpers import interfaces
 from opendbc.car.structs import car
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported
+from openpilot.nrdr.params import (
+  confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported, request_handcrafted_lateral_profile,
+)
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.lane_centering import LaneCenteringLayout
 from openpilot.system.ui.lib.application import gui_app
@@ -432,8 +434,9 @@ class LateralTuningLayout(Widget):
   @staticmethod
   def _handcrafted_description():
     description = tr(
-      "Applies the current reviewed profile once and turns the request back off only after every value verifies. " +
-      "All tuning controls remain editable, and later manual edits persist until you deliberately apply again."
+      "Applies the September 12 Civic-derived preset once, using only settings supported by this car and controller. " +
+      "Steer ratio, vehicle learning, and calibration stay unchanged. Common lane-centering and live-delay settings apply across supported cars; " +
+      "Honda-specific settings apply only to compatible controllers. Later manual edits persist until you deliberately apply again."
     )
     status = ui_state.params.get("NrdrCarHandcraftedInfo")
     return description if not status else f"{description}<br><br>{tr('Status')}: {status}"
@@ -449,7 +452,7 @@ class LateralTuningLayout(Widget):
   @staticmethod
   def _on_handcrafted_apply():
     if ui_state.is_offroad() and LateralTuningLayout._handcrafted_supported():
-      ui_state.params.put_bool("NrdrHandcraftedLateralTune", True, block=True)
+      request_handcrafted_lateral_profile(ui_state.CP, ui_state.CP_SP, ui_state.params)
 
   def _update_state(self):
     super()._update_state()

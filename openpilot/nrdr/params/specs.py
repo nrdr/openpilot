@@ -210,6 +210,7 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("NrdrCarHelpersInfo", ParamType.STRING, (P,), lifecycle=ParamLifecycle.STATUS, owner=ParamOwner.DIAGNOSTICS),
   _added("NrdrStarPilotPid", ParamType.BOOL, PB, "0", owner=ParamOwner.LATERAL),
   _added("NrdrHandcraftedLateralTune", ParamType.BOOL, PB, "0", ParamLifecycle.COMMAND, ParamOwner.LATERAL),
+  _added("NrdrHandcraftedLateralRequest", ParamType.JSON, (P,), lifecycle=ParamLifecycle.COMMAND, owner=ParamOwner.LATERAL),
   _added("NrdrNnlcEnabled", ParamType.BOOL, PB, "0", owner=ParamOwner.LATERAL),
   _added("NrdrNnlcActivationSpeed", ParamType.INT, PB, "30", owner=ParamOwner.LATERAL),
   _added("NrdrNnlcKpGain", ParamType.INT, PB, "100", owner=ParamOwner.LATERAL),

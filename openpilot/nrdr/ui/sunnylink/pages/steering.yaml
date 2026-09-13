@@ -9,8 +9,8 @@ sections:
     - key: NrdrHandcraftedLateralTune
       widget: toggle
       title: Apply Handcrafted Lateral Profile
-      description: Flip ON to request the current reviewed profile once. The device turns this switch back OFF only after every value verifies.
-      details: This is a one-shot apply command, not a mode. Wait a few seconds after flipping it ON, then refresh this page. Every tuning control remains manually editable immediately afterward, and later edits are never restored or overwritten by the profile.
+      description: Flip ON to request the September 12 Civic-derived preset once for this car and controller. Steer ratio, vehicle learning, and calibration stay unchanged.
+      details: Common lane-centering and live-delay settings apply across supported cars; Honda-specific groups apply only to compatible controllers. A fresh request is bound to the detected vehicle and preset version. Wait a few seconds, then refresh; the switch turns OFF after verified completion. This is opt-in, not a mode; existing customizations are not automatically overwritten, and later edits persist until you deliberately apply again. The source tune was recorded on a Civic, not validated on every vehicle.
       visibility:
       - {type: capability, field: has_handcrafted_lateral_profile, equals: true}
       enablement:

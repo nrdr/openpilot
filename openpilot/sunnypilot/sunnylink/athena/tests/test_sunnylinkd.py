@@ -23,10 +23,13 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
   def setup_method(self):
     self.saved_params = []
     self.params_writes = []
+    self.handcrafted_requests = []
+    self.handcrafted_request_accepted = True
 
     self.original_save = sunnylinkd.save_param_from_base64_encoded_string
     self.original_params = sunnylinkd.params
     self.original_generate_capabilities = sunnylinkd.generate_capabilities
+    self.original_handcrafted_request = sunnylinkd.request_stored_handcrafted_lateral_profile
 
     class FakeParams:
       offroad = True
@@ -52,12 +55,18 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
     def mock_save_param(key, value, compression=False):
       self.saved_params.append((key, value, compression))
 
+    def mock_handcrafted_request(params):
+      self.handcrafted_requests.append(params)
+      return self.handcrafted_request_accepted
+
     sunnylinkd.save_param_from_base64_encoded_string = mock_save_param  # ty: ignore[invalid-assignment]
+    sunnylinkd.request_stored_handcrafted_lateral_profile = mock_handcrafted_request
 
   def teardown_method(self):
     sunnylinkd.save_param_from_base64_encoded_string = self.original_save  # ty: ignore[invalid-assignment]
     sunnylinkd.params = self.original_params
     sunnylinkd.generate_capabilities = self.original_generate_capabilities
+    sunnylinkd.request_stored_handcrafted_lateral_profile = self.original_handcrafted_request
 
   def test_saveParams_blocked(self):
     blocked_params = {
@@ -254,7 +263,34 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     sunnylinkd.saveParams({"NrdrHandcraftedLateralTune": encoded})
 
-    assert self.saved_params == [("NrdrHandcraftedLateralTune", encoded, False)]
+    assert self.handcrafted_requests == [self.fake_params]
+    assert self.saved_params == []
+
+  def test_saveParams_rejected_bound_request_never_falls_through_to_generic_write(self):
+    self.handcrafted_request_accepted = False
+
+    sunnylinkd.saveParams({"NrdrHandcraftedLateralTune": remote_value("1")})
+
+    assert self.handcrafted_requests == [self.fake_params]
+    assert self.saved_params == []
+
+  def test_saveParams_never_requests_handcrafted_profile_onroad(self):
+    self.fake_params.offroad = False
+
+    sunnylinkd.saveParams({"NrdrHandcraftedLateralTune": remote_value("1")})
+
+    assert self.handcrafted_requests == []
+    assert self.saved_params == []
+
+  def test_saveParams_rejects_remote_handcrafted_context(self):
+    key = "NrdrHandcraftedLateralRequest"
+    for offroad in (False, True):
+      self.fake_params.offroad = offroad
+      assert not allow_param_write(key, onroad=not offroad, handcrafted_profile_available=True)
+      sunnylinkd.saveParams({key: remote_value('{"version":18}')})
+
+    assert self.handcrafted_requests == []
+    assert self.saved_params == []
 
   def test_saveParams_rejects_unsupported_handcrafted_enable_but_allows_cancel(self):
     sunnylinkd.generate_capabilities = lambda _: {
@@ -269,6 +305,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     sunnylinkd.saveParams({"NrdrHandcraftedLateralTune": disabled})
     assert self.saved_params == [("NrdrHandcraftedLateralTune", disabled, False)]
+    assert self.handcrafted_requests == []
 
   def test_saveParams_fails_closed_on_unknown_capability_or_malformed_bool(self):
     key = "NrdrHandcraftedLateralTune"
@@ -282,6 +319,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
     sunnylinkd.saveParams({key: "%%%not-base64%%%"})
 
     assert self.saved_params == []
+    assert self.handcrafted_requests == []
 
   def test_saveParams_enforces_vehicle_policy_for_compressed_values(self):
     key = "NrdrHandcraftedLateralTune"
@@ -289,4 +327,5 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     sunnylinkd.saveParams({key: encoded}, compression=True)
 
-    assert self.saved_params == [(key, encoded, True)]
+    assert self.handcrafted_requests == [self.fake_params]
+    assert self.saved_params == []

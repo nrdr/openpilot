@@ -112,6 +112,7 @@ class NrdrParamKey(StrEnum):
   NRDR_CAR_HELPERS_INFO = "NrdrCarHelpersInfo"
   NRDR_STAR_PILOT_PID = "NrdrStarPilotPid"
   NRDR_HANDCRAFTED_LATERAL_TUNE = "NrdrHandcraftedLateralTune"
+  NRDR_HANDCRAFTED_LATERAL_REQUEST = "NrdrHandcraftedLateralRequest"
   NRDR_NNLC_ENABLED = "NrdrNnlcEnabled"
   NRDR_NNLC_ACTIVATION_SPEED = "NrdrNnlcActivationSpeed"
   NRDR_NNLC_KP_GAIN = "NrdrNnlcKpGain"
@@ -246,6 +247,7 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.NRDR_CAR_HELPERS_INFO,
   NrdrParamKey.NRDR_STAR_PILOT_PID,
   NrdrParamKey.NRDR_HANDCRAFTED_LATERAL_TUNE,
+  NrdrParamKey.NRDR_HANDCRAFTED_LATERAL_REQUEST,
   NrdrParamKey.NRDR_NNLC_ENABLED,
   NrdrParamKey.NRDR_NNLC_ACTIVATION_SPEED,
   NrdrParamKey.NRDR_NNLC_KP_GAIN,

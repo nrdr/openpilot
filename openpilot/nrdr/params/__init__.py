@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     handcrafted_lateral_profile_status,
     handcrafted_lateral_profile_supported,
     handcrafted_lateral_success_marker,
+    request_handcrafted_lateral_profile,
   )
   from openpilot.nrdr.params.snapshots import (
     CONTROL_GROUPS,
@@ -98,6 +99,7 @@ __all__ = (
   "handcrafted_lateral_profile_status",
   "handcrafted_lateral_profile_supported",
   "handcrafted_lateral_success_marker",
+  "request_handcrafted_lateral_profile",
   "read_bool",
   "read_float",
   "reset_live_params_for_tests",
@@ -127,6 +129,7 @@ _EXPORT_MODULES = {
   "handcrafted_lateral_profile_status": "openpilot.nrdr.params.profiles",
   "handcrafted_lateral_profile_supported": "openpilot.nrdr.params.profiles",
   "handcrafted_lateral_success_marker": "openpilot.nrdr.params.profiles",
+  "request_handcrafted_lateral_profile": "openpilot.nrdr.params.profiles",
   "NRDR_UI_METADATA": "openpilot.nrdr.params.ui_metadata",
   "NRDR_UI_METADATA_BY_KEY": "openpilot.nrdr.params.ui_metadata",
   "NumericUiMetadata": "openpilot.nrdr.params.ui_metadata",

@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY, CV
+from openpilot.nrdr.features.lateral.capabilities import supports_interpolated_torque_pif
 from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
 
 
@@ -86,21 +86,6 @@ class InterpolatedTorquePifSettingsLatch:
     if not active:
       self.settings = resolve_interpolated_torque_pif_settings(settings, supported)
     return self.settings
-
-
-def supports_interpolated_torque_pif(CP, CP_SP) -> bool:
-  """Limit the experiment to modified-EPS Honda PID and Clarity-hybrid paths."""
-  if str(getattr(CP, "brand", "")).lower() != "honda":
-    return False
-  if not bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value):
-    return False
-
-  fingerprint = str(getattr(CP, "carFingerprint", ""))
-  try:
-    lateral_kind = CP.lateralTuning.which()
-  except (AttributeError, TypeError):
-    lateral_kind = ""
-  return lateral_kind == "pid" or (fingerprint == "HONDA_CLARITY" and lateral_kind == "torque")
 
 
 def resolve_interpolated_torque_pif_settings(settings, supported: bool) -> InterpolatedTorquePifSettings:

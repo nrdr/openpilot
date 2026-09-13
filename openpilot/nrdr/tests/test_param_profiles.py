@@ -41,11 +41,15 @@ class TestParamProfiles(unittest.TestCase):
     self.assertEqual(tuple(HANDCRAFTED_LATERAL_PROFILES), EXPECTED_HANDCRAFTED_FINGERPRINTS)
     self.assertEqual(len(HONDA_TORQUE_MOD_HANDCRAFTED_VALUES), 38)
     self.assertEqual(len(CLARITY_HANDCRAFTED_LATERAL_VALUES_V17), 47)
-    self.assertEqual(HANDCRAFTED_EXTERNAL_PARAM_KEYS, frozenset(("LagdToggle", "LagdToggleDelay")))
+    self.assertEqual(HANDCRAFTED_EXTERNAL_PARAM_KEYS, frozenset((
+      "LagdToggle", "LagdToggleDelay", "TorqueControlTune", "LateralJerkTorqueController",
+      "TorqueParamsOverrideEnabled", "TorqueParamsOverrideFriction", "TorqueParamsOverrideLatAccelFactor",
+      "LaneCentering", "LaneCenteringE2EAuthority", "LaneCenteringPauseOnSignal", "LaneCenterOffset",
+    )))
 
     for fingerprint, profile in HANDCRAFTED_LATERAL_PROFILES.items():
-      expected = CLARITY_HANDCRAFTED_LATERAL_VALUES_V17 if fingerprint == "HONDA_CLARITY" else HONDA_TORQUE_MOD_HANDCRAFTED_VALUES
-      self.assertEqual(profile.values, expected)
+      self.assertEqual(profile.version, 18)
+      self.assertFalse(any("SteerRatio" in key for key, _value in profile.values))
       self.assertEqual(len(profile.values), len(dict(profile.values)))
       self.assertTrue(all(type(key) is str for key, _ in profile.values))
       for key, value in profile.values:
@@ -55,7 +59,8 @@ class TestParamProfiles(unittest.TestCase):
         self.assertIn(key, {item.value for item in NrdrParamKey})
         self.assertEqual(PARAM_SPECS_BY_KEY[key].flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
 
-    self.assertIs(CLARITY_CURRENT_LATERAL_2026_08_28, HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"])
+    self.assertEqual(CLARITY_CURRENT_LATERAL_2026_08_28.values, CLARITY_HANDCRAFTED_LATERAL_VALUES_V17)
+    self.assertEqual(CLARITY_CURRENT_LATERAL_2026_08_28.version, 17)
     self.assertIs(CLARITY_ROAD_TESTED_2026_08_21, CLARITY_CURRENT_LATERAL_2026_08_28)
     self.assertIsNone(get_handcrafted_lateral_profile("HONDA_CRV_HYBRID"))
 

@@ -109,18 +109,36 @@ def persist_dongle_id(dongle_id) -> None:
 def allow_param_write(key: str, onroad: bool, *, handcrafted_profile_available: bool | None = None,
                       honda_tuning_available: bool | None = None,
                       requested_bool: bool | None = None) -> bool:
+  if key == "NrdrHandcraftedLateralRequest":
+    return False
   if onroad and key in ONROAD_WRITE_BLOCKLIST:
     return False
   if key == "NrdrHandcraftedLateralTune":
     # A false write lets the user cancel an existing command. Enabling is
     # admitted only when current CP/CP_SP and any selected platform agree that
-    # this exact vehicle has a reviewed profile. None is fail-closed.
+    # this exact vehicle can consume the preset. None is fail-closed. The
+    # caller must bind an admitted True request through the profile API.
     return requested_bool is False or (
       requested_bool is True and handcrafted_profile_available is True
     )
   if key in HONDA_TUNING_WRITE_KEYS:
     return honda_tuning_available is True
   return True
+
+
+def request_stored_handcrafted_lateral_profile(params) -> bool:
+  """Bind a remote opt-in to device-owned vehicle data, never client payloads."""
+  from opendbc.car.structs import car
+  from openpilot.cereal import custom, messaging
+  from openpilot.nrdr.params import request_handcrafted_lateral_profile
+
+  cp_bytes = params.get("CarParamsPersistent")
+  if not cp_bytes:
+    return False
+  CP = messaging.log_from_bytes(cp_bytes, car.CarParams)
+  cp_sp_bytes = params.get("CarParamsSPPersistent")
+  CP_SP = messaging.log_from_bytes(cp_sp_bytes, custom.CarParamsSP) if cp_sp_bytes else None
+  return request_handcrafted_lateral_profile(CP, CP_SP, params)
 
 
 def inject_car_tune_details(schema: dict, walk) -> None:
@@ -148,5 +166,6 @@ __all__ = (
   "allow_param_write",
   "inject_car_tune_details",
   "persist_dongle_id",
+  "request_stored_handcrafted_lateral_profile",
   "restore_dongle_id",
 )

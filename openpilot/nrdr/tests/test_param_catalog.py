@@ -25,19 +25,26 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "ad587cb66c72a8f12558ba6999ab3cbcc91dbe60515269b91b5e6b4d280e4554"
+REGISTRY_METADATA_SHA256 = "66361759b5b19c6505cb3ed8e52cd2ad7aa57f37c564c557bbca82a796332a41"
 
 
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 132)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 131)
+    self.assertEqual(len(PARAM_SPECS), 133)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 132)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
 
     metadata = "\n".join(f"{spec.action.value}|{spec.key}|{spec.cpp_attributes}" for spec in PARAM_SPECS) + "\n"
     self.assertEqual(sha256(metadata.encode()).hexdigest(), REGISTRY_METADATA_SHA256)
+
+  def test_handcrafted_request_context_is_typed_and_not_restored_from_backups(self) -> None:
+    spec = PARAM_SPECS_BY_KEY["NrdrHandcraftedLateralRequest"]
+    self.assertIs(spec.param_type, ParamType.JSON)
+    self.assertIs(spec.lifecycle, ParamLifecycle.COMMAND)
+    self.assertEqual(spec.flags, (ParamFlag.PERSISTENT,))
+    self.assertIsNone(spec.default)
 
   def test_personality_accel_profile_param_is_a_persistent_ignored_tombstone(self) -> None:
     spec = PARAM_SPECS_BY_KEY["NrdrPersonalityAccelProfiles"]

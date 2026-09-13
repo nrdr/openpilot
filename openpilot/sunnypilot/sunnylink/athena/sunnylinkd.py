@@ -34,7 +34,9 @@ from openpilot.sunnypilot.sunnylink.api import SunnylinkApi
 from openpilot.sunnypilot.sunnylink.utils import sunnylink_need_register, sunnylink_ready, get_param_as_byte, save_param_from_base64_encoded_string
 from openpilot.sunnypilot.sunnylink.capabilities import generate_capabilities, CAPABILITY_LABELS
 from openpilot.sunnypilot.sunnylink.tools.generate_settings_schema import generate_schema
-from openpilot.nrdr.features.services.sunnylink import HONDA_TUNING_WRITE_KEYS, allow_param_write
+from openpilot.nrdr.features.services.sunnylink import (
+  HONDA_TUNING_WRITE_KEYS, allow_param_write, request_stored_handcrafted_lateral_profile,
+)
 
 SUNNYLINK_ATHENA_HOST = os.getenv('SUNNYLINK_ATHENA_HOST', 'wss://athena.sunnylink.ai')
 HANDLER_THREADS = int(os.getenv('HANDLER_THREADS', "4"))
@@ -54,6 +56,7 @@ BLOCKED_PARAMS = {
   "GithubSshKeys",   # Direct SSH key injection
   "HasAcceptedTerms",
   "HasAcceptedTermsSP",
+  "NrdrHandcraftedLateralRequest",  # Device-generated vehicle/version binding; never accept remote context.
   "OnroadCycleRequested",      # Prevent remote cycle trigger
   "ParamsVersion",         # Device-managed version counter
 }
@@ -282,7 +285,11 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       continue
 
     try:
-      save_param_from_base64_encoded_string(key, value, compression)
+      if key == "NrdrHandcraftedLateralTune" and requested_bool is True:
+        if not request_stored_handcrafted_lateral_profile(params):
+          cloudlog.warning("sunnylinkd.saveParams.handcrafted: Fresh request rejected for current vehicle or state")
+      else:
+        save_param_from_base64_encoded_string(key, value, compression)
     except Exception as e:
       cloudlog.error(f"sunnylinkd.saveParams.exception {e}")
 

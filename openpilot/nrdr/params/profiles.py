@@ -6,6 +6,8 @@ functions that need them.
 """
 
 from dataclasses import dataclass
+import hashlib
+import json
 from pathlib import Path
 from typing import Protocol
 
@@ -49,13 +51,16 @@ HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS = (
   "HONDA_INSIGHT",
 )
 
-# These two settings are owned by SunnyPilot's live-delay subsystem rather than
-# the NRDR registry. Keeping the exception explicit prevents borrowed settings
-# from silently expanding the profile boundary.
-HANDCRAFTED_EXTERNAL_PARAM_KEYS = frozenset(("LagdToggle", "LagdToggleDelay"))
+# These settings are owned by the base/SunnyPilot registry. Keep borrowed keys
+# explicit so the preset cannot silently expand its write boundary.
+HANDCRAFTED_EXTERNAL_PARAM_KEYS = frozenset((
+  "LagdToggle", "LagdToggleDelay", "TorqueControlTune", "LateralJerkTorqueController",
+  "TorqueParamsOverrideEnabled", "TorqueParamsOverrideFriction", "TorqueParamsOverrideLatAccelFactor",
+  "LaneCentering", "LaneCenteringE2EAuthority", "LaneCenteringPauseOnSignal", "LaneCenterOffset",
+))
 
-# The safe legacy profile remains available as a one-shot action for the other
-# reviewed modified-EPS Honda fingerprints. Clarity has its own v17 snapshot.
+# Immutable historical values retained for provenance and import compatibility;
+# the active capability-scoped recipe below is v18.
 HONDA_TORQUE_MOD_HANDCRAFTED_VALUES = (
   (NrdrParamKey.NRDR_STAR_PILOT_PID.value, False),
   (NrdrParamKey.NRDR_LEARN_STIFFNESS.value, True),
@@ -155,7 +160,7 @@ CLARITY_HANDCRAFTED_LATERAL_VALUES_V17 = (
 )
 
 
-def _build_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
+def _build_legacy_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
   if fingerprint not in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS:
     raise ValueError(f"unsupported handcrafted-lateral fingerprint: {fingerprint}")
   if fingerprint == "HONDA_CLARITY":
@@ -173,19 +178,79 @@ def _build_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
   )
 
 
+# Historical exports remain immutable records, not the active apply recipe.
+CLARITY_CURRENT_LATERAL_2026_08_28 = _build_legacy_honda_profile("HONDA_CLARITY")
+CLARITY_ROAD_TESTED_2026_08_21 = CLARITY_CURRENT_LATERAL_2026_08_28
+
+HANDCRAFTED_LATERAL_VERSION = 18
+# Captured from the owner's Civic on 2026-09-12. This records provenance, not
+# validation on other vehicles. Never translate the hybrid's 1.0 friction into
+# the unrelated native torque-controller override.
+CIVIC_DIALED_SETTINGS_SHA256 = "c1faf2291527061621c7bdbb2679fd8f90cfa00f0b8acd08fdd27e5ee9770074"
+COMMON_HANDCRAFTED_VALUES = (
+  ("LaneCentering", True), ("LaneCenteringStrength", 1.0),
+  ("LaneCenteringMinSpeed", 50), ("LaneCenteringE2EAuthority", 0.0),
+  ("LaneCenteringPauseOnSignal", True), ("LaneCenterOffset", 0.0),
+  ("LagdToggle", True), ("LagdToggleDelay", 0.4),
+)
+_SNAPSHOT_UPDATES = {
+  "NrdrLatStiction": False,
+  "HondaLpfTauStandard": 0.05,
+  "HondaLpfTauHighway": 0.02,
+  "NrdrInterpolatedTorqueShare": 10,
+  "NrdrInterpolatedTorqueFriction": 1.0,
+  "NrdrInterpolatedTorqueFrictionStandard": 1.0,
+  "NrdrInterpolatedTorqueFrictionHighway": 1.0,
+}
+_PID_KEYS = frozenset((
+  "NrdrStarPilotPid", "NrdrLatStiction", "NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed",
+  "NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate",
+))
+_HONDA_KEYS = frozenset((
+  "NrdrIncreaseOverrideTolerance", "NrdrDriverOverrideThreshold", "NrdrOverrideThresholdCenterBoost",
+))
+
+
+def _snapshot_group(predicate) -> tuple[tuple[str, ProfileValue], ...]:
+  return tuple((key, _SNAPSHOT_UPDATES.get(key, value)) for key, value in CLARITY_HANDCRAFTED_LATERAL_VALUES_V17 if predicate(key))
+
+
+HONDA_PID_HANDCRAFTED_VALUES = _snapshot_group(lambda key: key in _PID_KEYS or key.startswith(("LatPScale", "LatIScale", "LatFScale")))
+HONDA_FILTER_HANDCRAFTED_VALUES = _snapshot_group(lambda key: key.startswith("Honda") or key in _HONDA_KEYS)
+HYBRID_HANDCRAFTED_VALUES = _snapshot_group(lambda key: key.startswith("NrdrInterpolatedTorque"))
+TORQUE_HANDCRAFTED_VALUES = (
+  ("TorqueParamsOverrideEnabled", False), ("TorqueParamsOverrideLatAccelFactor", 2.5),
+  ("TorqueParamsOverrideFriction", 0.1), ("TorqueControlTune", 0.0),
+  ("LateralJerkTorqueController", False),
+  ("NrdrNnlcEnabled", False), ("NrdrNnlcActivationSpeed", 0),
+  ("NrdrNnlcKpGain", 300), ("NrdrNnlcKiGain", 10), ("NrdrNnlcKfGain", 0),
+)
+
+
+def _make_profile(fingerprint: str, values: tuple[tuple[str, ProfileValue], ...], scope: str) -> HandcraftedLateralProfile:
+  # These checks apply to every future recipe, not just this captured snapshot.
+  if len(values) != len(dict(values)):
+    raise ValueError("duplicate handcrafted-lateral setting")
+  if any("SteerRatio" in key or "Calibration" in key or key in ("NrdrLearnStiffness", "NrdrLearnAngleOffset") for key, _ in values):
+    raise ValueError("handcrafted preset must preserve vehicle geometry and calibration")
+  return HandcraftedLateralProfile(f"Civic-derived 2026-09-12 ({scope}; steer ratio preserved)", fingerprint,
+                                  HANDCRAFTED_LATERAL_VERSION, values)
+
+
 HANDCRAFTED_LATERAL_PROFILES = {
-  fingerprint: _build_honda_profile(fingerprint)
+  fingerprint: _make_profile(
+    fingerprint, COMMON_HANDCRAFTED_VALUES + HONDA_FILTER_HANDCRAFTED_VALUES + HONDA_PID_HANDCRAFTED_VALUES +
+    HYBRID_HANDCRAFTED_VALUES + (TORQUE_HANDCRAFTED_VALUES if fingerprint == "HONDA_CLARITY" else ()),
+    "Honda hybrid",
+  )
   for fingerprint in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS
 }
 
-CLARITY_CURRENT_LATERAL_2026_08_28 = HANDCRAFTED_LATERAL_PROFILES["HONDA_CLARITY"]
-# Import compatibility for the previous public name; the object itself is v17.
-CLARITY_ROAD_TESTED_2026_08_21 = CLARITY_CURRENT_LATERAL_2026_08_28
-
 _REQUEST_KEY = NrdrParamKey.NRDR_HANDCRAFTED_LATERAL_TUNE.value
+_CONTEXT_KEY = "NrdrHandcraftedLateralRequest"
 _STATUS_KEY = NrdrParamKey.NRDR_CAR_HANDCRAFTED_INFO.value
 _BLEND_KEY = NrdrParamKey.NRDR_INTERPOLATED_TORQUE_PIF_BLEND.value
-_STEER_RATIO_MODE_KEY = NrdrParamKey.NRDR_STEER_RATIO_MODE.value
+_ENABLE_LAST_KEYS = (_BLEND_KEY, "LaneCentering")
 
 
 def _params_or_default(params: ProfileParamStore | None) -> ProfileParamStore:
@@ -195,8 +260,44 @@ def _params_or_default(params: ProfileParamStore | None) -> ProfileParamStore:
   return Params()
 
 
-def get_handcrafted_lateral_profile(fingerprint: str) -> HandcraftedLateralProfile | None:
-  return HANDCRAFTED_LATERAL_PROFILES.get(str(fingerprint))
+def get_handcrafted_lateral_profile(fingerprint: str, CP=None, CP_SP=None) -> HandcraftedLateralProfile | None:
+  """Resolve consumed settings only; a fingerprint-only lookup is informational.
+
+  All application paths pass authoritative CP/CP_SP. The historical Honda map
+  remains available to callers describing the full hybrid preset before boot.
+  """
+  if CP is None:
+    return HANDCRAFTED_LATERAL_PROFILES.get(str(fingerprint))
+  identity = confirmed_vehicle_identity(CP)
+  if identity is None or identity[0] != str(fingerprint) or identity[1] == "mock" or getattr(CP, "notCar", False):
+    return None
+  brand = identity[1]
+  mode = str(getattr(CP, "steerControlType", ""))
+  try:
+    lateral_kind = CP.lateralTuning.which()
+  except (AttributeError, TypeError):
+    return None
+  if mode not in ("torque", "angle", "curvature") or lateral_kind not in ("pid", "torque", "indi", "lqr"):
+    return None
+
+  values = COMMON_HANDCRAFTED_VALUES
+  scopes = ["lane centering / live delay"]
+  if mode == "torque" and lateral_kind == "torque":
+    values += TORQUE_HANDCRAFTED_VALUES
+    scopes.append("native torque options")
+  if brand == "honda" and mode == "torque":
+    from openpilot.nrdr.features.lateral.capabilities import supports_interpolated_torque_pif
+    from openpilot.nrdr.features.lateral.steer_ratio_tuning import get_steer_ratio_metadata
+    hybrid = supports_interpolated_torque_pif(CP, CP_SP)
+    values += HONDA_FILTER_HANDCRAFTED_VALUES
+    pid_path = lateral_kind == "pid" or (fingerprint == "HONDA_CLARITY" and lateral_kind == "torque")
+    if pid_path and (hybrid or get_steer_ratio_metadata(fingerprint) is not None):
+      values += HONDA_PID_HANDCRAFTED_VALUES
+      scopes.append("Honda PID")
+    if hybrid:
+      values += HYBRID_HANDCRAFTED_VALUES
+      scopes.append("10% torque / 90% PIF")
+  return _make_profile(str(fingerprint), values, ", ".join(scopes))
 
 
 def confirmed_vehicle_identity(CP, fingerprint: str | None = None,
@@ -224,29 +325,50 @@ def confirmed_vehicle_identity(CP, fingerprint: str | None = None,
 def handcrafted_lateral_profile_supported(CP, CP_SP, fingerprint: str | None = None,
                                            brand: str | None = None, *,
                                            selection_present: bool | None = None) -> bool:
-  """Return whether confirmed vehicle identity can consume its reviewed profile."""
+  """Return whether confirmed vehicle identity has a compatible preset subset."""
   identity = confirmed_vehicle_identity(
     CP, fingerprint, brand, selection_present=selection_present,
   )
   if identity is None:
     return False
-  resolved_fingerprint, resolved_brand = identity
-  if resolved_brand != "honda" or get_handcrafted_lateral_profile(resolved_fingerprint) is None:
-    return False
-  if resolved_fingerprint != "HONDA_CLARITY":
-    return True
+  return get_handcrafted_lateral_profile(identity[0], CP, CP_SP) is not None
 
-  from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
-  from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
-  if CP is None or CP_SP is None or get_honda_vgr_profile(CP) is None:
+
+def _canonical(value) -> str:
+  return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def _request_context(CP, CP_SP, profile: HandcraftedLateralProfile) -> dict:
+  firmware = sorted((str(getattr(fw, "ecu", "")), bytes(getattr(fw, "fwVersion", b"")).hex())
+                    for fw in getattr(CP, "carFw", ()))
+  return {
+    "version": profile.version, "fingerprint": profile.fingerprint, "brand": str(CP.brand).lower(),
+    "controller": str(CP.lateralTuning.which()), "steer_control_type": str(CP.steerControlType),
+    "flags_sp": int(getattr(CP_SP, "flags", 0)),
+    "firmware_sha256": hashlib.sha256(_canonical(firmware).encode()).hexdigest(),
+    "payload_sha256": hashlib.sha256(_canonical(dict(profile.values)).encode()).hexdigest(),
+  }
+
+
+def _put_context(params: ProfileParamStore, context: dict) -> None:
+  params.put(_CONTEXT_KEY, context, block=True)
+  if _canonical(params.get(_CONTEXT_KEY)) != _canonical(context):
+    raise RuntimeError("handcrafted lateral request context readback mismatch")
+
+
+def request_handcrafted_lateral_profile(CP, CP_SP, params: ProfileParamStore | None = None) -> bool:
+  """Bind a fresh offroad request to this vehicle, controller and exact recipe."""
+  params = _params_or_default(params)
+  if not params.get_bool("IsOffroad") or params.get_bool(_REQUEST_KEY):
     return False
-  if not bool(getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value):
+  present, fingerprint, brand = get_selected_car_identity(params)
+  if not handcrafted_lateral_profile_supported(CP, CP_SP, fingerprint, brand, selection_present=present):
     return False
-  try:
-    lateral_kind = CP.lateralTuning.which()
-  except (AttributeError, TypeError):
-    lateral_kind = ""
-  return lateral_kind in ("pid", "torque")
+  profile = get_handcrafted_lateral_profile(str(CP.carFingerprint), CP, CP_SP)
+  assert profile is not None
+  _put_context(params, _request_context(CP, CP_SP, profile))
+  _put_verified(params, _REQUEST_KEY, True)
+  return True
 
 
 def _value_matches(actual, expected: ProfileValue) -> bool:
@@ -272,7 +394,7 @@ def _stored_success_marker(stored) -> str | None:
 def handcrafted_lateral_profile_status(CP, CP_SP, params: ProfileParamStore | None = None) -> str:
   """Describe last apply state without writing or reconciling any tune value."""
   params = _params_or_default(params)
-  profile = get_handcrafted_lateral_profile(str(getattr(CP, "carFingerprint", "")))
+  profile = get_handcrafted_lateral_profile(str(getattr(CP, "carFingerprint", "")), CP, CP_SP)
   stored = params.get(_STATUS_KEY)
   stored_marker = _stored_success_marker(stored)
   if profile is None:
@@ -336,30 +458,33 @@ def get_selected_car_identity(params: ProfileParamStore) -> tuple[bool, str, str
 
 
 def _ordered_profile_writes(profile: HandcraftedLateralProfile) -> tuple[tuple[str, ProfileValue], ...]:
-  if profile.fingerprint != "HONDA_CLARITY":
-    return profile.values
-
   values = dict(profile.values)
+  enabled_keys = tuple(key for key in _ENABLE_LAST_KEYS if values.get(key) is True)
   underlying = tuple(
     (key, value) for key, value in profile.values
-    if key not in (_BLEND_KEY, _STEER_RATIO_MODE_KEY)
+    if key not in enabled_keys
   )
   return (
-    (_BLEND_KEY, False),
+    *((key, False) for key in enabled_keys),
     *underlying,
-    (_STEER_RATIO_MODE_KEY, values[_STEER_RATIO_MODE_KEY]),
-    (_BLEND_KEY, values[_BLEND_KEY]),
+    *((key, values[key]) for key in enabled_keys),
   )
 
 
-def _restore_safe_pending_state(params: ProfileParamStore, profile: HandcraftedLateralProfile) -> None:
-  """Leave an interrupted command retryable, with Clarity's blend verified off."""
+def _restore_safe_pending_state(params: ProfileParamStore, profile: HandcraftedLateralProfile, context: dict) -> None:
+  """Leave an interrupted command retryable with partial compound features off."""
   errors: list[Exception] = []
-  if profile.fingerprint == "HONDA_CLARITY":
+  for key in _ENABLE_LAST_KEYS:
+    if key not in dict(profile.values):
+      continue
     try:
-      _put_verified(params, _BLEND_KEY, False)
+      _put_verified(params, key, False)
     except Exception as error:
       errors.append(error)
+  try:
+    _put_context(params, context)
+  except Exception as error:
+    errors.append(error)
   try:
     params.put_bool(_REQUEST_KEY, True, block=True)
     if not _value_matches(params.get(_REQUEST_KEY, return_default=True), True):
@@ -377,11 +502,10 @@ def consume_handcrafted_lateral_request(CP, CP_SP, params: ProfileParamStore | N
                                         *, startup: bool = False) -> list[str]:
   """Consume one pending apply request only after every value verifies exactly.
 
-  A request for a positively identified Toyota-family vehicle without a reviewed
-  profile is terminally cleared without touching tune values. Unknown vehicle
-  identity and transient validation failures remain pending, so a later offroad
-  poll or car startup can safely retry. A false request is a strict no-op: this
-  function never reconciles a completed profile.
+  Legacy or mismatched requests are cleared without tune writes. In particular,
+  an old unsupported Toyota request cannot become permission for the new recipe.
+  Unknown vehicle identity and transient I/O failures remain pending. A false
+  request is a strict no-op: completed profiles are never reconciled.
   """
   params = _params_or_default(params)
   if not params.get_bool(_REQUEST_KEY):
@@ -395,42 +519,35 @@ def consume_handcrafted_lateral_request(CP, CP_SP, params: ProfileParamStore | N
   )
   if identity is None:
     return []
-  fingerprint, detected_brand = identity
-  profile = get_handcrafted_lateral_profile(fingerprint)
+  fingerprint, _detected_brand = identity
+  profile = get_handcrafted_lateral_profile(fingerprint, CP, CP_SP)
   if profile is None:
-    # This terminal consume is deliberately limited to the Toyota family seen
-    # in current, authoritative CP. Unknown/malformed identity and unreviewed
-    # Honda variants keep the user's request for a future supported context.
-    if detected_brand != "toyota":
-      return []
-    # A resolved unsupported vehicle can never satisfy this one-shot command.
-    # Consume only the command itself; every tune and success marker remains
-    # byte-for-byte under the user's control.
     _put_verified(params, _REQUEST_KEY, False)
     return []
-  if not handcrafted_lateral_profile_supported(CP, CP_SP):
+  context = _request_context(CP, CP_SP, profile)
+  try:
+    context_matches = _canonical(params.get(_CONTEXT_KEY)) == _canonical(context)
+  except (TypeError, ValueError):
+    context_matches = False
+  if not context_matches:
+    _put_verified(params, _REQUEST_KEY, False)
     return []
 
   try:
     ordered = _ordered_profile_writes(profile)
     written: list[str] = []
-    if profile.fingerprint == "HONDA_CLARITY":
-      # Phase one keeps the master durably OFF while every payload value and
-      # mode-last steering source is written and verified. Recheck the entire
-      # non-blend snapshot before the only write which can enable the blend.
-      for key, value in ordered[:-1]:
-        _put_verified(params, key, value)
-        written.append(key)
-      for key, value in profile.values:
-        if key != _BLEND_KEY:
-          _verify_typed(params, key, value)
-      key, value = ordered[-1]
+    enabling = tuple(key for key in _ENABLE_LAST_KEYS if dict(profile.values).get(key) is True)
+    payload_end = len(ordered) - len(enabling)
+    for key, value in ordered[:payload_end]:
       _put_verified(params, key, value)
       written.append(key)
-    else:
-      for key, value in ordered:
-        _put_verified(params, key, value)
-        written.append(key)
+    # Verify the whole payload before enabling either lane centering or hybrid.
+    for key, value in profile.values:
+      if key not in enabling:
+        _verify_typed(params, key, value)
+    for key, value in ordered[payload_end:]:
+      _put_verified(params, key, value)
+      written.append(key)
 
     for key, value in profile.values:
       _verify_typed(params, key, value)
@@ -448,13 +565,14 @@ def consume_handcrafted_lateral_request(CP, CP_SP, params: ProfileParamStore | N
     if params.get(_STATUS_KEY) != marker:
       raise RuntimeError("handcrafted lateral status readback mismatch")
 
+    _put_context(params, {})
     params.put_bool(_REQUEST_KEY, False, block=True)
     if not _value_matches(params.get(_REQUEST_KEY, return_default=True), False):
       raise RuntimeError("handcrafted lateral command clear readback mismatch")
     return written
   except Exception as apply_error:
     try:
-      _restore_safe_pending_state(params, profile)
+      _restore_safe_pending_state(params, profile, context)
     except HandcraftedLateralUnsafeStateError as cleanup_error:
       raise cleanup_error from apply_error
     raise
@@ -464,6 +582,9 @@ __all__ = (
   "CLARITY_CURRENT_LATERAL_2026_08_28",
   "CLARITY_HANDCRAFTED_LATERAL_VALUES_V17",
   "CLARITY_ROAD_TESTED_2026_08_21",
+  "CIVIC_DIALED_SETTINGS_SHA256",
+  "COMMON_HANDCRAFTED_VALUES",
+  "HANDCRAFTED_LATERAL_VERSION",
   "HANDCRAFTED_EXTERNAL_PARAM_KEYS",
   "HANDCRAFTED_LATERAL_PROFILES",
   "HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS",
@@ -481,4 +602,5 @@ __all__ = (
   "handcrafted_lateral_profile_status",
   "handcrafted_lateral_profile_supported",
   "handcrafted_lateral_success_marker",
+  "request_handcrafted_lateral_profile",
 )
