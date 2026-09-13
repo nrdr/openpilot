@@ -1,0 +1,14 @@
+# Canonical NRDR sections merged into the Sunnylink host page.
+page_id: software
+after_section: updates
+sections:
+  - id: nrdr
+    title: nrdr Force Update
+    description: Trigger a remote device update.
+    items:
+    - key: NrdrRemoteForceUpdate
+      widget: toggle
+      title: Force Update
+      description: Flip ON to run the full updater chain (check, download, install, reboot). Only works while the car is off.
+      details: Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status below for progress.
+    sub_panels: []
