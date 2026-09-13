@@ -7,6 +7,8 @@ import shlex
 from types import SimpleNamespace
 import unittest
 
+from openpilot.common.file_chunker import get_chunk_targets
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCONSCRIPT = REPO_ROOT / "openpilot/selfdrive/modeld/SConscript"
@@ -45,6 +47,7 @@ class BuildEnvironment:
     self.commands = []
     self.side_effects = []
     self.executed = []
+    self.chunk_estimates = {}
 
   def Clone(self):
     return self
@@ -65,12 +68,15 @@ class BuildEnvironment:
     return 0
 
 
-def assemble_build(arch, chestnut=False, device="mici", skip=False, all_cameras=None):
+def assemble_build(arch, chestnut=False, device="mici", skip=False, all_cameras=None, onnx_size=100):
   # Run production control flow and f-strings, but replace imports and all I/O.
   # This checks build wiring, not QCOM execution or on-device model correctness.
   tree = WithoutImports().visit(ast.parse(SCONSCRIPT.read_text(encoding="utf-8")))
   env = BuildEnvironment()
   chunked = []
+  def record_chunk_targets(path, size):
+    env.chunk_estimates[path] = size
+    return [path + ".manifest", path + ".000"]
   environment = {"SKIP_TINYGRAD_COMPILE": "1" if skip else None, "PREBUILT_ALL_CAMERAS": all_cameras}
   namespace = {
     "arch": arch,
@@ -86,7 +92,7 @@ def assemble_build(arch, chestnut=False, device="mici", skip=False, all_cameras=
       path=SimpleNamespace(
         isfile=lambda path: True,
         join=lambda *parts: str(PurePosixPath(*parts)),
-        getsize=lambda path: 100,
+        getsize=lambda path: onnx_size,
         expanduser=lambda path: "/home/test",
       ),
     ),
@@ -100,7 +106,7 @@ def assemble_build(arch, chestnut=False, device="mici", skip=False, all_cameras=
     "chestnut_present": lambda: chestnut,
     "modeld_pkl_path": lambda big: f"{MODEL_DIR}/models/{'big_' if big else ''}driving_tinygrad.pkl",
     "get_existing_chunks": lambda path: [path + ".000"],
-    "get_chunk_targets": lambda path, size: [path + ".manifest", path + ".000"],
+    "get_chunk_targets": record_chunk_targets,
     "chunk_file": lambda path, chunks: chunked.append((path, chunks)),
     "link_up": lambda: True,
   }
@@ -198,6 +204,28 @@ class TestModelBuildAffinity(unittest.TestCase):
         _, nodes, chunked = assemble_build("comma_arm64", chestnut, skip=True)
         self.assertEqual(nodes, [])
         self.assertEqual(chunked, [])
+
+  def test_chunk_budget_covers_every_driving_camera_without_inflating_dm(self):
+    onnx_size = 50 * 1024 * 1024
+    single_camera_budget = 2 * onnx_size + 10 * 1024 * 1024
+    for chestnut in (False, True):
+      for arch, flag, count in (("comma_arm64", None, 1), ("comma_arm64", "1", 2), ("x86_64", None, 2)):
+        with self.subTest(arch=arch, chestnut=chestnut, all_cameras=flag):
+          env, driving, _ = assemble_build(arch, chestnut, all_cameras=flag, onnx_size=onnx_size)
+          for node in driving:
+            pkl = node.targets[0].removesuffix(".manifest")
+            budget = env.chunk_estimates[pkl]
+            self.assertEqual(budget, count * single_camera_budget)
+            reserved = len(get_chunk_targets(pkl, budget)) - 1
+            if count == 2:
+              # The first real dual-camera C4 build produced 176.36 MB; the
+              # previous single-camera estimate reserved only three chunks.
+              needed = len(get_chunk_targets(pkl, 176_360_000)) - 1
+              self.assertGreaterEqual(reserved, needed)
+            else:
+              self.assertEqual(reserved, 3)
+          dm = f"{MODEL_DIR}/models/dmonitoring_model_tinygrad.pkl"
+          self.assertEqual(env.chunk_estimates[dm], single_camera_budget)
 
 
 if __name__ == "__main__":
