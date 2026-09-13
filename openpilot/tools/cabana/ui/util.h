@@ -31,8 +31,14 @@ inline bool inputText(const char *label, std::string *s, const char *hint = "", 
 
 bool inputTextMultiline(const char *label, std::string *s, const ImVec2 &size, ImGuiInputTextFlags flags = 0);
 
-// an input with a trailing clear button once it holds text; true when the text changed
+constexpr float CONTROL_OUTLINE_PADDING = 1.0f;
+// Always pair with ImGui::EndChild(), even when false is returned.
+bool beginControlChild(const char *id, const ImVec2 &size, ImGuiWindowFlags flags = 0);
+
+// SetNextItemWidth includes the field and clear button. Returns true when text changes.
 bool clearableInput(const char *label, std::string *s, const char *hint = "", ImGuiInputTextCallback validator = nullptr);
+
+bool selectable(const char *label, bool selected, ImGuiSelectableFlags flags = 0, const ImVec2 &size = ImVec2(0, 0));
 
 bool comboBox(const char *label, int *index, const std::vector<std::string> &items);
 
@@ -44,7 +50,7 @@ inline bool comboBox(const char *label, int *index, const T *values, int count) 
   if (ImGui::BeginCombo(label, preview.c_str())) {
     for (int i = 0; i < count; ++i) {
       ImGui::PushID(i);
-      if (ImGui::Selectable(std::to_string(values[i]).c_str(), i == *index) && *index != i) {
+      if (selectable(std::to_string(values[i]).c_str(), i == *index) && *index != i) {
         *index = i;
         changed = true;
       }
@@ -67,9 +73,18 @@ int doubleValidator(ImGuiInputTextCallbackData *data);
 int ipValidator(ImGuiInputTextCallbackData *data);
 int nonWhitespaceValidator(ImGuiInputTextCallbackData *data);
 
+#ifdef __APPLE__
+constexpr const char *MOD_KEY = "Cmd";
+#else
+constexpr const char *MOD_KEY = "Ctrl";
+#endif
+inline std::string shortcut(const char *keys) { return std::string(MOD_KEY) + "+" + keys; }
+
 // Use ItemInnerSpacing between related buttons and ItemSpacing between groups.
 bool iconButton(const char *id, const char *icon, const char *tooltip = nullptr);
 float iconButtonWidth();
+bool iconTextButton(const char *id, const char *icon, const std::string &text, float width = 0.0f);
+float iconTextButtonWidth(const char *icon, const std::string &text);
 
 // tooltip for the last item that also shows while the item is disabled
 void disabledItemTooltip(const char *text);

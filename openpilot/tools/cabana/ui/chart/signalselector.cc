@@ -11,7 +11,10 @@
 #include "tools/cabana/utils/strings.h"
 
 SignalSelector::SignalSelector(std::string title) : title_(std::move(title)) {
-  for (const auto &[id, _] : can->lastMessages()) {
+  std::set<MessageId> ids;
+  for (const auto &[id, _] : can->eventsMap()) ids.insert(id);
+  for (const auto &[id, _] : can->lastMessages()) ids.insert(id);
+  for (const auto &id : ids) {
     if (auto m = dbc()->msg(id)) {
       msgs_combo_.push_back({m->name + " (" + id.toString() + ")", id});
     }
@@ -40,7 +43,7 @@ bool SignalSelector::draw() {
   ImGui::BeginGroup();
   ImGui::TextUnformatted("Available Signals");
   // a combo popup with a filter box
-  const char *preview = msgs_combo_index_ >= 0 ? msgs_combo_[msgs_combo_index_].text.c_str() : "Select a msg...";
+  const char *preview = msgs_combo_index_ >= 0 ? msgs_combo_[msgs_combo_index_].text.c_str() : "Select a message...";
   ImGui::SetNextItemWidth(column_w);
   if (ImGui::BeginCombo("##msgs_combo", preview)) {
     if (ImGui::IsWindowAppearing()) {
@@ -48,10 +51,10 @@ bool SignalSelector::draw() {
       ImGui::SetKeyboardFocusHere();
     }
     ImGui::SetNextItemWidth(-FLT_MIN);
-    inputText("##msgs_filter", &msgs_combo_filter_, "Select a msg...");
+    inputText("##msgs_filter", &msgs_combo_filter_, "Select a message...");
     for (int i = 0; i < (int)msgs_combo_.size(); ++i) {
       if (!msgs_combo_filter_.empty() && !utils::containsCI(msgs_combo_[i].text, msgs_combo_filter_)) continue;
-      if (ImGui::Selectable(msgs_combo_[i].text.c_str(), i == msgs_combo_index_)) {
+      if (selectable(msgs_combo_[i].text.c_str(), i == msgs_combo_index_)) {
         msgs_combo_index_ = i;
         updateAvailableList(i);
         ImGui::CloseCurrentPopup();
@@ -104,7 +107,7 @@ void SignalSelector::drawList(const char *id, std::vector<ListItem> &list, int *
     const auto &item = list[i];
     ImGui::PushID(i);
     const ImVec2 pos = ImGui::GetCursorScreenPos();
-    if (ImGui::Selectable("##item", i == *current_row)) *current_row = i;
+    if (selectable("##item", i == *current_row)) *current_row = i;
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
       *current_row = i;
       *double_clicked = true;
@@ -114,10 +117,10 @@ void SignalSelector::drawList(const char *id, std::vector<ListItem> &list, int *
     float x = pos.x + 5;
     drawColorMarker(dl, ImVec2(x, pos.y), toImU32(item.sig->color));
     x += markerSize() + 4;
-    dl->AddText(ImVec2(x, pos.y), ImGui::GetColorU32(ImGuiCol_Text), item.sig->name.c_str());
+    dl->AddText(ImVec2(x, pos.y), ImGui::GetColorU32(i == *current_row ? palette().text_selected : palette().text), item.sig->name.c_str());
     if (show_msg_name) {
       x += ImGui::CalcTextSize(item.sig->name.c_str()).x;
-      dl->AddText(ImVec2(x, pos.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), msgLabel(item.msg_id).c_str());
+      dl->AddText(ImVec2(x, pos.y), ImGui::GetColorU32(i == *current_row ? palette().text_selected : palette().text_disabled), msgLabel(item.msg_id).c_str());
     }
     ImGui::PopID();
   }

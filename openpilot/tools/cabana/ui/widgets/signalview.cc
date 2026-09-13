@@ -260,13 +260,13 @@ void SignalView::paintCell(ImDrawList *painter, const ImRect &option_rect, const
 
   ImRect rect(option_rect.Min.x + h_margin, option_rect.Min.y + v_margin, option_rect.Max.x - h_margin, option_rect.Max.y - v_margin);
   // selection background is painted by the row's Selectable
-  const ImU32 text_color = ImGui::GetColorU32(ImGuiCol_Text);
+  const ImU32 text_color = ImGui::GetColorU32(selected ? palette().text_selected : palette().text);
 
   if (column == 0) {
     if (item->type == SignalModel::Item::Sig) {
       // color label
       ImRect icon_rect(rect.Min.x, rect.Min.y, rect.Min.x + COLOR_LABEL_WIDTH, rect.Max.y);
-      painter->AddRectFilled(icon_rect.Min, icon_rect.Max, toImU32(signalFillColor(item->sig->color).darker(item->highlight ? 125 : 0)), ImGui::GetStyle().FrameRounding);
+      painter->AddRectFilled(icon_rect.Min, icon_rect.Max, toImU32(item->sig->color.darker(item->highlight ? 125 : 0)), ImGui::GetStyle().FrameRounding);
       drawText(painter, icon_rect, std::to_string(item->row() + 1).c_str(), item->highlight ? IM_COL32_WHITE : IM_COL32_BLACK,
                nullptr, LABEL_FONT);
 
@@ -688,7 +688,7 @@ float SignalView::minimumWidth() {
 }
 
 void SignalView::draw() {
-  ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
+  ImGui::PushStyleColor(ImGuiCol_ChildBg, palette().surface);
   if (!ImGui::BeginChild("SignalView", ImVec2(0, 0), ImGuiChildFlags_Borders)) {
     ImGui::EndChild();
     ImGui::PopStyleColor();
@@ -737,10 +737,8 @@ void SignalView::collapseAll() {
 
 void SignalView::drawTree() {
   ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 0.0f));
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
   const float min_height = std::max(ImGui::GetContentRegionAvail().y, 300.0f);
-  const bool visible = ImGui::BeginChild("tree", ImVec2(0, min_height), ImGuiChildFlags_None);
-  ImGui::PopStyleVar();
+  const bool visible = beginControlChild("tree", ImVec2(0, min_height));
   if (visible) {
     DrawContext ctx{ImGui::GetWindowDrawList(), ImGui::GetCursorScreenPos().x, ImGui::GetContentRegionAvail().x, rowHeight()};
     // the press that closes an open editor is consumed by the focus change, the index widgets never see it
@@ -825,7 +823,7 @@ bool SignalView::drawItem(SignalModel::Item *item, int depth, DrawContext &ctx) 
   if (!item->children.empty()) {
     const float arrow_size = ImGui::GetFontSize() * 0.7f;
     ImGui::RenderArrow(ctx.draw_list, ImVec2(row_min.x + depth * INDENTATION + 4.0f, row_min.y + (row_height - arrow_size) * 0.5f),
-                       ImGui::GetColorU32(ImGuiCol_Text), item->expanded ? ImGuiDir_Down : ImGuiDir_Right, 0.7f);
+                       ImGui::GetColorU32(selected ? palette().text_selected : palette().text), item->expanded ? ImGuiDir_Down : ImGuiDir_Right, 0.7f);
   }
 
   // every row is measured, the header sizes column 0 to the contents of the whole tree
@@ -885,7 +883,7 @@ void SignalView::drawIndexWidget(SignalModel::Item *item, const ImRect &rect) {
     showChart(model_.msgId(), sig, item->chart_opened, ImGui::GetIO().KeyShift);
   }
   if (checked) ImGui::PopStyleColor();
-  ImGui::SetItemTooltip("%s", checked ? "Close Plot" : "Show Plot\nSHIFT click to add to previous opened plot");
+  ImGui::SetItemTooltip("%s", checked ? "Close Plot" : "Show Plot\nShift-click to add to the previously opened plot");
   ImGui::SameLine(0.0f, spacing);
   if (iconButton("remove", icon::X_LG) && !editor_open_on_press_) {
     pending_action_ = [this, sig]() { UndoStack::instance()->push(new RemoveSigCommand(model_.msgId(), sig)); };
@@ -938,7 +936,7 @@ bool ValueDescriptionDlg::draw() {
       if (row == current_row_) ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiCol_Header));
       ImGui::TableSetColumnIndex(0);
       ImGui::AlignTextToFramePadding();
-      ImGui::TextUnformatted(std::to_string(row + 1).c_str());
+      ImGui::TextColored(row == current_row_ ? palette().text_selected : palette().text, "%d", row + 1);
       ImGui::TableSetColumnIndex(1);
       ImGui::SetNextItemWidth(-FLT_MIN);
       if (valueDescriptionEditor(0, &table_[row].first)) current_row_ = row;

@@ -62,9 +62,21 @@ bool inputTextMultiline(const char *label, std::string *s, const ImVec2 &size, I
                                    inputCallback, &ctx);
 }
 
+bool beginControlChild(const char *id, const ImVec2 &size, ImGuiWindowFlags flags) {
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(CONTROL_OUTLINE_PADDING, CONTROL_OUTLINE_PADDING));
+  const bool visible = ImGui::BeginChild(id, size, ImGuiChildFlags_AlwaysUseWindowPadding, flags);
+  ImGui::PopStyleVar();
+  return visible;
+}
+
 bool clearableInput(const char *label, std::string *s, const char *hint, ImGuiInputTextCallback validator) {
+  const float width = ImGui::CalcItemWidth();
+  const float clear_width = iconButtonWidth() + ImGui::GetStyle().ItemInnerSpacing.x;
+  const bool show_clear = !s->empty() && width >= clear_width + ImGui::GetFrameHeight();
+  ImGui::SetNextItemWidth(show_clear ? width - clear_width : width);
+  ImGui::BeginGroup();
   bool changed = validatedInput(label, s, validator, hint);
-  if (!s->empty()) {
+  if (show_clear) {
     ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
     ImGui::PushID(label);
     if (iconButton("clear", icon::X_LG)) {
@@ -73,7 +85,18 @@ bool clearableInput(const char *label, std::string *s, const char *hint, ImGuiIn
     }
     ImGui::PopID();
   }
+  ImGui::EndGroup();
   return changed;
+}
+
+bool selectable(const char *label, bool selected, ImGuiSelectableFlags flags, const ImVec2 &size) {
+  if (selected) {
+    ImGui::PushStyleColor(ImGuiCol_Text, palette().text_selected);
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, palette().header);
+  }
+  const bool clicked = ImGui::Selectable(label, selected, flags, size);
+  if (selected) ImGui::PopStyleColor(2);
+  return clicked;
 }
 
 bool comboBox(const char *label, int *index, const std::vector<std::string> &items) {
@@ -82,7 +105,7 @@ bool comboBox(const char *label, int *index, const std::vector<std::string> &ite
   if (ImGui::BeginCombo(label, *index >= 0 && *index < count ? items[*index].c_str() : "")) {
     for (int i = 0; i < count; ++i) {
       ImGui::PushID(i);
-      if (ImGui::Selectable(items[i].c_str(), i == *index) && *index != i) {
+      if (selectable(items[i].c_str(), i == *index) && *index != i) {
         *index = i;
         changed = true;
       }
@@ -201,6 +224,26 @@ bool iconButton(const char *id, const char *icon, const char *tooltip) {
   return clicked;
 }
 
+float iconTextButtonWidth(const char *icon, const std::string &text) {
+  const ImGuiStyle &style = ImGui::GetStyle();
+  return ImGui::CalcTextSize(icon).x + style.ItemInnerSpacing.x + ImGui::CalcTextSize(text.c_str(), nullptr, true).x + style.FramePadding.x * 2;
+}
+
+bool iconTextButton(const char *id, const char *icon, const std::string &text, float width) {
+  const ImGuiStyle &style = ImGui::GetStyle();
+  if (width <= 0.0f) width = iconTextButtonWidth(icon, text);
+  const bool clicked = ImGui::Button((std::string("###") + id).c_str(), ImVec2(width, 0.0f));
+  const ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
+  const ImU32 color = ImGui::GetColorU32(ImGuiCol_Text);
+  auto *draw_list = ImGui::GetWindowDrawList();
+  draw_list->AddText(ImVec2(min.x + style.FramePadding.x, min.y + style.FramePadding.y), color, icon);
+  // the text is centered between the icon and the right padding
+  const float left = min.x + style.FramePadding.x + ImGui::CalcTextSize(icon).x + style.ItemInnerSpacing.x;
+  const float slack = max.x - style.FramePadding.x - left - ImGui::CalcTextSize(text.c_str(), nullptr, true).x;
+  draw_list->AddText(ImVec2(left + std::max(0.0f, slack * 0.5f), min.y + style.FramePadding.y), color, text.c_str());
+  return clicked;
+}
+
 void disabledItemTooltip(const char *text) {
   if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", text);
 }
@@ -208,7 +251,7 @@ void disabledItemTooltip(const char *text) {
 bool radioMenuItem(const char *label, bool checked, float width) {
   const float indent = ImGui::GetFontSize();
   const ImVec2 pos = ImGui::GetCursorScreenPos();
-  const bool clicked = ImGui::Selectable((std::string("##") + label).c_str(), false, ImGuiSelectableFlags_None,
+  const bool clicked = selectable((std::string("##") + label).c_str(), false, ImGuiSelectableFlags_None,
                                          ImVec2(ImMax(width, ImGui::GetContentRegionAvail().x), 0.0f));
   const ImU32 color = ImGui::GetColorU32(ImGuiCol_Text);
   ImDrawList *painter = ImGui::GetWindowDrawList();
@@ -295,7 +338,7 @@ int tableHeadersRow() {
 bool viewSelectable(const char *label, bool selected, ImGuiSelectableFlags flags, const ImVec2 &size) {
   ImGui::PushStyleColor(ImGuiCol_HeaderHovered, selected ? ImGui::GetColorU32(ImGuiCol_Header) : IM_COL32(0, 0, 0, 0));
   ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGui::GetColorU32(ImGuiCol_Header));
-  const bool clicked = ImGui::Selectable(label, selected, flags, size);
+  const bool clicked = selectable(label, selected, flags, size);
   ImGui::PopStyleColor(2);
   return clicked;
 }
@@ -486,7 +529,12 @@ void drawToolbar(const std::vector<ToolbarItem> &items, size_t spacer_index, flo
     // the extension button sits fully inside the toolbar: its right edge is the content region right edge
     const float extension_x = std::max(start_x, right_edge - extension_width);
     visible == 0 ? ImGui::SetCursorPosX(extension_x) : ImGui::SameLine(extension_x);
-    if (iconButton("toolbar_extension", icon::CHEVRON_DOUBLE_RIGHT, "More")) ImGui::OpenPopup("toolbar_extension_menu");
+    const bool extension_open = ImGui::IsPopupOpen("toolbar_extension_menu");
+    const bool extension_clicked = iconButton("toolbar_extension", icon::CHEVRON_DOUBLE_RIGHT, "More");
+    if (!extension_open && (extension_clicked ||
+        (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)))) {
+      ImGui::OpenPopup("toolbar_extension_menu");
+    }
     // the popup opens inward: its right edge is aligned with the button so it stays inside the window
     ImGui::SetNextWindowPos(ImVec2(ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y), ImGuiCond_Always, ImVec2(1, 0));
     if (ImGui::BeginPopup("toolbar_extension_menu")) {
@@ -532,7 +580,9 @@ bool menuButton(const char *id, const std::string &text, const char *popup_id, b
   ImGui::PushStyleColor(ImGuiCol_Button, popup_open ? style.Colors[ImGuiCol_ButtonActive] : style.Colors[ImGuiCol_Button]);
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding_x, style.FramePadding.y));
   ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
-  const bool clicked = ImGui::ButtonEx((text + "###" + id).c_str(), ImVec2(width, 0.0f), ImGuiButtonFlags_PressedOnClick);
+  const bool pressed = ImGui::ButtonEx((text + "###" + id).c_str(), ImVec2(width, 0.0f), ImGuiButtonFlags_PressedOnClick);
+  const bool clicked = pressed || (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) &&
+                                   ImGui::IsMouseClicked(ImGuiMouseButton_Left));
   ImGui::PopStyleVar(2);
   ImGui::PopStyleColor();
   if (bold) popBoldFont();
