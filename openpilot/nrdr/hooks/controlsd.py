@@ -1,7 +1,8 @@
 import math
 
 from openpilot.nrdr.params import get_live_params
-from openpilot.nrdr.params.snapshots import ENGAGEMENT_LATCHED_LATERAL_GROUPS
+from openpilot.nrdr.params.snapshots import _bool_value
+from openpilot.nrdr.features.lateral.live_tuning import LiveTorqueTransition
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   SteerRatioModeLatch,
   resolve_steer_ratio_selection,
@@ -14,14 +15,15 @@ def initialize_live_parameter_settings(controls) -> None:
     resolve_steer_ratio_selection(controls.CP, controls.nrdr_live_params.snapshot),
   )
   controls.nrdr_lateral_settings_active = False
+  controls.nrdr_live_torque_transition = LiveTorqueTransition()
   controls.nrdr_last_valid_comma_ratio = max(float(controls.CP.steerRatio), 0.1)
   refresh_live_parameter_settings(controls, None)
 
 
-def refresh_live_parameter_settings(controls, _params) -> None:
-  snapshot = controls.nrdr_live_params.snapshot
-  controls.learn_stiffness = snapshot.get_bool("NrdrLearnStiffness")
-  controls.learn_angle_offset = snapshot.get_bool("NrdrLearnAngleOffset")
+def refresh_live_parameter_settings(controls, snapshot=None) -> None:
+  snapshot = controls.nrdr_live_params.snapshot if snapshot is None else snapshot
+  controls.learn_stiffness = _bool_value(snapshot.get("NrdrLearnStiffness"))
+  controls.learn_angle_offset = _bool_value(snapshot.get("NrdrLearnAngleOffset"))
 
 
 def _valid_comma_ratio(controls, live_params) -> float | None:
@@ -56,16 +58,15 @@ def vehicle_model_params(controls, live_params) -> tuple[float, float, float]:
 
 
 def vehicle_model_state(controls, live_params, CS, lat_active: bool) -> tuple[float, float, float, float]:
-  """Return one latched geometry view for both measured and desired curvature paths."""
-  was_active = bool(getattr(controls, "nrdr_lateral_settings_active", False))
-  if was_active and not lat_active:
-    # All nine controller/geometry values are reread once, together, only
-    # after lateral control becomes inactive. Engaged writes therefore reach
-    # the immediately following engagement without any active-loop Params IO.
-    controls.nrdr_live_params.refresh_groups_atomic(ENGAGEMENT_LATCHED_LATERAL_GROUPS)
-  controls.nrdr_lateral_settings_active = bool(lat_active)
-
-  candidate = resolve_steer_ratio_selection(controls.CP, controls.nrdr_live_params.snapshot)
+  """Capture a single live snapshot for geometry, PID/blend and lane centering."""
+  snapshot = controls.nrdr_live_params.snapshot
+  controls.nrdr_lateral_snapshot = snapshot
+  refresh_live_parameter_settings(controls, snapshot)
+  if hasattr(controls, "update_lane_centering_params"):
+    controls.update_lane_centering_params(snapshot)
+  if hasattr(controls.LaC, "set_live_tuning_snapshot"):
+    controls.LaC.set_live_tuning_snapshot(snapshot)
+  candidate = resolve_steer_ratio_selection(controls.CP, snapshot)
   selection = controls.steer_ratio_latch.update(candidate, lat_active)
   if hasattr(controls.LaC, "set_steer_ratio_selection"):
     controls.LaC.set_steer_ratio_selection(selection)

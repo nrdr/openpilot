@@ -165,7 +165,7 @@ def test_delay_consumers_resolve_startup_and_refresh_paths():
     ("selfdrive/locationd/torqued.py", "__init__", 1),
     ("selfdrive/locationd/torqued.py", "handle_log", 1),
     ("sunnypilot/selfdrive/controls/controlsd_ext.py", "__init__", 1),
-    ("sunnypilot/selfdrive/controls/controlsd_ext.py", "get_params_sp", 1),
+    ("selfdrive/controls/controlsd.py", "state_control", 1),
     ("sunnypilot/livedelay/lagd_toggle.py", "update", 1),
   )
   for relative_path, function_name, count in expected_calls:
@@ -185,11 +185,14 @@ def test_fixed_and_learned_modes_switch_without_reusing_the_other_source():
   assert get_lat_delay(params, 0.41, 0.10) == pytest.approx(0.41)
 
 
-def test_controlsd_refreshes_each_published_lateral_delay():
+def test_controlsd_resolves_delay_from_the_captured_live_snapshot_each_frame():
   openpilot_root = Path(__file__).resolve().parents[2]
   controlsd_source = (openpilot_root / "selfdrive/controls/controlsd.py").read_text(encoding="utf-8")
-  assert 'if self.sm.updated["lateralDelay"]:' in controlsd_source
-  assert 'get_lat_delay(self.params, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay)' in controlsd_source
+  calls = _calls_in_function(openpilot_root / "selfdrive/controls/controlsd.py", "state_control", "get_lat_delay")
+  assert len(calls) == 1
+  assert ast.unparse(calls[0].args[0]) == "self.nrdr_lateral_snapshot"
+  assert 'get_lat_delay(self.nrdr_lateral_snapshot, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay)' in controlsd_source
+  assert 'get_lat_delay(self.params, self.sm["lateralDelay"]' not in controlsd_source
 
 
 def test_modeld_refreshes_each_published_lateral_delay():

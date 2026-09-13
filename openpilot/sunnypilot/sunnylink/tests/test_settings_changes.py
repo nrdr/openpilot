@@ -402,16 +402,21 @@ class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
     assert "final request temporarily returns to 100% P/I/F" in master["details"]
     assert "does not reuse angle or update its controller state" in master["details"]
     assert "not historically road-proven on Honda" in master["details"]
-    assert "save all six settings while driving" in master["details"]
-    assert "next disengage and re-engage" in master["details"]
-    assert "already disengaged, wait up to 10 seconds" in master["details"]
+    assert "All six settings apply live" in master["details"]
+    assert "normally within 0.5 seconds" in master["details"]
+    assert "one-second torque transition" in master["details"]
+    assert "No LKAS cycle is required" in master["details"]
     assert "NNLC is bypassed and reset" in master["details"]
     assert [item["key"] for item in master["sub_items"]] == list(self.KEYS[1:])
 
     for item in (master, *master["sub_items"]):
       rules = item.get("enablement")
       assert "offroad_only" not in _flatten_rule_types(rules)
+      assert "not_engaged" not in _flatten_rule_types(rules)
       assert _references_capability_field(rules, "nrdr_interpolated_torque_pif_blend_available")
+      assert "live" in item["details"]
+      assert "next engagement" not in item["details"]
+      assert "next disengage" not in item["details"]
 
     for item in master["sub_items"]:
       assert "NrdrInterpolatedTorquePifBlend" in json.dumps(item["enablement"])
@@ -471,13 +476,12 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert "offroad_only" in _flatten_rule_types(item.get("enablement"))
     assert _references_capability_field(item.get("visibility"), "has_handcrafted_lateral_profile")
     description = f"{item.get('description', '')} {item.get('details', '')}".lower()
-    assert "one-shot apply command" in description
-    assert "turns this switch back off" in description
-    assert "every value verifies" in description
+    assert "preset once" in description
+    assert "switch turns off after verified completion" in description
     assert "wait a few seconds" in description
     assert "refresh" in description
-    assert "manually editable" in description
-    assert "never restored or overwritten" in description
+    assert "existing customizations are not automatically overwritten" in description
+    assert "later edits persist until you deliberately apply again" in description
 
   @parameterized.expand(FORMER_HANDCRAFTED_LOCKED_KEYS, names=["key"])
   def test_one_shot_profile_never_locks_formerly_owned_controls(self, schema, key):
@@ -511,8 +515,9 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
       (0, "Manual"), (1, "Comma Learner"), (2, "nrdr Learner"), (3, "Firmware"),
     ]
     assert "offroad_only" not in json.dumps(item.get("enablement") or [])
-    assert "next disengage and re-engage" in item["details"]
-    assert "already disengaged, wait up to 10 seconds" in item["details"]
+    assert "one live snapshot" in item["details"]
+    assert "normally within 0.5 seconds" in item["details"]
+    assert "No LKAS cycle is required" in item["details"]
     assert "nrdr_raw_steer_ratio_available" in json.dumps(item["options"][2]["enablement"])
     assert "nrdr_firmware_steer_ratio_available" in json.dumps(item["options"][3]["enablement"])
 
@@ -530,6 +535,22 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert "NrdrSteerRatioMode" in rules and '"equals": 0' in rules
     assert "nrdr_manual_steer_ratio_available" in rules
     assert "NrdrHandcraftedLateralTune" not in rules
+
+
+class TestLiveLaneCentering(OpenpilotTestCase):
+  @parameterized.expand([
+    "LaneCentering", "LaneCenteringMinSpeed", "LaneCenteringPauseOnSignal",
+    "LaneCenterOffset", "LaneCenteringStrength", "LaneCenteringE2EAuthority",
+  ], names=["key"])
+  def test_live_edits_preserve_only_feature_dependency(self, schema, key):
+    item = _find_item(schema, key)
+    assert item is not None
+    rules = item.get("enablement")
+    assert "offroad_only" not in _flatten_rule_types(rules)
+    assert "not_engaged" not in _flatten_rule_types(rules)
+    if key != "LaneCentering":
+      assert "LaneCentering" in json.dumps(rules)
+      assert '"equals": true' in json.dumps(rules)
 
 
 class TestNotEngagedReplacement(OpenpilotTestCase):

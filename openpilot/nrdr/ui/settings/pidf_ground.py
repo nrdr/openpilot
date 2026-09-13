@@ -39,8 +39,8 @@ class PidfGroundLayout(Widget):
                      "Torque uses angle feedback through 2 m/s, transitions to calibrated yaw from 2-5 m/s, and uses yaw above 5 m/s. " +
                      "If required yaw is invalid, Torque holds its state without reusing angle and the final request temporarily returns to P/I/F. " +
                      "This generic branch was not Honda road-proven; NNLC is bypassed. You can save all six settings while driving; " +
-                     "edits made while engaged apply together after the next disengage and re-engage. If already disengaged, wait up to " +
-                     "10 seconds for settings to sync before engaging."),
+                     "edits apply live after the next background refresh (normally within 0.5 seconds), with a one-second torque transition. " +
+                     "No LKAS cycle is required. Have a passenger make adjustments while driving."),
       param="NrdrInterpolatedTorquePifBlend",
     )
     self._interpolated_torque_share = option_item_sp(
@@ -50,7 +50,7 @@ class PidfGroundLayout(Widget):
       max_value=100,
       value_change_step=1,
       description=lambda: tr("Splits the final steering request between the two complete controllers. " +
-                             "The shares always add to 100%. The active six-setting snapshot stays frozen until disengagement."),
+                             "The shares always add to 100%. All six settings apply from one live snapshot, without disengagement."),
       label_callback=lambda value: f"Torque {value}% / P/I/F {100 - value}%",
     )
     self._interpolated_laf = option_item_from_metadata(NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR)

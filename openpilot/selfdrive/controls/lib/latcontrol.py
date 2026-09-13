@@ -17,6 +17,10 @@ class LatControl(ABC):
     # first controller update. Keeping it on the common base makes every
     # controller consume the same latched geometry snapshot.
     self.steer_ratio_selection = stock_steer_ratio_selection(CP)
+    self.live_tuning_snapshot = None
+
+  def set_live_tuning_snapshot(self, snapshot) -> None:
+    self.live_tuning_snapshot = snapshot
 
   def set_steer_ratio_selection(self, selection: SteerRatioSelection) -> None:
     self.steer_ratio_selection = selection

@@ -97,12 +97,7 @@ class Controls(ControlsExt):
 
   def state_control(self):
     CS = self.sm['carState']
-    if self.sm.updated["lateralDelay"]:
-      self.lat_delay = get_lat_delay(self.params, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay)
-
-    # Resolve the final lateral-active state before geometry. The mode resolver
-    # latches while active, so measured curvature and PID desired angle always
-    # use the same complete steer-ratio snapshot.
+    # Resolve activity before capturing one live settings snapshot for this frame.
     standstill = abs(CS.vEgo) <= max(self.CP.minSteerSpeed, 0.3) or CS.standstill
     requested_lat_active = self.get_lat_active(self.sm)
     lat_active = requested_lat_active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
@@ -111,6 +106,7 @@ class Controls(ControlsExt):
     # Update VehicleModel
     lp = self.sm['vehicleParameters']
     x, sr, _angle_offset, measured_steer_angle = vehicle_model_state(self, lp, CS, lat_active)
+    self.lat_delay = get_lat_delay(self.nrdr_lateral_snapshot, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay)
     self.VM.update_params(x, sr)
 
     steer_angle_without_offset = math.radians(measured_steer_angle)
@@ -192,6 +188,11 @@ class Controls(ControlsExt):
     steer, lateral_output, lac_log = self.LaC.update(CC.latActive, CS, self.VM, lp,
                                                      self.steer_limited_by_safety, self.desired_curvature,
                                                      self.calibrated_pose, curvature_limited, lat_delay)
+    if self.CP.steerControlType == car.CarParams.SteerControlType.torque:
+      steer = self.nrdr_live_torque_transition.update(
+        float(steer), self.nrdr_lateral_snapshot, CC.latActive, bool(CS.steeringPressed), DT_CTRL,
+      )
+      lac_log.output = float(steer)
     actuators.torque = float(steer)
     if self.CP.steerControlType == car.CarParams.SteerControlType.curvature:
       actuators.curvature = float(lateral_output)

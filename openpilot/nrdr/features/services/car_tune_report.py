@@ -100,7 +100,7 @@ class CarTuneReporter:
       return (
         f"ON | {configured} | P/I/F angle feedback | Torque angle→yaw 2-5 m/s, calibrated yaw >=5 m/s | " +
         "invalid required yaw: exact P/I/F output + Torque state held | generic f13 yaw branch (not Honda road-proven) | " +
-        "engagement-latched | NNLC bypassed/reset",
+        "live snapshot | NNLC bypassed/reset",
         True,
       )
     if requested:
@@ -108,7 +108,7 @@ class CarTuneReporter:
         f"requested ON but unavailable for this car | Torque 0% / P/I/F 100% | P/I/F unchanged | stored: {configured}",
         False,
       )
-    return f"OFF | Torque 0% / P/I/F 100% | P/I/F unchanged | stored next engagement: {configured}", False
+    return f"OFF | Torque 0% / P/I/F 100% | P/I/F unchanged | stored settings: {configured}", False
 
   def _pid_source(self, CP):
     if CP.lateralTuning.which() == "pid":

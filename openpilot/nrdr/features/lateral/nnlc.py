@@ -24,8 +24,8 @@ class NrdrNnlc:
                                                 neg_limit=-controller.lac_torque.steer_max)
     self._apply_settings()
 
-  def _apply_settings(self) -> None:
-    snapshot = self.params.snapshot
+  def _apply_settings(self, snapshot=None) -> None:
+    snapshot = self.params.snapshot if snapshot is None else snapshot
     controller = self.controller
     was_enabled = controller.enabled
     controller.enabled = self.base_enabled and read_bool(snapshot, NrdrParamKey.NRDR_NNLC_ENABLED, False)
@@ -39,8 +39,10 @@ class NrdrNnlc:
     self.settings_generation = snapshot.generation
 
   def refresh(self) -> None:
-    if self.settings_generation != self.params.generation:
-      self._apply_settings()
+    snapshot = getattr(self.controller.lac_torque, "live_tuning_snapshot", None)
+    snapshot = self.params.snapshot if snapshot is None else snapshot
+    if self.settings_generation != snapshot.generation:
+      self._apply_settings(snapshot)
 
   def update(self) -> None:
     self.refresh()

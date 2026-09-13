@@ -20,7 +20,7 @@ from opendbc.sunnypilot.car.runtime_config import HondaLiveTuning
 from openpilot.nrdr.params.generated.keys import NrdrParamKey
 
 
-REFRESH_PERIOD = 10.0
+REFRESH_PERIOD = 0.5
 FAST_REFRESH_PERIOD = 0.25
 LEARNER_META_PATH = Path("/data/honda_learner_meta.json")
 LONG_FACTOR_MIN = 0.6

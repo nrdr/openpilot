@@ -1,5 +1,6 @@
 from types import MappingProxyType
 import unittest
+from unittest.mock import patch
 
 from openpilot.nrdr.params import snapshots
 from openpilot.nrdr.params.snapshots import CONTROL_GROUPS, LiveParams, ParamGroup, ParamSnapshot
@@ -31,6 +32,31 @@ class RecordingParams:
 
 
 class TestParamSnapshots(unittest.TestCase):
+  def test_applied_settings_log_is_deferred_and_does_not_write_params(self):
+    params = RecordingParams({"a": b"1"})
+    reader = LiveParams((ParamGroup(("a",)),), params=params, start_worker=False)
+    snapshot = reader.snapshot
+    with patch.object(reader, "_log_applied_settings") as log_settings:
+      reader.record_applied_settings("honda_torque_pif", snapshot.generation, friction_highway=0.3, active=True)
+      log_settings.assert_not_called()
+      reader._drain_applied_reports()
+      report = log_settings.call_args.args[0]
+      self.assertEqual(report["friction_highway"], 0.3)
+      self.assertTrue(report["active"])
+      self.assertEqual(report["generation"], snapshot.generation)
+      self.assertIs(reader.snapshot, snapshot)
+      self.assertFalse(params.writes)
+
+  def test_logging_failure_does_not_stop_parameter_refresh(self):
+    params = RecordingParams({"a": b"1"})
+    reader = LiveParams((ParamGroup(("a",)),), params=params, start_worker=False)
+    with patch.object(reader, "_log_applied_settings", side_effect=OSError("log unavailable")):
+      reader.record_applied_settings("honda_torque_pif", 1, friction_highway=0.3)
+      reader._drain_applied_reports()
+    params.values["a"] = b"2"
+    self.assertTrue(reader.poll_once())
+    self.assertEqual(reader.get("a"), b"2")
+
   def test_legacy_module_reexports_canonical_snapshot_objects(self):
     for name in legacy_live_params.__all__:
       self.assertIs(getattr(legacy_live_params, name), getattr(snapshots, name))
@@ -70,9 +96,21 @@ class TestParamSnapshots(unittest.TestCase):
     }
     keys = [key for group in CONTROL_GROUPS for key in group.keys]
     self.assertFalse(retired & set(keys))
-    self.assertEqual(len(CONTROL_GROUPS), 10)
+    self.assertEqual(len(CONTROL_GROUPS), 12)
     self.assertEqual(len(keys), len(set(keys)))
-    self.assertEqual(len(keys), 48)
+    self.assertEqual(len(keys), 56)
+
+  def test_lane_settings_have_one_live_group_and_subsecond_cycle(self):
+    self.assertIn(snapshots.LANE_CENTERING_PARAM_GROUP, CONTROL_GROUPS)
+    self.assertLessEqual(snapshots.REFRESH_PERIOD, 0.5)
+    params = RecordingParams({key: b"0" for key in snapshots.LANE_CENTERING_PARAM_GROUP.keys})
+    reader = LiveParams(CONTROL_GROUPS, params=params, start_worker=False)
+    initial = reader.snapshot
+    params.values["LaneCenteringStrength"] = b"0.3"
+    for _ in CONTROL_GROUPS:
+      reader.poll_once()
+    self.assertEqual(reader.get("LaneCenteringStrength"), b"0.3")
+    self.assertEqual(initial.get("LaneCenteringStrength"), b"0")
 
   def test_interpolated_torque_settings_share_one_atomic_group(self):
     expected = {

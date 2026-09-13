@@ -32,8 +32,8 @@ class SteerRatioTuningLayout(Widget):
         SteerRatioMode.COMMA,
         "Use Comma Steer Ratio Learner",
         "Uses Comma's last valid learned steer ratio as one number at every wheel angle. " +
-        "It holds the last good value through brief message dropouts. Changes saved while engaged apply after the next disengage and re-engage. " +
-        "If already disengaged, wait up to 10 seconds for settings to sync before engaging.",
+        "It holds the last good value through brief message dropouts. Changes apply live after the next background refresh " +
+        "(normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required.",
       ),
       SteerRatioMode.NRDR_RAW: self._mode_item(
         SteerRatioMode.NRDR_RAW,
@@ -41,14 +41,14 @@ class SteerRatioTuningLayout(Widget):
         "Uses NRDR's fixed curve made directly from logged steering angles. It does not learn while you drive. " +
         "The audited Clarity curve now reaches its 435.7-degree near-lock anchor instead of holding the " +
         "247.5-degree point through the rest of the rack. " +
-        "This is available only when NRDR has an exact audited curve for your car. Changes saved while engaged apply after the next " +
-        "disengage and re-engage; if already disengaged, wait up to 10 seconds before engaging.",
+        "This is available only when NRDR has an exact audited curve for your car. Changes apply live; " +
+        "no disengagement is required. Have a passenger make adjustments while driving.",
       ),
       SteerRatioMode.FIRMWARE: self._mode_item(
         SteerRatioMode.FIRMWARE,
         "Use Firmware Steer Ratio",
-        "Uses the exact shape stored in a recognized EPS firmware file, anchored to your car's stock center ratio. Changes saved while " +
-        "engaged apply after the next disengage and re-engage; if already disengaged, wait up to 10 seconds before engaging.",
+        "Uses the exact shape stored in a recognized EPS firmware file, anchored to your car's stock center ratio. " +
+        "Changes apply live; no disengagement is required. Have a passenger make adjustments while driving.",
       ),
     }
 
@@ -59,7 +59,7 @@ class SteerRatioTuningLayout(Widget):
       max_value=2500,
       value_change_step=1,
       description=lambda: tr("The ratio used with the wheel straight ahead. A bigger number asks for more steering-wheel movement " +
-                             "for the same planned curve; a smaller number asks for less. Saved changes use the same engagement latch as the mode."),
+                             "for the same planned curve; a smaller number asks for less. Saved changes apply live with the mode."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -70,7 +70,7 @@ class SteerRatioTuningLayout(Widget):
       max_value=2500,
       value_change_step=1,
       description=lambda: tr("The ratio used near the end of the steering wheel's travel. NRDR blends smoothly between the two manual numbers. " +
-                             "Saved changes use the same engagement latch as the mode."),
+                             "Saved changes apply live with the mode."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -144,7 +144,7 @@ class SteerRatioTuningLayout(Widget):
       selected = mode is item_mode
       item.action_item.set_state(selected)
       # With a mode selected, only its own switch remains clickable so turning
-      # it off returns to Manual. Runtime geometry remains engagement-latched.
+      # it off returns to Manual. Runtime captures the complete live geometry.
       item.action_item.set_enabled(selected or (mode is SteerRatioMode.MANUAL and available[item_mode]))
 
     manual_enabled = mode is SteerRatioMode.MANUAL and manual_available

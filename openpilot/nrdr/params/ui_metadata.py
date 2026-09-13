@@ -90,8 +90,9 @@ NRDR_UI_METADATA: Final = (
     native_title=tr_noop("Spoofed Lateral Acceleration Factor (Default: 5.0 m/s²)"),
     description=tr_noop("Sets how much lateral acceleration the legacy torque half treats as full normalized steering torque."),
     details=tr_noop(
-      "Higher values ask the torque half for less steering for the same planned curve. It scales Torque feedback error and " +
-      "non-friction feedforward, but never direct friction. This is m/s², not m/s. Changes apply on the next engagement."
+      "Higher values ask the torque half for less steering for the same planned curve. It scales Torque feedback error and "
+      "non-friction feedforward, but never direct friction. This is m/s², not m/s. Changes apply live after the next "
+      "background refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required."
     ),
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=NumericUiMetadata(minimum=0.1, maximum=10.0, step=0.1, unit="m/s²", display_precision=1, display_suffix=" m/s²"),
@@ -105,8 +106,9 @@ NRDR_UI_METADATA: Final = (
     native_title=tr_noop("Low-Speed Torque Friction (Below 25mph) (Default: 0.12)"),
     description=tr_noop("Sets direct normalized steering torque for the legacy torque half below 25 mph."),
     details=tr_noop(
-      "Helps the legacy torque half overcome rack friction. A ±1 mph handoff blends this value smoothly into Standard from " +
-      "24-26 mph. It is independent of the lateral acceleration factor. Changes apply on the next engagement."
+      "Helps the legacy torque half overcome rack friction. A ±1 mph handoff blends this value smoothly into Standard from "
+      "24-26 mph. It is independent of the lateral acceleration factor. Changes apply live after the next background "
+      "refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required."
     ),
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
@@ -120,8 +122,9 @@ NRDR_UI_METADATA: Final = (
     native_title=tr_noop("Standard-Speed Torque Friction (25-50mph) (Default: 0.10)"),
     description=tr_noop("Sets direct normalized steering torque for the legacy torque half between 25 and 50 mph."),
     details=tr_noop(
-      "Helps the legacy torque half overcome rack friction. ±1 mph handoffs blend Low into this value from 24-26 mph and this " +
-      "value into Highway from 49-51 mph. It is independent of the lateral acceleration factor. Changes apply on the next engagement."
+      "Helps the legacy torque half overcome rack friction. ±1 mph handoffs blend Low into this value from 24-26 mph and this "
+      "value into Highway from 49-51 mph. It is independent of the lateral acceleration factor. Changes apply live after "
+      "the next background refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required."
     ),
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
@@ -135,8 +138,9 @@ NRDR_UI_METADATA: Final = (
     native_title=tr_noop("Highway Torque Friction (50mph+) (Default: 0.06)"),
     description=tr_noop("Sets direct normalized steering torque for the legacy torque half above 50 mph."),
     details=tr_noop(
-      "Helps the legacy torque half overcome rack friction. A ±1 mph handoff blends Standard smoothly into this value from " +
-      "49-51 mph. It is independent of the lateral acceleration factor. Changes apply on the next engagement."
+      "Helps the legacy torque half overcome rack friction. A ±1 mph handoff blends Standard smoothly into this value from "
+      "49-51 mph. It is independent of the lateral acceleration factor. Changes apply live after the next background "
+      "refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required."
     ),
     native_description_source=UiDescriptionSource.DETAILS,
     numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),

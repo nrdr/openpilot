@@ -9,7 +9,9 @@ import time
 from types import MappingProxyType
 from typing import Any
 
-REFRESH_PERIOD = 10.0
+# One complete background polling cycle. Never poll storage from controlsd's
+# actuation loop; a saved tuning edit should reach it within about half a second.
+REFRESH_PERIOD = 0.5
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,8 @@ INTERPOLATED_TORQUE_PIF_PARAM_GROUP = ParamGroup((
   "NrdrInterpolatedTorqueFrictionStandard",
   "NrdrInterpolatedTorqueFrictionHighway",
 ))
+# Compatibility exports for older callers; runtime no longer waits for an
+# engagement boundary to consume these groups.
 ENGAGEMENT_LATCHED_LATERAL_GROUPS = (
   STEER_RATIO_PARAM_GROUP,
   INTERPOLATED_TORQUE_PIF_PARAM_GROUP,
@@ -52,6 +56,10 @@ ENGAGEMENT_LATCHED_LATERAL_GROUPS = (
 ENGAGEMENT_LATCHED_LATERAL_KEYS = frozenset(
   key for group in ENGAGEMENT_LATCHED_LATERAL_GROUPS for key in group.keys
 )
+LANE_CENTERING_PARAM_GROUP = ParamGroup((
+  "LaneCentering", "LaneCenteringMinSpeed", "LaneCenteringPauseOnSignal",
+  "LaneCenterOffset", "LaneCenteringStrength", "LaneCenteringE2EAuthority",
+))
 
 
 CONTROL_GROUPS = (
@@ -61,11 +69,10 @@ CONTROL_GROUPS = (
   ParamGroup(("HondaCenterScale", "HondaCenterBoostThreshold", "HondaCenterBoostMinSpeed")),
   ParamGroup(("NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed")),
   ParamGroup(("HondaInjectionTest", "NrdrStarPilotPid", "NrdrLatStiction")),
-  # Mode and both manual endpoints are deliberately one atomic snapshot. A
-  # latched resolver consumes this group so geometry cannot half-update.
+  # Mode and both manual endpoints are published together and captured once
+  # per control frame, including while lateral control is active.
   STEER_RATIO_PARAM_GROUP,
-  # The controller latches this complete tuple at an inactive boundary. Keep
-  # it isolated so a polling generation can never expose a mixed blend.
+  # Keep the complete blend tuple together when publishing live changes.
   INTERPOLATED_TORQUE_PIF_PARAM_GROUP,
   ParamGroup(("NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate", "NrdrTuneLearnerReset")),
   ParamGroup(("NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain")),
@@ -74,7 +81,16 @@ CONTROL_GROUPS = (
               "HondaStoppingDecelRateLong", "HondaVEgoStarting", "HondaVEgoStopping",
               "NrdrRoenAccelerationLimits")),
   ParamGroup(("NrdrLearnStiffness", "NrdrLearnAngleOffset")),
+  LANE_CENTERING_PARAM_GROUP,
+  ParamGroup(("LagdToggle", "LagdToggleDelay")),
 )
+
+# Exclude longitudinal tuning and learner maintenance from the steering-output
+# transition trigger. These do not change the lateral command's tuning.
+LIVE_LATERAL_KEYS = tuple(key for group in CONTROL_GROUPS for key in group.keys
+                          if not key.startswith(("Long", "HondaLiveLearningGas", "StaticFeedforwardLong",
+                                                 "HondaStop", "HondaVEgo", "NrdrRoen"))
+                          and key != "NrdrTuneLearnerReset")
 
 PLANNER_GROUPS = (
   ParamGroup(("HondaVEgoStopping", "NrdrCruiseMismatchCorrection", "NrdrCruiseOverspeedAllowance",
@@ -107,6 +123,7 @@ class LiveParams:
     self._slot = 0
     self._poll_lock = Lock()
     self._writes: SimpleQueue[tuple[str, Any, bool]] = SimpleQueue()
+    self._applied_reports: SimpleQueue[dict[str, Any]] = SimpleQueue()
     self._stop = Event()
     self._wake = Event()
     self._thread: Thread | None = None
@@ -139,6 +156,29 @@ class LiveParams:
   def put_async(self, key: str, value: Any, *, is_bool: bool = False) -> None:
     self._writes.put((key, value, is_bool))
     self._wake.set()
+
+  def record_applied_settings(self, component: str, generation: int, **values) -> None:
+    """Queue consumed settings for best-effort logging outside the control loop."""
+    self._applied_reports.put({"component": component, "generation": generation,
+                               "consumed_monotonic": time.monotonic(), **values})
+    self._wake.set()
+
+  def _drain_applied_reports(self) -> None:
+    while True:
+      try:
+        report = self._applied_reports.get_nowait()
+      except Empty:
+        return
+      try:
+        self._log_applied_settings(report)
+      except Exception:
+        # Diagnostics must never interrupt parameter refresh or steering.
+        pass
+
+  @staticmethod
+  def _log_applied_settings(report) -> None:
+    from openpilot.common.swaglog import cloudlog
+    cloudlog.event("nrdr_live_settings_consumed", **report)
 
   def refresh_all(self) -> bool:
     with self._poll_lock:
@@ -221,6 +261,7 @@ class LiveParams:
     while not self._stop.is_set():
       self._wake.wait(max(0.0, next_poll - time.monotonic()))
       self._wake.clear()
+      self._drain_applied_reports()
       self._drain_writes()
       now = time.monotonic()
       if now >= next_poll:

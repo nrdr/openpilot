@@ -12,11 +12,12 @@ from openpilot.cereal import log, custom
 from opendbc.car import structs
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
-from openpilot.selfdrive.controls.lib.lane_centering import LaneCenteringController, lane_centering_strength
+from openpilot.selfdrive.controls.lib.lane_centering import LaneCenteringController, lane_centering_min_speed_mph, lane_centering_strength
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
-from openpilot.nrdr.hooks import initialize_live_parameter_settings, refresh_live_parameter_settings
+from openpilot.nrdr.hooks import initialize_live_parameter_settings
+from openpilot.nrdr.params import read_bool, read_float
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
 from openpilot.nrdr.features.lateral.latcontrol_clarity_hybrid import LatControlClarityHybrid
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
@@ -36,9 +37,8 @@ class ControlsExt(ModelStateBase):
 
     self.lane_centering = LaneCenteringController()
     self._lane_centering_state_publish_frame = 0
-    self.update_lane_centering_params()
-
     initialize_live_parameter_settings(self)
+    self.update_lane_centering_params()
 
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
@@ -63,22 +63,19 @@ class ControlsExt(ModelStateBase):
     else:
       return lac
 
-  def update_lane_centering_params(self) -> None:
-    self.lane_centering_enabled = self.params.get_bool("LaneCentering")
-    self.lane_centering_min_speed_mph = self.params.get("LaneCenteringMinSpeed", return_default=True)
-    self.lane_centering_pause_on_signal = bool(self.params.get("LaneCenteringPauseOnSignal", return_default=True))
-    self.lane_centering_e2e_authority = float(self.params.get("LaneCenteringE2EAuthority", return_default=True))
-    self.lane_centering_strength = lane_centering_strength(self.params.get("LaneCenteringStrength", return_default=True))
-    self.lane_center_offset = float(self.params.get("LaneCenterOffset", return_default=True))
+  def update_lane_centering_params(self, snapshot=None) -> None:
+    snapshot = self.nrdr_live_params.snapshot if snapshot is None else snapshot
+    self.lane_centering_enabled = read_bool(snapshot, "LaneCentering")
+    self.lane_centering_min_speed_mph = lane_centering_min_speed_mph(snapshot.get("LaneCenteringMinSpeed"))
+    self.lane_centering_pause_on_signal = read_bool(snapshot, "LaneCenteringPauseOnSignal", True)
+    # Leave nonfinite inputs visible to the controller's existing fail-closed gate.
+    self.lane_centering_e2e_authority = read_float(snapshot, "LaneCenteringE2EAuthority", 1.0)
+    self.lane_centering_strength = lane_centering_strength(snapshot.get("LaneCenteringStrength"))
+    self.lane_center_offset = read_float(snapshot, "LaneCenterOffset", 0.0)
 
   def get_params_sp(self, sm: messaging.SubMaster) -> None:
     if time.monotonic() - self._param_update_time > PARAMS_UPDATE_PERIOD:
       self.blinker_pause_lateral.get_params()
-      self.update_lane_centering_params()
-
-      self.lat_delay = get_lat_delay(self.params, sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay)
-
-      refresh_live_parameter_settings(self, self.params)
 
       self._param_update_time = time.monotonic()
 

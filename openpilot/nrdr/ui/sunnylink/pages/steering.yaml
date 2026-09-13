@@ -79,7 +79,7 @@ sections:
         widget: toggle
         title: Interpolated Torque/PIF Blend
         description: Blend angle-feedback P/I/F with the generic f13 legacy torque controller.
-        details: The final request is Torque share times the f13de17 generic torque controller plus the remaining share times today's complete P/I/F controller. Torque uses angle feedback through 2 m/s, transitions from angle to calibrated yaw over 2-5 m/s, and uses calibrated yaw at 5 m/s and above. If required yaw is invalid, stale, missing, or non-finite, Torque does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F. This generic yaw branch was not historically road-proven on Honda. You can save all six settings while driving; edits made while engaged apply together after the next disengage and re-engage. If already disengaged, wait up to 10 seconds for settings to sync before engaging. Clarity NNLC is bypassed and reset.
+        details: The final request is Torque share times the f13de17 generic torque controller plus the remaining share times today's complete P/I/F controller. Torque uses angle feedback through 2 m/s, transitions from angle to calibrated yaw over 2-5 m/s, and uses calibrated yaw at 5 m/s and above. If required yaw is invalid, stale, missing, or non-finite, Torque does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F. This generic yaw branch was not historically road-proven on Honda. All six settings apply live after the next background refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required. Have a passenger make adjustments while driving. Clarity NNLC is bypassed and reset.
         enablement:
         - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
         sub_items:
@@ -87,7 +87,7 @@ sections:
           widget: option
           title: Torque / P/I/F Share
           description: Splits the final steering request between both complete controllers. Torque X% / P/I/F (100-X)%; default is 50% / 50%.
-          details: The two shares always add to 100%. You can save changes while engaged; the complete six-setting snapshot takes effect after the next disengage and re-engage.
+          details: The two shares always add to 100%. Changes apply from one live six-setting snapshot without disengagement.
           min: 0
           max: 100
           step: 1
@@ -277,11 +277,8 @@ sections:
       - key: LaneCentering
         widget: toggle
         title: Enable Lane Centering
-        description: Disabled by default. Development-only, delay-aware lane centering; not road-validated.
+        description: Disabled by default. Development-only, delay-aware lane centering; not road-validated. Settings apply live without disengagement.
         details: Builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Uses timing carried with the model action; no separate timing message or setting is needed. Looks farther ahead as delay increases and requires enough valid road preview. Missing timing, timing over 0.875 seconds, or short preview fades back to the model; TIME and SHORT explain these states. Checks the corridor farther ahead for diverging markings and reduces authority as confidence falls. When the paths agree, it requests no correction. The combined model and lane command still passes through the normal curvature and jerk limits.
-        enablement:
-        - $ref: '#/macros/offroad'
-        - $ref: '#/macros/not_engaged'
       - key: LaneCenteringMinSpeed
         widget: option
         title: Minimum Lane Centering Speed
@@ -292,16 +289,12 @@ sections:
         step: 1
         unit: mph
         enablement:
-        - $ref: '#/macros/offroad'
-        - $ref: '#/macros/not_engaged'
         - {type: param, key: LaneCentering, equals: true}
       - key: LaneCenteringPauseOnSignal
         widget: toggle
         title: Fade on Turn Signal
         description: Fade out the correction while a turn signal is active. Lane-change maneuvers always suspend the correction immediately, regardless of this setting.
         enablement:
-        - $ref: '#/macros/offroad'
-        - $ref: '#/macros/not_engaged'
         - {type: param, key: LaneCentering, equals: true}
       - key: LaneCenterOffset
         widget: option
@@ -312,8 +305,6 @@ sections:
         step: 0.01
         unit: meters
         enablement:
-        - $ref: '#/macros/offroad'
-        - $ref: '#/macros/not_engaged'
         - {type: param, key: LaneCentering, equals: true}
       - key: LaneCenteringStrength
         widget: option
@@ -324,8 +315,6 @@ sections:
         max: 1.0
         step: 0.05
         enablement:
-        - $ref: '#/macros/offroad'
-        - $ref: '#/macros/not_engaged'
         - {type: param, key: LaneCentering, equals: true}
       - key: LaneCenteringE2EAuthority
         widget: option
@@ -336,8 +325,6 @@ sections:
         max: 1.0
         step: 0.05
         enablement:
-        - $ref: '#/macros/offroad'
-        - $ref: '#/macros/not_engaged'
         - {type: param, key: LaneCentering, equals: true}
     - id: nrdr_steer_ratio_tuning
       label: Steer Ratio Tuning
@@ -348,7 +335,7 @@ sections:
         widget: multiple_button
         title: Steer Ratio Mode
         description: Choose exactly one geometry source. Manual is the same as turning all three in-car switches off.
-        details: Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. If an exact NRDR, firmware, or manual source is unavailable, the device safely uses the stock car ratio and reports that fallback. You can save the mode and manual endpoints while driving; edits made while engaged apply together after the next disengage and re-engage. If already disengaged, wait up to 10 seconds for settings to sync before engaging.
+        details: Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. If an exact NRDR, firmware, or manual source is unavailable, the device safely uses the stock car ratio and reports that fallback. The mode and manual endpoints apply from one live snapshot, normally within 0.5 seconds, with a one-second torque transition. No LKAS cycle is required. Have a passenger make adjustments while driving.
         options:
         - value: 0
           label: Manual

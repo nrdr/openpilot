@@ -88,6 +88,11 @@ class LatControlClarityHybrid(LatControl):
     model_v2 = self.torque_controller.extension.model_v2
     return log.LaneChangeState.off if model_v2 is None else model_v2.meta.laneChangeState
 
+  def set_live_tuning_snapshot(self, snapshot):
+    super().set_live_tuning_snapshot(snapshot)
+    self.pid_controller.set_live_tuning_snapshot(snapshot)
+    self.torque_controller.set_live_tuning_snapshot(snapshot)
+
   def _update_blend(self, active: bool, target: float, lane_change_state: log.LaneChangeState) -> float:
     if lane_change_state != log.LaneChangeState.off:
       self.nnlc_blend = 0.0

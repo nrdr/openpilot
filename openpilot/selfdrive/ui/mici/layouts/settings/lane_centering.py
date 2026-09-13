@@ -1,4 +1,4 @@
-"""Offroad-only mici controls for confidence-gated lane centering."""
+"""Live mici controls for confidence-gated lane centering."""
 
 from openpilot.selfdrive.ui.layouts.settings.common import (
   LANE_CENTER_OFFSET_LABELS,
@@ -23,7 +23,7 @@ class LaneCenteringLayoutMici(NavScroller):
 
     self._lane_centering_toggle = BigToggle(
       "lane centering",
-      "offroad only",
+      "applies live; passenger adjustments only while driving",
       initial_state=ui_state.params.get_bool("LaneCentering"),
       toggle_callback=self._on_lane_centering,
     )
@@ -74,7 +74,7 @@ class LaneCenteringLayoutMici(NavScroller):
 
   @staticmethod
   def _write_allowed() -> bool:
-    return ui_state.is_offroad() and not ui_state.engaged
+    return True  # Runtime uses live snapshots; lane confidence and actuation gates remain enforced.
 
   def _settings_writable(self) -> bool:
     return self._write_allowed() and ui_state.params.get_bool("LaneCentering")

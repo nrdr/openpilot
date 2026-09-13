@@ -6,12 +6,6 @@ from openpilot.common.hardware.hw import Paths
 
 UNREGISTERED = "UnregisteredDevice"
 ONROAD_WRITE_BLOCKLIST = frozenset((
-  "LaneCentering",
-  "LaneCenteringE2EAuthority",
-  "LaneCenteringMinSpeed",
-  "LaneCenteringPauseOnSignal",
-  "LaneCenteringStrength",
-  "LaneCenterOffset",
   "LongitudinalPersonality",
   "NrdrHandcraftedLateralTune",
 ))

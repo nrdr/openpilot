@@ -152,6 +152,18 @@ class TestParamUiMetadata(unittest.TestCase):
         self.assertEqual(native.format_label(100), "100%")
         self.assertEqual(native.format_label(500), "500%")
 
+  def test_blend_numeric_help_describes_live_application_on_both_surfaces(self):
+    for key in INTERPOLATED_KEYS:
+      with self.subTest(key=key.value):
+        native = get_native_option_spec(key)
+        remote = sunnylink_fields_for_key(key.value)
+        self.assertEqual(native.description, remote["details"])
+        self.assertIn("Changes apply live", native.description)
+        self.assertIn("normally within 0.5 seconds", native.description)
+        self.assertIn("one-second torque transition", native.description)
+        self.assertIn("No LKAS cycle is required", native.description)
+        self.assertNotIn("next engagement", native.description)
+
   def test_sunnylink_adapter_reproduces_exact_fields(self):
     for key in EXPECTED_KEYS:
       with self.subTest(key=key.value):
@@ -198,6 +210,7 @@ class TestParamUiMetadata(unittest.TestCase):
     relative_path = "openpilot/nrdr/params/ui_metadata.py"
     extracted = {entry.msgid for entry in extract_strings([relative_path], str(repository_root))}
     expected = {text for pair in EXPECTED_NATIVE.values() for text in pair}
+    expected.update(get_native_option_spec(key).description for key in INTERPOLATED_KEYS)
     self.assertLessEqual(expected, extracted)
 
   def test_consumers_do_not_redeclare_managed_metadata(self):

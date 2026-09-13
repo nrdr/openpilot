@@ -24,7 +24,7 @@ def test_unknown_fingerprint_has_no_profile():
   assert get_steer_ratio_metadata("UNKNOWN") is None
 
 
-def test_mode_latch_replaces_retired_lane_change_geometry_fade():
+def test_live_mode_selection_replaces_retired_lane_change_geometry_fade():
   CP = type("CP", (), {"brand": "honda", "carFingerprint": "HONDA_CLARITY", "steerRatio": 16.5, "carFw": []})()
   manual = resolve_steer_ratio_selection(CP, {
     "NrdrSteerRatioMode": 0,
@@ -38,6 +38,6 @@ def test_mode_latch_replaces_retired_lane_change_geometry_fade():
   })
   latch = SteerRatioModeLatch(manual)
 
-  assert latch.update(comma, active=True) is manual
-  assert latch.pending is comma
+  assert latch.update(comma, active=True) is comma
+  assert latch.pending is None
   assert latch.update(comma, active=False).effective_mode is SteerRatioMode.COMMA

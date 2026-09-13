@@ -11,7 +11,6 @@ from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   resolve_steer_ratio_selection,
 )
 from openpilot.nrdr.hooks.controlsd import vehicle_model_state
-from openpilot.nrdr.params.snapshots import ENGAGEMENT_LATCHED_LATERAL_GROUPS
 
 
 ORIGINAL_54F_RAW_ANGLES = (
@@ -143,12 +142,12 @@ def test_firmware_mode_uses_exact_profile_and_immutable_cp_anchor():
   assert selection.linearize_measured_angle(physical) == pytest.approx(180.0)
 
 
-def test_mode_latch_defers_complete_snapshot_while_active():
+def test_mode_selection_applies_complete_snapshot_while_active():
   manual = resolve_steer_ratio_selection(cp(), settings(mode=0, center=15.38, final=10.93))
   raw = resolve_steer_ratio_selection(cp(), settings(mode=2))
   latch = SteerRatioModeLatch(manual)
-  assert latch.update(raw, active=True) is manual
-  assert latch.pending is raw
+  assert latch.update(raw, active=True) is raw
+  assert latch.pending is None
   assert latch.update(raw, active=False) is raw
   assert latch.pending is None
 
@@ -156,6 +155,9 @@ def test_mode_latch_defers_complete_snapshot_while_active():
 class CaptureController:
   def set_steer_ratio_selection(self, selection):
     self.selection = selection
+
+  def set_live_tuning_snapshot(self, snapshot):
+    self.snapshot = snapshot
 
 
 class RefreshingSnapshot:
@@ -210,7 +212,7 @@ def test_comma_requires_valid_learning_and_valid_submaster_message():
     assert vehicle_model_state(controls, live, CS, True)[1] == pytest.approx(21.0)
 
 
-def test_current_and_desired_paths_share_one_latched_selection_frame():
+def test_current_and_desired_paths_share_one_live_selection_frame():
   live = SimpleNamespace(steerRatio=17.0, steerRatioValid=True, stiffnessFactor=1.0, angleOffsetDeg=0.0, roll=0.0)
   CS = SimpleNamespace(steeringAngleDeg=47.5, vEgo=15.0)
   controls = control_fixture(settings(mode=2))
@@ -231,15 +233,16 @@ def test_current_and_desired_paths_share_one_latched_selection_frame():
   assert desired_no_offset == pytest.approx(math.degrees(0.01 * current_ratio))
 
   controls.nrdr_live_params.snapshot = settings(mode=0, center=8.0, final=8.0)
-  _, still_latched, _, _ = vehicle_model_state(controls, live, CS, True)
-  assert still_latched == pytest.approx(current_ratio)
-  assert controls.LaC.selection is selection
+  _, live_ratio, _, _ = vehicle_model_state(controls, live, CS, True)
+  assert live_ratio == pytest.approx(8.0)
+  assert controls.LaC.selection is not selection
+  assert controls.LaC.snapshot is controls.nrdr_lateral_snapshot
   _, changed, _, _ = vehicle_model_state(controls, live, CS, False)
   assert changed == pytest.approx(8.0)
   assert controls.LaC.selection is not selection
 
 
-def test_settings_force_refresh_only_on_falling_edge_and_apply_next_engagement():
+def test_settings_apply_while_active_without_synchronous_storage_reads():
   live = SimpleNamespace(steerRatio=17.0, steerRatioValid=True, stiffnessFactor=1.0, angleOffsetDeg=0.0)
   CS = SimpleNamespace(steeringAngleDeg=0.0)
   controls = control_fixture(settings(mode=0, center=15.38, final=10.93))
@@ -249,10 +252,11 @@ def test_settings_force_refresh_only_on_falling_edge_and_apply_next_engagement()
   assert vehicle_model_state(controls, live, CS, True)[1] == pytest.approx(15.38)
   assert controls.nrdr_live_params.refresh_calls == []
 
-  assert vehicle_model_state(controls, live, CS, False)[1] == pytest.approx(8.0)
-  assert controls.nrdr_live_params.refresh_calls == [ENGAGEMENT_LATCHED_LATERAL_GROUPS]
+  # Simulate publication by the background worker; no disengagement needed.
+  controls.nrdr_live_params.snapshot = controls.nrdr_live_params.pending_snapshot
   assert vehicle_model_state(controls, live, CS, True)[1] == pytest.approx(8.0)
-  assert controls.nrdr_live_params.refresh_calls == [ENGAGEMENT_LATCHED_LATERAL_GROUPS]
+  assert vehicle_model_state(controls, live, CS, False)[1] == pytest.approx(8.0)
+  assert controls.nrdr_live_params.refresh_calls == []
 
 
 class LinearVehicleModel:

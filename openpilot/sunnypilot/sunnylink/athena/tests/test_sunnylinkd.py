@@ -115,7 +115,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     assert self.saved_params == [("SpeedLimitOffset", "10", False)]
 
-  def test_saveParams_blocks_lane_centering_stack_onroad(self):
+  def test_saveParams_allows_lane_centering_stack_onroad(self):
     self.fake_params.offroad = False
     lane_centering = {
       "LaneCentering": "1",
@@ -126,9 +126,10 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "LaneCenteringE2EAuthority": "0.45",
     }
 
-    sunnylinkd.saveParams({**lane_centering, "SpeedLimitOffset": "10"})
+    values = {**lane_centering, "SpeedLimitOffset": "10"}
+    sunnylinkd.saveParams(values)
 
-    assert self.saved_params == [("SpeedLimitOffset", "10", False)]
+    assert self.saved_params == [(key, value, False) for key, value in values.items()]
 
   def test_saveParams_allows_lane_centering_stack_offroad(self):
     lane_centering = {
@@ -144,7 +145,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     assert self.saved_params == [(key, value, False) for key, value in lane_centering.items()]
 
-  def test_lane_centering_strength_is_vehicle_agnostic_but_still_offroad_only(self):
+  def test_lane_centering_strength_is_vehicle_agnostic_and_live(self):
     sunnylinkd.generate_capabilities = lambda _: {
       "has_handcrafted_lateral_profile": False,
       "nrdr_honda_tuning_available": False,
@@ -156,7 +157,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
     self.saved_params.clear()
     self.fake_params.offroad = False
     sunnylinkd.saveParams({"LaneCenteringStrength": "0.60"})
-    assert self.saved_params == []
+    assert self.saved_params == [("LaneCenteringStrength", "0.60", False)]
 
   def test_saveParams_allows_complete_steer_ratio_snapshot_onroad(self):
     self.fake_params.offroad = False
@@ -201,7 +202,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     assert self.saved_params == [(key, value, False) for key, value in values.items()]
 
-  def test_latched_lateral_write_policy_allows_onroad_saves(self):
+  def test_live_lateral_write_policy_allows_onroad_saves(self):
     for key in (
       "NrdrSteerRatioMode",
       "NrdrSteerRatioManualCenter",
@@ -238,12 +239,6 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
   def test_onroad_blocklist_is_exact(self):
     assert ONROAD_WRITE_BLOCKLIST == frozenset((
-      "LaneCentering",
-      "LaneCenteringE2EAuthority",
-      "LaneCenteringMinSpeed",
-      "LaneCenteringPauseOnSignal",
-      "LaneCenteringStrength",
-      "LaneCenterOffset",
       "LongitudinalPersonality",
       "NrdrHandcraftedLateralTune",
     ))

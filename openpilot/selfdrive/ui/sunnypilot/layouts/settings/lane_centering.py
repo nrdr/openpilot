@@ -1,4 +1,4 @@
-"""Offroad-only controls for confidence-gated lane centering."""
+"""Live controls for confidence-gated lane centering."""
 
 from collections.abc import Callable
 
@@ -49,7 +49,8 @@ class LaneCenteringLayout(Widget):
       description=tr("Development feature. Compare a lane-center path with the model after the steering action takes effect. " +
                      "Uses timing carried with the model action and looks farther ahead as steering delay increases. " +
                      "Requires two confident boundaries and enough valid road preview. Missing timing, timing over 0.875 seconds, or short preview " +
-                     "fades back to the model. Normal curvature and jerk limits remain in force."),
+                     "fades back to the model. Normal curvature and jerk limits remain in force. Settings apply live; " +
+                     "no disengagement is required. Have a passenger make adjustments while driving."),
       initial_state=ui_state.params.get_bool("LaneCentering"),
       enabled=self._write_allowed,
       callback=self._on_lane_centering,
@@ -116,7 +117,7 @@ class LaneCenteringLayout(Widget):
 
   @staticmethod
   def _write_allowed() -> bool:
-    return ui_state.is_offroad() and not ui_state.engaged
+    return True  # Runtime uses live snapshots; lane confidence and actuation gates remain enforced.
 
   def _settings_writable(self) -> bool:
     return self._write_allowed() and ui_state.params.get_bool("LaneCentering")

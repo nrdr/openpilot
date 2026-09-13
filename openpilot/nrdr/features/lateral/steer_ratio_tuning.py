@@ -210,13 +210,11 @@ class SteerRatioSelection:
 
 @dataclass
 class SteerRatioModeLatch:
+  """Capture one complete geometry selection for the current control frame."""
   selection: SteerRatioSelection
   pending: SteerRatioSelection | None = field(init=False, default=None)
 
   def update(self, candidate: SteerRatioSelection, active: bool) -> SteerRatioSelection:
-    if active:
-      self.pending = candidate if candidate != self.selection else None
-      return self.selection
     self.selection = candidate
     self.pending = None
     return self.selection

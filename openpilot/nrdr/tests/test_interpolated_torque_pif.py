@@ -165,7 +165,7 @@ def test_settings_are_bounded_and_master_is_gated_by_support():
   assert settings.friction_highway == 1.0
 
 
-def test_settings_latch_replaces_the_whole_tuple_only_while_inactive():
+def test_settings_selection_replaces_the_whole_tuple_while_active():
   latch = InterpolatedTorquePifSettingsLatch(
     resolve_interpolated_torque_pif_settings(_settings(), supported=True),
   )
@@ -179,7 +179,7 @@ def test_settings_latch_replaces_the_whole_tuple_only_while_inactive():
   )
 
   engaged = latch.update(changed, supported=True, active=True)
-  assert engaged == InterpolatedTorquePifSettings(True, 0.5, 5.0, 0.5, 0.5, 0.5)
+  assert engaged == InterpolatedTorquePifSettings(False, 0.8, 7.0, 0.2, 0.3, 0.4)
 
   inactive = latch.update(changed, supported=True, active=False)
   assert inactive == InterpolatedTorquePifSettings(False, 0.8, 7.0, 0.2, 0.3, 0.4)

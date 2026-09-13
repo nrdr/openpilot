@@ -87,17 +87,50 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertNotIn("LaneCenteringLayoutMici()", mici_settings)
     self.assertIn("LaneCenteringLayoutMici()", mici_toggles)
 
-  def test_local_write_callbacks_require_offroad_and_not_engaged(self) -> None:
+  def test_local_write_callbacks_allow_live_changes_and_keep_feature_gate(self) -> None:
     tici = TICI_PANEL.read_text(encoding="utf-8")
     mici = MICI_PANEL.read_text(encoding="utf-8")
     self.assertIn("if self._write_allowed():", tici)
-    self.assertIn("return ui_state.is_offroad() and not ui_state.engaged", tici)
+    self.assertIn("return True  # Runtime uses live snapshots", tici)
+    self.assertNotIn("return ui_state.is_offroad() and not ui_state.engaged", tici)
     self.assertEqual(tici.count("if not self._write_allowed():"), 1)
     self.assertEqual(tici.count("if not self._settings_writable():"), 1)
-    self.assertIn("return ui_state.is_offroad() and not ui_state.engaged", mici)
+    self.assertIn("return True  # Runtime uses live snapshots", mici)
+    self.assertNotIn("return ui_state.is_offroad() and not ui_state.engaged", mici)
     self.assertEqual(mici.count("if not self._write_allowed():"), 1)
     self.assertEqual(mici.count("if not self._settings_writable():"), 5)
     self.assertNotIn('param="LaneCentering"', tici)
+
+  def test_native_callbacks_save_while_onroad_and_engaged(self) -> None:
+    class MemoryParams:
+      def __init__(self):
+        self.values = {"LaneCentering": False}
+
+      def get_bool(self, key):
+        return bool(self.values.get(key))
+
+      def put_bool(self, key, value, block=False):
+        self.values[key] = value
+
+    for path, class_name in ((TICI_PANEL, "LaneCenteringLayout"), (MICI_PANEL, "LaneCenteringLayoutMici")):
+      with self.subTest(panel=class_name):
+        source_class = next(node for node in ast.parse(path.read_text(encoding="utf-8")).body
+                            if isinstance(node, ast.ClassDef) and node.name == class_name)
+        methods = [node for node in source_class.body if isinstance(node, ast.FunctionDef)
+                   and node.name in ("_write_allowed", "_settings_writable", "_on_lane_centering", "_on_pause_on_signal")]
+        isolated_class = ast.ClassDef(name=class_name, bases=[], keywords=[], body=methods, decorator_list=[])
+        memory = MemoryParams()
+        namespace = {"ui_state": SimpleNamespace(params=memory, engaged=True, is_offroad=lambda: False)}
+        module = ast.fix_missing_locations(ast.Module(body=[isolated_class], type_ignores=[]))
+        exec(compile(module, str(path), "exec"), namespace)
+        panel = namespace[class_name]()
+        self.assertTrue(panel._write_allowed())
+        self.assertFalse(panel._settings_writable())
+        panel._on_lane_centering(True)
+        self.assertTrue(memory.values["LaneCentering"])
+        self.assertTrue(panel._settings_writable())
+        panel._on_pause_on_signal(False)
+        self.assertFalse(memory.values["LaneCenteringPauseOnSignal"])
 
   def test_sunnylink_stack_is_nested_under_nrdr_lateral_tuning(self) -> None:
     self.assertFalse((SUNNYLINK_ROOT / "settings_ui_src/pages/lane_centering.yaml").exists())
@@ -127,8 +160,8 @@ class TestLaneCenteringStack(unittest.TestCase):
     items = source_panel["items"]
     for item in items:
       with self.subTest(key=item["key"]):
-        self.assertIn({"$ref": "#/macros/offroad"}, item["enablement"])
-        self.assertIn({"$ref": "#/macros/not_engaged"}, item["enablement"])
+        self.assertNotIn({"$ref": "#/macros/offroad"}, item.get("enablement", []))
+        self.assertNotIn({"$ref": "#/macros/not_engaged"}, item.get("enablement", []))
     for item in items[1:]:
       self.assertIn({"type": "param", "key": "LaneCentering", "equals": True}, item["enablement"])
 
@@ -185,8 +218,9 @@ class TestLaneCenteringStack(unittest.TestCase):
   def test_control_path_reads_canonical_mph_setting_once_per_snapshot(self) -> None:
     controlsd = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/controlsd.py").read_text(encoding="utf-8")
     extension = (REPOSITORY_ROOT / "openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py").read_text(encoding="utf-8")
-    self.assertEqual(extension.count('self.params.get("LaneCenteringMinSpeed", return_default=True)'), 1)
-    self.assertEqual(extension.count('self.params.get("LaneCenteringStrength", return_default=True)'), 1)
+    self.assertEqual(extension.count('lane_centering_min_speed_mph(snapshot.get("LaneCenteringMinSpeed"))'), 1)
+    self.assertEqual(extension.count('snapshot.get("LaneCenteringStrength")'), 1)
+    self.assertNotIn('self.params.get("LaneCentering', extension)
     self.assertEqual(controlsd.count("self.lane_centering_min_speed_mph"), 1)
     self.assertEqual(controlsd.count("self.lane_centering_strength"), 1)
     tici = TICI_PANEL.read_text(encoding="utf-8")

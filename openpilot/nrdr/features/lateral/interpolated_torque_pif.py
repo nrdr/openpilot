@@ -1,4 +1,4 @@
-"""Engagement-latched NRDR interpolation between Honda torque and P/I/F control."""
+"""Live-snapshot NRDR interpolation between Honda torque and P/I/F control."""
 
 from __future__ import annotations
 
@@ -80,11 +80,11 @@ class ClassicTorqueMeasurement:
 
 @dataclass(slots=True)
 class InterpolatedTorquePifSettingsLatch:
+  """Compatibility name for a complete, frame-local live settings selection."""
   settings: InterpolatedTorquePifSettings
 
   def update(self, settings, supported: bool, active: bool) -> InterpolatedTorquePifSettings:
-    if not active:
-      self.settings = resolve_interpolated_torque_pif_settings(settings, supported)
+    self.settings = resolve_interpolated_torque_pif_settings(settings, supported)
     return self.settings
 
 

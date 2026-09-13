@@ -24,6 +24,11 @@ class LatControlPID(LatControl):
     if self.nrdr_controller is not None:
       self.nrdr_controller.set_steer_ratio_selection(selection)
 
+  def set_live_tuning_snapshot(self, snapshot):
+    super().set_live_tuning_snapshot(snapshot)
+    if self.nrdr_controller is not None:
+      self.nrdr_controller.set_live_tuning_snapshot(snapshot)
+
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature, calibrated_pose, curvature_limited, lat_delay):
     if self.nrdr_controller is not None:
       return self.nrdr_controller.update(

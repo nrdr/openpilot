@@ -6,6 +6,7 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.pid import PIDController
 from openpilot.common.realtime import DT_CTRL
 from openpilot.nrdr.features.lateral.honda_vgr import normalize_honda_eps_firmware
+from openpilot.nrdr.features.lateral.live_tuning import LIVE_TUNING_TRANSITION_SECONDS
 from openpilot.nrdr.features.lateral.interpolated_torque_pif import (
   ClassicTorqueCandidate,
   ClassicTorqueCandidateResult,
@@ -164,6 +165,7 @@ class NrdrLatControlPID(LatControl):
     )
     self.classic_torque_candidate = ClassicTorqueCandidate(dt, self.steer_max)
     self.last_classic_torque_result: ClassicTorqueCandidateResult | None = None
+    self._last_reported_blend_state = None
     self.settings_generation = -1
     self.frame = -1
     self.previous_output = 0.0
@@ -216,14 +218,36 @@ class NrdrLatControlPID(LatControl):
     self.classic_torque_candidate.reset()
     self.last_classic_torque_result = None
 
-  def _refresh_interpolated_torque_pif_settings(self) -> None:
-    # This method is called only while lateral control is inactive. The complete
-    # six-value tuple is therefore frozen from engagement until disengagement.
+  def _refresh_interpolated_torque_pif_settings(self, snapshot=None) -> None:
+    previous = self.interpolated_torque_pif_settings
     self.interpolated_torque_pif_latch.update(
-      self.params.snapshot,
+      self.params.snapshot if snapshot is None else snapshot,
       self.interpolated_torque_pif_supported,
       active=False,
     )
+    current = self.interpolated_torque_pif_settings
+    if previous.enabled != current.enabled or previous.lat_accel_factor != current.lat_accel_factor:
+      self.classic_torque_candidate.reset()
+      self.last_classic_torque_result = None
+
+  def _record_applied_blend_settings(self, snapshot, active: bool) -> None:
+    if not self.interpolated_torque_pif_supported:
+      return
+    settings = self.interpolated_torque_pif_settings
+    state = (settings, bool(active))
+    if state == self._last_reported_blend_state:
+      return
+    self._last_reported_blend_state = state
+    if recorder := getattr(self.params, "record_applied_settings", None):
+      result = self.last_classic_torque_result
+      recorder(
+        "honda_torque_pif", snapshot.generation, active=bool(active),
+        enabled=settings.enabled, torque_share_percent=settings.torque_share * 100.0,
+        lat_accel_factor=settings.lat_accel_factor, friction_low=settings.friction_low,
+        friction_standard=settings.friction_standard, friction_highway=settings.friction_highway,
+        yaw_feedback_valid=bool(active and result is not None and result.yaw_feedback_valid),
+        torque_transition_seconds=LIVE_TUNING_TRANSITION_SECONDS,
+      )
 
   def _feedforward(self, CS, desired_angle: float) -> float:
     factor = float(np.interp(CS.vEgo, self.kf_bp, self.kf_v)) if self.kf_v else self.ff_factor
@@ -258,8 +282,8 @@ class NrdrLatControlPID(LatControl):
       self.previous_steering_pressed = steering_pressed
     return steering_pressed
 
-  def _refresh_settings(self) -> None:
-    snapshot = self.params.snapshot
+  def _refresh_settings(self, snapshot=None) -> None:
+    snapshot = self.params.snapshot if snapshot is None else snapshot
     scale_keys = (
       (self.p_scales, "LatPScale"),
       (self.i_scales, "LatIScale"),
@@ -315,6 +339,10 @@ class NrdrLatControlPID(LatControl):
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
              calibrated_pose, curvature_limited, lat_delay):
+    snapshot = self.live_tuning_snapshot if self.live_tuning_snapshot is not None else self.params.snapshot
+    if self.settings_generation != snapshot.generation:
+      self._refresh_settings(snapshot)
+      self._refresh_interpolated_torque_pif_settings(snapshot)
     pid_log = log.ControlsState.LateralPIDState.new_message()
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
@@ -324,7 +352,6 @@ class NrdrLatControlPID(LatControl):
     pid_log.angleError = error
 
     if not active:
-      self._refresh_interpolated_torque_pif_settings()
       output_torque = 0.0
       pid_log.active = False
       self._reset(desired_no_offset)
@@ -343,8 +370,6 @@ class NrdrLatControlPID(LatControl):
         freeze_integrator = True
 
       self.frame += 1
-      if self.settings_generation != self.params.generation:
-        self._refresh_settings()
       self.pid.update(error, feedforward=feedforward, speed=CS.vEgo, freeze_integrator=freeze_integrator)
       output_torque = self._scaled_pid_output(CS, desired_no_offset, angle_delta, phase)
       params_valid = False
@@ -411,4 +436,5 @@ class NrdrLatControlPID(LatControl):
       self.previous_desired_angle = desired_no_offset
       self.previous_saturated = bool(pid_log.saturated)
 
+    self._record_applied_blend_settings(snapshot, active)
     return output_torque, desired_angle, pid_log

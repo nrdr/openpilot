@@ -71,7 +71,7 @@ class TestCarTuneReporter(unittest.TestCase):
 
     self.assertFalse(effective)
     self.assertIn("OFF | Torque 0% / P/I/F 100% | P/I/F unchanged", report)
-    self.assertIn("stored next engagement: Torque 60% / P/I/F 40%", report)
+    self.assertIn("stored settings: Torque 60% / P/I/F 40%", report)
 
   def test_enabled_interpolated_report_uses_complementary_share(self):
     report, effective = self._interpolated_reporter(True)._interpolated_torque_pif_info(self._interpolated_cp())
@@ -82,7 +82,7 @@ class TestCarTuneReporter(unittest.TestCase):
     self.assertIn("Torque angle→yaw 2-5 m/s, calibrated yaw >=5 m/s", report)
     self.assertIn("invalid required yaw: exact P/I/F output + Torque state held", report)
     self.assertIn("generic f13 yaw branch (not Honda road-proven)", report)
-    self.assertIn("engagement-latched | NNLC bypassed/reset", report)
+    self.assertIn("live snapshot | NNLC bypassed/reset", report)
 
   def test_small_scalar_feedforward_never_uses_exponent_notation(self):
     pid = SimpleNamespace(kpV=[0.2], kiV=[0.05], kf=0.0000036, kfV=[])
