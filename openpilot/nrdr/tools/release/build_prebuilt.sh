@@ -159,9 +159,10 @@ validate_source_tree() {
   [ -d "$SOURCE_DIR/openpilot/third_party" ] || die "missing nested third_party tree"
   [ -d "$SOURCE_DIR/openpilot/selfdrive/modeld/models" ] || die "missing nested model tree"
 
-  for item in events.py events_sp.py driver_monitoring.py mads.py backend_env.sh; do
+  for item in events.py events_sp.py driver_monitoring.py mads.py backend_env.sh restore_comm_events.py; do
     [ -f "$CLEAN_OVERLAY_DIR/$item" ] || die "missing clean overlay file: $CLEAN_OVERLAY_DIR/$item"
   done
+  [ -f "$SOURCE_DIR/openpilot/nrdr/tools/release/validate_model_artifacts.py" ] || die "missing model artifact validator"
 
   set +x
   mapfile -d '' -t RELEASE_FILES < <(cd "$SOURCE_DIR" && python3 "$RELEASE_FILES_SCRIPT")
@@ -244,6 +245,9 @@ apply_clean_overlay() {
   cp -p -- "$CLEAN_OVERLAY_DIR/driver_monitoring.py" "$hooks_target/driver_monitoring.py"
   cp -p -- "$CLEAN_OVERLAY_DIR/mads.py" "$driver_policy_target/mads.py"
   cp -p -- "$CLEAN_OVERLAY_DIR/backend_env.sh" "$backend_target"
+  # Source/nightly policy is independent: clean must keep communication-fault
+  # alerts and disengagement handlers even when development source omits them.
+  python3 "$CLEAN_OVERLAY_DIR/restore_comm_events.py" "$BUILD_DIR"
 
   # Clean releases retain the host seam but replace its NRDR-owned backend policy.
   replace_once "$BUILD_DIR/openpilot/nrdr/ui/home/layout.py" \
@@ -388,6 +392,9 @@ git commit -m "openpilot v$VERSION prebuilt"
 
 echo "[-] Building T=$SECONDS"
 export PYTHONPATH="$BUILD_DIR"
+export PREBUILT_ALL_CAMERAS=1
+# A developer's local skip flag must never produce an incomplete release.
+unset SKIP_TINYGRAD_COMPILE
 run_scons --minimal
 run_scons panda/
 
@@ -421,6 +428,7 @@ git checkout -- openpilot/third_party/ || true
 touch prebuilt
 
 validate_runtime_linkage
+python3 "$SOURCE_DIR/openpilot/nrdr/tools/release/validate_model_artifacts.py" "$BUILD_DIR"
 
 git add -A -f .
 git commit --amend -m "openpilot v$VERSION prebuilt"
@@ -436,6 +444,7 @@ RELEASE_COMMIT="$(git rev-parse HEAD)"
 
 echo "[-] Building mandatory $CLEAN_BRANCH tree T=$SECONDS"
 apply_clean_overlay
+python3 "$SOURCE_DIR/openpilot/nrdr/tools/release/validate_model_artifacts.py" "$BUILD_DIR"
 git branch -D "$CLEAN_BRANCH" 2>/dev/null || true
 git checkout --orphan "$CLEAN_BRANCH"
 git add -A -f .

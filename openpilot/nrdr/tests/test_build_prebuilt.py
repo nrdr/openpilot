@@ -161,6 +161,7 @@ def make_source(tmp_path: Path, entries: list[str], existing_entries: list[str])
   canonical_release.mkdir(parents=True)
   shutil.copy2(BUILD_SCRIPT, canonical_release / BUILD_SCRIPT.name)
   make_executable(canonical_release / BUILD_SCRIPT.name)
+  shutil.copy2(BUILD_SCRIPT.parent / "validate_model_artifacts.py", canonical_release / "validate_model_artifacts.py")
 
   backend_env = source / "openpilot" / "nrdr" / "config" / "backend_env.sh"
   backend_env.parent.mkdir(parents=True)
@@ -170,6 +171,7 @@ def make_source(tmp_path: Path, entries: list[str], existing_entries: list[str])
     "openpilot/sunnypilot/common/version.h",
     "release/build_prebuilt.sh",
     "openpilot/nrdr/tools/release/build_prebuilt.sh",
+    "openpilot/nrdr/tools/release/validate_model_artifacts.py",
     "openpilot/nrdr/config/backend_env.sh",
   ]
   write_manifest(source, [*required_entries, *entries])
@@ -186,6 +188,7 @@ def make_source(tmp_path: Path, entries: list[str], existing_entries: list[str])
   for name in ("events.py", "events_sp.py", "driver_monitoring.py", "mads.py"):
     (clean_overlay / name).write_text("# clean overlay fixture\n", encoding="utf-8")
   shutil.copy2(CLEAN_OVERLAY / "backend_env.sh", clean_overlay / "backend_env.sh")
+  shutil.copy2(CLEAN_OVERLAY / "restore_comm_events.py", clean_overlay / "restore_comm_events.py")
 
   # A deliberately broken copy at the pre-migration location proves preflight
   # uses tools/release/release_files.py, not release/release_files.py.
@@ -273,6 +276,19 @@ def test_release_shell_entry_points_and_backend_fragments_parse() -> None:
     timeout=10,
   )
   assert result.returncode == 0, result_details(result)
+
+
+def test_release_forces_shared_camera_models_and_checks_both_variants() -> None:
+  source = BUILD_SCRIPT.read_text(encoding="utf-8")
+  build = source.index("run_scons --minimal")
+  assert source.index("export PREBUILT_ALL_CAMERAS=1") < build
+  assert source.index("unset SKIP_TINYGRAD_COMPILE") < build
+  checks = 'python3 "$SOURCE_DIR/openpilot/nrdr/tools/release/validate_model_artifacts.py" "$BUILD_DIR"'
+  assert source.count(checks) == 2
+  first = source.index(checks)
+  second = source.index(checks, first + 1)
+  assert build < first < source.index('RELEASE_COMMIT="$(git rev-parse HEAD)"')
+  assert source.index('echo "[-] Building mandatory') < second < source.index('CLEAN_COMMIT="$(git rev-parse HEAD)"')
 
 
 def test_launch_env_selects_nrdr_backend_through_owned_fragment() -> None:
@@ -644,6 +660,7 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
   build.mkdir()
 
   overlay_targets = (
+    Path("openpilot/selfdrive/selfdrived/events.py"),
     Path("launch_env.sh"),
     Path("openpilot/common/api/comma_connect.py"),
     Path("openpilot/system/athena/athenad.py"),
@@ -678,6 +695,9 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
   assert git("remote", "get-url", "origin", cwd=build).stdout.strip() == "https://example.invalid/original.git"
   assert git("branch", "--list", "nrdr-clean", cwd=build).stdout.strip() == ""
   assert not (build / "prebuilt").exists()
+  from openpilot.nrdr.tools.release.clean_overlay.restore_comm_events import restore_comm_event_source
+  source_events = (REPO_ROOT / "openpilot/selfdrive/selfdrived/events.py").read_text(encoding="utf-8")
+  assert (build / "openpilot/selfdrive/selfdrived/events.py").read_text(encoding="utf-8") == restore_comm_event_source(source_events)
 
   for name, relative in CLEAN_OVERLAY_TARGETS.items():
     assert (build / relative).read_bytes() == (CLEAN_OVERLAY / name).read_bytes()

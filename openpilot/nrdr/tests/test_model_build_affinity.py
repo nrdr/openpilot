@@ -65,12 +65,13 @@ class BuildEnvironment:
     return 0
 
 
-def assemble_build(arch, chestnut=False, device="mici", skip=False):
+def assemble_build(arch, chestnut=False, device="mici", skip=False, all_cameras=None):
   # Run production control flow and f-strings, but replace imports and all I/O.
   # This checks build wiring, not QCOM execution or on-device model correctness.
   tree = WithoutImports().visit(ast.parse(SCONSCRIPT.read_text(encoding="utf-8")))
   env = BuildEnvironment()
   chunked = []
+  environment = {"SKIP_TINYGRAD_COMPILE": "1" if skip else None, "PREBUILT_ALL_CAMERAS": all_cameras}
   namespace = {
     "arch": arch,
     "env": env,
@@ -81,7 +82,7 @@ def assemble_build(arch, chestnut=False, device="mici", skip=False):
     "Value": lambda value: value,
     "glob": SimpleNamespace(glob=lambda *args, **kwargs: ["tinygrad_repo/tinygrad/engine/jit.py"]),
     "os": SimpleNamespace(
-      getenv=lambda name: "1" if skip and name == "SKIP_TINYGRAD_COMPILE" else None,
+      getenv=environment.get,
       path=SimpleNamespace(
         isfile=lambda path: True,
         join=lambda *parts: str(PurePosixPath(*parts)),
@@ -158,6 +159,38 @@ class TestModelBuildAffinity(unittest.TestCase):
           self.assertIn(f"{MODEL_DIR}/compile_modeld.py", dependencies)
           self.assertIn("#tinygrad_repo/tinygrad/engine/jit.py", dependencies)
           self.assertIn("/repo/openpilot/common/file_chunker.py", dependencies)
+
+  def test_prebuilt_camera_coverage_and_normal_device_selection(self):
+    for device in ("mici", "tici", "tizi"):
+      for chestnut in (False, True):
+        for all_cameras in (None, "0", "true", "1"):
+          with self.subTest(device=device, chestnut=chestnut, all_cameras=all_cameras):
+            env, driving, _ = assemble_build("comma_arm64", chestnut, device, all_cameras=all_cameras)
+            resolutions = (["1928x1208", "1344x760"] if all_cameras == "1" else
+                           ["1344x760"] if device == "mici" else ["1928x1208"])
+            self.assertEqual(len(driving), 2 if chestnut else 1)
+            for node in driving:
+              if isinstance(node.actions, BuildAction):
+                node.actions.function([], [], env)
+                command = env.executed[-1]
+              else:
+                command = node.actions[0]
+              words = shlex.split(command)
+              self.assertEqual(words[words.index("--camera-resolutions") + 1:words.index("--onnx")], resolutions)
+              self.assertIn(" ".join(resolutions), node.sources)
+
+            warps = [node for node in env.commands if isinstance(node.targets, str) and "/dm_warp_" in node.targets]
+            self.assertEqual([node.targets for node in warps], [
+              f"{MODEL_DIR}/models/dm_warp_{resolution}_tinygrad.pkl" for resolution in resolutions
+            ])
+            for resolution, node in zip(resolutions, warps, strict=True):
+              words = shlex.split(node.actions)
+              executable = words.index("python3")
+              self.assertEqual(words[executable:], [
+                "python3", f"{MODEL_DIR}/compile_dm_warp.py",
+                "--camera-resolution", resolution, "--warp-to", "1440x960", "--output", node.targets,
+              ])
+              self.assertIn("DEV=QCOM", words[:executable])
 
   def test_skip_tinygrad_compile_still_skips_driving_model(self):
     for chestnut in (False, True):

@@ -91,6 +91,7 @@ class TestReleaseOwnership(unittest.TestCase):
       "release/build_prebuilt.sh",
       "openpilot/nrdr/config/backend_env.sh",
       "openpilot/nrdr/tools/release/build_prebuilt.sh",
+      "openpilot/nrdr/tools/release/validate_model_artifacts.py",
       *(
         path.relative_to(REPOSITORY_ROOT).as_posix()
         for path in (CANONICAL_RELEASE / "clean_overlay").iterdir()

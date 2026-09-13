@@ -25,8 +25,12 @@ def estimate_pickle_max_size(onnx_size):
 
 if arch == 'comma_arm64':
   from openpilot.common.hardware import HARDWARE
-  camera = _os_fisheye if HARDWARE.get_device_type() == "mici" else _ar_ox_fisheye
-  camera_configs = [(camera.width, camera.height)]
+  if os.getenv('PREBUILT_ALL_CAMERAS') == '1':
+    # Release artifacts must cover both C3/C3X and C4 regardless of build host.
+    camera_configs = [(c.width, c.height) for c in (_ar_ox_fisheye, _os_fisheye)]
+  else:
+    camera = _os_fisheye if HARDWARE.get_device_type() == "mici" else _ar_ox_fisheye
+    camera_configs = [(camera.width, camera.height)]
   tg_backend = 'QCOM'
   tg_flags = f'DEV={tg_backend} IMAGE=1 FLOAT16=1 NOLOCALS=1 JIT_BATCH_SIZE=0 OPENPILOT_HACKS=1'
 else:
