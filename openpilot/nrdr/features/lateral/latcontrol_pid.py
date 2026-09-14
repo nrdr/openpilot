@@ -3,7 +3,7 @@ import numpy as np
 from openpilot.cereal import log
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.common.pid import PIDController
+from openpilot.nrdr.features.lateral.integral_pid import IntegralScaledPIDController
 from openpilot.common.realtime import DT_CTRL
 from openpilot.nrdr.features.lateral.honda_vgr import normalize_honda_eps_firmware
 from openpilot.nrdr.features.lateral.live_tuning import LIVE_TUNING_TRANSITION_SECONDS
@@ -127,7 +127,7 @@ class NrdrLatControlPID(LatControl):
 
   def __init__(self, CP, CP_SP, CI, dt):
     super().__init__(CP, CP_SP, CI, dt)
-    self.pid = PIDController(
+    self.pid = IntegralScaledPIDController(
       (CP.lateralTuning.pid.kpBP, CP.lateralTuning.pid.kpV),
       (CP.lateralTuning.pid.kiBP, CP.lateralTuning.pid.kiV),
       pos_limit=self.steer_max,
@@ -208,6 +208,7 @@ class NrdrLatControlPID(LatControl):
     return angle_no_offset, angle_no_offset + params.angleOffsetDeg
 
   def _reset(self, desired_angle: float) -> None:
+    self.pid.reset()
     self.steering_pressed_duration = 0.0
     self.previous_steering_pressed = False
     self.center_taper.x = 1.0
@@ -307,7 +308,7 @@ class NrdrLatControlPID(LatControl):
 
   def _scaled_pid_output(self, CS, desired_angle: float, angle_delta: float, phase: float) -> float:
     p_term = self.pid.p * _speed_banded_value(CS.vEgo, *self.p_scales)
-    i_term = self.pid.i * _speed_banded_value(CS.vEgo, *self.i_scales)
+    i_term = self.pid.i  # The selected I scale now controls accumulation, not stored output.
     f_term = self.pid.f * _speed_banded_value(CS.vEgo, *self.f_scales)
     if self.is_eps_modified:
       center_fade = 0.0 if (bool(getattr(CS, "leftBlinker", False)) or bool(getattr(CS, "rightBlinker", False))) else float(
@@ -363,14 +364,15 @@ class NrdrLatControlPID(LatControl):
       phase, self.phase_direction = phase_with_latch(desired_no_offset, angle_delta, CS.vEgo, self.phase_direction)
       feedforward = self._feedforward(CS, desired_no_offset)
       steering_pressed = self._steering_pressed(CS)
-      freeze_speed = 2.0 if self.is_eps_modified else 5.0
-      freeze_integrator = (steer_limited_by_safety or steering_pressed or CS.vEgo < freeze_speed
-                           or (self.stiction_enabled and self.stiction.freeze_integrator))
-      if phase < 0.0 and self.pid.i * error > 0.0:
-        freeze_integrator = True
+      # Like VFN, unwind alone does not freeze correction of a remaining error.
+      i_scale = _speed_banded_value(CS.vEgo, *self.i_scales)
 
       self.frame += 1
-      self.pid.update(error, feedforward=feedforward, speed=CS.vEgo, freeze_integrator=freeze_integrator)
+      self.pid.update_lateral(
+        error, feedforward=feedforward, speed=CS.vEgo, i_scale=i_scale, eps_modified=self.is_eps_modified,
+        steer_limited=steer_limited_by_safety, steering_pressed=steering_pressed,
+        stiction_freeze=self.stiction_enabled and self.stiction.freeze_integrator,
+      )
       output_torque = self._scaled_pid_output(CS, desired_no_offset, angle_delta, phase)
       params_valid = False
       if self.is_eps_modified:

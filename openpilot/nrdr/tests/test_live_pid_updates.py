@@ -124,3 +124,44 @@ def test_highway_friction_changes_real_yaw_branch_without_resetting_integral(liv
   assert 0.019 < second.i <= first.i < 0.02  # Evolves normally; not reset on the edit.
   assert second.output < first.output
   assert first.yaw_feedback_valid and second.yaw_feedback_valid
+
+
+@pytest.mark.parametrize("sign", (-1.0, 1.0))
+def test_highway_unwind_does_not_freeze_remaining_angle_error(live_pid, monkeypatch, sign):
+  controller, live, update = live_pid
+  live.snapshot = make_snapshot(2, NrdrInterpolatedTorquePifBlend=False)
+  controller.pid._k_i = ([0.0], [0.2])
+  controller.pid.i = sign * 0.1
+  controller.previous_desired_angle = sign * 5.0
+  monkeypatch.setattr(controller, "_desired_angles", lambda *args: (sign * 4.99, sign * 4.99))
+  update()
+  assert controller.phase_direction < 0.0
+  assert controller.pid.i == pytest.approx(sign * (0.1 + 0.2 * 0.01 * 4.99))
+
+
+def test_live_zero_i_clears_correction_and_reenable_starts_fresh(live_pid):
+  controller, live, update = live_pid
+  controller.pid._k_i = ([0.0], [0.2])
+  controller.pid.i = 0.25
+  live.snapshot = make_snapshot(2, LatIScaleHighway=0, NrdrInterpolatedTorquePifBlend=False)
+  update()
+  assert controller.pid.i == 0.0
+  live.snapshot = make_snapshot(3, LatIScaleHighway=100, NrdrInterpolatedTorquePifBlend=False)
+  update()
+  assert 0.0 < controller.pid.i < 0.01
+
+
+def test_scheduled_i_is_not_multiplied_twice_at_the_output(live_pid):
+  controller, _, _ = live_pid
+  controller.pid.i = 0.25
+  controller.i_scales = [0.2, 1.35, 2.0]
+  for speed in (5.0, 15.0, 27.0):
+    cs = SimpleNamespace(vEgo=speed, steeringRateDeg=0.0, steeringAngleDeg=0.0)
+    assert controller._scaled_pid_output(cs, 0.0, 0.0, 0.0) == pytest.approx(0.25)
+
+
+def test_disengagement_clears_pid_integral_before_reengagement(live_pid):
+  controller, _, update = live_pid
+  controller.pid.i = 0.3
+  assert update(active=False) == 0.0
+  assert controller.pid.i == 0.0

@@ -5,8 +5,8 @@ import pyray as rl
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
-  RAW_STEER_RATIO_PROFILES,
   SteerRatioMode,
+  get_raw_steer_ratio_profile,
   get_steer_ratio_metadata,
   resolve_steer_ratio_selection,
 )
@@ -37,12 +37,12 @@ class SteerRatioTuningLayout(Widget):
       ),
       SteerRatioMode.NRDR_RAW: self._mode_item(
         SteerRatioMode.NRDR_RAW,
-        "Use nrdr Steer Ratio Learner",
+        "Use NRDR Measured Curve",
         "Uses NRDR's fixed curve made directly from logged steering angles. It does not learn while you drive. " +
-        "The audited Clarity curve now reaches its 435.7-degree near-lock anchor instead of holding the " +
-        "247.5-degree point through the rest of the rack. " +
-        "This is available only when NRDR has an exact audited curve for your car. Changes apply live; " +
-        "no disengagement is required. Have a passenger make adjustments while driving.",
+        "Clarity retains its audited 435.7-degree near-lock anchor. Civic TEG-A010 uses provisional v0: " +
+        "data-derived anchors at 3.3-58.7 degrees, linear interpolation between them, and the nearest " +
+        "anchor held outside that range. The Civic draft is not road-validated and has no fitted speed correction. " +
+        "Unavailable means no matching car/EPS data profile. Select only while parked; existing settings are not changed automatically.",
       ),
       SteerRatioMode.FIRMWARE: self._mode_item(
         SteerRatioMode.FIRMWARE,
@@ -114,7 +114,7 @@ class SteerRatioTuningLayout(Widget):
     is_honda = str(ui_state.CP.brand).lower() == "honda"
     return (
       is_honda and get_steer_ratio_metadata(fingerprint) is not None,
-      is_honda and fingerprint in RAW_STEER_RATIO_PROFILES,
+      get_raw_steer_ratio_profile(ui_state.CP) is not None,
       get_honda_vgr_profile(ui_state.CP) is not None,
     )
 

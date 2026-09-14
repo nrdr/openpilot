@@ -1217,7 +1217,7 @@
                   "widget": "multiple_button",
                   "title": "Steer Ratio Mode",
                   "description": "Choose exactly one geometry source. Manual is the same as turning all three in-car switches off.",
-                  "details": "Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR uses the fixed audited Clarity angle-log curve, including a bilateral near-lock anchor at 435.7 degrees; it no longer holds the 247.5-degree point through the rest of the rack. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. If an exact NRDR, firmware, or manual source is unavailable, the device safely uses the stock car ratio and reports that fallback. The mode and manual endpoints apply from one live snapshot, normally within 0.5 seconds, with a one-second torque transition. No LKAS cycle is required. Have a passenger make adjustments while driving.",
+                  "details": "Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR Measured Curve uses fixed logged data; it does not learn while you drive. Clarity retains its audited 435.7-degree near-lock anchor. Civic TEG-A010 uses provisional v0, with data-derived anchors at 3.3-58.7 degrees and linear interpolation between them. Outside that range the nearest anchor is held as an unmeasured estimate. This Civic draft is not road-validated and has no fitted speed correction; select it only while parked. A disabled NRDR option means no matching car/EPS data profile. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. An unavailable selected source uses the stock car ratio and reports that fallback. The mode and manual endpoints apply from one live snapshot, normally within 0.5 seconds, with a one-second torque transition. No LKAS cycle is required. Existing settings are not changed automatically.",
                   "options": [
                     {
                       "value": 0,
@@ -1229,7 +1229,7 @@
                     },
                     {
                       "value": 2,
-                      "label": "nrdr Learner",
+                      "label": "NRDR Measured Curve",
                       "enablement": [
                         {
                           "type": "capability",

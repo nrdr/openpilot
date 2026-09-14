@@ -25,7 +25,7 @@ from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose, gate_cal
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
-from openpilot.nrdr.hooks import allow_longitudinal, apply_hud_lead, stopping_inputs, vehicle_model_state
+from openpilot.nrdr.hooks import allow_longitudinal, apply_hud_lead, finalize_lateral_torque, stopping_inputs, vehicle_model_state
 
 State = log.SelfdriveState.OpenpilotState
 LaneChangeState = log.LaneChangeState
@@ -189,9 +189,7 @@ class Controls(ControlsExt):
                                                      self.steer_limited_by_safety, self.desired_curvature,
                                                      self.calibrated_pose, curvature_limited, lat_delay)
     if self.CP.steerControlType == car.CarParams.SteerControlType.torque:
-      steer = self.nrdr_live_torque_transition.update(
-        float(steer), self.nrdr_lateral_snapshot, CC.latActive, bool(CS.steeringPressed), DT_CTRL,
-      )
+      steer = finalize_lateral_torque(self, float(steer), CS, CC.latActive, DT_CTRL)
       lac_log.output = float(steer)
     actuators.torque = float(steer)
     if self.CP.steerControlType == car.CarParams.SteerControlType.curvature:

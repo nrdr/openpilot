@@ -160,6 +160,13 @@ class CarTuneReporter:
       return (f"{prefix} | last valid live vehicleParameters.steerRatio scalar | " +
               f"CP {selection.cp_ratio:g} until the first valid sample")
     if selection.effective_mode is SteerRatioMode.NRDR_RAW:
+      if selection.raw_profile.provisional:
+        profile = selection.raw_profile
+        lower, upper = profile.observed_angle_range
+        return (f"{prefix} | {profile.name} | provisional data anchors {lower:g}-{upper:g} deg | " +
+                f"VM ratio {profile.ratios[0]:.4f}->{profile.ratios[-1]:.4f} | linear interpolation | " +
+                "outside range: nearest anchor held, unmeasured | no live learning or fitted speed correction | " +
+                f"not road-validated | source {profile.provenance}")
       return (f"{prefix} | {selection.raw_profile.name} | audited near-lock anchor 435.7 deg " +
               f"(VM ratio {selection.raw_profile.ratio_at(435.7):.6f}), endpoint-clamped | " +
               f"source {selection.raw_profile.provenance}")

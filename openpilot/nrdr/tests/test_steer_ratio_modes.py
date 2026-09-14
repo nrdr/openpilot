@@ -125,7 +125,7 @@ def test_invalid_mode_is_manual_and_unsupported_explicit_modes_fall_back_for_who
   assert civic_raw.effective_mode is None
   assert civic_raw.ratio_at(0.0) == pytest.approx(15.4)
   assert civic_raw.ratio_at(400.0) == pytest.approx(15.4)
-  assert "No exact audited" in civic_raw.unavailable_reason
+  assert "No matching NRDR measured curve" in civic_raw.unavailable_reason
 
   no_firmware = resolve_steer_ratio_selection(cp("HONDA_CLARITY", 16.5), settings(mode=3))
   assert no_firmware.requested_mode is SteerRatioMode.FIRMWARE

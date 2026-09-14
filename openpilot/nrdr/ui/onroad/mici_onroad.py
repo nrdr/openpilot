@@ -1,4 +1,5 @@
 import pyray as rl
+from openpilot.nrdr.ui.onroad.lateral_state import lateral_control_kind
 
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.alert_renderer import SPEED_LIMIT_ALERT_EVENTS
@@ -15,6 +16,7 @@ from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui.elements import (
   LeadSpeedElement,
   RelDistElement,
   SteeringAngleElement,
+  UiElement,
 )
 from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -76,12 +78,14 @@ class StripDevUiRenderer(Widget):
     self.lane_centering_elem = LaneCenteringStatusElement()
 
   def _desired(self, sm):
-    which = sm['controlsState'].lateralControlState.which()
+    which = lateral_control_kind(sm, ui_state.started_frame)
     if which == 'angleState':
       return self.desired_steer_elem.update(sm, ui_state.is_metric)
     if which == 'torqueState':
       return self.desired_lat_accel_elem.update(sm, ui_state.is_metric)
-    return self.desired_pid_steer_elem.update(sm, ui_state.is_metric)
+    if which == 'pidState':
+      return self.desired_pid_steer_elem.update(sm, ui_state.is_metric)
+    return UiElement("--", "DESIRED STEER", "", rl.WHITE)
 
   def _render(self, _):
     if ui_state.developer_ui not in (DeveloperUiState.RIGHT, DeveloperUiState.BOTH):

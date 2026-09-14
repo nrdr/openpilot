@@ -512,12 +512,15 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     item = _find_item(schema, "NrdrSteerRatioMode")
     assert item["widget"] == "multiple_button"
     assert [(option["value"], option["label"]) for option in item["options"]] == [
-      (0, "Manual"), (1, "Comma Learner"), (2, "nrdr Learner"), (3, "Firmware"),
+      (0, "Manual"), (1, "Comma Learner"), (2, "NRDR Measured Curve"), (3, "Firmware"),
     ]
     assert "offroad_only" not in json.dumps(item.get("enablement") or [])
     assert "one live snapshot" in item["details"]
     assert "normally within 0.5 seconds" in item["details"]
     assert "No LKAS cycle is required" in item["details"]
+    assert "does not learn while you drive" in item["details"]
+    assert "provisional v0" in item["details"]
+    assert "unmeasured estimate" in item["details"]
     assert "nrdr_raw_steer_ratio_available" in json.dumps(item["options"][2]["enablement"])
     assert "nrdr_firmware_steer_ratio_available" in json.dumps(item["options"][3]["enablement"])
 

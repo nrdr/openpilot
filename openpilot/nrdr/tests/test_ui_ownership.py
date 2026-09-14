@@ -76,7 +76,7 @@ class TestUiOwnership(unittest.TestCase):
 
     for title in (
       "Use Comma Steer Ratio Learner",
-      "Use nrdr Steer Ratio Learner",
+      "Use NRDR Measured Curve",
       "Use Firmware Steer Ratio",
       "Manual Override On-Center Ratio",
       "Manual Override Final Ratio",

@@ -17,7 +17,9 @@ from openpilot.common.hardware import HARDWARE
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
 from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
-from openpilot.nrdr.features.lateral.steer_ratio_tuning import RAW_STEER_RATIO_PROFILES, get_steer_ratio_metadata
+from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
+  RAW_STEER_RATIO_PROFILES, get_raw_steer_ratio_profile, get_steer_ratio_metadata,
+)
 
 
 # Wire-protocol version for the capabilities payload. Bump on breaking changes
@@ -79,7 +81,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
   "nrdr_honda_tuning_available": "Confirmed Honda-specific NRDR tuning available",
   "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio geometry available",
-  "nrdr_raw_steer_ratio_available": "Exact audited NRDR raw steer-ratio curve available",
+  "nrdr_raw_steer_ratio_available": "Matching NRDR measured steer-ratio curve available (may be provisional)",
   "nrdr_firmware_steer_ratio_available": "Exact NRDR firmware steer-ratio geometry available",
   "nrdr_interpolated_torque_pif_blend_available": "Modified-EPS Honda interpolated torque/P/I/F control available",
 }
@@ -212,7 +214,13 @@ def generate_capabilities(params: Params | None = None) -> dict:
   )
   is_honda = caps["brand"] == "honda"
   caps["nrdr_manual_steer_ratio_available"] = is_honda and get_steer_ratio_metadata(fingerprint) is not None
-  caps["nrdr_raw_steer_ratio_available"] = is_honda and fingerprint in RAW_STEER_RATIO_PROFILES
+  raw_profile = RAW_STEER_RATIO_PROFILES.get(fingerprint) if is_honda else None
+  caps["nrdr_raw_steer_ratio_available"] = raw_profile is not None and (
+    not raw_profile.eps_firmware or (
+      confirmed_identity is not None and confirmed_identity[0] == fingerprint
+      and get_raw_steer_ratio_profile(CP) is raw_profile
+    )
+  )
   caps["nrdr_firmware_steer_ratio_available"] = CP is not None and get_honda_vgr_profile(CP) is not None
   caps["nrdr_interpolated_torque_pif_blend_available"] = (
     CP is not None and CP_SP is not None and supports_interpolated_torque_pif(CP, CP_SP)

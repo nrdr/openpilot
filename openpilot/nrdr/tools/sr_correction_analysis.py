@@ -117,6 +117,8 @@ class CorrectionSample:
   fingerprint: str = "UNKNOWN"
   command_output_available: bool = True
   safety_limited: bool = False
+  eps_firmware: str = "unknown"
+  vehicle_model_id: str = "unknown"
 
 
 @dataclass(frozen=True)
@@ -145,6 +147,18 @@ class MappingSample:
   lateral_accel_mps2: float = math.nan
   zero_roll_effective_ratio: float = math.nan
   unit_stiffness_effective_ratio: float = math.nan
+  software_id: str = "unknown"
+  eps_firmware: str = "unknown"
+  vehicle_model_id: str = "unknown"
+  geometric_effective_ratio: float = math.nan
+  continuity_id: int = 0
+  steering_fault: bool = False
+
+
+def sample_cohort(sample: MappingSample | CorrectionSample) -> str:
+  """Never silently pool different vehicles, EPS revisions, models, or saved settings."""
+  cohort = "|".join((sample.fingerprint, sample.eps_firmware, sample.vehicle_model_id, sample.software_id))
+  return cohort + ("|faulted=1" if getattr(sample, "steering_fault", False) else "")
 
 
 @dataclass(frozen=True)
@@ -215,8 +229,9 @@ def _percentile(values: Sequence[float], percentile: float) -> float:
 def nearest_sample(samples: Sequence[T], target_time: float, max_age: float) -> T | None:  # noqa: UP047
   if not samples or max_age < 0.0 or not math.isfinite(target_time):
     return None
-  timestamps = [float(sample.timestamp) for sample in samples]
-  index = bisect_left(timestamps, target_time)
+  # Histories are time ordered. Avoid allocating/scanning every timestamp for
+  # each pose and lag probe; query only the binary-search candidates.
+  index = bisect_left(samples, target_time, key=lambda sample: float(sample.timestamp))
   candidates = []
   if index < len(samples):
     candidates.append(samples[index])
@@ -382,6 +397,8 @@ def stable_dwell_samples(samples: Sequence[MappingSample], min_duration_s: float
       run
       and sample.route_id == run[-1].route_id
       and sample.direction == run[-1].direction
+      and sample_cohort(sample) == sample_cohort(run[-1])
+      and sample.continuity_id == run[-1].continuity_id
       and 0.0 <= sample.timestamp - run[-1].timestamp <= max_gap_s + 1e-9
       and max(run_max_angle, angle) - min(run_min_angle, angle) <= max_angle_span_deg + 1e-9
     )

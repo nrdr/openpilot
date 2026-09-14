@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
   from openpilot.nrdr.hooks.controlsd import (
     apply_hud_lead,
+    finalize_lateral_torque,
     initialize_live_parameter_settings,
     refresh_live_parameter_settings,
     stopping_inputs,
@@ -25,6 +26,7 @@ __all__ = (
   "apply_events",
   "apply_hud_lead",
   "filter_car_events",
+  "finalize_lateral_torque",
   "initialize_live_parameter_settings",
   "is_drivable_gear",
   "keep_lateral_active",
@@ -36,6 +38,7 @@ __all__ = (
 )
 _EXPORT_MODULES = {
   "apply_hud_lead": "openpilot.nrdr.hooks.controlsd",
+  "finalize_lateral_torque": "openpilot.nrdr.hooks.controlsd",
   "initialize_live_parameter_settings": "openpilot.nrdr.hooks.controlsd",
   "refresh_live_parameter_settings": "openpilot.nrdr.hooks.controlsd",
   "stopping_inputs": "openpilot.nrdr.hooks.controlsd",

@@ -215,8 +215,8 @@ class HondaParamsProvider:
     self.refresh_all()
     self._start_workers()
 
-  def get_live_tuning(self) -> HondaLiveTuning:
-    if self._snapshot.generation == 0:
+  def get_live_tuning(self, *, refresh_if_uninitialized: bool = True) -> HondaLiveTuning:
+    if refresh_if_uninitialized and self._snapshot.generation == 0:
       self.refresh_all()
     snapshot = self._snapshot
     cached = self._tuning_cache

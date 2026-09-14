@@ -140,8 +140,19 @@ class TestCarTuneReporter(unittest.TestCase):
     report = CarTuneReporter._steer_ratio_info(self._steer_ratio_selection(2, "HONDA_CIVIC_BOSCH"))
 
     self.assertIn("selected NRDR measured-angle curve | effective Stock car ratio (safe fallback)", report)
-    self.assertIn("No exact audited NRDR raw curve exists", report)
+    self.assertIn("No matching NRDR measured curve exists", report)
     self.assertIn("CP 16.5", report)
+
+  def test_civic_draft_report_does_not_claim_clarity_near_lock_evidence(self):
+    CP = SimpleNamespace(brand="honda", carFingerprint="HONDA_CIVIC", steerRatio=15.38,
+                         carFw=[SimpleNamespace(ecu="eps", fwVersion=b"39990-TEG-A010")])
+    selection = resolve_steer_ratio_selection(CP, {"NrdrSteerRatioMode": 2})
+    report = CarTuneReporter._steer_ratio_info(selection)
+    for text in ("provisional v0", "3.292-58.671 deg", "nearest anchor held, unmeasured",
+                 "no live learning", "not road-validated", "15.8207->14.7617"):
+      self.assertIn(text, report)
+    self.assertNotIn("audited near-lock", report)
+    self.assertNotIn("435.7", report)
 
 
 if __name__ == "__main__":

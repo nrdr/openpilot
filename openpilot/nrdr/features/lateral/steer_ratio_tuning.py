@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from openpilot.nrdr.features.lateral.honda_vgr import HondaVgrProfile, get_honda_vgr_profile
+from openpilot.nrdr.features.lateral.honda_vgr import HondaVgrProfile, get_honda_vgr_profile, normalize_honda_eps_firmware
 
 
 MANUAL_CENTER_DEFAULT = 15.38
@@ -59,14 +59,33 @@ class RawSteerRatioProfile:
   angles_deg: tuple[float, ...]
   ratios: tuple[float, ...]
   provenance: str
+  # Keep the legacy name/API for Clarity and stored mode 2. New profiles must
+  # state their domain: a model-normalized ratio must not be converted twice.
+  ratio_domain: str = "raw-angle"
+  eps_firmware: tuple[str, ...] = ()
+  provisional: bool = False
+  observed_angle_range: tuple[float, float] | None = None
 
   def __post_init__(self) -> None:
     if len(self.angles_deg) != len(self.ratios) or len(self.angles_deg) < 2:
       raise ValueError("raw steer-ratio curves require matching angle and ratio arrays")
-    if self.angles_deg[0] != 0.0 or any(b <= a for a, b in zip(self.angles_deg, self.angles_deg[1:], strict=False)):
+    if (any(not math.isfinite(value) for value in self.angles_deg) or self.angles_deg[0] != 0.0
+        or any(b <= a for a, b in zip(self.angles_deg, self.angles_deg[1:], strict=False))):
       raise ValueError("raw steer-ratio angles must start at zero and increase")
     if any(not math.isfinite(value) or value <= 0.0 for value in self.ratios):
       raise ValueError("raw steer-ratio samples must be finite and positive")
+    if self.ratio_domain not in ("raw-angle", "vehicle-model"):
+      raise ValueError("unknown steer-ratio domain")
+    if self.ratio_domain == "vehicle-model":
+      normalized = [angle / ratio for angle, ratio in zip(self.angles_deg, self.ratios, strict=True)]
+      if any(b <= a for a, b in zip(normalized, normalized[1:], strict=False)):
+        raise ValueError("vehicle-model curve must preserve increasing angle-to-curvature mapping")
+    if self.provisional and self.observed_angle_range is None:
+      raise ValueError("provisional profiles must disclose their observed range")
+    if self.observed_angle_range is not None:
+      lower, upper = self.observed_angle_range
+      if not 0.0 <= lower < upper <= self.angles_deg[-1]:
+        raise ValueError("observed range must be inside the profile anchors")
 
   def _clamped_angle_deg(self, measured_angle_deg: float) -> float:
     angle_deg = abs(float(measured_angle_deg))
@@ -75,7 +94,7 @@ class RawSteerRatioProfile:
     return min(angle_deg, self.angles_deg[-1])
 
   def raw_domain_ratio_at(self, measured_angle_deg: float) -> float:
-    """Interpolate the archived theta/atan(wheel-angle) ratio domain."""
+    """Interpolate stored ratios in the profile's explicitly declared domain."""
     angle_deg = self._clamped_angle_deg(measured_angle_deg)
     return float(np.interp(angle_deg, self.angles_deg, self.ratios))
 
@@ -83,7 +102,7 @@ class RawSteerRatioProfile:
     """Return the equivalent small-angle ratio expected by VehicleModel."""
     angle_deg = self._clamped_angle_deg(measured_angle_deg)
     raw_domain_ratio = self.raw_domain_ratio_at(angle_deg)
-    if angle_deg == 0.0:
+    if self.ratio_domain == "vehicle-model" or angle_deg == 0.0:
       return raw_domain_ratio
     theta_rad = math.radians(angle_deg)
     return theta_rad / math.tan(theta_rad / raw_domain_ratio)
@@ -112,7 +131,34 @@ CLARITY_RAW_STEER_RATIO = RawSteerRatioProfile(
              "see openpilot/nrdr/features/lateral/CLARITY_RAW_STEER_RATIO_EVIDENCE.md",
 )
 
-RAW_STEER_RATIO_PROFILES = {CLARITY_RAW_STEER_RATIO.fingerprint: CLARITY_RAW_STEER_RATIO}
+CIVIC_TEG_PROVISIONAL_STEER_RATIO = RawSteerRatioProfile(
+  name="Civic TEG-A010 provisional v0 (2026-09-13)",
+  fingerprint="HONDA_CIVIC",
+  angles_deg=(0.0, 3.292, 8.783, 19.289, 35.669, 58.671),
+  ratios=(15.8207, 15.8207, 15.6557, 15.5427, 15.1964, 14.7617),
+  provenance="2026-09-13 routes 00000059--23041ba9e2, 0000005a--8cecadb216, 0000005b--b351e105bb; " +
+             "sr_samples.csv.gz SHA256 15c8c34551eb6dd9d31e09a9959225dbe1c0e2dbdff5522e62dc1ac9daedec5a; " +
+             "see openpilot/nrdr/features/lateral/CIVIC_TEG_PROVISIONAL_STEER_RATIO_EVIDENCE.md",
+  ratio_domain="vehicle-model",
+  eps_firmware=("39990-TEG-A010",),
+  provisional=True,
+  observed_angle_range=(3.292, 58.671),
+)
+
+RAW_STEER_RATIO_PROFILES = {
+  profile.fingerprint: profile for profile in (CLARITY_RAW_STEER_RATIO, CIVIC_TEG_PROVISIONAL_STEER_RATIO)
+}
+
+
+def get_raw_steer_ratio_profile(CP) -> RawSteerRatioProfile | None:
+  """Resolve data profiles without borrowing evidence from a different EPS."""
+  if str(getattr(CP, "brand", "")).lower() != "honda":
+    return None
+  profile = RAW_STEER_RATIO_PROFILES.get(str(getattr(CP, "carFingerprint", "")))
+  if profile is None or not profile.eps_firmware:
+    return profile
+  versions = {normalize_honda_eps_firmware(fw.fwVersion) for fw in getattr(CP, "carFw", ()) if fw.ecu == "eps"}
+  return profile if versions and versions.issubset(profile.eps_firmware) else None
 
 
 @dataclass(frozen=True)
@@ -138,6 +184,8 @@ class SteerRatioSelection:
 
   @property
   def effective_label(self) -> str:
+    if self.effective_mode is SteerRatioMode.NRDR_RAW and self.raw_profile is not None and self.raw_profile.provisional:
+      return "NRDR measured-angle curve (provisional)"
     return "Stock car ratio (safe fallback)" if self.effective_mode is None else steer_ratio_mode_label(self.effective_mode)
 
   @property
@@ -272,7 +320,7 @@ def resolve_steer_ratio_selection(CP, settings: Any) -> SteerRatioSelection:
   final = _bounded_ratio(_value(settings, "NrdrSteerRatioManualFinal"), MANUAL_FINAL_DEFAULT)
   metadata = get_steer_ratio_metadata(fingerprint) if is_honda else None
   outer_angle = metadata.outer_angle if metadata is not None else GENERIC_MANUAL_OUTER_ANGLE_DEG
-  raw_profile = RAW_STEER_RATIO_PROFILES.get(fingerprint) if is_honda else None
+  raw_profile = get_raw_steer_ratio_profile(CP)
   firmware_profile = get_honda_vgr_profile(CP)
 
   effective_mode: SteerRatioMode | None = mode
@@ -282,7 +330,7 @@ def resolve_steer_ratio_selection(CP, settings: Any) -> SteerRatioSelection:
     unavailable_reason = f"Manual endpoint geometry is not supported for {fingerprint or 'this car'}"
   elif mode is SteerRatioMode.NRDR_RAW and raw_profile is None:
     effective_mode = None
-    unavailable_reason = f"No exact audited NRDR raw curve exists for {fingerprint or 'this car'}"
+    unavailable_reason = f"No matching NRDR measured curve exists for {fingerprint or 'this car'} and its reported EPS"
   elif mode is SteerRatioMode.FIRMWARE and firmware_profile is None:
     effective_mode = None
     unavailable_reason = f"No exact recognized EPS firmware profile exists for {fingerprint or 'this car'}"
@@ -323,6 +371,7 @@ def stock_steer_ratio_selection(CP) -> SteerRatioSelection:
 
 
 __all__ = (
+  "CIVIC_TEG_PROVISIONAL_STEER_RATIO",
   "CLARITY_RAW_STEER_RATIO",
   "GENERIC_MANUAL_OUTER_ANGLE_DEG",
   "MANUAL_CENTER_DEFAULT",
@@ -336,6 +385,7 @@ __all__ = (
   "SteerRatioModeLatch",
   "SteerRatioSelection",
   "get_steer_ratio_metadata",
+  "get_raw_steer_ratio_profile",
   "resolve_steer_ratio_selection",
   "stock_steer_ratio_selection",
   "steer_ratio_mode_label",

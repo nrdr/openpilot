@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime
 import glob
 import gzip
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -26,6 +27,8 @@ from openpilot.nrdr.tools.sr_correction_analysis import (
   CorrectionSample,
   GateConfig,
   MappingSample,
+  MappingGateConfig,
+  DEFAULT_MAPPING_GATE_CONFIG,
   VehicleSample,
   aggregate_mapping_bin,
   aggregate_bin,
@@ -40,7 +43,9 @@ from openpilot.nrdr.tools.sr_correction_analysis import (
   phase_from_steering,
   rejection_reason,
   stable_dwell_samples,
+  sample_cohort,
 )
+from openpilot.nrdr.tools.steer_ratio.surface import SurfaceConfig, mapping_surface, matched_speed_comparisons, tracking_surface
 
 
 MPS_TO_MPH = 2.236936
@@ -70,6 +75,13 @@ SETTINGS_KEYS = (
   "NrdrCurvServo",
   "NrdrCurvatureTrim",
   "NrdrNnlcEnabled",
+  "NrdrInterpolatedTorquePifBlend", "NrdrInterpolatedTorqueShare",
+  "NrdrInterpolatedTorqueLatAccelFactor", "NrdrInterpolatedTorqueFriction",
+  "NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway",
+  "LatPScaleLowSpeed", "LatPScaleStandard", "LatPScaleHighway",
+  "LatIScaleLowSpeed", "LatIScaleStandard", "LatIScaleHighway",
+  "LatFScaleLowSpeed", "LatFScaleStandard", "LatFScaleHighway",
+  "LaneCentering", "LaneCenteringStrength", "LagdToggle", "LagdToggleDelay",
 )
 REJECTION_COLUMNS = (
   "stale state",
@@ -131,6 +143,18 @@ def expand_sources(raw_sources: list[str]) -> list[str]:
   return sorted(dict.fromkeys(sources), key=source_sort_key)
 
 
+ANALYSIS_EVENTS = frozenset((
+  "initData", "carParams", "extrinsicsCalibration", "vehicleParameters", "lateralDelay", "modelV2",
+  "carState", "controlsState", "carControl", "carOutput", "deviceMotion",
+))
+
+
+def ordered_analysis_events(events):
+  # loggerd arrival order is not event-time order. Keep only required streams
+  # before sorting to avoid retaining camera/model/debug traffic unnecessarily.
+  return sorted((event for event in events if event.which() in ANALYSIS_EVENTS), key=lambda event: event.logMonoTime)
+
+
 def iter_local_events(source: str):
   import zstandard as zstd
   from openpilot.cereal import log
@@ -138,7 +162,7 @@ def iter_local_events(source: str):
   with open(source, "rb") as compressed:
     with zstd.ZstdDecompressor().stream_reader(compressed) as reader:
       data = reader.read()
-  yield from log.Event.read_multiple_bytes(data)
+  yield from ordered_analysis_events(log.Event.read_multiple_bytes(data))
 
 
 def decode_param_map(entries) -> dict[str, str]:
@@ -181,6 +205,8 @@ class RouteContext:
   branch: str = "unknown"
   settings: dict[str, str] = field(default_factory=dict)
   eps_firmware: str = "unknown"
+  rear_steer_ratio: float = 0.0
+  vehicle_model_id: str = "unknown"
 
   @property
   def signature(self) -> str:
@@ -246,6 +272,8 @@ class ScanResult:
   routes: set[str] = field(default_factory=set)
   fingerprints: set[str] = field(default_factory=set)
   signatures: set[str] = field(default_factory=set)
+  source_errors: list[dict[str, str]] = field(default_factory=list)
+  source_manifest: list[dict] = field(default_factory=list)
 
 
 def angle_bin(angle_deg: float, width: float) -> float:
@@ -281,6 +309,9 @@ def geometry_valid(context: RouteContext) -> bool:
     and 0.0 < context.center_to_front_m < context.wheelbase_m
     and context.tire_stiffness_front > 0.0
     and context.tire_stiffness_rear > 0.0
+    # The current inversion assumes front-wheel steering. Refuse an unsupported
+    # rear-steer model rather than silently attributing it to a different SR.
+    and context.rear_steer_ratio == 0.0
   )
 
 
@@ -299,6 +330,10 @@ def update_car_params(context: RouteContext, car_params) -> None:
   context.center_to_front_m = finite(car_params.centerToFront)
   context.tire_stiffness_front = finite(car_params.tireStiffnessFront)
   context.tire_stiffness_rear = finite(car_params.tireStiffnessRear)
+  context.rear_steer_ratio = finite(getattr(car_params, "steerRatioRear", 0.0))
+  geometry = [context.wheelbase_m, context.mass_kg, context.center_to_front_m,
+              context.tire_stiffness_front, context.tire_stiffness_rear, context.rear_steer_ratio]
+  context.vehicle_model_id = hashlib.sha256(json.dumps(geometry).encode()).hexdigest()[:16]
   context.default_delay_s = finite(car_params.steerActuatorDelay, 0.10) + 0.20
   firmware = []
   for item in car_params.carFw:
@@ -311,6 +346,8 @@ def update_car_params(context: RouteContext, car_params) -> None:
 
 
 def openpilot_roll_curvature(context: RouteContext, vehicle: VehicleSample) -> float | None:
+  if not geometry_valid(context):
+    return None
   steering_roll = model_roll_compensation(
     vehicle.speed_mps,
     vehicle.road_roll_rad,
@@ -389,6 +426,8 @@ def make_sample(route: str, context: RouteContext, command: CommandSample, vehic
     fingerprint=context.fingerprint,
     command_output_available=command_output_available,
     safety_limited=safety_limited,
+    eps_firmware=context.eps_firmware,
+    vehicle_model_id=context.vehicle_model_id,
   )
 
 
@@ -397,11 +436,23 @@ def finalize_manual_mapping(result: ScanResult) -> None:
   for sample in result.manual_mapping_samples:
     by_route[sample.route_id].append(sample)
 
+  # A center fit must not cross an EPS/settings/model change within a route.
+  split_routes = {}
+  for route_id, route_samples in by_route.items():
+    cohorts = {sample_cohort(sample) for sample in route_samples}
+    if len(cohorts) == 1:
+      split_routes[route_id] = route_samples
+    else:
+      for cohort in sorted(cohorts):
+        key = route_id + "|cohort=" + hashlib.sha256(cohort.encode()).hexdigest()[:12]
+        split_routes[key] = [sample for sample in route_samples if sample_cohort(sample) == cohort]
+  by_route = split_routes
+
   estimates = []
-  for route_samples in by_route.values():
+  for route_id, route_samples in by_route.items():
     estimate = estimate_center_bias(route_samples)
     if estimate is not None:
-      estimates.append(estimate)
+      estimates.append(replace(estimate, route_id=route_id))
   result.manual_center_bias = sorted(estimates, key=lambda estimate: estimate.route_id)
 
   estimates_by_route = {estimate.route_id: estimate for estimate in estimates}
@@ -418,7 +469,9 @@ def finalize_manual_mapping(result: ScanResult) -> None:
 
 
 def scan_sources(sources: list[str], angle_width_deg: float, delay_override: float | None,
-                 pair_age_s: float, progress_every: int) -> ScanResult:
+                 pair_age_s: float, progress_every: int,
+                 mapping_config: MappingGateConfig = DEFAULT_MAPPING_GATE_CONFIG,
+                 include_faulted_mapping: bool = False) -> ScanResult:
   from openpilot.cereal import log
   from openpilot.selfdrive.locationd.helpers import Pose, PoseCalibrator
 
@@ -454,6 +507,9 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
     strict_since: float | None = None
     previous_pose_t: float | None = None
     previous_yaw_rate = 0.0
+    continuity_id = 0
+    previous_mapping_accepted = False
+    initial_sample_counts = (len(result.samples), len(result.experimental_samples))
     result.routes.add(route)
 
     try:
@@ -493,6 +549,9 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
           state.lane_change_active = event.modelV2.meta.laneChangeState != log.LaneChangeState.off
 
         elif which == "carState":
+          if not event.valid:
+            state.car_state_t = None
+            continue
           car_state = event.carState
           state.car_state_t = timestamp
           state.speed_mps = finite(car_state.vEgo)
@@ -513,6 +572,10 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
           state.saturated = extract_saturation(event.controlsState)
 
         elif which == "carControl":
+          if not event.valid:
+            command_history.clear()
+            strict_since = None
+            continue
           control = event.carControl
           desired_curvature = finite(control.actuators.curvature)
           desired_angle = finite(control.actuators.steeringAngleDeg)
@@ -530,12 +593,18 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
             ))
 
         elif which == "carOutput":
+          if not event.valid:
+            output_history.clear()
+            continue
           output_history.append(AppliedTorqueSample(
             timestamp=timestamp,
             torque=finite(event.carOutput.actuatorsOutput.torque),
           ))
 
         elif which == "deviceMotion":
+          if not previous_mapping_accepted:
+            continuity_id += 1
+          previous_mapping_accepted = False
           if context.fingerprint == "UNKNOWN":
             strict_since = None
             continue
@@ -556,7 +625,7 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
           previous_yaw_rate = yaw_rate
 
           pose_valid = bool(
-            calibrator.calib_valid
+            event.valid and calibrator.calib_valid
             and device_motion.inputsOK
             and device_motion.posenetOK
             and device_motion.sensorsOK
@@ -586,7 +655,7 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
           if current_command is not None and current_command.lat_active and not state.steering_pressed:
             add_stage(result, fingerprint, start, "no_driver", route, timestamp)
 
-          if state.car_state_t is None or timestamp - state.car_state_t > 0.10:
+          if state.car_state_t is None or not 0.0 <= timestamp - state.car_state_t <= 0.10:
             add_rejection(result, fingerprint, start, "stale state", route, timestamp)
             add_manual_rejection(result, fingerprint, start, "stale state", route, timestamp)
             strict_since = None
@@ -597,7 +666,7 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
             and state.average_offset_valid
             and state.stiffness_valid
             and state.live_params_t is not None
-            and timestamp - state.live_params_t <= 0.50
+            and 0.0 <= timestamp - state.live_params_t <= 0.50
             and math.isfinite(mapping_geometry_offset)
             and math.isfinite(mapping_stiffness)
           )
@@ -616,7 +685,7 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
               longitudinal_accel_mps2=state.accel_mps2,
               road_roll_rad=state.road_roll_rad,
               stiffness_factor=mapping_stiffness,
-              pose_valid=pose_valid and not state.steer_fault,
+              pose_valid=pose_valid,
               geometry_angle_offset_deg=mapping_geometry_offset,
               steering_torque=state.steering_torque,
               forward_gear=state.forward_gear if state.gear_known else pose_forward,
@@ -639,7 +708,10 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
               geometry_valid=geometry_valid(context),
               average_offset_valid=state.average_offset_valid,
               stiffness_valid=state.stiffness_valid,
+              config=mapping_config,
             )
+            if state.steer_fault and not include_faulted_mapping:
+              mapping_reason = "steering fault"
             if mapping_reason is None and mapping_ratio is not None:
               zero_roll_ratio = model_effective_ratio(
                 mapping_angle, yaw_rate, state.speed_mps, 0.0, mapping_stiffness,
@@ -672,7 +744,15 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
                 unit_stiffness_effective_ratio=(
                   unit_stiffness_ratio if unit_stiffness_ratio is not None else math.nan
                 ),
+                software_id=context.signature,
+                eps_firmware=context.eps_firmware,
+                vehicle_model_id=context.vehicle_model_id,
+                geometric_effective_ratio=(abs(math.radians(mapping_angle)) /
+                  math.atan(context.wheelbase_m * abs(yaw_rate / state.speed_mps))),
+                continuity_id=continuity_id,
+                steering_fault=state.steer_fault,
               ))
+              previous_mapping_accepted = True
             else:
               add_manual_rejection(
                 result, fingerprint, start, mapping_reason or "invalid vehicle model", route, timestamp,
@@ -689,7 +769,7 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
             and controller_stiffness_valid
             and (not learn_offset or state.offset_valid)
             and state.live_params_t is not None
-            and timestamp - state.live_params_t <= 0.50
+            and 0.0 <= timestamp - state.live_params_t <= 0.50
             and math.isfinite(controller_geometry_offset)
             and math.isfinite(controller_stiffness)
           )
@@ -770,6 +850,12 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
               mapping_vehicle=mapping_vehicle,
             )
             if sample is not None:
+              minus_command = nearest_sample(command_history, timestamp - max(0.0, delay - 0.10), pair_age_s)
+              plus_command = nearest_sample(command_history, timestamp - delay - 0.10, pair_age_s)
+              minus = command_response_factor(context, minus_command, vehicle) if minus_command is not None else None
+              plus = command_response_factor(context, plus_command, vehicle) if plus_command is not None else None
+              sample = replace(sample, factor_delay_minus_100ms=minus if minus is not None else math.nan,
+                               factor_delay_plus_100ms=plus if plus is not None else math.nan)
               result.samples.append(sample)
               add_stage(result, fingerprint, start, "relaxed_usable", route, timestamp)
               if quality == "strict":
@@ -815,8 +901,16 @@ def scan_sources(sources: list[str], angle_width_deg: float, delay_override: flo
       result.manual_mapping_samples.extend(dwell_samples)
       result.files_read += 1
       result.signatures.add(context.signature)
+      result.source_manifest.append({"path": source, "route": route, "segment": _segment,
+                                     "fingerprint": context.fingerprint, "eps_firmware": context.eps_firmware,
+                                     "vehicle_model_id": context.vehicle_model_id, "settings": context.settings.copy(),
+                                     "commit": context.commit, "branch": context.branch})
     except Exception as exc:
+      # Do not retain partial controller data from a failed segment.
+      del result.samples[initial_sample_counts[0]:]
+      del result.experimental_samples[initial_sample_counts[1]:]
       result.files_failed += 1
+      result.source_errors.append({"path": source, "error": str(exc)})
       print(f"!! {source}: {exc}", file=sys.stderr, flush=True)
 
     if source_index == len(sources) or source_index % progress_every == 0:
@@ -918,10 +1012,10 @@ def write_manual_mapping_samples(path: Path, samples: list[MappingSample]) -> No
 
 
 def manual_supported_speed_strata(samples: list[MappingSample]) -> list[float]:
-  edges = (2.0, 5.0, 8.0, 12.0, 15.000001)
+  edges = (2.0, 5.0, 8.0, 12.0, 15.000001, 20.0, 25.0, 30.0, 35.0, math.inf)
   groups: defaultdict[tuple[float, float], list[MappingSample]] = defaultdict(list)
   for sample in samples:
-    for lower, upper in zip(edges, edges[1:], strict=True):
+    for lower, upper in zip(edges, edges[1:], strict=False):
       if lower <= sample.speed_mps < upper:
         groups[(lower, upper)].append(sample)
         break
@@ -946,12 +1040,12 @@ def mapping_variant_stats(samples: list[MappingSample], attribute: str):
 
 
 def write_manual_mapping(path: Path, samples: list[MappingSample], angle_width: float) -> list[dict]:
-  groups: defaultdict[tuple[str, float], list[MappingSample]] = defaultdict(list)
+  groups: defaultdict[tuple[str, str, float], list[MappingSample]] = defaultdict(list)
   for sample in samples:
-    groups[(sample.fingerprint, angle_bin(sample.bias_corrected_angle_deg, angle_width))].append(sample)
+    groups[(sample.fingerprint, sample_cohort(sample), angle_bin(sample.bias_corrected_angle_deg, angle_width))].append(sample)
 
   rows = []
-  for (fingerprint, start), group in sorted(groups.items()):
+  for (fingerprint, cohort, start), group in sorted(groups.items()):
     stats = aggregate_mapping_bin(group)
     if stats is None:
       continue
@@ -960,6 +1054,9 @@ def write_manual_mapping(path: Path, samples: list[MappingSample], angle_width: 
                     if len(speed_strata) >= 2 and median(speed_strata) else math.nan)
     confidence = stats.confidence
     warnings = []
+    if any(sample.steering_fault for sample in group):
+      confidence = "low"
+      warnings.append("steering-fault-tagged mapping; diagnostic only")
     if not math.isfinite(stats.bilateral_gap_percent) or stats.bilateral_gap_percent > 5.0:
       confidence = "low"
       warnings.append("left/right disagreement")
@@ -1005,6 +1102,7 @@ def write_manual_mapping(path: Path, samples: list[MappingSample], angle_width: 
       warnings.append("roll/stiffness model sensitivity exceeds 5%")
     rows.append({
       "fingerprint": fingerprint,
+      "cohort": cohort,
       "angle_start_deg": start,
       "angle_end_deg": start + angle_width,
       "unique_seconds": stats.seconds,
@@ -1071,13 +1169,13 @@ def write_manual_mapping_rejections(path: Path, result: ScanResult, angle_width:
 
 
 def write_headline(path: Path, samples: list[CorrectionSample], angle_width: float) -> list[dict]:
-  groups: defaultdict[tuple[str, float], list[CorrectionSample]] = defaultdict(list)
+  groups: defaultdict[tuple[str, str, float], list[CorrectionSample]] = defaultdict(list)
   for sample in samples:
     if sample.quality == "strict" and sample.phase == "steady" and math.isfinite(sample.effective_ratio):
-      groups[(sample.fingerprint, angle_bin(sample.angle_deg, angle_width))].append(sample)
+      groups[(sample.fingerprint, sample_cohort(sample), angle_bin(sample.angle_deg, angle_width))].append(sample)
 
   rows = []
-  for (fingerprint, start), group in sorted(groups.items()):
+  for (fingerprint, cohort, start), group in sorted(groups.items()):
     stats = aggregate_bin(group)
     if stats is None:
       continue
@@ -1088,6 +1186,7 @@ def write_headline(path: Path, samples: list[CorrectionSample], angle_width: flo
                     if len(speed_strata) >= 2 and median(speed_strata) else math.nan)
     rows.append({
       "fingerprint": fingerprint,
+      "cohort": cohort,
       "angle_start_deg": start,
       "angle_end_deg": start + angle_width,
       "unique_seconds": stats.seconds,
@@ -1118,7 +1217,7 @@ def write_command_correction(path: Path, samples: list[CorrectionSample], angle_
   for sample in samples:
     if (sample.quality == "strict" and sample.phase == "steady"
         and sample.command_output_available and not sample.safety_limited):
-      groups[(sample.fingerprint, sample.software_id, angle_bin(sample.desired_angle_deg, angle_width))].append(sample)
+      groups[(sample.fingerprint, sample_cohort(sample), angle_bin(sample.desired_angle_deg, angle_width))].append(sample)
   rows = []
   for (fingerprint, signature, start), group in sorted(groups.items()):
     stats = aggregate_bin(group)
@@ -1129,7 +1228,8 @@ def write_command_correction(path: Path, samples: list[CorrectionSample], angle_
                     if len(speed_strata) >= 2 and median(speed_strata) else math.nan)
     rows.append({
       "fingerprint": fingerprint,
-      "settings_signature": signature,
+      "cohort": signature,
+      "settings_signature": group[0].software_id,
       "angle_start_deg": start,
       "angle_end_deg": start + angle_width,
       "unique_seconds": stats.seconds,
@@ -1155,7 +1255,7 @@ def write_command_correction(path: Path, samples: list[CorrectionSample], angle_
 def write_detail(path: Path, samples: list[CorrectionSample], angle_width: float) -> None:
   groups: defaultdict[tuple[str, BinKey], list[CorrectionSample]] = defaultdict(list)
   for sample in samples:
-    groups[(sample.fingerprint, make_bin_key(sample, angle_width))].append(sample)
+    groups[(sample_cohort(sample), make_bin_key(sample, angle_width))].append(sample)
   rows = []
   for (fingerprint, key), group in sorted(groups.items(), key=lambda item: (item[0][0], *asdict(item[0][1]).values())):
     stats = aggregate_bin(group)
@@ -1163,7 +1263,8 @@ def write_detail(path: Path, samples: list[CorrectionSample], angle_width: float
       continue
     ratio, ratio_p25, ratio_p75 = route_balanced_metric(group, "effective_ratio")
     rows.append({
-      "fingerprint": fingerprint,
+      "fingerprint": group[0].fingerprint,
+      "cohort": fingerprint,
       **asdict(key),
       "unique_seconds": stats.seconds,
       "routes": stats.routes,
@@ -1205,7 +1306,7 @@ def write_stage_coverage(path: Path, result: ScanResult, angle_width: float) -> 
 def write_experimental(path: Path, samples: list[CorrectionSample], angle_width: float) -> list[dict]:
   groups: defaultdict[tuple[str, str, float, str], list[CorrectionSample]] = defaultdict(list)
   for sample in samples:
-    groups[(sample.fingerprint, sample.software_id, angle_bin(sample.angle_deg, angle_width), sample.phase)].append(sample)
+    groups[(sample.fingerprint, sample_cohort(sample), angle_bin(sample.angle_deg, angle_width), sample.phase)].append(sample)
   rows = []
   for (fingerprint, signature, start, phase), group in sorted(groups.items()):
     stats = aggregate_bin(group)
@@ -1229,7 +1330,8 @@ def write_experimental(path: Path, samples: list[CorrectionSample], angle_width:
     effective_ratio, effective_ratio_p25, effective_ratio_p75 = route_balanced_metric(group, "effective_ratio")
     rows.append({
       "fingerprint": fingerprint,
-      "settings_signature": signature,
+      "cohort": signature,
+      "settings_signature": group[0].software_id,
       "angle_start_deg": start,
       "angle_end_deg": start + angle_width,
       "phase": phase,
@@ -1278,7 +1380,7 @@ def write_report(path: Path, result: ScanResult, headline: list[dict], command_r
     f"manual mapping-only steady-dwell samples: {len(result.manual_mapping_samples)}",
     f"experimental transient samples: {len(result.experimental_samples)}",
     "",
-    "Strict mapping-independent coverage",
+    "Command-conditioned strict coverage (not independent geometry evidence)",
   ]
   for row in headline:
     lines.append(
@@ -1333,6 +1435,11 @@ def build_parser() -> argparse.ArgumentParser:
   parser.add_argument("sources", nargs="+", help="local rlog.zst files, globs, or archive directories")
   parser.add_argument("--output-dir", type=Path, required=True, help="new output directory outside the checkout")
   parser.add_argument("--angle-bin", type=float, default=5.0, help="absolute steering-angle bin width (default: 5 deg)")
+  parser.add_argument("--speed-bin", type=float, default=5.0, help="angle/speed report bin width in m/s")
+  parser.add_argument("--mapping-max-speed", type=float, default=15.0,
+                      help="command-independent speed ceiling in m/s; use 33 for a separate highway investigation")
+  parser.add_argument("--include-faulted-mapping", action="store_true",
+                      help="retain otherwise valid manual mapping during steering faults in separate diagnostic-only cohorts")
   parser.add_argument("--delay", type=float, help="override logged/default lateral delay in seconds")
   parser.add_argument("--max-pair-age", type=float, default=0.03,
                       help="maximum distance from requested delayed command sample (default: 0.03 s)")
@@ -1354,20 +1461,28 @@ def json_safe(value):
 def main(argv: list[str] | None = None) -> int:
   parser = build_parser()
   args = parser.parse_args(argv)
-  if args.angle_bin <= 0.0 or args.max_pair_age <= 0.0 or args.progress_every <= 0:
+  if (any(not math.isfinite(value) or value <= 0.0 for value in
+          (args.angle_bin, args.speed_bin, args.max_pair_age)) or args.progress_every <= 0):
     parser.error("angle bin, pair age, and progress interval must be positive")
-  if args.delay is not None and args.delay < 0.0:
+  if args.delay is not None and (not math.isfinite(args.delay) or args.delay < 0.0):
     parser.error("delay cannot be negative")
+  if not math.isfinite(args.mapping_max_speed) or args.mapping_max_speed < MappingGateConfig().min_speed_mps:
+    parser.error("mapping speed ceiling must be finite and at least 2 m/s")
+  try:
+    surface_config = SurfaceConfig(args.angle_bin, args.speed_bin)
+  except ValueError as exc:
+    parser.error(str(exc))
 
   sources = expand_sources(args.sources)
   if not sources:
     parser.error("no local rlog.zst files found")
   output_dir = args.output_dir.resolve()
-  checkout = Path(__file__).resolve().parent
+  checkout = Path(__file__).resolve().parents[4]
   if output_dir == checkout or checkout in output_dir.parents:
     parser.error("analysis output must be outside the source checkout")
 
   output_names = (
+    "sr_angle_speed.csv", "sr_matched_speed.csv", "sr_tracking_vs_mapping.csv",
     "sr_samples.csv.gz",
     "sr_experimental_samples.csv.gz",
     "sr_manual_mapping_samples.csv.gz",
@@ -1388,7 +1503,9 @@ def main(argv: list[str] | None = None) -> int:
   output_dir.mkdir(parents=True, exist_ok=True)
 
   print(f"Scanning {len(sources)} unique local rlogs...", file=sys.stderr, flush=True)
-  result = scan_sources(sources, args.angle_bin, args.delay, args.max_pair_age, args.progress_every)
+  mapping_config = MappingGateConfig(max_speed_mps=args.mapping_max_speed)
+  result = scan_sources(sources, args.angle_bin, args.delay, args.max_pair_age, args.progress_every,
+                        mapping_config, args.include_faulted_mapping)
   write_samples(output_dir / "sr_samples.csv.gz", result.samples)
   write_samples(output_dir / "sr_experimental_samples.csv.gz", result.experimental_samples)
   write_manual_mapping_samples(output_dir / "sr_manual_mapping_samples.csv.gz", result.manual_mapping_samples)
@@ -1406,11 +1523,26 @@ def main(argv: list[str] | None = None) -> int:
   experimental_rows = write_experimental(
     output_dir / "sr_experimental_transient.csv", result.experimental_samples, args.angle_bin,
   )
+  surface_rows = mapping_surface(result.manual_mapping_samples, surface_config)
+  speed_rows = matched_speed_comparisons(result.manual_mapping_samples, surface_config)
+  tracking_rows = tracking_surface(result.samples, surface_config)
+  write_dict_rows(output_dir / "sr_angle_speed.csv", surface_rows)
+  write_dict_rows(output_dir / "sr_matched_speed.csv", speed_rows)
+  write_dict_rows(output_dir / "sr_tracking_vs_mapping.csv", tracking_rows)
   summary = {
+    "schema_version": 2,
     "created": datetime.now().astimezone().isoformat(),
     "sources": len(sources),
     "files_read": result.files_read,
     "files_failed": result.files_failed,
+    "source_errors": result.source_errors,
+    "source_manifest": result.source_manifest,
+    "configuration": {"surface": asdict(surface_config), "mapping_gates": asdict(mapping_config),
+                      "include_faulted_mapping": args.include_faulted_mapping,
+                      "command_delay_override_s": args.delay, "max_pair_age_s": args.max_pair_age},
+    "angle_speed": surface_rows,
+    "matched_speed": speed_rows,
+    "tracking_vs_mapping": tracking_rows,
     "routes": len(result.routes),
     "fingerprints": sorted(result.fingerprints),
     "settings_signatures": sorted(result.signatures),
@@ -1433,9 +1565,20 @@ def main(argv: list[str] | None = None) -> int:
     output_dir / "sr_report.txt", result, headline, command_rows, stage_rows, experimental_rows,
     manual_rows, bias_rows, manual_rejection_rows,
   )
+  with (output_dir / "sr_report.txt").open("a", encoding="utf-8") as report:
+    report.write("\nAngle/speed investigation (schema 2)\n")
+    report.write(f"Mapping speed ceiling: {args.mapping_max_speed:g} m/s; angle/speed cells: {len(surface_rows)}\n")
+    report.write(f"Matched-speed comparisons: {len(speed_rows)}; tracking/model cells: {len(tracking_rows)}\n")
+    report.write("Settings are recorded snapshots, not proof of live consumption on historical builds.\n")
+    report.write("Occupied seconds and dwells are correlated coverage, not independent trials.\n")
+    report.write("No matching speed rows means insufficient overlap, not speed independence.\n")
+    report.write("Rear-steer geometry is unsupported and rejected; no car-specific curve is assumed.\n")
+    report.write("See sr_matched_speed.csv and sr_tracking_vs_mapping.csv for model/lag qualifications.\n")
+    if result.files_failed:
+      report.write("INCOMPLETE: one or more source files failed; inspect source_errors.\n")
   print((output_dir / "sr_report.txt").read_text(encoding="utf-8"))
   print(f"Wrote analysis to {output_dir}")
-  return 0 if result.files_read else 1
+  return 0 if result.files_read and not result.files_failed else 1
 
 
 if __name__ == "__main__":

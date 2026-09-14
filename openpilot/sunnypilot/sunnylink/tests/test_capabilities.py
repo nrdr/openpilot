@@ -37,10 +37,12 @@ def params():
   return Params()
 
 
-def put_car_params(params, fingerprint: str, brand: str) -> None:
+def put_car_params(params, fingerprint: str, brand: str, firmware: bytes | None = None) -> None:
   CP = car.CarParams.new_message()
   CP.carFingerprint = fingerprint
   CP.brand = brand
+  if firmware is not None:
+    CP.carFw = [{"ecu": "eps", "fwVersion": firmware}]
   params.put("CarParamsPersistent", CP.to_bytes(), block=True)
 
 
@@ -145,6 +147,24 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
     model_caps = generate_capabilities(params)
     assert model_caps["nrdr_manual_steer_ratio_available"] is False
     assert model_caps["nrdr_raw_steer_ratio_available"] is False
+
+  def test_civic_measured_curve_requires_matching_cp_and_eps(self, params):
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CIVIC"}, block=True)
+    assert generate_capabilities(params)["nrdr_raw_steer_ratio_available"] is False
+    for version, available in ((b"39990-TBA-A030", False), (b"39990-TEG-A010", True)):
+      put_car_params(params, "HONDA_CIVIC", "honda", version)
+      assert generate_capabilities(params)["nrdr_raw_steer_ratio_available"] is available
+    for bundle in ({"brand": "honda", "platform": "HONDA_CIVIC_BOSCH"}, {}, {"brand": "honda"},
+                   {"brand": "toyota", "platform": "HONDA_CIVIC"}):
+      params.put("CarPlatformBundle", bundle, block=True)
+      assert generate_capabilities(params)["nrdr_raw_steer_ratio_available"] is False
+
+  def test_civic_measured_curve_rejects_stale_cp_without_requiring_manual_selection(self, params):
+    put_car_params(params, "HONDA_CIVIC", "honda", b"39990-TEG-A010")
+    assert generate_capabilities(params)["nrdr_raw_steer_ratio_available"] is True
+    put_car_params(params, "HONDA_CIVIC_BOSCH", "honda", b"39990-TEG-A010")
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CIVIC"}, block=True)
+    assert generate_capabilities(params)["nrdr_raw_steer_ratio_available"] is False
 
   def test_subaru_has_sng_field_present(self):
     assert "subaru_has_sng" in CAPABILITY_FIELDS

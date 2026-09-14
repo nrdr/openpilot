@@ -16,6 +16,7 @@ import pytest
 from opendbc.sunnypilot.car.honda.controller_features import HondaControllerFeatures
 from openpilot.common.params import Params
 from openpilot.nrdr.features.lateral.live_tuning import LiveTorqueTransition
+from openpilot.nrdr.features.lateral.torque_output_filter import HondaTorqueOutputFilter
 from openpilot.nrdr.params.snapshots import CONTROL_GROUPS, LiveParams
 from openpilot.nrdr.tests.test_live_pid_updates import make_live_pid, make_snapshot
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
@@ -51,11 +52,11 @@ def test_highway_friction_round_trip_remains_live_through_final_software_output(
     controller, _, update = make_live_pid(monkeypatch, reader, mock_candidate=False)
     pose = SimpleNamespace(angular_velocity_valid=True, angular_velocity=SimpleNamespace(z=-0.02))
     transition = LiveTorqueTransition()
+    torque_filter = HondaTorqueOutputFilter()
     # Only construct the steering post-processor's in-memory state: its normal
     # constructor initializes unrelated longitudinal storage and is not needed.
     honda = HondaControllerFeatures.__new__(HondaControllerFeatures)
     honda.override_ramp = 1.0
-    honda.torque_lpf = 0.0
     honda.lat_active_previous = True
     honda.steering_pressed_filter = 0.0
     honda.steering_pressed_previous = False
@@ -73,9 +74,10 @@ def test_highway_friction_round_trip_remains_live_through_final_software_output(
       controller.set_live_tuning_snapshot(captured)
       raw = update(pose=pose)
       transitioned = transition.update(raw, captured, True, False, 0.01)
-      command.actuators.torque = transitioned
+      command.actuators.torque = torque_filter.update(transitioned, True, car.out.vEgo, live, 0.01)
       processed, lkas_active = honda.update_steering_torque(command, car, live, processed)
       assert lkas_active
+      assert processed == command.actuators.torque  # No second, car-side LPF.
       return raw, transitioned, processed
 
     for _ in range(200):
@@ -98,7 +100,8 @@ def test_highway_friction_round_trip_remains_live_through_final_software_output(
         sunnylinkd.saveParams({KEY: base64.b64encode(str(value).encode()).decode()})
         assert params.get(KEY) == value
     else:
-      write = lambda value: params.put(KEY, value, block=True)
+      def write(value):
+        params.put(KEY, value, block=True)
     for desired in (0.3, 1.0):
       previous_output = before[2]
       written = time.monotonic()

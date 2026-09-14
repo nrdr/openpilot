@@ -196,6 +196,77 @@ def test_param_decode_captures_historical_sr_and_learner_settings():
   }
 
 
+def test_manual_highway_speed_is_explicit_and_keeps_validity_gates(tmp_path, monkeypatch):
+  install_fake_scan_dependencies(monkeypatch)
+  events = scan_setup_events()
+  for index in range(9):
+    frame = manual_scan_frame(10.0 + index / 10)
+    frame[1].carState.vEgo = 27.0
+    frame[1].carState.steeringAngleDeg = -6.0
+    frame[2].deviceMotion.yaw_rate = 0.05
+    events.extend(frame)
+  monkeypatch.setattr(cli, "iter_local_events", lambda _source: iter(events))
+  source = str(tmp_path / "route-a--0" / "rlog.zst")
+  assert cli.scan_sources([source], 5, 0, 0.02, 100).manual_mapping_samples == []
+  config = cli.MappingGateConfig(max_speed_mps=33)
+  result = cli.scan_sources([source], 5, 0, 0.02, 100, config)
+  assert len(result.manual_mapping_samples) == 9
+  assert all(s.vehicle_model_id != "unknown" for s in result.manual_mapping_samples)
+  events[2 + 4 * 3 + 2].valid = False
+  assert cli.scan_sources([source], 5, 0, 0.02, 100, config).manual_mapping_samples == []
+
+
+def test_unsupported_rear_steer_geometry_is_rejected():
+  context = cli.RouteContext(wheelbase_m=2.7, mass_kg=1500, center_to_front_m=1.1,
+                             tire_stiffness_front=100000, tire_stiffness_rear=100000, rear_steer_ratio=0.1)
+  assert not cli.geometry_valid(context)
+
+
+def test_log_arrival_order_is_sorted_and_unneeded_streams_are_discarded():
+  events = [scan_event("carState", 10.1, None), scan_event("deviceMotion", 10.05, None),
+            scan_event("roadEncodeData", 10.02, None), scan_event("carState", 10.0, None)]
+  assert cli.ordered_analysis_events(events) == [events[3], events[1], events[0]]
+
+
+def test_faulted_mapping_is_opt_in_separate_and_never_command_evidence(tmp_path, monkeypatch):
+  install_fake_scan_dependencies(monkeypatch)
+  events = scan_setup_events()
+  for index in range(9):
+    frame = controller_scan_frame(10.0 + index / 10)
+    frame[1].carState.steerFaultTemporary = True
+    events.extend(frame)
+  monkeypatch.setattr(cli, "iter_local_events", lambda _source: iter(events))
+  source = str(tmp_path / "route--0" / "rlog.zst")
+  assert cli.scan_sources([source], 5, 0, 0.02, 100).manual_mapping_samples == []
+  result = cli.scan_sources([source], 5, 0, 0.02, 100, include_faulted_mapping=True)
+  assert len(result.manual_mapping_samples) == 9
+  assert result.samples == []
+  assert all(s.steering_fault for s in result.manual_mapping_samples)
+  rows = cli.write_manual_mapping(tmp_path / "mapping.csv", result.manual_mapping_samples, 5)
+  assert rows[0]["confidence"] == "low"
+  assert "fault" in rows[0]["warning"]
+
+
+def test_failed_segment_does_not_silently_pass(tmp_path, monkeypatch):
+  source = tmp_path / "route--0" / "rlog.zst"
+  source.parent.mkdir()
+  source.touch()
+  result = cli.ScanResult(files_read=1, files_failed=1,
+                          source_errors=[{"path": str(source), "error": "bad segment"}])
+  monkeypatch.setattr(cli, "scan_sources", lambda *_args, **_kwargs: result)
+  output = tmp_path / "results"
+  assert cli.main([str(source), "--output-dir", str(output)]) == 1
+  summary = json.loads((output / "sr_summary.json").read_text())
+  assert summary["source_errors"][0]["error"] == "bad segment"
+
+
+@pytest.mark.parametrize("flag,value", [("--mapping-max-speed", "nan"), ("--mapping-max-speed", "1"),
+                                       ("--speed-bin", "0"), ("--delay", "nan"), ("--angle-bin", "inf")])
+def test_nonfinite_cli_config_is_rejected(tmp_path, flag, value):
+  with pytest.raises(SystemExit):
+    cli.main(["missing", "--output-dir", str(tmp_path / "out"), flag, value])
+
+
 def test_default_route_context_is_not_ready_for_sampling():
   context = cli.RouteContext()
   assert context.fingerprint == "UNKNOWN"
@@ -596,6 +667,50 @@ def test_command_report_never_blends_commits_or_settings(tmp_path):
   with output.open(newline="", encoding="utf-8") as stream:
     csv_rows = list(csv.DictReader(stream))
   assert {row["settings_signature"] for row in csv_rows} == {"build-a", "build-b"}
+
+
+def test_center_fit_cannot_join_one_sided_eps_cohorts_in_one_route():
+  samples = [mapping_sample(timestamp=float(second + 10 * index), signed_angle_deg=sign * magnitude,
+                            bias_corrected_angle_deg=sign * magnitude,
+                            direction=direction, eps_firmware=eps)
+             for index, magnitude in enumerate((7.5, 12.5, 17.5)) for second in range(10)
+             for sign, direction, eps in ((-1, "left", "eps-a"), (1, "right", "eps-b"))]
+  result = cli.ScanResult(manual_mapping_samples=samples)
+  cli.finalize_manual_mapping(result)
+  assert result.manual_center_bias == []
+  assert len(result.manual_applied_bias) == 2
+  assert all(value == (0, "none") for value in result.manual_applied_bias.values())
+  assert {s.route_id for s in result.manual_mapping_samples} == {"route-a"}
+
+
+@pytest.mark.parametrize("report", [cli.write_manual_mapping, cli.write_headline, cli.write_command_correction])
+def test_all_ratio_summaries_separate_eps_revisions(tmp_path, report):
+  factory = mapping_sample if report is cli.write_manual_mapping else sample
+  rows = report(tmp_path / "out.csv", [factory(eps_firmware="a", effective_ratio=15),
+                                      factory(eps_firmware="b", effective_ratio=15)], 5)
+  assert len(rows) == 2
+  assert len({row["cohort"] for row in rows}) == 2
+
+
+def test_failed_segment_discards_partial_command_samples(tmp_path, monkeypatch):
+  install_fake_scan_dependencies(monkeypatch)
+  def broken_events(_source):
+    yield from scan_setup_events()
+    for index in range(9):
+      yield from controller_scan_frame(10.0 + index / 10)
+    raise ValueError("broken tail")
+  monkeypatch.setattr(cli, "iter_local_events", broken_events)
+  result = cli.scan_sources([str(tmp_path / "route--0" / "rlog.zst")], 5, 0, 0.02, 100)
+  assert result.files_failed == 1 and result.files_read == 0
+  assert result.samples == [] and result.manual_mapping_samples == []
+  assert result.source_errors[0]["error"] == "broken tail"
+
+
+def test_cli_rejects_output_anywhere_inside_source_checkout():
+  from pathlib import Path
+  source = Path(cli.__file__).resolve()
+  with pytest.raises(SystemExit):
+    cli.main([str(source), "--output-dir", str(source.parents[4] / "diagnostic-output")])
 
 
 def test_command_report_bins_the_requested_angle_not_physical_actual_angle(tmp_path):

@@ -8,6 +8,7 @@ import pyray as rl
 from dataclasses import dataclass
 
 from openpilot.common.constants import CV
+from openpilot.nrdr.ui.onroad.lateral_state import lateral_control_kind
 from openpilot.selfdrive.ui.sunnypilot.onroad.lane_centering_status import (
   LANE_CENTERING_REASON_LABELS,
   LANE_CENTERING_SUSPENDED_REASONS,
@@ -161,6 +162,8 @@ class DesiredSteeringAngleElement(LateralControlElement):
     self.unit = ""
 
   def update(self, sm, is_metric: bool) -> UiElement:
+    if lateral_control_kind(sm, ui_state.started_frame) != 'angleState':
+      return UiElement("--", "DESIRED STEER", self.unit, rl.WHITE)
     car_state = sm['carState']
     controls_state = sm['controlsState']
     lat_active = sm['carControl'].latActive
@@ -224,6 +227,8 @@ class DesiredSteeringPIDElement(LateralControlElement):
     self.unit = ""
 
   def update(self, sm, is_metric: bool) -> UiElement:
+    if lateral_control_kind(sm, ui_state.started_frame) != 'pidState':
+      return UiElement("--", "DESIRED STEER", self.unit, rl.WHITE)
     car_state = sm['carState']
     controls_state = sm['controlsState']
     lat_active = sm['carControl'].latActive

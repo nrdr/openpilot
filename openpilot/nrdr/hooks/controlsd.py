@@ -3,6 +3,7 @@ import math
 from openpilot.nrdr.params import get_live_params
 from openpilot.nrdr.params.snapshots import _bool_value
 from openpilot.nrdr.features.lateral.live_tuning import LiveTorqueTransition
+from openpilot.nrdr.features.lateral.torque_output_filter import HondaTorqueOutputFilter
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   SteerRatioModeLatch,
   resolve_steer_ratio_selection,
@@ -16,6 +17,7 @@ def initialize_live_parameter_settings(controls) -> None:
   )
   controls.nrdr_lateral_settings_active = False
   controls.nrdr_live_torque_transition = LiveTorqueTransition()
+  controls.nrdr_torque_output_filter = HondaTorqueOutputFilter()
   controls.nrdr_last_valid_comma_ratio = max(float(controls.CP.steerRatio), 0.1)
   refresh_live_parameter_settings(controls, None)
 
@@ -24,6 +26,18 @@ def refresh_live_parameter_settings(controls, snapshot=None) -> None:
   snapshot = controls.nrdr_live_params.snapshot if snapshot is None else snapshot
   controls.learn_stiffness = _bool_value(snapshot.get("NrdrLearnStiffness"))
   controls.learn_angle_offset = _bool_value(snapshot.get("NrdrLearnAngleOffset"))
+
+
+def finalize_lateral_torque(controls, torque: float, CS, active: bool, dt: float) -> float:
+  torque = controls.nrdr_live_torque_transition.update(
+    torque, controls.nrdr_lateral_snapshot, active, bool(CS.steeringPressed), dt,
+  )
+  if controls.CP.brand == "honda":
+    # Reuse the typed, background-refreshed Honda settings and their existing
+    # defaults; no Params reads or second set of LPF controls in this loop.
+    live = controls.CI.interface_config.honda.provider.get_live_tuning(refresh_if_uninitialized=False)
+    torque = controls.nrdr_torque_output_filter.update(torque, active, CS.vEgo, live, dt)
+  return torque
 
 
 def _valid_comma_ratio(controls, live_params) -> float | None:

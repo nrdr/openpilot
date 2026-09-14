@@ -233,6 +233,20 @@ class TestOpendbcBoundary(unittest.TestCase):
     )
     self.assertEqual(tuning, expected)
 
+  def test_control_loop_can_get_defaults_without_synchronous_storage_reads(self):
+    params = FakeParams()
+    provider = HondaParamsProvider(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+    before_reads = list(params.reads)
+    tuning = provider.get_live_tuning(refresh_if_uninitialized=False)
+    self.assertEqual(params.reads, before_reads)
+    self.assertTrue(tuning.torque_lpf_enabled)
+    self.assertEqual((tuning.lpf_tau_low, tuning.lpf_tau_standard, tuning.lpf_tau_highway), (0.1, 0.1, 0.05))
+    params.values[str(OpendbcParamKey.HONDA_LPF_TAU_HIGHWAY)] = 0.07
+    provider.refresh_all()  # Simulate the background worker's successful refresh.
+    before_reads = list(params.reads)
+    self.assertEqual(provider.get_live_tuning(refresh_if_uninitialized=False).lpf_tau_highway, 0.07)
+    self.assertEqual(params.reads, before_reads)
+
   def test_live_values_preserve_conversion_scaling_and_clamps(self):
     params = FakeParams(values={
       OpendbcParamKey.HONDA_OVERRIDE_FADE_DOWN_SECS: -1.0,
