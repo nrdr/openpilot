@@ -1,0 +1,4 @@
+# Canonical NRDR rule fragments merged into Sunnylink's framework macros.
+macros:
+  handcrafted_apply_offroad:
+    - $ref: '#/macros/offroad'
