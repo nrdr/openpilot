@@ -182,13 +182,15 @@ def _build_legacy_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
 CLARITY_CURRENT_LATERAL_2026_08_28 = _build_legacy_honda_profile("HONDA_CLARITY")
 CLARITY_ROAD_TESTED_2026_08_21 = CLARITY_CURRENT_LATERAL_2026_08_28
 
-HANDCRAFTED_LATERAL_VERSION = 18
+HANDCRAFTED_LATERAL_VERSION = 19
 # Captured from the owner's Civic on 2026-09-12. This records provenance, not
 # validation on other vehicles. Never translate the hybrid's 1.0 friction into
 # the unrelated native torque-controller override.
+# v19: owner-requested 2026-09-14 lane strength reduction to 0.30. Keep the
+# original snapshot hash/provenance and the already-zero model break-in.
 CIVIC_DIALED_SETTINGS_SHA256 = "c1faf2291527061621c7bdbb2679fd8f90cfa00f0b8acd08fdd27e5ee9770074"
 COMMON_HANDCRAFTED_VALUES = (
-  ("LaneCentering", True), ("LaneCenteringStrength", 1.0),
+  ("LaneCentering", True), ("LaneCenteringStrength", 0.30),
   ("LaneCenteringMinSpeed", 50), ("LaneCenteringE2EAuthority", 0.0),
   ("LaneCenteringPauseOnSignal", True), ("LaneCenterOffset", 0.0),
   ("LagdToggle", True), ("LagdToggleDelay", 0.4),
