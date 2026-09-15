@@ -23,7 +23,7 @@ BLEND_KEY = "NrdrInterpolatedTorquePifBlend"
 
 COMMON_VALUES = (
   ("LaneCentering", True),
-  ("LaneCenteringStrength", 1.0),
+  ("LaneCenteringStrength", 0.30),
   ("LaneCenteringMinSpeed", 50),
   ("LaneCenteringE2EAuthority", 0.0),
   ("LaneCenteringPauseOnSignal", True),
@@ -192,31 +192,31 @@ def request_profile(CP, CP_SP, params):
   return context
 
 
-def test_v18_static_lookup_and_honda_hybrid_profiles_are_exact():
+def test_current_static_lookup_and_honda_hybrid_profiles_are_exact():
   static_civic = get_handcrafted_lateral_profile("HONDA_CIVIC")
   assert static_civic is not None
-  assert static_civic.version == 18
+  assert static_civic.version == 19
   assert static_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
 
   static_clarity = get_handcrafted_lateral_profile("HONDA_CLARITY")
   assert static_clarity is not None
-  assert static_clarity.version == 18
+  assert static_clarity.version == 19
   assert static_clarity.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + TORQUE_VALUES
 
   civic = vehicle_cp()
   runtime_civic = get_handcrafted_lateral_profile(civic.carFingerprint, civic, cp_sp())
   assert runtime_civic is not None
-  assert runtime_civic.version == 18
+  assert runtime_civic.version == 19
   assert runtime_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
 
   clarity = vehicle_cp("HONDA_CLARITY", controller="torque", firmware=b"39990-TRW-A020\x00")
   runtime_clarity = get_handcrafted_lateral_profile(clarity.carFingerprint, clarity, cp_sp())
   assert runtime_clarity is not None
-  assert runtime_clarity.version == 18
+  assert runtime_clarity.version == 19
   assert runtime_clarity.values == COMMON_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
 
 
-def test_v18_capability_subsets_exclude_inapplicable_groups():
+def test_current_capability_subsets_exclude_inapplicable_groups():
   honda_stock = vehicle_cp()
   honda_stock_profile = get_handcrafted_lateral_profile(honda_stock.carFingerprint, honda_stock, cp_sp(modified=False))
   assert honda_stock_profile is not None
@@ -297,7 +297,7 @@ def test_request_writes_exact_json_context_before_legacy_boolean():
   assert profile is not None
   firmware = sorted((str(fw.ecu), bytes(fw.fwVersion).hex()) for fw in civic.carFw)
   assert params.values[CONTEXT_KEY] == {
-    "version": 18,
+    "version": 19,
     "fingerprint": "HONDA_CIVIC",
     "brand": "honda",
     "controller": "pid",
@@ -316,6 +316,7 @@ def test_request_writes_exact_json_context_before_legacy_boolean():
 
 @pytest.mark.parametrize(("field", "replacement"), (
   ("version", 17),
+  ("version", 18),
   ("fingerprint", "HONDA_CLARITY"),
   ("payload_sha256", "0" * 64),
 ))
@@ -464,7 +465,7 @@ for name in ('capnp', 'numpy', 'pyray', 'zmq', 'openpilot.common.params'):
   sys.modules[name] = None
 from openpilot.nrdr.params import get_handcrafted_lateral_profile
 profile = get_handcrafted_lateral_profile('HONDA_CIVIC')
-assert profile is not None and profile.version == 18
+assert profile is not None and profile.version == 19
 """
   subprocess.run(
     [sys.executable, "-c", script], cwd=repo_root, env=environment,

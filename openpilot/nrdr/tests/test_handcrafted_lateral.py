@@ -168,14 +168,14 @@ def pending_params(values=None, **kwargs):
   }, **kwargs)
 
 
-def test_profiles_are_fingerprint_scoped_and_current_version_is_v18():
+def test_profiles_are_fingerprint_scoped_and_current_version_is_v19():
   assert HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS == EXPECTED_FINGERPRINTS
   assert tuple(HANDCRAFTED_LATERAL_PROFILES) == EXPECTED_FINGERPRINTS
-  assert get_handcrafted_lateral_profile("HONDA_CLARITY").version == 18
+  assert get_handcrafted_lateral_profile("HONDA_CLARITY").version == 19
   for fingerprint in EXPECTED_FINGERPRINTS:
     profile = get_handcrafted_lateral_profile(fingerprint)
     assert profile.fingerprint == fingerprint
-    assert profile.version == 18
+    assert profile.version == 19
     assert len(profile.values) == len(dict(profile.values))
   assert get_handcrafted_lateral_profile("HONDA_CIVIC_2022") is None
 
@@ -189,6 +189,32 @@ def test_clarity_v17_is_exact_47_key_reviewed_oracle():
   provenance = source.read_text(encoding="utf-8")
   assert "d9bea117c3ef7a30c8f67c809b386f35e89fd2ba1158dbe7cb30b1b6ded5c97a" in provenance
   assert "bd8b0ebfc10342ff6405c50659eeb24645439d4f06ea4a145ca25dfa998a8e3d" in provenance
+
+
+def test_v19_lane_defaults_are_strength_030_and_zero_model_break_in_for_every_profile():
+  from openpilot.nrdr.params.profiles import COMMON_HANDCRAFTED_VALUES
+  assert dict(COMMON_HANDCRAFTED_VALUES) == {
+    "LaneCentering": True, "LaneCenteringStrength": 0.30,
+    "LaneCenteringMinSpeed": 50, "LaneCenteringE2EAuthority": 0.0,
+    "LaneCenteringPauseOnSignal": True, "LaneCenterOffset": 0.0,
+    "LagdToggle": True, "LagdToggleDelay": 0.4,
+  }
+  for profile in HANDCRAFTED_LATERAL_PROFILES.values():
+    values = dict(profile.values)
+    assert values["LaneCenteringStrength"] == 0.30
+    assert values["LaneCenteringE2EAuthority"] == 0.0
+
+
+def test_v19_lane_defaults_only_apply_on_a_fresh_explicit_request():
+  params = FakeParams({"IsOffroad": True, "LaneCenteringStrength": 1.0, "LaneCenteringE2EAuthority": 0.7})
+  assert consume_handcrafted_lateral_request(clarity_cp(), clarity_cp_sp(), params, startup=True) == []
+  assert params.values["LaneCenteringStrength"] == 1.0
+  assert params.values["LaneCenteringE2EAuthority"] == 0.7
+  assert not params.calls
+  requested = pending_params({"LaneCenteringStrength": 1.0, "LaneCenteringE2EAuthority": 0.7})
+  consume_handcrafted_lateral_request(clarity_cp(), clarity_cp_sp(), requested)
+  assert requested.values["LaneCenteringStrength"] == 0.30
+  assert requested.values["LaneCenteringE2EAuthority"] == 0.0
 
 
 def test_current_profiles_never_copy_steer_ratio_settings():
@@ -571,7 +597,7 @@ def test_pending_or_unavailable_status_preserves_any_prior_success_marker():
   assert handcrafted_lateral_profile_status(clarity_cp(firmware=False), clarity_cp_sp(), params).startswith(old_marker)
 
 
-def test_prior_success_marker_is_preserved_until_v18_is_applied():
+def test_prior_success_marker_is_preserved_until_v19_is_applied():
   old_marker = "Last applied: Honda Clarity Current Lateral 2026-08-28 (v16) [HONDA_CLARITY]"
   params = pending_params({
     "NrdrHandcraftedLateralTune": False,
@@ -579,7 +605,7 @@ def test_prior_success_marker_is_preserved_until_v18_is_applied():
   })
 
   assert handcrafted_lateral_profile_status(clarity_cp(), clarity_cp_sp(), params) == \
-    f"{old_marker} | current profile v18 not applied"
+    f"{old_marker} | current profile v19 not applied"
 
 
 def test_native_apply_callback_is_a_durable_blocking_command():

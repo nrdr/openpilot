@@ -47,8 +47,8 @@ class TestParamProfiles(unittest.TestCase):
       "LaneCentering", "LaneCenteringE2EAuthority", "LaneCenteringPauseOnSignal", "LaneCenterOffset",
     )))
 
-    for fingerprint, profile in HANDCRAFTED_LATERAL_PROFILES.items():
-      self.assertEqual(profile.version, 18)
+    for profile in HANDCRAFTED_LATERAL_PROFILES.values():
+      self.assertEqual(profile.version, 19)
       self.assertFalse(any("SteerRatio" in key for key, _value in profile.values))
       self.assertEqual(len(profile.values), len(dict(profile.values)))
       self.assertTrue(all(type(key) is str for key, _ in profile.values))
