@@ -83,6 +83,9 @@ class TestParamSnapshots(unittest.TestCase):
   def test_steer_ratio_mode_and_manual_values_share_one_atomic_group(self):
     self.assertEqual(CONTROL_GROUPS[4].keys, (
       "NrdrSteerRatioMode",
+      "NrdrSteerRatioHybrid",
+      "NrdrSteerRatioSourceB",
+      "NrdrSteerRatioBlendStart",
       "NrdrSteerRatioManualCenter",
       "NrdrSteerRatioManualFinal",
     ))
@@ -98,12 +101,12 @@ class TestParamSnapshots(unittest.TestCase):
     self.assertFalse(retired & set(keys))
     self.assertEqual(len(CONTROL_GROUPS), 12)
     self.assertEqual(len(keys), len(set(keys)))
-    self.assertEqual(len(keys), 56)
+    self.assertEqual(len(keys), 59)
 
   def test_lane_settings_have_one_live_group_and_subsecond_cycle(self):
     self.assertIn(snapshots.LANE_CENTERING_PARAM_GROUP, CONTROL_GROUPS)
     self.assertLessEqual(snapshots.REFRESH_PERIOD, 0.5)
-    params = RecordingParams({key: b"0" for key in snapshots.LANE_CENTERING_PARAM_GROUP.keys})
+    params = RecordingParams(dict.fromkeys(snapshots.LANE_CENTERING_PARAM_GROUP.keys, b"0"))
     reader = LiveParams(CONTROL_GROUPS, params=params, start_worker=False)
     initial = reader.snapshot
     params.values["LaneCenteringStrength"] = b"0.3"

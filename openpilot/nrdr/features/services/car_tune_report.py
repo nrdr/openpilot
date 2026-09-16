@@ -153,6 +153,9 @@ class CarTuneReporter:
     prefix = f"selected {selection.requested_label} | effective {selection.effective_label}"
     if not selection.available:
       return f"{prefix} | {selection.unavailable_reason} | CP {selection.cp_ratio:g}"
+    if selection.hybrid is not None:
+      return (f"{prefix} | equivalent angle-to-curvature blend | fixed 5-degree transition | " +
+              "no speed-based switch | experimental, not road-validated | configured snapshot, not a live-consumption acknowledgement")
     if selection.effective_mode is SteerRatioMode.MANUAL:
       return (f"{prefix} | {selection.manual_center:.2f} center -> {selection.manual_final:.2f} final " +
               f"by {selection.manual_outer_angle_deg:g} deg | no lane fade")

@@ -69,23 +69,25 @@ UI_PRODUCTION_IMPORTS = {
 
 
 class TestUiOwnership(unittest.TestCase):
-  def test_native_latched_lateral_controls_are_onroad_editable_and_modes_remain_exclusive(self):
+  def test_native_hybrid_controls_keep_one_selection_per_source_and_existing_live_controls(self):
     repository_root = Path(__file__).resolve().parents[3]
     source = (repository_root / "openpilot/nrdr/ui/settings/steer_ratio_tuning.py").read_text(encoding="utf-8")
     pidf_source = (repository_root / "openpilot/nrdr/ui/settings/pidf_ground.py").read_text(encoding="utf-8")
 
     for title in (
-      "Use Comma Steer Ratio Learner",
-      "Use NRDR Measured Curve",
-      "Use Firmware Steer Ratio",
+      "Enable Hybrid Steer Ratio",
+      "Ratio A — Near Center / Single Source",
+      "Blend Starts At",
+      "Ratio B — Beyond the Blend",
       "Manual Override On-Center Ratio",
       "Manual Override Final Ratio",
     ):
       self.assertIn(title, source)
     self.assertNotIn("ui_state.engaged", source)
-    self.assertIn("new_mode = mode if state else SteerRatioMode.MANUAL if current is mode else current", source)
-    self.assertIn("selected or (mode is SteerRatioMode.MANUAL and available[item_mode])", source)
-    self.assertIn("manual_enabled = mode is SteerRatioMode.MANUAL and manual_available", source)
+    self.assertIn("multiple_button_item_sp", source)
+    self.assertIn("set_enabled_buttons(allowed)", source)
+    self.assertIn("self._hybrid, self._source_a, self._blend_start, self._source_b", source)
+    self.assertIn("manual_enabled = manual_available", source)
     self.assertNotIn("ui_state.engaged", pidf_source)
     self.assertIn("set_enabled(interpolated_supported)", pidf_source)
     self.assertIn("set_enabled(interpolated_enabled)", pidf_source)

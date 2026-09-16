@@ -505,7 +505,8 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     panel = next(sub_panel for sub_panel in section["sub_panels"] if sub_panel["id"] == "nrdr_steer_ratio_tuning")
     assert panel["label"] == "Steer Ratio Tuning"
     assert [item["key"] for item in panel["items"]] == [
-      "NrdrSteerRatioMode", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
+      "NrdrSteerRatioHybrid", "NrdrSteerRatioMode", "NrdrSteerRatioBlendStart", "NrdrSteerRatioSourceB",
+      "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
     ]
 
   def test_mode_selector_has_all_four_sources_and_availability_guards(self, schema):
@@ -516,8 +517,8 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     ]
     assert "offroad_only" not in json.dumps(item.get("enablement") or [])
     assert "one live snapshot" in item["details"]
-    assert "normally within 0.5 seconds" in item["details"]
-    assert "No LKAS cycle is required" in item["details"]
+    assert "0.5-second cycle" in item["details"]
+    assert "does not prove Sunnylink delivery or active-controller consumption" in item["details"]
     assert "does not learn while you drive" in item["details"]
     assert "provisional v0" in item["details"]
     assert "unmeasured estimate" in item["details"]

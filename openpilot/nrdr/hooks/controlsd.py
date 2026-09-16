@@ -80,8 +80,24 @@ def vehicle_model_state(controls, live_params, CS, lat_active: bool) -> tuple[fl
     controls.update_lane_centering_params(snapshot)
   if hasattr(controls.LaC, "set_live_tuning_snapshot"):
     controls.LaC.set_live_tuning_snapshot(snapshot)
-  candidate = resolve_steer_ratio_selection(controls.CP, snapshot)
+  candidate = resolve_steer_ratio_selection(controls.CP, snapshot, _held_comma_ratio(controls, live_params))
   selection = controls.steer_ratio_latch.update(candidate, lat_active)
+  # Record requested vs actually accepted geometry outside the realtime loop.
+  # Unlike the ratio itself this signature does not change with wheel angle.
+  signature = (candidate.requested_label, selection.effective_label, controls.steer_ratio_latch.rejected_reason,
+               snapshot.get("NrdrSteerRatioMode"), snapshot.get("NrdrSteerRatioHybrid"),
+               snapshot.get("NrdrSteerRatioSourceB"), snapshot.get("NrdrSteerRatioBlendStart"), bool(lat_active),
+               snapshot.get("NrdrSteerRatioManualCenter"), snapshot.get("NrdrSteerRatioManualFinal"))
+  if signature != getattr(controls, "nrdr_geometry_report_signature", None):
+    controls.nrdr_geometry_report_signature = signature
+    if hasattr(controls.nrdr_live_params, "record_applied_settings"):
+      controls.nrdr_live_params.record_applied_settings(
+        "steer_ratio_geometry", getattr(snapshot, "generation", 0), active=signature[7],
+        requested=signature[0], effective=signature[1], rejected_reason=signature[2],
+        source_a=signature[3], hybrid=signature[4], source_b=signature[5], blend_start=signature[6],
+        requested_manual_center=signature[8], requested_manual_final=signature[9],
+        effective_manual_center=selection.manual_center, effective_manual_final=selection.manual_final,
+      )
   if hasattr(controls.LaC, "set_steer_ratio_selection"):
     controls.LaC.set_steer_ratio_selection(selection)
 

@@ -36,6 +36,9 @@ class ParamSnapshot:
 
 STEER_RATIO_PARAM_GROUP = ParamGroup((
   "NrdrSteerRatioMode",
+  "NrdrSteerRatioHybrid",
+  "NrdrSteerRatioSourceB",
+  "NrdrSteerRatioBlendStart",
   "NrdrSteerRatioManualCenter",
   "NrdrSteerRatioManualFinal",
 ))

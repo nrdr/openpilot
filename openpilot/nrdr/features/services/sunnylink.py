@@ -44,6 +44,9 @@ HONDA_TUNING_WRITE_KEYS = frozenset((
   "NrdrNnlcKiGain",
   # Steer ratio, override, and steering filters.
   "NrdrSteerRatioMode",
+  "NrdrSteerRatioHybrid",
+  "NrdrSteerRatioSourceB",
+  "NrdrSteerRatioBlendStart",
   "NrdrSteerRatioManualCenter",
   "NrdrSteerRatioManualFinal",
   "NrdrIncreaseOverrideTolerance",

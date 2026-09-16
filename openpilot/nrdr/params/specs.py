@@ -139,6 +139,9 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("HondaNotchFreq", ParamType.FLOAT, PB, "7.5", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),
   _added("HondaNotchQ", ParamType.FLOAT, PB, "1.5", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),
   _added("NrdrSteerRatioMode", ParamType.INT, PB, "0", owner=ParamOwner.LATERAL),
+  _added("NrdrSteerRatioHybrid", ParamType.BOOL, PB, "0", owner=ParamOwner.LATERAL),
+  _added("NrdrSteerRatioSourceB", ParamType.INT, PB, "3", owner=ParamOwner.LATERAL),
+  _added("NrdrSteerRatioBlendStart", ParamType.FLOAT, PB, "25.0", owner=ParamOwner.LATERAL),
   _added("NrdrSteerRatioManualCenter", ParamType.FLOAT, PB, "15.38", owner=ParamOwner.LATERAL),
   _added("NrdrSteerRatioManualFinal", ParamType.FLOAT, PB, "10.93", owner=ParamOwner.LATERAL),
   # Retained so startup can perform a one-time migration and older builds can

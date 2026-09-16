@@ -45,6 +45,9 @@ class NrdrParamKey(StrEnum):
   HONDA_NOTCH_FREQ = "HondaNotchFreq"
   HONDA_NOTCH_Q = "HondaNotchQ"
   NRDR_STEER_RATIO_MODE = "NrdrSteerRatioMode"
+  NRDR_STEER_RATIO_HYBRID = "NrdrSteerRatioHybrid"
+  NRDR_STEER_RATIO_SOURCE_B = "NrdrSteerRatioSourceB"
+  NRDR_STEER_RATIO_BLEND_START = "NrdrSteerRatioBlendStart"
   NRDR_STEER_RATIO_MANUAL_CENTER = "NrdrSteerRatioManualCenter"
   NRDR_STEER_RATIO_MANUAL_FINAL = "NrdrSteerRatioManualFinal"
   NRDR_LEARN_STEER_RATIO = "NrdrLearnSteerRatio"
@@ -180,6 +183,9 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.HONDA_NOTCH_FREQ,
   NrdrParamKey.HONDA_NOTCH_Q,
   NrdrParamKey.NRDR_STEER_RATIO_MODE,
+  NrdrParamKey.NRDR_STEER_RATIO_HYBRID,
+  NrdrParamKey.NRDR_STEER_RATIO_SOURCE_B,
+  NrdrParamKey.NRDR_STEER_RATIO_BLEND_START,
   NrdrParamKey.NRDR_STEER_RATIO_MANUAL_CENTER,
   NrdrParamKey.NRDR_STEER_RATIO_MANUAL_FINAL,
   NrdrParamKey.NRDR_LEARN_STEER_RATIO,

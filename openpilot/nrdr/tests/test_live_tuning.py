@@ -21,6 +21,7 @@ def test_unchanged_settings_pass_normal_steering_through_exactly():
   {"NrdrInterpolatedTorqueShare": 5}, {"NrdrSteerRatioMode": 3},
   {"NrdrSteerRatioManualCenter": 17.0}, {"LatPScaleHighway": 110},
   {"LaneCenteringStrength": 0.3}, {"NrdrLearnAngleOffset": False},
+  {"NrdrSteerRatioHybrid": True}, {"NrdrSteerRatioSourceB": 3}, {"NrdrSteerRatioBlendStart": 25.0},
   {"NrdrInterpolatedTorqueFrictionHighway": 0.3},
 ))
 def test_active_edit_is_bumpless_then_converges_without_disengagement(changed):
@@ -31,7 +32,7 @@ def test_active_edit_is_bumpless_then_converges_without_disengagement(changed):
   values = [transition.update(0.7, updated, True, False, 0.01) for _ in range(100)]
   assert values[-1] == pytest.approx(0.7)
   assert all(0.3 <= value <= 0.7 for value in values)
-  assert max(b - a for a, b in zip([0.3, *values[:-1]], values)) <= 0.004001
+  assert max(b - a for a, b in zip([0.3, *values[:-1]], values, strict=True)) <= 0.004001
 
 
 @pytest.mark.parametrize("active,pressed", ((False, False), (True, True)))

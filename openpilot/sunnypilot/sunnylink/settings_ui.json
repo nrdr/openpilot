@@ -1213,15 +1213,29 @@
               },
               "items": [
                 {
+                  "key": "NrdrSteerRatioHybrid",
+                  "widget": "toggle",
+                  "title": "Enable Hybrid Steer Ratio",
+                  "description": "Use source A near center, then blend into source B across 5 degrees. OFF preserves single-source operation and your existing selection.",
+                  "details": "Experimental geometry, not road-validated. Configure while parked. The slider is the start of the transition, measured from straight ahead in either direction. Both sources must match this vehicle. A blend that reverses the angle-to-curvature mapping is rejected; runtime holds the last accepted geometry while active, or uses stock fallback at startup. Inspect the current steer-ratio result on the device. No PID gains or original curve data are changed."
+                },
+                {
                   "key": "NrdrSteerRatioMode",
                   "widget": "multiple_button",
-                  "title": "Steer Ratio Mode",
-                  "description": "Choose exactly one geometry source. Manual is the same as turning all three in-car switches off.",
-                  "details": "Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR Measured Curve uses fixed logged data; it does not learn while you drive. Clarity retains its audited 435.7-degree near-lock anchor. Civic TEG-A010 uses provisional v0, with data-derived anchors at 3.3-58.7 degrees and linear interpolation between them. Outside that range the nearest anchor is held as an unmeasured estimate. This Civic draft is not road-validated and has no fitted speed correction; select it only while parked. A disabled NRDR option means no matching car/EPS data profile. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. An unavailable selected source uses the stock car ratio and reports that fallback. The mode and manual endpoints apply from one live snapshot, normally within 0.5 seconds, with a one-second torque transition. No LKAS cycle is required. Existing settings are not changed automatically.",
+                  "title": "Ratio A \u2014 Near Center / Single Source",
+                  "description": "The only source with Hybrid OFF; the near-center source with Hybrid ON.",
+                  "details": "Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR Measured Curve uses fixed logged data; it does not learn while you drive. Clarity retains its audited 435.7-degree near-lock anchor. Civic TEG-A010 uses provisional v0, with data-derived anchors at 3.3-58.7 degrees and linear interpolation between them. Outside that range the nearest anchor is held as an unmeasured estimate. This Civic draft is not road-validated and has no fitted speed correction. A disabled NRDR option means no matching car/EPS data profile. Firmware uses an exact recognized EPS shape anchored to the car's stock center ratio. Settings are captured from one live snapshot. Background polling has a 0.5-second cycle, but this does not prove Sunnylink delivery or active-controller consumption. Configure experimental settings while parked. Existing settings are not changed automatically.",
                   "options": [
                     {
                       "value": 0,
-                      "label": "Manual"
+                      "label": "Manual",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_manual_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
                     },
                     {
                       "value": 1,
@@ -1252,6 +1266,75 @@
                   ]
                 },
                 {
+                  "key": "NrdrSteerRatioBlendStart",
+                  "widget": "option",
+                  "title": "Blend Starts At",
+                  "description": "Steering-wheel angle in either direction. Source B takes over fully 5 degrees later; for example, 25 degrees blends from 25 to 30 degrees. This is not a recommended tuning point.",
+                  "min": 0.0,
+                  "max": 180.0,
+                  "step": 1.0,
+                  "unit": "\u00b0",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrSteerRatioHybrid",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrSteerRatioSourceB",
+                  "widget": "multiple_button",
+                  "title": "Ratio B \u2014 Beyond the Blend",
+                  "description": "Used after the 5-degree transition. The same transition is followed in reverse when unwinding. No speed-based switch.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Manual",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_manual_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "value": 1,
+                      "label": "Comma Learner"
+                    },
+                    {
+                      "value": 2,
+                      "label": "NRDR Measured Curve",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_raw_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "value": 3,
+                      "label": "Firmware",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_firmware_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrSteerRatioHybrid",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
                   "key": "NrdrSteerRatioManualCenter",
                   "widget": "option",
                   "title": "Manual Override On-Center Ratio",
@@ -1261,9 +1344,29 @@
                   "step": 0.01,
                   "enablement": [
                     {
-                      "type": "param",
-                      "key": "NrdrSteerRatioMode",
-                      "equals": 0
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrSteerRatioMode",
+                          "equals": 0
+                        },
+                        {
+                          "type": "all",
+                          "conditions": [
+                            {
+                              "type": "param",
+                              "key": "NrdrSteerRatioHybrid",
+                              "equals": true
+                            },
+                            {
+                              "type": "param",
+                              "key": "NrdrSteerRatioSourceB",
+                              "equals": 0
+                            }
+                          ]
+                        }
+                      ]
                     },
                     {
                       "type": "capability",
@@ -1283,9 +1386,29 @@
                   "step": 0.01,
                   "enablement": [
                     {
-                      "type": "param",
-                      "key": "NrdrSteerRatioMode",
-                      "equals": 0
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrSteerRatioMode",
+                          "equals": 0
+                        },
+                        {
+                          "type": "all",
+                          "conditions": [
+                            {
+                              "type": "param",
+                              "key": "NrdrSteerRatioHybrid",
+                              "equals": true
+                            },
+                            {
+                              "type": "param",
+                              "key": "NrdrSteerRatioSourceB",
+                              "equals": 0
+                            }
+                          ]
+                        }
+                      ]
                     },
                     {
                       "type": "capability",

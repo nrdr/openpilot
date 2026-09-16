@@ -118,6 +118,9 @@ def test_interpolated_torque_settings_publish_together():
 def test_engagement_latched_groups_force_refresh_all_or_nothing():
   assert ENGAGEMENT_LATCHED_LATERAL_KEYS == {
     "NrdrSteerRatioMode",
+    "NrdrSteerRatioHybrid",
+    "NrdrSteerRatioSourceB",
+    "NrdrSteerRatioBlendStart",
     "NrdrSteerRatioManualCenter",
     "NrdrSteerRatioManualFinal",
     "NrdrInterpolatedTorquePifBlend",

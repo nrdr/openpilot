@@ -1,6 +1,6 @@
 """Explicit, auditable steer-ratio modes shared by controlsd and lateral PID."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import IntEnum
 import math
 from typing import Any
@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 from openpilot.nrdr.features.lateral.honda_vgr import HondaVgrProfile, get_honda_vgr_profile, normalize_honda_eps_firmware
+from openpilot.nrdr.features.lateral.hybrid_steer_ratio import AngleSource, HybridGeometry, BLEND_START_DEFAULT, build_hybrid
 
 
 MANUAL_CENTER_DEFAULT = 15.38
@@ -173,6 +174,8 @@ class SteerRatioSelection:
   raw_profile: RawSteerRatioProfile | None = None
   firmware_profile: HondaVgrProfile | None = None
   unavailable_reason: str = ""
+  hybrid_requested: bool = False
+  hybrid: HybridGeometry | None = None
 
   @property
   def available(self) -> bool:
@@ -180,19 +183,25 @@ class SteerRatioSelection:
 
   @property
   def requested_label(self) -> str:
-    return steer_ratio_mode_label(self.requested_mode)
+    return "Hybrid steer ratio" if self.hybrid_requested else steer_ratio_mode_label(self.requested_mode)
 
   @property
   def effective_label(self) -> str:
+    if self.hybrid is not None:
+      return f"Hybrid: {self.hybrid.a.label} → {self.hybrid.b.label} ({self.hybrid.start:g}–{self.hybrid.end:g}°)"
     if self.effective_mode is SteerRatioMode.NRDR_RAW and self.raw_profile is not None and self.raw_profile.provisional:
       return "NRDR measured-angle curve (provisional)"
     return "Stock car ratio (safe fallback)" if self.effective_mode is None else steer_ratio_mode_label(self.effective_mode)
 
   @property
   def firmware_vgr_selected(self) -> bool:
+    if self.hybrid is not None:
+      return SteerRatioMode.FIRMWARE in (self.hybrid.a.mode, self.hybrid.b.mode)
     return self.effective_mode is SteerRatioMode.FIRMWARE and self.firmware_profile is not None
 
   def ratio_at(self, measured_angle_deg: float, live_comma_ratio: float | None = None) -> float:
+    if self.hybrid is not None:
+      return self.cp_ratio
     if self.effective_mode is SteerRatioMode.COMMA:
       return _safe_positive_ratio(live_comma_ratio, self.cp_ratio)
     if self.effective_mode is SteerRatioMode.NRDR_RAW and self.raw_profile is not None:
@@ -206,11 +215,15 @@ class SteerRatioSelection:
     return self.cp_ratio
 
   def linearize_measured_angle(self, measured_angle_deg: float) -> float:
+    if self.hybrid is not None:
+      return self.hybrid.forward(measured_angle_deg)
     if self.firmware_vgr_selected:
       return self.firmware_profile.physical_to_linear(measured_angle_deg)
     return measured_angle_deg
 
   def physicalize_desired_angle(self, linear_angle_deg: float) -> float:
+    if self.hybrid is not None:
+      return self.hybrid.inverse(linear_angle_deg)
     if self.firmware_vgr_selected:
       return self.firmware_profile.linear_to_physical(linear_angle_deg)
     return linear_angle_deg
@@ -261,8 +274,14 @@ class SteerRatioModeLatch:
   """Capture one complete geometry selection for the current control frame."""
   selection: SteerRatioSelection
   pending: SteerRatioSelection | None = field(init=False, default=None)
+  rejected_reason: str = field(init=False, default="")
 
   def update(self, candidate: SteerRatioSelection, active: bool) -> SteerRatioSelection:
+    self.rejected_reason = candidate.unavailable_reason if candidate.hybrid_requested and not candidate.available else ""
+    if self.rejected_reason and active:
+      # Invalid live edits must not switch an engaged controller to an unrelated
+      # geometry. Startup's existing stock selection remains the safe baseline.
+      return self.selection
     self.selection = candidate
     self.pending = None
     return self.selection
@@ -289,7 +308,7 @@ def _mode_value(value: Any) -> SteerRatioMode:
     if isinstance(value, bytes):
       value = value.decode()
     return SteerRatioMode(int(value))
-  except (TypeError, ValueError, UnicodeDecodeError):
+  except (TypeError, ValueError, OverflowError, UnicodeDecodeError):
     return SteerRatioMode.MANUAL
 
 
@@ -311,7 +330,7 @@ def _safe_positive_ratio(value: Any, default: float) -> float:
   return result if math.isfinite(result) and result >= 0.1 else max(float(default), 0.1)
 
 
-def resolve_steer_ratio_selection(CP, settings: Any) -> SteerRatioSelection:
+def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | None = None) -> SteerRatioSelection:
   fingerprint = str(getattr(CP, "carFingerprint", ""))
   is_honda = str(getattr(CP, "brand", "")).lower() == "honda"
   cp_ratio = _safe_positive_ratio(getattr(CP, "steerRatio", MANUAL_CENTER_DEFAULT), MANUAL_CENTER_DEFAULT)
@@ -335,7 +354,7 @@ def resolve_steer_ratio_selection(CP, settings: Any) -> SteerRatioSelection:
     effective_mode = None
     unavailable_reason = f"No exact recognized EPS firmware profile exists for {fingerprint or 'this car'}"
 
-  return SteerRatioSelection(
+  selection = SteerRatioSelection(
     requested_mode=mode,
     effective_mode=effective_mode,
     fingerprint=fingerprint,
@@ -347,6 +366,34 @@ def resolve_steer_ratio_selection(CP, settings: Any) -> SteerRatioSelection:
     firmware_profile=firmware_profile,
     unavailable_reason=unavailable_reason,
   )
+  enabled = _value(settings, "NrdrSteerRatioHybrid")
+  if str(enabled).lower() not in ("1", "true", "b'1'", "b'true'"):
+    return selection
+  selection = replace(selection, hybrid_requested=True)
+  try:
+    mode = SteerRatioMode(int(_value(settings, "NrdrSteerRatioMode")))
+    mode_b_value = _value(settings, "NrdrSteerRatioSourceB")
+    start_value = _value(settings, "NrdrSteerRatioBlendStart")
+    mode_b = SteerRatioMode(3 if mode_b_value is None else int(mode_b_value))
+    start = BLEND_START_DEFAULT if start_value is None else float(start_value)
+    if not selection.available:
+      raise ValueError(selection.unavailable_reason)
+    if not is_honda or metadata is None:
+      raise ValueError("Hybrid requires supported Honda geometry metadata")
+    if SteerRatioMode.NRDR_RAW in (mode, mode_b) and raw_profile is None:
+      raise ValueError("Hybrid source has no matching measured car/EPS profile")
+    if SteerRatioMode.FIRMWARE in (mode, mode_b) and firmware_profile is None:
+      raise ValueError("Hybrid source has no recognized EPS firmware profile")
+    comma = _safe_positive_ratio(live_comma_ratio, cp_ratio) if SteerRatioMode.COMMA in (mode, mode_b) else cp_ratio
+    def source(source_mode):
+      label = steer_ratio_mode_label(source_mode)
+      if source_mode is SteerRatioMode.NRDR_RAW and raw_profile.provisional:
+        label += " (provisional)"
+      return AngleSource(int(source_mode), label, cp_ratio,
+                         center, final, outer_angle, comma, raw_profile, firmware_profile)
+    return replace(selection, hybrid=build_hybrid(source(mode), source(mode_b), start))
+  except (TypeError, ValueError, OverflowError) as error:
+    return replace(selection, effective_mode=None, unavailable_reason=f"Hybrid unavailable: {error}")
 
 
 def stock_steer_ratio_selection(CP) -> SteerRatioSelection:
