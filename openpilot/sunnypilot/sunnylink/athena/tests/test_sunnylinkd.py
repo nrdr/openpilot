@@ -218,7 +218,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       assert allow_param_write(key, onroad=False, honda_tuning_available=True)
 
   def test_honda_tuning_cohort_is_fail_closed_for_every_remote_write(self):
-    assert len(HONDA_TUNING_WRITE_KEYS) == 51
+    assert len(HONDA_TUNING_WRITE_KEYS) == 54
     for key in HONDA_TUNING_WRITE_KEYS:
       assert allow_param_write(key, onroad=False, honda_tuning_available=True)
       assert allow_param_write(key, onroad=True, honda_tuning_available=True)
