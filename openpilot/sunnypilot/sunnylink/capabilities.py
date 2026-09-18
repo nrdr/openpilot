@@ -16,6 +16,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
+from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
 from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   RAW_STEER_RATIO_PROFILES, get_raw_steer_ratio_profile, get_steer_ratio_metadata,
@@ -51,6 +52,7 @@ CAPABILITY_FIELDS = (
   "hyundai_alpha_long_available",
   "has_handcrafted_lateral_profile",
   "nrdr_honda_tuning_available",
+  "nrdr_longitudinal_tuning_available",
   "nrdr_manual_steer_ratio_available",
   "nrdr_raw_steer_ratio_available",
   "nrdr_firmware_steer_ratio_available",
@@ -80,6 +82,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "hyundai_alpha_long_available": "Hyundai Alpha Longitudinal available",
   "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
   "nrdr_honda_tuning_available": "Confirmed Honda-specific NRDR tuning available",
+  "nrdr_longitudinal_tuning_available": "Vehicle explicitly supported by NRDR longitudinal tuning",
   "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio geometry available",
   "nrdr_raw_steer_ratio_available": "Matching NRDR measured steer-ratio curve available (may be provisional)",
   "nrdr_firmware_steer_ratio_available": "Exact NRDR firmware steer-ratio geometry available",
@@ -205,6 +208,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
     CP, selected_fingerprint, selected_brand, selection_present=selection_present,
   )
   caps["nrdr_honda_tuning_available"] = confirmed_identity is not None and confirmed_identity[1] == "honda"
+  caps["nrdr_longitudinal_tuning_available"] = confirmed_identity is not None and nrdr_longitudinal_enabled(CP)
   # A selected platform and deserialized CP must agree before exposing a
   # vehicle-scoped apply command. A stale CP from the previous car cannot make
   # the command appear for a newly selected unsupported vehicle.

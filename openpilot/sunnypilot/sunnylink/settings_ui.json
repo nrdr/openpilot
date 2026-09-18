@@ -1791,7 +1791,14 @@
                 },
                 {
                   "value": 3,
-                  "label": "Econ"
+                  "label": "Econ",
+                  "enablement": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ]
                 }
               ],
               "enablement": [
@@ -2205,13 +2212,18 @@
         {
           "id": "nrdr",
           "title": "nrdr Longitudinal Tuning",
-          "description": "Longitudinal tuning specific to the nrdr fork.",
+          "description": "NRDR longitudinal tuning is Honda-only unless an exact non-Honda profile is explicitly approved in the software. Other cars use the baseline Sunnypilot longitudinal path and ignore saved NRDR tuning values.",
           "items": [],
           "sub_panels": [
             {
               "id": "nrdr_longitudinal",
               "label": "Longitudinal Tuning",
               "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_longitudinal_tuning_available",
+                "equals": true
+              },
               "items": [
                 {
                   "key": "HondaLiveLearningGas",

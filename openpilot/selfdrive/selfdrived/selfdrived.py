@@ -29,6 +29,7 @@ from openpilot.common.hardware import HARDWARE
 from openpilot.sunnypilot.mads.mads import ModularAssistiveDrivingSystem
 from openpilot.sunnypilot import get_sanitize_int_param
 from openpilot.nrdr.hooks import NrdrSelfdrive, filter_car_events
+from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
 from openpilot.sunnypilot.selfdrive.car.car_specific import CarSpecificEventsSP
 from openpilot.sunnypilot.selfdrive.car.cruise_helpers import CruiseHelper
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.controller import IntelligentCruiseButtonManagement
@@ -143,12 +144,15 @@ class SelfdriveD(CruiseHelper):
     self.logged_comm_issue = None
     self.not_running_prev = None
     self.experimental_mode = False
-    self.personality = get_sanitize_int_param(
+    saved_personality = get_sanitize_int_param(
       "LongitudinalPersonality",
       min(log.LongitudinalPersonality.schema.enumerants.values()),
       max(log.LongitudinalPersonality.schema.enumerants.values()),
       self.params
     )
+    self.personality = longitudinal_personality(saved_personality, nrdr_longitudinal_enabled(self.CP))
+    if self.personality != saved_personality:
+      self.params.put("LongitudinalPersonality", self.personality)
     self.recalibrating_seen = False
     self.dm_lockout_set = False
     self.dm_uncertain_alerted = False
@@ -185,7 +189,7 @@ class SelfdriveD(CruiseHelper):
 
     CruiseHelper.__init__(self, self.CP)
     self.button_state_tracker = ButtonStateTracker()
-    self.nrdr = NrdrSelfdrive()
+    self.nrdr = NrdrSelfdrive(self.CP)
 
   def update_events(self, CS):
     """Compute onroadEvents from carState"""
@@ -666,6 +670,8 @@ class SelfdriveD(CruiseHelper):
       self.is_ldw_enabled = self.params.get_bool("IsLdwEnabled")
       self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
       self.experimental_mode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
+      if not self.nrdr.longitudinal_enabled:
+        self.personality = longitudinal_personality(self.params.get("LongitudinalPersonality", return_default=True), False)
       self.mads.read_params()
       time.sleep(0.1)
 

@@ -1,4 +1,5 @@
 from openpilot.cereal import log
+from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
 from openpilot.common.params import Params, UnknownKeyName
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.list_view import multiple_button_item, toggle_item
@@ -158,6 +159,11 @@ class TogglesLayout(Widget):
 
   def _update_toggles(self):
     ui_state.update_params()
+    enabled = nrdr_longitudinal_enabled(ui_state.CP)
+    self._long_personality_setting.action_item.set_enabled_buttons(set(range(4 if enabled else 3)))
+    self._long_personality_setting.action_item.set_selected_button(
+      longitudinal_personality(self._params.get("LongitudinalPersonality", return_default=True), enabled),
+    )
 
     e2e_description = tr(
       "sunnypilot defaults to driving in chill mode. Experimental mode enables alpha-level features that aren't ready for chill mode. " +
@@ -246,4 +252,5 @@ class TogglesLayout(Widget):
       self._params.put_bool("OnroadCycleRequested", True, block=True)
 
   def _set_longitudinal_personality(self, button_index: int):
-    self._params.put("LongitudinalPersonality", button_index, block=True)
+    personality = longitudinal_personality(button_index, nrdr_longitudinal_enabled(ui_state.CP))
+    self._params.put("LongitudinalPersonality", personality, block=True)

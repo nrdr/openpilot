@@ -1,3 +1,5 @@
+# Frozen test reference from 66ad9fac65f577940a9cbbe269104fb8177f2f76
+# Original path: openpilot/sunnypilot/selfdrive/controls/lib/dec/dec.py
 """
 Copyright (c) 2021-, rav4kumar, sunnypilot, and a number of other contributors.
 
@@ -12,8 +14,6 @@ from numpy import interp
 from openpilot.common.params import Params
 from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot.selfdrive.controls.lib.dec.constants import WMACConstants
-from openpilot.nrdr.features.driver_policy.dec import enforce_mode_dwell, slow_down_threshold
-from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
 from typing import Literal
 
 # d-e2e, from modeldata.h
@@ -80,8 +80,7 @@ class SmoothKalmanFilter:
 class ModeTransitionManager:
   """Manages smooth transitions between driving modes with hysteresis."""
 
-  def __init__(self, *, nrdr_enabled: bool = False):
-    self.nrdr_enabled = nrdr_enabled
+  def __init__(self):
     self.current_mode: ModeType = 'acc'
     self.mode_confidence = {'acc': 1.0, 'blended': 0.0}
     self.transition_timeout = 0
@@ -104,9 +103,7 @@ class ModeTransitionManager:
         self.mode_confidence[m] = max(0.0, self.mode_confidence[m] - 0.05)
 
     # Require minimum duration in current mode (unless emergency)
-    enforce_dwell = (enforce_mode_dwell(self, mode) if self.nrdr_enabled else
-                     self.mode_duration < self.min_mode_duration and not self.emergency_override)
-    if enforce_dwell:
+    if self.mode_duration < self.min_mode_duration and not self.emergency_override:
       return
 
     # Hysteresis: higher threshold for mode changes
@@ -138,7 +135,6 @@ class ModeTransitionManager:
 class DynamicExperimentalController:
   def __init__(self, CP: structs.CarParams, mpc, params=None):
     self._CP = CP
-    self._nrdr_enabled = nrdr_longitudinal_enabled(CP)
     self._mpc = mpc
     self._params = params or Params()
     self._enabled: bool = self._params.get_bool("DynamicExperimentalControl")
@@ -146,7 +142,7 @@ class DynamicExperimentalController:
     self._frame: int = 0
     self._urgency = 0.0
 
-    self._mode_manager = ModeTransitionManager(nrdr_enabled=self._nrdr_enabled)
+    self._mode_manager = ModeTransitionManager()
 
     # Smooth filters for stable decision making with faster response for critical scenarios
     self._lead_filter = SmoothKalmanFilter(
@@ -265,9 +261,7 @@ class DynamicExperimentalController:
 
       self._slow_down_filter.add_data(urgency)
       urgency_filtered = self._slow_down_filter.get_value() or 0.0
-      threshold = (slow_down_threshold(WMACConstants.SLOW_DOWN_PROB, self._has_slow_down, 1.0, 0.625)
-                   if self._nrdr_enabled else WMACConstants.SLOW_DOWN_PROB)
-      self._has_slow_down = urgency_filtered > threshold
+      self._has_slow_down = urgency_filtered > WMACConstants.SLOW_DOWN_PROB
       self._urgency = urgency_filtered
       return
 
@@ -307,9 +301,7 @@ class DynamicExperimentalController:
     urgency_filtered = self._slow_down_filter.get_value() or 0.0
 
     # Update state with lower threshold for better stop detection
-    threshold = (slow_down_threshold(WMACConstants.SLOW_DOWN_PROB, self._has_slow_down, 0.8, 0.5)
-                 if self._nrdr_enabled else WMACConstants.SLOW_DOWN_PROB * 0.8)
-    self._has_slow_down = urgency_filtered > threshold
+    self._has_slow_down = urgency_filtered > (WMACConstants.SLOW_DOWN_PROB * 0.8)
     self._urgency = urgency_filtered
 
   def _radarless_mode(self) -> None:

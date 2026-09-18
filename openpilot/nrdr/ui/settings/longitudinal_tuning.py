@@ -4,6 +4,8 @@ import pyray as rl
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
+from openpilot.system.ui.widgets.list_view import ListItem
+from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP
@@ -15,8 +17,13 @@ class LongitudinalTuningLayout(Widget):
     self._back_button = NavButton(tr("Back"))
     self._back_button.set_click_callback(back_btn_callback)
 
-    items = self._initialize_items()
-    self._scroller = Scroller(items, line_separator=False, spacing=0)
+    self._tuning_items = self._initialize_items()
+    status = ListItem(
+      title=lambda: tr("NRDR longitudinal active") if nrdr_longitudinal_enabled(ui_state.CP) else tr("Baseline longitudinal - NRDR tuning inactive"),
+      description=lambda: tr("NRDR tuning is enabled for Honda only unless an exact non-Honda vehicle profile is explicitly approved in the software. " +
+                             "Saved NRDR settings do not enable it on another car. Baseline Sunnypilot features remain available."),
+    )
+    self._scroller = Scroller([status, *self._tuning_items], line_separator=False, spacing=0)
 
   def _initialize_items(self):
     self._long_pid_tune_scale_aggressive = option_item_sp(
@@ -246,7 +253,11 @@ class LongitudinalTuningLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
-    self._live_learning_gas.action_item.set_enabled(ui_state.is_offroad())
+    enabled = nrdr_longitudinal_enabled(ui_state.CP)
+    for item in self._tuning_items:
+      if action := getattr(item, "action_item", None):
+        action.set_enabled(enabled)
+    self._live_learning_gas.action_item.set_enabled(enabled and ui_state.is_offroad())
 
   def _render(self, rect):
     self._back_button.set_position(self._rect.x, self._rect.y + 20)

@@ -227,6 +227,6 @@ def test_mpc_and_planner_both_consume_bosch_fcw_authority():
   mpc_source = (OPENPILOT_ROOT / "selfdrive/controls/lib/longitudinal_mpc_lib/long_mpc.py").read_text()
   planner_source = (OPENPILOT_ROOT / "selfdrive/controls/lib/longitudinal_planner.py").read_text()
 
-  assert "lead_probability > 0.9 and self.nrdr.fcw_authorized(radarstate.leadOne, v_ego)" in mpc_source
+  assert "lead_probability > 0.9 and (self.nrdr is None or self.nrdr.fcw_authorized(radarstate.leadOne, v_ego))" in mpc_source
   assert "self.mpc.nrdr.fcw_authorized(sm['radarState'].leadOne, v_ego)" in planner_source
   assert "honda_bosch_a_radar=self.honda_bosch_a_radar" in planner_source

@@ -20,7 +20,7 @@ class RecordingParams:
 def test_button_personality_change_is_live_and_persisted(monkeypatch, initial, expected):
   monkeypatch.setattr("openpilot.nrdr.hooks.selfdrived.consume_button_press", lambda _: True)
   selfdrived = SimpleNamespace(
-    CP=SimpleNamespace(openpilotLongitudinalControl=True),
+    CP=SimpleNamespace(openpilotLongitudinalControl=True, brand="honda"),
     params=RecordingParams(),
     personality=initial,
     experimental_mode_switched=False,
@@ -51,7 +51,8 @@ def test_onroad_params_thread_does_not_read_personality(monkeypatch):
 
   selfdrived = object.__new__(SelfdriveD)
   selfdrived.params = ParamsWithoutPersonalityReads()
-  selfdrived.CP = SimpleNamespace(openpilotLongitudinalControl=True)
+  selfdrived.CP = SimpleNamespace(openpilotLongitudinalControl=True, brand="honda")
+  selfdrived.nrdr = NrdrSelfdrive(selfdrived.CP)
   selfdrived.mads = SimpleNamespace(read_params=lambda: None)
   monkeypatch.setattr("openpilot.selfdrive.selfdrived.selfdrived.time.sleep", lambda _: None)
 
@@ -62,7 +63,7 @@ def test_sla_confirmation_release_stays_reserved_across_planner_race(monkeypatch
   times = iter((10.0, 10.1, 10.8))
   monkeypatch.setattr("openpilot.nrdr.hooks.selfdrived.time.monotonic", lambda: next(times))
 
-  nrdr = NrdrSelfdrive()
+  nrdr = NrdrSelfdrive(SimpleNamespace(brand="honda"))
   pre_active = custom.LongitudinalPlanSP.SpeedLimit.AssistState.preActive
   active = custom.LongitudinalPlanSP.SpeedLimit.AssistState.active
 

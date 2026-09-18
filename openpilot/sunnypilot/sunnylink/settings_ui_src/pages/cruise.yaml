@@ -42,6 +42,8 @@ sections:
       label: Relaxed
     - value: 3
       label: Econ
+      enablement:
+      - {type: capability, field: nrdr_longitudinal_tuning_available, equals: true}
     enablement:
     - $ref: '#/macros/longitudinal'
   - key: IntelligentCruiseButtonManagement
