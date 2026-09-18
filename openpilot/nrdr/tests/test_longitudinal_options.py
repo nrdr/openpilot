@@ -437,9 +437,15 @@ def test_core_planner_applies_profile_only_to_positive_cruise_ceiling():
                   and isinstance(node.func, ast.Name) and node.func.id == "get_cruise_accel"]
   assert len(cruise_calls) == 1
   keywords = {keyword.arg: keyword.value for keyword in cruise_calls[0].keywords}
-  max_override = keywords["max_accel_override"]
-  turn_threshold = keywords["min_lat_accel"]
-  positive_ceiling = keywords["positive_accel_ceiling"]
+  nrdr_gate = ast.parse("self.nrdr is not None", mode="eval").body
+  for name, fallback in (("max_accel_override", None), ("min_lat_accel", 0.0), ("positive_accel_ceiling", None)):
+    value = keywords[name]
+    assert isinstance(value, ast.IfExp)
+    assert ast.dump(value.test) == ast.dump(nrdr_gate)
+    assert isinstance(value.orelse, ast.Constant) and value.orelse.value == fallback
+  max_override = keywords["max_accel_override"].body
+  turn_threshold = keywords["min_lat_accel"].body
+  positive_ceiling = keywords["positive_accel_ceiling"].body
   assert isinstance(max_override, ast.Call) and isinstance(max_override.func, ast.Attribute)
   assert max_override.func.attr == "max_accel"
   assert isinstance(turn_threshold, ast.Call) and isinstance(turn_threshold.func, ast.Attribute)
@@ -454,13 +460,21 @@ def test_core_planner_applies_profile_only_to_positive_cruise_ceiling():
                             and any(isinstance(target, ast.Name) and target.id == "accel_clip" for target in node.targets)
                             and isinstance(node.value, ast.List)]
   assert len(accel_clip_assignments) == 1
-  assert {id(call) for call in platform_max_calls} == {id(max_override), id(accel_clip_assignments[0].value.elts[1])}
+  assert ast.dump(accel_clip_assignments[0].value) == ast.dump(ast.parse("[ACCEL_MIN, ACCEL_MAX]", mode="eval").body)
+  gated_blocks = [node for node in ast.walk(tree) if isinstance(node, ast.If) and ast.dump(node.test) == ast.dump(nrdr_gate)]
+  gated_max_assignments = [node for block in gated_blocks for node in block.body
+                          if isinstance(node, ast.Assign) and any(
+                            ast.dump(target) == ast.dump(ast.parse("accel_clip[1] = 0").body[0].targets[0])
+                            for target in node.targets) and isinstance(node.value, ast.Call)
+                          and isinstance(node.value.func, ast.Attribute) and node.value.func.attr == "max_accel"]
+  assert len(gated_max_assignments) == 1
+  assert {id(call) for call in platform_max_calls} == {id(max_override), id(gated_max_assignments[0].value)}
 
   profile_calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
                    and isinstance(node.func, ast.Attribute) and node.func.attr == "personality_accel_ceiling"]
   assert profile_calls == [positive_ceiling]
   assert ast.dump(positive_ceiling.args[1]) == ast.dump(ast.parse("personality", mode="eval").body)
-  live_personality = ast.parse("sm['selfdriveState'].personality", mode="eval").body
+  live_personality = ast.parse("longitudinal_personality(sm['selfdriveState'].personality, self.nrdr is not None)", mode="eval").body
   personality_assignments = [
     node for node in ast.walk(tree)
     if isinstance(node, ast.Assign)
