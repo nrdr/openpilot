@@ -1,0 +1,27 @@
+# Keep NRDR lane-change controls in SunnyPilot's existing Lane Change section.
+page_id: steering
+section_id: lane_change
+after_item: AutoLaneChangeBsmDelay
+items:
+  - key: NrdrLaneChangeMinTime
+  - key: NrdrLaneChangeEntrySrReduction
+    enablement:
+    - type: capability
+      field: nrdr_honda_tuning_available
+      equals: true
+  - key: NrdrLaneChangeEntryReturnTime
+    enablement:
+    - type: capability
+      field: nrdr_honda_tuning_available
+      equals: true
+  - key: NrdrLaneChangeTorqueFactor
+    enablement:
+    - type: capability
+      field: nrdr_honda_tuning_available
+      equals: true
+  - key: NrdrLaneChangeFrictionPercent
+    enablement:
+    - type: capability
+      field: nrdr_honda_tuning_available
+      equals: true
+extend_enablement: []
