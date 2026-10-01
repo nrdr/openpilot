@@ -122,10 +122,11 @@ def test_invalid_mode_is_manual_and_unsupported_explicit_modes_fall_back_for_who
 
   civic_raw = resolve_steer_ratio_selection(cp("HONDA_CIVIC_BOSCH", 15.4), settings(mode=2))
   assert civic_raw.requested_mode is SteerRatioMode.NRDR_RAW
-  assert civic_raw.effective_mode is None
+  assert civic_raw.effective_mode is SteerRatioMode.COMMA
   assert civic_raw.ratio_at(0.0) == pytest.approx(15.4)
   assert civic_raw.ratio_at(400.0) == pytest.approx(15.4)
   assert "No matching NRDR measured curve" in civic_raw.unavailable_reason
+  assert civic_raw.ratio_at(0.0, 17.2) == pytest.approx(17.2)
 
   no_firmware = resolve_steer_ratio_selection(cp("HONDA_CLARITY", 16.5), settings(mode=3))
   assert no_firmware.requested_mode is SteerRatioMode.FIRMWARE

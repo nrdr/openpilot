@@ -62,8 +62,9 @@ def test_profile_does_not_leak_to_other_cars_or_eps(fingerprint, firmware, brand
   CP = cp(fingerprint, firmware, brand)
   assert get_raw_steer_ratio_profile(CP) is None
   selection = resolve_steer_ratio_selection(CP, {'NrdrSteerRatioMode': 2})
-  assert selection.effective_mode is None
+  assert selection.effective_mode is SteerRatioMode.COMMA
   assert selection.ratio_at(80) == 15.38
+  assert selection.ratio_at(80, 17.0) == 17.0
   assert 'reported EPS' in selection.unavailable_reason
 
 

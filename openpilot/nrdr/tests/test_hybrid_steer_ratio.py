@@ -9,7 +9,7 @@ from pathlib import Path
 
 from openpilot.nrdr.features.lateral.hybrid_steer_ratio import AngleSource
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
-  CLARITY_RAW_STEER_RATIO, SteerRatioModeLatch, resolve_steer_ratio_selection,
+  CLARITY_RAW_STEER_RATIO, SteerRatioMode, SteerRatioModeLatch, get_raw_steer_ratio_profile, resolve_steer_ratio_selection,
 )
 from openpilot.nrdr.features.lateral.honda_vgr import HONDA_VGR_PROFILES
 from openpilot.nrdr.params.snapshots import CONTROL_GROUPS, LiveParams
@@ -81,7 +81,13 @@ def test_invalid_sources_rejected(a, b):
 
 @pytest.mark.parametrize("vehicle", (cp(firmware=None), cp("HONDA_CIVIC", b"39990-TRW-A020"), cp(brand="toyota")))
 def test_profiles_cannot_be_borrowed_between_cars_or_unknown_firmware(vehicle):
-  assert not resolve_steer_ratio_selection(vehicle, settings()).available
+  selection = resolve_steer_ratio_selection(vehicle, settings())
+  if get_raw_steer_ratio_profile(vehicle) is None:
+    assert selection.effective_mode is SteerRatioMode.COMMA
+    assert selection.hybrid is None
+    assert selection.ratio_at(20.0, 17.0) == 17.0
+  else:
+    assert not selection.available  # Measured exists, but firmware B is unknown.
 
 
 @pytest.mark.parametrize("mode", range(4))

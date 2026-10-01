@@ -348,8 +348,8 @@ def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | N
     effective_mode = None
     unavailable_reason = f"Manual endpoint geometry is not supported for {fingerprint or 'this car'}"
   elif mode is SteerRatioMode.NRDR_RAW and raw_profile is None:
-    effective_mode = None
-    unavailable_reason = f"No matching NRDR measured curve exists for {fingerprint or 'this car'} and its reported EPS"
+    effective_mode = SteerRatioMode.COMMA
+    unavailable_reason = f"No matching NRDR measured curve exists for {fingerprint or 'this car'} and its reported EPS; using Comma learner"
   elif mode is SteerRatioMode.FIRMWARE and firmware_profile is None:
     effective_mode = None
     unavailable_reason = f"No exact recognized EPS firmware profile exists for {fingerprint or 'this car'}"
@@ -376,12 +376,15 @@ def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | N
     start_value = _value(settings, "NrdrSteerRatioBlendStart")
     mode_b = SteerRatioMode(3 if mode_b_value is None else int(mode_b_value))
     start = BLEND_START_DEFAULT if start_value is None else float(start_value)
+    if SteerRatioMode.NRDR_RAW in (mode, mode_b) and raw_profile is None:
+      # Without measured evidence, use the real live learner for the entire
+      # mapping. Do not blend an invented curve or hold a stale custom map.
+      return replace(selection, effective_mode=SteerRatioMode.COMMA,
+                     unavailable_reason="Measured hybrid source unavailable; using Comma learner")
     if not selection.available:
       raise ValueError(selection.unavailable_reason)
     if not is_honda or metadata is None:
       raise ValueError("Hybrid requires supported Honda geometry metadata")
-    if SteerRatioMode.NRDR_RAW in (mode, mode_b) and raw_profile is None:
-      raise ValueError("Hybrid source has no matching measured car/EPS profile")
     if SteerRatioMode.FIRMWARE in (mode, mode_b) and firmware_profile is None:
       raise ValueError("Hybrid source has no recognized EPS firmware profile")
     comma = _safe_positive_ratio(live_comma_ratio, cp_ratio) if SteerRatioMode.COMMA in (mode, mode_b) else cp_ratio
