@@ -182,7 +182,7 @@ def _build_legacy_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
 CLARITY_CURRENT_LATERAL_2026_08_28 = _build_legacy_honda_profile("HONDA_CLARITY")
 CLARITY_ROAD_TESTED_2026_08_21 = CLARITY_CURRENT_LATERAL_2026_08_28
 
-HANDCRAFTED_LATERAL_VERSION = 20
+HANDCRAFTED_LATERAL_VERSION = 21
 # Oct 1 owner snapshot, PopV2, plus explicitly requested cleanup defaults.
 # The new per-speed damping and optimized lane-change behavior still need road
 # validation; the provenance date is not a claim those additions were tested.
@@ -211,8 +211,8 @@ HONDA_FILTER_HANDCRAFTED_VALUES = (
   ("HondaLpfTauStandard", 0.02), ("HondaLpfTauHighway", 0.0),
   ("HondaSteerDeltaLimiter", False), ("HondaSteerDeltaUp", 4.0), ("HondaSteerDeltaDown", 4.0),
 )
-# Compound blend values are now internal constants, not writable profile knobs.
-HYBRID_HANDCRAFTED_VALUES = ()
+# Strength/friction stay internal constants; only the bypass is user-facing.
+HYBRID_HANDCRAFTED_VALUES = (("NrdrDeviceYawCorrection", True),)
 CLARITY_GEOMETRY_VALUES = (
   ("NrdrSteerRatioHybrid", True), ("NrdrSteerRatioMode", 2), ("NrdrSteerRatioSourceB", 3),
   ("NrdrSteerRatioBlendStart", 10.0), ("NrdrSteerRatioManualCenter", 16.5), ("NrdrSteerRatioManualFinal", 12.74),
@@ -237,7 +237,7 @@ def _make_profile(fingerprint: str, values: tuple[tuple[str, ProfileValue], ...]
 
 HANDCRAFTED_LATERAL_PROFILES = {
   fingerprint: _make_profile(
-    fingerprint, COMMON_HANDCRAFTED_VALUES + HONDA_FILTER_HANDCRAFTED_VALUES + HONDA_PID_HANDCRAFTED_VALUES +
+    fingerprint, COMMON_HANDCRAFTED_VALUES + HONDA_FILTER_HANDCRAFTED_VALUES + HONDA_PID_HANDCRAFTED_VALUES + HYBRID_HANDCRAFTED_VALUES +
     (CLARITY_GEOMETRY_VALUES + TORQUE_HANDCRAFTED_VALUES if fingerprint == "HONDA_CLARITY" else ()),
     "Honda hybrid",
   )

@@ -165,6 +165,15 @@ def test_fixed_settings_ignore_retired_values_and_master_is_gated_by_support():
   assert settings.friction_highway == 1.0
 
 
+@pytest.mark.parametrize("value,enabled", [(None, True), (True, True), (1, True), ("1", True), (b"1", True),
+  ("true", True), (b" TRUE ", True), (False, False), (0, False), ("0", False), (b"0", False),
+  ("false", False), (b"FALSE", False), ("", False), ("invalid", False), (b"\xff", False)])
+@pytest.mark.parametrize("supported", [False, True])
+def test_device_yaw_switch_only_changes_enablement(value, enabled, supported):
+  actual = resolve_interpolated_torque_pif_settings(_settings(NrdrDeviceYawCorrection=value), supported)
+  assert actual == InterpolatedTorquePifSettings(enabled and supported, 0.01, 10.0, 1.0, 1.0, 1.0)
+
+
 def test_retired_settings_never_replace_the_fixed_tuple_while_active():
   latch = InterpolatedTorquePifSettingsLatch(
     resolve_interpolated_torque_pif_settings(_settings(), supported=True),

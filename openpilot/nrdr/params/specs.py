@@ -106,6 +106,7 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("LatPScaleLowSpeed", ParamType.INT, PB, "100", owner=ParamOwner.LATERAL),
   _added("NrdrOptimizedLaneChanges", ParamType.BOOL, PB, "1", owner=ParamOwner.LATERAL),
   _added("NrdrLateralController", ParamType.INT, PB, "0", owner=ParamOwner.LATERAL),
+  _added("NrdrDeviceYawCorrection", ParamType.BOOL, PB, "1", owner=ParamOwner.LATERAL),
   _added("NrdrSuggestedSettings", ParamType.BOOL, PB, "0", owner=ParamOwner.LATERAL),
   _added("NrdrLatRateDampingLowSpeed", ParamType.INT, PB, "30", owner=ParamOwner.LATERAL),
   _added("NrdrLatRateDampingStandard", ParamType.INT, PB, "30", owner=ParamOwner.LATERAL),

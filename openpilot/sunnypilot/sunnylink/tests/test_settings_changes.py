@@ -400,15 +400,18 @@ class TestControllerCleanup(OpenpilotTestCase):
   def test_controller_stiction_and_optimized_lane_changes_lead_dungeon(self, schema):
     section = _find_section(schema, "steering", "nrdr")
     panel = next(p for p in section["sub_panels"] if p["id"] == "nrdr_pidf_ground")
-    assert [item["key"] for item in panel["items"][:3]] == [
-      "NrdrLateralController", "NrdrLatStiction", "NrdrOptimizedLaneChanges",
+    assert [item["key"] for item in panel["items"][:4]] == [
+      "NrdrLateralController", "NrdrLatStiction", "NrdrDeviceYawCorrection", "NrdrOptimizedLaneChanges",
     ]
     controller = panel["items"][0]
     assert [(o["value"], o["label"]) for o in controller["options"]] == [(0, "PIF Control"), (1, "Yaw Control")]
     assert "description" not in controller and "details" not in controller
     assert "offroad_only" in _flatten_rule_types(controller["enablement"])
     assert _references_capability_field(controller["options"][1]["enablement"], "nrdr_yaw_controller_available")
-    optimized = panel["items"][2]
+    correction = panel["items"][2]
+    assert correction["title"] == "Use Device Yaw Correction" and correction["widget"] == "toggle"
+    assert _references_capability_field(correction["enablement"], "nrdr_interpolated_torque_pif_blend_available")
+    optimized = panel["items"][3]
     assert optimized["widget"] == "toggle"
     assert "either controller" in optimized["description"]
 
@@ -430,7 +433,7 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     "LatPScaleHighway", "LatIScaleHighway", "LatFScaleHighway",
     "NrdrLatRateDampingLowSpeed", "NrdrLatRateDampingStandard", "NrdrLatRateDampingHighway",
     "HondaCenterScale", "HondaCenterBoostThreshold", "HondaCenterBoostMinSpeed",
-    "NrdrLatStiction", "NrdrOptimizedLaneChanges",
+    "NrdrLatStiction", "NrdrOptimizedLaneChanges", "NrdrDeviceYawCorrection",
     "NrdrDriverOverrideThreshold", "NrdrOverrideThresholdCenterBoost",
     "HondaDriverAssistDuringOverride", "HondaOverrideFadeDownSecs", "HondaOverrideFadeUpSecs", "HondaOverrideTorqueScale",
     "HondaTorqueLowPassFilter", "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",

@@ -660,6 +660,44 @@
                   ]
                 },
                 {
+                  "key": "NrdrDeviceYawCorrection",
+                  "widget": "toggle",
+                  "title": "Use Device Yaw Correction",
+                  "description": "Blends 1% device-yaw torque feedback with 99% PIF. Does not select Yaw Control. Optimized lane changes bypass it.",
+                  "details": "Defaults ON. The blend strength, acceleration factor, and friction remain fixed. Below 4.5 mph the torque leg uses steering-angle feedback, transitioning to the device's calibrated yaw estimate by 11.2 mph. Missing, stale, or invalid yaw falls back to PIF when yaw is required. Available only for supported modified-EPS Honda PIF setups, not full Yaw Control. Turn Suggested Settings OFF to unlock this switch.",
+                  "enablement": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_interpolated_torque_pif_blend_available",
+                      "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
                   "key": "NrdrOptimizedLaneChanges",
                   "widget": "toggle",
                   "title": "Optimized Lane Changes",

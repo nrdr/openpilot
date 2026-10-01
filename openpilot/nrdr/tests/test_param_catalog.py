@@ -25,19 +25,27 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "1bd1b41c190df9c26a4302c9565c29e0cb0f29fa0357150d772e037f50be545e"
+REGISTRY_METADATA_SHA256 = "2c29d4293c815c224cdc2b9c93a64c9861430f662ddd2624283823ebedf08d56"
 
 
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 148)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 147)
+    self.assertEqual(len(PARAM_SPECS), 149)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 148)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
 
     metadata = "\n".join(f"{spec.action.value}|{spec.key}|{spec.cpp_attributes}" for spec in PARAM_SPECS) + "\n"
     self.assertEqual(sha256(metadata.encode()).hexdigest(), REGISTRY_METADATA_SHA256)
+
+  def test_device_yaw_switch_defaults_on_without_reviving_retired_sliders(self) -> None:
+    spec = PARAM_SPECS_BY_KEY["NrdrDeviceYawCorrection"]
+    self.assertIs(spec.param_type, ParamType.BOOL)
+    self.assertIs(spec.lifecycle, ParamLifecycle.SETTING)
+    self.assertEqual(spec.default, "1")
+    self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
+    self.assertIs(PARAM_SPECS_BY_KEY["NrdrInterpolatedTorquePifBlend"].lifecycle, ParamLifecycle.TOMBSTONE)
 
   def test_handcrafted_request_context_is_typed_and_not_restored_from_backups(self) -> None:
     spec = PARAM_SPECS_BY_KEY["NrdrHandcraftedLateralRequest"]

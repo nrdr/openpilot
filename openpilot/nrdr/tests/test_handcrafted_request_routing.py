@@ -113,6 +113,37 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
           honda_tuning_available=True, requested_bool=True,
         ))
 
+  def test_device_yaw_switch_requires_device_owned_support_and_preserves_controller_choice(self):
+    key = "NrdrDeviceYawCorrection"
+    for honda, supported, expected in ((True, True, True), (True, False, False), (True, None, False), (False, True, False)):
+      for onroad in (False, True):
+        with self.subTest(honda=honda, supported=supported, onroad=onroad):
+          self.generic_write.reset_mock()
+          self.params.put.reset_mock()
+          self.params.get_bool.return_value = not onroad
+          self.namespace["_vehicle_tuning_capabilities"].return_value = {
+            "nrdr_honda_tuning_available": honda,
+            "nrdr_interpolated_torque_pif_blend_available": supported,
+          }
+          self.save_params({key: self._encode(b"0")})
+          self.assertEqual(self.generic_write.called, expected)
+          if expected:
+            self.generic_write.assert_called_once_with(key, self._encode(b"0"), False)
+          self.assertNotIn("NrdrLateralController", [call.args[0] for call in self.params.put.call_args_list])
+
+  def test_device_yaw_switch_respects_suggested_and_full_yaw_locks_on_server(self):
+    key = "NrdrDeviceYawCorrection"
+    self.namespace["_vehicle_tuning_capabilities"].return_value = {
+      "nrdr_honda_tuning_available": True,
+      "nrdr_interpolated_torque_pif_blend_available": True,
+    }
+    for locked in ({"NrdrSuggestedSettings": True}, {"NrdrHandcraftedLateralTune": True}, {"NrdrLateralController": 1}):
+      with self.subTest(locked=locked):
+        self.generic_write.reset_mock()
+        self.params.get.side_effect = lambda name, **_: locked.get(name, "0")
+        self.save_params({key: self._encode(b"0")})
+        self.generic_write.assert_not_called()
+
 
 if __name__ == "__main__":
   unittest.main()

@@ -283,6 +283,7 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       key, onroad,
       handcrafted_profile_available=handcrafted_available,
       honda_tuning_available=honda_tuning_available,
+      device_yaw_correction_available=capabilities.get("nrdr_interpolated_torque_pif_blend_available") is True,
       requested_bool=requested_bool,
     ):
       cloudlog.warning(f"sunnylinkd.saveParams.policy: Attempted to modify unavailable parameter '{key}'")

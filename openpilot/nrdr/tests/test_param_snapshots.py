@@ -101,7 +101,7 @@ class TestParamSnapshots(unittest.TestCase):
     self.assertFalse(retired & set(keys))
     self.assertEqual(len(CONTROL_GROUPS), 11)
     self.assertEqual(len(keys), len(set(keys)))
-    self.assertEqual(len(keys), 49)
+    self.assertEqual(len(keys), 50)
 
   def test_lane_settings_have_one_live_group_and_subsecond_cycle(self):
     self.assertIn(snapshots.LANE_CENTERING_PARAM_GROUP, CONTROL_GROUPS)
@@ -114,6 +114,18 @@ class TestParamSnapshots(unittest.TestCase):
       reader.poll_once()
     self.assertEqual(reader.get("LaneCenteringStrength"), b"0.3")
     self.assertEqual(initial.get("LaneCenteringStrength"), b"0")
+
+  def test_device_yaw_switch_is_live_and_part_of_output_transition_keys(self):
+    key = "NrdrDeviceYawCorrection"
+    self.assertIn(key, snapshots.LIVE_LATERAL_KEYS)
+    params = RecordingParams({key: b"1"})
+    reader = LiveParams(CONTROL_GROUPS, params=params, start_worker=False)
+    before = reader.snapshot
+    params.values[key] = b"0"
+    for _ in CONTROL_GROUPS:
+      reader.poll_once()
+    self.assertEqual(reader.get(key), b"0")
+    self.assertEqual(before.get(key), b"1")
 
   def test_retired_interpolated_torque_settings_have_no_runtime_polling(self):
     expected = {

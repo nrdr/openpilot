@@ -13,7 +13,7 @@ from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   SteerRatioSelection,
   resolve_steer_ratio_selection,
 )
-from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
+from openpilot.nrdr.features.lateral.interpolated_torque_pif import resolve_interpolated_torque_pif_settings, supports_interpolated_torque_pif
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 
 
@@ -83,7 +83,8 @@ class CarTuneReporter:
 
   def _interpolated_torque_pif_info(self, CP) -> tuple[str, bool]:
     supported = supports_interpolated_torque_pif(CP, self._cp_sp())
-    enabled = supported and self.params.get("NrdrLateralController") != 1
+    controller = self.params.get("NrdrLateralController")
+    enabled = resolve_interpolated_torque_pif_settings(self.params, supported).enabled and controller not in (1, "1", b"1")
     return ("Fixed 1% torque / 99% PIF | LAF 10 | friction 1/1/1 | optimized lane changes bypass blend"
             if enabled else "PIF blend inactive"), enabled
 

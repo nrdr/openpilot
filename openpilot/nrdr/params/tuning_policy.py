@@ -7,7 +7,7 @@ SUGGESTED_DESCRIPTION = (
 PIF_KEYS = frozenset(
   f"Lat{term}Scale{band}" for term in "PIF" for band in ("LowSpeed", "Standard", "Highway")
 ) | frozenset(("HondaCenterScale", "HondaCenterBoostThreshold", "HondaCenterBoostMinSpeed",
-               "NrdrLatStiction", "NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate"))
+               "NrdrLatStiction", "NrdrDeviceYawCorrection", "NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate"))
 LONG_SCALE_KEYS = frozenset(("LongPidTuneScale", "LongPidTuneScaleAggressive", "LongPidTuneScaleStandard",
                             "LongPidTuneScaleRelaxed", "LongPidTuneScaleEcon"))
 YAW_FIXED_KEYS = PIF_KEYS | frozenset((

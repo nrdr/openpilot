@@ -11,6 +11,7 @@
     {"LatPScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},
     {"NrdrOptimizedLaneChanges", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrLateralController", {PERSISTENT | BACKUP, INT, "0"}},
+    {"NrdrDeviceYawCorrection", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrSuggestedSettings", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrLatRateDampingLowSpeed", {PERSISTENT | BACKUP, INT, "30"}},
     {"NrdrLatRateDampingStandard", {PERSISTENT | BACKUP, INT, "30"}},

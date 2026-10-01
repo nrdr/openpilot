@@ -75,7 +75,7 @@ CONTROL_GROUPS = (
               "LatFScaleLowSpeed", "LatFScaleStandard", "LatFScaleHighway")),
   ParamGroup(("HondaCenterScale", "HondaCenterBoostThreshold", "HondaCenterBoostMinSpeed")),
   ParamGroup(("NrdrLatRateDampingLowSpeed", "NrdrLatRateDampingStandard", "NrdrLatRateDampingHighway")),
-  ParamGroup(("HondaInjectionTest", "NrdrLatStiction")),
+  ParamGroup(("HondaInjectionTest", "NrdrLatStiction", "NrdrDeviceYawCorrection")),
   # Mode and both manual endpoints are published together and captured once
   # per control frame, including while lateral control is active.
   STEER_RATIO_PARAM_GROUP,

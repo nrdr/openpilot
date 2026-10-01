@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import unittest
 
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_schema, DEFAULT_SRC
 
 
@@ -93,6 +94,26 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertTrue(local["use_float_scaling"])
     self.assertEqual(local["label_callback"](125), "+1.25 m")
     self.assertEqual(tuple(web[k] for k in ("min", "max", "step", "unit")), (0.0, 5.0, 0.25, "m"))
+
+  def test_device_yaw_switch_is_near_top_separate_from_full_controller_and_locked_consistently(self):
+    key = "NrdrDeviceYawCorrection"
+    native = _native_class("pidf_ground.py", "PidfGroundLayout")(lambda: None, lambda: None)
+    panel = _panel(self.schema, "steering", "nrdr_pidf_ground")
+    self.assertEqual([item["key"] for item in panel["items"][:4]],
+                     ["NrdrLateralController", "NrdrLatStiction", key, "NrdrOptimizedLaneChanges"])
+    local, web = native._tuning_items[key], panel["items"][2]
+    self.assertEqual(local["title"], "Use Device Yaw Correction")
+    self.assertEqual(web["title"], local["title"])
+    self.assertEqual(web["description"], local["description"])
+    self.assertEqual(web["widget"], "toggle")
+    self.assertEqual(web["enablement"][0], {
+      "type": "capability", "field": "nrdr_interpolated_torque_pif_blend_available", "equals": True,
+    })
+    locks = {rule["condition"]["key"] for rule in web["enablement"] if rule["type"] == "not"}
+    self.assertEqual(locks, {"NrdrSuggestedSettings", "NrdrHandcraftedLateralTune", "NrdrLateralController"})
+    self.assertTrue(tuning_write_allowed({}, key))
+    for settings in ({"NrdrSuggestedSettings": True}, {"NrdrHandcraftedLateralTune": True}, {"NrdrLateralController": 1}):
+      self.assertFalse(tuning_write_allowed(settings, key))
 
   def test_committed_sunnylink_output_matches_source(self):
     path = ROOT / "openpilot/sunnypilot/sunnylink/settings_ui.json"

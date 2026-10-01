@@ -10,8 +10,10 @@ from openpilot.nrdr.features.services.car_tune_report import CarTuneReporter, _l
 class TestCarTuneReporter(unittest.TestCase):
 
   @staticmethod
-  def _interpolated_reporter(enabled):
+  def _interpolated_reporter(enabled, device_yaw=None, controller=0):
     values = {
+      "NrdrDeviceYawCorrection": device_yaw,
+      "NrdrLateralController": controller,
       "NrdrInterpolatedTorqueShare": "60",
       "NrdrInterpolatedTorqueLatAccelFactor": "5.0",
       "NrdrInterpolatedTorqueFriction": "0.50",
@@ -73,6 +75,14 @@ class TestCarTuneReporter(unittest.TestCase):
       self.assertEqual(report, "Fixed 1% torque / 99% PIF | LAF 10 | friction 1/1/1 | optimized lane changes bypass blend")
       self.assertNotIn("60%", report)
       self.assertNotIn("NNLC", report)
+
+  def test_device_yaw_switch_and_full_yaw_controller_are_reported_separately(self):
+    for enabled, controller, expected in ((False, 0, False), (True, 0, True), (True, 1, False), (True, "1", False)):
+      with self.subTest(enabled=enabled, controller=controller):
+        reporter = self._interpolated_reporter(True, device_yaw=enabled, controller=controller)
+        report, effective = reporter._interpolated_torque_pif_info(self._interpolated_cp())
+        self.assertEqual(effective, expected)
+        self.assertEqual("Fixed 1%" in report, expected)
 
   def test_small_scalar_feedforward_never_uses_exponent_notation(self):
     pid = SimpleNamespace(kpV=[0.2], kiV=[0.05], kf=0.0000036, kfV=[])

@@ -88,8 +88,15 @@ class InterpolatedTorquePifSettingsLatch:
 
 
 def resolve_interpolated_torque_pif_settings(settings, supported: bool) -> InterpolatedTorquePifSettings:
-  # Fixed road-tested blend. Retired saved sliders cannot change the runtime.
-  return InterpolatedTorquePifSettings(enabled=bool(supported))
+  # Preserve the fixed blend on existing installs with no new key yet. The new
+  # switch only bypasses it; retired saved sliders cannot change its strength.
+  value = settings.get("NrdrDeviceYawCorrection")
+  if isinstance(value, bytes):
+    value = value.decode("ascii", errors="replace")
+  requested = value is None or value is True or value == 1 or (
+    isinstance(value, str) and value.strip().lower() in ("1", "true")
+  )
+  return InterpolatedTorquePifSettings(enabled=bool(supported and requested))
 
 
 def speed_banded_friction(v_ego: float, low: float, standard: float, highway: float) -> float:

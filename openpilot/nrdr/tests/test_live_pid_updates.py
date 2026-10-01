@@ -83,6 +83,33 @@ def test_fixed_blend_ignores_retired_share_while_pid_scale_changes_live(live_pid
   assert controller.frame == 1  # Two active updates; no inactive/reset call.
 
 
+def test_device_yaw_switch_off_bypasses_candidate_and_on_restores_fixed_blend(live_pid):
+  controller, live, update = live_pid
+  blended = update()
+  controller.classic_torque_candidate.pid.i = 0.25
+  live.snapshot = make_snapshot(2, NrdrDeviceYawCorrection=False)
+  pif_only = update()
+  assert not controller.interpolated_torque_pif_enabled
+  assert controller.last_classic_torque_result is None
+  assert controller.classic_torque_candidate.pid.i == 0.0
+  assert blended == pytest.approx(0.99 * pif_only + 0.01 * 0.8)
+  live.snapshot = make_snapshot(3, NrdrDeviceYawCorrection=True)
+  assert update() == pytest.approx(blended)
+  assert controller.interpolated_torque_pif_settings.torque_share == 0.01
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_lane_change_exit_does_not_override_device_yaw_switch(live_pid, enabled):
+  controller, live, update = live_pid
+  live.snapshot = make_snapshot(2, NrdrDeviceYawCorrection=enabled)
+  controller.model_v2 = SimpleNamespace(meta=SimpleNamespace(laneChangeState=SimpleNamespace(raw=2)))
+  update()
+  assert not controller.interpolated_torque_pif_enabled
+  controller.model_v2 = None
+  update()
+  assert controller.interpolated_torque_pif_enabled == enabled
+
+
 def test_pid_uses_the_frame_snapshot_even_if_worker_publishes_mid_frame(live_pid):
   controller, live, update = live_pid
   captured = live.snapshot

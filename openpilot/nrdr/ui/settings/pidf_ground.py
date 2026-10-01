@@ -5,6 +5,7 @@ import pyray as rl
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
+from openpilot.nrdr.features.lateral.capabilities import supports_interpolated_torque_pif
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
@@ -36,6 +37,9 @@ class PidfGroundLayout(Widget):
       remember("NrdrLatStiction", toggle_item_sp(
         title=tr("Predictive Lateral Stiction"), param="NrdrLatStiction",
         description=tr("Tapers torque near a stable target. Driver input, lane changes, faults and steering limits bypass it."))),
+      remember("NrdrDeviceYawCorrection", toggle_item_sp(
+        title=tr("Use Device Yaw Correction"), param="NrdrDeviceYawCorrection",
+        description=tr("Blends 1% device-yaw torque feedback with 99% PIF. Does not select Yaw Control. Optimized lane changes bypass it."))),
       remember("NrdrOptimizedLaneChanges", toggle_item_sp(
         title=tr("Optimized lane changes"), param="NrdrOptimizedLaneChanges",
         description=tr("NRDR lane-change entry shaping. During the maneuver, uses P/I feedback without torque blend, feedforward or rate damping."))),
@@ -101,7 +105,8 @@ class PidfGroundLayout(Widget):
     super()._update_state()
     self._controller.action_item.set_enabled(ui_state.is_offroad())
     for key, item in self._tuning_items.items():
-      item.action_item.set_enabled(tuning_write_allowed(ui_state.params, key))
+      available = key != "NrdrDeviceYawCorrection" or supports_interpolated_torque_pif(ui_state.CP, ui_state.CP_SP)
+      item.action_item.set_enabled(available and tuning_write_allowed(ui_state.params, key))
 
   def _render(self, rect):
     self._back_button.set_position(self._rect.x, self._rect.y + 20)

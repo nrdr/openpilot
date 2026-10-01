@@ -96,6 +96,7 @@ install_module("openpilot.nrdr.features.lateral.model_policy", SteerRatioModelRe
                resolve_steer_ratio_model=lambda *args: None)
 install_module("openpilot.nrdr.features.lateral.honda_vgr", get_honda_vgr_profile=lambda *args: None)
 install_module("openpilot.nrdr.features.lateral.interpolated_torque_pif",
+               resolve_interpolated_torque_pif_settings=lambda *args: types.SimpleNamespace(enabled=False),
                supports_interpolated_torque_pif=lambda *args: False)
 install_module("openpilot.nrdr.features.lateral.steer_ratio_tuning", SteerRatioMode=dummy_type,
                SteerRatioSelection=dummy_type, resolve_steer_ratio_selection=lambda *args: None)
