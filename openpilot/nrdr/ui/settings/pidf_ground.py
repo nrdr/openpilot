@@ -4,13 +4,16 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
-from openpilot.system.ui.widgets import Widget
+from openpilot.system.ui.widgets import Widget, DialogResult
+from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.list_view import (
-  LineSeparatorSP, multiple_button_item_sp, option_item_sp, simple_button_item_sp, toggle_item_sp,
+  LineSeparatorSP, button_item_sp, option_item_sp, simple_button_item_sp, toggle_item_sp,
 )
 
 
@@ -19,10 +22,10 @@ class PidfGroundLayout(Widget):
     super().__init__()
     self._back_button = NavButton(tr("Back"))
     self._back_button.set_click_callback(back_btn_callback)
-    self._controller = multiple_button_item_sp(
-      title=lambda: tr("Controller Type"), description="", param="NrdrLateralController",
-      buttons=[lambda: tr("PIF Control"), lambda: tr("Yaw Control")], button_width=380,
-    )
+    self._controller_dialog = None
+    self._controller = button_item_sp(
+      title=lambda: tr("Controller Type"), description="", button_text=self._controller_label,
+      callback=self._show_controller_selector, enabled=lambda: ui_state.is_offroad())
     self._tuning_items = {}
 
     def remember(key, item):
@@ -65,12 +68,38 @@ class PidfGroundLayout(Widget):
         label_callback=lambda value, key=key, suffix=suffix: f"{value / 100 if key == 'HondaCenterBoostThreshold' else value:g}{suffix}")))
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
+  @staticmethod
+  def _controller_label():
+    return tr("Yaw Control") if str(ui_state.params.get("NrdrLateralController")) in ("1", "b'1'") else tr("PIF Control")
+
+  @staticmethod
+  def _commit_controller_selection(value):
+    # Recheck on confirmation: the car may have started while the dialog was open.
+    if not ui_state.is_offroad() or value not in (0, 1):
+      return False
+    if value == 1 and not yaw_controller_available(ui_state.CP, ui_state.CP_SP):
+      return False
+    ui_state.params.put("NrdrLateralController", value, block=True)
+    return True
+
+  def _show_controller_selector(self):
+    if not ui_state.is_offroad():
+      return
+    options = [tr("PIF Control")]
+    if yaw_controller_available(ui_state.CP, ui_state.CP_SP):
+      options.append(tr("Yaw Control"))
+
+    def selected(result):
+      dialog, self._controller_dialog = self._controller_dialog, None
+      if result == DialogResult.CONFIRM and dialog is not None and dialog.selection in options:
+        self._commit_controller_selection(options.index(dialog.selection))
+
+    self._controller_dialog = MultiOptionDialog(tr("Controller Type"), options, self._controller_label(), callback=selected)
+    gui_app.push_widget(self._controller_dialog)
+
   def _update_state(self):
     super()._update_state()
-    from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
     self._controller.action_item.set_enabled(ui_state.is_offroad())
-    self._controller.action_item.set_enabled_buttons({0, 1} if yaw_controller_available(ui_state.CP, ui_state.CP_SP) else {0})
-    self._controller.action_item.selected_button = int(ui_state.params.get("NrdrLateralController", return_default=True))
     for key, item in self._tuning_items.items():
       item.action_item.set_enabled(tuning_write_allowed(ui_state.params, key))
 

@@ -106,6 +106,21 @@ def _definitions(relative, env):
   return env
 
 
+@pytest.mark.parametrize("offroad,available,value,allowed", [
+  (True, True, 1, True), (True, False, 1, False), (False, True, 1, False),
+  (True, False, 0, True), (False, True, 0, False), (True, True, 2, False),
+])
+def test_native_controller_picker_rechecks_vehicle_and_offroad_on_confirmation(offroad, available, value, allowed):
+  from collections.abc import Callable
+  params = MemoryParams(NrdrLateralController=0)
+  env = dict(Widget=object, Callable=Callable,
+             ui_state=NS(params=params, CP=object(), CP_SP=object(), is_offroad=lambda: offroad),
+             yaw_controller_available=lambda cp, sp: available)
+  picker = _definitions("openpilot/nrdr/ui/settings/pidf_ground.py", env)["PidfGroundLayout"]
+  assert picker._commit_controller_selection(value) == allowed
+  assert params["NrdrLateralController"] == (value if allowed else 0)
+
+
 def _vision():
   params = MemoryParams(SmartCruiseControlVision=True)
   state = NS(disabled=0, enabled=1, entering=2, turning=3, leaving=4, overriding=5)
