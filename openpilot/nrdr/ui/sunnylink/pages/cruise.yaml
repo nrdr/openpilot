@@ -38,7 +38,7 @@ sections:
         widget: toggle
         title: Roen Nidec Acceleration Limits
         description: Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.
-        details: Enabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas.
+        details: Disabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas.
       - key: HondaBoschARadar
         widget: toggle
         title: Honda Bosch-A Radar (experimental)
@@ -53,7 +53,7 @@ sections:
         widget: option
         title: Distance 1 / Aggressive PID Scale
         description: Scales the longitudinal PID controller for the Aggressive personality (distance setting 1).
-        details: Defaults to 200%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
         min: 0
         max: 500
         step: 5
@@ -71,7 +71,7 @@ sections:
         widget: option
         title: Distance 3 / Relaxed PID Scale
         description: Scales the longitudinal PID controller for the Relaxed personality (distance setting 3).
-        details: Defaults to 80%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
         min: 0
         max: 500
         step: 5
@@ -80,7 +80,7 @@ sections:
         widget: option
         title: Distance 4 / Econ PID Scale
         description: Scales the longitudinal PID controller for the Econ personality (distance setting 4).
-        details: Defaults to 50%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
         min: 0
         max: 500
         step: 5

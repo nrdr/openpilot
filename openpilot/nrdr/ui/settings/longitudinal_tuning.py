@@ -92,7 +92,7 @@ class LongitudinalTuningLayout(Widget):
 
     self._static_feedforward_long = toggle_item_sp(
       param="StaticFeedforwardLong",
-      title=lambda: tr("Keep Feedforward Static (Default: ON)"),
+      title=lambda: tr("Keep Feedforward Static (Default: OFF)"),
       description=lambda: tr(
         "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value " +
         "instead of being scaled along with it. The lateral PID scales have their own toggle in Lateral Tuning."
@@ -120,7 +120,7 @@ class LongitudinalTuningLayout(Widget):
 
     self._roen_acceleration_limits = toggle_item_sp(
       param="NrdrRoenAccelerationLimits",
-      title=lambda: tr("Roen Nidec Acceleration Limits (Default: ON)"),
+      title=lambda: tr("Roen Nidec Acceleration Limits (Default: OFF)"),
       description=lambda: tr(
         "Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling. " +
         "This operates independently of Live Learning Gas."

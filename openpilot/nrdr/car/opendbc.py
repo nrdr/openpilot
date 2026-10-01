@@ -18,6 +18,7 @@ from opendbc.sunnypilot.car.honda.longitudinal import LEARN_VERSION
 from opendbc.sunnypilot.car.runtime_config import HondaLiveTuning
 
 from openpilot.nrdr.params.generated.keys import NrdrParamKey
+from openpilot.nrdr.car.mvl_state import MvlStateStore
 
 
 REFRESH_PERIOD = 0.5
@@ -194,9 +195,11 @@ class HondaParamsProvider:
     self._tuning_cache: HondaLiveTuning | None = None
     self._workers_enabled = start_worker
     self._workers_started = False
+    self._mvl_state = MvlStateStore(params, start_worker=start_worker)
 
   def close(self) -> None:
     self._stop.set()
+    self._mvl_state.close()
     self._write_queue.put(None)
     if self._poll_thread is not None:
       self._poll_thread.join(timeout=2.0)
@@ -251,7 +254,7 @@ class HondaParamsProvider:
       sub_mode_until=_float_value(values.get(OpendbcParamKey.NRDR_HUD_SUB_MODE_UNTIL), 0.0, 0.0),
       ecu_matched_long=_bool_value(values.get(OpendbcParamKey.NRDR_HONDA_ECU_MATCHED_LONG), False),
       full_brake_authority=_bool_value(values.get(OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY), True),
-      roen_acceleration_limits=_bool_value(values.get(OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS), True),
+      roen_acceleration_limits=_bool_value(values.get(OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS), False),
     )
     self._tuning_cache = tuning
     return tuning
@@ -366,6 +369,12 @@ class HondaParamsProvider:
   def persist_longitudinal_factors(self, gas_factor: float, wind_factor: float, car_fingerprint: str) -> None:
     """Compatibility shim for callers predating gas-alpha persistence."""
     self.persist_longitudinal_state(self.load_gas_alpha(car_fingerprint), gas_factor, wind_factor, car_fingerprint)
+
+  def load_mvl_param(self, key: str, default: float) -> float:
+    return self._mvl_state.load(key, default)
+
+  def persist_mvl_state(self, values: Mapping[str, float]) -> None:
+    self._mvl_state.put_many(values)
 
   def _start_workers(self) -> None:
     if not self._workers_enabled or self._workers_started:

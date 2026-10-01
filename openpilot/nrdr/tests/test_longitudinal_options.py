@@ -29,6 +29,8 @@ if sys.platform == "win32":
 
   swaglog_module = ModuleType("openpilot.common.swaglog")
   swaglog_module.cloudlog = SimpleNamespace(
+    debug=lambda *_args, **_kwargs: None,
+    info=lambda *_args, **_kwargs: None,
     exception=lambda *_args, **_kwargs: None,
     warning=lambda *_args, **_kwargs: None,
   )
@@ -184,6 +186,7 @@ def test_zero_and_near_zero_dynamic_pid_scale_clears_and_freezes_integrator(scal
 )
 def test_active_personality_transition_slews_at_bounded_rate(start, personality, expected):
   control = _scale_control(scale=start)
+  control.pid_scales = (1.5, 1.0, 0.9, 0.8)
 
   control._update_pid_scale(personality, was_pid=True)
 
@@ -639,8 +642,8 @@ def test_lower_selected_target_blocks_overspeed_allowance():
   assert apply_cruise_overspeed_allowance(18.0, 18.0, 20.0, 22.0, 0.2, 2.0) == 18.0
 
 
-@pytest.mark.parametrize(("accel", "expected"), ((0.2, 21.5), (-0.2, 21.9)))
-def test_overspeed_allowance_follows_vehicle_with_directional_buffer(accel, expected):
+@pytest.mark.parametrize(("accel", "expected"), ((0.2, 22.0), (-0.2, 22.0)))
+def test_overspeed_allowance_follows_vehicle_without_braking_bias(accel, expected):
   assert apply_cruise_overspeed_allowance(20.0, 20.0, 20.0, 22.0, accel, 5.0) == pytest.approx(expected)
 
 

@@ -96,7 +96,7 @@ def test_ui_preserves_preferences_without_delete_restore_cycle(has_long, cp):
 
 
 def test_unrelated_vehicle_constraints_are_still_enforced():
-  forbidden = ("EnforceTorqueControl", "NeuralNetworkLateralControl", "LateralJerkTorqueController",
+  forbidden = ("EnforceTorqueControl", "LateralJerkTorqueController",
                "AlphaLongitudinalEnabled", "AutoLaneChangeBsmDelay", "IntelligentCruiseButtonManagement")
   params = RecordingParams(dict.fromkeys((*PREFERENCES, *forbidden), True))
   constraints(params, steer_control_type=2, has_bsm=False)

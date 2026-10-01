@@ -80,8 +80,6 @@ LEGACY_FEATURE_EXPORTS = {
     "openpilot.nrdr.features.longitudinal.longitudinal_planner",
     (
       "CRUISE_ACCEL_VALUES",
-      "CRUISE_OVERSPEED_BRAKING_BUFFER",
-      "CRUISE_OVERSPEED_DRIVING_BUFFER",
       "LAUNCH_COMMIT_TIME",
       "LAUNCH_DISARM_SPEED",
       "LAUNCH_MAX_ACCEL",

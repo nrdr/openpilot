@@ -50,7 +50,7 @@ class TestLaneCenteringStack(unittest.TestCase):
     source = PARAM_HEADER.read_text(encoding="utf-8")
     expected = {
       "LaneCentering": 'PERSISTENT | BACKUP, BOOL, "0"',
-      "LaneCenteringE2EAuthority": 'PERSISTENT | BACKUP, FLOAT, "1.0"',
+      "LaneCenteringE2EAuthority": 'PERSISTENT | BACKUP, FLOAT, "0.0"',
       "LaneCenteringPauseOnSignal": 'PERSISTENT | BACKUP, BOOL, "1"',
       "LaneCenterOffset": 'PERSISTENT | BACKUP, FLOAT, "0.0"',
     }
@@ -59,8 +59,8 @@ class TestLaneCenteringStack(unittest.TestCase):
         self.assertEqual(len(re.findall(rf'\{{"{key}", \{{{re.escape(attributes)}\}}\}}', source)), 1)
     generated = PARAM_INCLUDE.read_text(encoding="utf-8")
     self.assertNotIn('"LaneCenteringMinSpeed"', source)
-    self.assertEqual(generated.count('{"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "50"}}'), 1)
-    self.assertEqual(generated.count('{"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.30"}}'), 1)
+    self.assertEqual(generated.count('{"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "12"}}'), 1)
+    self.assertEqual(generated.count('{"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.95"}}'), 1)
 
   def test_controls_are_rehomed_out_of_developer_pages(self) -> None:
     developer_sources = (
@@ -182,7 +182,7 @@ class TestLaneCenteringStack(unittest.TestCase):
     strength = items[4]
     self.assertEqual(strength["title"], "Lane-Centering Strength")
     self.assertEqual({field: strength[field] for field in ("min", "max", "step")}, {"min": 0.0, "max": 1.0, "step": 0.05})
-    self.assertIn("0.30 is the default", strength["description"])
+    self.assertIn("0.95 is the suggested setting", strength["description"])
     self.assertIn("1.0 requests the lane-center path", strength["description"])
     self.assertIn("without raising the existing maximum correction ceiling", strength["description"])
     self.assertEqual(items[5]["title"], "Model Break-In")
@@ -232,9 +232,9 @@ class TestLaneCenteringStack(unittest.TestCase):
     source = PARAM_HEADER.read_text(encoding="utf-8")
     generated = PARAM_INCLUDE.read_text(encoding="utf-8")
     self.assertIn('{"LaneCentering", {PERSISTENT | BACKUP, BOOL, "0"}}', source)
-    self.assertIn('{"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "50"}}', generated)
-    self.assertIn('{"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.30"}}', generated)
-    self.assertIn("Existing enabled installs adopt the new 50 mph minimum", NRDR_STEERING.read_text(encoding="utf-8"))
+    self.assertIn('{"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "12"}}', generated)
+    self.assertIn('{"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.95"}}', generated)
+    self.assertIn("5 m/s controller floor", NRDR_STEERING.read_text(encoding="utf-8"))
 
   def test_driver_override_is_wired_without_other_starpilot_controls(self) -> None:
     controlsd = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/controlsd.py").read_text(encoding="utf-8")

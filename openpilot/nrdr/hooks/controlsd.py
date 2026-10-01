@@ -1,7 +1,6 @@
 import math
 
-from openpilot.nrdr.params import get_live_params
-from openpilot.nrdr.params.snapshots import _bool_value
+from openpilot.nrdr.params import NrdrParamKey, get_live_params, read_bool
 from openpilot.nrdr.features.lateral.live_tuning import LiveTorqueTransition
 from openpilot.nrdr.features.lateral.torque_output_filter import HondaTorqueOutputFilter, torque_lpf_tau
 from openpilot.nrdr.features.lateral.lane_change_tuning import LaneChangeEntry, shape_lane_change_curvature
@@ -26,8 +25,8 @@ def initialize_live_parameter_settings(controls) -> None:
 
 def refresh_live_parameter_settings(controls, snapshot=None) -> None:
   snapshot = controls.nrdr_live_params.snapshot if snapshot is None else snapshot
-  controls.learn_stiffness = _bool_value(snapshot.get("NrdrLearnStiffness"))
-  controls.learn_angle_offset = _bool_value(snapshot.get("NrdrLearnAngleOffset"))
+  controls.learn_stiffness = read_bool(snapshot, NrdrParamKey.NRDR_LEARN_STIFFNESS, False)
+  controls.learn_angle_offset = read_bool(snapshot, NrdrParamKey.NRDR_LEARN_ANGLE_OFFSET, False)
 
 
 def finalize_lateral_torque(controls, torque: float, CS, active: bool, dt: float) -> float:

@@ -15,7 +15,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params import (
   confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported, request_handcrafted_lateral_profile,
 )
-from openpilot.nrdr.params.profiles import disable_suggested_settings
+from openpilot.nrdr.params import disable_suggested_settings
 from openpilot.nrdr.params.tuning_policy import SUGGESTED_DESCRIPTION
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.lane_centering import LaneCenteringLayout

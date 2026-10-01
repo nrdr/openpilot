@@ -7,7 +7,7 @@ from openpilot.nrdr.params.snapshots import ParamSnapshot
 
 
 def snapshot(generation=1, **changes):
-  return ParamSnapshot(generation, MappingProxyType({"NrdrInterpolatedTorqueShare": 10, **changes}))
+  return ParamSnapshot(generation, MappingProxyType({"NrdrLatRateDampingLowSpeed": 10, **changes}))
 
 
 def test_unchanged_settings_pass_normal_steering_through_exactly():
@@ -18,12 +18,12 @@ def test_unchanged_settings_pass_normal_steering_through_exactly():
 
 
 @pytest.mark.parametrize("changed", (
-  {"NrdrInterpolatedTorqueShare": 5}, {"NrdrSteerRatioMode": 3},
+  {"NrdrLatRateDampingLowSpeed": 5}, {"NrdrSteerRatioMode": 3},
   {"NrdrSteerRatioManualCenter": 17.0}, {"LatPScaleHighway": 110},
   {"LaneCenteringStrength": 0.3}, {"NrdrLearnAngleOffset": False},
   {"NrdrSteerRatioHybrid": True}, {"NrdrSteerRatioSourceB": 3}, {"NrdrSteerRatioBlendStart": 25.0},
-  {"NrdrInterpolatedTorqueFrictionHighway": 0.3},
-  {"NrdrLaneChangeTorqueFactor": 1.0}, {"NrdrLaneChangeFrictionPercent": 50},
+  {"NrdrLatRateDampingHighway": 0.3},
+  {"NrdrLatRateDampingStandard": 10}, {"NrdrOptimizedLaneChanges": False},
 ))
 def test_active_edit_is_bumpless_then_converges_without_disengagement(changed):
   transition = LiveTorqueTransition()
@@ -40,7 +40,7 @@ def test_active_edit_is_bumpless_then_converges_without_disengagement(changed):
 def test_disengagement_and_driver_override_clear_transition_immediately(active, pressed):
   transition = LiveTorqueTransition()
   transition.update(0.3, snapshot(), True, False, 0.01)
-  updated = snapshot(2, NrdrInterpolatedTorqueShare=5)
+  updated = snapshot(2, NrdrLatRateDampingLowSpeed=5)
   transition.update(0.7, updated, True, False, 0.01)
   assert transition.update(0.0, updated, active, pressed, 0.01) == 0.0
   assert transition.remaining == 0.0
@@ -50,9 +50,9 @@ def test_disengagement_and_driver_override_clear_transition_immediately(active, 
 def test_repeated_edits_and_nonfinite_outputs_do_not_leave_stale_bias():
   transition = LiveTorqueTransition()
   transition.update(0.3, snapshot(), True, False, 0.01)
-  first = snapshot(2, NrdrInterpolatedTorqueShare=5)
+  first = snapshot(2, NrdrLatRateDampingLowSpeed=5)
   transition.update(0.7, first, True, False, 0.01)
-  second = snapshot(3, NrdrInterpolatedTorqueShare=15)
+  second = snapshot(3, NrdrLatRateDampingLowSpeed=15)
   assert transition.update(-0.5, second, True, False, 0.01) == pytest.approx(0.3)
   transition.update(float("nan"), second, True, False, 0.01)
   assert transition.remaining == 0.0

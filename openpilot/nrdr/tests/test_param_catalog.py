@@ -25,14 +25,14 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "987b7faccab3ec54512f383b5c85b0f9b9d63636f4a081e1905534a84a92b815"
+REGISTRY_METADATA_SHA256 = "1bd1b41c190df9c26a4302c9565c29e0cb0f29fa0357150d772e037f50be545e"
 
 
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 142)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 141)
+    self.assertEqual(len(PARAM_SPECS), 148)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 147)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
 
@@ -58,15 +58,15 @@ class TestParamCatalog(unittest.TestCase):
     spec = PARAM_SPECS_BY_KEY["LaneCenteringMinSpeed"]
     self.assertIs(spec.param_type, ParamType.INT)
     self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
-    self.assertEqual(spec.default, "50")
+    self.assertEqual(spec.default, "12")
     self.assertIs(spec.lifecycle, ParamLifecycle.SETTING)
     self.assertIs(spec.owner, ParamOwner.LATERAL)
 
-  def test_lane_centering_strength_preserves_legacy_default(self) -> None:
+  def test_lane_centering_strength_uses_suggested_default(self) -> None:
     spec = PARAM_SPECS_BY_KEY["LaneCenteringStrength"]
     self.assertIs(spec.param_type, ParamType.FLOAT)
     self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
-    self.assertEqual(spec.default, "0.30")
+    self.assertEqual(spec.default, "0.95")
     self.assertIs(spec.lifecycle, ParamLifecycle.SETTING)
     self.assertIs(spec.owner, ParamOwner.LATERAL)
 
@@ -84,6 +84,12 @@ class TestParamCatalog(unittest.TestCase):
 
     tombstones = {spec.key for spec in PARAM_SPECS if spec.lifecycle is ParamLifecycle.TOMBSTONE}
     self.assertEqual(tombstones, {
+      "NrdrInterpolatedTorquePifBlend", "NrdrInterpolatedTorqueShare", "NrdrInterpolatedTorqueLatAccelFactor",
+      "NrdrInterpolatedTorqueFriction", "NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway",
+      "NrdrLaneChangeMinTime", "NrdrLaneChangeEntrySrReduction", "NrdrLaneChangeEntryReturnTime",
+      "NrdrLaneChangeTorqueFactor", "NrdrLaneChangeFrictionPercent", "NrdrIncreaseOverrideTolerance",
+      "NrdrStarPilotPid", "NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain",
+      "NrdrNnlcKiGain", "NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed",
       "HondaCivicRadarTryout",
       "HondaNotchEnabled",
       "HondaNotchFreq",

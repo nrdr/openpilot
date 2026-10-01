@@ -89,8 +89,9 @@ class TestUiOwnership(unittest.TestCase):
     self.assertIn("self._hybrid, self._source_a, self._blend_start, self._source_b", source)
     self.assertIn("manual_enabled = manual_available", source)
     self.assertNotIn("ui_state.engaged", pidf_source)
-    self.assertIn("set_enabled(interpolated_supported)", pidf_source)
-    self.assertIn("set_enabled(interpolated_enabled)", pidf_source)
+    self.assertIn("set_enabled(tuning_write_allowed(ui_state.params, key))", pidf_source)
+    self.assertNotIn("NrdrInterpolatedTorquePifBlend", pidf_source)
+    self.assertIn('param="NrdrOptimizedLaneChanges"', pidf_source)
 
   def test_lateral_tuning_routes_all_feedforward_outputs_through_decimal_formatters(self):
     repository_root = Path(__file__).resolve().parents[3]

@@ -2,8 +2,6 @@
 
 from openpilot.nrdr.features.longitudinal.longitudinal_planner import (
   CRUISE_ACCEL_VALUES,
-  CRUISE_OVERSPEED_BRAKING_BUFFER,
-  CRUISE_OVERSPEED_DRIVING_BUFFER,
   LAUNCH_COMMIT_TIME,
   LAUNCH_DISARM_SPEED,
   LAUNCH_MAX_ACCEL,
@@ -18,8 +16,6 @@ from openpilot.nrdr.features.longitudinal.longitudinal_planner import (
 
 __all__ = (
   "CRUISE_ACCEL_VALUES",
-  "CRUISE_OVERSPEED_BRAKING_BUFFER",
-  "CRUISE_OVERSPEED_DRIVING_BUFFER",
   "LAUNCH_COMMIT_TIME",
   "LAUNCH_DISARM_SPEED",
   "LAUNCH_MAX_ACCEL",

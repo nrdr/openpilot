@@ -99,9 +99,9 @@ class TestParamSnapshots(unittest.TestCase):
     }
     keys = [key for group in CONTROL_GROUPS for key in group.keys]
     self.assertFalse(retired & set(keys))
-    self.assertEqual(len(CONTROL_GROUPS), 13)
+    self.assertEqual(len(CONTROL_GROUPS), 11)
     self.assertEqual(len(keys), len(set(keys)))
-    self.assertEqual(len(keys), 63)
+    self.assertEqual(len(keys), 49)
 
   def test_lane_settings_have_one_live_group_and_subsecond_cycle(self):
     self.assertIn(snapshots.LANE_CENTERING_PARAM_GROUP, CONTROL_GROUPS)
@@ -115,7 +115,7 @@ class TestParamSnapshots(unittest.TestCase):
     self.assertEqual(reader.get("LaneCenteringStrength"), b"0.3")
     self.assertEqual(initial.get("LaneCenteringStrength"), b"0")
 
-  def test_interpolated_torque_settings_share_one_atomic_group(self):
+  def test_retired_interpolated_torque_settings_have_no_runtime_polling(self):
     expected = {
       "NrdrInterpolatedTorquePifBlend",
       "NrdrInterpolatedTorqueShare",
@@ -125,8 +125,7 @@ class TestParamSnapshots(unittest.TestCase):
       "NrdrInterpolatedTorqueFrictionHighway",
     }
     matching = [group for group in CONTROL_GROUPS if expected.intersection(group.keys)]
-    self.assertEqual(len(matching), 1)
-    self.assertEqual(set(matching[0].keys), expected)
+    self.assertEqual(matching, [])
 
   def test_snapshot_keeps_legacy_get_and_bool_semantics(self):
     snapshot = ParamSnapshot(4, MappingProxyType({"Bytes": b"value", "False": b" FALSE ", "True": "yes"}))

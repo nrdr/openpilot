@@ -40,7 +40,7 @@ class SteerFiltersLayout(Widget):
 
     self._lpf_tau_standard = option_item_sp(
       param="HondaLpfTauStandard",
-      title=lambda: tr("Standard Tau (25-50mph) (Default: 0.1)"),
+      title=lambda: tr("Standard Tau (25-50mph) (Default: 0.02)"),
       min_value=0,
       max_value=500,
       value_change_step=1,
@@ -51,7 +51,7 @@ class SteerFiltersLayout(Widget):
 
     self._lpf_tau_highway = option_item_sp(
       param="HondaLpfTauHighway",
-      title=lambda: tr("Highway Tau (50mph+) (Default: 0.05)"),
+      title=lambda: tr("Highway Tau (50mph+) (Default: 0.00)"),
       min_value=0,
       max_value=500,
       value_change_step=1,
@@ -71,7 +71,7 @@ class SteerFiltersLayout(Widget):
 
     self._steer_delta_up = option_item_sp(
       param="HondaSteerDeltaUp",
-      title=lambda: tr("Steer Delta Up (Default: 3.0)"),
+      title=lambda: tr("Steer Delta Up (Default: 4.0)"),
       min_value=0,
       max_value=10000,
       value_change_step=10,
@@ -82,7 +82,7 @@ class SteerFiltersLayout(Widget):
 
     self._steer_delta_down = option_item_sp(
       param="HondaSteerDeltaDown",
-      title=lambda: tr("Steer Delta Down (Default: 3.0)"),
+      title=lambda: tr("Steer Delta Down (Default: 4.0)"),
       min_value=0,
       max_value=10000,
       value_change_step=10,

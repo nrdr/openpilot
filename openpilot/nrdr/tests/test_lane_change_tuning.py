@@ -15,8 +15,8 @@ from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
 from openpilot.nrdr.ui.sunnylink_schema import sunnylink_fields_for_key
 
 
-def settings(reduction=3.0, duration=1.0):
-  return {"NrdrLaneChangeEntrySrReduction": reduction, "NrdrLaneChangeEntryReturnTime": duration}
+def settings(reduction=5.0, duration=1.0):
+  return {"NrdrOptimizedLaneChanges": reduction != 0, "NrdrLaneChangeEntrySrReduction": reduction, "NrdrLaneChangeEntryReturnTime": duration}
 
 
 def tick(entry, state=2, direction=1, **kwargs):
@@ -31,9 +31,9 @@ def test_envelope_has_smooth_entry_bounded_peak_return_and_no_retrigger(directio
   entry = LaneChangeEntry()
   assert tick(entry, state=1, direction=direction) == 0
   values = [tick(entry, direction=direction) for _ in range(200)]
-  assert values[0] < 0.05
-  assert max(values) == pytest.approx(3.0)
-  assert all(0 <= v <= 3 for v in values)
+  assert values[0] < 0.1
+  assert max(values) == pytest.approx(5.0)
+  assert all(0 <= v <= 5 for v in values)
   assert values[115:] == [0.0] * len(values[115:])
   assert all(a <= b + 1e-10 for a, b in zip(values[:14], values[1:15], strict=True))
   assert all(a >= b - 1e-10 for a, b in zip(values[14:114], values[15:115], strict=True))
@@ -75,17 +75,17 @@ def test_driver_nudge_does_not_start_a_delayed_entry_after_release():
   assert tick(entry, driver_override=False) == 0
 
 
-def test_edits_are_captured_next_lane_change_except_zero_cancels():
+def test_retired_edits_do_not_change_shape_and_toggle_cancels():
   entry = LaneChangeEntry()
   tick(entry)
   for _ in range(14):
     tick(entry, settings=settings(5, 3))
-  assert entry.applied == pytest.approx(3)
+  assert entry.applied == pytest.approx(5)
   assert entry.return_seconds == 1
   for _ in range(25):
     tick(entry, state=1, settings=settings(5, 3))
   tick(entry, settings=settings(5, 3))
-  assert entry.reduction == 5 and entry.return_seconds == 3
+  assert entry.reduction == 5 and entry.return_seconds == 1
 
 
 @pytest.mark.parametrize("bad", (None, "bad", math.nan, math.inf, -math.inf))
@@ -151,20 +151,14 @@ def test_zero_does_not_touch_geometry():
   assert shape_lane_change_curvature(None, None, 0, 25, 0, 0.01, 0) == 0.01
 
 
-def test_ui_metadata_and_snapshots_are_complete():
+def test_only_optimized_toggle_is_exposed_and_polled():
   assert not validate_ui_metadata()
   controls = {key for group in CONTROL_GROUPS for key in group.keys}
   model = {key for group in MODEL_GROUPS for key in group.keys}
-  assert len(LANE_CHANGE_UI_METADATA) == 5
-  for metadata in LANE_CHANGE_UI_METADATA:
-    key = metadata.key.value
-    assert key in controls | model
-    native = get_native_option_spec(key)
-    remote = sunnylink_fields_for_key(key)
-    assert native.description == remote["details"]
-    assert remote["title"].startswith("NRDR ")
-    assert "reboot" in native.description or "refresh" in native.description
-  assert PARAM_SPECS_BY_KEY["NrdrLaneChangeEntrySrReduction"].default == "0.0"
+  assert not LANE_CHANGE_UI_METADATA
+  assert "NrdrOptimizedLaneChanges" in controls
+  assert not {"NrdrLaneChangeEntrySrReduction", "NrdrLaneChangeEntryReturnTime",
+              "NrdrLaneChangeTorqueFactor", "NrdrLaneChangeFrictionPercent"}.intersection(controls | model)
 
 
 def test_background_snapshot_propagates_entry_edits_without_engagement_or_reboot():
@@ -182,7 +176,7 @@ def test_background_snapshot_propagates_entry_edits_without_engagement_or_reboot
     live.poll_once()
   entry = LaneChangeEntry()
   assert tick(entry, settings=live.snapshot) > 0
-  assert entry.reduction == 3
+  assert entry.reduction == 5
 
 
 def test_shaping_is_before_curvature_limit_and_has_vehicle_gate():

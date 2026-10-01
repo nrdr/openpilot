@@ -198,28 +198,28 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertFalse(config.tesla.cooperative_steering)
     self.assertFalse(config.toyota.enforce_stock_longitudinal)
 
-  def test_missing_live_values_match_historical_defaults(self):
+  def test_missing_live_values_match_suggested_defaults(self):
     provider = HondaParamsProvider(FakeParams(), start_worker=False, metadata_path=self.tmp_path / "meta.json")
     tuning = provider.get_live_tuning()
 
     expected = HondaLiveTuning(
       generation=tuning.generation,
-      override_fade_down_s=0.1,
-      override_fade_up_s=0.1,
+      override_fade_down_s=0.5,
+      override_fade_up_s=0.01,
       override_torque_scale=0.0,
       driver_assist_during_override=True,
       live_learning_gas=True,
       torque_lpf_enabled=True,
       lpf_tau_low=0.1,
-      lpf_tau_standard=0.1,
-      lpf_tau_highway=0.05,
+      lpf_tau_standard=0.02,
+      lpf_tau_highway=0.0,
       steer_delta_limiter_enabled=False,
-      steer_delta_up=3.0,
-      steer_delta_down=3.0,
+      steer_delta_up=4.0,
+      steer_delta_down=4.0,
       stopping_decel_rate=0.3,
       increase_override_tolerance=False,
       driver_override_threshold=1400.0,
-      center_override_threshold=1000.0,
+      center_override_threshold=1200.0,
       center_boost_angle=0.0,
       alt_dashboard_speed=0,
       alt_dashboard_distance=0,
@@ -229,7 +229,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       sub_mode_until=0.0,
       ecu_matched_long=False,
       full_brake_authority=True,
-      roen_acceleration_limits=True,
+      roen_acceleration_limits=False,
     )
     self.assertEqual(tuning, expected)
 
@@ -240,7 +240,7 @@ class TestOpendbcBoundary(unittest.TestCase):
     tuning = provider.get_live_tuning(refresh_if_uninitialized=False)
     self.assertEqual(params.reads, before_reads)
     self.assertTrue(tuning.torque_lpf_enabled)
-    self.assertEqual((tuning.lpf_tau_low, tuning.lpf_tau_standard, tuning.lpf_tau_highway), (0.1, 0.1, 0.05))
+    self.assertEqual((tuning.lpf_tau_low, tuning.lpf_tau_standard, tuning.lpf_tau_highway), (0.1, 0.02, 0.0))
     params.values[str(OpendbcParamKey.HONDA_LPF_TAU_HIGHWAY)] = 0.07
     provider.refresh_all()  # Simulate the background worker's successful refresh.
     before_reads = list(params.reads)
@@ -549,7 +549,6 @@ class TestOpendbcBoundary(unittest.TestCase):
       "openpilot/selfdrive/car/card.py": "build_sunnypilot_car_config(self.params)",
       "openpilot/selfdrive/controls/controlsd.py": "build_sunnypilot_car_config(self.params)",
       "openpilot/selfdrive/test/process_replay/process_replay.py": "build_sunnypilot_car_config(params)",
-      "openpilot/nrdr/features/lateral/latcontrol_clarity_hybrid.py": "CI.interface_config",
       "openpilot/nrdr/features/services/car_tune_report.py": "build_sunnypilot_car_config(self.params, start_worker=False)",
       "openpilot/nrdr/ui/settings/lateral_tuning.py": "build_sunnypilot_car_config(ui_state.params, start_worker=False)",
     }

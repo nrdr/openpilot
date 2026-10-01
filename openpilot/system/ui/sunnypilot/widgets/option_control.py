@@ -1,4 +1,5 @@
 import pyray as rl
+import time
 from collections.abc import Callable
 from openpilot.common.params import Params
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
@@ -39,14 +40,7 @@ class OptionControlSP(ItemAction):
     self.use_float_scaling = use_float_scaling
     self.current_value = min_value
     self.label_callback = label_callback
-    if self.value_map:
-      for key in self.value_map:
-        if self.value_map[key] == self.params.get(self.param_key, return_default=True):
-          self.current_value = int(key)
-          break
-    else:
-      value = self.params.get(self.param_key, return_default=True)
-      self.current_value = int(float(value) * 100.0) if self.use_float_scaling else int(value)
+    self._refresh_from_params(force=True)
 
     # Initialize font and button styles
     self._font = gui_app.font(FontWeight.MEDIUM)
@@ -58,6 +52,20 @@ class OptionControlSP(ItemAction):
   def get_value(self) -> int:
     """Get the current value of the control"""
     return self.current_value
+
+  def _refresh_from_params(self, *, force=False):
+    now = time.monotonic()
+    if not force and now < getattr(self, "_next_param_refresh", 0.0):
+      return
+    self._next_param_refresh = now + 0.5
+    value = self.params.get(self.param_key, return_default=True)
+    if self.value_map:
+      for key, mapped in self.value_map.items():
+        if mapped == value:
+          self.current_value = int(key)
+          break
+    elif value is not None:
+      self.current_value = round(float(value) * 100.0) if self.use_float_scaling else int(value)
 
   def set_value(self, value: int):
     """Set the control to a specific value"""
@@ -101,6 +109,8 @@ class OptionControlSP(ItemAction):
   def _render(self, rect: rl.Rectangle):
     if self._rect.width == 0 or self._rect.height == 0 or not self.is_visible:
       return
+
+    self._refresh_from_params()
 
     control_width = (BUTTON_WIDTH * 2) + self.label_width + (BUTTON_SPACING * 2)
     total_width = control_width + (CONTAINER_PADDING * 2)
@@ -153,7 +163,8 @@ class OptionControlSP(ItemAction):
   def _render_value_label(self):
     """Render the current value label"""
     text = self.get_displayed_value()
-    text_color = style.ITEM_TEXT_COLOR if self.enabled else style.ITEM_DISABLED_TEXT_COLOR
+    allowed = self.enabled and tuning_write_allowed(self.params, self.param_key)
+    text_color = style.ITEM_TEXT_COLOR if allowed else style.ITEM_DISABLED_TEXT_COLOR
 
     text_size = measure_text_cached(self._font, text, VALUE_FONT_SIZE)
     text_x = self.label_rect.x + (self.label_rect.width - text_size.x) / 2
@@ -162,6 +173,8 @@ class OptionControlSP(ItemAction):
     rl.draw_text_ex(self._font, text, rl.Vector2(text_x, text_y), VALUE_FONT_SIZE, 0, text_color)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
+    # A profile or remote edit may have changed the baseline since the last frame.
+    self._refresh_from_params(force=True)
     if self._minus_enabled and rl.check_collision_point_rec(mouse_pos, self.minus_btn_rect):
       new_value = self.current_value - self.value_change_step
       new_value = max(self.min_value, new_value)

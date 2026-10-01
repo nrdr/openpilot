@@ -28,6 +28,7 @@ from openpilot.nrdr.tools.sr_correction_analysis import (
   nearest_sample,
   phase_from_steering,
   rejection_reason,
+  sample_cohort,
   stable_dwell_samples,
 )
 
@@ -60,5 +61,6 @@ __all__ = (
   "nearest_sample",
   "phase_from_steering",
   "rejection_reason",
+  "sample_cohort",
   "stable_dwell_samples",
 )

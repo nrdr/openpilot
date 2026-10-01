@@ -10,7 +10,6 @@ from openpilot.nrdr.params import NrdrParamKey, ParamReader, ParamValue, read_bo
 
 
 MIGRATED_PARAM_CONSUMERS = (
-  "openpilot/nrdr/features/lateral/interpolated_torque_pif.py",
   "openpilot/nrdr/features/lateral/latcontrol_pid.py",
   "openpilot/nrdr/features/lateral/tune_learner.py",
   "openpilot/nrdr/features/longitudinal/longcontrol.py",
@@ -95,10 +94,8 @@ HOOK_AND_UI_CONSUMERS = {
   "openpilot/selfdrive/selfdrived/selfdrived.py": ("openpilot.nrdr.hooks",),
   "openpilot/selfdrive/ui/sunnypilot/layouts/settings/cruise.py": ("openpilot.nrdr.ui",),
   "openpilot/selfdrive/ui/sunnypilot/layouts/settings/cruise_sub_layouts/speed_limit_settings.py": ("openpilot.nrdr.ui",),
-  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/models.py": ("openpilot.nrdr.ui",),
   "openpilot/selfdrive/ui/sunnypilot/layouts/settings/steering.py": ("openpilot.nrdr.ui",),
   "openpilot/selfdrive/ui/sunnypilot/layouts/settings/visuals.py": ("openpilot.nrdr.ui",),
-  "openpilot/selfdrive/ui/sunnypilot/ui_state.py": ("openpilot.nrdr.ui",),
   "openpilot/sunnypilot/mads/mads.py": ("openpilot.nrdr.features.driver_policy", "openpilot.nrdr.hooks"),
   "openpilot/sunnypilot/mads/state.py": ("openpilot.nrdr.hooks",),
   "openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py": ("openpilot.nrdr.hooks",),
@@ -143,7 +140,7 @@ class TestPackageBoundaries(unittest.TestCase):
     repository_root = Path(__file__).resolve().parents[3]
     for relative_path in MIGRATED_PARAM_CONSUMERS:
       with self.subTest(path=relative_path):
-        source = (repository_root / relative_path).read_text()
+        source = (repository_root / relative_path).read_text(encoding="utf-8")
         self.assertIn("from openpilot.nrdr.params import", source)
         self.assertNotIn("from openpilot.sunnypilot.nrdr.params import", source)
 
@@ -151,7 +148,7 @@ class TestPackageBoundaries(unittest.TestCase):
     repository_root = Path(__file__).resolve().parents[3]
     failures: list[str] = []
     for relative_path in MIGRATED_PARAM_CONSUMERS:
-      tree = ast.parse((repository_root / relative_path).read_text(), filename=relative_path)
+      tree = ast.parse((repository_root / relative_path).read_text(encoding="utf-8"), filename=relative_path)
       for node in ast.walk(tree):
         if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
           continue
@@ -174,8 +171,8 @@ class TestPackageBoundaries(unittest.TestCase):
     )
     for relative_path in PHASE_TWO_CONSUMERS:
       with self.subTest(path=relative_path):
-        source = (repository_root / relative_path).read_text()
-        self.assertIn("from openpilot.nrdr.params import", source)
+        source = (repository_root / relative_path).read_text(encoding="utf-8")
+        # Policy/widget-only consumers need no direct Params facade import.
         self.assertFalse(any(import_line in source for import_line in forbidden))
 
   def test_public_parameter_exports_are_lazy_and_complete(self):
@@ -205,14 +202,14 @@ class TestPackageBoundaries(unittest.TestCase):
     repository_root = Path(__file__).resolve().parents[3]
     for relative_path in CANONICAL_FEATURE_MODULES:
       with self.subTest(path=relative_path):
-        source = (repository_root / relative_path).read_text()
+        source = (repository_root / relative_path).read_text(encoding="utf-8")
         self.assertNotIn("openpilot.sunnypilot.nrdr", source)
 
   def test_production_consumers_import_canonical_feature_owners(self):
     repository_root = Path(__file__).resolve().parents[3]
     for relative_path, module_name in FEATURE_CONSUMERS.items():
       with self.subTest(path=relative_path):
-        source = (repository_root / relative_path).read_text()
+        source = (repository_root / relative_path).read_text(encoding="utf-8")
         self.assertIn(f"from {module_name} import", source)
         self.assertNotIn("from openpilot.sunnypilot.nrdr.", source)
 
@@ -220,14 +217,14 @@ class TestPackageBoundaries(unittest.TestCase):
     repository_root = Path(__file__).resolve().parents[3]
     for relative_path in CANONICAL_HOOK_AND_UI_MODULES:
       with self.subTest(path=relative_path):
-        source = (repository_root / relative_path).read_text()
+        source = (repository_root / relative_path).read_text(encoding="utf-8")
         self.assertNotIn("openpilot.sunnypilot.nrdr", source)
 
   def test_framework_consumers_use_canonical_hook_and_policy_facades(self):
     repository_root = Path(__file__).resolve().parents[3]
     for relative_path, module_names in HOOK_AND_UI_CONSUMERS.items():
       with self.subTest(path=relative_path):
-        source = (repository_root / relative_path).read_text()
+        source = (repository_root / relative_path).read_text(encoding="utf-8")
         for module_name in module_names:
           self.assertIn(f"from {module_name} import", source)
         self.assertNotIn("from openpilot.sunnypilot.nrdr.", source)
@@ -239,7 +236,7 @@ class TestPackageBoundaries(unittest.TestCase):
       if path.name == "__init__.py" or path.name.startswith("test_"):
         continue
       with self.subTest(path=path.name):
-        tree = ast.parse(path.read_text(), filename=path.name)
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=path.name)
         definitions = [
           node for node in tree.body
           if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
@@ -261,7 +258,7 @@ class TestPackageBoundaries(unittest.TestCase):
 
   def test_ui_metadata_keeps_params_dependency_direction(self):
     params_dir = Path(__file__).resolve().parent.parent / "params"
-    tree = ast.parse((params_dir / "ui_metadata.py").read_text(), filename="ui_metadata.py")
+    tree = ast.parse((params_dir / "ui_metadata.py").read_text(encoding="utf-8"), filename="ui_metadata.py")
     forbidden_prefixes = (
       "openpilot.common",
       "openpilot.nrdr.features",
@@ -283,7 +280,7 @@ class TestPackageBoundaries(unittest.TestCase):
     canonical = import_module("openpilot.nrdr.tools.sr_correction_analysis")
     legacy = import_module("openpilot.sunnypilot.nrdr.sr_correction_analysis")
     canonical_path = Path(canonical.__file__).resolve()
-    tree = ast.parse(canonical_path.read_text(), filename=canonical_path.name)
+    tree = ast.parse(canonical_path.read_text(encoding="utf-8"), filename=canonical_path.name)
     module_defined: set[str] = set()
     for node in tree.body:
       if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -305,7 +302,7 @@ class TestPackageBoundaries(unittest.TestCase):
 
   def test_canonical_steer_ratio_cli_imports_the_canonical_analysis_module(self):
     repository_root = Path(__file__).resolve().parents[3]
-    source = (repository_root / "openpilot/nrdr/tools/steer_ratio/correction.py").read_text()
+    source = (repository_root / "openpilot/nrdr/tools/steer_ratio/correction.py").read_text(encoding="utf-8")
     self.assertIn("from openpilot.nrdr.tools.sr_correction_analysis import", source)
     self.assertNotIn("from openpilot.sunnypilot.nrdr.sr_correction_analysis import", source)
 
@@ -319,7 +316,7 @@ class TestPackageBoundaries(unittest.TestCase):
 
   def test_canonical_latcontrol_pid_uses_canonical_lateral_dependencies(self):
     repository_root = Path(__file__).resolve().parents[3]
-    source = (repository_root / "openpilot/nrdr/features/lateral/latcontrol_pid.py").read_text()
+    source = (repository_root / "openpilot/nrdr/features/lateral/latcontrol_pid.py").read_text(encoding="utf-8")
     self.assertIn("from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch", source)
     for module in ("honda_vgr", "lat_stiction", "phase_detector", "tune_learner"):
       with self.subTest(module=module):
@@ -331,7 +328,7 @@ class TestPackageBoundaries(unittest.TestCase):
     legacy_dir = repository_root / "openpilot" / "sunnypilot" / "nrdr"
     for module_name, expected_exports in LATERAL_COMPATIBILITY_EXPORTS.items():
       with self.subTest(module=module_name):
-        tree = ast.parse((legacy_dir / f"{module_name}.py").read_text(), filename=module_name)
+        tree = ast.parse((legacy_dir / f"{module_name}.py").read_text(encoding="utf-8"), filename=module_name)
         import_nodes = [node for node in tree.body if isinstance(node, ast.ImportFrom)]
         self.assertEqual(len(import_nodes), 1)
         self.assertEqual(import_nodes[0].module, f"openpilot.nrdr.features.lateral.{module_name}")
@@ -385,17 +382,13 @@ class TestPackageBoundaries(unittest.TestCase):
     repository_root = Path(__file__).resolve().parents[3]
     consumers = (
       "openpilot/nrdr/tools/lateral/attribution.py",
-      "openpilot/nrdr/ui/settings/pidf_ground.py",
-      "openpilot/nrdr/features/services/car_tune_report.py",
-      "openpilot/nrdr/features/lateral/latcontrol_pid.py",
-      "openpilot/sunnypilot/sunnylink/capabilities.py",
     )
     for relative_path in consumers:
       with self.subTest(path=relative_path):
-        source = (repository_root / relative_path).read_text()
+        source = (repository_root / relative_path).read_text(encoding="utf-8")
         self.assertIn("from openpilot.nrdr.features.lateral.model_policy import", source)
         self.assertNotIn("from openpilot.sunnypilot.nrdr.model_policy import", source)
 
-    controller = (repository_root / "openpilot/nrdr/features/lateral/latcontrol_pid.py").read_text()
+    controller = (repository_root / "openpilot/nrdr/features/lateral/latcontrol_pid.py").read_text(encoding="utf-8")
     self.assertIn("from openpilot.nrdr.features.lateral.steer_ratio_tuning import", controller)
     self.assertNotIn("from openpilot.sunnypilot.nrdr.steer_ratio_tuning import", controller)

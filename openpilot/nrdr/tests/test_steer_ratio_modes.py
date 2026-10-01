@@ -373,6 +373,8 @@ def test_every_lateral_controller_path_uses_the_shared_selection_api():
     for helper in helpers:
       assert f"steer_ratio_selection.{helper}" in source, f"{relative_path} bypasses {helper}"
 
-  hybrid = (repository_root / "openpilot/nrdr/features/lateral/latcontrol_clarity_hybrid.py").read_text(encoding="utf-8")
-  assert "self.pid_controller.set_steer_ratio_selection(selection)" in hybrid
-  assert "self.torque_controller.set_steer_ratio_selection(selection)" in hybrid
+  # The optional VFN controller deliberately owns its calibrated rack map;
+  # the NRDR SR dropdowns are locked while it is selected.
+  yaw = (repository_root / "openpilot/nrdr/features/lateral/latcontrol_vfn_eps.py").read_text(encoding="utf-8")
+  assert "self.rack_map.angle_from_curvature" in yaw
+  assert "self.rack_map.curvature_from_angle" in yaw

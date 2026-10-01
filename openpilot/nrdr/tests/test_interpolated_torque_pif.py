@@ -148,7 +148,7 @@ def test_held_pose_validity_clears_on_calibration_loss_and_recovers_only_when_re
   assert rebuilt_pose.angular_velocity_valid
 
 
-def test_settings_are_bounded_and_master_is_gated_by_support():
+def test_fixed_settings_ignore_retired_values_and_master_is_gated_by_support():
   settings = resolve_interpolated_torque_pif_settings(_settings(
     NrdrInterpolatedTorqueShare=150,
     NrdrInterpolatedTorqueLatAccelFactor=0,
@@ -158,14 +158,14 @@ def test_settings_are_bounded_and_master_is_gated_by_support():
   ), supported=False)
 
   assert not settings.enabled
-  assert settings.torque_share == 1.0
-  assert settings.lat_accel_factor == 0.1
+  assert settings.torque_share == 0.01
+  assert settings.lat_accel_factor == 10.0
   assert settings.friction == settings.friction_low == 1.0
-  assert settings.friction_standard == 0.0
+  assert settings.friction_standard == 1.0
   assert settings.friction_highway == 1.0
 
 
-def test_settings_selection_replaces_the_whole_tuple_while_active():
+def test_retired_settings_never_replace_the_fixed_tuple_while_active():
   latch = InterpolatedTorquePifSettingsLatch(
     resolve_interpolated_torque_pif_settings(_settings(), supported=True),
   )
@@ -179,10 +179,10 @@ def test_settings_selection_replaces_the_whole_tuple_while_active():
   )
 
   engaged = latch.update(changed, supported=True, active=True)
-  assert engaged == InterpolatedTorquePifSettings(False, 0.8, 7.0, 0.2, 0.3, 0.4)
+  assert engaged == InterpolatedTorquePifSettings(True, 0.01, 10.0, 1.0, 1.0, 1.0)
 
   inactive = latch.update(changed, supported=True, active=False)
-  assert inactive == InterpolatedTorquePifSettings(False, 0.8, 7.0, 0.2, 0.3, 0.4)
+  assert inactive == InterpolatedTorquePifSettings(True, 0.01, 10.0, 1.0, 1.0, 1.0)
 
 
 @pytest.mark.parametrize("speed_mph,expected", (

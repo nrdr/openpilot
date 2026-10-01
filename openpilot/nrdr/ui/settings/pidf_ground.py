@@ -4,6 +4,7 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.network import NavButton
@@ -44,10 +45,14 @@ class PidfGroundLayout(Widget):
         key = f"NrdrLatRateDamping{band}" if term == "D" else f"Lat{term}Scale{band}"
         description = ("Opposes reported steering rate. 0% disables it. The 30% starting value needs road validation." if term == "D"
                        else f"Scales the {name.lower()} term in this speed band.")
+        spec = get_native_option_spec(key) if term in ("P", "I") else None
+        if spec is not None:
+          description = spec.description
         items.append(remember(key, option_item_sp(
           title=lambda label=label, name=name: tr(f"{label} — {name}"), param=key,
-          description=lambda description=description: tr(description), min_value=0,
-          max_value=300 if term == "D" else 500, value_change_step=5, label_callback=lambda value: f"{value}%")))
+          description=lambda description=description: tr(description), min_value=spec.min_value if spec else 0,
+          max_value=spec.max_value if spec else (300 if term == "D" else 500),
+          value_change_step=spec.value_change_step if spec else 5, label_callback=lambda value: f"{value}%")))
     items.append(LineSeparatorSP(40))
     for key, title, maximum, step, scaled, suffix in (
       ("HondaCenterScale", "Center Boost", 500, 1, True, "%"),

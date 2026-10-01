@@ -25,7 +25,6 @@ INHERITED_LANE_CENTERING_KEYS = {
 EXPECTED_SOURCE_FILES = (
   "_macros.yaml",
   "items/device.yaml",
-  "items/steering.yaml",
   "pages/cruise.yaml",
   "pages/software.yaml",
   "pages/steering.yaml",
@@ -63,7 +62,7 @@ def _honda_tuning_write_keys() -> frozenset[str]:
 class TestSunnylinkSourceOwnership(unittest.TestCase):
   def test_manifest_is_explicit_complete_and_deterministic(self):
     self.assertEqual(MACRO_SOURCE, "_macros.yaml")
-    self.assertEqual(ITEM_SOURCE_FILES, ("items/device.yaml", "items/steering.yaml"))
+    self.assertEqual(ITEM_SOURCE_FILES, ("items/device.yaml",))
     self.assertEqual(PAGE_SOURCE_FILES, ("pages/cruise.yaml", "pages/software.yaml", "pages/steering.yaml"))
     self.assertEqual(SOURCE_FILES, EXPECTED_SOURCE_FILES)
     actual = tuple(sorted(path.relative_to(SOURCE_ROOT).as_posix() for path in SOURCE_ROOT.rglob("*.yaml")))
@@ -104,8 +103,9 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
 
     canonical_keys = set(canonical_references) & catalog_keys
     generated_nrdr_keys = set(generated_references) & catalog_keys
-    self.assertEqual(len(canonical_keys), 98)
-    self.assertEqual(canonical_keys, generated_nrdr_keys)
+    self.assertEqual(len(canonical_keys), 68)
+    # The adapter adds the pending-apply lock to each suggested-profile control.
+    self.assertEqual(canonical_keys | {"NrdrHandcraftedLateralTune"}, generated_nrdr_keys)
     self.assertEqual(set(canonical_references) - catalog_keys, INHERITED_LANE_CENTERING_KEYS)
     retired_setting_keys = {
       "NrdrPersonalityAccelProfiles",
@@ -187,11 +187,6 @@ assert "openpilot.sunnypilot.sunnylink.tools.compile_settings_ui" not in sys.mod
         panel = next(p for p in source_sections["nrdr_special"]["sub_panels"] if p["id"] == panel_id)
       _collect_keys(panel, source_honda_keys)
     honda_tuning_write_keys = _honda_tuning_write_keys()
-    lane_change = _yaml_document("items/steering.yaml")
-    for item in lane_change["items"]:
-      if item["key"] != "NrdrLaneChangeMinTime":
-        self.assertEqual(item["enablement"], [capability_rule])
-        source_honda_keys.append(item["key"])
     self.assertEqual(set(source_honda_keys), honda_tuning_write_keys)
     self.assertTrue({"LaneCentering", "NrdrLearnStiffness"}.isdisjoint(honda_tuning_write_keys))
 

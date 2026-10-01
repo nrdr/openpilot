@@ -76,43 +76,19 @@ def test_failed_group_retains_last_good_values():
   assert reader.snapshot.values["a"] == reader.snapshot.values["b"] == b"2"
 
 
-def test_nnlc_enable_and_gains_publish_together():
+def test_retired_controller_settings_are_not_polled():
+  retired = {"NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain",
+             "NrdrNnlcKiGain", "NrdrInterpolatedTorquePifBlend", "NrdrInterpolatedTorqueShare",
+             "NrdrInterpolatedTorqueLatAccelFactor", "NrdrInterpolatedTorqueFriction",
+             "NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway"}
   values = {key: b"1" for group in CONTROL_GROUPS for key in group.keys}
-  values["NrdrNnlcEnabled"] = b"0"
-  params = RecordingParams(values)
+  params = RecordingParams(values | dict.fromkeys(retired, b"0"))
   reader = LiveParams(CONTROL_GROUPS, params=params, start_worker=False)
   initial = reader.snapshot
-
-  params.values.update({
-    "NrdrNnlcEnabled": b"1",
-    "NrdrNnlcActivationSpeed": b"45",
-    "NrdrNnlcKpGain": b"125",
-    "NrdrNnlcKfGain": b"60",
-    "NrdrNnlcKiGain": b"15",
-  })
+  params.values.update(dict.fromkeys(retired, b"1"))
   _poll_cycle(reader)
-
-  assert reader.snapshot is not initial
-  assert reader.get_bool("NrdrNnlcEnabled")
-  assert reader.get("NrdrNnlcActivationSpeed") == b"45"
-  assert reader.get("NrdrNnlcKpGain") == b"125"
-  assert reader.get("NrdrNnlcKfGain") == b"60"
-  assert reader.get("NrdrNnlcKiGain") == b"15"
-
-
-def test_interpolated_torque_settings_publish_together():
-  keys = {
-    "NrdrInterpolatedTorquePifBlend",
-    "NrdrInterpolatedTorqueShare",
-    "NrdrInterpolatedTorqueLatAccelFactor",
-    "NrdrInterpolatedTorqueFriction",
-    "NrdrInterpolatedTorqueFrictionStandard",
-    "NrdrInterpolatedTorqueFrictionHighway",
-  }
-  matching = [group for group in CONTROL_GROUPS if keys.intersection(group.keys)]
-
-  assert len(matching) == 1
-  assert set(matching[0].keys) == keys
+  assert reader.snapshot is initial
+  assert not retired.intersection(key for group in CONTROL_GROUPS for key in group.keys)
 
 
 def test_engagement_latched_groups_force_refresh_all_or_nothing():

@@ -85,70 +85,6 @@ _PERCENT_SCALE: Final = NumericUiMetadata(
 )
 _BASE_UI_METADATA: Final = (
   ParamUiMetadata(
-    key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR,
-    widget=UiWidget.OPTION,
-    title=tr_noop("Spoofed Lateral Acceleration Factor"),
-    native_title=tr_noop("Spoofed Lateral Acceleration Factor (Default: 5.0 m/s²)"),
-    description=tr_noop("Sets how much lateral acceleration the legacy torque half treats as full normalized steering torque."),
-    details=tr_noop(
-      "Higher values ask the torque half for less steering for the same planned curve. It scales Torque feedback error and "
-      "non-friction feedforward, but never direct friction. This is m/s², not m/s. Changes apply live after the next "
-      "background refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required."
-    ),
-    native_description_source=UiDescriptionSource.DETAILS,
-    numeric=NumericUiMetadata(minimum=0.1, maximum=10.0, step=0.1, unit="m/s²", display_precision=1, display_suffix=" m/s²"),
-    edit_policies=(),
-    remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
-  ),
-  ParamUiMetadata(
-    key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
-    widget=UiWidget.OPTION,
-    title=tr_noop("Low-Speed Torque Friction (Below 25mph)"),
-    native_title=tr_noop("Low-Speed Torque Friction (Below 25mph) (Default: 0.12)"),
-    description=tr_noop("Sets direct normalized steering torque for the legacy torque half below 25 mph."),
-    details=tr_noop(
-      "Helps the legacy torque half overcome rack friction. A ±1 mph handoff blends this value smoothly into Standard from "
-      "24-26 mph. It is independent of the lateral acceleration factor. Changes apply live after the next background "
-      "refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required."
-    ),
-    native_description_source=UiDescriptionSource.DETAILS,
-    numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
-    edit_policies=(),
-    remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
-  ),
-  ParamUiMetadata(
-    key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD,
-    widget=UiWidget.OPTION,
-    title=tr_noop("Standard-Speed Torque Friction (25-50mph)"),
-    native_title=tr_noop("Standard-Speed Torque Friction (25-50mph) (Default: 0.10)"),
-    description=tr_noop("Sets direct normalized steering torque for the legacy torque half between 25 and 50 mph."),
-    details=tr_noop(
-      "Helps the legacy torque half overcome rack friction. ±1 mph handoffs blend Low into this value from 24-26 mph and this "
-      "value into Highway from 49-51 mph. It is independent of the lateral acceleration factor. Changes apply live after "
-      "the next background refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required."
-    ),
-    native_description_source=UiDescriptionSource.DETAILS,
-    numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
-    edit_policies=(),
-    remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
-  ),
-  ParamUiMetadata(
-    key=NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY,
-    widget=UiWidget.OPTION,
-    title=tr_noop("Highway Torque Friction (50mph+)"),
-    native_title=tr_noop("Highway Torque Friction (50mph+) (Default: 0.06)"),
-    description=tr_noop("Sets direct normalized steering torque for the legacy torque half above 50 mph."),
-    details=tr_noop(
-      "Helps the legacy torque half overcome rack friction. A ±1 mph handoff blends Standard smoothly into this value from "
-      "49-51 mph. It is independent of the lateral acceleration factor. Changes apply live after the next background "
-      "refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required."
-    ),
-    native_description_source=UiDescriptionSource.DETAILS,
-    numeric=NumericUiMetadata(minimum=0.0, maximum=1.0, step=0.01, display_precision=2),
-    edit_policies=(),
-    remote_write_policy=UiRemoteWritePolicy.ANY_ROAD_STATE,
-  ),
-  ParamUiMetadata(
     key=NrdrParamKey.LAT_P_SCALE_LOW_SPEED,
     widget=UiWidget.OPTION,
     title=tr_noop("Low Speed Proportional Scale (Below 25mph)"),
@@ -231,59 +167,9 @@ def _lane_change_metadata(key: str, title: str, native_title: str, description: 
   )
 
 
-LANE_CHANGE_UI_METADATA = (
-  _lane_change_metadata(
-    "NrdrLaneChangeMinTime", tr_noop("NRDR Minimum Lane-Change State Time"),
-    tr_noop("NRDR Minimum Lane-Change State Time (Default: 0.5 s)"),
-    tr_noop("Minimum time before the lane-change state can finish; not the time to cross a lane. Default: 0.5 s."),
-    tr_noop("Separate from the SunnyPilot blinker start delay. Completion also requires the model's lane-change probability "
-            "to fall below its existing threshold. Read at each lane-change start after background refresh (normally 0.5 s); "
-            "no reboot or LKAS cycle. Configure while parked. Speed, blind-spot, road-edge and timeout checks are unchanged."),
-    NumericUiMetadata(0.5, 2.0, 0.1, unit="s", display_precision=1, display_suffix=" s"),
-  ),
-  _lane_change_metadata(
-    "NrdrLaneChangeEntrySrReduction", tr_noop("NRDR Lane Change Entry SR Reduction"),
-    tr_noop("NRDR Lane Change Entry SR Reduction (Default: 0.0)"),
-    tr_noop("Temporary command-side SR reduction. 0 disables it; 3.0 is an experimental test value, not a validated tune."),
-    tr_noop("Honda only. Uses the current resolved Manual, Comma, Measured, Firmware or Hybrid ratio. Ramps the reduction in "
-            "over 0.15 s, then smoothly restores the current source using Entry SR Return Time. Higher values ask for less "
-            "initial steering and can weaken a lane change. Saved geometry and learning are unchanged. Captured at the next "
-            "lane-change start after background refresh (normally 0.5 s), without reboot/LKAS cycling. Setting 0 cancels the "
-            "effect with a 0.2 s return. Configure while parked. Existing steering limits still apply."),
-    NumericUiMetadata(0.0, 5.0, 0.1, display_precision=1),
-  ),
-  _lane_change_metadata(
-    "NrdrLaneChangeEntryReturnTime", tr_noop("NRDR Lane Change Entry SR Return Time"),
-    tr_noop("NRDR Lane Change Entry SR Return Time (Default: 1.0 s)"),
-    tr_noop("Seconds to blend the entry SR reduction back to zero after the 0.15 s entry ramp. Default: 1.0 s."),
-    tr_noop("This is time-based request shaping, not measured lane-crossing progress. Longer values retain reduced steering "
-            "for longer. Ending the lane-change state or driver takeover returns it within 0.2 s; disengagement clears it. "
-            "Driver steering at the start suppresses entry shaping for that maneuver. Used only with a nonzero Entry SR "
-            "Reduction. Captured for the next lane change after background refresh, "
-            "without a reboot or LKAS cycle. Configure while parked."),
-    NumericUiMetadata(0.2, 3.0, 0.1, unit="s", display_precision=1, display_suffix=" s"),
-  ),
-  _lane_change_metadata(
-    "NrdrLaneChangeTorqueFactor", tr_noop("NRDR Legacy Lane Change Torque Factor"),
-    tr_noop("NRDR Legacy Lane Change Torque Factor (Default: 2.0x)"),
-    tr_noop("Legacy v1 torque controller only: multiplies its acceleration factor during lane-change states. Default: 2.0x."),
-    tr_noop("Honda v1 torque path only, including the pre-lane-change waiting state. Higher values generally reduce its "
-            "torque request. 1.0 removes this multiplier. Does not tune Honda PID, the PIF/Torque blend, NNLC or v0/jerk-aware "
-            "controllers. Edits apply after background refresh (normally 0.5 s), with the existing one-second tuning "
-            "transition. Configure while parked."),
-    NumericUiMetadata(1.0, 3.0, 0.1, display_precision=1, display_suffix="x"),
-  ),
-  _lane_change_metadata(
-    "NrdrLaneChangeFrictionPercent", tr_noop("NRDR Legacy Lane Change Friction"),
-    tr_noop("NRDR Legacy Lane Change Friction (Default: 0%)"),
-    tr_noop("Legacy v1 torque controller only: retained friction compensation during lane-change states. Default: 0%."),
-    tr_noop("Honda v1 torque path only, including the pre-lane-change waiting state. 0% preserves existing suppression; "
-            "100% retains its normal friction compensation. Does not change PID or PIF/Torque blend friction. "
-            "Edits apply after background refresh (normally 0.5 s), with the existing one-second tuning transition. "
-            "Configure while parked."),
-    NumericUiMetadata(0, 100, 5, unit="%", display_suffix="%"),
-  ),
-)
+# Compatibility export: lane-change shaping is now one optimized setting.
+LANE_CHANGE_UI_METADATA = ()
+
 NRDR_UI_METADATA: Final = (*_BASE_UI_METADATA, *LANE_CHANGE_UI_METADATA)
 NRDR_UI_METADATA_BY_KEY: Final = MappingProxyType({metadata.key.value: metadata for metadata in NRDR_UI_METADATA})
 

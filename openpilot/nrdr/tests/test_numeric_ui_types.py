@@ -6,6 +6,7 @@ from types import SimpleNamespace as NS
 import pytest
 
 from openpilot.nrdr.params.specs import PARAM_SPECS_BY_KEY, ParamType
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -27,7 +28,7 @@ def production_set_value(control, value):
   path = ROOT / "openpilot/system/ui/sunnypilot/widgets/option_control.py"
   cls = next(n for n in ast.parse(path.read_text()).body if isinstance(n, ast.ClassDef) and n.name == "OptionControlSP")
   method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "set_value")
-  namespace = {}
+  namespace = {"tuning_write_allowed": tuning_write_allowed}
   exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), "exec"), namespace)
   namespace["set_value"](control, value)
 
@@ -44,7 +45,7 @@ def test_float_settings_write_decimals_without_crashing(key, filename):
     assert type(value) is expected, f"UI would raise a Params TypeError: {name} {value!r}"
     writes.append(value)
   control = NS(**spec, current_value=spec["min_value"], value_map=None, param_key=key,
-               params=NS(put=put), on_value_changed=None)
+               params=NS(put=put, get=lambda *a, **kw: None), on_value_changed=None)
   for value in range(spec["min_value"] + spec["value_change_step"], spec["max_value"] + 1, spec["value_change_step"]):
     production_set_value(control, value)
     assert writes[-1] == pytest.approx(value / 100)
