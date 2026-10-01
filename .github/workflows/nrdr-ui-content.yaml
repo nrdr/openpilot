@@ -1,0 +1,43 @@
+name: NRDR UI content regression checks
+
+on:
+  push:
+    branches: ['nrdr-architecture-development']
+  pull_request:
+    paths:
+      - 'openpilot/selfdrive/selfdrived/events.py'
+      - 'openpilot/selfdrive/ui/**'
+      - 'openpilot/system/ui/**'
+      - 'openpilot/nrdr/ui/**'
+      - 'openpilot/sunnypilot/sunnylink/**'
+      - 'openpilot/sunnypilot/selfdrive/selfdrived/**'
+      - 'openpilot/nrdr/tests/test_no_donation_promotions.py'
+      - 'openpilot/nrdr/tests/test_mici_alert_overlay.py'
+      - '.github/workflows/nrdr-ui-content.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ui-content:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: false
+          lfs: false
+      - name: Install isolated test dependencies
+        run: |
+          python3 -m venv .ui-content-tests
+          .ui-content-tests/bin/python -m pip install pytest==9.1.1
+      - name: Check startup and home-screen content
+        run: |
+          .ui-content-tests/bin/python -m pytest -q -p no:cacheprovider \
+            --confcutdir=openpilot/nrdr/tests \
+            openpilot/nrdr/tests/test_no_donation_promotions.py \
+            openpilot/nrdr/tests/test_mici_alert_overlay.py
+      # No publication, device access, or branch mutation.

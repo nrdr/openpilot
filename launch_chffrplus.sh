@@ -4,6 +4,12 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source "$DIR/launch_env.sh"
 
+# Recreate local developer helpers after branch switches, reinstalls, or factory resets.
+# This is the actual boot entry on the August base; launch_openpilot.sh only delegates here.
+if [[ -f "${DIR}/openpilot/nrdr/tools/device/setup_dev_helpers.sh" ]]; then
+  bash "${DIR}/openpilot/nrdr/tools/device/setup_dev_helpers.sh" || true
+fi
+
 function agnos_init {
   # TODO: move this to agnos
   sudo rm -f /data/etc/NetworkManager/system-connections/*.nmmeta
@@ -19,12 +25,16 @@ function agnos_init {
 
   # Check if AGNOS update is required
   if [ $(< /VERSION) != "$AGNOS_VERSION" ]; then
-    AGNOS_PY="$DIR/system/hardware/tici/agnos.py"
-    MANIFEST="$DIR/system/hardware/tici/agnos.json"
+    AGNOS_PY="$DIR/openpilot/common/hardware/comma/agnos.py"
+    MANIFEST="$DIR/openpilot/system/hardware/comma/agnos.json"
+    # Stale updater zipapp still imports pyserial; repo root serial/ shim is on PYTHONPATH.
+    export PYTHONPATH="$DIR${PYTHONPATH:+:$PYTHONPATH}"
     if $AGNOS_PY --verify $MANIFEST; then
       sudo reboot
     fi
-    $DIR/system/hardware/tici/updater $AGNOS_PY $MANIFEST
+    while true; do
+      $DIR/openpilot/common/hardware/comma/updater $AGNOS_PY $MANIFEST
+    done
   fi
 }
 
@@ -70,6 +80,14 @@ function launch {
   ln -sfn $(pwd) /data/pythonpath
   export PYTHONPATH="$PWD"
 
+  # submodule package symlinks for PYTHONPATH imports on device.
+  # on PC these come from editable installs via pyproject.toml / uv.
+  ln -sfn msgq_repo/msgq msgq
+  ln -sfn opendbc_repo/opendbc opendbc
+  ln -sfn rednose_repo/rednose rednose
+  ln -sfn teleoprtc_repo/teleoprtc teleoprtc
+  ln -sfn tinygrad_repo/tinygrad tinygrad
+
   # hardware specific init
   if [ -f /AGNOS ]; then
     agnos_init
@@ -79,7 +97,7 @@ function launch {
   tmux capture-pane -pq -S-1000 > /tmp/launch_log
 
   # start manager
-  cd system/manager
+  cd openpilot/system/manager
   if [ ! -f $DIR/prebuilt ]; then
     ./build.py
   fi

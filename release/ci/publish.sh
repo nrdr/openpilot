@@ -30,7 +30,7 @@ if [ -z "$GIT_ORIGIN" ]; then
 fi
 
 # "Tagging"
-echo "#define SUNNYPILOT_VERSION \"$VERSION\"" > ${OUTPUT_DIR}/sunnypilot/common/version.h
+echo "#define SUNNYPILOT_VERSION \"$VERSION\"" > ${OUTPUT_DIR}/openpilot/sunnypilot/common/version.h
 
 ## set git identity
 #source $DIR/identity.sh
@@ -47,15 +47,21 @@ git rm -rf $OUTPUT_DIR/.git || true # Doing cleanup, but it might fail if the .g
 git remote remove origin || true # ensure cleanup
 git remote add origin $GIT_ORIGIN
 #git push origin -d $DEV_BRANCH || true # Ensuring we delete the remote branch if it exists as we are wiping it out
-git fetch origin $DEV_BRANCH || (git checkout -b $DEV_BRANCH && git commit --allow-empty -m "sunnypilot v$VERSION release" && git push -u origin $DEV_BRANCH)
+git fetch --depth 1 origin $DEV_BRANCH || (git checkout -b $DEV_BRANCH && git commit --allow-empty -m "sunnypilot v$VERSION release" && git push -u origin $DEV_BRANCH)
 
 echo "[-] committing version $VERSION T=$SECONDS"
 git add -f .
 
+# gitlinks break the release tree on device
+if git ls-files -s | awk '$1 == "160000" { found = 1; print } END { exit !found }'; then
+    echo "Error: submodules found in release tree."
+    exit 1
+fi
+
 # include source commit hash and build date in commit
 GIT_HASH=$(git --git-dir=$SOURCE_DIR/.git rev-parse HEAD)
 DATETIME=$(date '+%Y-%m-%dT%H:%M:%S')
-SP_VERSION=$(awk -F\" '{print $2}' $SOURCE_DIR/sunnypilot/common/version.h)
+SP_VERSION=$(awk -F\" '{print $2}' $SOURCE_DIR/openpilot/sunnypilot/common/version.h)
 
 # Commit with detailed message
 git commit -a -m "sunnypilot v$VERSION
