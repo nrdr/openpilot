@@ -7,7 +7,6 @@ from openpilot.common.swaglog import cloudlog
 
 
 STEER_RATIO_MANUAL_DEFAULTS = (15.38, 10.93)
-INTERPOLATED_TORQUE_FRICTION_DEFAULTS = (0.12, 0.10, 0.06)
 
 # Legacy endpoint Params remain registered only so this one-time migration can
 # preserve an existing owner's tune. They have no runtime consumers afterward.
@@ -35,7 +34,6 @@ BOOL_DEFAULTS = {
   "CustomAccIncrementsEnabled": True,
   "MadsMainCruiseAllowed": False,
   "HondaTorqueLowPassFilter": True,
-  "NrdrNnlcEnabled": False,
   "RocketFuel": True,
   "BlindSpot": True,
   "TorqueBar": True,
@@ -56,10 +54,6 @@ BOOL_DEFAULTS = {
 VALUE_DEFAULTS = {
   "LaneTurnValue": 20.0,
   "AutoLaneChangeTimer": 1,
-  "NrdrNnlcActivationSpeed": 30,
-  "NrdrNnlcKpGain": 100,
-  "NrdrNnlcKfGain": 50,
-  "NrdrNnlcKiGain": 10,
   "LongitudinalPersonality": 3,
   "SpeedLimitMode": 3,
   "SpeedLimitOffsetType": 1,
@@ -67,9 +61,9 @@ VALUE_DEFAULTS = {
   "CustomAccShortPressIncrement": 5,
   "CustomAccLongPressIncrement": 1,
   "NrdrDriverOverrideThreshold": 1400,
-  "NrdrOverrideThresholdCenterBoost": 1000,
-  "HondaOverrideFadeDownSecs": 0.1,
-  "HondaOverrideFadeUpSecs": 0.1,
+  "NrdrOverrideThresholdCenterBoost": 1200,
+  "HondaOverrideFadeDownSecs": 0.50,
+  "HondaOverrideFadeUpSecs": 0.01,
   "ChevronInfo": 4,
   "DevUIInfo": 3,
   "OnroadScreenOffBrightness": 1,
@@ -160,58 +154,8 @@ def _migrate_steer_ratio_settings(params: Params) -> None:
            params.put, block=True)
 
 
-def _migrate_interpolated_torque_friction(params: Params) -> None:
-  """Seed fresh split defaults or preserve a durable legacy Low tune."""
-  low_key = "NrdrInterpolatedTorqueFriction"
-  new_keys = (
-    "NrdrInterpolatedTorqueFrictionStandard",
-    "NrdrInterpolatedTorqueFrictionHighway",
-  )
-  try:
-    low = params.get(low_key)
-    missing = {key: params.get(key) is None for key in new_keys}
-  except Exception:
-    cloudlog.exception("failed to inspect interpolated torque friction migration state")
-    return
-
-  def write_verified(key: str, value: float) -> bool:
-    """Make the migration discriminator depend on a durable, typed readback."""
-    try:
-      params.put(key, value, block=True)
-      readback = params.get(key)
-      if type(readback) is not type(value) or readback != value:
-        raise ValueError(f"unexpected readback for {key}: {readback!r}")
-      return True
-    except Exception:
-      cloudlog.exception("failed to initialize and verify nrdr param %s", key)
-      return False
-
-  if low is None:
-    # Low is the durable migration discriminator. On a fresh install, write the
-    # distinct dependent bands first and Low last. An interruption therefore
-    # cannot make the next boot mistake a half-seeded fresh tune for a legacy
-    # single-value tune and collapse it to .12/.12/.12.
-    standard_ok = not missing[new_keys[0]] or write_verified(
-      new_keys[0], INTERPOLATED_TORQUE_FRICTION_DEFAULTS[1]
-    )
-    highway_ok = not missing[new_keys[1]] or write_verified(
-      new_keys[1], INTERPOLATED_TORQUE_FRICTION_DEFAULTS[2]
-    )
-    if standard_ok and highway_ok:
-      write_verified(low_key, INTERPOLATED_TORQUE_FRICTION_DEFAULTS[0])
-    return
-
-  # Low existed before inspection, so this is an upgrade from the original
-  # single-value tune. Copy its exact value only into missing bands. Existing
-  # partial values are never overwritten, and each failed band retries alone.
-  for key in new_keys:
-    if missing[key]:
-      write_verified(key, low)
-
-
 def apply_defaults(params: Params) -> None:
   _migrate_steer_ratio_settings(params)
-  _migrate_interpolated_torque_friction(params)
 
   for key, value in BOOL_DEFAULTS.items():
     # Persist QuietMode before manager's generic defaults can seed it as false.
@@ -222,6 +166,8 @@ def apply_defaults(params: Params) -> None:
 
   _write(params, "EnforceTorqueControl", False, params.put_bool, force=True)
   _write(params, "NeuralNetworkLateralControl", False, params.put_bool, force=True)
+  from openpilot.nrdr.params.tuning_policy import reset_learning_scales
+  reset_learning_scales(params)
 
   try:
     from openpilot.common.version import terms_version, terms_version_sp, training_version, sunnylink_consent_version

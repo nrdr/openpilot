@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import copy
 
+from openpilot.nrdr.params.tuning_policy import LONG_SCALE_KEYS, SUGGESTED_LOCK_KEYS, YAW_FIXED_KEYS
+
 from openpilot.nrdr.params import NRDR_UI_METADATA_BY_KEY, get_ui_metadata
 
 
@@ -31,9 +33,7 @@ def sunnylink_fields_for_key(key: str) -> dict:
 
 def apply_sunnylink_metadata(item: dict) -> dict:
   key = item.get("key")
-  if key not in NRDR_UI_METADATA_BY_KEY:
-    return dict(item)
-  expected = sunnylink_fields_for_key(key)
+  expected = sunnylink_fields_for_key(key) if key in NRDR_UI_METADATA_BY_KEY else {}
 
   merged = dict(item)
   for field, expected_value in expected.items():
@@ -42,6 +42,19 @@ def apply_sunnylink_metadata(item: dict) -> dict:
         f"{key}: explicit Sunnylink field {field!r} conflicts with shared NRDR UI metadata"
       )
     merged.setdefault(field, copy.deepcopy(expected_value))
+  if key:
+    enablement = copy.deepcopy(merged.get("enablement", []))
+    if key in SUGGESTED_LOCK_KEYS or key.startswith(("NrdrSteerRatio", "LaneCenter", "NrdrLatRateDamping")):
+      for switch in ("NrdrSuggestedSettings", "NrdrHandcraftedLateralTune"):
+        enablement.append({"type": "not", "condition": {"type": "param", "key": switch, "equals": True}})
+    if key in YAW_FIXED_KEYS or key.startswith(("NrdrSteerRatio", "NrdrLatRateDamping")):
+      enablement.append({"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 1}})
+    if key in LONG_SCALE_KEYS:
+      condition = {"type": "not", "condition": {"type": "param", "key": "HondaLiveLearningGas", "equals": True}}
+      enablement.append(condition)
+      merged["visibility"] = [*copy.deepcopy(merged.get("visibility", [])), condition]
+    if enablement:
+      merged["enablement"] = enablement
   return merged
 
 

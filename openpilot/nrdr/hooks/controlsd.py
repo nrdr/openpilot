@@ -31,6 +31,10 @@ def refresh_live_parameter_settings(controls, snapshot=None) -> None:
 
 
 def finalize_lateral_torque(controls, torque: float, CS, active: bool, dt: float) -> float:
+  if getattr(getattr(controls, "LaC", None), "owns_output_filter", False):
+    # VFN already applies its calibrated per-speed output filter. Applying the
+    # PIF filter or settings-transition blend again would change that controller.
+    return torque
   torque = controls.nrdr_live_torque_transition.update(
     torque, controls.nrdr_lateral_snapshot, active, bool(CS.steeringPressed), dt,
   )
@@ -145,6 +149,9 @@ def lane_change_request(controls, CS, model, live_params, desired_curvature: flo
     controls.steer_ratio_latch.selection, controls.VM, CS.steeringAngleDeg, CS.vEgo, live_params.roll,
     desired_curvature, reduction,
   )
+  if hasattr(controls.LaC, "shape_lane_change_request"):
+    shaped_curvature = controls.LaC.shape_lane_change_request(
+      CS.steeringAngleDeg, CS.vEgo, live_params.roll, desired_curvature, reduction)
   # Queue consumed settings and command telemetry, never disk I/O in the control loop.
   entry = controls.nrdr_lane_change_entry
   signature = (entry.was_starting, entry.reduction, entry.return_seconds, entry.direction, enabled, reduction > 0.0)

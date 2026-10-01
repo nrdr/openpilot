@@ -8,6 +8,7 @@ from collections.abc import Callable, Sequence
 
 import pyray as rl
 from openpilot.common.params import Params
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.system.ui.lib.application import gui_app, MousePos, FontWeight, TextAlignment, TextAlignmentVertical
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.sunnypilot.widgets.toggle import ToggleSP
@@ -141,20 +142,21 @@ class MultipleButtonActionSP(MultipleButtonAction):
 
   def _render(self, rect: rl.Rectangle):
 
+    allowed = self.enabled and tuning_write_allowed(self.params, self.param_key)
     button_y = rect.y + (rect.height - style.BUTTON_HEIGHT) / 2
 
     total_width = len(self.buttons) * self.button_width
     track_rect = rl.Rectangle(rect.x, button_y, total_width, style.BUTTON_HEIGHT)
 
     bg_color = style.MBC_TRANSPARENT
-    text_color = style.ITEM_TEXT_COLOR if self.enabled else style.MBC_DISABLED
-    highlight_color = style.MBC_BG_CHECKED_ENABLED if self.enabled else style.MBC_DISABLED
+    text_color = style.ITEM_TEXT_COLOR if allowed else style.MBC_DISABLED
+    highlight_color = style.MBC_BG_CHECKED_ENABLED if allowed else style.MBC_DISABLED
 
     # background
     rl.draw_rectangle_rounded(track_rect, 0.2, 20, bg_color)
 
     # border
-    border_color = style.MBC_BG_CHECKED_ENABLED if self.enabled else style.MBC_DISABLED
+    border_color = style.MBC_BG_CHECKED_ENABLED if allowed else style.MBC_DISABLED
     rl.draw_rectangle_rounded_lines_ex(track_rect, 0.2, 20, 2, border_color)
 
     # highlight with animation
@@ -176,14 +178,14 @@ class MultipleButtonActionSP(MultipleButtonAction):
       text_y = button_y + (style.BUTTON_HEIGHT - text_size.y) / 2
 
       # Check individual button enabled state
-      is_button_enabled = self.enabled and (self.enabled_buttons is None or i in self.enabled_buttons)
+      is_button_enabled = allowed and (self.enabled_buttons is None or i in self.enabled_buttons)
       current_text_color = text_color if is_button_enabled else style.MBC_DISABLED
 
       rl.draw_text_ex(self._font, text, rl.Vector2(text_x, text_y), 40, 0, current_text_color)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     # Override parent method to check individual button enabled state
-    if not self.enabled:
+    if not self.enabled or not tuning_write_allowed(self.params, self.param_key):
       return
 
     button_y = self._rect.y + (self._rect.height - style.BUTTON_HEIGHT) / 2

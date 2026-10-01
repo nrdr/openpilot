@@ -7,9 +7,31 @@ import math
 ENTRY_RAMP_SECONDS = 0.15
 CANCEL_RETURN_SECONDS = 0.20
 MIN_EFFECTIVE_RATIO = 8.0
+OPTIMIZED_VALUES = {
+  "NrdrLaneChangeMinTime": 0.5,
+  "NrdrLaneChangeEntrySrReduction": 5.0,
+  "NrdrLaneChangeEntryReturnTime": 1.0,
+  "NrdrLaneChangeTorqueFactor": 2.0,
+  "NrdrLaneChangeFrictionPercent": 0.0,
+}
+BASELINE_VALUES = {**OPTIMIZED_VALUES, "NrdrLaneChangeMinTime": 1.0,
+                   "NrdrLaneChangeEntrySrReduction": 0.0, "NrdrLaneChangeTorqueFactor": 1.0,
+                   "NrdrLaneChangeFrictionPercent": 100.0}
+
+
+def optimized_lane_changes_enabled(settings) -> bool:
+  value = settings.get("NrdrOptimizedLaneChanges") if settings is not None else None
+  return value is None or str(value).strip().lower() in ("1", "true", "b'1'", "b'true'")
+
+
+def optimized_lane_change_active(settings, state) -> bool:
+  # Waiting for a nudge is not yet a lane change. Keep normal steering then.
+  return optimized_lane_changes_enabled(settings) and int(getattr(state, "raw", state)) in (2, 3)
 
 
 def bounded_setting(settings, key: str, default: float, minimum: float, maximum: float) -> float:
+  if key in OPTIMIZED_VALUES:
+    return (OPTIMIZED_VALUES if optimized_lane_changes_enabled(settings) else BASELINE_VALUES)[key]
   try:
     value = float(settings.get(key)) if settings is not None else default
   except (TypeError, ValueError, OverflowError):

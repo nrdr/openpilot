@@ -375,10 +375,13 @@ def test_honda_mpc_retains_fourth_personality_and_fcw_authorization():
 @pytest.mark.parametrize('brand,enabled', [('honda', True), ('toyota', False), ('', False)])
 def test_native_tuning_controls_follow_vehicle_policy(brand, enabled):
   widget = type('Widget', (), {'_update_state': lambda _: None})
-  state = NS(CP=cp(brand), is_offroad=lambda: True)
+  state = NS(CP=cp(brand), is_offroad=lambda: True, params=NS(get_bool=lambda _: False))
   module = definitions(ROOT / 'openpilot/nrdr/ui/settings/longitudinal_tuning.py', {"Widget": widget, "Callable": Callable,
                        "ui_state": state, "nrdr_longitudinal_enabled": policy.nrdr_longitudinal_enabled})
   layout = object.__new__(module['LongitudinalTuningLayout'])
+  for band in ('aggressive', 'standard', 'relaxed', 'econ'):
+    setattr(layout, '_long_pid_tune_scale_' + band, NS(set_visible=lambda _: None,
+                                                    action_item=NS(set_enabled=lambda _: None)))
   values = []
   layout._live_learning_gas = NS(action_item=NS(set_enabled=lambda value: values.append(('gas', value))))
   layout._standstill_gap = NS(action_item=NS(set_enabled=lambda value: values.append(('gap', value))))

@@ -52,6 +52,7 @@ CAPABILITY_FIELDS = (
   "hyundai_alpha_long_available",
   "has_handcrafted_lateral_profile",
   "nrdr_honda_tuning_available",
+  "nrdr_yaw_controller_available",
   "nrdr_longitudinal_tuning_available",
   "nrdr_manual_steer_ratio_available",
   "nrdr_raw_steer_ratio_available",
@@ -81,6 +82,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "subaru_has_sng": "Subaru Stop-and-Go available",
   "hyundai_alpha_long_available": "Hyundai Alpha Longitudinal available",
   "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
+  "nrdr_yaw_controller_available": "Clarity Yaw Control",
   "nrdr_honda_tuning_available": "Confirmed Honda-specific NRDR tuning available",
   "nrdr_longitudinal_tuning_available": "Vehicle explicitly supported by NRDR longitudinal tuning",
   "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio geometry available",
@@ -207,6 +209,8 @@ def generate_capabilities(params: Params | None = None) -> dict:
   confirmed_identity = confirmed_vehicle_identity(
     CP, selected_fingerprint, selected_brand, selection_present=selection_present,
   )
+  from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
+  caps["nrdr_yaw_controller_available"] = confirmed_identity is not None and yaw_controller_available(CP, CP_SP)
   caps["nrdr_honda_tuning_available"] = confirmed_identity is not None and confirmed_identity[1] == "honda"
   caps["nrdr_longitudinal_tuning_available"] = confirmed_identity is not None and nrdr_longitudinal_enabled(CP)
   # A selected platform and deserialized CP must agree before exposing a

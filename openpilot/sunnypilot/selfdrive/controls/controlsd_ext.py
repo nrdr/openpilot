@@ -19,7 +19,6 @@ from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.nrdr.hooks import initialize_live_parameter_settings
 from openpilot.nrdr.params import read_bool, read_float
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
-from openpilot.nrdr.features.lateral.latcontrol_clarity_hybrid import LatControlClarityHybrid
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 
@@ -48,9 +47,10 @@ class ControlsExt(ModelStateBase):
     self.pm_services_ext = ['carControlSP', 'laneCenteringStateSP']
 
   def initialize_lateral_control(self, lac, CI, dt):
-    if str(self.CP.carFingerprint) == "HONDA_CLARITY" and self.CP.lateralTuning.which() == 'torque':
-      return LatControlClarityHybrid(self.CP, self.CP_SP, CI, dt)
-
+    from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
+    if self.params.get("NrdrLateralController") == 1 and yaw_controller_available(self.CP, self.CP_SP):
+      from openpilot.nrdr.features.lateral.latcontrol_vfn_eps import LatControlVfnEps
+      return LatControlVfnEps(self.CP, self.CP_SP, CI, dt)
     enforce_torque_control = self.params.get_bool("EnforceTorqueControl")
     torque_versions = self.params.get("TorqueControlTune")
     if not enforce_torque_control:

@@ -23,7 +23,7 @@ LONG_PID_SCALE_KEYS = (
   NrdrParamKey.LONG_PID_TUNE_SCALE_RELAXED,
   NrdrParamKey.LONG_PID_TUNE_SCALE_ECON,
 )
-LONG_PID_SCALE_DEFAULTS = (2.0, 1.0, 0.8, 0.5)
+LONG_PID_SCALE_DEFAULTS = (1.0, 1.0, 1.0, 1.0)
 LONG_PID_SCALE_SLEW_PER_SECOND = 2.0
 LONG_PID_SCALE_EPSILON = 1e-6
 
@@ -134,6 +134,8 @@ class NrdrLongControl:
       for key, default in zip(LONG_PID_SCALE_KEYS, LONG_PID_SCALE_DEFAULTS, strict=True)
     )
     self.live_learning_gas = read_bool(snapshot, NrdrParamKey.HONDA_LIVE_LEARNING_GAS, not self.CP_SP.enableGasInterceptor)
+    if self.live_learning_gas:
+      self.pid_scales = LONG_PID_SCALE_DEFAULTS
     self.static_feedforward = read_bool(snapshot, NrdrParamKey.STATIC_FEEDFORWARD_LONG, True)
     self.stop_accel = read_float(snapshot, NrdrParamKey.HONDA_STOP_ACCEL, self.CP.stopAccel, -10.0, 0.0)
     self.stopping_decel_rate = read_float(

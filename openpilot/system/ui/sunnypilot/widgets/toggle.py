@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 import pyray as rl
 from openpilot.common.params import Params
+from openpilot.nrdr.params.tuning_policy import reset_learning_scales, tuning_write_allowed
 from openpilot.system.ui.lib.application import MousePos
 from openpilot.system.ui.widgets.toggle import Toggle
 from openpilot.system.ui.sunnypilot.lib.styles import style
@@ -28,14 +29,20 @@ class ToggleSP(Toggle):
     self._rect = rl.Rectangle(rect.x, rect.y, style.TOGGLE_WIDTH, style.TOGGLE_HEIGHT)
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
+    if not tuning_write_allowed(self.params, self.param_key):
+      return
     super()._handle_mouse_release(mouse_pos)
     if self._enabled and self.param_key:
       self.params.put_bool(self.param_key, self._state)
+      if self.param_key == "HondaLiveLearningGas" and self._state:
+        # Blocking enable/readback ordering prevents keeping custom scale values.
+        self.params.put_bool(self.param_key, True, block=True)
+        reset_learning_scales(self.params)
 
   def _render(self, rect: rl.Rectangle):
     self.update()
     self._rect.y -= style.ITEM_PADDING / 2
-    if self._enabled:
+    if self._enabled and tuning_write_allowed(self.params, self.param_key):
       bg_color = self._blend_color(style.TOGGLE_OFF_COLOR, style.TOGGLE_ON_COLOR, self._progress)
       knob_color = style.TOGGLE_KNOB_COLOR
     else:

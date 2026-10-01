@@ -48,8 +48,9 @@ class TestParamProfiles(unittest.TestCase):
     )))
 
     for profile in HANDCRAFTED_LATERAL_PROFILES.values():
-      self.assertEqual(profile.version, 19)
-      self.assertFalse(any("SteerRatio" in key for key, _value in profile.values))
+      self.assertEqual(profile.version, 20)
+      if profile.fingerprint != "HONDA_CLARITY":
+        self.assertFalse(any("SteerRatio" in key for key, _value in profile.values))
       self.assertEqual(len(profile.values), len(dict(profile.values)))
       self.assertTrue(all(type(key) is str for key, _ in profile.values))
       for key, value in profile.values:

@@ -66,11 +66,14 @@ class LongitudinalPlannerSP:
 
     targets = {
       LongitudinalPlanSource.cruise: (v_cruise, a_ego),
-      LongitudinalPlanSource.sccVision: (self.scc.vision.output_v_target, self.scc.vision.output_a_target),
       LongitudinalPlanSource.sccMap: (self.scc.map.output_v_target, self.scc.map.output_a_target),
       LongitudinalPlanSource.speedLimitAssist: (self.sla.output_v_target, self.sla.output_a_target),
     }
 
+    # An OFF/inactive SCC-V must never win target arbitration, even if an old
+    # result survived in memory while the remote setting changed.
+    if self.scc.vision.enabled and self.scc.vision.is_active:
+      targets[LongitudinalPlanSource.sccVision] = (self.scc.vision.output_v_target, self.scc.vision.output_a_target)
     self.source = min(targets, key=lambda k: targets[k][0])
     self.output_v_target, self.output_a_target = targets[self.source]
     return self.output_v_target, self.output_a_target

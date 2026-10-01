@@ -9,6 +9,8 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
   "LongitudinalPersonality",
   "NrdrHandcraftedLateralTune",
   "NrdrStandstillGapExtra",
+  "NrdrSuggestedSettings",
+  "NrdrLateralController",
 ))
 
 # These controls are surfaced only for an exact, confirmed Honda CP. Keeping
@@ -16,6 +18,8 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
 # custom remote client from bypassing the vehicle-aware UI.
 HONDA_TUNING_WRITE_KEYS = frozenset((
   # Controller Tuning Dungeon.
+  "NrdrLateralController", "NrdrOptimizedLaneChanges",
+  "NrdrLatRateDampingLowSpeed", "NrdrLatRateDampingStandard", "NrdrLatRateDampingHighway",
   "NrdrInterpolatedTorquePifBlend",
   "NrdrInterpolatedTorqueShare",
   "NrdrInterpolatedTorqueLatAccelFactor",
@@ -115,7 +119,7 @@ def allow_param_write(key: str, onroad: bool, *, handcrafted_profile_available: 
     return False
   if onroad and key in ONROAD_WRITE_BLOCKLIST:
     return False
-  if key == "NrdrHandcraftedLateralTune":
+  if key in ("NrdrHandcraftedLateralTune", "NrdrSuggestedSettings"):
     # A false write lets the user cancel an existing command. Enabling is
     # admitted only when current CP/CP_SP and any selected platform agree that
     # this exact vehicle can consume the preset. None is fail-closed. The

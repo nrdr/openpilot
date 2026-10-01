@@ -9,7 +9,6 @@ import numpy as np
 
 from openpilot.common.constants import ACCELERATION_DUE_TO_GRAVITY, CV
 from openpilot.nrdr.features.lateral.capabilities import supports_interpolated_torque_pif
-from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
 
 
 LEGACY_TORQUE_KP = 0.5
@@ -21,11 +20,11 @@ LEGACY_TORQUE_LOW_SPEED_Y = (30.0, 17.0, 10.0, 5.0)
 LEGACY_TORQUE_FRICTION_THRESHOLD = 0.3
 LEGACY_TORQUE_YAW_BLEND_X = (2.0, 5.0)
 
-DEFAULT_TORQUE_SHARE_PERCENT = 50.0
-DEFAULT_LAT_ACCEL_FACTOR = 5.0
-DEFAULT_FRICTION_LOW = 0.12
-DEFAULT_FRICTION_STANDARD = 0.10
-DEFAULT_FRICTION_HIGHWAY = 0.06
+DEFAULT_TORQUE_SHARE_PERCENT = 1.0
+DEFAULT_LAT_ACCEL_FACTOR = 10.0
+DEFAULT_FRICTION_LOW = 1.0
+DEFAULT_FRICTION_STANDARD = 1.0
+DEFAULT_FRICTION_HIGHWAY = 1.0
 # Compatibility name for the original single Low-speed setting.
 DEFAULT_FRICTION = DEFAULT_FRICTION_LOW
 FRICTION_LOW_STANDARD_TRANSITION_MPH = 25.0
@@ -89,45 +88,8 @@ class InterpolatedTorquePifSettingsLatch:
 
 
 def resolve_interpolated_torque_pif_settings(settings, supported: bool) -> InterpolatedTorquePifSettings:
-  share_percent = read_float(
-    settings,
-    NrdrParamKey.NRDR_INTERPOLATED_TORQUE_SHARE,
-    DEFAULT_TORQUE_SHARE_PERCENT,
-    0.0,
-    100.0,
-  )
-  return InterpolatedTorquePifSettings(
-    enabled=supported and read_bool(settings, NrdrParamKey.NRDR_INTERPOLATED_TORQUE_PIF_BLEND),
-    torque_share=share_percent / 100.0,
-    lat_accel_factor=read_float(
-      settings,
-      NrdrParamKey.NRDR_INTERPOLATED_TORQUE_LAT_ACCEL_FACTOR,
-      DEFAULT_LAT_ACCEL_FACTOR,
-      0.1,
-      10.0,
-    ),
-    friction_low=read_float(
-      settings,
-      NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION,
-      DEFAULT_FRICTION_LOW,
-      0.0,
-      1.0,
-    ),
-    friction_standard=read_float(
-      settings,
-      NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_STANDARD,
-      DEFAULT_FRICTION_STANDARD,
-      0.0,
-      1.0,
-    ),
-    friction_highway=read_float(
-      settings,
-      NrdrParamKey.NRDR_INTERPOLATED_TORQUE_FRICTION_HIGHWAY,
-      DEFAULT_FRICTION_HIGHWAY,
-      0.0,
-      1.0,
-    ),
-  )
+  # Fixed road-tested blend. Retired saved sliders cannot change the runtime.
+  return InterpolatedTorquePifSettings(enabled=bool(supported))
 
 
 def speed_banded_friction(v_ego: float, low: float, standard: float, highway: float) -> float:

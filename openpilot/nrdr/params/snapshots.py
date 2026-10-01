@@ -64,10 +64,9 @@ LANE_CENTERING_PARAM_GROUP = ParamGroup((
   "LaneCenterOffset", "LaneCenteringStrength", "LaneCenteringE2EAuthority",
 ))
 LANE_CHANGE_PARAM_GROUP = ParamGroup((
-  "NrdrLaneChangeEntrySrReduction", "NrdrLaneChangeEntryReturnTime",
-  "NrdrLaneChangeTorqueFactor", "NrdrLaneChangeFrictionPercent",
+  "NrdrOptimizedLaneChanges",
 ))
-MODEL_GROUPS = (ParamGroup(("NrdrLaneChangeMinTime",)),)
+MODEL_GROUPS = (LANE_CHANGE_PARAM_GROUP,)
 
 
 CONTROL_GROUPS = (
@@ -75,16 +74,13 @@ CONTROL_GROUPS = (
               "LatIScaleLowSpeed", "LatIScaleStandard", "LatIScaleHighway",
               "LatFScaleLowSpeed", "LatFScaleStandard", "LatFScaleHighway")),
   ParamGroup(("HondaCenterScale", "HondaCenterBoostThreshold", "HondaCenterBoostMinSpeed")),
-  ParamGroup(("NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed")),
-  ParamGroup(("HondaInjectionTest", "NrdrStarPilotPid", "NrdrLatStiction")),
+  ParamGroup(("NrdrLatRateDampingLowSpeed", "NrdrLatRateDampingStandard", "NrdrLatRateDampingHighway")),
+  ParamGroup(("HondaInjectionTest", "NrdrLatStiction")),
   # Mode and both manual endpoints are published together and captured once
   # per control frame, including while lateral control is active.
   STEER_RATIO_PARAM_GROUP,
   LANE_CHANGE_PARAM_GROUP,
-  # Keep the complete blend tuple together when publishing live changes.
-  INTERPOLATED_TORQUE_PIF_PARAM_GROUP,
   ParamGroup(("NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate", "NrdrTuneLearnerReset")),
-  ParamGroup(("NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain")),
   ParamGroup(("LongPidTuneScaleAggressive", "LongPidTuneScaleStandard", "LongPidTuneScaleRelaxed",
               "LongPidTuneScaleEcon", "HondaLiveLearningGas", "StaticFeedforwardLong", "HondaStopAccel",
               "HondaStoppingDecelRateLong", "HondaVEgoStarting", "HondaVEgoStopping",

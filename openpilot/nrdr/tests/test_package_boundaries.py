@@ -12,7 +12,6 @@ from openpilot.nrdr.params import NrdrParamKey, ParamReader, ParamValue, read_bo
 MIGRATED_PARAM_CONSUMERS = (
   "openpilot/nrdr/features/lateral/interpolated_torque_pif.py",
   "openpilot/nrdr/features/lateral/latcontrol_pid.py",
-  "openpilot/nrdr/features/lateral/nnlc.py",
   "openpilot/nrdr/features/lateral/tune_learner.py",
   "openpilot/nrdr/features/longitudinal/longcontrol.py",
   "openpilot/nrdr/features/longitudinal/longitudinal_planner.py",
@@ -24,18 +23,11 @@ LATERAL_COMPATIBILITY_EXPORTS = {
     "get_honda_vgr_profile", "normalize_honda_eps_firmware",
   ),
   "lat_stiction": ("LatStiction", "LatStictionState"),
-  "latcontrol_clarity_hybrid": (
-    "BLEND_TO_NNLC_SECONDS", "BLEND_TO_PID_SECONDS", "NNLC_BLEND_HALF_WIDTH",
-    "NNLC_DEFAULT_ACTIVATION_SPEED", "ClarityHybridExtension", "LatControlClarityHybrid",
-    "clarity_nnlc_blend_target",
-  ),
   "latcontrol_pid": (
     "CENTER_BOOST_SPEED_FADE", "CENTER_TAPER_FADE_TAU", "CIVIC_TEG_CENTER_BOOST_FADE_DEG",
     "LOW_SPEED_MAX", "MPH_TO_MS", "RATE_DAMPING_REFERENCE", "RATE_DAMPING_UNWIND_ANGLE",
     "STANDARD_SPEED_MAX", "NrdrLatControlPID",
   ),
-  "nnlc": ("NrdrNnlc",),
-  "nnlc_model": ("MODEL_PATHS", "get_forced_nnlc_model", "is_nnlc_forced"),
   "pid": ("FeedforwardPIDController",),
   "tune_learner": (
     "ANGLE_BIN_DEG", "ANGLE_MAX_DEG", "ERROR_GATE_FULL_DEG", "ERR_REJECT_DEG",
@@ -57,7 +49,6 @@ PHASE_TWO_CONSUMERS = (
   "openpilot/nrdr/features/lateral/latcontrol_pid.py",
   "openpilot/nrdr/features/longitudinal/longcontrol.py",
   "openpilot/nrdr/features/longitudinal/longitudinal_planner.py",
-  "openpilot/nrdr/features/lateral/nnlc.py",
   "openpilot/nrdr/ui/settings_policy.py",
   "openpilot/nrdr/features/lateral/tune_learner.py",
   "openpilot/sunnypilot/sunnylink/capabilities.py",

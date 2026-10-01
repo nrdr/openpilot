@@ -15,8 +15,6 @@ LAUNCH_COMMIT_TIME = 3.5
 LAUNCH_MOVING_SPEED = 1.2
 LAUNCH_MAX_ACCEL = 3.5
 CRUISE_ACCEL_VALUES = (2.0, 1.6, 0.8, 0.6)
-CRUISE_OVERSPEED_BRAKING_BUFFER = 0.1
-CRUISE_OVERSPEED_DRIVING_BUFFER = 0.5
 ROEN_ACCEL_BP = (0.0, 5.0, 20.0)
 ROEN_PLANNER_ACCEL = (4.0, 4.0, 2.0)
 ROEN_TURN_ACCEL_THRESHOLD = 1.3
@@ -67,11 +65,16 @@ def c3_personality_accel_max(v_ego: float, personality) -> float | None:
 
 def apply_cruise_overspeed_allowance(target: float, selected_target: float, set_speed: float,
                                      v_ego: float, accel: float, allowance: float) -> float:
+  # A lower selected target may represent a speed limit or curve target; never
+  # raise it. Lead/obstacle braking remains independently enforced by the MPC.
+  if not all(np.isfinite(v) for v in (target, selected_target, set_speed, v_ego, allowance)):
+    return target
   if allowance <= 0.0 or selected_target < set_speed or v_ego <= target:
     return target
-  delta = v_ego - target
-  buffer = min(CRUISE_OVERSPEED_BRAKING_BUFFER if accel < 0.0 else CRUISE_OVERSPEED_DRIVING_BUFFER, delta)
-  return max(target, min(v_ego - buffer, set_speed + allowance))
+  # Previously an unconditional 0.1/0.5 m/s negative speed error asked for
+  # braking even inside the allowance. Coast at current speed within the band,
+  # without moving the driver's set speed or permitting unbounded overspeed.
+  return max(target, min(v_ego, set_speed + allowance))
 
 
 class NrdrLongitudinalPlanner:
@@ -85,7 +88,7 @@ class NrdrLongitudinalPlanner:
     self.cruise_scale = 1.0
     self.cruise_overspeed_allowance = 0.0
     self.standstill_gap_extra = 0.0
-    self.roen_acceleration_limits = True
+    self.roen_acceleration_limits = False
     self.launch_armed = False
     self._refresh_settings()
 
@@ -100,7 +103,7 @@ class NrdrLongitudinalPlanner:
     self.cruise_overspeed_allowance = read_float(
       snapshot, NrdrParamKey.NRDR_CRUISE_OVERSPEED_ALLOWANCE, 0.0, 0.0, 10.0,
     ) * CV.MPH_TO_MS
-    self.roen_acceleration_limits = read_bool(snapshot, NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS, True)
+    self.roen_acceleration_limits = read_bool(snapshot, NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS, False)
     self.standstill_gap_requested = read_float(snapshot, NrdrParamKey.NRDR_STANDSTILL_GAP_EXTRA, 0.0, 0.0, 5.0)
     self.settings_generation = snapshot.generation
 

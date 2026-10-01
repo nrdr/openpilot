@@ -182,50 +182,44 @@ def _build_legacy_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
 CLARITY_CURRENT_LATERAL_2026_08_28 = _build_legacy_honda_profile("HONDA_CLARITY")
 CLARITY_ROAD_TESTED_2026_08_21 = CLARITY_CURRENT_LATERAL_2026_08_28
 
-HANDCRAFTED_LATERAL_VERSION = 19
-# Captured from the owner's Civic on 2026-09-12. This records provenance, not
-# validation on other vehicles. Never translate the hybrid's 1.0 friction into
-# the unrelated native torque-controller override.
-# v19: owner-requested 2026-09-14 lane strength reduction to 0.30. Keep the
-# original snapshot hash/provenance and the already-zero model break-in.
+HANDCRAFTED_LATERAL_VERSION = 20
+# Oct 1 owner snapshot, PopV2, plus explicitly requested cleanup defaults.
+# The new per-speed damping and optimized lane-change behavior still need road
+# validation; the provenance date is not a claim those additions were tested.
 CIVIC_DIALED_SETTINGS_SHA256 = "c1faf2291527061621c7bdbb2679fd8f90cfa00f0b8acd08fdd27e5ee9770074"
 COMMON_HANDCRAFTED_VALUES = (
-  ("LaneCentering", True), ("LaneCenteringStrength", 0.30),
-  ("LaneCenteringMinSpeed", 50), ("LaneCenteringE2EAuthority", 0.0),
+  ("LaneCentering", True), ("LaneCenteringStrength", 0.95),
+  ("LaneCenteringMinSpeed", 12), ("LaneCenteringE2EAuthority", 0.0),
   ("LaneCenteringPauseOnSignal", True), ("LaneCenterOffset", 0.0),
   ("LagdToggle", True), ("LagdToggleDelay", 0.4),
 )
-_SNAPSHOT_UPDATES = {
-  "NrdrLatStiction": False,
-  "HondaLpfTauStandard": 0.05,
-  "HondaLpfTauHighway": 0.02,
-  "NrdrInterpolatedTorqueShare": 10,
-  "NrdrInterpolatedTorqueFriction": 1.0,
-  "NrdrInterpolatedTorqueFrictionStandard": 1.0,
-  "NrdrInterpolatedTorqueFrictionHighway": 1.0,
-}
-_PID_KEYS = frozenset((
-  "NrdrStarPilotPid", "NrdrLatStiction", "NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed",
-  "NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate",
-))
-_HONDA_KEYS = frozenset((
-  "NrdrIncreaseOverrideTolerance", "NrdrDriverOverrideThreshold", "NrdrOverrideThresholdCenterBoost",
-))
-
-
-def _snapshot_group(predicate) -> tuple[tuple[str, ProfileValue], ...]:
-  return tuple((key, _SNAPSHOT_UPDATES.get(key, value)) for key, value in CLARITY_HANDCRAFTED_LATERAL_VALUES_V17 if predicate(key))
-
-
-HONDA_PID_HANDCRAFTED_VALUES = _snapshot_group(lambda key: key in _PID_KEYS or key.startswith(("LatPScale", "LatIScale", "LatFScale")))
-HONDA_FILTER_HANDCRAFTED_VALUES = _snapshot_group(lambda key: key.startswith("Honda") or key in _HONDA_KEYS)
-HYBRID_HANDCRAFTED_VALUES = _snapshot_group(lambda key: key.startswith("NrdrInterpolatedTorque"))
+HONDA_PID_HANDCRAFTED_VALUES = tuple(
+  (f"Lat{term}Scale{band}", value)
+  for band, feedforward in (("LowSpeed", 100), ("Standard", 150), ("Highway", 200))
+  for term, value in (("P", 100), ("I", 100), ("F", feedforward))
+) + (
+  ("NrdrLatStiction", False), ("NrdrOptimizedLaneChanges", True),
+  ("NrdrLatRateDampingLowSpeed", 30), ("NrdrLatRateDampingStandard", 30), ("NrdrLatRateDampingHighway", 30),
+  ("HondaCenterScale", 0.0), ("HondaCenterBoostThreshold", 5.0), ("HondaCenterBoostMinSpeed", 0),
+  ("NrdrTuneLearner", False), ("NrdrTuneLearnerStrength", 0), ("NrdrTuneLearnerRate", 10),
+)
+HONDA_FILTER_HANDCRAFTED_VALUES = (
+  ("NrdrDriverOverrideThreshold", 1400), ("NrdrOverrideThresholdCenterBoost", 1200),
+  ("HondaDriverAssistDuringOverride", True), ("HondaOverrideFadeUpSecs", 0.01),
+  ("HondaOverrideFadeDownSecs", 0.50), ("HondaOverrideTorqueScale", 0),
+  ("HondaTorqueLowPassFilter", True), ("HondaLpfTauLowSpeed", 0.10),
+  ("HondaLpfTauStandard", 0.02), ("HondaLpfTauHighway", 0.0),
+  ("HondaSteerDeltaLimiter", False), ("HondaSteerDeltaUp", 4.0), ("HondaSteerDeltaDown", 4.0),
+)
+# Compound blend values are now internal constants, not writable profile knobs.
+HYBRID_HANDCRAFTED_VALUES = ()
+CLARITY_GEOMETRY_VALUES = (
+  ("NrdrSteerRatioHybrid", True), ("NrdrSteerRatioMode", 2), ("NrdrSteerRatioSourceB", 3),
+  ("NrdrSteerRatioBlendStart", 10.0), ("NrdrSteerRatioManualCenter", 16.5), ("NrdrSteerRatioManualFinal", 12.74),
+)
 TORQUE_HANDCRAFTED_VALUES = (
   ("TorqueParamsOverrideEnabled", False), ("TorqueParamsOverrideLatAccelFactor", 2.5),
-  ("TorqueParamsOverrideFriction", 0.1), ("TorqueControlTune", 0.0),
-  ("LateralJerkTorqueController", False),
-  ("NrdrNnlcEnabled", False), ("NrdrNnlcActivationSpeed", 0),
-  ("NrdrNnlcKpGain", 300), ("NrdrNnlcKiGain", 10), ("NrdrNnlcKfGain", 0),
+  ("TorqueParamsOverrideFriction", 0.1), ("TorqueControlTune", 0.0), ("LateralJerkTorqueController", False),
 )
 
 
@@ -233,16 +227,18 @@ def _make_profile(fingerprint: str, values: tuple[tuple[str, ProfileValue], ...]
   # These checks apply to every future recipe, not just this captured snapshot.
   if len(values) != len(dict(values)):
     raise ValueError("duplicate handcrafted-lateral setting")
-  if any("SteerRatio" in key or "Calibration" in key or key in ("NrdrLearnStiffness", "NrdrLearnAngleOffset") for key, _ in values):
+  if any("Calibration" in key or key in ("NrdrLearnStiffness", "NrdrLearnAngleOffset") or
+         ("SteerRatio" in key and (fingerprint != "HONDA_CLARITY" or key not in dict(CLARITY_GEOMETRY_VALUES)))
+         for key, _ in values):
     raise ValueError("handcrafted preset must preserve vehicle geometry and calibration")
-  return HandcraftedLateralProfile(f"Civic-derived 2026-09-12 ({scope}; steer ratio preserved)", fingerprint,
+  return HandcraftedLateralProfile(f"Suggested PopV2 settings 2026-10-01 ({scope})", fingerprint,
                                   HANDCRAFTED_LATERAL_VERSION, values)
 
 
 HANDCRAFTED_LATERAL_PROFILES = {
   fingerprint: _make_profile(
     fingerprint, COMMON_HANDCRAFTED_VALUES + HONDA_FILTER_HANDCRAFTED_VALUES + HONDA_PID_HANDCRAFTED_VALUES +
-    HYBRID_HANDCRAFTED_VALUES + (TORQUE_HANDCRAFTED_VALUES if fingerprint == "HONDA_CLARITY" else ()),
+    (CLARITY_GEOMETRY_VALUES + TORQUE_HANDCRAFTED_VALUES if fingerprint == "HONDA_CLARITY" else ()),
     "Honda hybrid",
   )
   for fingerprint in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS
@@ -252,7 +248,7 @@ _REQUEST_KEY = NrdrParamKey.NRDR_HANDCRAFTED_LATERAL_TUNE.value
 _CONTEXT_KEY = "NrdrHandcraftedLateralRequest"
 _STATUS_KEY = NrdrParamKey.NRDR_CAR_HANDCRAFTED_INFO.value
 _BLEND_KEY = NrdrParamKey.NRDR_INTERPOLATED_TORQUE_PIF_BLEND.value
-_ENABLE_LAST_KEYS = (_BLEND_KEY, "LaneCentering")
+_ENABLE_LAST_KEYS = ("NrdrSteerRatioHybrid", "LaneCentering")
 
 
 def _params_or_default(params: ProfileParamStore | None) -> ProfileParamStore:
@@ -298,7 +294,9 @@ def get_handcrafted_lateral_profile(fingerprint: str, CP=None, CP_SP=None) -> Ha
       scopes.append("Honda PID")
     if hybrid:
       values += HYBRID_HANDCRAFTED_VALUES
-      scopes.append("10% torque / 90% PIF")
+      scopes.append("fixed 1% torque / 99% PIF")
+      if fingerprint == "HONDA_CLARITY":
+        values += CLARITY_GEOMETRY_VALUES
   return _make_profile(str(fingerprint), values, ", ".join(scopes))
 
 
@@ -371,6 +369,14 @@ def request_handcrafted_lateral_profile(CP, CP_SP, params: ProfileParamStore | N
   _put_context(params, _request_context(CP, CP_SP, profile))
   _put_verified(params, _REQUEST_KEY, True)
   return True
+
+
+def disable_suggested_settings(params: ProfileParamStore | None = None) -> None:
+  """Unlock without restoring a previous tune; cancel an unconsumed request."""
+  params = _params_or_default(params)
+  _put_verified(params, _REQUEST_KEY, False)
+  _put_context(params, {})
+  _put_verified(params, "NrdrSuggestedSettings", False)
 
 
 def _value_matches(actual, expected: ProfileValue) -> bool:
@@ -567,6 +573,7 @@ def consume_handcrafted_lateral_request(CP, CP_SP, params: ProfileParamStore | N
     if params.get(_STATUS_KEY) != marker:
       raise RuntimeError("handcrafted lateral status readback mismatch")
 
+    _put_verified(params, "NrdrSuggestedSettings", True)
     _put_context(params, {})
     params.put_bool(_REQUEST_KEY, False, block=True)
     if not _value_matches(params.get(_REQUEST_KEY, return_default=True), False):

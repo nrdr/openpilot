@@ -40,7 +40,7 @@ class LongitudinalTuningLayout(Widget):
     )
     self._long_pid_tune_scale_aggressive = option_item_sp(
       param="LongPidTuneScaleAggressive",
-      title=lambda: tr("Distance 1 / Aggressive PID Scale (Default: 200%)"),
+      title=lambda: tr("Distance 1 / Aggressive PID Scale (Default: 100%)"),
       min_value=0,
       max_value=500,
       value_change_step=5,
@@ -66,7 +66,7 @@ class LongitudinalTuningLayout(Widget):
 
     self._long_pid_tune_scale_relaxed = option_item_sp(
       param="LongPidTuneScaleRelaxed",
-      title=lambda: tr("Distance 3 / Relaxed PID Scale (Default: 80%)"),
+      title=lambda: tr("Distance 3 / Relaxed PID Scale (Default: 100%)"),
       min_value=0,
       max_value=500,
       value_change_step=5,
@@ -79,7 +79,7 @@ class LongitudinalTuningLayout(Widget):
 
     self._long_pid_tune_scale_econ = option_item_sp(
       param="LongPidTuneScaleEcon",
-      title=lambda: tr("Distance 4 / Econ PID Scale (Default: 50%)"),
+      title=lambda: tr("Distance 4 / Econ PID Scale (Default: 100%)"),
       min_value=0,
       max_value=500,
       value_change_step=5,
@@ -270,6 +270,11 @@ class LongitudinalTuningLayout(Widget):
     for item in self._tuning_items:
       if action := getattr(item, "action_item", None):
         action.set_enabled(enabled)
+    learning = ui_state.params.get_bool("HondaLiveLearningGas")
+    for item in (self._long_pid_tune_scale_aggressive, self._long_pid_tune_scale_standard,
+                 self._long_pid_tune_scale_relaxed, self._long_pid_tune_scale_econ):
+      item.set_visible(not learning)
+      item.action_item.set_enabled(enabled and not learning)
     self._live_learning_gas.action_item.set_enabled(enabled and ui_state.is_offroad())
     self._standstill_gap.action_item.set_enabled(
       enabled and ui_state.is_offroad() and bool(ui_state.CP and ui_state.CP.openpilotLongitudinalControl)

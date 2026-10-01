@@ -82,33 +82,10 @@ class CarTuneReporter:
     return messaging.log_from_bytes(cp_sp_bytes, custom.CarParamsSP) if cp_sp_bytes else None
 
   def _interpolated_torque_pif_info(self, CP) -> tuple[str, bool]:
-    requested = self.params.get_bool("NrdrInterpolatedTorquePifBlend")
-    cp_sp = self._cp_sp()
-    supported = cp_sp is not None and supports_interpolated_torque_pif(CP, cp_sp)
-    enabled = requested and supported
-    share = int(max(0.0, min(100.0, float(self._value("NrdrInterpolatedTorqueShare")))))
-    configured = " | ".join((
-      f"Torque {share}% / P/I/F {100 - share}%",
-      f"LAF {float(self._value('NrdrInterpolatedTorqueLatAccelFactor')):g} m/s²",
-      "friction " + " / ".join((
-        f"Low {float(self._value('NrdrInterpolatedTorqueFriction')):g}",
-        f"Standard {float(self._value('NrdrInterpolatedTorqueFrictionStandard')):g}",
-        f"Highway {float(self._value('NrdrInterpolatedTorqueFrictionHighway')):g}",
-      )),
-    ))
-    if enabled:
-      return (
-        f"ON | {configured} | P/I/F angle feedback | Torque angle→yaw 2-5 m/s, calibrated yaw >=5 m/s | " +
-        "invalid required yaw: exact P/I/F output + Torque state held | generic f13 yaw branch (not Honda road-proven) | " +
-        "live snapshot | NNLC bypassed/reset",
-        True,
-      )
-    if requested:
-      return (
-        f"requested ON but unavailable for this car | Torque 0% / P/I/F 100% | P/I/F unchanged | stored: {configured}",
-        False,
-      )
-    return f"OFF | Torque 0% / P/I/F 100% | P/I/F unchanged | stored settings: {configured}", False
+    supported = supports_interpolated_torque_pif(CP, self._cp_sp())
+    enabled = supported and self.params.get("NrdrLateralController") != 1
+    return ("Fixed 1% torque / 99% PIF | LAF 10 | friction 1/1/1 | optimized lane changes bypass blend"
+            if enabled else "PIF blend inactive"), enabled
 
   def _pid_source(self, CP):
     if CP.lateralTuning.which() == "pid":
@@ -123,7 +100,7 @@ class CarTuneReporter:
     return reconstructed if reconstructed.lateralTuning.which() == "pid" else CP
 
   def _controller_name(self, CP) -> str:
-    return "PID/NNLC" if str(CP.carFingerprint) == "HONDA_CLARITY" else CP.lateralTuning.which().upper()
+    return "PIF Control" if str(CP.carFingerprint) == "HONDA_CLARITY" else CP.lateralTuning.which().upper()
 
   def _pid_info(self, CP) -> tuple[str, str, str]:
     source = self._pid_source(CP)
@@ -176,16 +153,11 @@ class CarTuneReporter:
     return (f"{prefix} | {selection.firmware_profile.name} relative Table-A shape | " +
             f"immutable CP center anchor {selection.cp_ratio:g} | no lane fade")
 
-  def _controller_info(self, controller: str, steer_ratio: SteerRatioSelection) -> str:
-    if controller == "PID/NNLC":
-      if steer_ratio.firmware_vgr_selected:
-        nnlc = "PID only | NNLC unavailable in firmware EPS mode"
-      else:
-        nnlc = "PID/NNLC hybrid | PID for lane changes" if self._state("NrdrNnlcEnabled") == "ON" \
-          else "PID only | NNLC disabled"
-    else:
-      nnlc = controller
-    return nnlc
+  def _controller_info(self, controller: str, steer_ratio: SteerRatioSelection, CP) -> str:
+    from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
+    if self.params.get("NrdrLateralController") == 1 and yaw_controller_available(CP, self._cp_sp()):
+      return "Yaw Control (VFN EPS)"
+    return controller.replace("PID/NNLC", "PIF Control")
 
   def _build(self, CP) -> dict[str, str]:
     eps = self._eps_firmware(CP)
@@ -194,7 +166,7 @@ class CarTuneReporter:
     controller = self._controller_name(CP)
     steer_ratio_selection = resolve_steer_ratio_selection(CP, self.params)
     handcrafted = handcrafted_lateral_profile_status(CP, self._cp_sp(), self.params)
-    controller_info = self._controller_info(controller, steer_ratio_selection)
+    controller_info = self._controller_info(controller, steer_ratio_selection, CP)
     interpolated, interpolated_enabled = self._interpolated_torque_pif_info(CP)
     if interpolated_enabled:
       controller_info += f" | {interpolated}"
@@ -206,25 +178,15 @@ class CarTuneReporter:
     pid_low = f"P {self._value('LatPScaleLowSpeed')}% | I {self._value('LatIScaleLowSpeed')}% | F {self._value('LatFScaleLowSpeed')}%"
     pid_mid = f"P {self._value('LatPScaleStandard')}% | I {self._value('LatIScaleStandard')}% | F {self._value('LatFScaleStandard')}%"
     pid_high = f"P {self._value('LatPScaleHighway')}% | I {self._value('LatIScaleHighway')}% | F {self._value('LatFScaleHighway')}%"
-    damping = f"{self._value('NrdrLatRateDamping')}% | fades by {self._value('NrdrLatRateDampingFadeSpeed')} mph"
+    damping = " | ".join(f"{band} {self._value('NrdrLatRateDamping' + band)}%" for band in ("LowSpeed", "Standard", "Highway"))
     center = "".join((
       f"P-only {float(self._value('HondaCenterScale')) * 100.0:g}% | ",
       f"+/-{float(self._value('HondaCenterBoostThreshold')):g} deg | ",
       f"above {self._value('HondaCenterBoostMinSpeed')} mph",
     ))
-    nnlc = "".join((
-      f"{self._state('NrdrNnlcEnabled')} | {self._value('NrdrNnlcActivationSpeed')} mph | ",
-      f"KP {float(self._value('NrdrNnlcKpGain')) / 100.0:g} | ",
-      f"KF {float(self._value('NrdrNnlcKfGain')) / 100.0:g} | ",
-      f"KI {float(self._value('NrdrNnlcKiGain')) / 100.0:g}",
-    ))
-    if steer_ratio_selection.firmware_vgr_selected:
-      nnlc += " | inactive in firmware EPS mode"
-    if interpolated_enabled:
-      nnlc += " | inactive while Interpolated Torque/PIF Blend is active"
     steer_ratio = self._steer_ratio_info(steer_ratio_selection)
     learning = f"stiffness {self._state('NrdrLearnStiffness')} | angle {self._state('NrdrLearnAngleOffset')}"
-    helpers = f"stiction {self._state('NrdrLatStiction')} | StarPilot {self._state('NrdrStarPilotPid')} | {interpolated}"
+    helpers = f"stiction {self._state('NrdrLatStiction')} | {interpolated}"
     gas = "gas" if interceptor == "true" else "no gas"
     radar = "radar" if not CP.radarUnavailable else "no radar"
 
@@ -237,7 +199,6 @@ class CarTuneReporter:
       "NrdrCarPidHighInfo": pid_high,
       "NrdrCarDampingInfo": damping,
       "NrdrCarCenterInfo": center,
-      "NrdrCarNnlcInfo": nnlc,
       "NrdrCarSteerRatioInfo": steer_ratio,
       "NrdrCarLearningInfo": learning,
       "NrdrCarHelpersInfo": helpers,
@@ -252,7 +213,6 @@ class CarTuneReporter:
       "CONTROLLER",
       controller_info,
       f"Handcrafted profile: {handcrafted}",
-      f"NNLC: {nnlc}",
       "",
       f"LATERAL PID BASE ({pid_speeds})",
       pid_base,

@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 
 from openpilot.cereal import log
@@ -17,6 +19,7 @@ from openpilot.nrdr.features.lateral.interpolated_torque_pif import (
   supports_interpolated_torque_pif,
 )
 from openpilot.nrdr.features.lateral.lat_stiction import LatStiction
+from openpilot.nrdr.features.lateral.lane_change_tuning import optimized_lane_change_active
 from openpilot.nrdr.features.lateral.phase_detector import phase_with_latch
 from openpilot.nrdr.features.lateral.tune_learner import TuneLearner
 from openpilot.nrdr.params import NrdrParamKey, get_live_params, read_bool, read_float
@@ -88,36 +91,6 @@ def _center_boost_angle_fade(CP) -> float:
   return CIVIC_TEG_CENTER_BOOST_FADE_DEG if teg_a010 else 1.0
 
 
-def _output_scale(angle: float, phase: float, steering_rate: float, v_ego: float, enabled: bool) -> float:
-  if not enabled:
-    return 1.0
-
-  abs_angle = abs(angle)
-  speed_weight = np.clip((v_ego - 4.0) / 10.0, 0.0, 1.0)
-  mid_turn_weight = np.clip((abs_angle - 10.0) / 10.0, 0.0, 1.0)
-  angle_weight = np.clip((abs_angle - 16.0) / 12.0, 0.0, 1.0)
-  is_left = angle > 0.0
-
-  low_speed_weight = np.clip(1.0 - v_ego / (15.0 * MPH_TO_MS), 0.0, 1.0)
-  low_speed_unwind = low_speed_weight > 0.0 and angle * steering_rate < -1.0
-  mid_turn_scale = 0.1200 if is_left else 0.0150
-  mid_turn_turn_in_scale = -0.5500 if is_left else -0.0524
-  mid_turn_unwind_scale = -0.0743 if is_left else -0.0842
-  base_scale = 0.0722 if is_left else 0.0972
-  turn_in_scale = -0.0799 if is_left else 0.0888
-  unwind_scale = 0.1600 if is_left else 0.2000
-
-  scale = 1.0 + speed_weight * mid_turn_weight * mid_turn_scale + speed_weight * angle_weight * base_scale
-  turn_in_weight = np.clip(phase / 0.5, 0.0, 1.0)
-  unwind_weight = np.clip(-phase / 0.5, 0.0, 1.0)
-  if low_speed_unwind and speed_weight < 0.1:
-    scale += low_speed_weight * mid_turn_weight * 0.18
-  else:
-    scale += speed_weight * mid_turn_weight * (turn_in_weight * mid_turn_turn_in_scale + unwind_weight * mid_turn_unwind_scale)
-    scale += speed_weight * angle_weight * (turn_in_weight * turn_in_scale - unwind_weight * unwind_scale)
-  return max(scale, 0.6863)
-
-
 class NrdrLatControlPID(LatControl):
   @staticmethod
   def supports(CP, CP_SP) -> bool:
@@ -141,18 +114,16 @@ class NrdrLatControlPID(LatControl):
     self.dt = dt
     self.params = get_live_params()
     self.steer_ratio_selection = resolve_steer_ratio_selection(CP, self.params.snapshot)
-    self.center_boost_magnitude = 0.5
-    self.center_boost_threshold = 3.0
-    self.center_boost_min_speed = 50.0
+    self.center_boost_magnitude = 0.0
+    self.center_boost_threshold = 5.0
+    self.center_boost_min_speed = 0.0
     self.center_boost_angle_fade = _center_boost_angle_fade(CP)
     self.center_taper = FirstOrderFilter(1.0, CENTER_TAPER_FADE_TAU, dt)
-    self.rate_damping = 0.3
-    self.rate_damping_fade_speed = 30.0 * MPH_TO_MS
+    self.rate_damping_scales = [0.3, 0.3, 0.3]
     self.p_scales = [1.0, 1.0, 1.0]
     self.i_scales = [1.0, 1.0, 1.0]
-    self.f_scales = [1.0, 1.0, 1.0]
+    self.f_scales = [1.0, 1.5, 2.0]
     self.injection_test = False
-    self.starpilot = False
     self.stiction_enabled = False
     self.stiction = LatStiction(dt, self.steer_max)
     self.tune_learner = TuneLearner(dt, self.steer_max, self.params)
@@ -186,6 +157,11 @@ class NrdrLatControlPID(LatControl):
   def _lane_change_active(self) -> bool:
     return self.model_v2 is not None and self.model_v2.meta.laneChangeState != log.LaneChangeState.off
 
+  def _optimized_lane_change(self) -> bool:
+    state = self.model_v2.meta.laneChangeState if self.model_v2 is not None else 0
+    settings = self.live_tuning_snapshot if self.live_tuning_snapshot is not None else self.params.snapshot
+    return optimized_lane_change_active(settings, state)
+
   def _lane_change_starting(self) -> bool:
     return self.model_v2 is not None and self.model_v2.meta.laneChangeState == log.LaneChangeState.laneChangeStarting
 
@@ -199,7 +175,8 @@ class NrdrLatControlPID(LatControl):
 
   @property
   def interpolated_torque_pif_settings(self):
-    return self.interpolated_torque_pif_latch.settings
+    settings = self.interpolated_torque_pif_latch.settings
+    return replace(settings, enabled=False) if self._optimized_lane_change() else settings
 
   def _desired_angles(self, VM, CS, params, desired_curvature):
     angle_no_offset = self.steer_ratio_selection.desired_angle_no_offset(
@@ -251,6 +228,8 @@ class NrdrLatControlPID(LatControl):
       )
 
   def _feedforward(self, CS, desired_angle: float) -> float:
+    if self._optimized_lane_change():
+      return 0.0
     factor = float(np.interp(CS.vEgo, self.kf_bp, self.kf_v)) if self.kf_v else self.ff_factor
     return factor * self.get_steer_feedforward(desired_angle, CS.vEgo)
 
@@ -293,16 +272,17 @@ class NrdrLatControlPID(LatControl):
     for values, prefix in scale_keys:
       values[:] = [
         read_float(snapshot, f"{prefix}LowSpeed", 1.0, 0.0, 5.0, scale=100.0),
-        read_float(snapshot, f"{prefix}Standard", 1.0, 0.0, 5.0, scale=100.0),
-        read_float(snapshot, f"{prefix}Highway", 1.0, 0.0, 5.0, scale=100.0),
+        read_float(snapshot, f"{prefix}Standard", 1.5 if prefix == "LatFScale" else 1.0, 0.0, 5.0, scale=100.0),
+        read_float(snapshot, f"{prefix}Highway", 2.0 if prefix == "LatFScale" else 1.0, 0.0, 5.0, scale=100.0),
       ]
-    self.center_boost_magnitude = read_float(snapshot, NrdrParamKey.HONDA_CENTER_SCALE, 0.5, 0.0, 5.0)
-    self.center_boost_threshold = read_float(snapshot, NrdrParamKey.HONDA_CENTER_BOOST_THRESHOLD, 3.0, 0.0, 10.0)
-    self.center_boost_min_speed = read_float(snapshot, NrdrParamKey.HONDA_CENTER_BOOST_MIN_SPEED, 50.0, 0.0, 90.0)
-    self.rate_damping = read_float(snapshot, NrdrParamKey.NRDR_LAT_RATE_DAMPING, 0.3, 0.0, 3.0, scale=100.0)
-    self.rate_damping_fade_speed = read_float(snapshot, NrdrParamKey.NRDR_LAT_RATE_DAMPING_FADE_SPEED, 30.0, 0.0, 60.0) * MPH_TO_MS
+    self.center_boost_magnitude = read_float(snapshot, NrdrParamKey.HONDA_CENTER_SCALE, 0.0, 0.0, 5.0)
+    self.center_boost_threshold = read_float(snapshot, NrdrParamKey.HONDA_CENTER_BOOST_THRESHOLD, 5.0, 0.0, 10.0)
+    self.center_boost_min_speed = read_float(snapshot, NrdrParamKey.HONDA_CENTER_BOOST_MIN_SPEED, 0.0, 0.0, 90.0)
+    self.rate_damping_scales = [
+      read_float(snapshot, f"NrdrLatRateDamping{band}", 0.3, 0.0, 3.0, scale=100.0)
+      for band in ("LowSpeed", "Standard", "Highway")
+    ]
     self.injection_test = read_bool(snapshot, NrdrParamKey.HONDA_INJECTION_TEST)
-    self.starpilot = read_bool(snapshot, NrdrParamKey.NRDR_STAR_PILOT_PID)
     self.stiction_enabled = read_bool(snapshot, NrdrParamKey.NRDR_LAT_STICTION)
     self.settings_generation = snapshot.generation
 
@@ -328,14 +308,12 @@ class NrdrLatControlPID(LatControl):
     output = p_term + i_term + self.pid.d + f_term
     if self.injection_test:
       output *= 9.99
-    if self.is_eps_modified:
-      output *= _output_scale(desired_angle, phase, float(CS.steeringRateDeg), CS.vEgo, self.starpilot)
-      speed_fade = float(np.clip((self.rate_damping_fade_speed - CS.vEgo) / self.rate_damping_fade_speed, 0.0, 1.0)) \
-        if self.rate_damping_fade_speed > 0.0 else 0.0
+    if self.is_eps_modified and not self._optimized_lane_change():
+      damping = _speed_banded_value(CS.vEgo, *self.rate_damping_scales)
       unwind_weight = float(np.clip(-phase / 0.5, 0.0, 1.0))
       angle_fade = float(np.clip((RATE_DAMPING_UNWIND_ANGLE - abs(CS.steeringAngleDeg)) / RATE_DAMPING_UNWIND_ANGLE, 0.0, 1.0))
       unwind_factor = 1.0 - unwind_weight + unwind_weight * angle_fade
-      output -= self.rate_damping * RATE_DAMPING_REFERENCE * float(CS.steeringRateDeg) * speed_fade * unwind_factor
+      output -= damping * RATE_DAMPING_REFERENCE * float(CS.steeringRateDeg) * unwind_factor
     return output
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
@@ -376,7 +354,8 @@ class NrdrLatControlPID(LatControl):
       output_torque = self._scaled_pid_output(CS, desired_no_offset, angle_delta, phase)
       params_valid = False
       if self.is_eps_modified:
-        output_torque += self.tune_learner.apply(CS.vEgo, desired_angle, error)
+        if not self._optimized_lane_change():
+          output_torque += self.tune_learner.apply(CS.vEgo, desired_angle, error)
         output_torque = float(np.clip(output_torque, -self.steer_max, self.steer_max))
         params_valid = bool(params.valid and params.angleOffsetValid and params.steerRatioValid and params.stiffnessFactorValid)
 

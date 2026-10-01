@@ -8,8 +8,6 @@ from collections.abc import Callable
 import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.nrdr.params.ui_metadata import LANE_CHANGE_UI_METADATA
-from openpilot.nrdr.ui.native_param_controls import option_item_from_metadata
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP
 from openpilot.system.ui.widgets.network import NavButton
@@ -66,10 +64,6 @@ class LaneChangeSettingsLayout(Widget):
       LineSeparatorSP(40),
       self._road_edge_block,
     ]
-    self._nrdr_items = {metadata.key.value: option_item_from_metadata(metadata.key) for metadata in LANE_CHANGE_UI_METADATA}
-    for item in self._nrdr_items.values():
-      items.extend((LineSeparatorSP(40), item))
-
     return items
 
   def _update_state(self):
@@ -87,8 +81,6 @@ class LaneChangeSettingsLayout(Widget):
     self._scroller.show_event()
 
   def _update_toggles(self):
-    for key, item in self._nrdr_items.items():
-      item.action_item.set_enabled(key == "NrdrLaneChangeMinTime" or (ui_state.CP is not None and ui_state.CP.brand == "honda"))
     enable_bsm = ui_state.CP is not None and ui_state.CP.enableBsm
     if not enable_bsm and ui_state.params.get_bool("AutoLaneChangeBsmDelay"):
       ui_state.params.remove("AutoLaneChangeBsmDelay")

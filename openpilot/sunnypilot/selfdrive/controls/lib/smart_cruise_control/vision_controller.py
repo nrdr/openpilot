@@ -9,9 +9,7 @@ import numpy as np
 import openpilot.cereal.messaging as messaging
 from openpilot.cereal import custom
 from openpilot.common.params import Params
-from openpilot.common.realtime import DT_MDL
 from openpilot.selfdrive.car.cruise import V_CRUISE_UNSET
-from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.selfdrive.controls.lib.smart_cruise_control import MIN_V
 
 VisionState = custom.LongitudinalPlanSP.SmartCruiseControl.VisionState
@@ -67,25 +65,27 @@ class SmartCruiseControlVision:
     self.max_pred_lat_acc = 0.
 
   def get_a_target_from_control(self) -> float:
-    return self.a_target
+    return self.a_target if self.enabled and self.is_active else 0.0
 
   def get_v_target_from_control(self) -> float:
-    if self.is_active:
+    if self.enabled and self.is_active:
       return max(self.v_target, MIN_V) + self.a_target * _NO_OVERSHOOT_TIME_HORIZON
 
     return V_CRUISE_UNSET
 
   def _update_params(self) -> None:
-    if self.frame % int(PARAMS_UPDATE_PERIOD / DT_MDL) == 0:
-      self.enabled = self.params.get_bool("SmartCruiseControlVision")
+    self.enabled = self.params.get_bool("SmartCruiseControlVision")
 
-  def _update_calculations(self, sm: messaging.SubMaster) -> None:
+  def _update_calculations(self, sm: messaging.SubMaster) -> bool:
     if not self.long_enabled:
-      return
+      return False
     else:
       rate_plan = np.array(np.abs(sm['modelV2'].orientationRate.z))
       vel_plan = np.array(sm['modelV2'].velocity.x)
 
+      if not len(rate_plan) or len(rate_plan) != len(vel_plan) or not np.all(np.isfinite(rate_plan * vel_plan)):
+        self._disable()
+        return False
       self.current_lat_acc = self.v_ego ** 2 * abs(sm['controlsState'].curvature)
 
       # get the maximum lat accel from the model
@@ -97,7 +97,8 @@ class SmartCruiseControlVision:
       max_curve = self.max_pred_lat_acc / (v_ego**2)
 
       # Get the target velocity for the maximum curve
-      self.v_target = (_A_LAT_REG_MAX / max_curve) ** 0.5
+      self.v_target = (_A_LAT_REG_MAX / max_curve) ** 0.5 if max_curve > 1e-9 else V_CRUISE_UNSET
+      return True
 
   def _update_state_machine(self) -> tuple[bool, bool]:
     # ENABLED, ENTERING, TURNING, LEAVING, OVERRIDING
@@ -183,6 +184,13 @@ class SmartCruiseControlVision:
 
     return a_target
 
+  def _disable(self):
+    self.state = VisionState.disabled
+    self.is_enabled = self.is_active = False
+    self.current_lat_acc = self.max_pred_lat_acc = 0.0
+    self.v_target = self.output_v_target = V_CRUISE_UNSET
+    self.a_target = self.output_a_target = 0.0
+
   def update(self, sm: messaging.SubMaster, long_enabled: bool, long_override: bool, v_ego: float, a_ego: float,
              v_cruise_setpoint: float) -> None:
     self.long_enabled = long_enabled
@@ -192,7 +200,13 @@ class SmartCruiseControlVision:
     self.v_cruise_setpoint = v_cruise_setpoint
 
     self._update_params()
-    self._update_calculations(sm)
+    if not self.enabled or not self.long_enabled:
+      self._disable()
+      self.frame += 1
+      return
+    if not self._update_calculations(sm):
+      self.frame += 1
+      return
 
     self.is_enabled, self.is_active = self._update_state_machine()
     self.a_target = self._update_solution()

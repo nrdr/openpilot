@@ -15,6 +15,8 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params import (
   confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported, request_handcrafted_lateral_profile,
 )
+from openpilot.nrdr.params.profiles import disable_suggested_settings
+from openpilot.nrdr.params.tuning_policy import SUGGESTED_DESCRIPTION
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.lane_centering import LaneCenteringLayout
 from openpilot.system.ui.lib.application import gui_app
@@ -27,7 +29,7 @@ from openpilot.system.ui.widgets.list_view import (BUTTON_BORDER_RADIUS, BUTTON_
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.html_render import HtmlModalSP
-from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, simple_button_item_sp
+from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, simple_button_item_sp, toggle_item_sp
 from openpilot.nrdr.ui.settings.pidf_ground import PidfGroundLayout
 from openpilot.nrdr.ui.settings.vehicle_model_learning import VehicleModelLearningLayout
 from openpilot.nrdr.ui.settings.override_tuning import OverrideTuningLayout
@@ -377,11 +379,10 @@ class LateralTuningLayout(Widget):
     return [self._tune_report_item, self._pid_tune_info_item]
 
   def _initialize_items(self):
-    self._handcrafted_tune = button_item(
-      lambda: tr("Apply Handcrafted Lateral Profile"),
-      lambda: tr("WAIT") if ui_state.params.get_bool("NrdrHandcraftedLateralTune") else tr("APPLY"),
-      self._handcrafted_description,
-      callback=self._on_handcrafted_apply,
+    self._handcrafted_tune = toggle_item_sp(
+      title=lambda: tr("Apply Suggested Settings"),
+      description=lambda: tr(SUGGESTED_DESCRIPTION),
+      callback=self._on_suggested_toggle,
     )
     # Stay hidden until live CP/CP_SP proves this exact vehicle is supported.
     self._handcrafted_tune.set_visible(False)
@@ -433,13 +434,7 @@ class LateralTuningLayout(Widget):
 
   @staticmethod
   def _handcrafted_description():
-    description = tr(
-      "Applies the September 12 Civic-derived preset once, using only settings supported by this car and controller. " +
-      "Steer ratio, vehicle learning, and calibration stay unchanged. Common lane-centering and live-delay settings apply across supported cars; " +
-      "Honda-specific settings apply only to compatible controllers. Later manual edits persist until you deliberately apply again."
-    )
-    status = ui_state.params.get("NrdrCarHandcraftedInfo")
-    return description if not status else f"{description}<br><br>{tr('Status')}: {status}"
+    return tr(SUGGESTED_DESCRIPTION)
 
   @staticmethod
   def _handcrafted_supported():
@@ -450,9 +445,13 @@ class LateralTuningLayout(Widget):
     )
 
   @staticmethod
-  def _on_handcrafted_apply():
-    if ui_state.is_offroad() and LateralTuningLayout._handcrafted_supported():
+  def _on_suggested_toggle(enabled: bool):
+    if not ui_state.is_offroad():
+      return
+    if enabled and LateralTuningLayout._handcrafted_supported():
       request_handcrafted_lateral_profile(ui_state.CP, ui_state.CP_SP, ui_state.params)
+    elif not enabled:
+      disable_suggested_settings(ui_state.params)
 
   def _update_state(self):
     super()._update_state()
@@ -465,7 +464,8 @@ class LateralTuningLayout(Widget):
     supported = self._handcrafted_supported()
     pending = ui_state.params.get_bool("NrdrHandcraftedLateralTune")
     self._handcrafted_tune.set_visible(supported)
-    self._handcrafted_tune.action_item.set_enabled(supported and ui_state.is_offroad() and not pending)
+    self._handcrafted_tune.action_item.set_enabled(supported and ui_state.is_offroad())
+    self._handcrafted_tune.action_item.toggle.set_state(pending or ui_state.params.get_bool("NrdrSuggestedSettings"))
 
   def _render(self, rect):
     if self._current_panel == LateralPanel.VEHICLE_MODEL:

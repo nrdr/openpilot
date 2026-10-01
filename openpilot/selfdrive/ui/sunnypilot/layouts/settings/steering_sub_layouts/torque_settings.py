@@ -115,8 +115,7 @@ class TorqueSettingsLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
-    nnlc_enabled = ui_state.params.get_bool("NeuralNetworkLateralControl")
-    self._jerk_aware_toggle.action_item.set_enabled(ui_state.is_offroad() and not nnlc_enabled)
+    self._jerk_aware_toggle.action_item.set_enabled(ui_state.is_offroad())
     if not ui_state.params.get_bool("LiveTorqueParamsToggle"):
       ui_state.params.remove("LiveTorqueParamsRelaxedToggle")
       self._relaxed_tune_toggle.action_item.set_state(False)

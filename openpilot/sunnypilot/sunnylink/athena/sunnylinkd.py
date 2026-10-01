@@ -263,18 +263,22 @@ def _remote_bool_value(value: str, compression: bool) -> bool | None:
 
 @dispatcher.add_method
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
+  from openpilot.nrdr.params.tuning_policy import reset_learning_scales, tuning_write_allowed
   onroad = not params.get_bool("IsOffroad")
-  vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {"NrdrHandcraftedLateralTune"}
+  vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {"NrdrHandcraftedLateralTune", "NrdrSuggestedSettings"}
   capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
   handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
   honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
   for key, value in params_to_update.items():
+    if not tuning_write_allowed(params, key):
+      cloudlog.warning(f"sunnylinkd.saveParams.locked: '{key}'")
+      continue
     # disallow modifications to blocked parameters
     if key in BLOCKED_PARAMS:
       cloudlog.warning(f"sunnylinkd.saveParams.blocked: Attempted to modify blocked parameter '{key}'")
       continue
     requested_bool = _remote_bool_value(value, compression) \
-      if key == "NrdrHandcraftedLateralTune" else None
+      if key in ("NrdrHandcraftedLateralTune", "NrdrSuggestedSettings") else None
     if not allow_param_write(
       key, onroad,
       handcrafted_profile_available=handcrafted_available,
@@ -285,11 +289,25 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       continue
 
     try:
-      if key == "NrdrHandcraftedLateralTune" and requested_bool is True:
+      if key == "NrdrLateralController":
+        # Read only device-owned capability evidence, never trust the web client.
+        decoded = base64.b64decode(value)
+        if compression:
+          decoded = gzip.decompress(decoded)
+        selection = int(decoded)
+        if selection not in (0, 1) or (selection == 1 and capabilities.get("nrdr_yaw_controller_available") is not True):
+          continue
+        params.put(key, selection, block=True)
+      elif key == "NrdrSuggestedSettings" and requested_bool is False:
+        from openpilot.nrdr.params.profiles import disable_suggested_settings
+        disable_suggested_settings(params)
+      elif key in ("NrdrHandcraftedLateralTune", "NrdrSuggestedSettings") and requested_bool is True:
         if not request_stored_handcrafted_lateral_profile(params):
           cloudlog.warning("sunnylinkd.saveParams.handcrafted: Fresh request rejected for current vehicle or state")
       else:
         save_param_from_base64_encoded_string(key, value, compression)
+      if key == "HondaLiveLearningGas":
+        reset_learning_scales(params)
     except Exception as e:
       cloudlog.error(f"sunnylinkd.saveParams.exception {e}")
 

@@ -304,11 +304,6 @@
                   "type": "capability",
                   "field": "torque_allowed",
                   "equals": true
-                },
-                {
-                  "type": "param",
-                  "key": "NeuralNetworkLateralControl",
-                  "equals": false
                 }
               ]
             }
@@ -342,11 +337,6 @@
                   "enablement": [
                     {
                       "type": "offroad_only"
-                    },
-                    {
-                      "type": "param",
-                      "key": "NeuralNetworkLateralControl",
-                      "equals": false
                     }
                   ]
                 },
@@ -571,87 +561,6 @@
                   "value": 0
                 }
               ]
-            },
-            {
-              "key": "NrdrLaneChangeMinTime",
-              "widget": "option",
-              "title": "NRDR Minimum Lane-Change State Time",
-              "description": "Minimum time before the lane-change state can finish; not the time to cross a lane. Default: 0.5 s.",
-              "details": "Separate from the SunnyPilot blinker start delay. Completion also requires the model's lane-change probability to fall below its existing threshold. Read at each lane-change start after background refresh (normally 0.5 s); no reboot or LKAS cycle. Configure while parked. Speed, blind-spot, road-edge and timeout checks are unchanged.",
-              "min": 0.5,
-              "max": 2.0,
-              "step": 0.1,
-              "unit": "s"
-            },
-            {
-              "key": "NrdrLaneChangeEntrySrReduction",
-              "widget": "option",
-              "title": "NRDR Lane Change Entry SR Reduction",
-              "description": "Temporary command-side SR reduction. 0 disables it; 3.0 is an experimental test value, not a validated tune.",
-              "details": "Honda only. Uses the current resolved Manual, Comma, Measured, Firmware or Hybrid ratio. Ramps the reduction in over 0.15 s, then smoothly restores the current source using Entry SR Return Time. Higher values ask for less initial steering and can weaken a lane change. Saved geometry and learning are unchanged. Captured at the next lane-change start after background refresh (normally 0.5 s), without reboot/LKAS cycling. Setting 0 cancels the effect with a 0.2 s return. Configure while parked. Existing steering limits still apply.",
-              "min": 0.0,
-              "max": 5.0,
-              "step": 0.1,
-              "enablement": [
-                {
-                  "type": "capability",
-                  "field": "nrdr_honda_tuning_available",
-                  "equals": true
-                }
-              ]
-            },
-            {
-              "key": "NrdrLaneChangeEntryReturnTime",
-              "widget": "option",
-              "title": "NRDR Lane Change Entry SR Return Time",
-              "description": "Seconds to blend the entry SR reduction back to zero after the 0.15 s entry ramp. Default: 1.0 s.",
-              "details": "This is time-based request shaping, not measured lane-crossing progress. Longer values retain reduced steering for longer. Ending the lane-change state or driver takeover returns it within 0.2 s; disengagement clears it. Driver steering at the start suppresses entry shaping for that maneuver. Used only with a nonzero Entry SR Reduction. Captured for the next lane change after background refresh, without a reboot or LKAS cycle. Configure while parked.",
-              "min": 0.2,
-              "max": 3.0,
-              "step": 0.1,
-              "unit": "s",
-              "enablement": [
-                {
-                  "type": "capability",
-                  "field": "nrdr_honda_tuning_available",
-                  "equals": true
-                }
-              ]
-            },
-            {
-              "key": "NrdrLaneChangeTorqueFactor",
-              "widget": "option",
-              "title": "NRDR Legacy Lane Change Torque Factor",
-              "description": "Legacy v1 torque controller only: multiplies its acceleration factor during lane-change states. Default: 2.0x.",
-              "details": "Honda v1 torque path only, including the pre-lane-change waiting state. Higher values generally reduce its torque request. 1.0 removes this multiplier. Does not tune Honda PID, the PIF/Torque blend, NNLC or v0/jerk-aware controllers. Edits apply after background refresh (normally 0.5 s), with the existing one-second tuning transition. Configure while parked.",
-              "min": 1.0,
-              "max": 3.0,
-              "step": 0.1,
-              "enablement": [
-                {
-                  "type": "capability",
-                  "field": "nrdr_honda_tuning_available",
-                  "equals": true
-                }
-              ]
-            },
-            {
-              "key": "NrdrLaneChangeFrictionPercent",
-              "widget": "option",
-              "title": "NRDR Legacy Lane Change Friction",
-              "description": "Legacy v1 torque controller only: retained friction compensation during lane-change states. Default: 0%.",
-              "details": "Honda v1 torque path only, including the pre-lane-change waiting state. 0% preserves existing suppression; 100% retains its normal friction compensation. Does not change PID or PIF/Torque blend friction. Edits apply after background refresh (normally 0.5 s), with the existing one-second tuning transition. Configure while parked.",
-              "min": 0,
-              "max": 100,
-              "step": 5,
-              "unit": "%",
-              "enablement": [
-                {
-                  "type": "capability",
-                  "field": "nrdr_honda_tuning_available",
-                  "equals": true
-                }
-              ]
             }
           ]
         },
@@ -661,11 +570,10 @@
           "description": "Lateral tuning specific to the nrdr fork.",
           "items": [
             {
-              "key": "NrdrHandcraftedLateralTune",
+              "key": "NrdrSuggestedSettings",
               "widget": "toggle",
-              "title": "Apply Handcrafted Lateral Profile",
-              "description": "Flip ON to request the September 12 Civic-derived preset once for this car and controller. Steer ratio, vehicle learning, and calibration stay unchanged.",
-              "details": "Common lane-centering and live-delay settings apply across supported cars; Honda-specific groups apply only to compatible controllers. A fresh request is bound to the detected vehicle and preset version. Wait a few seconds, then refresh; the switch turns OFF after verified completion. This is opt-in, not a mode; existing customizations are not automatically overwritten, and later edits persist until you deliberately apply again. The source tune was recorded on a Civic, not validated on every vehicle.",
+              "title": "Apply Suggested Settings",
+              "description": "Last Road Tested: October 1, 2026, with PopV2 Model. Your mileage may vary. Turning back to OFF will preserve these settings and unlock tuning menus.",
               "visibility": [
                 {
                   "type": "capability",
@@ -682,93 +590,6 @@
           ],
           "sub_panels": [
             {
-              "id": "nrdr_vehicle_model_learning",
-              "label": "Vehicle Model & Learning",
-              "trigger_key": null,
-              "items": [
-                {
-                  "key": "NrdrRemoteTuneScan",
-                  "widget": "toggle",
-                  "title": "Run Tune Report Scan",
-                  "description": "Flip ON to scan every drive log into a tune report (the device flips it back OFF on the next start)."
-                },
-                {
-                  "key": "NrdrCarTuneInfo",
-                  "widget": "info",
-                  "title": "Loaded Profile",
-                  "details": "Live vehicle, controller, base-tune, geometry, and tuning-knob details are written here by the device."
-                },
-                {
-                  "key": "NrdrCarControllerInfo",
-                  "widget": "info",
-                  "title": "Controller"
-                },
-                {
-                  "key": "NrdrCarHandcraftedInfo",
-                  "widget": "info",
-                  "title": "Handcrafted"
-                },
-                {
-                  "key": "NrdrCarPidLowInfo",
-                  "widget": "info",
-                  "title": "PID Low"
-                },
-                {
-                  "key": "NrdrCarPidMidInfo",
-                  "widget": "info",
-                  "title": "PID Mid"
-                },
-                {
-                  "key": "NrdrCarPidHighInfo",
-                  "widget": "info",
-                  "title": "PID Hwy"
-                },
-                {
-                  "key": "NrdrCarDampingInfo",
-                  "widget": "info",
-                  "title": "Damping"
-                },
-                {
-                  "key": "NrdrCarCenterInfo",
-                  "widget": "info",
-                  "title": "Center"
-                },
-                {
-                  "key": "NrdrCarNnlcInfo",
-                  "widget": "info",
-                  "title": "NNLC"
-                },
-                {
-                  "key": "NrdrCarSteerRatioInfo",
-                  "widget": "info",
-                  "title": "Steer Ratio"
-                },
-                {
-                  "key": "NrdrCarLearningInfo",
-                  "widget": "info",
-                  "title": "Learning"
-                },
-                {
-                  "key": "NrdrCarHelpersInfo",
-                  "widget": "info",
-                  "title": "Helpers"
-                },
-                {
-                  "key": "NrdrLearnStiffness",
-                  "widget": "toggle",
-                  "title": "Learn Tire Stiffness (Auto)",
-                  "description": "When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0."
-                },
-                {
-                  "key": "NrdrLearnAngleOffset",
-                  "widget": "toggle",
-                  "title": "Learn Angle Offset (Auto)",
-                  "description": "When ON (Auto), uses the live-learned steering angle offset; OFF uses a static 0.0 offset.",
-                  "details": "When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. Turn OFF if a bad learned offset is pulling the car to one side."
-                }
-              ]
-            },
-            {
               "id": "nrdr_pidf_ground",
               "label": "Controller Tuning Dungeon",
               "trigger_key": null,
@@ -779,139 +600,88 @@
               },
               "items": [
                 {
-                  "key": "NrdrInterpolatedTorquePifBlend",
-                  "widget": "toggle",
-                  "title": "Interpolated Torque/PIF Blend",
-                  "description": "Blend angle-feedback P/I/F with the generic f13 legacy torque controller.",
-                  "details": "The final request is Torque share times the f13de17 generic torque controller plus the remaining share times today's complete P/I/F controller. Torque uses angle feedback through 2 m/s, transitions from angle to calibrated yaw over 2-5 m/s, and uses calibrated yaw at 5 m/s and above. If required yaw is invalid, stale, missing, or non-finite, Torque does not reuse angle or update its controller state; the final request temporarily returns to 100% P/I/F. This generic yaw branch was not historically road-proven on Honda. All six settings apply live after the next background refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required. Have a passenger make adjustments while driving. Clarity NNLC is bypassed and reset.",
-                  "enablement": [
+                  "key": "NrdrLateralController",
+                  "widget": "multiple_button",
+                  "title": "Controller Type",
+                  "options": [
                     {
-                      "type": "capability",
-                      "field": "nrdr_interpolated_torque_pif_blend_available",
-                      "equals": true
+                      "value": 0,
+                      "label": "PIF Control"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Yaw Control",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_yaw_controller_available",
+                          "equals": true
+                        }
+                      ]
                     }
                   ],
-                  "sub_items": [
+                  "enablement": [
                     {
-                      "key": "NrdrInterpolatedTorqueShare",
-                      "widget": "option",
-                      "title": "Torque / P/I/F Share",
-                      "description": "Splits the final steering request between both complete controllers. Torque X% / P/I/F (100-X)%; default is 50% / 50%.",
-                      "details": "The two shares always add to 100%. Changes apply from one live six-setting snapshot without disengagement.",
-                      "min": 0,
-                      "max": 100,
-                      "step": 1,
-                      "unit": "%",
-                      "enablement": [
-                        {
-                          "type": "capability",
-                          "field": "nrdr_interpolated_torque_pif_blend_available",
-                          "equals": true
-                        },
-                        {
-                          "type": "param",
-                          "key": "NrdrInterpolatedTorquePifBlend",
-                          "equals": true
-                        }
-                      ]
-                    },
-                    {
-                      "key": "NrdrInterpolatedTorqueLatAccelFactor",
-                      "widget": "option",
-                      "title": "Spoofed Lateral Acceleration Factor",
-                      "description": "Sets how much lateral acceleration the legacy torque half treats as full normalized steering torque.",
-                      "details": "Higher values ask the torque half for less steering for the same planned curve. It scales Torque feedback error and non-friction feedforward, but never direct friction. This is m/s\u00b2, not m/s. Changes apply live after the next background refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required.",
-                      "min": 0.1,
-                      "max": 10.0,
-                      "step": 0.1,
-                      "unit": "m/s\u00b2",
-                      "enablement": [
-                        {
-                          "type": "capability",
-                          "field": "nrdr_interpolated_torque_pif_blend_available",
-                          "equals": true
-                        },
-                        {
-                          "type": "param",
-                          "key": "NrdrInterpolatedTorquePifBlend",
-                          "equals": true
-                        }
-                      ]
-                    },
-                    {
-                      "key": "NrdrInterpolatedTorqueFriction",
-                      "widget": "option",
-                      "title": "Low-Speed Torque Friction (Below 25mph)",
-                      "description": "Sets direct normalized steering torque for the legacy torque half below 25 mph.",
-                      "details": "Helps the legacy torque half overcome rack friction. A \u00b11 mph handoff blends this value smoothly into Standard from 24-26 mph. It is independent of the lateral acceleration factor. Changes apply live after the next background refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required.",
-                      "min": 0.0,
-                      "max": 1.0,
-                      "step": 0.01,
-                      "enablement": [
-                        {
-                          "type": "capability",
-                          "field": "nrdr_interpolated_torque_pif_blend_available",
-                          "equals": true
-                        },
-                        {
-                          "type": "param",
-                          "key": "NrdrInterpolatedTorquePifBlend",
-                          "equals": true
-                        }
-                      ]
-                    },
-                    {
-                      "key": "NrdrInterpolatedTorqueFrictionStandard",
-                      "widget": "option",
-                      "title": "Standard-Speed Torque Friction (25-50mph)",
-                      "description": "Sets direct normalized steering torque for the legacy torque half between 25 and 50 mph.",
-                      "details": "Helps the legacy torque half overcome rack friction. \u00b11 mph handoffs blend Low into this value from 24-26 mph and this value into Highway from 49-51 mph. It is independent of the lateral acceleration factor. Changes apply live after the next background refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required.",
-                      "min": 0.0,
-                      "max": 1.0,
-                      "step": 0.01,
-                      "enablement": [
-                        {
-                          "type": "capability",
-                          "field": "nrdr_interpolated_torque_pif_blend_available",
-                          "equals": true
-                        },
-                        {
-                          "type": "param",
-                          "key": "NrdrInterpolatedTorquePifBlend",
-                          "equals": true
-                        }
-                      ]
-                    },
-                    {
-                      "key": "NrdrInterpolatedTorqueFrictionHighway",
-                      "widget": "option",
-                      "title": "Highway Torque Friction (50mph+)",
-                      "description": "Sets direct normalized steering torque for the legacy torque half above 50 mph.",
-                      "details": "Helps the legacy torque half overcome rack friction. A \u00b11 mph handoff blends Standard smoothly into this value from 49-51 mph. It is independent of the lateral acceleration factor. Changes apply live after the next background refresh (normally within 0.5 seconds), with a one-second torque transition. No LKAS cycle is required.",
-                      "min": 0.0,
-                      "max": 1.0,
-                      "step": 0.01,
-                      "enablement": [
-                        {
-                          "type": "capability",
-                          "field": "nrdr_interpolated_torque_pif_blend_available",
-                          "equals": true
-                        },
-                        {
-                          "type": "param",
-                          "key": "NrdrInterpolatedTorquePifBlend",
-                          "equals": true
-                        }
-                      ]
+                      "type": "offroad_only"
                     }
                   ]
                 },
                 {
-                  "key": "NrdrStarPilotPid",
+                  "key": "NrdrLatStiction",
                   "widget": "toggle",
-                  "title": "StarPilot PID Additions",
-                  "description": "Adds the borrowed StarPilot turn-in / unwind / per-direction output scaling, not built for Honda.",
-                  "details": "The borrowed turn-in / unwind / per-direction output scaling (the StarPilot half of _pid_output_scale) not built for Honda. Off = clean banded PID/F + rate-damping D, your center boost kept. Turn on to A/B it against the raw base."
+                  "title": "Predictive Lateral Stiction",
+                  "description": "Tapers torque before a stable steering target, then holds it until another correction is needed.",
+                  "details": "PID remains the normal throw. A predictive capture stage can only reduce torque as the wheel closes on a stable target, then freezes the captured output until error, relative motion, drift, or a decisive corrective torque reversal requires reacquisition. It operates at every speed and immediately bypasses for driver input, lane changes, steering faults, or control limits. Default is OFF.",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrOptimizedLaneChanges",
+                  "widget": "toggle",
+                  "title": "Optimized Lane Changes",
+                  "description": "Use the fixed NRDR lane-change profile. During the maneuver, disable torque blending, feedforward, and rate damping for either controller.",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LatPScaleLowSpeed",
@@ -922,7 +692,33 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LatIScaleLowSpeed",
@@ -933,7 +729,33 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LatFScaleLowSpeed",
@@ -944,7 +766,69 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrLatRateDampingLowSpeed",
+                  "widget": "option",
+                  "title": "Low Speed Rate Damping",
+                  "description": "Opposes steering-wheel rate. 0 disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
+                  "min": 0,
+                  "max": 300,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LatPScaleStandard",
@@ -954,7 +838,33 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LatIScaleStandard",
@@ -964,7 +874,33 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LatFScaleStandard",
@@ -974,7 +910,69 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrLatRateDampingStandard",
+                  "widget": "option",
+                  "title": "Standard Speed Rate Damping",
+                  "description": "Opposes steering-wheel rate. 0 disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
+                  "min": 0,
+                  "max": 300,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LatPScaleHighway",
@@ -984,7 +982,33 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LatIScaleHighway",
@@ -994,7 +1018,33 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LatFScaleHighway",
@@ -1004,29 +1054,69 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
-                  "key": "NrdrLatRateDamping",
+                  "key": "NrdrLatRateDampingHighway",
                   "widget": "option",
-                  "title": "Rate Damping (D) Strength",
-                  "description": "Adds a damping (D) term opposing wheel speed to flatten low-speed oscillation; 0 = off.",
-                  "details": "The derivative term openpilot normally can't use. Adds torque opposing how fast the wheel is moving, which damps the low-speed oscillation plain P can't (the wheel is torque-commanded, so P alone rings). Relies on a clean steering-rate signal and a low-lag EPS - which this car has. 0 = off. Raise until the low-speed wobble flattens; too high makes turn-in feel heavy.",
+                  "title": "Highway Rate Damping",
+                  "description": "Opposes steering-wheel rate. 0 disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
                   "min": 0,
                   "max": 300,
                   "step": 5,
-                  "unit": "%"
-                },
-                {
-                  "key": "NrdrLatRateDampingFadeSpeed",
-                  "widget": "option",
-                  "title": "Rate Damping Fade-Out Speed",
-                  "description": "Speed at which rate damping tapers to zero (strongest at a standstill).",
-                  "details": "Speed at which rate damping tapers to zero. Damping is strongest at a standstill and gone by this speed, where tire self-aligning torque resumes damping the steering itself. Keeps the D term out of your highway feel.",
-                  "min": 0,
-                  "max": 60,
-                  "step": 1,
-                  "unit": "mph"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "HondaCenterScale",
@@ -1036,7 +1126,33 @@
                   "details": "Multiplies only the proportional term near center. Integral, feedforward, and damping keep their normal values. Available at every speed above the minimum, including the highway.",
                   "min": 0.0,
                   "max": 5.0,
-                  "step": 0.01
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "HondaCenterBoostThreshold",
@@ -1046,7 +1162,33 @@
                   "min": 0.0,
                   "max": 10.0,
                   "step": 0.1,
-                  "unit": "deg"
+                  "unit": "deg",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "HondaCenterBoostMinSpeed",
@@ -1057,131 +1199,31 @@
                   "min": 0,
                   "max": 80,
                   "step": 1,
-                  "unit": "mph"
-                },
-                {
-                  "key": "NrdrLatStiction",
-                  "widget": "toggle",
-                  "title": "Predictive Lateral Stiction",
-                  "description": "Tapers torque before a stable steering target, then holds it until another correction is needed.",
-                  "details": "PID remains the normal throw. A predictive capture stage can only reduce torque as the wheel closes on a stable target, then freezes the captured output until error, relative motion, drift, or a decisive corrective torque reversal requires reacquisition. It operates at every speed and immediately bypasses for driver input, lane changes, steering faults, or control limits. Default is OFF."
-                },
-                {
-                  "key": "NrdrNnlcEnabled",
-                  "widget": "toggle",
-                  "title": "Enable Neural Network Lateral Model (NNLC)",
-                  "description": "Use PID at lower speeds and during lane changes, then smoothly hand off to the Clarity neural lateral model at higher speeds. Default is OFF.",
-                  "details": "OFF keeps the exact Clarity interface.py PID tune active everywhere. ON runs the PID/NNLC hybrid; lane changes immediately select PID before their opening torque command. NNLC remains configured but is inactive whenever a recognized Clarity is using the experimental firmware EPS position map or Interpolated Torque/PIF Blend.",
+                  "unit": "mph",
                   "enablement": [
                     {
                       "type": "not",
                       "condition": {
                         "type": "param",
-                        "key": "NrdrInterpolatedTorquePifBlend",
+                        "key": "NrdrSuggestedSettings",
                         "equals": true
                       }
-                    }
-                  ],
-                  "sub_items": [
-                    {
-                      "key": "NrdrNnlcActivationSpeed",
-                      "widget": "option",
-                      "title": "Activate NNLC Above",
-                      "description": "Center speed of the smooth 6 mph PID-to-NNLC handoff. Default is 30 mph (PID full through 27 mph, NNLC full from 33 mph).",
-                      "min": 0,
-                      "max": 100,
-                      "step": 1,
-                      "unit": "mph",
-                      "enablement": [
-                        {
-                          "type": "param",
-                          "key": "NrdrNnlcEnabled",
-                          "equals": true
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "param",
-                            "key": "NrdrInterpolatedTorquePifBlend",
-                            "equals": true
-                          }
-                        }
-                      ]
                     },
                     {
-                      "key": "NrdrNnlcKpGain",
-                      "widget": "option",
-                      "title": "NNLC KP Gain Scale",
-                      "description": "NNLC proportional feedback gain. 100% gives kp = 1.0.",
-                      "min": 0,
-                      "max": 300,
-                      "step": 5,
-                      "unit": "%",
-                      "enablement": [
-                        {
-                          "type": "param",
-                          "key": "NrdrNnlcEnabled",
-                          "equals": true
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "param",
-                            "key": "NrdrInterpolatedTorquePifBlend",
-                            "equals": true
-                          }
-                        }
-                      ]
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
                     },
                     {
-                      "key": "NrdrNnlcKfGain",
-                      "widget": "option",
-                      "title": "NNLC KF Gain Scale",
-                      "description": "NNLC neural-model feedforward gain. 50% gives kf = 0.5.",
-                      "min": 0,
-                      "max": 300,
-                      "step": 5,
-                      "unit": "%",
-                      "enablement": [
-                        {
-                          "type": "param",
-                          "key": "NrdrNnlcEnabled",
-                          "equals": true
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "param",
-                            "key": "NrdrInterpolatedTorquePifBlend",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "key": "NrdrNnlcKiGain",
-                      "widget": "option",
-                      "title": "NNLC KI Gain Scale",
-                      "description": "NNLC integral feedback gain. 10% gives ki = 0.1.",
-                      "min": 0,
-                      "max": 300,
-                      "step": 5,
-                      "unit": "%",
-                      "enablement": [
-                        {
-                          "type": "param",
-                          "key": "NrdrNnlcEnabled",
-                          "equals": true
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "param",
-                            "key": "NrdrInterpolatedTorquePifBlend",
-                            "equals": true
-                          }
-                        }
-                      ]
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
                     }
                   ]
                 }
@@ -1197,7 +1239,25 @@
                   "widget": "toggle",
                   "title": "Enable Lane Centering",
                   "description": "Disabled by default. Development-only, delay-aware lane centering; not road-validated. Settings apply live without disengagement.",
-                  "details": "Builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Uses timing carried with the model action; no separate timing message or setting is needed. Looks farther ahead as delay increases and requires enough valid road preview. Missing timing, timing over 0.875 seconds, or short preview fades back to the model; TIME and SHORT explain these states. Checks the corridor farther ahead for diverging markings and reduces authority as confidence falls. When the paths agree, it requests no correction. The combined model and lane command still passes through the normal curvature and jerk limits."
+                  "details": "Builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Uses timing carried with the model action; no separate timing message or setting is needed. Looks farther ahead as delay increases and requires enough valid road preview. Missing timing, timing over 0.875 seconds, or short preview fades back to the model; TIME and SHORT explain these states. Checks the corridor farther ahead for diverging markings and reduces authority as confidence falls. When the paths agree, it requests no correction. The combined model and lane command still passes through the normal curvature and jerk limits.",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LaneCenteringMinSpeed",
@@ -1214,6 +1274,22 @@
                       "type": "param",
                       "key": "LaneCentering",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -1227,6 +1303,22 @@
                       "type": "param",
                       "key": "LaneCentering",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -1244,6 +1336,22 @@
                       "type": "param",
                       "key": "LaneCentering",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -1251,7 +1359,7 @@
                   "key": "LaneCenteringStrength",
                   "widget": "option",
                   "title": "Lane-Centering Strength",
-                  "description": "Blend the model path toward the lane-center path. 0.0 uses the model path; 1.0 requests the lane-center path, without raising the existing maximum correction ceiling. 0.30 is the default.",
+                  "description": "Blend the model path toward the lane-center path. 0.0 uses the model path; 1.0 requests the lane-center path, without raising the existing maximum correction ceiling. 0.95 is the suggested setting.",
                   "details": "Confidence and steering limits always apply. Model Break-In can reduce the lane contribution during a large, confident path disagreement; set Model Break-In to 0.0 if you want no such reduction. This is a path weight, not a promise of exact physical lane position.",
                   "min": 0.0,
                   "max": 1.0,
@@ -1261,6 +1369,22 @@
                       "type": "param",
                       "key": "LaneCentering",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -1278,6 +1402,22 @@
                       "type": "param",
                       "key": "LaneCentering",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
                     }
                   ]
                 }
@@ -1298,7 +1438,33 @@
                   "widget": "toggle",
                   "title": "Enable Hybrid Steer Ratio",
                   "description": "Use source A near center, then blend into source B across 5 degrees. OFF preserves single-source operation and your existing selection.",
-                  "details": "Experimental geometry, not road-validated. Configure while parked. The slider is the start of the transition, measured from straight ahead in either direction. Both sources must match this vehicle. A blend that reverses the angle-to-curvature mapping is rejected; runtime holds the last accepted geometry while active, or uses stock fallback at startup. Inspect the current steer-ratio result on the device. No PID gains or original curve data are changed."
+                  "details": "Experimental geometry, not road-validated. Configure while parked. The slider is the start of the transition, measured from straight ahead in either direction. Both sources must match this vehicle. A blend that reverses the angle-to-curvature mapping is rejected; runtime holds the last accepted geometry while active, or uses stock fallback at startup. Inspect the current steer-ratio result on the device. No PID gains or original curve data are changed.",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrSteerRatioMode",
@@ -1344,6 +1510,32 @@
                         }
                       ]
                     }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
                   ]
                 },
                 {
@@ -1360,6 +1552,30 @@
                       "type": "param",
                       "key": "NrdrSteerRatioHybrid",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
                     }
                   ]
                 },
@@ -1412,6 +1628,30 @@
                       "type": "param",
                       "key": "NrdrSteerRatioHybrid",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
                     }
                   ]
                 },
@@ -1453,6 +1693,30 @@
                       "type": "capability",
                       "field": "nrdr_manual_steer_ratio_available",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
                     }
                   ]
                 },
@@ -1495,6 +1759,30 @@
                       "type": "capability",
                       "field": "nrdr_manual_steer_ratio_available",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
                     }
                   ]
                 }
@@ -1511,13 +1799,6 @@
               },
               "items": [
                 {
-                  "key": "NrdrIncreaseOverrideTolerance",
-                  "widget": "toggle",
-                  "title": "Increase Driver Override Hysteresis",
-                  "description": "Reduces false driver override detections on sensitive Honda EPS by doubling the override threshold below.",
-                  "details": "Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by doubling the override threshold below."
-                },
-                {
                   "key": "NrdrDriverOverrideThreshold",
                   "widget": "option",
                   "title": "Driver Override Threshold",
@@ -1525,7 +1806,25 @@
                   "details": "Raw steering torque sensor reading above which you are considered to be steering (driver override). On cars with a different stock threshold, this value is applied proportionally so 1200 still represents the stock threshold.",
                   "min": 100,
                   "max": 5000,
-                  "step": 100
+                  "step": 100,
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrOverrideThresholdCenterBoost",
@@ -1535,14 +1834,50 @@
                   "details": "When the wheel is within the Center Boost degree band (on a straight), this lower override threshold applies instead of the one above - so you can override easily on straights while curves keep the higher threshold and do not drop torque from a false override. Set equal to Driver Override Threshold to disable.",
                   "min": 100,
                   "max": 5000,
-                  "step": 100
+                  "step": 100,
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "HondaDriverAssistDuringOverride",
                   "widget": "toggle",
-                  "title": "Pass-through assist torque on override",
+                  "title": "Assist Pass-Through",
                   "description": "Resets the EPS lane-assist state so the final override feels like normal driving after fade completes.",
-                  "details": "When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling."
+                  "details": "When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling.",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "HondaOverrideFadeDownSecs",
@@ -1551,8 +1886,26 @@
                   "description": "Controls how quickly steering torque fades out when driver override begins.",
                   "min": 0.0,
                   "max": 10.0,
-                  "step": 0.1,
-                  "unit": "second"
+                  "step": 0.01,
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "HondaOverrideFadeUpSecs",
@@ -1561,8 +1914,26 @@
                   "description": "Controls how quickly steering torque fades back in after driver override ends.",
                   "min": 0.0,
                   "max": 10.0,
-                  "step": 0.1,
-                  "unit": "second"
+                  "step": 0.01,
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "HondaOverrideTorqueScale",
@@ -1572,7 +1943,25 @@
                   "min": 0,
                   "max": 100,
                   "step": 1,
-                  "unit": "%"
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
                 }
               ]
             },
@@ -1591,7 +1980,33 @@
                   "widget": "toggle",
                   "title": "Low Pass Filter (tau)",
                   "description": "Master switch. OFF bypasses all three speed bands, regardless of saved tau values.",
-                  "details": "Changing tau does not turn the filter on. With the master switch ON, 0 bypasses only that speed band; higher tau adds smoothing and delay. Too much delay can cause oscillations. After a remote edit, refresh and verify the device-reported switch and values; editable sliders alone do not prove filtering is active."
+                  "details": "Changing tau does not turn the filter on. With the master switch ON, 0 bypasses only that speed band; higher tau adds smoothing and delay. Too much delay can cause oscillations. After a remote edit, refresh and verify the device-reported switch and values; editable sliders alone do not prove filtering is active.",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "HondaLpfTauLowSpeed",
@@ -1606,6 +2021,30 @@
                       "type": "param",
                       "key": "HondaTorqueLowPassFilter",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
                     }
                   ]
                 },
@@ -1622,6 +2061,30 @@
                       "type": "param",
                       "key": "HondaTorqueLowPassFilter",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
                     }
                   ]
                 },
@@ -1638,6 +2101,30 @@
                       "type": "param",
                       "key": "HondaTorqueLowPassFilter",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
                     }
                   ]
                 },
@@ -1646,7 +2133,25 @@
                   "widget": "toggle",
                   "title": "Legacy Steer Delta Rate Limiter",
                   "description": "Limits how quickly requested steering torque can rise or fall.",
-                  "details": "Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass filter."
+                  "details": "Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass filter.",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "HondaSteerDeltaUp",
@@ -1661,6 +2166,22 @@
                       "type": "param",
                       "key": "HondaSteerDeltaLimiter",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -1677,6 +2198,22 @@
                       "type": "param",
                       "key": "HondaSteerDeltaLimiter",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
                     }
                   ]
                 }
@@ -2369,7 +2906,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LongPidTuneScaleStandard",
@@ -2380,7 +2937,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LongPidTuneScaleRelaxed",
@@ -2391,7 +2968,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "LongPidTuneScaleEcon",
@@ -2402,7 +2999,27 @@
                   "min": 0,
                   "max": 500,
                   "step": 5,
-                  "unit": "%"
+                  "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrCruiseOverspeedAllowance",
@@ -3566,7 +4183,33 @@
               "key": "LagdToggle",
               "widget": "toggle",
               "title": "Live Learning Steer Delay",
-              "description": "Allow device to learn and adapt car's steering response time"
+              "description": "Allow device to learn and adapt car's steering response time",
+              "enablement": [
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "param",
+                    "key": "NrdrSuggestedSettings",
+                    "equals": true
+                  }
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "param",
+                    "key": "NrdrHandcraftedLateralTune",
+                    "equals": true
+                  }
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "param",
+                    "key": "NrdrLateralController",
+                    "equals": 1
+                  }
+                }
+              ]
             },
             {
               "key": "LagdToggleDelay",
@@ -3590,49 +4233,30 @@
                   "type": "param",
                   "key": "ShowAdvancedControls",
                   "equals": true
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "id": "lateral_control",
-          "title": "Lateral Control",
-          "description": "Neural network lateral control for supported models",
-          "items": [
-            {
-              "key": "NeuralNetworkLateralControl",
-              "widget": "toggle",
-              "title": "Neural Network Lateral Control (NNLC)",
-              "description": "Use a neural network for lateral control instead of the default torque controller.",
-              "visibility": [
+                },
                 {
                   "type": "not",
                   "condition": {
-                    "type": "capability",
-                    "field": "steer_control_type",
-                    "equals": "angle"
+                    "type": "param",
+                    "key": "NrdrSuggestedSettings",
+                    "equals": true
                   }
-                }
-              ],
-              "enablement": [
-                {
-                  "type": "offroad_only"
                 },
                 {
-                  "type": "capability",
-                  "field": "torque_allowed",
-                  "equals": true
+                  "type": "not",
+                  "condition": {
+                    "type": "param",
+                    "key": "NrdrHandcraftedLateralTune",
+                    "equals": true
+                  }
                 },
                 {
-                  "type": "param",
-                  "key": "EnforceTorqueControl",
-                  "equals": false
-                },
-                {
-                  "type": "param",
-                  "key": "LateralJerkTorqueController",
-                  "equals": false
+                  "type": "not",
+                  "condition": {
+                    "type": "param",
+                    "key": "NrdrLateralController",
+                    "equals": 1
+                  }
                 }
               ]
             }

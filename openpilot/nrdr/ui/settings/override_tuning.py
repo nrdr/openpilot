@@ -18,15 +18,6 @@ class OverrideTuningLayout(Widget):
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
-    self._increase_override_tolerance = toggle_item_sp(
-      param="NrdrIncreaseOverrideTolerance",
-      title=lambda: tr("Increase Driver Override Hysteresis (Default: OFF)"),
-      description=lambda: tr(
-        "Reduces the likelihood of false driver override detections (resulting in dropped torque) on sensitive Honda EPS platforms by " +
-        "doubling the override threshold below."
-      ),
-    )
-
     self._driver_override_threshold = option_item_sp(
       param="NrdrDriverOverrideThreshold",
       title=lambda: tr("Driver Override Threshold (Default: 1400)"),
@@ -42,7 +33,7 @@ class OverrideTuningLayout(Widget):
 
     self._driver_override_threshold_cb = option_item_sp(
       param="NrdrOverrideThresholdCenterBoost",
-      title=lambda: tr("Override Threshold Center Boost (Default: 1000)"),
+      title=lambda: tr("Override Threshold Center Boost (Default: 1200)"),
       min_value=100,
       max_value=5000,
       value_change_step=100,
@@ -56,7 +47,7 @@ class OverrideTuningLayout(Widget):
 
     self._driver_assist_during_override = toggle_item_sp(
       param="HondaDriverAssistDuringOverride",
-      title=lambda: tr("Pass-through assist torque on override (Default: ON)"),
+      title=lambda: tr("Assist Pass-Through"),
       description=lambda: tr(
         "When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling " +
         "this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering " +
@@ -66,23 +57,23 @@ class OverrideTuningLayout(Widget):
 
     self._override_fade_down = option_item_sp(
       param="HondaOverrideFadeDownSecs",
-      title=lambda: tr("Override Torque Fade Down (Default: 0.1)"),
+      title=lambda: tr("Override Torque Fade Down (Default: 0.50 s)"),
       min_value=0,
       max_value=1000,
-      value_change_step=10,
+      value_change_step=1,
       description=lambda: tr("Controls how quickly steering torque fades out when driver override begins."),
-      label_callback=lambda value: f"{value / 100:.1f} s",
+      label_callback=lambda value: f"{value / 100:.2f} s",
       use_float_scaling=True,
     )
 
     self._override_fade_up = option_item_sp(
       param="HondaOverrideFadeUpSecs",
-      title=lambda: tr("Override Torque Fade Up (Default: 0.1)"),
+      title=lambda: tr("Override Torque Fade Up (Default: 0.01 s)"),
       min_value=0,
       max_value=1000,
-      value_change_step=10,
+      value_change_step=1,
       description=lambda: tr("Controls how quickly steering torque fades back in after driver override ends."),
-      label_callback=lambda value: f"{value / 100:.1f} s",
+      label_callback=lambda value: f"{value / 100:.2f} s",
       use_float_scaling=True,
     )
 
@@ -97,7 +88,6 @@ class OverrideTuningLayout(Widget):
     )
 
     return [
-      self._increase_override_tolerance,
       self._driver_override_threshold,
       self._driver_override_threshold_cb,
       LineSeparatorSP(40),

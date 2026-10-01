@@ -1,6 +1,7 @@
 import pyray as rl
 from collections.abc import Callable
 from openpilot.common.params import Params
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.sunnypilot.lib.styles import style
@@ -60,6 +61,8 @@ class OptionControlSP(ItemAction):
 
   def set_value(self, value: int):
     """Set the control to a specific value"""
+    if not tuning_write_allowed(self.params, self.param_key):
+      return
     if not (self.min_value <= value <= self.max_value):
       return
     if value == self.current_value:
@@ -122,8 +125,9 @@ class OptionControlSP(ItemAction):
     plus_x = label_x + self.label_width + BUTTON_SPACING
     self.plus_btn_rect = rl.Rectangle(plus_x, component_y, BUTTON_WIDTH + CONTAINER_PADDING, BUTTON_HEIGHT)
 
-    self._minus_enabled = self.enabled and self.current_value > self.min_value
-    self._plus_enabled = self.enabled and self.current_value < self.max_value
+    allowed = self.enabled and tuning_write_allowed(self.params, self.param_key)
+    self._minus_enabled = allowed and self.current_value > self.min_value
+    self._plus_enabled = allowed and self.current_value < self.max_value
 
     self._render_button(self.minus_btn_rect, "-", self._minus_enabled)
     self._render_value_label()

@@ -15,6 +15,12 @@ class NrdrParamKey(StrEnum):
   LIVE_VIEW_ENABLED = "LiveViewEnabled"
   LIVE_VIEW = "LiveView"
   LAT_P_SCALE_LOW_SPEED = "LatPScaleLowSpeed"
+  NRDR_OPTIMIZED_LANE_CHANGES = "NrdrOptimizedLaneChanges"
+  NRDR_LATERAL_CONTROLLER = "NrdrLateralController"
+  NRDR_SUGGESTED_SETTINGS = "NrdrSuggestedSettings"
+  NRDR_LAT_RATE_DAMPING_LOW_SPEED = "NrdrLatRateDampingLowSpeed"
+  NRDR_LAT_RATE_DAMPING_STANDARD = "NrdrLatRateDampingStandard"
+  NRDR_LAT_RATE_DAMPING_HIGHWAY = "NrdrLatRateDampingHighway"
   LAT_P_SCALE_STANDARD = "LatPScaleStandard"
   LAT_P_SCALE_HIGHWAY = "LatPScaleHighway"
   LAT_I_SCALE_LOW_SPEED = "LatIScaleLowSpeed"
@@ -159,6 +165,12 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.LIVE_VIEW_ENABLED,
   NrdrParamKey.LIVE_VIEW,
   NrdrParamKey.LAT_P_SCALE_LOW_SPEED,
+  NrdrParamKey.NRDR_OPTIMIZED_LANE_CHANGES,
+  NrdrParamKey.NRDR_LATERAL_CONTROLLER,
+  NrdrParamKey.NRDR_SUGGESTED_SETTINGS,
+  NrdrParamKey.NRDR_LAT_RATE_DAMPING_LOW_SPEED,
+  NrdrParamKey.NRDR_LAT_RATE_DAMPING_STANDARD,
+  NrdrParamKey.NRDR_LAT_RATE_DAMPING_HIGHWAY,
   NrdrParamKey.LAT_P_SCALE_STANDARD,
   NrdrParamKey.LAT_P_SCALE_HIGHWAY,
   NrdrParamKey.LAT_I_SCALE_LOW_SPEED,

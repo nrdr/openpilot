@@ -154,7 +154,8 @@ def active_clarity_profile():
 PROFILE_WRITE_COUNT = len(active_clarity_profile().values) + 2  # both enable-last keys are written OFF first
 VERSION_INDEX = PROFILE_WRITE_COUNT
 MARKER_INDEX = VERSION_INDEX + 1
-CONTEXT_CLEAR_INDEX = MARKER_INDEX + 1
+SUGGESTED_INDEX = MARKER_INDEX + 1
+CONTEXT_CLEAR_INDEX = SUGGESTED_INDEX + 1
 REQUEST_CLEAR_INDEX = CONTEXT_CLEAR_INDEX + 1
 
 
@@ -168,14 +169,14 @@ def pending_params(values=None, **kwargs):
   }, **kwargs)
 
 
-def test_profiles_are_fingerprint_scoped_and_current_version_is_v19():
+def test_profiles_are_fingerprint_scoped_and_current_version_is_v20():
   assert HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS == EXPECTED_FINGERPRINTS
   assert tuple(HANDCRAFTED_LATERAL_PROFILES) == EXPECTED_FINGERPRINTS
-  assert get_handcrafted_lateral_profile("HONDA_CLARITY").version == 19
+  assert get_handcrafted_lateral_profile("HONDA_CLARITY").version == 20
   for fingerprint in EXPECTED_FINGERPRINTS:
     profile = get_handcrafted_lateral_profile(fingerprint)
     assert profile.fingerprint == fingerprint
-    assert profile.version == 19
+    assert profile.version == 20
     assert len(profile.values) == len(dict(profile.values))
   assert get_handcrafted_lateral_profile("HONDA_CIVIC_2022") is None
 
@@ -191,21 +192,21 @@ def test_clarity_v17_is_exact_47_key_reviewed_oracle():
   assert "bd8b0ebfc10342ff6405c50659eeb24645439d4f06ea4a145ca25dfa998a8e3d" in provenance
 
 
-def test_v19_lane_defaults_are_strength_030_and_zero_model_break_in_for_every_profile():
+def test_v20_lane_defaults_are_strength_095_and_zero_model_break_in_for_every_profile():
   from openpilot.nrdr.params.profiles import COMMON_HANDCRAFTED_VALUES
   assert dict(COMMON_HANDCRAFTED_VALUES) == {
-    "LaneCentering": True, "LaneCenteringStrength": 0.30,
-    "LaneCenteringMinSpeed": 50, "LaneCenteringE2EAuthority": 0.0,
+    "LaneCentering": True, "LaneCenteringStrength": 0.95,
+    "LaneCenteringMinSpeed": 12, "LaneCenteringE2EAuthority": 0.0,
     "LaneCenteringPauseOnSignal": True, "LaneCenterOffset": 0.0,
     "LagdToggle": True, "LagdToggleDelay": 0.4,
   }
   for profile in HANDCRAFTED_LATERAL_PROFILES.values():
     values = dict(profile.values)
-    assert values["LaneCenteringStrength"] == 0.30
+    assert values["LaneCenteringStrength"] == 0.95
     assert values["LaneCenteringE2EAuthority"] == 0.0
 
 
-def test_v19_lane_defaults_only_apply_on_a_fresh_explicit_request():
+def test_v20_lane_defaults_only_apply_on_a_fresh_explicit_request():
   params = FakeParams({"IsOffroad": True, "LaneCenteringStrength": 1.0, "LaneCenteringE2EAuthority": 0.7})
   assert consume_handcrafted_lateral_request(clarity_cp(), clarity_cp_sp(), params, startup=True) == []
   assert params.values["LaneCenteringStrength"] == 1.0
@@ -213,17 +214,22 @@ def test_v19_lane_defaults_only_apply_on_a_fresh_explicit_request():
   assert not params.calls
   requested = pending_params({"LaneCenteringStrength": 1.0, "LaneCenteringE2EAuthority": 0.7})
   consume_handcrafted_lateral_request(clarity_cp(), clarity_cp_sp(), requested)
-  assert requested.values["LaneCenteringStrength"] == 0.30
+  assert requested.values["LaneCenteringStrength"] == 0.95
   assert requested.values["LaneCenteringE2EAuthority"] == 0.0
 
 
-def test_current_profiles_never_copy_steer_ratio_settings():
+def test_only_clarity_profile_copies_steer_ratio_settings():
   protected = {
     "NrdrSteerRatioMode", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
     "NrdrLearnStiffness", "NrdrLearnAngleOffset",
   }
   for fingerprint in EXPECTED_FINGERPRINTS:
-    assert not protected & dict(get_handcrafted_lateral_profile(fingerprint).values).keys()
+    keys = dict(get_handcrafted_lateral_profile(fingerprint).values).keys()
+    if fingerprint == "HONDA_CLARITY":
+      assert "NrdrSteerRatioMode" in keys
+      assert not {"NrdrLearnStiffness", "NrdrLearnAngleOffset"} & keys
+    else:
+      assert not protected & keys
 
 
 def test_shared_support_predicate_allows_base_preset_without_hybrid_or_firmware_sr():
@@ -231,7 +237,7 @@ def test_shared_support_predicate_allows_base_preset_without_hybrid_or_firmware_
   assert handcrafted_lateral_profile_supported(clarity_cp(firmware=False), clarity_cp_sp())
   assert handcrafted_lateral_profile_supported(clarity_cp(), clarity_cp_sp(modified=False))
   unmodified = get_handcrafted_lateral_profile("HONDA_CLARITY", clarity_cp(), clarity_cp_sp(modified=False))
-  assert "NrdrInterpolatedTorquePifBlend" not in dict(unmodified.values)
+  assert "NrdrSteerRatioHybrid" not in dict(unmodified.values)
   assert not handcrafted_lateral_profile_supported(None, None, "HONDA_CLARITY")
   assert not handcrafted_lateral_profile_supported(None, None, "HONDA_CIVIC")
   assert handcrafted_lateral_profile_supported(vehicle_cp("HONDA_CIVIC", brand="honda"), None)
@@ -267,11 +273,12 @@ def test_success_is_blocking_ordered_verified_versioned_and_auto_clears():
   assert params.values["ParamsVersion"] == 6
   marker = handcrafted_lateral_success_marker(active_clarity_profile())
   assert params.values["NrdrCarHandcraftedInfo"] == marker
-  assert written[0] == "NrdrInterpolatedTorquePifBlend"
-  assert written[-2:] == ["NrdrInterpolatedTorquePifBlend", "LaneCentering"]
-  assert params.calls[0][:3] == ("put_bool", "NrdrInterpolatedTorquePifBlend", False)
-  assert params.calls[-4][:3] == ("put", "ParamsVersion", 6)
-  assert params.calls[-3][:3] == ("put", "NrdrCarHandcraftedInfo", marker)
+  assert written[0] == "NrdrSteerRatioHybrid"
+  assert written[-2:] == ["NrdrSteerRatioHybrid", "LaneCentering"]
+  assert params.calls[0][:3] == ("put_bool", "NrdrSteerRatioHybrid", False)
+  assert params.calls[-5][:3] == ("put", "ParamsVersion", 6)
+  assert params.calls[-4][:3] == ("put", "NrdrCarHandcraftedInfo", marker)
+  assert params.calls[-3][:3] == ("put_bool", "NrdrSuggestedSettings", True)
   assert params.calls[-2][:3] == ("put", "NrdrHandcraftedLateralRequest", {})
   assert params.calls[-1][:3] == ("put_bool", "NrdrHandcraftedLateralTune", False)
   assert all(call[3] is True for call in params.calls)
@@ -415,7 +422,7 @@ def test_interruption_retains_request_and_full_retry_converges(failure_index):
   with pytest.raises(OSError, match="injected interruption"):
     consume_handcrafted_lateral_request(clarity_cp(), clarity_cp_sp(), params)
   assert params.values["NrdrHandcraftedLateralTune"] is True
-  assert params.values["NrdrInterpolatedTorquePifBlend"] is False
+  assert params.values["NrdrSteerRatioHybrid"] is False
 
   params.fail_on_call = None
   params.calls.clear()
@@ -438,9 +445,9 @@ def test_silent_payload_write_keeps_card_startup_safe_and_retry_pending():
 
   assert card_continued
   assert params.values["NrdrHandcraftedLateralTune"] is True
-  assert params.values["NrdrInterpolatedTorquePifBlend"] is False
+  assert params.values["NrdrSteerRatioHybrid"] is False
   assert [call[1] for call in params.calls[-4:]] == [
-    "NrdrInterpolatedTorquePifBlend", "LaneCentering", "NrdrHandcraftedLateralRequest", "NrdrHandcraftedLateralTune",
+    "NrdrSteerRatioHybrid", "LaneCentering", "NrdrHandcraftedLateralRequest", "NrdrHandcraftedLateralTune",
   ]
   assert "NrdrCarHandcraftedInfo" not in params.values
   assert params.values["ParamsVersion"] == 5
@@ -453,9 +460,9 @@ def test_post_write_request_clear_failure_rejournals_true_and_disables_blend():
     consume_handcrafted_lateral_request(clarity_cp(), clarity_cp_sp(), params)
 
   assert params.values["NrdrHandcraftedLateralTune"] is True
-  assert params.values["NrdrInterpolatedTorquePifBlend"] is False
+  assert params.values["NrdrSteerRatioHybrid"] is False
   assert [call[1] for call in params.calls[-4:]] == [
-    "NrdrInterpolatedTorquePifBlend", "LaneCentering", "NrdrHandcraftedLateralRequest", "NrdrHandcraftedLateralTune",
+    "NrdrSteerRatioHybrid", "LaneCentering", "NrdrHandcraftedLateralRequest", "NrdrHandcraftedLateralTune",
   ]
 
 
@@ -465,13 +472,13 @@ def test_unverifiable_blend_off_cleanup_is_fatal_and_keeps_card_from_starting():
   # construction with the blend still enabled.
   params = pending_params(
     fail_on_call=VERSION_INDEX,
-    silent_writes={("NrdrInterpolatedTorquePifBlend", 3)},
+    silent_writes={("NrdrSteerRatioHybrid", 3)},
   )
 
   with pytest.raises(HandcraftedLateralUnsafeStateError, match="safe pending state"):
     consume_handcrafted_lateral_request(clarity_cp(), clarity_cp_sp(), params, startup=True)
 
-  assert params.values["NrdrInterpolatedTorquePifBlend"] is True
+  assert params.values["NrdrSteerRatioHybrid"] is True
   assert params.values["NrdrHandcraftedLateralTune"] is True
 
 
@@ -479,7 +486,7 @@ def test_unverifiable_blend_off_cleanup_is_fatal_and_keeps_card_from_starting():
 def test_blend_cleanup_write_or_readback_failure_is_fatal(failure):
   kwargs = {"fail_on_calls": {VERSION_INDEX, VERSION_INDEX + 1}} if failure == "write" else {
     "fail_on_call": VERSION_INDEX,
-    "readback_overrides": {("NrdrInterpolatedTorquePifBlend", 3): True},
+    "readback_overrides": {("NrdrSteerRatioHybrid", 3): True},
   }
   params = pending_params(**kwargs)
 
@@ -501,13 +508,13 @@ def test_unverifiable_request_restore_after_post_write_clear_is_fatal():
   with pytest.raises(HandcraftedLateralUnsafeStateError, match="safe pending state"):
     consume_handcrafted_lateral_request(clarity_cp(), clarity_cp_sp(), params, startup=True)
 
-  assert params.values["NrdrInterpolatedTorquePifBlend"] is False
+  assert params.values["NrdrSteerRatioHybrid"] is False
   assert params.values["NrdrHandcraftedLateralTune"] is False
 
 
 @pytest.mark.parametrize(("key", "write_number", "coerced_readback"), (
-  ("NrdrInterpolatedTorquePifBlend", 1, 0),
-  ("NrdrInterpolatedTorquePifBlend", 2, 1),
+  ("NrdrSteerRatioHybrid", 1, 0),
+  ("NrdrSteerRatioHybrid", 2, 1),
   ("NrdrHandcraftedLateralTune", 1, 0),
 ))
 def test_bool_as_int_readback_is_rejected_and_cleanup_is_exact(key, write_number, coerced_readback):
@@ -518,8 +525,8 @@ def test_bool_as_int_readback_is_rejected_and_cleanup_is_exact(key, write_number
 
   assert params.values["NrdrHandcraftedLateralTune"] is True
   assert type(params.values["NrdrHandcraftedLateralTune"]) is bool
-  assert params.values["NrdrInterpolatedTorquePifBlend"] is False
-  assert type(params.values["NrdrInterpolatedTorquePifBlend"]) is bool
+  assert params.values["NrdrSteerRatioHybrid"] is False
+  assert type(params.values["NrdrSteerRatioHybrid"]) is bool
 
 
 def test_params_version_bool_readback_is_rejected_before_success_marker():
@@ -534,7 +541,7 @@ def test_params_version_bool_readback_is_rejected_before_success_marker():
 
   assert params.values["NrdrCarHandcraftedInfo"] == old_marker
   assert params.values["NrdrHandcraftedLateralTune"] is True
-  assert params.values["NrdrInterpolatedTorquePifBlend"] is False
+  assert params.values["NrdrSteerRatioHybrid"] is False
 
 
 def test_existing_bool_params_version_is_not_coerced_to_an_integer():
@@ -545,7 +552,7 @@ def test_existing_bool_params_version_is_not_coerced_to_an_integer():
 
   assert params.values["ParamsVersion"] is True
   assert params.values["NrdrHandcraftedLateralTune"] is True
-  assert params.values["NrdrInterpolatedTorquePifBlend"] is False
+  assert params.values["NrdrSteerRatioHybrid"] is False
 
 
 @pytest.mark.parametrize(("failure_index", "expected_version"), ((VERSION_INDEX, 5), (MARKER_INDEX, 6)))
@@ -559,7 +566,7 @@ def test_version_or_marker_failure_preserves_prior_success_marker(failure_index,
   assert params.values["NrdrCarHandcraftedInfo"] == old_marker
   assert params.values["ParamsVersion"] == expected_version
   assert params.values["NrdrHandcraftedLateralTune"] is True
-  assert params.values["NrdrInterpolatedTorquePifBlend"] is False
+  assert params.values["NrdrSteerRatioHybrid"] is False
 
 
 def test_readback_mismatch_retains_request_and_does_not_publish_success():
@@ -571,7 +578,7 @@ def test_readback_mismatch_retains_request_and_does_not_publish_success():
   with pytest.raises(RuntimeError, match="HondaCenterScale"):
     consume_handcrafted_lateral_request(clarity_cp(), clarity_cp_sp(), params)
   assert params.values["NrdrHandcraftedLateralTune"] is True
-  assert params.values["NrdrInterpolatedTorquePifBlend"] is False
+  assert params.values["NrdrSteerRatioHybrid"] is False
   assert params.values["NrdrCarHandcraftedInfo"] == old_marker
   assert params.values["ParamsVersion"] == 5
 
@@ -597,7 +604,7 @@ def test_pending_or_unavailable_status_preserves_any_prior_success_marker():
   assert handcrafted_lateral_profile_status(clarity_cp(firmware=False), clarity_cp_sp(), params).startswith(old_marker)
 
 
-def test_prior_success_marker_is_preserved_until_v19_is_applied():
+def test_prior_success_marker_is_preserved_until_v20_is_applied():
   old_marker = "Last applied: Honda Clarity Current Lateral 2026-08-28 (v16) [HONDA_CLARITY]"
   params = pending_params({
     "NrdrHandcraftedLateralTune": False,
@@ -605,13 +612,13 @@ def test_prior_success_marker_is_preserved_until_v19_is_applied():
   })
 
   assert handcrafted_lateral_profile_status(clarity_cp(), clarity_cp_sp(), params) == \
-    f"{old_marker} | current profile v19 not applied"
+    f"{old_marker} | current profile v20 not applied"
 
 
 def test_native_apply_callback_is_a_durable_blocking_command():
   source = Path(__file__).parents[1] / "ui" / "settings" / "lateral_tuning.py"
   text = source.read_text(encoding="utf-8")
-  assert 'tr("Apply Handcrafted Lateral Profile")' in text
+  assert 'tr("Apply Suggested Settings")' in text
   assert 'request_handcrafted_lateral_profile(ui_state.CP, ui_state.CP_SP, ui_state.params)' in text
   assert 'self._handcrafted_tune.set_visible(False)' in text
   assert "get_selected_car_identity(ui_state.params)" in text
