@@ -91,6 +91,15 @@ class TestDefaultChestnutHelpers(OpenpilotTestCase):
       with mock.patch("openpilot.sunnypilot.models.default_chestnut.BIG_ONNX_PATH", onnx_path):
         assert read_bundled_big_onnx_hash() == BMRLNAP_ONNX
 
+  def test_read_bundled_big_onnx_hash_from_binary_model(self):
+    import hashlib
+    data = b"\xff\x80\x00materialized-model" * 100
+    with tempfile.TemporaryDirectory() as tmp:
+      onnx_path = Path(tmp) / "big_driving_supercombo.onnx"
+      onnx_path.write_bytes(data)
+      with mock.patch("openpilot.sunnypilot.models.default_chestnut.BIG_ONNX_PATH", onnx_path):
+        assert read_bundled_big_onnx_hash() == hashlib.sha256(data).hexdigest()
+
   def test_artifact_from_hf_bundle(self):
     bundle = typing.cast(dict, HF_DEFAULTS["bundles"][1])
     artifact = artifact_from_hf_bundle(bundle)

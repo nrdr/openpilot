@@ -1264,7 +1264,7 @@
                   "widget": "option",
                   "title": "Minimum Lane Centering Speed",
                   "description": "Arms at this speed and releases smoothly 3 mph below it, bounded by the 5 m/s controller floor.",
-                  "details": "Existing enabled installs adopt the new 50 mph minimum after updating, which only removes lower-speed authority.",
+                  "details": "Suggested Settings uses 12 mph. Outside that profile, existing saved minimum speeds are preserved.",
                   "min": 12,
                   "max": 100,
                   "step": 1,

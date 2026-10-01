@@ -1,4 +1,4 @@
-"""Persisted setting -> background reader -> real PID/blend -> transition -> Honda LPF.
+"""Persisted P-scale -> background reader -> real PID/fixed blend -> transition -> Honda LPF.
 
 This does not start the driving processes or send any control messages. Only a
 temporary Params directory is written; native graphics and network delivery are
@@ -20,9 +20,10 @@ from openpilot.nrdr.features.lateral.torque_output_filter import HondaTorqueOutp
 from openpilot.nrdr.params.snapshots import CONTROL_GROUPS, LiveParams
 from openpilot.nrdr.tests.test_live_pid_updates import make_live_pid, make_snapshot
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 
 
-KEY = "NrdrInterpolatedTorqueFrictionHighway"
+KEY = "LatPScaleHighway"
 
 
 def native_setter(params):
@@ -31,7 +32,7 @@ def native_setter(params):
   tree = ast.parse(path.read_text(encoding="utf-8"))
   cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "OptionControlSP")
   setter = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == "set_value")
-  namespace = {}
+  namespace = {"tuning_write_allowed": tuning_write_allowed}
   exec(compile(ast.Module(body=[setter], type_ignores=[]), str(path), "exec"), namespace)
   spec = get_native_option_spec(KEY)
   widget = SimpleNamespace(params=params, param_key=spec.param, min_value=spec.min_value,
@@ -41,7 +42,7 @@ def native_setter(params):
 
 
 @pytest.mark.parametrize("writer_kind", ["native_widget", "sunnylink_handler", "typed_saved_value"])
-def test_highway_friction_round_trip_remains_live_through_final_software_output(tmp_path, monkeypatch, writer_kind):
+def test_highway_p_scale_remains_live_through_final_software_output(tmp_path, monkeypatch, writer_kind):
   params = Params(str(tmp_path / "params"))
   for key, value in make_snapshot(1).values.items():
     params.put(key, value, block=True)
@@ -102,41 +103,32 @@ def test_highway_friction_round_trip_remains_live_through_final_software_output(
     else:
       def write(value):
         params.put(KEY, value, block=True)
-    for desired in (0.3, 1.0):
+    for desired in (140, 100):
       previous_output = before[2]
       written = time.monotonic()
       write(desired)
-      while controller.interpolated_torque_pif_settings.friction_highway != desired:
-        assert time.monotonic() - written < 2.0, "Saved friction did not reach the continuously active controller"
+      while controller.p_scales[2] != desired / 100:
+        assert time.monotonic() - written < 2.0, "Saved P scale did not reach the continuously active controller"
         previous_transitioned = before[1]
         before = tick()
-        if controller.interpolated_torque_pif_settings.friction_highway == desired:
+        if controller.p_scales[2] == desired / 100:
           # The update reached the controller, while the first-frame command
           # step is removed by the exact production transition implementation.
           assert before[1] == pytest.approx(previous_transitioned, abs=1e-12)
           break
         time.sleep(0.01)
-      consumed_generation = controller.settings_generation
       for _ in range(120):
         before = tick()
       assert transition.remaining == 0.0
       assert before[1] == pytest.approx(before[0], abs=1e-12)
       assert abs(before[2] - before[0]) < 5e-4
-      assert abs(before[2] - previous_output) > 0.02
+      assert abs(before[2] - previous_output) > 0.002
       settings = controller.interpolated_torque_pif_settings
-      assert settings.torque_share == 0.1
+      assert settings.torque_share == 0.01
       assert settings.lat_accel_factor == 10.0
       assert settings.friction_low == settings.friction_standard == 1.0
-      deadline = time.monotonic() + 2.0
-      while not any(report["generation"] == consumed_generation and report["friction_highway"] == desired for _, report in events):
-        assert time.monotonic() < deadline, "Consumed-setting event was not emitted by the worker"
-        time.sleep(0.01)
-      matching = [report for thread_name, report in events if report["generation"] == consumed_generation
-                  and report["friction_highway"] == desired and thread_name == "nrdr-live-params"]
-      assert len(matching) == 1
-      assert matching[0]["active"] and matching[0]["yaw_feedback_valid"]
-      assert matching[0]["torque_share_percent"] == 10.0
-      assert matching[0]["torque_transition_seconds"] == 1.0
+      assert settings.friction_highway == 1.0  # Retired friction stays fixed.
+      assert reader.snapshot.get(KEY) == desired
       assert all(params.get(key) == value for key, value in make_snapshot(1).values.items() if key != KEY)
   finally:
     reader.close()

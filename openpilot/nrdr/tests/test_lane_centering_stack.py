@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import unittest
 
 import yaml
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -91,11 +92,11 @@ class TestLaneCenteringStack(unittest.TestCase):
     tici = TICI_PANEL.read_text(encoding="utf-8")
     mici = MICI_PANEL.read_text(encoding="utf-8")
     self.assertIn("if self._write_allowed():", tici)
-    self.assertIn("return True  # Runtime uses live snapshots", tici)
+    self.assertIn('return tuning_write_allowed(ui_state.params, "LaneCentering")', tici)
     self.assertNotIn("return ui_state.is_offroad() and not ui_state.engaged", tici)
     self.assertEqual(tici.count("if not self._write_allowed():"), 1)
     self.assertEqual(tici.count("if not self._settings_writable():"), 1)
-    self.assertIn("return True  # Runtime uses live snapshots", mici)
+    self.assertIn('return tuning_write_allowed(ui_state.params, "LaneCentering")', mici)
     self.assertNotIn("return ui_state.is_offroad() and not ui_state.engaged", mici)
     self.assertEqual(mici.count("if not self._write_allowed():"), 1)
     self.assertEqual(mici.count("if not self._settings_writable():"), 5)
@@ -105,6 +106,9 @@ class TestLaneCenteringStack(unittest.TestCase):
     class MemoryParams:
       def __init__(self):
         self.values = {"LaneCentering": False}
+
+      def get(self, key):
+        return self.values.get(key)
 
       def get_bool(self, key):
         return bool(self.values.get(key))
@@ -120,7 +124,8 @@ class TestLaneCenteringStack(unittest.TestCase):
                    and node.name in ("_write_allowed", "_settings_writable", "_on_lane_centering", "_on_pause_on_signal")]
         isolated_class = ast.ClassDef(name=class_name, bases=[], keywords=[], body=methods, decorator_list=[])
         memory = MemoryParams()
-        namespace = {"ui_state": SimpleNamespace(params=memory, engaged=True, is_offroad=lambda: False)}
+        namespace = {"ui_state": SimpleNamespace(params=memory, engaged=True, is_offroad=lambda: False),
+                     "tuning_write_allowed": tuning_write_allowed}
         module = ast.fix_missing_locations(ast.Module(body=[isolated_class], type_ignores=[]))
         exec(compile(module, str(path), "exec"), namespace)
         panel = namespace[class_name]()
@@ -131,6 +136,11 @@ class TestLaneCenteringStack(unittest.TestCase):
         self.assertTrue(panel._settings_writable())
         panel._on_pause_on_signal(False)
         self.assertFalse(memory.values["LaneCenteringPauseOnSignal"])
+        for lock in ("NrdrSuggestedSettings", "NrdrHandcraftedLateralTune"):
+          memory.values[lock] = True
+          self.assertFalse(panel._write_allowed())
+          self.assertFalse(panel._settings_writable())
+          memory.values[lock] = False
 
   def test_sunnylink_stack_is_nested_under_nrdr_lateral_tuning(self) -> None:
     self.assertFalse((SUNNYLINK_ROOT / "settings_ui_src/pages/lane_centering.yaml").exists())

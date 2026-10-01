@@ -55,13 +55,16 @@ def read_bundled_big_onnx_hash() -> str | None:
     return None
 
   try:
-    text = BIG_ONNX_PATH.read_text()
+    # Read only the small header: a materialized ONNX is binary and may be
+    # hundreds of MB, not UTF-8 text like its Git LFS pointer.
+    with BIG_ONNX_PATH.open("rb") as model:
+      header = model.read(1024)
   except OSError as e:
     cloudlog.warning(f"Failed to read {BIG_ONNX_PATH}: {e}")
     return None
 
-  if text.startswith("version https://git-lfs.github.com/spec/v1"):
-    for line in text.splitlines():
+  if header.startswith(b"version https://git-lfs.github.com/spec/v1"):
+    for line in header.decode("ascii").splitlines():
       if line.startswith("oid sha256:"):
         return line.split(":", 1)[1].strip().lower()
     return None

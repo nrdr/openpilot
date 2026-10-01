@@ -69,7 +69,7 @@ class ControlsExt(ModelStateBase):
     self.lane_centering_min_speed_mph = lane_centering_min_speed_mph(snapshot.get("LaneCenteringMinSpeed"))
     self.lane_centering_pause_on_signal = read_bool(snapshot, "LaneCenteringPauseOnSignal", True)
     # Leave nonfinite inputs visible to the controller's existing fail-closed gate.
-    self.lane_centering_e2e_authority = read_float(snapshot, "LaneCenteringE2EAuthority", 1.0)
+    self.lane_centering_e2e_authority = read_float(snapshot, "LaneCenteringE2EAuthority", 0.0)
     self.lane_centering_strength = lane_centering_strength(snapshot.get("LaneCenteringStrength"))
     self.lane_center_offset = read_float(snapshot, "LaneCenterOffset", 0.0)
 

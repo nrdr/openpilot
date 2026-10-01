@@ -3,6 +3,7 @@
 from collections.abc import Callable
 
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.selfdrive.controls.lib.lane_centering import (
   LANE_CENTERING_MIN_SPEED_MAX_MPH,
   LANE_CENTERING_MIN_SPEED_MIN_MPH,
@@ -117,7 +118,7 @@ class LaneCenteringLayout(Widget):
 
   @staticmethod
   def _write_allowed() -> bool:
-    return True  # Runtime uses live snapshots; lane confidence and actuation gates remain enforced.
+    return tuning_write_allowed(ui_state.params, "LaneCentering")  # Unlocked settings still apply live.
 
   def _settings_writable(self) -> bool:
     return self._write_allowed() and ui_state.params.get_bool("LaneCentering")

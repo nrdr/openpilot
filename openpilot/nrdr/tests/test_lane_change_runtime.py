@@ -22,7 +22,7 @@ def test_native_enums_and_hook_vehicle_admission():
   reports = []
   for brand in ('honda', 'toyota'):
     cp = SimpleNamespace(brand=brand, carFingerprint='HONDA_CLARITY' if brand == 'honda' else 'LEXUS_ES', steerRatio=16.5, carFw=[])
-    snapshot = {'NrdrSteerRatioMode': 1, 'NrdrLaneChangeEntrySrReduction': 3.0}
+    snapshot = {'NrdrSteerRatioMode': 1, 'NrdrOptimizedLaneChanges': True}
     controls = SimpleNamespace(
       CP=cp, VM=VehicleModel(), nrdr_lateral_snapshot=snapshot, nrdr_lane_change_entry=LaneChangeEntry(),
       steer_ratio_latch=SteerRatioModeLatch(resolve_steer_ratio_selection(cp, snapshot)),
@@ -62,7 +62,7 @@ def test_native_vehicle_model_preserves_feedback_and_shapes_selected_geometry(mo
 
 
 @pytest.mark.parametrize('duration', (0.5, 1.0, 2.0))
-def test_minimum_state_time_uses_next_start_snapshot_and_preserves_model_completion_gate(monkeypatch, duration):
+def test_fixed_minimum_state_time_ignores_retired_sliders_and_preserves_model_completion_gate(monkeypatch, duration):
   reports = []
   live = SimpleNamespace(snapshot={'NrdrLaneChangeMinTime': duration}, generation=2,
                          record_applied_settings=lambda *args, **kw: reports.append(kw))
@@ -76,7 +76,8 @@ def test_minimum_state_time_uses_next_start_snapshot_and_preserves_model_complet
   assert dh.lane_change_state == log.LaneChangeState.preLaneChange
   dh.update(cs, True, 1.0)
   assert dh.lane_change_state == log.LaneChangeState.laneChangeStarting
-  assert reports[-1]['minimum_start_time'] == duration
+  assert reports[-1]['minimum_start_time'] == 0.5
+  duration = 0.5
   live.snapshot = {'NrdrLaneChangeMinTime': 0.5}
   # A saved edit cannot shorten a maneuver already in progress.
   for _ in range(round(duration / desire_helper.DT_MDL) - 1):
@@ -96,7 +97,7 @@ def test_legacy_torque_factor_preserves_defaults_and_restores_params_even_on_fai
     return accel / p.latAccelFactor
   assert torque_from_lateral_accel(torque, 2, params, False, {'NrdrLaneChangeTorqueFactor': 3}) == 0.5
   assert torque_from_lateral_accel(torque, 2, params, True) == 0.25
-  assert torque_from_lateral_accel(torque, 2, params, True, {'NrdrLaneChangeTorqueFactor': 1}) == 0.5
+  assert torque_from_lateral_accel(torque, 2, params, True, {'NrdrLaneChangeTorqueFactor': 1}) == 0.25
   assert params.latAccelFactor == 4.0
 
   def fail(accel, p):

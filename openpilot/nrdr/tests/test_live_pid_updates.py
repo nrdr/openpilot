@@ -35,7 +35,8 @@ def make_snapshot(generation, **changes):
     "NrdrInterpolatedTorqueLatAccelFactor": 10.0,
     "NrdrInterpolatedTorqueFriction": 1.0, "NrdrInterpolatedTorqueFrictionStandard": 1.0,
     "NrdrInterpolatedTorqueFrictionHighway": 1.0,
-    "HondaCenterScale": 0.0, "NrdrLatRateDamping": 0,
+    "HondaCenterScale": 0.0,
+    "NrdrLatRateDampingLowSpeed": 0, "NrdrLatRateDampingStandard": 0, "NrdrLatRateDampingHighway": 0,
     **changes,
   }
   return ParamSnapshot(generation, MappingProxyType(values))
@@ -70,13 +71,13 @@ def live_pid(monkeypatch):
   return make_live_pid(monkeypatch, SimpleNamespace(snapshot=make_snapshot(1)))
 
 
-def test_blend_share_and_pid_scale_change_during_continuous_engagement(live_pid):
+def test_fixed_blend_ignores_retired_share_while_pid_scale_changes_live(live_pid):
   controller, live, update = live_pid
   first = update()
-  assert controller.interpolated_torque_pif_settings.torque_share == 0.1
+  assert controller.interpolated_torque_pif_settings.torque_share == 0.01
   live.snapshot = make_snapshot(2, NrdrInterpolatedTorqueShare=5, LatPScaleHighway=120)
   second = update()
-  assert controller.interpolated_torque_pif_settings.torque_share == 0.05
+  assert controller.interpolated_torque_pif_settings.torque_share == 0.01
   assert controller.p_scales[2] == 1.2
   assert second != first
   assert controller.frame == 1  # Two active updates; no inactive/reset call.
@@ -86,28 +87,28 @@ def test_pid_uses_the_frame_snapshot_even_if_worker_publishes_mid_frame(live_pid
   controller, live, update = live_pid
   captured = live.snapshot
   controller.set_live_tuning_snapshot(captured)
-  live.snapshot = make_snapshot(2, NrdrInterpolatedTorqueShare=5)
+  live.snapshot = make_snapshot(2, LatPScaleHighway=120)
   update()
-  assert controller.interpolated_torque_pif_settings.torque_share == 0.1
+  assert controller.p_scales[2] == 1.0
   controller.set_live_tuning_snapshot(live.snapshot)
   update()
-  assert controller.interpolated_torque_pif_settings.torque_share == 0.05
+  assert controller.p_scales[2] == 1.2
 
 
-def test_blend_can_be_disabled_and_reenabled_without_disengaging(live_pid):
+def test_optimized_lane_change_disables_and_restores_fixed_blend(live_pid):
   controller, live, update = live_pid
   update()
-  live.snapshot = make_snapshot(2, NrdrInterpolatedTorquePifBlend=False)
+  controller.model_v2 = SimpleNamespace(meta=SimpleNamespace(laneChangeState=SimpleNamespace(raw=2)))
   update()
   assert not controller.interpolated_torque_pif_enabled
   assert controller.last_classic_torque_result is None
-  live.snapshot = make_snapshot(3, NrdrInterpolatedTorquePifBlend=True)
+  controller.model_v2 = None
   update()
   assert controller.interpolated_torque_pif_enabled
   assert controller.last_classic_torque_result.output == 0.8
 
 
-def test_highway_friction_changes_real_yaw_branch_without_resetting_integral(live_pid):
+def test_retired_highway_friction_cannot_change_fixed_real_yaw_branch(live_pid):
   controller, live, update = live_pid
   controller.classic_torque_candidate = ClassicTorqueCandidate(0.01)
   controller.classic_torque_candidate.pid.i = 0.02
@@ -118,11 +119,11 @@ def test_highway_friction_changes_real_yaw_branch_without_resetting_integral(liv
   update(pose=pose)
   second = controller.last_classic_torque_result
   settings = controller.interpolated_torque_pif_settings
-  assert settings.torque_share == 0.1
+  assert settings.torque_share == 0.01
   assert settings.friction_low == settings.friction_standard == 1.0
-  assert settings.friction_highway == 0.3
+  assert settings.friction_highway == 1.0
   assert 0.019 < second.i <= first.i < 0.02  # Evolves normally; not reset on the edit.
-  assert second.output < first.output
+  assert second.f == first.f
   assert first.yaw_feedback_valid and second.yaw_feedback_valid
 
 

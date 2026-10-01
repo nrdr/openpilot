@@ -14,6 +14,7 @@ from openpilot.selfdrive.ui.layouts.settings.common import (
 from openpilot.selfdrive.controls.lib.lane_centering import lane_centering_min_speed_mph, lane_centering_strength
 from openpilot.selfdrive.ui.mici.widgets.button import BigMultiToggle, BigToggle
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.system.ui.widgets.scroller import NavScroller
 
 
@@ -74,7 +75,7 @@ class LaneCenteringLayoutMici(NavScroller):
 
   @staticmethod
   def _write_allowed() -> bool:
-    return True  # Runtime uses live snapshots; lane confidence and actuation gates remain enforced.
+    return tuning_write_allowed(ui_state.params, "LaneCentering")  # Unlocked settings still apply live.
 
   def _settings_writable(self) -> bool:
     return self._write_allowed() and ui_state.params.get_bool("LaneCentering")
