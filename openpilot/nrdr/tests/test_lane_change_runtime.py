@@ -24,7 +24,7 @@ def test_native_enums_and_hook_vehicle_admission():
     cp = SimpleNamespace(brand=brand, carFingerprint='HONDA_CLARITY' if brand == 'honda' else 'LEXUS_ES', steerRatio=16.5, carFw=[])
     snapshot = {'NrdrSteerRatioMode': 1, 'NrdrOptimizedLaneChanges': True}
     controls = SimpleNamespace(
-      CP=cp, VM=VehicleModel(), nrdr_lateral_snapshot=snapshot, nrdr_lane_change_entry=LaneChangeEntry(),
+      CP=cp, VM=VehicleModel(), LaC=SimpleNamespace(), nrdr_lateral_snapshot=snapshot, nrdr_lane_change_entry=LaneChangeEntry(),
       steer_ratio_latch=SteerRatioModeLatch(resolve_steer_ratio_selection(cp, snapshot)),
       sm=SimpleNamespace(valid={'lateralManeuverPlan': False}, all_checks=lambda services: True),
       nrdr_live_params=SimpleNamespace(record_applied_settings=lambda *args, **kw: reports.append(kw)),

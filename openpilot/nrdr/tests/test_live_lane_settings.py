@@ -35,7 +35,7 @@ def test_nonfinite_inputs_reach_existing_controller_rejection(key, attribute, va
 def test_defaults_and_captured_frame_override_background_publication():
   defaults = decode({})
   assert defaults.lane_center_offset == 0.0
-  assert defaults.lane_centering_e2e_authority == 1.0
+  assert defaults.lane_centering_e2e_authority == 0.0
   assert defaults.lane_centering_strength == 0.3
   assert not defaults.lane_centering_enabled
   assert defaults.lane_centering_pause_on_signal

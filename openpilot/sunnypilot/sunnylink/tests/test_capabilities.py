@@ -114,11 +114,11 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
     assert caps["has_handcrafted_lateral_profile"] is False
     assert caps["nrdr_honda_tuning_available"] is False
 
-  def test_confirmed_unsupported_toyota_never_exposes_handcrafted_profile(self, params):
+  def test_confirmed_toyota_only_exposes_compatible_non_honda_profile(self, params):
     put_car_params(params, "LEXUS_ES_TSS2", "toyota")
     params.put("CarPlatformBundle", {"brand": "toyota", "platform": "LEXUS_ES_TSS2"}, block=True)
     caps = generate_capabilities(params)
-    assert caps["has_handcrafted_lateral_profile"] is False
+    assert caps["has_handcrafted_lateral_profile"] is True
     assert caps["nrdr_honda_tuning_available"] is False
 
   def test_nrdr_steer_ratio_availability_fields_present(self):
