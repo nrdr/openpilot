@@ -28,7 +28,7 @@ class LongitudinalTuningLayout(Widget):
   def _initialize_items(self):
     self._standstill_gap = option_item_sp(
       param="NrdrStandstillGapExtra",
-      title=lambda: tr("NRDR Extra Stopped Lead Gap (Default: 0 m)"),
+      title=lambda: tr("Extra Stopped Lead Gap (Default: 0 m)"),
       min_value=0, max_value=500, value_change_step=25, use_float_scaling=True,
       label_callback=lambda value: f"+{value / 100:.2f} m",
       description=lambda: tr(

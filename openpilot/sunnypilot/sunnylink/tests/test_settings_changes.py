@@ -413,12 +413,12 @@ class TestControllerCleanup(OpenpilotTestCase):
     assert "either controller" in optimized["description"]
 
   @parameterized.expand(["LowSpeed", "Standard", "Highway"], names=["band"])
-  def test_rate_damping_is_grouped_after_each_pif(self, schema, band):
+  def test_each_speed_band_is_ordered_pidf(self, schema, band):
     section = _find_section(schema, "steering", "nrdr")
     panel = next(p for p in section["sub_panels"] if p["id"] == "nrdr_pidf_ground")
     keys = [item["key"] for item in panel["items"]]
     start = keys.index("LatPScale" + band)
-    assert keys[start:start + 4] == ["Lat" + term + "Scale" + band for term in ("P", "I", "F")] + ["NrdrLatRateDamping" + band]
+    assert keys[start:start + 4] == ["LatPScale" + band, "LatIScale" + band, "NrdrLatRateDamping" + band, "LatFScale" + band]
     damping = _find_item(schema, "NrdrLatRateDamping" + band)
     assert (damping["min"], damping["max"], damping["step"], damping["unit"]) == (0, 300, 5, "%")
 

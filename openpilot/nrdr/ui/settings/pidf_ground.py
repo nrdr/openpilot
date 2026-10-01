@@ -41,18 +41,18 @@ class PidfGroundLayout(Widget):
         description=tr("NRDR lane-change entry shaping. During the maneuver, uses P/I feedback without torque blend, feedforward or rate damping."))),
       simple_button_item_sp(button_text=lambda: tr("Steer Ratio Tuning"), button_width=800, callback=steer_ratio_callback),
     ]
-    for band, label in (("LowSpeed", "Low Speed (Below 25mph)"), ("Standard", "Standard Speed (25–50mph)"),
-                        ("Highway", "Highway (50mph+)")):
+    for band, label in (("LowSpeed", "[0-25MPH]"), ("Standard", "[25-50MPH]"), ("Highway", "[50+MPH]")):
       items.append(LineSeparatorSP(40))
-      for term, name in (("P", "Proportional"), ("I", "Integral"), ("F", "Feedforward"), ("D", "Rate Damping")):
+      for term, name in (("P", "Proportional"), ("I", "Integral"), ("D", "Derivative"), ("F", "Feedforward")):
         key = f"NrdrLatRateDamping{band}" if term == "D" else f"Lat{term}Scale{band}"
-        description = ("Opposes reported steering rate. 0% disables it. The 30% starting value needs road validation." if term == "D"
-                       else f"Scales the {name.lower()} term in this speed band.")
+        description = ("Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). "
+                       "0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it." if term == "D"
+                       else "Supplies anticipated steering torque before an error occurs.")
         spec = get_native_option_spec(key) if term in ("P", "I") else None
         if spec is not None:
           description = spec.description
         items.append(remember(key, option_item_sp(
-          title=lambda label=label, name=name: tr(f"{label} — {name}"), param=key,
+          title=lambda label=label, name=name: tr(f"{label} {name}"), param=key,
           description=lambda description=description: tr(description), min_value=spec.min_value if spec else 0,
           max_value=spec.max_value if spec else (300 if term == "D" else 500),
           value_change_step=spec.value_change_step if spec else 5, label_callback=lambda value: f"{value}%")))

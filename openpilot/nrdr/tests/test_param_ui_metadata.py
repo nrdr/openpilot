@@ -40,60 +40,60 @@ ALL_EXPECTED_KEYS = EXPECTED_KEYS
 
 EXPECTED_NATIVE = {
   "LatPScaleLowSpeed": (
-    "Low Speed Proportional Scale (Below 25mph) (Default: 100%)",
-    "Scales the proportional (P) term below 25 mph. Higher = more error correction (tighter, can cut corners); lower = looser with wider swings.",
+    "[0-25MPH] Proportional (Default: 100%)",
+    "Corrects steering error as it occurs.",
   ),
   "LatIScaleLowSpeed": (
-    "Low Speed Integral Scale (Below 25mph) (Default: 100%)",
-    "Scales the integral (I) term below 25 mph. Builds correction over time to erase steady-state error; too high oscillates.",
+    "[0-25MPH] Integral (Default: 100%)",
+    "Builds correction over time for persistent steering error, such as an alignment bias.",
   ),
   "LatPScaleStandard": (
-    "Standard Speed Proportional Scale (25-50mph) (Default: 100%)",
-    "Scales the proportional (P) term between 25 and 50 mph.",
+    "[25-50MPH] Proportional (Default: 100%)",
+    "Corrects steering error as it occurs.",
   ),
   "LatIScaleStandard": (
-    "Standard Speed Integral Scale (25-50mph) (Default: 100%)",
-    "Scales the integral (I) term between 25 and 50 mph.",
+    "[25-50MPH] Integral (Default: 100%)",
+    "Builds correction over time for persistent steering error, such as an alignment bias.",
   ),
   "LatPScaleHighway": (
-    "Highway Proportional Scale (50mph+) (Default: 100%)",
-    "Scales the proportional (P) term above 50 mph.",
+    "[50+MPH] Proportional (Default: 100%)",
+    "Corrects steering error as it occurs.",
   ),
   "LatIScaleHighway": (
-    "Highway Integral Scale (50mph+) (Default: 100%)",
-    "Scales the integral (I) term above 50 mph.",
+    "[50+MPH] Integral (Default: 100%)",
+    "Builds correction over time for persistent steering error, such as an alignment bias.",
   ),
 }
 
 EXPECTED_SUNNYLINK_COPY = {
   "LatPScaleLowSpeed": (
-    "Low Speed Proportional Scale (Below 25mph)",
-    "Scales the proportional (P) term below 25 mph.",
-    "Scales the proportional (P) term below 25 mph. Higher = more error correction (tighter, can cut corners); lower = looser with wider swings.",
+    "[0-25MPH] Proportional",
+    "Corrects steering error as it occurs.",
+    "Corrects steering error as it occurs.",
   ),
   "LatIScaleLowSpeed": (
-    "Low Speed Integral Scale (Below 25mph)",
-    "Scales the integral (I) term below 25 mph.",
-    "Scales the integral (I) term below 25 mph. Builds correction over time to erase steady-state error; too high oscillates.",
+    "[0-25MPH] Integral",
+    "Builds correction over time for persistent steering error, such as an alignment bias.",
+    "Builds correction over time for persistent steering error, such as an alignment bias.",
   ),
   "LatPScaleStandard": (
-    "Standard Speed Proportional Scale (25-50mph)",
-    "Scales the proportional (P) term between 25 and 50 mph.",
+    "[25-50MPH] Proportional",
+    "Corrects steering error as it occurs.",
     None,
   ),
   "LatIScaleStandard": (
-    "Standard Speed Integral Scale (25-50mph)",
-    "Scales the integral (I) term between 25 and 50 mph.",
+    "[25-50MPH] Integral",
+    "Builds correction over time for persistent steering error, such as an alignment bias.",
     None,
   ),
   "LatPScaleHighway": (
-    "Highway Proportional Scale (50mph+)",
-    "Scales the proportional (P) term above 50 mph.",
+    "[50+MPH] Proportional",
+    "Corrects steering error as it occurs.",
     None,
   ),
   "LatIScaleHighway": (
-    "Highway Integral Scale (50mph+)",
-    "Scales the integral (I) term above 50 mph.",
+    "[50+MPH] Integral",
+    "Builds correction over time for persistent steering error, such as an alignment bias.",
     None,
   ),
 }

@@ -686,9 +686,9 @@
                 {
                   "key": "LatPScaleLowSpeed",
                   "widget": "option",
-                  "title": "Low Speed Proportional Scale (Below 25mph)",
-                  "description": "Scales the proportional (P) term below 25 mph.",
-                  "details": "Scales the proportional (P) term below 25 mph. Higher = more error correction (tighter, can cut corners); lower = looser with wider swings.",
+                  "title": "[0-25MPH] Proportional",
+                  "description": "Corrects steering error as it occurs.",
+                  "details": "Corrects steering error as it occurs.",
                   "min": 0,
                   "max": 500,
                   "step": 5,
@@ -723,46 +723,9 @@
                 {
                   "key": "LatIScaleLowSpeed",
                   "widget": "option",
-                  "title": "Low Speed Integral Scale (Below 25mph)",
-                  "description": "Scales the integral (I) term below 25 mph.",
-                  "details": "Scales the integral (I) term below 25 mph. Builds correction over time to erase steady-state error; too high oscillates.",
-                  "min": 0,
-                  "max": 500,
-                  "step": 5,
-                  "unit": "%",
-                  "enablement": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrSuggestedSettings",
-                        "equals": true
-                      }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrHandcraftedLateralTune",
-                        "equals": true
-                      }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
-                      }
-                    }
-                  ]
-                },
-                {
-                  "key": "LatFScaleLowSpeed",
-                  "widget": "option",
-                  "title": "Low Speed Feedforward Scale (Below 25mph)",
-                  "description": "Scales the feedforward (kf) term below 25 mph (100% = tuned value).",
-                  "details": "Scales the feedforward (kf) term below 25 mph. Follows the commanded angle rather than error, adding authority without amplifying noise. 100% = tuned value (static).",
+                  "title": "[0-25MPH] Integral",
+                  "description": "Builds correction over time for persistent steering error, such as an alignment bias.",
+                  "details": "Builds correction over time for persistent steering error, such as an alignment bias.",
                   "min": 0,
                   "max": 500,
                   "step": 5,
@@ -797,8 +760,8 @@
                 {
                   "key": "NrdrLatRateDampingLowSpeed",
                   "widget": "option",
-                  "title": "Low Speed Rate Damping",
-                  "description": "Opposes steering-wheel rate. 0 disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
+                  "title": "[0-25MPH] Derivative",
+                  "description": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). 0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
                   "min": 0,
                   "max": 300,
                   "step": 5,
@@ -831,10 +794,46 @@
                   ]
                 },
                 {
+                  "key": "LatFScaleLowSpeed",
+                  "widget": "option",
+                  "title": "[0-25MPH] Feedforward",
+                  "description": "Supplies anticipated steering torque before an error occurs.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
                   "key": "LatPScaleStandard",
                   "widget": "option",
-                  "title": "Standard Speed Proportional Scale (25-50mph)",
-                  "description": "Scales the proportional (P) term between 25 and 50 mph.",
+                  "title": "[25-50MPH] Proportional",
+                  "description": "Corrects steering error as it occurs.",
                   "min": 0,
                   "max": 500,
                   "step": 5,
@@ -869,44 +868,8 @@
                 {
                   "key": "LatIScaleStandard",
                   "widget": "option",
-                  "title": "Standard Speed Integral Scale (25-50mph)",
-                  "description": "Scales the integral (I) term between 25 and 50 mph.",
-                  "min": 0,
-                  "max": 500,
-                  "step": 5,
-                  "unit": "%",
-                  "enablement": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrSuggestedSettings",
-                        "equals": true
-                      }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrHandcraftedLateralTune",
-                        "equals": true
-                      }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
-                      }
-                    }
-                  ]
-                },
-                {
-                  "key": "LatFScaleStandard",
-                  "widget": "option",
-                  "title": "Standard Speed Feedforward Scale (25-50mph)",
-                  "description": "Scales the feedforward (kf) term between 25 and 50 mph (100% = tuned value).",
+                  "title": "[25-50MPH] Integral",
+                  "description": "Builds correction over time for persistent steering error, such as an alignment bias.",
                   "min": 0,
                   "max": 500,
                   "step": 5,
@@ -941,8 +904,8 @@
                 {
                   "key": "NrdrLatRateDampingStandard",
                   "widget": "option",
-                  "title": "Standard Speed Rate Damping",
-                  "description": "Opposes steering-wheel rate. 0 disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
+                  "title": "[25-50MPH] Derivative",
+                  "description": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). 0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
                   "min": 0,
                   "max": 300,
                   "step": 5,
@@ -975,10 +938,46 @@
                   ]
                 },
                 {
+                  "key": "LatFScaleStandard",
+                  "widget": "option",
+                  "title": "[25-50MPH] Feedforward",
+                  "description": "Supplies anticipated steering torque before an error occurs.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
                   "key": "LatPScaleHighway",
                   "widget": "option",
-                  "title": "Highway Proportional Scale (50mph+)",
-                  "description": "Scales the proportional (P) term above 50 mph.",
+                  "title": "[50+MPH] Proportional",
+                  "description": "Corrects steering error as it occurs.",
                   "min": 0,
                   "max": 500,
                   "step": 5,
@@ -1013,44 +1012,8 @@
                 {
                   "key": "LatIScaleHighway",
                   "widget": "option",
-                  "title": "Highway Integral Scale (50mph+)",
-                  "description": "Scales the integral (I) term above 50 mph.",
-                  "min": 0,
-                  "max": 500,
-                  "step": 5,
-                  "unit": "%",
-                  "enablement": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrSuggestedSettings",
-                        "equals": true
-                      }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrHandcraftedLateralTune",
-                        "equals": true
-                      }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
-                      }
-                    }
-                  ]
-                },
-                {
-                  "key": "LatFScaleHighway",
-                  "widget": "option",
-                  "title": "Highway Feedforward Scale (50mph+)",
-                  "description": "Scales the feedforward (kf) term above 50 mph (100% = tuned value).",
+                  "title": "[50+MPH] Integral",
+                  "description": "Builds correction over time for persistent steering error, such as an alignment bias.",
                   "min": 0,
                   "max": 500,
                   "step": 5,
@@ -1085,10 +1048,46 @@
                 {
                   "key": "NrdrLatRateDampingHighway",
                   "widget": "option",
-                  "title": "Highway Rate Damping",
-                  "description": "Opposes steering-wheel rate. 0 disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
+                  "title": "[50+MPH] Derivative",
+                  "description": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). 0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
                   "min": 0,
                   "max": 300,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LatFScaleHighway",
+                  "widget": "option",
+                  "title": "[50+MPH] Feedforward",
+                  "description": "Supplies anticipated steering torque before an error occurs.",
+                  "min": 0,
+                  "max": 500,
                   "step": 5,
                   "unit": "%",
                   "enablement": [
@@ -3046,7 +3045,7 @@
                 {
                   "key": "NrdrStandstillGapExtra",
                   "widget": "option",
-                  "title": "NRDR Extra Stopped Lead Gap",
+                  "title": "Extra Stopped Lead Gap",
                   "description": "Additional lead clearance retained through creeping and at a complete stop. 0 preserves existing behavior.",
                   "details": "Adds to the planner's distance floor, not the distance-bar time gap. Measured bumper clearance can vary with lead sensing and braking. Configure offroad; applies on the next engagement. Requires NRDR-supported openpilot longitudinal control; stock ACC and unapproved non-Honda vehicles are unchanged.",
                   "min": 0.0,
