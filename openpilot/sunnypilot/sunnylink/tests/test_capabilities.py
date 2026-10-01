@@ -120,6 +120,14 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
     caps = generate_capabilities(params)
     assert caps["has_handcrafted_lateral_profile"] is True
     assert caps["nrdr_honda_tuning_available"] is False
+    assert caps["nrdr_yaw_controller_available"] is False
+    assert caps["nrdr_interpolated_torque_pif_blend_available"] is False
+    from openpilot.nrdr.params.profiles import get_handcrafted_lateral_profile
+    with car.CarParams.from_bytes(params.get("CarParamsPersistent")) as cp:
+      profile = get_handcrafted_lateral_profile("LEXUS_ES_TSS2", cp, None)
+    assert profile is not None
+    assert not any(key.startswith(("Honda", "LatP", "LatI", "LatF", "NrdrLat", "LongPid", "NrdrSteerRatio"))
+                   for key, _ in profile.values)
 
   def test_nrdr_steer_ratio_availability_fields_present(self):
     assert "nrdr_manual_steer_ratio_available" in CAPABILITY_FIELDS
