@@ -166,3 +166,20 @@ def test_disengagement_clears_pid_integral_before_reengagement(live_pid):
   controller.pid.i = 0.3
   assert update(active=False) == 0.0
   assert controller.pid.i == 0.0
+
+
+@pytest.mark.parametrize("state", [2, 3])
+def test_optimized_lane_change_suppresses_feedforward_and_rate_damping(live_pid, state):
+  controller, _, update = live_pid
+  update()
+  cs = SimpleNamespace(vEgo=25., steeringRateDeg=20., steeringAngleDeg=10.)
+  assert controller._feedforward(cs, 10.) != 0.
+  controller.rate_damping_scales = [.3, .3, .3]
+  controller.pid.p, controller.pid.i, controller.pid.d, controller.pid.f = .2, .1, 0., 0.
+  damped = controller._scaled_pid_output(cs, 10., .1, 1.)
+  controller.model_v2 = SimpleNamespace(meta=SimpleNamespace(laneChangeState=SimpleNamespace(raw=state)))
+  assert controller._feedforward(cs, 10.) == 0.
+  assert controller._scaled_pid_output(cs, 10., .1, 1.) - damped == pytest.approx(.06)
+  update()
+  assert controller.pid.f == 0.
+  assert not controller.interpolated_torque_pif_enabled
