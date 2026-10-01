@@ -269,44 +269,17 @@ class TestKnownPanels(OpenpilotTestCase):
       "LaneCenteringE2EAuthority",
     ]
 
-  def test_nrdr_vehicle_model_learning_contains_tune_summary(self, schema):
+  def test_vehicle_model_learning_is_not_exposed(self, schema):
     steering = next(p for p in schema["panels"] if p["id"] == "steering")
-    vehicle_model_learning = next(
-      sp for sp in _iter_all_sub_panels(steering) if sp["id"] == "nrdr_vehicle_model_learning"
-    )
-    keys = [item["key"] for item in vehicle_model_learning["items"]]
-    assert keys == [
-      "NrdrRemoteTuneScan",
-      "NrdrCarTuneInfo", "NrdrCarControllerInfo", "NrdrCarHandcraftedInfo", "NrdrCarPidLowInfo",
-      "NrdrCarPidMidInfo", "NrdrCarPidHighInfo", "NrdrCarDampingInfo", "NrdrCarCenterInfo", "NrdrCarNnlcInfo",
-      "NrdrCarSteerRatioInfo", "NrdrCarLearningInfo", "NrdrCarHelpersInfo",
-      "NrdrLearnStiffness", "NrdrLearnAngleOffset",
-    ]
+    assert "nrdr_vehicle_model_learning" not in {sp["id"] for sp in _iter_all_sub_panels(steering)}
 
-  def test_mutual_exclusion_torque_nnlc(self, schema):
-    """MVL's global controllers and nrdr's scoped NNLC control must all remain available."""
-    torque = nnlc = enhanced = nrdr_nnlc = None
-    for panel in schema["panels"]:
-      for item in _iter_panel_items(panel):
-        if item["key"] == "EnforceTorqueControl":
-          torque = item
-        elif item["key"] == "NeuralNetworkLateralControl":
-          nnlc = item
-        elif item["key"] == "LateralJerkTorqueController":
-          enhanced = item
-        elif item["key"] == "NrdrNnlcEnabled":
-          nrdr_nnlc = item
-    assert torque is not None, "EnforceTorqueControl item missing"
-    assert nnlc is not None, "NeuralNetworkLateralControl item missing"
-    assert enhanced is not None, "LateralJerkTorqueController item missing"
-    assert nrdr_nnlc is not None, "nrdr's scoped NNLC toggle is missing"
-    torque_enable_keys = {r.get("key") for r in torque.get("enablement", []) if r.get("type") == "param"}
-    assert "NeuralNetworkLateralControl" in torque_enable_keys
-    nnlc_enable_keys = {r.get("key") for r in nnlc.get("enablement", []) if r.get("type") == "param"}
-    assert "EnforceTorqueControl" in nnlc_enable_keys
-    assert "LateralJerkTorqueController" in nnlc_enable_keys
-    enhanced_enable_keys = {r.get("key") for r in enhanced.get("enablement", []) if r.get("type") == "param"}
-    assert "NeuralNetworkLateralControl" in enhanced_enable_keys
+  def test_nnlc_is_retired_and_clarity_controller_selector_is_present(self, schema):
+    serialized = json.dumps(schema)
+    assert "NeuralNetworkLateralControl" not in serialized
+    assert "NrdrNnlc" not in serialized
+    items = {item["key"]: item for panel in schema["panels"] for item in _iter_panel_items(panel)}
+    selector = items["NrdrLateralController"]
+    assert [option["label"] for option in selector["options"]] == ["PIF Control", "Yaw Control"]
 
 
 class TestKnownVehicleSettings(OpenpilotTestCase):

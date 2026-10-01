@@ -78,22 +78,22 @@ class TestLatControlTorqueExt(OpenpilotTestCase):
   def test_init_enhanced_only(self):
     controller, VM, _ = _make_controller(enhanced=True, nnlc=False)
     assert controller.extension._jerk_aware_enabled
-    assert not controller.extension.enabled  # NNLC disabled
+    assert not hasattr(controller.extension, "enabled")
 
-  def test_init_nnlc_only(self):
+  def test_stale_nnlc_setting_cannot_enable_retired_controller(self):
     controller, VM, _ = _make_controller(enhanced=False, nnlc=True)
     assert not controller.extension._jerk_aware_enabled
-    assert controller.extension.enabled
+    assert not hasattr(controller.extension, "enabled")
 
   def test_init_neither(self):
     controller, VM, _ = _make_controller(enhanced=False, nnlc=False)
     assert not controller.extension._jerk_aware_enabled
-    assert not controller.extension.enabled
+    assert not hasattr(controller.extension, "enabled")
 
-  def test_init_both_no_crash(self):
+  def test_stale_nnlc_setting_does_not_block_jerk_controller(self):
     controller, VM, _ = _make_controller(enhanced=True, nnlc=True)
-    assert not controller.extension._jerk_aware_enabled
-    assert not controller.extension.enabled
+    assert controller.extension._jerk_aware_enabled
+    assert not hasattr(controller.extension, "enabled")
 
   def test_update_enhanced_only(self):
     controller, VM, _ = _make_controller(enhanced=True, nnlc=False)

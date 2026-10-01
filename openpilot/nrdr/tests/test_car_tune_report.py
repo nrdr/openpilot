@@ -66,23 +66,13 @@ class TestCarTuneReporter(unittest.TestCase):
       ("P 0.2 | I 0.05", "0.0000024/0.0000018/0.0000036/0.000006", "P/I all speeds | F 0 / <25 / 25 / 50 mph"),
     )
 
-  def test_disabled_interpolated_report_is_explicitly_unchanged_pif(self):
-    report, effective = self._interpolated_reporter(False)._interpolated_torque_pif_info(self._interpolated_cp())
-
-    self.assertFalse(effective)
-    self.assertIn("OFF | Torque 0% / P/I/F 100% | P/I/F unchanged", report)
-    self.assertIn("stored settings: Torque 60% / P/I/F 40%", report)
-
-  def test_enabled_interpolated_report_uses_complementary_share(self):
-    report, effective = self._interpolated_reporter(True)._interpolated_torque_pif_info(self._interpolated_cp())
-
-    self.assertTrue(effective)
-    self.assertIn("ON | Torque 60% / P/I/F 40%", report)
-    self.assertIn("LAF 5 m/s² | friction Low 0.5 / Standard 0.3 / Highway 0.12 | P/I/F angle feedback", report)
-    self.assertIn("Torque angle→yaw 2-5 m/s, calibrated yaw >=5 m/s", report)
-    self.assertIn("invalid required yaw: exact P/I/F output + Torque state held", report)
-    self.assertIn("generic f13 yaw branch (not Honda road-proven)", report)
-    self.assertIn("live snapshot | NNLC bypassed/reset", report)
+  def test_legacy_blend_settings_do_not_change_fixed_report(self):
+    for legacy_enabled in (False, True):
+      report, effective = self._interpolated_reporter(legacy_enabled)._interpolated_torque_pif_info(self._interpolated_cp())
+      self.assertTrue(effective)
+      self.assertEqual(report, "Fixed 1% torque / 99% PIF | LAF 10 | friction 1/1/1 | optimized lane changes bypass blend")
+      self.assertNotIn("60%", report)
+      self.assertNotIn("NNLC", report)
 
   def test_small_scalar_feedforward_never_uses_exponent_notation(self):
     pid = SimpleNamespace(kpV=[0.2], kiV=[0.05], kf=0.0000036, kfV=[])
@@ -139,7 +129,7 @@ class TestCarTuneReporter(unittest.TestCase):
   def test_steer_ratio_report_makes_unsupported_mode_fallback_explicit(self):
     report = CarTuneReporter._steer_ratio_info(self._steer_ratio_selection(2, "HONDA_CIVIC_BOSCH"))
 
-    self.assertIn("selected NRDR measured-angle curve | effective Stock car ratio (safe fallback)", report)
+    self.assertIn("selected NRDR measured-angle curve | effective Comma steer-ratio learner", report)
     self.assertIn("No matching NRDR measured curve exists", report)
     self.assertIn("CP 16.5", report)
 

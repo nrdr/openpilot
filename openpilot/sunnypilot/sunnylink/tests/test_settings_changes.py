@@ -217,10 +217,11 @@ class TestTorqueOptionGeneration(OpenpilotTestCase):
     expected = _build_torque_options(versions)
     item = _find_item(schema, "TorqueControlTune")
     if item is None:
-      # nrdr intentionally hides the global Torque/NNLC controls. The Clarity
-      # uses its fingerprint-scoped PID/NNLC hybrid and exposes only its safe knobs.
+      # Global controller knobs stay hidden; NNLC is retired and the
+      # Clarity selector exposes only the supported PIF/Yaw paths.
       assert _find_item(schema, "EnforceTorqueControl") is None
-      assert _find_item(schema, "NrdrNnlcEnabled") is not None
+      assert _find_item(schema, "NrdrNnlcEnabled") is None
+      assert _find_item(schema, "NrdrLateralController") is not None
       return
     assert item.get("options") == expected
 
@@ -336,7 +337,7 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
   def test_longitudinal_default_descriptions(self, schema):
     roen = _find_item(schema, "NrdrRoenAccelerationLimits")
     live_gas = _find_item(schema, "HondaLiveLearningGas")
-    assert "Enabled by default" in roen.get("details", "")
+    assert "Disabled by default" in roen.get("details", "")
     assert _find_item(schema, "NrdrPersonalityAccelProfiles") is None
     assert "default OFF when a gas pedal interceptor is detected" in live_gas.get("details", "")
     assert "selection is preserved" in live_gas.get("details", "")
@@ -374,7 +375,7 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     assert [keys[index] for index in scale_indices] == list(self.PERSONALITY_SCALE_KEYS)
 
   @parameterized.expand(
-    tuple(zip(PERSONALITY_SCALE_KEYS, (200, 100, 80, 50), strict=True)),
+    tuple(zip(PERSONALITY_SCALE_KEYS, (100, 100, 100, 100), strict=True)),
     names=["key", "default"],
   )
   def test_personality_pid_scale_describes_default(self, schema, key, default):
@@ -383,111 +384,86 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     assert f"Defaults to {default}%" in item.get("details", "")
 
 
-class TestInterpolatedTorquePifBlend(OpenpilotTestCase):
-  KEYS = (
-    "NrdrInterpolatedTorquePifBlend",
-    "NrdrInterpolatedTorqueShare",
-    "NrdrInterpolatedTorqueLatAccelFactor",
-    "NrdrInterpolatedTorqueFriction",
-    "NrdrInterpolatedTorqueFrictionStandard",
-    "NrdrInterpolatedTorqueFrictionHighway",
-  )
+class TestControllerCleanup(OpenpilotTestCase):
+  @parameterized.expand([
+    "NrdrInterpolatedTorquePifBlend", "NrdrInterpolatedTorqueShare",
+    "NrdrInterpolatedTorqueLatAccelFactor", "NrdrInterpolatedTorqueFriction",
+    "NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway",
+    "NrdrStarPilotPid", "NrdrNnlcEnabled", "NrdrNnlcActivationSpeed",
+    "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain",
+    "NeuralNetworkLateralControl", "NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed",
+    "NrdrIncreaseOverrideTolerance",
+  ], names=["key"])
+  def test_retired_controls_are_not_exposed(self, schema, key):
+    assert _find_item(schema, key) is None
 
-  def test_master_and_complete_tuple_are_onroad_editable_and_capability_gated(self, schema):
-    master = _find_item(schema, self.KEYS[0])
-    assert master is not None
-    assert master["title"] == "Interpolated Torque/PIF Blend"
-    assert "angle feedback through 2 m/s" in master["details"]
-    assert "calibrated yaw at 5 m/s and above" in master["details"]
-    assert "final request temporarily returns to 100% P/I/F" in master["details"]
-    assert "does not reuse angle or update its controller state" in master["details"]
-    assert "not historically road-proven on Honda" in master["details"]
-    assert "All six settings apply live" in master["details"]
-    assert "normally within 0.5 seconds" in master["details"]
-    assert "one-second torque transition" in master["details"]
-    assert "No LKAS cycle is required" in master["details"]
-    assert "NNLC is bypassed and reset" in master["details"]
-    assert [item["key"] for item in master["sub_items"]] == list(self.KEYS[1:])
+  def test_controller_stiction_and_optimized_lane_changes_lead_dungeon(self, schema):
+    section = _find_section(schema, "steering", "nrdr")
+    panel = next(p for p in section["sub_panels"] if p["id"] == "nrdr_pidf_ground")
+    assert [item["key"] for item in panel["items"][:3]] == [
+      "NrdrLateralController", "NrdrLatStiction", "NrdrOptimizedLaneChanges",
+    ]
+    controller = panel["items"][0]
+    assert [(o["value"], o["label"]) for o in controller["options"]] == [(0, "PIF Control"), (1, "Yaw Control")]
+    assert "description" not in controller and "details" not in controller
+    assert "offroad_only" in _flatten_rule_types(controller["enablement"])
+    assert _references_capability_field(controller["options"][1]["enablement"], "nrdr_yaw_controller_available")
+    optimized = panel["items"][2]
+    assert optimized["widget"] == "toggle"
+    assert "either controller" in optimized["description"]
 
-    for item in (master, *master["sub_items"]):
-      rules = item.get("enablement")
-      assert "offroad_only" not in _flatten_rule_types(rules)
-      assert "not_engaged" not in _flatten_rule_types(rules)
-      assert _references_capability_field(rules, "nrdr_interpolated_torque_pif_blend_available")
-      assert "live" in item["details"]
-      assert "next engagement" not in item["details"]
-      assert "next disengage" not in item["details"]
-
-    for item in master["sub_items"]:
-      assert "NrdrInterpolatedTorquePifBlend" in json.dumps(item["enablement"])
-
-  def test_locked_ranges_units_and_complementary_copy(self, schema):
-    share = _find_item(schema, "NrdrInterpolatedTorqueShare")
-    assert (share["min"], share["max"], share["step"], share["unit"]) == (0, 100, 1, "%")
-    assert "Torque X% / P/I/F (100-X)%" in share["description"]
-
-    laf = _find_item(schema, "NrdrInterpolatedTorqueLatAccelFactor")
-    assert (laf["min"], laf["max"], laf["step"], laf["unit"]) == (0.1, 10.0, 0.1, "m/s²")
-    assert "scales Torque feedback error" in laf["details"]
-    assert "never direct friction" in laf["details"]
-
-    friction_titles = {
-      "NrdrInterpolatedTorqueFriction": "Low-Speed Torque Friction (Below 25mph)",
-      "NrdrInterpolatedTorqueFrictionStandard": "Standard-Speed Torque Friction (25-50mph)",
-      "NrdrInterpolatedTorqueFrictionHighway": "Highway Torque Friction (50mph+)",
-    }
-    for key, title in friction_titles.items():
-      friction = _find_item(schema, key)
-      assert (friction["min"], friction["max"], friction["step"]) == (0.0, 1.0, 0.01)
-      assert friction["title"] == title
-      assert "±1 mph handoff" in friction["details"]
-
-  def test_nnlc_controls_are_mutually_exclusive(self, schema):
-    for key in ("NrdrNnlcEnabled", "NrdrNnlcActivationSpeed", "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain"):
-      rules = json.dumps(_find_item(schema, key).get("enablement") or [])
-      assert "NrdrInterpolatedTorquePifBlend" in rules
-      assert '"type": "not"' in rules
+  @parameterized.expand(["LowSpeed", "Standard", "Highway"], names=["band"])
+  def test_rate_damping_is_grouped_after_each_pif(self, schema, band):
+    section = _find_section(schema, "steering", "nrdr")
+    panel = next(p for p in section["sub_panels"] if p["id"] == "nrdr_pidf_ground")
+    keys = [item["key"] for item in panel["items"]]
+    start = keys.index("LatPScale" + band)
+    assert keys[start:start + 4] == ["Lat" + term + "Scale" + band for term in ("P", "I", "F")] + ["NrdrLatRateDamping" + band]
+    damping = _find_item(schema, "NrdrLatRateDamping" + band)
+    assert (damping["min"], damping["max"], damping["step"], damping["unit"]) == (0, 300, 5, "%")
 
 
 class TestNrdrSteerRatioMode(OpenpilotTestCase):
-  FORMER_HANDCRAFTED_LOCKED_KEYS = (
-    "NrdrLearnStiffness", "NrdrLearnAngleOffset", "NrdrStarPilotPid",
+  SUGGESTED_LOCKED_KEYS = (
     "LatPScaleLowSpeed", "LatIScaleLowSpeed", "LatFScaleLowSpeed",
     "LatPScaleStandard", "LatIScaleStandard", "LatFScaleStandard",
     "LatPScaleHighway", "LatIScaleHighway", "LatFScaleHighway",
-    "NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed",
+    "NrdrLatRateDampingLowSpeed", "NrdrLatRateDampingStandard", "NrdrLatRateDampingHighway",
     "HondaCenterScale", "HondaCenterBoostThreshold", "HondaCenterBoostMinSpeed",
-    "NrdrLatStiction", "NrdrNnlcEnabled",
-    "NrdrIncreaseOverrideTolerance", "NrdrDriverOverrideThreshold", "NrdrOverrideThresholdCenterBoost",
+    "NrdrLatStiction", "NrdrOptimizedLaneChanges",
+    "NrdrDriverOverrideThreshold", "NrdrOverrideThresholdCenterBoost",
     "HondaDriverAssistDuringOverride", "HondaOverrideFadeDownSecs", "HondaOverrideFadeUpSecs", "HondaOverrideTorqueScale",
     "HondaTorqueLowPassFilter", "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",
     "HondaSteerDeltaLimiter", "HondaSteerDeltaUp", "HondaSteerDeltaDown",
     "LagdToggle", "LagdToggleDelay",
+    "NrdrSteerRatioHybrid", "NrdrSteerRatioMode", "NrdrSteerRatioBlendStart",
+    "NrdrSteerRatioSourceB", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
+    "LaneCentering", "LaneCenteringMinSpeed", "LaneCenteringPauseOnSignal",
+    "LaneCenterOffset", "LaneCenteringStrength", "LaneCenteringE2EAuthority",
   )
 
-  def test_handcrafted_profile_is_first_and_documents_one_shot_behavior(self, schema):
+  def test_suggested_settings_is_first_and_documents_preserve_on_unlock(self, schema):
     section = _find_section(schema, "steering", "nrdr")
     assert section is not None
-    assert section["items"][0]["key"] == "NrdrHandcraftedLateralTune"
-
     item = section["items"][0]
-    assert item.get("widget") == "toggle"
-    assert item["title"] == "Apply Handcrafted Lateral Profile"
+    assert item["key"] == "NrdrSuggestedSettings"
+    assert item["widget"] == "toggle"
+    assert item["title"] == "Apply Suggested Settings"
     assert "offroad_only" in _flatten_rule_types(item.get("enablement"))
     assert _references_capability_field(item.get("visibility"), "has_handcrafted_lateral_profile")
-    description = f"{item.get('description', '')} {item.get('details', '')}".lower()
-    assert "preset once" in description
-    assert "switch turns off after verified completion" in description
-    assert "wait a few seconds" in description
-    assert "refresh" in description
-    assert "existing customizations are not automatically overwritten" in description
-    assert "later edits persist until you deliberately apply again" in description
+    assert item["description"] == (
+      "Last Road Tested: October 1, 2026, with PopV2 Model. Your mileage may vary. "
+      "Turning back to OFF will preserve these settings and unlock tuning menus."
+    )
+    assert "details" not in item
 
-  @parameterized.expand(FORMER_HANDCRAFTED_LOCKED_KEYS, names=["key"])
-  def test_one_shot_profile_never_locks_formerly_owned_controls(self, schema, key):
+  @parameterized.expand(SUGGESTED_LOCKED_KEYS, names=["key"])
+  def test_suggested_and_pending_application_lock_owned_controls(self, schema, key):
     item = _find_item(schema, key)
     assert item is not None
-    assert "NrdrHandcraftedLateralTune" not in json.dumps(item.get("enablement") or [])
+    rules = json.dumps(item.get("enablement") or [])
+    assert "NrdrSuggestedSettings" in rules
+    assert "NrdrHandcraftedLateralTune" in rules
 
   @parameterized.expand([
     "NrdrLearnSteerRatio", "NrdrLegacyDualBpSteerRatio", "NrdrLaneChangeEndpointSteerRatio",
@@ -538,7 +514,8 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert "offroad_only" not in rules
     assert "NrdrSteerRatioMode" in rules and '"equals": 0' in rules
     assert "nrdr_manual_steer_ratio_available" in rules
-    assert "NrdrHandcraftedLateralTune" not in rules
+    assert "NrdrSuggestedSettings" in rules
+    assert "NrdrHandcraftedLateralTune" in rules
 
 
 class TestLiveLaneCentering(OpenpilotTestCase):
