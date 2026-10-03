@@ -16,11 +16,15 @@ def build() -> None:
   if AGNOS:
     os.sched_setaffinity(0, range(8))  # ensure we can use the isolcpus cores
 
-  # building with all cores can result in using too much memory, so retry serially
+  # A clean AGNOS build of the parameter registry can exhaust RAM even with a
+  # single compiler when full debug information is enabled. Use the same
+  # low-memory flags as device validation, including on the first boot after an
+  # updater checkout has removed the prebuilt artifacts. Keep desktop retries.
+  build_attempts = (("-j1", "--ccflags=-g0"),) if AGNOS else ((), ("-j4",), ("-j1",))
   compile_output: list[bytes] = []
-  for parallelism in ([], ["-j4"], ["-j1"]):
+  for flags in build_attempts:
     compile_output.clear()
-    with subprocess.Popen(["scons", *parallelism], cwd=BASEDIR, env={**os.environ, "PWD": BASEDIR}, stderr=subprocess.PIPE) as scons:
+    with subprocess.Popen(["scons", *flags], cwd=BASEDIR, env={**os.environ, "PWD": BASEDIR}, stderr=subprocess.PIPE) as scons:
       assert scons.stderr is not None
 
       # Read progress from stderr and update spinner
