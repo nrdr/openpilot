@@ -11,6 +11,7 @@ from openpilot.cereal import log
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
 from openpilot.nrdr.features.lateral.vfn_eps_core import HondaEpsLateralCore
+from openpilot.nrdr.features.lateral.yaw_control_timing import clarity_lateral_delay
 from openpilot.nrdr.features.lateral.vfn_geometry import NRDR_CLARITY_VGR_LINEAR_BP, NRDR_CLARITY_VGR_ANGLE_BP
 from openpilot.nrdr.features.lateral.vfn_rack_map import ClarityRackMap
 from openpilot.nrdr.features.lateral.latcontrol_pid import _eps_modified_steering_pressed
@@ -21,10 +22,6 @@ GAIN_BP = [0.0, 11.175, 11.176, 22.352]
 KP = [0.018, 0.024, 0.048, 0.060]
 KI = [0.006, 0.008, 0.016, 0.020]
 ANGLE_RATE_LIMIT = 300.0
-
-
-def clarity_lateral_delay(speed: float) -> float:
-  return float(np.interp(speed, [3.5, 7.0, 12.0, 20.0, 30.0], [0.12, 0.12, 0.15, 0.20, 0.30]))
 
 
 class LatControlVfnEps(LatControl):
