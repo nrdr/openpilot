@@ -11,6 +11,7 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
   "NrdrStandstillGapExtra",
   "NrdrSuggestedSettings",
   "NrdrLateralController",
+  "NrdrYawDelaySchedule",  # modeld/controlsd latch this together at onroad start
 ))
 
 # These controls are surfaced only for an exact, confirmed Honda CP. Keeping

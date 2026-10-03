@@ -251,6 +251,11 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("HondaVEgoStopping", ParamType.FLOAT, PB, "0.5", owner=ParamOwner.HONDA),
   _added("HondaVEgoStarting", ParamType.FLOAT, PB, "0.5", owner=ParamOwner.HONDA),
   _added("HondaCivicRadarTryout", ParamType.BOOL, PB, "0", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),
+  # Yaw Control timing. The schedule toggle is read once per
+  # onroad start by modeld and controlsd; command delays are live, in seconds.
+  _added("NrdrYawDelaySchedule", ParamType.BOOL, PB, "1", owner=ParamOwner.LATERAL),
+  _added("NrdrYawCommandDelayLow", ParamType.FLOAT, PB, "0.145", owner=ParamOwner.LATERAL),
+  _added("NrdrYawCommandDelayHigh", ParamType.FLOAT, PB, "0.025", owner=ParamOwner.LATERAL),
 )
 
 

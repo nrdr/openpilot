@@ -88,6 +88,7 @@ CONTROL_GROUPS = (
   ParamGroup(("NrdrLearnStiffness", "NrdrLearnAngleOffset")),
   LANE_CENTERING_PARAM_GROUP,
   ParamGroup(("LagdToggle", "LagdToggleDelay")),
+  ParamGroup(("NrdrYawCommandDelayLow", "NrdrYawCommandDelayHigh")),
 )
 
 # Exclude longitudinal tuning and learner maintenance from the steering-output

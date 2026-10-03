@@ -90,6 +90,7 @@ HOOK_AND_UI_CONSUMERS = {
   "openpilot/selfdrive/controls/controlsd.py": ("openpilot.nrdr.hooks",),
   "openpilot/selfdrive/controls/lib/desire_helper.py": ("openpilot.nrdr.features.driver_policy",),
   "openpilot/selfdrive/controls/lib/latcontrol_torque.py": ("openpilot.nrdr.features.driver_policy",),
+  "openpilot/selfdrive/modeld/modeld.py": ("openpilot.nrdr.hooks",),
   "openpilot/selfdrive/monitoring/policy.py": ("openpilot.nrdr.hooks",),
   "openpilot/selfdrive/selfdrived/selfdrived.py": ("openpilot.nrdr.hooks",),
   "openpilot/selfdrive/ui/sunnypilot/layouts/settings/cruise.py": ("openpilot.nrdr.ui",),
@@ -98,6 +99,7 @@ HOOK_AND_UI_CONSUMERS = {
   "openpilot/selfdrive/ui/sunnypilot/layouts/settings/visuals.py": ("openpilot.nrdr.ui",),
   "openpilot/sunnypilot/mads/mads.py": ("openpilot.nrdr.features.driver_policy", "openpilot.nrdr.hooks"),
   "openpilot/sunnypilot/mads/state.py": ("openpilot.nrdr.hooks",),
+  "openpilot/sunnypilot/modeld_v2/modeld.py": ("openpilot.nrdr.hooks",),
   "openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py": ("openpilot.nrdr.hooks",),
   "openpilot/sunnypilot/selfdrive/selfdrived/events.py": ("openpilot.nrdr.hooks",),
 }
@@ -107,6 +109,7 @@ CANONICAL_HOOK_AND_UI_MODULES = (
   "openpilot/nrdr/hooks/driver_monitoring.py",
   "openpilot/nrdr/hooks/events.py",
   "openpilot/nrdr/hooks/events_sp.py",
+  "openpilot/nrdr/hooks/modeld.py",
   "openpilot/nrdr/hooks/selfdrived.py",
   "openpilot/nrdr/ui/settings_policy.py",
 )

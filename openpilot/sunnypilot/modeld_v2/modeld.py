@@ -51,6 +51,7 @@ from openpilot.sunnypilot.modeld_v2.compile_modeld import (derive_frame_skip, ma
                                                            make_supercombo_input_queues, nv12_copy_size,
                                                            WARP_INPUTS, POLICY_INPUTS)
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
+from openpilot.nrdr.hooks import model_lateral_delay_schedule
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.modeld_v2.helpers import load_oob
 from openpilot.sunnypilot.models.helpers import get_active_bundle
@@ -415,6 +416,7 @@ def main(demo=False):
     CP = messaging.log_from_bytes(params.get("CarParams", block=True), car.CarParams)
   cloudlog.info("modeld got CarParams: %s", CP.brand)
   model.lat_delay = get_lat_delay(params, model.lat_delay, CP.steerActuatorDelay)
+  lat_delay_schedule = model_lateral_delay_schedule(params, CP)
 
   # TODO Move smooth seconds to action function
   long_delay = CP.longitudinalActuatorDelay + model.LONG_SMOOTH_SECONDS
@@ -462,7 +464,9 @@ def main(demo=False):
     is_rhd = sm["driverMonitoringState"].isRHD
     frame_id = sm["narrowRoadCameraState"].frameId
     v_ego = max(sm["carState"].vEgo, 0.)
-    if sm.updated["lateralDelay"]:
+    if lat_delay_schedule is not None:
+      model.lat_delay = lat_delay_schedule(v_ego)
+    elif sm.updated["lateralDelay"]:
       model.lat_delay = get_lat_delay(params, sm["lateralDelay"].lateralDelay, CP.steerActuatorDelay)
     if sm.frame % 60 == 0:
       model.PLANPLUS_CONTROL = params.get("PlanplusControl", return_default=True)
