@@ -902,6 +902,15 @@ struct ControlsState @0x97ff69c53601abf1 {
     output @7 :Float32;
     saturated @8 :Bool;
     steeringAngleDesiredDeg @9 :Float32;
+
+    # NRDR Yaw Control (EPS firmware-inversion feedforward) telemetry; zero for other controllers.
+    epsFfActive @10 :Bool;
+    epsFfFeedforward @11 :Float32;   # lateral output ([-1, 1]) of the feedforward at full weight
+    epsFfR5 @12 :Float32;            # EPS firmware target counts it asks for
+    epsFfLoad @13 :Float32;          # firmware output counts the column load model says the motion needs
+    epsFfDesiredRate @14 :Float32;   # deg/s, filtered desired steering-wheel rate it used
+    epsFfWeight @15 :Float32;        # 0..1 fade-in; the command carries epsFfWeight * epsFfFeedforward
+    commandDelay @16 :Float32;       # s, delay applied to desiredCurvature before the controller
    }
 
   struct LateralTorqueState {

@@ -50,7 +50,8 @@ class ControlsExt(ModelStateBase):
     from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
     if self.params.get("NrdrLateralController") == 1 and yaw_controller_available(self.CP, self.CP_SP):
       from openpilot.nrdr.features.lateral.latcontrol_vfn_eps import LatControlVfnEps
-      return LatControlVfnEps(self.CP, self.CP_SP, CI, dt)
+      from openpilot.nrdr.features.lateral.yaw_control_timing import delay_schedule_enabled
+      return LatControlVfnEps(self.CP, self.CP_SP, CI, dt, delay_schedule=delay_schedule_enabled(self.params))
     enforce_torque_control = self.params.get_bool("EnforceTorqueControl")
     torque_versions = self.params.get("TorqueControlTune")
     if not enforce_torque_control:

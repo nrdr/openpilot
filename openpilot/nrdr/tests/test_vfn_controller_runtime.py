@@ -75,8 +75,12 @@ def test_custom_pif_geometry_and_filter_settings_do_not_retune_vfn():
     assert tick(custom, desired=desired)[0] == pytest.approx(tick(baseline, desired=desired)[0])
 
 
+NO_COMMAND_DELAY = ParamSnapshot(1, {"NrdrYawCommandDelayLow": 0.0, "NrdrYawCommandDelayHigh": 0.0})
+
+
 def test_inactive_control_resets_and_reengagement_limits_requested_angle_rate():
   control = controller()
+  control.set_live_tuning_snapshot(NO_COMMAND_DELAY)
   for _ in range(100):
     tick(control)
   output, previous, logged = tick(control, active=False)
@@ -92,3 +96,47 @@ def test_lane_change_shaping_reduces_request_without_reversing_it(curvature):
   shaped = control.shape_lane_change_request(15., 15., .01, curvature, 5.)
   assert min(0., curvature) <= shaped <= max(0., curvature)
   assert abs(shaped) < abs(curvature)
+
+
+@pytest.mark.parametrize("speed, delay", [(5., .145), (12.5, .085), (20., .025)])
+def test_default_command_delay_holds_the_request_back_on_speed(speed, delay):
+  control = controller()
+  for _ in range(50):
+    tick(control, speed=speed, desired=0.)
+  frames = 0
+  while tick(control, speed=speed, desired=10.)[1] < 9.999:
+    frames += 1
+  # The rate limit takes 4 frames to reach 10 deg; the rest is the delay line.
+  assert frames - 3 == pytest.approx(delay / .01, abs=1.)
+  assert control.update(True, SimpleNamespace(vEgo=speed, steeringAngleDeg=0., steeringRateDeg=0., steeringPressed=False,
+                                              steeringTorque=0.), None, SimpleNamespace(roll=0., angleOffsetDeg=0.),
+                        False, 0., None, False, .2)[2].commandDelay == pytest.approx(delay)
+
+
+def test_command_delay_settings_are_live_and_zero_passes_through():
+  delayed, direct = controller(), controller()
+  direct.set_live_tuning_snapshot(NO_COMMAND_DELAY)
+  for _ in range(50):
+    tick(delayed, speed=5., desired=0.)
+    tick(direct, speed=5., desired=0.)
+  assert tick(direct, speed=5., desired=1.)[1] == pytest.approx(1.)
+  assert tick(delayed, speed=5., desired=1.)[1] == pytest.approx(0.)
+
+
+def test_lateral_delay_follows_the_startup_schedule_setting():
+  scheduled, unscheduled = controller(), LatControlVfnEps(*car(), None, .01, delay_schedule=False)
+  assert scheduled.lateral_delay(5.25, .4) == pytest.approx(.115)
+  assert unscheduled.lateral_delay(5.25, .4) == .4
+  assert unscheduled.lateral_delay(5.25) == pytest.approx(.115)
+
+
+def test_feedforward_telemetry_is_logged_on_the_pid_state():
+  control = controller()
+  for _ in range(100):
+    _, _, logged = tick(control, angle=0.)
+  assert logged.epsFfActive
+  assert logged.epsFfWeight == pytest.approx(control.core.ff_weight)
+  assert logged.epsFfFeedforward == pytest.approx(control.core.ff.output) and logged.epsFfFeedforward != 0.
+  assert logged.epsFfR5 == pytest.approx(control.core.ff.r5)
+  assert logged.epsFfLoad == pytest.approx(control.core.ff.load)
+  assert logged.epsFfDesiredRate == pytest.approx(control.core.ff.rate)
