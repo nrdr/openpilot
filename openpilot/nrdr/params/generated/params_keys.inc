@@ -146,3 +146,6 @@
     {"HondaVEgoStopping", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
     {"HondaVEgoStarting", {PERSISTENT | BACKUP, FLOAT, "0.5"}},
     {"HondaCivicRadarTryout", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrYawDelaySchedule", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrYawCommandDelayLow", {PERSISTENT | BACKUP, FLOAT, "0.145"}},
+    {"NrdrYawCommandDelayHigh", {PERSISTENT | BACKUP, FLOAT, "0.025"}},

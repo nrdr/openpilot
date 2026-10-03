@@ -1,8 +1,10 @@
 """SunnyPilot shell for VFN's f837ca86 Clarity EPS controller.
 
-Uses the source controller's fixed gains, yaw-calibrated rack map, delay schedule
-and output filter. NRDR's other lateral tuning does not change this controller.
-Optimized lane changes are the explicit owner-requested exception.
+Uses the source controller's fixed gains, yaw-calibrated rack map, delay schedule,
+command delay and output filter. NRDR's other lateral tuning does not change this
+controller. Optimized lane changes are the explicit owner-requested exception, and
+the command delay ends (NrdrYawCommandDelayLow/High) are settings because they
+depend on how the driving model aims its action.
 """
 import math
 import numpy as np
@@ -11,6 +13,7 @@ from openpilot.cereal import log
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
 from openpilot.nrdr.features.lateral.vfn_eps_core import HondaEpsLateralCore
+from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, clarity_lateral_delay, command_delay
 from openpilot.nrdr.features.lateral.vfn_geometry import NRDR_CLARITY_VGR_LINEAR_BP, NRDR_CLARITY_VGR_ANGLE_BP
 from openpilot.nrdr.features.lateral.vfn_rack_map import ClarityRackMap
 from openpilot.nrdr.features.lateral.latcontrol_pid import _eps_modified_steering_pressed
@@ -23,19 +26,17 @@ KI = [0.006, 0.008, 0.016, 0.020]
 ANGLE_RATE_LIMIT = 300.0
 
 
-def clarity_lateral_delay(speed: float) -> float:
-  return float(np.interp(speed, [3.5, 7.0, 12.0, 20.0, 30.0], [0.12, 0.12, 0.15, 0.20, 0.30]))
-
-
 class LatControlVfnEps(LatControl):
   owns_output_filter = True
 
-  def __init__(self, CP, CP_SP, CI, dt):
+  def __init__(self, CP, CP_SP, CI, dt, delay_schedule=True):
     if not yaw_controller_available(CP, CP_SP) or CP.lateralTuning.which() != "pid":
       raise ValueError("VFN EPS control requires modified Clarity A020 with PID CarParams")
     super().__init__(CP, CP_SP, CI, dt)
     self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt)
     self.rack_map = ClarityRackMap(CP.wheelbase, (NRDR_CLARITY_VGR_LINEAR_BP, NRDR_CLARITY_VGR_ANGLE_BP))
+    self.delay_schedule = bool(delay_schedule)
+    self.cmd_delay = CommandDelay(dt)
     self.model_v2 = None
     self.prev_angle = 0.0
     self.pressed_duration = 0.0
@@ -44,8 +45,11 @@ class LatControlVfnEps(LatControl):
   def update_model_v2(self, model_v2):
     self.model_v2 = model_v2
 
-  def lateral_delay(self, speed):
-    return clarity_lateral_delay(speed)
+  def lateral_delay(self, speed, fallback=None):
+    # Matches what modeld tells the model (hooks.modeld); both latch the setting at onroad start.
+    if self.delay_schedule or fallback is None:
+      return clarity_lateral_delay(speed)
+    return fallback
 
   def measured_curvature(self, angle, speed, roll):
     return self.rack_map.curvature_from_angle(angle, speed, roll)
@@ -75,6 +79,8 @@ class LatControlVfnEps(LatControl):
     pid_log = log.ControlsState.LateralPIDState.new_message()
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
+    delay = command_delay(self.live_tuning_snapshot, CS.vEgo)
+    desired_curvature = self.cmd_delay.update(desired_curvature, delay)
     desired = self.rack_map.angle_from_curvature(desired_curvature, CS.vEgo, params.roll)
     if active:
       step = ANGLE_RATE_LIMIT * self.dt
@@ -101,6 +107,14 @@ class LatControlVfnEps(LatControl):
       pid_log.f = float(self.core.pid.f)
       pid_log.saturated = bool(self._check_saturation(
         self.steer_max - abs(output) < 1e-3, CS, steer_limited_by_safety, curvature_limited))
+    ff = self.core.ff
+    pid_log.epsFfActive = bool(active)
+    pid_log.epsFfWeight = float(self.core.ff_weight)
+    pid_log.epsFfFeedforward = float(ff.output)
+    pid_log.epsFfR5 = float(ff.r5)
+    pid_log.epsFfLoad = float(ff.load)
+    pid_log.epsFfDesiredRate = float(ff.rate)
+    pid_log.commandDelay = float(delay)
     pid_log.active = bool(active)
     pid_log.output = output
     return output, angle, pid_log

@@ -152,6 +152,9 @@ class NrdrParamKey(StrEnum):
   HONDA_V_EGO_STOPPING = "HondaVEgoStopping"
   HONDA_V_EGO_STARTING = "HondaVEgoStarting"
   HONDA_CIVIC_RADAR_TRYOUT = "HondaCivicRadarTryout"
+  NRDR_YAW_DELAY_SCHEDULE = "NrdrYawDelaySchedule"
+  NRDR_YAW_COMMAND_DELAY_LOW = "NrdrYawCommandDelayLow"
+  NRDR_YAW_COMMAND_DELAY_HIGH = "NrdrYawCommandDelayHigh"
 
 
 ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
@@ -302,6 +305,9 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.HONDA_V_EGO_STOPPING,
   NrdrParamKey.HONDA_V_EGO_STARTING,
   NrdrParamKey.HONDA_CIVIC_RADAR_TRYOUT,
+  NrdrParamKey.NRDR_YAW_DELAY_SCHEDULE,
+  NrdrParamKey.NRDR_YAW_COMMAND_DELAY_LOW,
+  NrdrParamKey.NRDR_YAW_COMMAND_DELAY_HIGH,
 ))
 
 OVERRIDDEN_KEYS: frozenset[NrdrParamKey] = frozenset((

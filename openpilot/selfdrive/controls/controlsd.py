@@ -115,7 +115,7 @@ class Controls(ControlsExt):
     self.curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
     if hasattr(self.LaC, "measured_curvature"):
       self.curvature = self.LaC.measured_curvature(CS.steeringAngleDeg - lp.angleOffsetDeg, CS.vEgo, lp.roll)
-      self.lat_delay = self.LaC.lateral_delay(CS.vEgo)
+      self.lat_delay = self.LaC.lateral_delay(CS.vEgo, self.lat_delay)
 
     # Update Torque Params
     if self.CP.lateralTuning.which() == 'torque':
