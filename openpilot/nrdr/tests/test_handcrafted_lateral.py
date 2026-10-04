@@ -169,14 +169,14 @@ def pending_params(values=None, **kwargs):
   }, **kwargs)
 
 
-def test_profiles_are_fingerprint_scoped_and_current_version_is_v21():
+def test_profiles_are_fingerprint_scoped_and_current_version_is_v22():
   assert HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS == EXPECTED_FINGERPRINTS
   assert tuple(HANDCRAFTED_LATERAL_PROFILES) == EXPECTED_FINGERPRINTS
-  assert get_handcrafted_lateral_profile("HONDA_CLARITY").version == 21
+  assert get_handcrafted_lateral_profile("HONDA_CLARITY").version == 22
   for fingerprint in EXPECTED_FINGERPRINTS:
     profile = get_handcrafted_lateral_profile(fingerprint)
     assert profile.fingerprint == fingerprint
-    assert profile.version == 21
+    assert profile.version == 22
     assert len(profile.values) == len(dict(profile.values))
   assert get_handcrafted_lateral_profile("HONDA_CIVIC_2022") is None
 
@@ -604,7 +604,7 @@ def test_pending_or_unavailable_status_preserves_any_prior_success_marker():
   assert handcrafted_lateral_profile_status(clarity_cp(firmware=False), clarity_cp_sp(), params).startswith(old_marker)
 
 
-def test_prior_success_marker_is_preserved_until_v21_is_applied():
+def test_prior_success_marker_is_preserved_until_v22_is_applied():
   old_marker = "Last applied: Honda Clarity Current Lateral 2026-08-28 (v16) [HONDA_CLARITY]"
   params = pending_params({
     "NrdrHandcraftedLateralTune": False,
@@ -612,7 +612,7 @@ def test_prior_success_marker_is_preserved_until_v21_is_applied():
   })
 
   assert handcrafted_lateral_profile_status(clarity_cp(), clarity_cp_sp(), params) == \
-    f"{old_marker} | current profile v21 not applied"
+    f"{old_marker} | current profile v22 not applied"
 
 
 def test_native_apply_callback_is_a_durable_blocking_command():
