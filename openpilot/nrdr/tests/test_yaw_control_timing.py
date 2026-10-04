@@ -1,17 +1,16 @@
-"""Yaw Control timing: model delay schedule, command delay, and the modeld seam."""
+"""Yaw command timing stays separate from shared live/manual model delay."""
 import math
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
-from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.nrdr.features.lateral import yaw_control_timing as timing
-from openpilot.nrdr.hooks.modeld import model_lateral_delay_schedule
 from openpilot.nrdr.params.snapshots import ParamSnapshot
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 
 
-def test_schedule_is_the_refit_table():
+def test_reference_schedule_is_the_refit_table():
   assert [timing.clarity_lateral_delay(v) for v in (0., 3.5, 7., 12., 20., 30., 40.)] == \
     pytest.approx([.15, .15, .08, .10, .20, .30, .30])
 
@@ -39,72 +38,47 @@ def test_delay_line_interpolates_between_samples_and_never_runs_out():
   assert len(line.buf) == line.buf.maxlen == 32
 
 
-class Params:
-  def __init__(self, values):
-    self.values = values
-    self.reads = []
-
-  def get(self, key, block=False):
-    self.reads.append(key)
-    return self.values.get(key)
-
-
-def car(fingerprint="HONDA_CLARITY", firmware=b"39990-TRW-A020"):
-  return SimpleNamespace(brand="honda", carFingerprint=fingerprint,
-                         carFw=[SimpleNamespace(ecu="eps", fwVersion=firmware)],
-                         lateralTuning=SimpleNamespace(which=lambda: "pid"))
+@pytest.mark.parametrize("controller", [0, 1])
+@pytest.mark.parametrize("legacy_schedule", [False, True])
+@pytest.mark.parametrize("live", [False, True])
+def test_delay_selection_is_independent_of_controller_and_retired_override(controller, legacy_schedule, live):
+  values = {"NrdrLateralController": controller, "NrdrYawDelaySchedule": legacy_schedule,
+            "LagdToggle": live, "LagdToggleDelay": .3}
+  settings = ParamSnapshot(1, values)
+  assert get_lat_delay(settings, .8, .2) == pytest.approx(.8 if live else .5)
+  assert settings.values == values
 
 
-@pytest.fixture
-def car_params_sp(monkeypatch):
-  import openpilot.cereal.messaging as messaging
-  monkeypatch.setattr(messaging, "log_from_bytes", lambda data, _: SimpleNamespace(flags=data))
-  return HondaFlagsSP.EPS_MODIFIED.value
+def test_manual_delay_edit_changes_total_delay_without_touching_command_delay():
+  values = {"NrdrLateralController": 1, "NrdrYawDelaySchedule": True,
+            "LagdToggle": False, "LagdToggleDelay": .4}
+  before = ParamSnapshot(1, values)
+  after = ParamSnapshot(2, {**values, "LagdToggleDelay": .3})
+  assert get_lat_delay(before, .8, .2) - get_lat_delay(after, .8, .2) == pytest.approx(.1)
+  for speed in (5., 12.5, 30.):
+    assert timing.command_delay(before, speed) == timing.command_delay(after, speed)
 
 
-def test_modeld_uses_the_schedule_only_for_selected_yaw_control(car_params_sp):
-  params = Params({"NrdrLateralController": 1, "CarParamsSP": car_params_sp})
-  assert model_lateral_delay_schedule(params, car()) is timing.clarity_lateral_delay
-  assert model_lateral_delay_schedule(Params({**params.values, "NrdrYawDelaySchedule": False}), car()) is None
-  assert model_lateral_delay_schedule(Params({**params.values, "NrdrLateralController": 0}), car()) is None
-  assert model_lateral_delay_schedule(Params({**params.values, "CarParamsSP": 0}), car()) is None
-  assert model_lateral_delay_schedule(params, car(firmware=b"39990-TRW-A010")) is None
+def test_live_toggle_preserves_manual_value_for_return_to_manual():
+  manual = ParamSnapshot(1, {"NrdrLateralController": 1, "LagdToggle": False, "LagdToggleDelay": .3})
+  live = ParamSnapshot(2, {**manual.values, "LagdToggle": True})
+  assert get_lat_delay(manual, .8, .2) == pytest.approx(.5)
+  assert get_lat_delay(live, .8, .2) == pytest.approx(.8)
+  assert live.get("LagdToggleDelay") == manual.get("LagdToggleDelay") == .3
+  assert get_lat_delay(manual, .8, .2) == pytest.approx(.5)
 
 
-def test_modeld_never_waits_for_car_params_sp_on_other_cars():
-  params = Params({"NrdrLateralController": 1})
-  assert model_lateral_delay_schedule(params, car(fingerprint="HONDA_CIVIC")) is None
-  assert model_lateral_delay_schedule(params, SimpleNamespace(brand="toyota", carFingerprint="TOYOTA_RAV4",
-                                                              lateralTuning=SimpleNamespace(which=lambda: "torque"))) is None
-  assert "CarParamsSP" not in params.reads
+def test_retired_override_cannot_be_written():
+  assert not tuning_write_allowed(ParamSnapshot(1, {}), "NrdrYawDelaySchedule")
 
 
-@pytest.mark.parametrize("selection", [None, 0, 2])
-def test_pif_or_invalid_selection_does_not_read_timing_or_wait_for_sp(selection):
-  params = Params({"NrdrLateralController": selection})
-  assert model_lateral_delay_schedule(params, car()) is None
-  assert params.reads == ["NrdrLateralController"]
-
-
-def test_schedule_selection_is_latched_not_a_live_param_reader(car_params_sp):
-  params = Params({"NrdrLateralController": 1, "CarParamsSP": car_params_sp})
-  schedule = model_lateral_delay_schedule(params, car())
-  params.values["NrdrYawDelaySchedule"] = False
-  params.reads.clear()
-  assert schedule(7.) == pytest.approx(.08)
-  assert not params.reads
-  assert model_lateral_delay_schedule(params, car()) is None
-
-
-def test_startup_only_schedule_cannot_be_changed_remotely_onroad():
-  from openpilot.nrdr.features.services.sunnylink import allow_param_write
-  assert not allow_param_write("NrdrYawDelaySchedule", onroad=True)
-  assert allow_param_write("NrdrYawDelaySchedule", onroad=False)
-
-
-def test_both_model_runtimes_apply_schedule_before_falling_back_to_lagd():
+def test_model_and_controls_runtimes_keep_shared_delay_wiring():
   root = Path(__file__).resolve().parents[2]
   for relative in ("selfdrive/modeld/modeld.py", "sunnypilot/modeld_v2/modeld.py"):
     source = (root / relative).read_text()
-    assert source.count("lat_delay_schedule = model_lateral_delay_schedule(params, CP)") == 1
-    assert 'if lat_delay_schedule is not None:\n      model.lat_delay = lat_delay_schedule(v_ego)\n    elif sm.updated["lateralDelay"]:' in source
+    assert "model_lateral_delay_schedule" not in source
+    assert 'if sm.updated["lateralDelay"]:\n      model.lat_delay = get_lat_delay(params,' in source
+  source = (root / "selfdrive/controls/controlsd.py").read_text()
+  assert "get_lat_delay(self.nrdr_lateral_snapshot," in source
+  assert "LaC.lateral_delay" not in source
+  assert "LaC.measured_curvature" not in source

@@ -16,7 +16,6 @@ if TYPE_CHECKING:
   from openpilot.nrdr.hooks.driver_monitoring import apply_driver_monitoring_policy
   from openpilot.nrdr.hooks.events import allow_longitudinal, filter_car_events, is_drivable_gear, keep_lateral_active
   from openpilot.nrdr.hooks.events_sp import apply_events, speed_limit_pre_active_alert
-  from openpilot.nrdr.hooks.modeld import model_lateral_delay_schedule
   from openpilot.nrdr.hooks.selfdrived import NrdrSelfdrive
 
 
@@ -31,7 +30,6 @@ __all__ = (
   "initialize_live_parameter_settings",
   "is_drivable_gear",
   "keep_lateral_active",
-  "model_lateral_delay_schedule",
   "refresh_live_parameter_settings",
   "speed_limit_pre_active_alert",
   "stopping_inputs",
@@ -53,7 +51,6 @@ _EXPORT_MODULES = {
   "keep_lateral_active": "openpilot.nrdr.hooks.events",
   "apply_events": "openpilot.nrdr.hooks.events_sp",
   "speed_limit_pre_active_alert": "openpilot.nrdr.hooks.events_sp",
-  "model_lateral_delay_schedule": "openpilot.nrdr.hooks.modeld",
   "NrdrSelfdrive": "openpilot.nrdr.hooks.selfdrived",
 }
 

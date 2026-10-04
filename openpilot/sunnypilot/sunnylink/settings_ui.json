@@ -1492,14 +1492,6 @@
                         "key": "NrdrHandcraftedLateralTune",
                         "equals": true
                       }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
-                      }
                     }
                   ]
                 },
@@ -1564,14 +1556,6 @@
                         "key": "NrdrHandcraftedLateralTune",
                         "equals": true
                       }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
-                      }
                     }
                   ]
                 },
@@ -1604,14 +1588,6 @@
                         "type": "param",
                         "key": "NrdrHandcraftedLateralTune",
                         "equals": true
-                      }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
                       }
                     }
                   ]
@@ -1681,14 +1657,6 @@
                         "key": "NrdrHandcraftedLateralTune",
                         "equals": true
                       }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
-                      }
                     }
                   ]
                 },
@@ -1745,14 +1713,6 @@
                         "type": "param",
                         "key": "NrdrHandcraftedLateralTune",
                         "equals": true
-                      }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
                       }
                     }
                   ]
@@ -1811,14 +1771,6 @@
                         "type": "param",
                         "key": "NrdrHandcraftedLateralTune",
                         "equals": true
-                      }
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
                       }
                     }
                   ]
@@ -4237,14 +4189,6 @@
                     "key": "NrdrHandcraftedLateralTune",
                     "equals": true
                   }
-                },
-                {
-                  "type": "not",
-                  "condition": {
-                    "type": "param",
-                    "key": "NrdrLateralController",
-                    "equals": 1
-                  }
                 }
               ]
             },
@@ -4285,14 +4229,6 @@
                     "type": "param",
                     "key": "NrdrHandcraftedLateralTune",
                     "equals": true
-                  }
-                },
-                {
-                  "type": "not",
-                  "condition": {
-                    "type": "param",
-                    "key": "NrdrLateralController",
-                    "equals": 1
                   }
                 }
               ]

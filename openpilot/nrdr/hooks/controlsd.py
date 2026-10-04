@@ -148,9 +148,6 @@ def lane_change_request(controls, CS, model, live_params, desired_curvature: flo
     controls.steer_ratio_latch.selection, controls.VM, CS.steeringAngleDeg, CS.vEgo, live_params.roll,
     desired_curvature, reduction,
   )
-  if hasattr(controls.LaC, "shape_lane_change_request"):
-    shaped_curvature = controls.LaC.shape_lane_change_request(
-      CS.steeringAngleDeg, CS.vEgo, live_params.roll, desired_curvature, reduction)
   # Queue consumed settings and command telemetry, never disk I/O in the control loop.
   entry = controls.nrdr_lane_change_entry
   signature = (entry.was_starting, entry.reduction, entry.return_seconds, entry.direction, enabled, reduction > 0.0)

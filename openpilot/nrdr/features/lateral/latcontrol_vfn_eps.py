@@ -1,21 +1,18 @@
 """SunnyPilot shell for VFN's f837ca86 Clarity EPS controller, with PR #18 timing.
 
-Uses the source controller's fixed gains, yaw-calibrated rack map, delay schedule,
-command delay and output filter. NRDR's other lateral tuning does not change this
-controller. Optimized lane changes are the explicit owner-requested exception, and
-the command delay ends (NrdrYawCommandDelayLow/High) are settings because they
-depend on how the driving model aims its action.
+Uses the source controller's fixed gains, firmware-inversion feedforward, command
+delay and output filter. Geometry is supplied by the shared steer-ratio selection,
+just as for PIF; choosing this controller must not replace the user's ratio choice.
+Optimized lane changes remain an explicit owner-requested adaptation. The command
+delay ends (NrdrYawCommandDelayLow/High) depend on how the driving model aims its action.
 """
-import math
 import numpy as np
 
 from openpilot.cereal import log
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
 from openpilot.nrdr.features.lateral.vfn_eps_core import HondaEpsLateralCore
-from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, clarity_lateral_delay, command_delay
-from openpilot.nrdr.features.lateral.vfn_geometry import NRDR_CLARITY_VGR_LINEAR_BP, NRDR_CLARITY_VGR_ANGLE_BP
-from openpilot.nrdr.features.lateral.vfn_rack_map import ClarityRackMap
+from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, command_delay
 from openpilot.nrdr.features.lateral.latcontrol_pid import _eps_modified_steering_pressed
 from openpilot.nrdr.features.lateral.lane_change_tuning import optimized_lane_change_active
 
@@ -29,13 +26,11 @@ ANGLE_RATE_LIMIT = 300.0
 class LatControlVfnEps(LatControl):
   owns_output_filter = True
 
-  def __init__(self, CP, CP_SP, CI, dt, delay_schedule=True):
+  def __init__(self, CP, CP_SP, CI, dt):
     if not yaw_controller_available(CP, CP_SP) or CP.lateralTuning.which() != "pid":
       raise ValueError("VFN EPS control requires modified Clarity A020 with PID CarParams")
     super().__init__(CP, CP_SP, CI, dt)
     self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt)
-    self.rack_map = ClarityRackMap(CP.wheelbase, (NRDR_CLARITY_VGR_LINEAR_BP, NRDR_CLARITY_VGR_ANGLE_BP))
-    self.delay_schedule = bool(delay_schedule)
     self.cmd_delay = CommandDelay(dt)
     self.model_v2 = None
     self.prev_angle = 0.0
@@ -44,29 +39,6 @@ class LatControlVfnEps(LatControl):
 
   def update_model_v2(self, model_v2):
     self.model_v2 = model_v2
-
-  def lateral_delay(self, speed, fallback=None):
-    # Matches what modeld tells the model (hooks.modeld); both latch the setting at onroad start.
-    if self.delay_schedule or fallback is None:
-      return clarity_lateral_delay(speed)
-    return fallback
-
-  def measured_curvature(self, angle, speed, roll):
-    return self.rack_map.curvature_from_angle(angle, speed, roll)
-
-  def shape_lane_change_request(self, angle, speed, roll, curvature, reduction):
-    # Same command-only reduction as PIF, evaluated in this controller's own
-    # rack coordinates, before controlsd's unchanged curvature safety limits.
-    if reduction <= 0.0 or not all(math.isfinite(v) for v in (angle, speed, roll, curvature, reduction)):
-      return curvature
-    zero = self.rack_map.angle_from_curvature(0.0, speed, roll)
-    target = self.rack_map.angle_from_curvature(curvature, speed, roll)
-    reference = max(abs(angle), 0.01)
-    ref_curve = abs(self.rack_map.curvature_from_angle(reference, 0.0, 0.0))
-    ratio = math.radians(reference) / max(ref_curve * self.rack_map.wheelbase, 1e-9)
-    scale = 1.0 - min(reduction, 5.0, max(0.0, ratio - 1.0)) / ratio
-    result = self.rack_map.curvature_from_angle(zero + scale * (target - zero), speed, roll)
-    return float(np.clip(result, min(0.0, curvature), max(0.0, curvature)))
 
   def reset(self):
     super().reset()
@@ -81,7 +53,8 @@ class LatControlVfnEps(LatControl):
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
     delay = command_delay(self.live_tuning_snapshot, CS.vEgo)
     desired_curvature = self.cmd_delay.update(desired_curvature, delay)
-    desired = self.rack_map.angle_from_curvature(desired_curvature, CS.vEgo, params.roll)
+    desired = self.steer_ratio_selection.desired_angle_no_offset(
+      VM, CS.steeringAngleDeg, CS.vEgo, params.roll, desired_curvature)
     if active:
       step = ANGLE_RATE_LIMIT * self.dt
       desired = float(np.clip(desired, self.prev_angle - step, self.prev_angle + step))

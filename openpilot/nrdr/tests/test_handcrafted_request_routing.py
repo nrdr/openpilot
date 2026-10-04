@@ -144,6 +144,23 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
         self.save_params({key: self._encode(b"0")})
         self.generic_write.assert_not_called()
 
+  def test_shared_geometry_and_delay_writes_are_not_blocked_by_yaw_controller(self):
+    self.namespace["_vehicle_tuning_capabilities"].return_value = {
+      "nrdr_honda_tuning_available": True,
+    }
+    for suggested in (False, True):
+      values = {"NrdrLateralController": 1, "NrdrSuggestedSettings": suggested}
+      self.params.get.side_effect = lambda name, **_: values.get(name, "0")
+      for key, raw in (("NrdrSteerRatioMode", b"2"), ("LagdToggle", b"0"), ("LagdToggleDelay", b"0.3")):
+        with self.subTest(suggested=suggested, key=key):
+          self.generic_write.reset_mock()
+          value = self._encode(raw)
+          self.save_params({key: value})
+          if suggested:
+            self.generic_write.assert_not_called()
+          else:
+            self.generic_write.assert_called_once_with(key, value, False)
+
 
 if __name__ == "__main__":
   unittest.main()

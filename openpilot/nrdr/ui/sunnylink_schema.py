@@ -47,7 +47,7 @@ def apply_sunnylink_metadata(item: dict) -> dict:
     if key in SUGGESTED_LOCK_KEYS or key.startswith(("NrdrSteerRatio", "LaneCenter", "NrdrLatRateDamping")):
       for switch in ("NrdrSuggestedSettings", "NrdrHandcraftedLateralTune"):
         enablement.append({"type": "not", "condition": {"type": "param", "key": switch, "equals": True}})
-    if key in YAW_FIXED_KEYS or key.startswith(("NrdrSteerRatio", "NrdrLatRateDamping")):
+    if key in YAW_FIXED_KEYS or key.startswith("NrdrLatRateDamping"):
       enablement.append({"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 1}})
     if key in LONG_SCALE_KEYS:
       condition = {"type": "not", "condition": {"type": "param", "key": "HondaLiveLearningGas", "equals": True}}

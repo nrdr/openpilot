@@ -1,17 +1,19 @@
-"""Timing for the Clarity Yaw Control: model delay schedule and command delay.
+"""Timing for Clarity Yaw Control: command delay and the reference VFN delay table.
 
 Ported by JamesL787 in nrdr/openpilot PR #18 (ab868ea15561dd65a4bc52199ec11abbbd4bf789),
 from vfn-yaw-trim a434a79b19 (096aedb9 delay refit, 0fb4a6dc command delay).
-Pure functions and a small buffer; settings arrive as a startup value or the controlsd live snapshot.
+The measured table is retained for reference, not selected automatically by the
+controller. modeld/controlsd use the shared live/manual delay settings. Command
+delay is a separate delay line, fed by the controlsd live snapshot.
 """
 from collections import deque
 import math
 
 import numpy as np
 
-from openpilot.nrdr.params import NrdrParamKey, read_bool, read_float
+from openpilot.nrdr.params import NrdrParamKey, read_float
 
-# Lateral delay the model is told in place of lagd/SteerDelay, scheduled on speed. Each value is the
+# Reference lateral delay VFN supplied to the model instead of lagd/SteerDelay. Each value is the
 # measured lag of yaw-sensor curvature behind the logged model action, minus the fixed pipeline offset,
 # so the car reaches the requested curvature when the model intends it to. Refit 2026-10-01 against a
 # per-route gain: 2.5-5 m/s 0.18/0.14, 5-9 m/s 0.08, 9-15 m/s 0.10 s. Above 15 m/s the values sum the
@@ -33,11 +35,6 @@ MAX_COMMAND_DELAY = 0.30  # s
 
 def clarity_lateral_delay(speed: float) -> float:
   return float(np.interp(speed, DELAY_SCHEDULE_BP, DELAY_SCHEDULE_V))
-
-
-def delay_schedule_enabled(settings) -> bool:
-  """Startup-only: modeld and controlsd must agree for the whole onroad session."""
-  return read_bool(settings, NrdrParamKey.NRDR_YAW_DELAY_SCHEDULE, True)
 
 
 def _command_delay_setting(settings, key, default: float) -> float:

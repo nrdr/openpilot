@@ -363,6 +363,7 @@ def test_every_lateral_controller_path_uses_the_shared_selection_api():
     "openpilot/selfdrive/controls/lib/latcontrol_angle.py": ("desired_angle_no_offset",),
     "openpilot/selfdrive/controls/lib/latcontrol_pid.py": ("desired_angle_no_offset",),
     "openpilot/nrdr/features/lateral/latcontrol_pid.py": ("desired_angle_no_offset",),
+    "openpilot/nrdr/features/lateral/latcontrol_vfn_eps.py": ("desired_angle_no_offset",),
     "openpilot/selfdrive/controls/lib/latcontrol_torque.py": ("measured_curvature", "curvature_deadzone"),
     "openpilot/sunnypilot/selfdrive/controls/lib/latcontrol_torque_v0.py": ("measured_curvature", "curvature_deadzone"),
     "openpilot/selfdrive/controls/lib/latcontrol_curvature.py": ("measured_curvature",),
@@ -372,9 +373,3 @@ def test_every_lateral_controller_path_uses_the_shared_selection_api():
     source = (repository_root / relative_path).read_text(encoding="utf-8")
     for helper in helpers:
       assert f"steer_ratio_selection.{helper}" in source, f"{relative_path} bypasses {helper}"
-
-  # The optional VFN controller deliberately owns its calibrated rack map;
-  # the NRDR SR dropdowns are locked while it is selected.
-  yaw = (repository_root / "openpilot/nrdr/features/lateral/latcontrol_vfn_eps.py").read_text(encoding="utf-8")
-  assert "self.rack_map.angle_from_curvature" in yaw
-  assert "self.rack_map.curvature_from_angle" in yaw

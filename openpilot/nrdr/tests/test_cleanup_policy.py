@@ -41,14 +41,28 @@ def test_suggested_locks_touched_controls_and_off_preserves_values(key):
   assert tuning_write_allowed(params, key)
 
 
-@pytest.mark.parametrize("key", ["LatFScaleStandard", "NrdrLatRateDampingLowSpeed", "NrdrSteerRatioMode",
-                                 "LagdToggleDelay", "HondaTorqueLowPassFilter", "HondaLpfTauHighway"])
+@pytest.mark.parametrize("key", ["LatFScaleStandard", "NrdrLatRateDampingLowSpeed",
+                                 "HondaTorqueLowPassFilter", "HondaLpfTauHighway"])
 def test_yaw_locks_ignored_pif_controls_without_changing_the_saved_values(key):
   params = MemoryParams(NrdrLateralController=1, **{key: 7})
   assert not tuning_write_allowed(params, key)
   assert params[key] == 7
   params["NrdrLateralController"] = 0
   assert tuning_write_allowed(params, key)
+
+
+@pytest.mark.parametrize("key", ["NrdrSteerRatioMode", "NrdrSteerRatioHybrid", "NrdrSteerRatioSourceB",
+                                 "NrdrSteerRatioBlendStart", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
+                                 "LagdToggle", "LagdToggleDelay"])
+def test_shared_geometry_and_delay_are_not_locked_by_controller_selection(key):
+  from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
+  params = MemoryParams(NrdrLateralController=1, NrdrSuggestedSettings=False)
+  assert tuning_write_allowed(params, key)
+  item = apply_sunnylink_metadata({"key": key})
+  conditions = {condition["condition"]["key"] for condition in item["enablement"]}
+  assert conditions == {"NrdrSuggestedSettings", "NrdrHandcraftedLateralTune"}
+  params["NrdrSuggestedSettings"] = True
+  assert not tuning_write_allowed(params, key)
 
 
 def test_learning_forces_all_scales_to_unity_and_keeps_them_locked():
