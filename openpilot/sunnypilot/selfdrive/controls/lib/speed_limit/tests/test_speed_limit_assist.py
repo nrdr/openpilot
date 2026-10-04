@@ -133,6 +133,31 @@ class TestSpeedLimitAssist(OpenpilotTestCase):
     assert self.sla.state == SpeedLimitAssistState.preActive
     assert self.sla.is_enabled and not self.sla.is_active
 
+  @parameterized.expand([(state, pcm_op_long) for state in ALL_STATES for pcm_op_long in (False, True)],
+                        names=["state", "pcm_op_long"])
+  def test_only_confirmed_states_can_supply_speed_target(self, state, pcm_op_long):
+    self.sla.pcm_op_long = pcm_op_long
+    self.sla.state = state
+    self.sla.is_enabled = state in (SpeedLimitAssistState.preActive, SpeedLimitAssistState.pending, *ACTIVE_STATES)
+    self.sla.is_active = state in ACTIVE_STATES
+    self.sla._has_speed_limit = True
+    self.sla._speed_limit_final_last = 40 * CV.MPH_TO_MS
+
+    expected = self.sla._speed_limit_final_last if state in ACTIVE_STATES else V_CRUISE_UNSET
+    assert self.sla.get_v_target_from_control() == expected
+
+  @parameterized.expand([0., SPEED_LIMITS['city']], names=["current_speed_limit"])
+  def test_highway_engagement_does_not_apply_unconfirmed_lower_limit(self, current_speed_limit):
+    """Lexus route 0000006d: 70 mph cruise must not adopt the 35+5 mph preview."""
+    assert self.sla.pcm_op_long
+    remembered_target = 40 * CV.MPH_TO_MS
+    for _ in range(int(8. / DT_MDL)):
+      self.sla.update(True, False, 69.9 * CV.MPH_TO_MS, 0., 69.6 * CV.MPH_TO_MS,
+                      current_speed_limit, remembered_target, True, 0., self.events_sp)
+      assert not self.sla.is_active
+      assert self.sla.output_v_target == V_CRUISE_UNSET
+    assert self.sla.state == SpeedLimitAssistState.preActive
+
   def test_transition_disabled_to_pending_no_speed_limit_not_max_initial_set_speed(self):
     for _ in range(int(3. / DT_MDL)):
       self.sla.update(True, False, SPEED_LIMITS['highway'], 0, SPEED_LIMITS['city'], 0, 0, False, 0, self.events_sp)

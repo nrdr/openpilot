@@ -127,11 +127,10 @@ class SpeedLimitAssist:
       events_sp.add(EventNameSP.speedLimitActive)
 
   def get_v_target_from_control(self) -> float:
-    if self._has_speed_limit:
-      if self.pcm_op_long and self.is_enabled:
-        return self._speed_limit_final_last
-      if not self.pcm_op_long and self.is_active:
-        return self._speed_limit_final_last
+    # Enabled includes pending/preActive: offer confirmation without controlling
+    # speed. PCM cars must not brake toward a remembered limit before confirmation.
+    if self._has_speed_limit and self.is_active:
+      return self._speed_limit_final_last
 
     # Fallback
     return V_CRUISE_UNSET
