@@ -610,7 +610,7 @@
                     },
                     {
                       "value": 1,
-                      "label": "Yaw Control",
+                      "label": "Firmware Controller",
                       "enablement": [
                         {
                           "type": "capability",
@@ -663,8 +663,18 @@
                   "key": "NrdrDeviceYawCorrection",
                   "widget": "toggle",
                   "title": "Use Device Yaw Correction",
-                  "description": "Blends 1% device-yaw torque feedback with 99% PIF. Does not select Yaw Control. Optimized lane changes bypass it.",
-                  "details": "Defaults ON. The blend strength, acceleration factor, and friction remain fixed. Below 4.5 mph the torque leg uses steering-angle feedback, transitioning to the device's calibrated yaw estimate by 11.2 mph. Missing, stale, or invalid yaw falls back to PIF when yaw is required. Available only for supported modified-EPS Honda PIF setups, not full Yaw Control. Turn Suggested Settings OFF to unlock this switch.",
+                  "description": "Blends 1% device-yaw torque feedback with 99% PIF. Not used by Firmware Controller. Optimized lane changes bypass it.",
+                  "details": "Defaults ON. The blend strength, acceleration factor, and friction remain fixed. Below 4.5 mph the torque leg uses steering-angle feedback, transitioning to the device's calibrated yaw estimate by 11.2 mph. Missing, stale, or invalid yaw falls back to PIF when yaw is required. Available only for supported modified-EPS Honda PIF setups. Firmware Controller never uses this blend. Turn Suggested Settings OFF to unlock this switch.",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ],
                   "enablement": [
                     {
                       "type": "capability",
@@ -799,7 +809,7 @@
                   "key": "NrdrLatRateDampingLowSpeed",
                   "widget": "option",
                   "title": "[0-25MPH] Derivative",
-                  "description": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). 0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
+                  "description": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). Defaults to 0% (off). Optimized lane changes bypass it.",
                   "min": 0,
                   "max": 300,
                   "step": 5,
@@ -943,7 +953,7 @@
                   "key": "NrdrLatRateDampingStandard",
                   "widget": "option",
                   "title": "[25-50MPH] Derivative",
-                  "description": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). 0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
+                  "description": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). Defaults to 0% (off). Optimized lane changes bypass it.",
                   "min": 0,
                   "max": 300,
                   "step": 5,
@@ -1087,7 +1097,7 @@
                   "key": "NrdrLatRateDampingHighway",
                   "widget": "option",
                   "title": "[50+MPH] Derivative",
-                  "description": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). 0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
+                  "description": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). Defaults to 0% (off). Optimized lane changes bypass it.",
                   "min": 0,
                   "max": 300,
                   "step": 5,
@@ -4172,7 +4182,7 @@
               "key": "LagdToggle",
               "widget": "toggle",
               "title": "Live Learning Steer Delay",
-              "description": "Allow device to learn and adapt car's steering response time",
+              "description": "Learn steering delay for PIF and other standard controllers. Firmware Controller ignores this toggle and uses a fixed 0.30-second total delay.",
               "enablement": [
                 {
                   "type": "not",
@@ -4189,6 +4199,14 @@
                     "key": "NrdrHandcraftedLateralTune",
                     "equals": true
                   }
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "param",
+                    "key": "NrdrLateralController",
+                    "equals": 1
+                  }
                 }
               ]
             },
@@ -4196,8 +4214,8 @@
               "key": "LagdToggleDelay",
               "widget": "option",
               "title": "Adjust Software Delay",
-              "description": "Add software delay on top of the vehicle's actuator delay when Live Learning Steer Delay is off.",
-              "details": "This additional delay is combined with the vehicle's actuator delay. The default additional value is 0.2 seconds. Higher values increase prediction lead and may cause early or oscillatory steering.",
+              "description": "Saved additional software delay for PIF and other standard controllers. Firmware Controller ignores this value and uses a fixed 0.30-second total delay.",
+              "details": "The slider preserves your PIF software delay, added to the vehicle's actuator delay when live learning is off. Firmware Controller always uses 0.30 seconds total instead; the greyed-out slider is not its effective delay. Firmware command-delay settings are separate. Default additional PIF delay is 0.2 seconds.",
               "min": 0.05,
               "max": 1.0,
               "step": 0.01,
@@ -4229,6 +4247,14 @@
                     "type": "param",
                     "key": "NrdrHandcraftedLateralTune",
                     "equals": true
+                  }
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "param",
+                    "key": "NrdrLateralController",
+                    "equals": 1
                   }
                 }
               ]

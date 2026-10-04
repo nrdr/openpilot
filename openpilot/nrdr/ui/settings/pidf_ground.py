@@ -39,7 +39,7 @@ class PidfGroundLayout(Widget):
         description=tr("Tapers torque near a stable target. Driver input, lane changes, faults and steering limits bypass it."))),
       remember("NrdrDeviceYawCorrection", toggle_item_sp(
         title=tr("Use Device Yaw Correction"), param="NrdrDeviceYawCorrection",
-        description=tr("Blends 1% device-yaw torque feedback with 99% PIF. Does not select Yaw Control. Optimized lane changes bypass it."))),
+        description=tr("Blends 1% device-yaw torque feedback with 99% PIF. Not used by Firmware Controller. Optimized lane changes bypass it."))),
       remember("NrdrOptimizedLaneChanges", toggle_item_sp(
         title=tr("Optimized lane changes"), param="NrdrOptimizedLaneChanges",
         description=tr("NRDR lane-change entry shaping. During the maneuver, uses P/I feedback without torque blend, feedforward or rate damping."))),
@@ -50,7 +50,7 @@ class PidfGroundLayout(Widget):
       for term, name in (("P", "Proportional"), ("I", "Integral"), ("D", "Derivative"), ("F", "Feedforward")):
         key = f"NrdrLatRateDamping{band}" if term == "D" else f"Lat{term}Scale{band}"
         description = ("Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). "
-                       "0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it." if term == "D"
+                       + "Defaults to 0% (off). Optimized lane changes bypass it." if term == "D"
                        else "Supplies anticipated steering torque before an error occurs.")
         spec = get_native_option_spec(key) if term in ("P", "I") else None
         if spec is not None:
@@ -74,7 +74,7 @@ class PidfGroundLayout(Widget):
 
   @staticmethod
   def _controller_label():
-    return tr("Yaw Control") if str(ui_state.params.get("NrdrLateralController")) in ("1", "b'1'") else tr("PIF Control")
+    return tr("Firmware Controller") if str(ui_state.params.get("NrdrLateralController")) in ("1", "b'1'") else tr("PIF Control")
 
   @staticmethod
   def _commit_controller_selection(value):
@@ -91,7 +91,7 @@ class PidfGroundLayout(Widget):
       return
     options = [tr("PIF Control")]
     if yaw_controller_available(ui_state.CP, ui_state.CP_SP):
-      options.append(tr("Yaw Control"))
+      options.append(tr("Firmware Controller"))
 
     def selected(result):
       dialog, self._controller_dialog = self._controller_dialog, None
@@ -106,6 +106,8 @@ class PidfGroundLayout(Widget):
     self._controller.action_item.set_enabled(ui_state.is_offroad())
     for key, item in self._tuning_items.items():
       available = key != "NrdrDeviceYawCorrection" or supports_interpolated_torque_pif(ui_state.CP, ui_state.CP_SP)
+      if key == "NrdrDeviceYawCorrection":
+        item.set_visible(str(ui_state.params.get("NrdrLateralController")) not in ("1", "b'1'"))
       item.action_item.set_enabled(available and tuning_write_allowed(ui_state.params, key))
 
   def _render(self, rect):

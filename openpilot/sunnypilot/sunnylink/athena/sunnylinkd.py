@@ -269,6 +269,23 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
   capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
   handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
   honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
+  controller_selection = None
+  if "NrdrLateralController" in params_to_update:
+    # A rejected controller request must be an RPC error, not a success-looking
+    # no-op. Selection is drive-latched; never switch the running controller.
+    if onroad:
+      raise ValueError("Controller Type can only be changed while the device is offroad. The selection was not saved.")
+    try:
+      decoded = base64.b64decode(params_to_update["NrdrLateralController"], validate=True)
+      if compression:
+        decoded = gzip.decompress(decoded)
+      controller_selection = int(decoded)
+    except (ValueError, TypeError, OSError) as error:
+      raise ValueError("Invalid Controller Type. The selection was not saved.") from error
+    if not honda_tuning_available or controller_selection not in (0, 1) or (
+      controller_selection == 1 and capabilities.get("nrdr_yaw_controller_available") is not True
+    ):
+      raise ValueError("This Controller Type is unavailable for the detected vehicle. The selection was not saved.")
   for key, value in params_to_update.items():
     if not tuning_write_allowed(params, key):
       cloudlog.warning(f"sunnylinkd.saveParams.locked: '{key}'")
@@ -291,14 +308,12 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
 
     try:
       if key == "NrdrLateralController":
-        # Read only device-owned capability evidence, never trust the web client.
-        decoded = base64.b64decode(value)
-        if compression:
-          decoded = gzip.decompress(decoded)
-        selection = int(decoded)
-        if selection not in (0, 1) or (selection == 1 and capabilities.get("nrdr_yaw_controller_available") is not True):
-          continue
-        params.put(key, selection, block=True)
+        # Recheck road state immediately before the write, including stale UI.
+        if not params.get_bool("IsOffroad"):
+          raise ValueError("Controller Type cannot be changed after the car starts.")
+        params.put(key, controller_selection, block=True)
+        if str(params.get(key)) not in (str(controller_selection), f"b'{controller_selection}'"):
+          raise ValueError("Controller Type readback did not match the requested selection.")
       elif key == "NrdrSuggestedSettings" and requested_bool is False:
         from openpilot.nrdr.params.profiles import disable_suggested_settings
         disable_suggested_settings(params)
@@ -311,6 +326,8 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
         reset_learning_scales(params)
     except Exception as e:
       cloudlog.error(f"sunnylinkd.saveParams.exception {e}")
+      if key == "NrdrLateralController":
+        raise ValueError("Controller Type could not be saved. Refresh settings to read the device's selection.") from e
 
   # Increment version counter for frontend change detection
   try:

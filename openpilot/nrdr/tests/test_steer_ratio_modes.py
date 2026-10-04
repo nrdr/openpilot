@@ -363,7 +363,7 @@ def test_every_lateral_controller_path_uses_the_shared_selection_api():
     "openpilot/selfdrive/controls/lib/latcontrol_angle.py": ("desired_angle_no_offset",),
     "openpilot/selfdrive/controls/lib/latcontrol_pid.py": ("desired_angle_no_offset",),
     "openpilot/nrdr/features/lateral/latcontrol_pid.py": ("desired_angle_no_offset",),
-    "openpilot/nrdr/features/lateral/latcontrol_vfn_eps.py": ("desired_angle_no_offset",),
+    "openpilot/nrdr/features/lateral/latcontrol_fw.py": ("desired_angle_no_offset",),
     "openpilot/selfdrive/controls/lib/latcontrol_torque.py": ("measured_curvature", "curvature_deadzone"),
     "openpilot/sunnypilot/selfdrive/controls/lib/latcontrol_torque_v0.py": ("measured_curvature", "curvature_deadzone"),
     "openpilot/selfdrive/controls/lib/latcontrol_curvature.py": ("measured_curvature",),

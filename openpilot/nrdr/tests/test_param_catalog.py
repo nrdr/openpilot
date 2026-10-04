@@ -25,7 +25,7 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "afa9e85442042e7d2195316d888587f1ccb4f29a54daeb6fe298fc658c8d610a"
+REGISTRY_METADATA_SHA256 = "c6bc7e9fb72a6a6341306de15c36a28dc74f5a9483498c4b4a1ee626e429407d"
 
 
 class TestParamCatalog(unittest.TestCase):

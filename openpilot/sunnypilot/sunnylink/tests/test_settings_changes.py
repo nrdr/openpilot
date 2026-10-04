@@ -404,7 +404,7 @@ class TestControllerCleanup(OpenpilotTestCase):
       "NrdrLateralController", "NrdrLatStiction", "NrdrDeviceYawCorrection", "NrdrOptimizedLaneChanges",
     ]
     controller = panel["items"][0]
-    assert [(o["value"], o["label"]) for o in controller["options"]] == [(0, "PIF Control"), (1, "Yaw Control")]
+    assert [(o["value"], o["label"]) for o in controller["options"]] == [(0, "PIF Control"), (1, "Firmware Controller")]
     assert "description" not in controller and "details" not in controller
     assert "offroad_only" in _flatten_rule_types(controller["enablement"])
     assert _references_capability_field(controller["options"][1]["enablement"], "nrdr_yaw_controller_available")
@@ -456,7 +456,7 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     assert _references_capability_field(item.get("visibility"), "has_handcrafted_lateral_profile")
     assert item["description"] == (
       "Last Road Tested: October 1, 2026, with PopV2 Model. Your mileage may vary. "
-      "Turning back to OFF will preserve these settings and unlock tuning menus."
+      + "Turning back to OFF will preserve these settings and unlock tuning menus."
     )
     assert "details" not in item
 

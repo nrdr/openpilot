@@ -108,7 +108,8 @@ class Controls(ControlsExt):
     # Update VehicleModel
     lp = self.sm['vehicleParameters']
     x, sr, _angle_offset, measured_steer_angle = vehicle_model_state(self, lp, CS, lat_active)
-    self.lat_delay = get_lat_delay(self.nrdr_lateral_snapshot, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay)
+    self.lat_delay = get_lat_delay(self.nrdr_lateral_snapshot, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay,
+                                   firmware_controller=getattr(self.LaC, "uses_firmware_delay", False))
     self.VM.update_params(x, sr)
 
     steer_angle_without_offset = math.radians(measured_steer_angle)

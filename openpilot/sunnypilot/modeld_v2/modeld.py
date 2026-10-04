@@ -414,7 +414,9 @@ def main(demo=False):
   else:
     CP = messaging.log_from_bytes(params.get("CarParams", block=True), car.CarParams)
   cloudlog.info("modeld got CarParams: %s", CP.brand)
-  model.lat_delay = get_lat_delay(params, model.lat_delay, CP.steerActuatorDelay)
+  from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_for_model
+  firmware_controller = firmware_controller_for_model(params, CP)
+  model.lat_delay = get_lat_delay(params, model.lat_delay, CP.steerActuatorDelay, firmware_controller=firmware_controller)
 
   # TODO Move smooth seconds to action function
   long_delay = CP.longitudinalActuatorDelay + model.LONG_SMOOTH_SECONDS
@@ -463,11 +465,12 @@ def main(demo=False):
     frame_id = sm["narrowRoadCameraState"].frameId
     v_ego = max(sm["carState"].vEgo, 0.)
     if sm.updated["lateralDelay"]:
-      model.lat_delay = get_lat_delay(params, sm["lateralDelay"].lateralDelay, CP.steerActuatorDelay)
+      model.lat_delay = get_lat_delay(params, sm["lateralDelay"].lateralDelay, CP.steerActuatorDelay,
+                                      firmware_controller=firmware_controller)
     if sm.frame % 60 == 0:
       model.PLANPLUS_CONTROL = params.get("PlanplusControl", return_default=True)
       camera_offset_helper.set_offset(params.get("CameraOffset", return_default=True))
-    lat_delay = model.lat_delay + model.LAT_SMOOTH_SECONDS
+    lat_delay = model.lat_delay if firmware_controller else model.lat_delay + model.LAT_SMOOTH_SECONDS
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["extrinsicsCalibration"].rpyCalib, dtype=np.float32)
       dc = DEVICE_CAMERAS[(str(sm['deviceState'].deviceType), str(sm['narrowRoadCameraState'].sensor))]

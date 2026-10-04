@@ -1,4 +1,5 @@
 """Yaw command timing stays separate from shared live/manual model delay."""
+import ast
 import math
 from pathlib import Path
 
@@ -82,3 +83,61 @@ def test_model_and_controls_runtimes_keep_shared_delay_wiring():
   assert "get_lat_delay(self.nrdr_lateral_snapshot," in source
   assert "LaC.lateral_delay" not in source
   assert "LaC.measured_curvature" not in source
+
+
+@pytest.mark.parametrize("live", [False, True])
+@pytest.mark.parametrize("saved", [None, .05, .31, .4, 1., math.nan])
+@pytest.mark.parametrize("actuator", [0., .2, .5])
+def test_firmware_delay_is_fixed_total_and_preserves_pif_settings(live, saved, actuator):
+  values = {"LagdToggle": live, "LagdToggleDelay": saved}
+  snapshot = ParamSnapshot(1, values)
+  for learned in (0., .15, .8, math.nan):
+    assert get_lat_delay(snapshot, learned, actuator, firmware_controller=True) == .30
+  assert snapshot.values == values
+
+
+def test_model_and_control_fixed_delay_gates_match():
+  root = Path(__file__).resolve().parents[2]
+  for relative in ("selfdrive/modeld/modeld.py", "sunnypilot/modeld_v2/modeld.py"):
+    source = (root / relative).read_text()
+    assert "firmware_controller = firmware_controller_for_model(params, CP)" in source
+    assert source.count("firmware_controller=firmware_controller") == 2
+  source = (root / "selfdrive/controls/controlsd.py").read_text()
+  assert 'firmware_controller=getattr(self.LaC, "uses_firmware_delay", False)' in source
+
+
+@pytest.mark.parametrize("relative", ["selfdrive/modeld/modeld.py", "sunnypilot/modeld_v2/modeld.py"])
+@pytest.mark.parametrize("smooth", [0., .1, .3])
+def test_firmware_total_is_not_extended_by_model_specific_smoothing(relative, smooth):
+  from types import SimpleNamespace as NS
+  root = Path(__file__).resolve().parents[2]
+  tree = ast.parse((root / relative).read_text())
+  assignment, = [node for node in ast.walk(tree) if isinstance(node, ast.Assign)
+                  and any(isinstance(target, ast.Name) and target.id == "lat_delay" for target in node.targets)]
+  expr = compile(ast.Expression(assignment.value), relative, "eval")
+  context = {"model": NS(lat_delay=.30, LAT_SMOOTH_SECONDS=smooth), "LAT_SMOOTH_SECONDS": smooth}
+  assert eval(expr, {**context, "firmware_controller": True}) == .30
+  assert eval(expr, {**context, "firmware_controller": False}) == pytest.approx(.30 + smooth)
+
+
+def test_model_firmware_selection_never_reads_honda_data_for_another_vehicle():
+  from types import SimpleNamespace as NS
+  from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_for_model
+  class OtherCarParams:
+    def get(self, *args, **kwargs):
+      raise AssertionError("Other cars must not read Honda controller settings or CP_SP")
+  for cp in (None, NS(brand="toyota", carFingerprint="LEXUS_ES_TSS2"), NS(brand="honda", carFingerprint="HONDA_CIVIC")):
+    assert not firmware_controller_for_model(OtherCarParams(), cp)
+
+
+def test_admitted_firmware_selection_matches_runtime_and_stale_selection_falls_back():
+  from types import SimpleNamespace as NS
+  from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
+  from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_selected
+  cp = NS(brand="honda", carFingerprint="HONDA_CLARITY", lateralTuning=NS(which=lambda: "pid"),
+          carFw=[NS(ecu="eps", fwVersion=b"39990-TRW-A020\x00")])
+  sp = NS(flags=HondaFlagsSP.EPS_MODIFIED.value)
+  for selected in (1, "1", b"1"):
+    assert firmware_controller_selected({"NrdrLateralController": selected}, cp, sp)
+    assert not firmware_controller_selected({"NrdrLateralController": selected}, cp, NS(flags=0))
+  assert not firmware_controller_selected({"NrdrLateralController": 0}, cp, sp)

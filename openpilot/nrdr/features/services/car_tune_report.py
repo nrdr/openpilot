@@ -159,7 +159,7 @@ class CarTuneReporter:
   def _controller_info(self, controller: str, steer_ratio: SteerRatioSelection, CP) -> str:
     from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
     if self.params.get("NrdrLateralController") == 1 and yaw_controller_available(CP, self._cp_sp()):
-      return "Yaw Control (VFN EPS)"
+      return "Firmware Controller (VFN EPS)"
     return controller.replace("PID/NNLC", "PIF Control")
 
   def _build(self, CP) -> dict[str, str]:

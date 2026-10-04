@@ -279,7 +279,7 @@ class NrdrLatControlPID(LatControl):
     self.center_boost_threshold = read_float(snapshot, NrdrParamKey.HONDA_CENTER_BOOST_THRESHOLD, 5.0, 0.0, 10.0)
     self.center_boost_min_speed = read_float(snapshot, NrdrParamKey.HONDA_CENTER_BOOST_MIN_SPEED, 0.0, 0.0, 90.0)
     self.rate_damping_scales = [
-      read_float(snapshot, f"NrdrLatRateDamping{band}", 0.3, 0.0, 3.0, scale=100.0)
+      read_float(snapshot, f"NrdrLatRateDamping{band}", 0.0, 0.0, 3.0, scale=100.0)
       for band in ("LowSpeed", "Standard", "Highway")
     ]
     self.injection_test = read_bool(snapshot, NrdrParamKey.HONDA_INJECTION_TEST)

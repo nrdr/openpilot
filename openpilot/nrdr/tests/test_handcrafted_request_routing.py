@@ -140,26 +140,73 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
     for locked in ({"NrdrSuggestedSettings": True}, {"NrdrHandcraftedLateralTune": True}, {"NrdrLateralController": 1}):
       with self.subTest(locked=locked):
         self.generic_write.reset_mock()
-        self.params.get.side_effect = lambda name, **_: locked.get(name, "0")
+        self.params.get.side_effect = lambda name, locked=locked, **_: locked.get(name, "0")
         self.save_params({key: self._encode(b"0")})
         self.generic_write.assert_not_called()
 
-  def test_shared_geometry_and_delay_writes_are_not_blocked_by_yaw_controller(self):
+  def test_geometry_is_shared_but_firmware_fixed_delay_cannot_be_written(self):
     self.namespace["_vehicle_tuning_capabilities"].return_value = {
       "nrdr_honda_tuning_available": True,
     }
     for suggested in (False, True):
       values = {"NrdrLateralController": 1, "NrdrSuggestedSettings": suggested}
-      self.params.get.side_effect = lambda name, **_: values.get(name, "0")
+      self.params.get.side_effect = lambda name, values=values, **_: values.get(name, "0")
       for key, raw in (("NrdrSteerRatioMode", b"2"), ("LagdToggle", b"0"), ("LagdToggleDelay", b"0.3")):
         with self.subTest(suggested=suggested, key=key):
           self.generic_write.reset_mock()
           value = self._encode(raw)
           self.save_params({key: value})
-          if suggested:
+          if suggested or key in ("LagdToggle", "LagdToggleDelay"):
             self.generic_write.assert_not_called()
           else:
             self.generic_write.assert_called_once_with(key, value, False)
+
+  def test_controller_change_onroad_is_rpc_error_and_never_saves_or_updates_version(self):
+    self.params.get_bool.return_value = False
+    with self.assertRaisesRegex(ValueError, "offroad"):
+      self.save_params({"NrdrLateralController": self._encode(b"1")})
+    self.params.put.assert_not_called()
+    self.generic_write.assert_not_called()
+
+  def test_controller_choice_validates_support_and_reports_invalid_values(self):
+    for available, value in ((False, b"1"), (True, b"2"), (True, b"garbage"), (True, b"1.0")):
+      with self.subTest(available=available, value=value):
+        self.namespace["_vehicle_tuning_capabilities"].return_value = {
+          "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": available,
+        }
+        with self.assertRaises(ValueError):
+          self.save_params({"NrdrLateralController": self._encode(value)})
+        self.params.put.assert_not_called()
+
+  def test_controller_choice_is_saved_and_read_back_offroad(self):
+    self.namespace["_vehicle_tuning_capabilities"].return_value = {
+      "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": True,
+    }
+    for value in (0, 1):
+      for compression in (False, True):
+        with self.subTest(value=value, compression=compression):
+          stored = {"NrdrLateralController": 1 - value}
+          self.params.get.side_effect = lambda key, stored=stored, **_: stored.get(key, 0)
+          self.params.put.side_effect = lambda key, value, stored=stored, **_: stored.update({key: value})
+          self.save_params({"NrdrLateralController": self._encode(str(value).encode(), compression)}, compression)
+          self.assertEqual(stored["NrdrLateralController"], value)
+          self.assertNotIn("NrdrDeviceYawCorrection", stored)
+
+  def test_controller_choice_readback_failure_propagates_error(self):
+    self.namespace["_vehicle_tuning_capabilities"].return_value = {
+      "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": True,
+    }
+    with self.assertRaisesRegex(ValueError, "could not be saved"):
+      self.save_params({"NrdrLateralController": self._encode(b"1")})
+
+  def test_controller_write_rechecks_road_state_after_validation(self):
+    self.namespace["_vehicle_tuning_capabilities"].return_value = {
+      "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": True,
+    }
+    self.params.get_bool.side_effect = [True, False]
+    with self.assertRaisesRegex(ValueError, "could not be saved"):
+      self.save_params({"NrdrLateralController": self._encode(b"1")})
+    self.params.put.assert_not_called()
 
 
 if __name__ == "__main__":

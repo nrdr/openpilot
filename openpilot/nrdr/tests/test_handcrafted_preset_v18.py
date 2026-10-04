@@ -39,7 +39,7 @@ HONDA_PID_VALUES = (
   ("LatPScaleStandard", 100), ("LatIScaleStandard", 100), ("LatFScaleStandard", 150),
   ("LatPScaleHighway", 100), ("LatIScaleHighway", 100), ("LatFScaleHighway", 200),
   ("NrdrLatStiction", False), ("NrdrOptimizedLaneChanges", True),
-  ("NrdrLatRateDampingLowSpeed", 30), ("NrdrLatRateDampingStandard", 30), ("NrdrLatRateDampingHighway", 30),
+  ("NrdrLatRateDampingLowSpeed", 0), ("NrdrLatRateDampingStandard", 0), ("NrdrLatRateDampingHighway", 0),
   ("HondaCenterScale", 0.0), ("HondaCenterBoostThreshold", 5.0), ("HondaCenterBoostMinSpeed", 0),
   ("NrdrTuneLearner", False), ("NrdrTuneLearnerStrength", 0), ("NrdrTuneLearnerRate", 10),
 )
@@ -155,24 +155,24 @@ def request_profile(CP, CP_SP, params):
 def test_current_static_lookup_and_honda_hybrid_profiles_are_exact():
   static_civic = get_handcrafted_lateral_profile("HONDA_CIVIC")
   assert static_civic is not None
-  assert static_civic.version == 21
+  assert static_civic.version == 22
   assert static_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
 
   static_clarity = get_handcrafted_lateral_profile("HONDA_CLARITY")
   assert static_clarity is not None
-  assert static_clarity.version == 21
+  assert static_clarity.version == 22
   assert static_clarity.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + CLARITY_GEOMETRY_VALUES + TORQUE_VALUES
 
   civic = vehicle_cp()
   runtime_civic = get_handcrafted_lateral_profile(civic.carFingerprint, civic, cp_sp())
   assert runtime_civic is not None
-  assert runtime_civic.version == 21
+  assert runtime_civic.version == 22
   assert runtime_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
 
   clarity = vehicle_cp("HONDA_CLARITY", controller="torque", firmware=b"39990-TRW-A020\x00")
   runtime_clarity = get_handcrafted_lateral_profile(clarity.carFingerprint, clarity, cp_sp())
   assert runtime_clarity is not None
-  assert runtime_clarity.version == 21
+  assert runtime_clarity.version == 22
   assert runtime_clarity.values == COMMON_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + CLARITY_GEOMETRY_VALUES
 
 
@@ -257,7 +257,7 @@ def test_request_writes_exact_json_context_before_legacy_boolean():
   assert profile is not None
   firmware = sorted((str(fw.ecu), bytes(fw.fwVersion).hex()) for fw in civic.carFw)
   assert params.values[CONTEXT_KEY] == {
-    "version": 21,
+    "version": 22,
     "fingerprint": "HONDA_CIVIC",
     "brand": "honda",
     "controller": "pid",
@@ -424,7 +424,7 @@ for name in ('capnp', 'numpy', 'pyray', 'zmq', 'openpilot.common.params'):
   sys.modules[name] = None
 from openpilot.nrdr.params import get_handcrafted_lateral_profile
 profile = get_handcrafted_lateral_profile('HONDA_CIVIC')
-assert profile is not None and profile.version == 21
+assert profile is not None and profile.version == 22
 """
   subprocess.run(
     [sys.executable, "-c", script], cwd=repo_root, env=environment,

@@ -182,7 +182,7 @@ def _build_legacy_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
 CLARITY_CURRENT_LATERAL_2026_08_28 = _build_legacy_honda_profile("HONDA_CLARITY")
 CLARITY_ROAD_TESTED_2026_08_21 = CLARITY_CURRENT_LATERAL_2026_08_28
 
-HANDCRAFTED_LATERAL_VERSION = 21
+HANDCRAFTED_LATERAL_VERSION = 22
 # Oct 1 owner snapshot, PopV2, plus explicitly requested cleanup defaults.
 # The new per-speed damping and optimized lane-change behavior still need road
 # validation; the provenance date is not a claim those additions were tested.
@@ -199,7 +199,7 @@ HONDA_PID_HANDCRAFTED_VALUES = tuple(
   for term, value in (("P", 100), ("I", 100), ("F", feedforward))
 ) + (
   ("NrdrLatStiction", False), ("NrdrOptimizedLaneChanges", True),
-  ("NrdrLatRateDampingLowSpeed", 30), ("NrdrLatRateDampingStandard", 30), ("NrdrLatRateDampingHighway", 30),
+  ("NrdrLatRateDampingLowSpeed", 0), ("NrdrLatRateDampingStandard", 0), ("NrdrLatRateDampingHighway", 0),
   ("HondaCenterScale", 0.0), ("HondaCenterBoostThreshold", 5.0), ("HondaCenterBoostMinSpeed", 0),
   ("NrdrTuneLearner", False), ("NrdrTuneLearnerStrength", 0), ("NrdrTuneLearnerRate", 10),
 )

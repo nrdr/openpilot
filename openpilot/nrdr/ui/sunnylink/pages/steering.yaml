@@ -27,7 +27,7 @@ sections:
         - value: 0
           label: PIF Control
         - value: 1
-          label: Yaw Control
+          label: Firmware Controller
           enablement:
           - {type: capability, field: nrdr_yaw_controller_available, equals: true}
         enablement:
@@ -40,8 +40,10 @@ sections:
       - key: NrdrDeviceYawCorrection
         widget: toggle
         title: Use Device Yaw Correction
-        description: Blends 1% device-yaw torque feedback with 99% PIF. Does not select Yaw Control. Optimized lane changes bypass it.
-        details: Defaults ON. The blend strength, acceleration factor, and friction remain fixed. Below 4.5 mph the torque leg uses steering-angle feedback, transitioning to the device's calibrated yaw estimate by 11.2 mph. Missing, stale, or invalid yaw falls back to PIF when yaw is required. Available only for supported modified-EPS Honda PIF setups, not full Yaw Control. Turn Suggested Settings OFF to unlock this switch.
+        description: Blends 1% device-yaw torque feedback with 99% PIF. Not used by Firmware Controller. Optimized lane changes bypass it.
+        details: Defaults ON. The blend strength, acceleration factor, and friction remain fixed. Below 4.5 mph the torque leg uses steering-angle feedback, transitioning to the device's calibrated yaw estimate by 11.2 mph. Missing, stale, or invalid yaw falls back to PIF when yaw is required. Available only for supported modified-EPS Honda PIF setups. Firmware Controller never uses this blend. Turn Suggested Settings OFF to unlock this switch.
+        visibility:
+        - {type: not, condition: {type: param, key: NrdrLateralController, equals: 1}}
         enablement:
         - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
       - key: NrdrOptimizedLaneChanges
@@ -55,7 +57,7 @@ sections:
       - key: NrdrLatRateDampingLowSpeed
         widget: option
         title: "[0-25MPH] Derivative"
-        description: Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). 0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it.
+        description: Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). Defaults to 0% (off). Optimized lane changes bypass it.
         min: 0
         max: 300
         step: 5
@@ -75,7 +77,7 @@ sections:
       - key: NrdrLatRateDampingStandard
         widget: option
         title: "[25-50MPH] Derivative"
-        description: Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). 0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it.
+        description: Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). Defaults to 0% (off). Optimized lane changes bypass it.
         min: 0
         max: 300
         step: 5
@@ -95,7 +97,7 @@ sections:
       - key: NrdrLatRateDampingHighway
         widget: option
         title: "[50+MPH] Derivative"
-        description: Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). 0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it.
+        description: Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). Defaults to 0% (off). Optimized lane changes bypass it.
         min: 0
         max: 300
         step: 5

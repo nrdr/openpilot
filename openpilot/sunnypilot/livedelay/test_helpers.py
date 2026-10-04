@@ -191,7 +191,9 @@ def test_controlsd_resolves_delay_from_the_captured_live_snapshot_each_frame():
   calls = _calls_in_function(openpilot_root / "selfdrive/controls/controlsd.py", "state_control", "get_lat_delay")
   assert len(calls) == 1
   assert ast.unparse(calls[0].args[0]) == "self.nrdr_lateral_snapshot"
-  assert 'get_lat_delay(self.nrdr_lateral_snapshot, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay)' in controlsd_source
+  assert ast.unparse(calls[0].args[2]) == "self.CP.steerActuatorDelay"
+  assert len(calls[0].keywords) == 1 and calls[0].keywords[0].arg == "firmware_controller"
+  assert ast.unparse(calls[0].keywords[0].value) == "getattr(self.LaC, 'uses_firmware_delay', False)"
   assert 'get_lat_delay(self.params, self.sm["lateralDelay"]' not in controlsd_source
 
 

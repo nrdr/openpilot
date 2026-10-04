@@ -17,8 +17,8 @@ TERMS = (("P", "Proportional"), ("I", "Integral"), ("D", "Derivative"), ("F", "F
 DESCRIPTIONS = {
   "P": "Corrects steering error as it occurs.",
   "I": "Builds correction over time for persistent steering error, such as an alignment bias.",
-  "D": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). "
-       "0% disables it. The 30% starting value needs road validation; optimized lane changes bypass it.",
+    "D": "Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). "
+       + "Defaults to 0% (off). Optimized lane changes bypass it.",
   "F": "Supplies anticipated steering torque before an error occurs.",
 }
 
@@ -106,6 +106,11 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertEqual(web["title"], local["title"])
     self.assertEqual(web["description"], local["description"])
     self.assertEqual(web["widget"], "toggle")
+    self.assertEqual(web["visibility"], [{
+      "type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 1},
+    }])
+    self.assertEqual([option["label"] for option in panel["items"][0]["options"]],
+                     ["PIF Control", "Firmware Controller"])
     self.assertEqual(web["enablement"][0], {
       "type": "capability", "field": "nrdr_interpolated_torque_pif_blend_available", "equals": True,
     })

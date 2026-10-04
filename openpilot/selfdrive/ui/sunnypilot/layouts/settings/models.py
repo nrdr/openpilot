@@ -9,6 +9,8 @@ import time
 import pyray as rl
 
 from openpilot.cereal import custom
+from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_selected
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.sunnypilot.models.helpers import ACTIVE_BUNDLE_KEYS, get_selected_bundle, resolve_bundle_by_ref
 from openpilot.common.constants import CV
 from openpilot.selfdrive.ui.ui_state import device, ui_state
@@ -97,8 +99,8 @@ class ModelsLayout(Widget):
                                                   param="LaneTurnDesire")
 
     self.delay_control = option_item_sp(tr("Adjust Software Delay"), "LagdToggleDelay", 5, 100,
-                                        tr("Additional delay applied on top of the vehicle's actuator delay when Live Learning Steer Delay is off. " +
-                                           "Default is 0.2 s. Higher values increase prediction lead and may cause early or oscillatory steering."),
+                                        tr("Saved additional software delay for standard controllers, including PIF. " +
+                                           "Firmware Controller ignores this value and uses a fixed 0.30-second total delay."),
                                         1, None, True, "", style.BUTTON_ACTION_WIDTH, None, True, lambda v: f"{v / 100:.2f}s")
 
     self.lagd_toggle = toggle_item_sp(tr("Live Learning Steer Delay"), "", param="LagdToggle")
@@ -112,6 +114,11 @@ class ModelsLayout(Widget):
                   self.lane_turn_desire_toggle, self.lane_turn_value_control, self.lagd_toggle, self.delay_control, self.camera_offset]
 
   def _update_lagd_description(self, lagd_toggle: bool):
+    if firmware_controller_selected(ui_state.params, ui_state.CP, ui_state.CP_SP):
+      self.lagd_toggle.set_description(tr("Firmware Controller uses a fixed 0.30-second total model/control delay. " +
+                                         "Live learning and the saved PIF software-delay value are ignored, not overwritten. " +
+                                         "Firmware command delay is separate."))
+      return
     desc = tr("Enable this for the car to learn and adapt its steering response time. Disable to use a fixed steering response time. " +
               "Keeping this on provides the stock openpilot experience.")
     if lagd_toggle:
@@ -319,6 +326,8 @@ class ModelsLayout(Widget):
     self.lane_turn_desire_toggle.action_item.set_state(turn_desire)
     self.lane_turn_value_control.set_visible(turn_desire and advanced_controls)
     self.lagd_toggle.action_item.set_state(live_delay)
+    self.lagd_toggle.action_item.set_enabled(tuning_write_allowed(ui_state.params, "LagdToggle"))
+    self.delay_control.action_item.set_enabled(tuning_write_allowed(ui_state.params, "LagdToggleDelay"))
     self.delay_control.set_visible(not live_delay and advanced_controls)
     new_step = int(round(100 / CV.MPH_TO_KPH)) if ui_state.is_metric else 100
     if self.lane_turn_value_control.action_item is not None and self.lane_turn_value_control.action_item.value_change_step != new_step:

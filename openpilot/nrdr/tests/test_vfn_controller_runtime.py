@@ -9,7 +9,7 @@ from opendbc.car.structs import car as car_structs
 from opendbc.car.vehicle_model import VehicleModel
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import resolve_steer_ratio_selection
 from openpilot.nrdr.features.lateral.lane_change_tuning import shape_lane_change_curvature
-from openpilot.nrdr.features.lateral.latcontrol_vfn_eps import LatControlVfnEps
+from openpilot.nrdr.features.lateral.latcontrol_fw import LatControlFirmware
 from openpilot.nrdr.params.snapshots import ParamSnapshot
 
 
@@ -23,7 +23,7 @@ def car(fingerprint="HONDA_CLARITY", firmware=b"39990-TRW-A020", modified=True):
 
 def controller(**changes):
   cp, sp = car(**changes)
-  return LatControlVfnEps(cp, sp, None, .01)
+  return LatControlFirmware(cp, sp, None, .01)
 
 
 def vehicle_model():
@@ -42,7 +42,7 @@ def tick(control, *, active=True, state=0, angle=20., speed=15., desired=20.):
                         False, curvature, None, False, .2)
 
 
-@pytest.mark.parametrize("changes", [dict(fingerprint="HONDA_CIVIC"), dict(firmware=b"39990-TRW-A010"), dict(modified=False)])
+@pytest.mark.parametrize("changes", [{"fingerprint": "HONDA_CIVIC"}, {"firmware": b"39990-TRW-A010"}, {"modified": False}])
 def test_wrong_platform_or_eps_cannot_select_vfn(changes):
   with pytest.raises(ValueError):
     controller(**changes)

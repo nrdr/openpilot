@@ -2,7 +2,7 @@
 
 SUGGESTED_DESCRIPTION = (
   "Last Road Tested: October 1, 2026, with PopV2 Model. Your mileage may vary. "
-  "Turning back to OFF will preserve these settings and unlock tuning menus."
+  + "Turning back to OFF will preserve these settings and unlock tuning menus."
 )
 PIF_KEYS = frozenset(
   f"Lat{term}Scale{band}" for term in "PIF" for band in ("LowSpeed", "Standard", "Highway")
@@ -11,6 +11,7 @@ PIF_KEYS = frozenset(
 LONG_SCALE_KEYS = frozenset(("LongPidTuneScale", "LongPidTuneScaleAggressive", "LongPidTuneScaleStandard",
                             "LongPidTuneScaleRelaxed", "LongPidTuneScaleEcon"))
 YAW_FIXED_KEYS = PIF_KEYS | frozenset((
+  "LagdToggle", "LagdToggleDelay",
   "HondaTorqueLowPassFilter",
   "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",
 ))

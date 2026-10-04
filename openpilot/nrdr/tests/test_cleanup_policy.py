@@ -52,9 +52,8 @@ def test_yaw_locks_ignored_pif_controls_without_changing_the_saved_values(key):
 
 
 @pytest.mark.parametrize("key", ["NrdrSteerRatioMode", "NrdrSteerRatioHybrid", "NrdrSteerRatioSourceB",
-                                 "NrdrSteerRatioBlendStart", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
-                                 "LagdToggle", "LagdToggleDelay"])
-def test_shared_geometry_and_delay_are_not_locked_by_controller_selection(key):
+                                 "NrdrSteerRatioBlendStart", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal"])
+def test_shared_geometry_is_not_locked_by_controller_selection(key):
   from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
   params = MemoryParams(NrdrLateralController=1, NrdrSuggestedSettings=False)
   assert tuning_write_allowed(params, key)
@@ -63,6 +62,19 @@ def test_shared_geometry_and_delay_are_not_locked_by_controller_selection(key):
   assert conditions == {"NrdrSuggestedSettings", "NrdrHandcraftedLateralTune"}
   params["NrdrSuggestedSettings"] = True
   assert not tuning_write_allowed(params, key)
+
+
+@pytest.mark.parametrize("key", ["LagdToggle", "LagdToggleDelay"])
+def test_firmware_fixed_delay_is_locked_but_saved_pif_value_is_preserved(key):
+  from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
+  params = MemoryParams(NrdrLateralController=1, **{key: .31})
+  assert not tuning_write_allowed(params, key)
+  item = apply_sunnylink_metadata({"key": key})
+  conditions = {condition["condition"]["key"] for condition in item["enablement"]}
+  assert conditions == {"NrdrSuggestedSettings", "NrdrHandcraftedLateralTune", "NrdrLateralController"}
+  params["NrdrLateralController"] = 0
+  assert tuning_write_allowed(params, key)
+  assert params[key] == .31
 
 
 def test_learning_forces_all_scales_to_unity_and_keeps_them_locked():
@@ -127,9 +139,9 @@ def _definitions(relative, env):
 def test_native_controller_picker_rechecks_vehicle_and_offroad_on_confirmation(offroad, available, value, allowed):
   from collections.abc import Callable
   params = MemoryParams(NrdrLateralController=0)
-  env = dict(Widget=object, Callable=Callable,
-             ui_state=NS(params=params, CP=object(), CP_SP=object(), is_offroad=lambda: offroad),
-             yaw_controller_available=lambda cp, sp: available)
+  env = {"Widget": object, "Callable": Callable,
+         "ui_state": NS(params=params, CP=object(), CP_SP=object(), is_offroad=lambda: offroad),
+         "yaw_controller_available": lambda cp, sp: available}
   picker = _definitions("openpilot/nrdr/ui/settings/pidf_ground.py", env)["PidfGroundLayout"]
   assert picker._commit_controller_selection(value) == allowed
   assert params["NrdrLateralController"] == (value if allowed else 0)
@@ -138,7 +150,7 @@ def test_native_controller_picker_rechecks_vehicle_and_offroad_on_confirmation(o
 def _vision():
   params = MemoryParams(SmartCruiseControlVision=True)
   state = NS(disabled=0, enabled=1, entering=2, turning=3, leaving=4, overriding=5)
-  env = dict(np=np, Params=lambda: params, VisionState=state, V_CRUISE_UNSET=255., MIN_V=5., messaging=NS(SubMaster=object))
+  env = {"np": np, "Params": lambda: params, "VisionState": state, "V_CRUISE_UNSET": 255., "MIN_V": 5., "messaging": NS(SubMaster=object)}
   env["custom"] = NS(LongitudinalPlanSP=NS(SmartCruiseControl=NS(VisionState=state)))
   cls = _definitions("openpilot/sunnypilot/selfdrive/controls/lib/smart_cruise_control/vision_controller.py", env)["SmartCruiseControlVision"]
   model = NS(orientationRate=NS(z=[.04] * 33), velocity=NS(x=[25.] * 33))

@@ -82,7 +82,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "subaru_has_sng": "Subaru Stop-and-Go available",
   "hyundai_alpha_long_available": "Hyundai Alpha Longitudinal available",
   "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
-  "nrdr_yaw_controller_available": "Clarity Yaw Control",
+  "nrdr_yaw_controller_available": "Clarity Firmware Controller",
   "nrdr_honda_tuning_available": "Confirmed Honda-specific NRDR tuning available",
   "nrdr_longitudinal_tuning_available": "Vehicle explicitly supported by NRDR longitudinal tuning",
   "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio geometry available",

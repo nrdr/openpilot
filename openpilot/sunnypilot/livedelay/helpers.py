@@ -16,6 +16,7 @@ MIN_SOFTWARE_DELAY = 0.05
 MAX_SOFTWARE_DELAY = 1.0
 DEFAULT_SOFTWARE_DELAY = 0.2
 LAT_DELAY_BUFFER_SECONDS = 2.0
+FIRMWARE_LATERAL_DELAY = 0.30  # total model/control prediction delay, not additive software delay
 
 
 def _finite_float(value, fallback: float) -> float:
@@ -26,7 +27,10 @@ def _finite_float(value, fallback: float) -> float:
   return result if math.isfinite(result) else fallback
 
 
-def get_lat_delay(params: Params, live_lat_delay: float, steer_actuator_delay: float) -> float:
+def get_lat_delay(params: Params, live_lat_delay: float, steer_actuator_delay: float, *, firmware_controller: bool = False) -> float:
+  if firmware_controller:
+    # Keep saved PIF learning/manual values intact when changing controllers.
+    return FIRMWARE_LATERAL_DELAY
   actuator_delay = max(_finite_float(steer_actuator_delay, 0.0), 0.0)
   fallback = min(LAT_DELAY_BUFFER_SECONDS, actuator_delay + DEFAULT_SOFTWARE_DELAY)
   if params.get_bool("LagdToggle"):
