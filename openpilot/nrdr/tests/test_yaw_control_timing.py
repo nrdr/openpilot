@@ -1,4 +1,4 @@
-"""Yaw command timing stays separate from shared live/manual model delay."""
+"""Profile-specific prediction delay stays separate from the command delay line."""
 import ast
 import math
 from pathlib import Path
@@ -78,7 +78,7 @@ def test_model_and_controls_runtimes_keep_shared_delay_wiring():
   for relative in ("selfdrive/modeld/modeld.py", "sunnypilot/modeld_v2/modeld.py"):
     source = (root / relative).read_text()
     assert "model_lateral_delay_schedule" not in source
-    assert 'if sm.updated["lateralDelay"]:\n      model.lat_delay = get_lat_delay(params,' in source
+    assert 'if delay_schedule is not None or sm.updated["lateralDelay"]:\n      model.lat_delay = get_lat_delay(params,' in source
   source = (root / "selfdrive/controls/controlsd.py").read_text()
   assert "get_lat_delay(self.nrdr_lateral_snapshot," in source
   assert "LaC.lateral_delay" not in source
@@ -88,27 +88,34 @@ def test_model_and_controls_runtimes_keep_shared_delay_wiring():
 @pytest.mark.parametrize("live", [False, True])
 @pytest.mark.parametrize("saved", [None, .05, .31, .4, 1., math.nan])
 @pytest.mark.parametrize("actuator", [0., .2, .5])
-def test_firmware_delay_is_fixed_total_and_preserves_pif_settings(live, saved, actuator):
+def test_clarity_delay_is_scheduled_and_preserves_saved_settings(live, saved, actuator):
   values = {"LagdToggle": live, "LagdToggleDelay": saved}
   snapshot = ParamSnapshot(1, values)
   for learned in (0., .15, .8, math.nan):
-    assert get_lat_delay(snapshot, learned, actuator, firmware_controller=True) == .30
+    for speed, expected in ((0., .15), (7., .08), (12., .10), (20., .20), (30., .30), (40., .30)):
+      assert get_lat_delay(snapshot, learned, actuator,
+        delay_schedule=(timing.DELAY_SCHEDULE_BP, timing.DELAY_SCHEDULE_V), v_ego=speed) == expected
   assert snapshot.values == values
 
 
-def test_model_and_control_fixed_delay_gates_match():
+def test_model_and_control_schedule_gates_match_and_update_on_speed_every_frame():
   root = Path(__file__).resolve().parents[2]
   for relative in ("selfdrive/modeld/modeld.py", "sunnypilot/modeld_v2/modeld.py"):
     source = (root / relative).read_text()
-    assert "firmware_controller = firmware_controller_for_model(params, CP)" in source
-    assert source.count("firmware_controller=firmware_controller") == 2
+    assert "firmware_profile = firmware_controller_profile_for_model(params, CP)" in source
+    assert "delay_schedule = prediction_delay_schedule(firmware_profile)" in source
+    assert source.count("delay_schedule=delay_schedule") == 2
+    assert 'if delay_schedule is not None or sm.updated["lateralDelay"]:' in source
+    assert "v_ego=v_ego" in source
   source = (root / "selfdrive/controls/controlsd.py").read_text()
-  assert 'firmware_controller=getattr(self.LaC, "uses_firmware_delay", False)' in source
+  assert 'delay_schedule=getattr(self.LaC, "delay_schedule", None), v_ego=CS.vEgo' in source
+  source = (root / "sunnypilot/selfdrive/controls/controlsd_ext.py").read_text()
+  assert "firmware_controller_selected(self.params, self.CP, self.CP_SP)" in source
 
 
 @pytest.mark.parametrize("relative", ["selfdrive/modeld/modeld.py", "sunnypilot/modeld_v2/modeld.py"])
 @pytest.mark.parametrize("smooth", [0., .1, .3])
-def test_firmware_total_is_not_extended_by_model_specific_smoothing(relative, smooth):
+def test_measured_schedule_preserves_source_model_specific_smoothing(relative, smooth):
   from types import SimpleNamespace as NS
   root = Path(__file__).resolve().parents[2]
   tree = ast.parse((root / relative).read_text())
@@ -116,8 +123,7 @@ def test_firmware_total_is_not_extended_by_model_specific_smoothing(relative, sm
                   and any(isinstance(target, ast.Name) and target.id == "lat_delay" for target in node.targets)]
   expr = compile(ast.Expression(assignment.value), relative, "eval")
   context = {"model": NS(lat_delay=.30, LAT_SMOOTH_SECONDS=smooth), "LAT_SMOOTH_SECONDS": smooth}
-  assert eval(expr, {**context, "firmware_controller": True}) == .30
-  assert eval(expr, {**context, "firmware_controller": False}) == pytest.approx(.30 + smooth)
+  assert eval(expr, context) == pytest.approx(.30 + smooth)
 
 
 def test_model_firmware_selection_never_reads_honda_data_for_another_vehicle():

@@ -48,6 +48,51 @@ def test_wrong_platform_or_eps_cannot_select_vfn(changes):
     controller(**changes)
 
 
+SUPPORTED_CIVICS = [
+  {"fingerprint": "HONDA_CIVIC_BOSCH", "firmware": b"39990-TBA-C020"},
+  {"fingerprint": "HONDA_CIVIC", "firmware": b"39990-TEG-A010"},
+]
+
+
+@pytest.mark.parametrize("changes", SUPPORTED_CIVICS)
+def test_civic_wrapper_uses_complete_c020_tune_without_mutating_carparams(changes):
+  from openpilot.nrdr.features.lateral.vfn_eps_core import CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE
+  cp, sp = car(**changes)
+  before = repr(cp)
+  control = LatControlFirmware(cp, sp, None, .01)
+  assert repr(cp) == before
+  assert control.core.ff.cal is CIVIC_BOSCH_C020
+  assert control.core.ff.load_coefficients == CIVIC_EPS_LOAD
+  assert control.core.p_scale == CIVIC_P_SCALE and control.core.i_scale == CIVIC_I_SCALE
+  assert control.delay_schedule is None
+  assert control.firmware_profile.provisional == (changes["fingerprint"] == "HONDA_CIVIC")
+  # User PIF/yaw settings cannot leak into either firmware profile.
+  control.set_live_tuning_snapshot(ParamSnapshot(1, {"NrdrDeviceYawCorrection": True, "LatFScaleHighway": 500,
+                                                   "NrdrLatRateDampingHighway": 300}))
+  for state in (0, 2, 3):
+    for _ in range(100):
+      output, _, logged = tick(control, state=state)
+      assert math.isfinite(output) and abs(output) <= control.steer_max
+      assert logged.commandDelay == pytest.approx(.025)
+      if state in (2, 3):
+        assert logged.f == 0. and logged.epsFfWeight == 0.
+
+
+@pytest.mark.parametrize("changes", SUPPORTED_CIVICS)
+@pytest.mark.parametrize("speed,delay", [(5., .175), (12.5, .10), (20., .025)])
+def test_civic_wrapper_uses_its_command_delay_and_preserves_shared_steer_ratio(changes, speed, delay):
+  control = controller(**changes)
+  cp, _ = car(**changes)
+  selection = resolve_steer_ratio_selection(cp, {"NrdrSteerRatioMode": 3})
+  control.set_steer_ratio_selection(selection)
+  for _ in range(60):
+    tick(control, active=False, speed=speed, desired=15.)
+  _, target, logged = tick(control, speed=speed, desired=60.)
+  assert target == pytest.approx(15.)
+  assert logged.commandDelay == pytest.approx(delay)
+  assert selection.firmware_profile is not None
+
+
 @pytest.mark.parametrize("state", [2, 3])
 def test_lane_change_suppresses_wrapper_feedforward_and_rejoins(state):
   control = controller()

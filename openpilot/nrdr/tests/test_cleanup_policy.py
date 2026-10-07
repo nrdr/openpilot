@@ -65,15 +65,19 @@ def test_shared_geometry_is_not_locked_by_controller_selection(key):
 
 
 @pytest.mark.parametrize("key", ["LagdToggle", "LagdToggleDelay"])
-def test_firmware_fixed_delay_is_locked_but_saved_pif_value_is_preserved(key):
+def test_only_measured_firmware_schedule_locks_live_manual_delay(key):
   from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
   params = MemoryParams(NrdrLateralController=1, **{key: .31})
-  assert not tuning_write_allowed(params, key)
+  assert tuning_write_allowed(params, key)  # Civic keeps live/manual delay
+  assert not tuning_write_allowed(params, key, firmware_prediction_schedule=True)
   item = apply_sunnylink_metadata({"key": key})
-  conditions = {condition["condition"]["key"] for condition in item["enablement"]}
-  assert conditions == {"NrdrSuggestedSettings", "NrdrHandcraftedLateralTune", "NrdrLateralController"}
+  assert item["enablement"][-1] == {"type": "not", "condition": {"type": "all", "conditions": [
+    {"type": "param", "key": "NrdrLateralController", "equals": 1},
+    {"type": "capability", "field": "nrdr_firmware_prediction_schedule", "equals": True},
+  ]}}
   params["NrdrLateralController"] = 0
   assert tuning_write_allowed(params, key)
+  assert tuning_write_allowed(params, key, firmware_prediction_schedule=True)
   assert params[key] == .31
 
 

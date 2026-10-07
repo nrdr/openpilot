@@ -1,4 +1,9 @@
-"""nrdr: the Honda Clarity modified-EPS lateral controller, built on the EPS firmware's own control law.
+"""Honda modified-EPS firmware-inversion control, with isolated per-image calibrations.
+
+Civic C020 calibration/load/P-I trims adapted from JamesL787/openpilot
+59eb99e3183eb68963394daee8e52e51eb034f38. Clarity retains the newer angle-dependent
+R6 conversion below; the Civic source's older constant Clarity R6 is NOT ported.
+TEG-A010 may use the C020 calibration only as an explicitly provisional fallback.
 
 The Clarity's LKAS path is not a torque command. The firmware turns our 0xE4 value into a target R5,
 compares it with R6 -- a filtered steering RATE, taken before its angle table (see R6_PER_CENTRE_DEG_S) --
@@ -119,6 +124,8 @@ BAND_LOW_MAX = 25.0 * MPH_TO_MS
 BAND_STD_MAX = 50.0 * MPH_TO_MS
 P_SCALE = (1.25, 1.00, 1.25)
 I_SCALE = (0.70, 0.95, 0.35)
+CIVIC_P_SCALE = (1.15, 1.25, 1.15)
+CIVIC_I_SCALE = (0.75, 0.95, 1.00)
 OUTPUT_LPF_TAU = (0.07, 0.05, 0.01)
 INTEGRATOR_MIN_SPEED = 2.0  # m/s, below this the integrator is held at zero (as vfn)
 
@@ -140,50 +147,101 @@ FF_CRAWL_ANGLE_BP = [5.0, 20.0]  # deg
 FF_CRAWL_SPEED_BP = [5.0, 8.0]   # m/s
 
 
+class EpsFirmwareCalibration:
+  """Per-image command map, envelope and rate feedback; no shared mutable state."""
+
+  def __init__(self, e4_per_output, r5_key_bp, r5_v, envelope_bp, envelope_v, r6_per_deg_s,
+               *, r5_per_key=None, r6_angle_bp=None, r6_angle_gain=None):
+    self.e4_per_output = e4_per_output
+    self.r5_key_bp, self.r5_v = tuple(r5_key_bp), tuple(r5_v)
+    self.envelope_bp, self.envelope_v = tuple(envelope_bp), tuple(envelope_v)
+    self.r6_per_deg_s = r6_per_deg_s
+    self.r6_angle_bp, self.r6_angle_gain = r6_angle_bp, r6_angle_gain
+    self.r5_per_key = r5_per_key
+    if r5_per_key is not None:
+      self.kp_pieces = tuple(KP_PIECES)
+    else:
+      # Kp(key(R5)) has knots at BOTH maps' breakpoints. Keeping only the P
+      # breakpoints would make the quadratic inverse wrong on C020's nonlinear map.
+      knots = sorted(set(r5_v) | {float(np.interp(k, r5_key_bp, r5_v)) for k in KP_KEY_BP if k <= r5_key_bp[-1]})
+      kps = [float(np.interp(np.interp(r, r5_v, r5_key_bp), KP_KEY_BP, KP_V)) for r in knots]
+      pieces = [(lo, hi, kp_lo, (kp_hi - kp_lo) / (hi - lo))
+                for lo, hi, kp_lo, kp_hi in zip(knots[:-1], knots[1:], kps[:-1], kps[1:], strict=True)]
+      self.kp_pieces = (*pieces, (knots[-1], math.inf, kps[-1], 0.0))
+    self.kp_r5_bp = tuple(p[0] for p in self.kp_pieces)
+    self.kp_r5_v = tuple(p[2] for p in self.kp_pieces)
+
+
+CLARITY_A020 = EpsFirmwareCalibration(
+  E4_PER_OUTPUT, R5_KEY_BP, R5_V, ENVELOPE_BP, ENVELOPE_V, R6_PER_CENTRE_DEG_S,
+  r5_per_key=R5_PER_KEY, r6_angle_bp=R6_ANGLE_BP, r6_angle_gain=R6_ANGLE_GAIN,
+)
+# Only for the C020 TargetMapD / Tracker4500 / Norm1650 / P117to265 / D737 /
+# KFF45 modified build. Version strings alone cannot confirm this image. The
+# source's high-speed envelope is firmware-derived, not road-validated at its rail.
+CIVIC_BOSCH_C020 = EpsFirmwareCalibration(
+  e4_per_output=4096.0,
+  r5_key_bp=[0, 115, 254, 449, 654, 862, 1111, 1549, 1774],
+  r5_v=[0, 1926, 4938, 8455, 12036, 15926, 20138, 26955, 30000],
+  envelope_bp=[0, 50, 100, 150, 200, 240, 300, 321, 400],
+  envelope_v=[1774, 1774, 1774, 1774, 1774, 1552, 1219, 1108, 1108],
+  r6_per_deg_s=-173.0,
+)
+CLARITY_EPS_LOAD = (LOAD_K0, LOAD_K1, LOAD_C, LOAD_FRICTION, LOAD_BIAS, LOAD_KROLL)
+# Source fit on Civic C020 firmware-controller route 294 (not its separate PID shadow fit).
+CIVIC_EPS_LOAD = (-5.574, -0.1831, -4.540, -326.5, -83.6, -3.185)
+
+
 def command_key(e4: float) -> int:
   return int(math.trunc(math.trunc(e4 * 56756 / 32768) / 4))
 
 
-def key_ceiling(v_ego: float) -> float:
-  return min(float(np.interp(v_ego * 3.6 * 2.0, ENVELOPE_BP, ENVELOPE_V)), KEY_CLAMP)
+def key_ceiling(v_ego: float, cal: EpsFirmwareCalibration = CLARITY_A020) -> float:
+  return min(float(np.interp(v_ego * 3.6 * 2.0, cal.envelope_bp, cal.envelope_v)), KEY_CLAMP)
 
 
-def r5_from_output(output: float, v_ego: float) -> float:
+def r5_from_output(output: float, v_ego: float, cal: EpsFirmwareCalibration = CLARITY_A020) -> float:
   """What the firmware makes of a lateral output: forward model of 0xE4 -> key -> R5."""
-  key = command_key(-output * E4_PER_OUTPUT)
-  mag = float(np.interp(min(abs(key), key_ceiling(v_ego)), R5_KEY_BP, R5_V))
+  key = command_key(-output * cal.e4_per_output)
+  mag = float(np.interp(min(abs(key), key_ceiling(v_ego, cal)), cal.r5_key_bp, cal.r5_v))
   return math.copysign(mag, key) if key else 0.0
 
 
-def output_from_r5(r5: float) -> float:
+def output_from_r5(r5: float, cal: EpsFirmwareCalibration = CLARITY_A020) -> float:
   """Inverse of r5_from_output (up to integer truncation)."""
-  key = float(np.interp(min(abs(r5), R5_V[-1]), R5_V, R5_KEY_BP))
+  key = float(np.interp(min(abs(r5), cal.r5_v[-1]), cal.r5_v, cal.r5_key_bp))
   e4 = key * 4.0 * 32768.0 / 56756.0
-  return -math.copysign(e4, r5) / E4_PER_OUTPUT
+  return -math.copysign(e4, r5) / cal.e4_per_output
 
 
-def firmware_kp(r5: float) -> float:
-  return float(np.interp(abs(r5) / R5_PER_KEY, KP_KEY_BP, KP_V))
+def firmware_kp(r5: float, cal: EpsFirmwareCalibration = CLARITY_A020) -> float:
+  if cal.r5_per_key is not None:
+    return float(np.interp(abs(r5) / cal.r5_per_key, KP_KEY_BP, KP_V))
+  return float(np.interp(abs(r5), cal.kp_r5_bp, cal.kp_r5_v))
 
 
-def firmware_r6(steering_rate_deg_s: float, angle_deg: float) -> float:
+def firmware_r6(steering_rate_deg_s: float, angle_deg: float, cal: EpsFirmwareCalibration = CLARITY_A020) -> float:
   """The firmware's rate feedback for a published steering rate at a published angle."""
-  return R6_PER_CENTRE_DEG_S * float(np.interp(abs(angle_deg), R6_ANGLE_BP, R6_ANGLE_GAIN)) * steering_rate_deg_s
+  gain = 1.0 if cal.r6_angle_bp is None else float(np.interp(abs(angle_deg), cal.r6_angle_bp, cal.r6_angle_gain))
+  return cal.r6_per_deg_s * gain * steering_rate_deg_s
 
 
-def firmware_output(r5: float, steering_rate_deg_s: float, angle_deg: float = 0.0) -> float:
+def firmware_output(r5: float, steering_rate_deg_s: float, angle_deg: float = 0.0,
+                    cal: EpsFirmwareCalibration = CLARITY_A020) -> float:
   """Steady-state firmware output for a target and a rate (D term omitted): scale*(Kp*(R5-R6) + KFF*R5)/1024/256."""
-  r6 = firmware_r6(steering_rate_deg_s, angle_deg)
-  return SCALE_Q8 * (firmware_kp(r5) * (r5 - r6) + KFF * r5) / 1024.0 / 256.0
+  r6 = firmware_r6(steering_rate_deg_s, angle_deg, cal)
+  return SCALE_Q8 * (firmware_kp(r5, cal) * (r5 - r6) + KFF * r5) / 1024.0 / 256.0
 
 
 def column_load(angle_deg: float, rate_deg_s: float, v_ego: float, roll: float,
-                friction_width: float = FRICTION_WIDTH_DEG_S) -> float:
-  return (LOAD_K0 * angle_deg + LOAD_K1 * angle_deg * v_ego ** 2 + LOAD_C * rate_deg_s
-          + LOAD_FRICTION * math.tanh(rate_deg_s / friction_width) + LOAD_BIAS + LOAD_KROLL * roll * v_ego ** 2)
+                friction_width: float = FRICTION_WIDTH_DEG_S, coefficients=CLARITY_EPS_LOAD) -> float:
+  k0, k1, damping, friction, bias, kroll = coefficients
+  return (k0 * angle_deg + k1 * angle_deg * v_ego ** 2 + damping * rate_deg_s
+          + friction * math.tanh(rate_deg_s / friction_width) + bias + kroll * roll * v_ego ** 2)
 
 
-def r5_for_motion(load: float, rate_deg_s: float, r5_guess: float = 0.0, angle_deg: float = 0.0) -> float:
+def r5_for_motion(load: float, rate_deg_s: float, r5_guess: float = 0.0, angle_deg: float = 0.0,
+                  cal: EpsFirmwareCalibration = CLARITY_A020) -> float:
   """Solve the firmware law for the target that yields `load` while the wheel moves at `rate_deg_s` through `angle_deg`.
 
   load = scale * (Kp*(R5 - R6) + KFF*R5) / 1024 / 256, with Kp piecewise linear in |R5|. On each piece
@@ -192,9 +250,9 @@ def r5_for_motion(load: float, rate_deg_s: float, r5_guess: float = 0.0, angle_d
   here: it is 1-4% off after three passes from rest and need not contract during a fast unwind.
   """
   x = 1024.0 * load * 256.0 / SCALE_Q8
-  r6 = firmware_r6(rate_deg_s, angle_deg)
+  r6 = firmware_r6(rate_deg_s, angle_deg, cal)
   roots = []
-  for lo, hi, kp_lo, slope in KP_PIECES:
+  for lo, hi, kp_lo, slope in cal.kp_pieces:
     for side in (1.0, -1.0):
       # on this piece Kp = a + b*R5, and R5*(Kp + KFF) - Kp*R6 = x
       a, b = kp_lo - slope * lo, slope * side
@@ -213,12 +271,15 @@ def r5_for_motion(load: float, rate_deg_s: float, r5_guess: float = 0.0, angle_d
 
 class HondaEpsFirmwareFeedforward:
   def __init__(self, dt: float, rate_tau: float = DESIRED_RATE_TAU, lead_s: float = LEAD_S,
-               output_tau: float = FF_OUTPUT_TAU, friction_width: float | None = None):
+               output_tau: float = FF_OUTPUT_TAU, friction_width: float | None = None,
+               *, cal: EpsFirmwareCalibration = CLARITY_A020, load=CLARITY_EPS_LOAD):
     self.dt = dt
     self.alpha = dt / (rate_tau + dt)
     self.output_alpha = dt / (output_tau + dt)
     self.lead_s = lead_s
     self.friction_width = friction_width  # None: the speed schedule above
+    self.cal = cal
+    self.load_coefficients = load
     self.reset()
 
   def reset(self):
@@ -237,10 +298,10 @@ class HondaEpsFirmwareFeedforward:
 
     angle = desired_angle_no_offset + self.lead_s * self.rate
     width = self.friction_width if self.friction_width is not None else friction_width(v_ego)
-    self.load = column_load(angle, self.rate, v_ego, roll, width)
-    cap = min(R5_CAP, R5_CAP_ENVELOPE_FRAC * float(np.interp(key_ceiling(v_ego), R5_KEY_BP, R5_V)))
-    self.r5 = max(min(r5_for_motion(self.load, self.rate, self.r5, angle), cap), -cap)
-    target = output_from_r5(self.r5)
+    self.load = column_load(angle, self.rate, v_ego, roll, width, self.load_coefficients)
+    cap = min(R5_CAP, R5_CAP_ENVELOPE_FRAC * float(np.interp(key_ceiling(v_ego, self.cal), self.cal.r5_key_bp, self.cal.r5_v)))
+    self.r5 = max(min(r5_for_motion(self.load, self.rate, self.r5, angle, self.cal), cap), -cap)
+    target = output_from_r5(self.r5, self.cal)
     self.output = target if first else self.output + self.output_alpha * (target - self.output)
     return self.output
 
@@ -255,8 +316,10 @@ class HondaEpsLateralCore:
   Pure (no messaging, no params), so the closed-loop replay can drive exactly the code the car runs.
   """
 
-  def __init__(self, kp_bp, kp_v, ki_bp, ki_v, dt: float, ff: HondaEpsFirmwareFeedforward | None = None):
+  def __init__(self, kp_bp, kp_v, ki_bp, ki_v, dt: float, ff: HondaEpsFirmwareFeedforward | None = None,
+               *, p_scale=P_SCALE, i_scale=I_SCALE):
     self.dt = dt
+    self.p_scale, self.i_scale = p_scale, i_scale
     self.pid = PIDController((kp_bp, kp_v), (ki_bp, ki_v), pos_limit=1.0, neg_limit=-1.0, rate=1.0 / dt)
     self.ff = ff if ff is not None else HondaEpsFirmwareFeedforward(dt)
     # The NRDR torque-output LPF, run exactly as LatControlPID runs it (the car controller deliberately does
@@ -294,12 +357,12 @@ class HondaEpsLateralCore:
       self.ff_ramp = self.ff_weight = 0.0
     ff = self.ff_weight * ff_full
 
-    i_scale = speed_band(v_ego, I_SCALE)
+    i_scale = speed_band(v_ego, self.i_scale)
     self.pid.update(error, speed=v_ego, feedforward=ff,
                     freeze_integrator=steer_limited or steering_pressed or v_ego < INTEGRATOR_MIN_SPEED,
                     integrator_gain_scale=i_scale,
                     reset_integrator=i_scale <= 0.0 or v_ego < INTEGRATOR_MIN_SPEED)
-    output = max(min(self.pid.p * speed_band(v_ego, P_SCALE) + self.pid.i + self.pid.d + ff, 1.0), -1.0)
+    output = max(min(self.pid.p * speed_band(v_ego, self.p_scale) + self.pid.i + self.pid.d + ff, 1.0), -1.0)
 
     if self.output_lpf_enabled:
       self.output_lpf.update_alpha(speed_band(v_ego, self.output_lpf_tau))

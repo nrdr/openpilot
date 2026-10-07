@@ -1,18 +1,24 @@
-"""Firmware Controller: VFN's f837ca86 Clarity EPS controller, with PR #18 timing.
+"""Firmware Controller: VFN Clarity A020 and James's Civic C020 EPS calibrations.
 
 Uses the source controller's fixed gains, firmware-inversion feedforward, command
 delay and output filter. Geometry is supplied by the shared steer-ratio selection,
 just as for PIF; choosing this controller must not replace the user's ratio choice.
 Optimized lane changes remain an explicit owner-requested adaptation. The command
-delay ends (NrdrYawCommandDelayLow/High) depend on how the driving model aims its action.
+delay ends (NrdrYawCommandDelayLow/High) remain Clarity-specific. Civic uses the
+source Civic schedule plus the existing SunnyPilot port compensation. TEG-A010 is
+an explicit owner-requested provisional C020 fallback; its CAN range stays 3840,
+not C020's 4096. No physical equivalence or road validation is implied.
 """
 import numpy as np
 
 from openpilot.cereal import log
+from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
-from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
-from openpilot.nrdr.features.lateral.vfn_eps_core import HondaEpsLateralCore
-from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, command_delay
+from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile
+from openpilot.nrdr.features.lateral.vfn_eps_core import (
+  CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_I_SCALE, CIVIC_P_SCALE, HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
+)
+from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, command_delay, prediction_delay_schedule
 from openpilot.nrdr.features.lateral.latcontrol_pid import _eps_modified_steering_pressed
 from openpilot.nrdr.features.lateral.lane_change_tuning import optimized_lane_change_active
 
@@ -25,13 +31,23 @@ ANGLE_RATE_LIMIT = 300.0
 
 class LatControlFirmware(LatControl):
   owns_output_filter = True
-  uses_firmware_delay = True
-
   def __init__(self, CP, CP_SP, CI, dt):
-    if not yaw_controller_available(CP, CP_SP) or CP.lateralTuning.which() != "pid":
-      raise ValueError("VFN EPS control requires modified Clarity A020 with PID CarParams")
+    self.firmware_profile = firmware_controller_profile(CP, CP_SP)
+    if self.firmware_profile is None:
+      raise ValueError("Firmware control requires a supported modified EPS family with PID CarParams")
     super().__init__(CP, CP_SP, CI, dt)
-    self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt)
+    self.delay_schedule = prediction_delay_schedule(self.firmware_profile)
+    if self.firmware_profile.calibration == "civic_bosch_c020":
+      # Source Bosch base gains as well as its fixed trims, including on the
+      # owner-requested TEG fallback. Never retune CP or increase CAN/safety limits.
+      self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt,
+        ff=HondaEpsFirmwareFeedforward(dt, cal=CIVIC_BOSCH_C020, load=CIVIC_EPS_LOAD),
+        p_scale=CIVIC_P_SCALE, i_scale=CIVIC_I_SCALE)
+    else:
+      self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt)
+    cloudlog.info("Firmware Controller profile=%s calibration=%s provisional=%s prediction_schedule=%s",
+                  self.firmware_profile.name, self.firmware_profile.calibration,
+                  self.firmware_profile.provisional, self.delay_schedule)
     self.cmd_delay = CommandDelay(dt)
     self.model_v2 = None
     self.prev_angle = 0.0
@@ -52,7 +68,7 @@ class LatControlFirmware(LatControl):
     pid_log = log.ControlsState.LateralPIDState.new_message()
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
-    delay = command_delay(self.live_tuning_snapshot, CS.vEgo)
+    delay = command_delay(self.live_tuning_snapshot, CS.vEgo, calibration=self.firmware_profile.calibration)
     desired_curvature = self.cmd_delay.update(desired_curvature, delay)
     desired = self.steer_ratio_selection.desired_angle_no_offset(
       VM, CS.steeringAngleDeg, CS.vEgo, params.roll, desired_curvature)

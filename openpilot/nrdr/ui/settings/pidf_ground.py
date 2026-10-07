@@ -4,7 +4,7 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
-from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
+from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile, yaw_controller_available
 from openpilot.nrdr.features.lateral.capabilities import supports_interpolated_torque_pif
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
 from openpilot.system.ui.lib.application import gui_app
@@ -104,6 +104,9 @@ class PidfGroundLayout(Widget):
   def _update_state(self):
     super()._update_state()
     self._controller.action_item.set_enabled(ui_state.is_offroad())
+    profile = firmware_controller_profile(ui_state.CP, ui_state.CP_SP)
+    self._controller.set_description(tr("TEG-A010 uses the Bosch C020 tune as a provisional placeholder, not a road-validated calibration.")
+                                     if profile is not None and profile.provisional else "")
     for key, item in self._tuning_items.items():
       available = key != "NrdrDeviceYawCorrection" or supports_interpolated_torque_pif(ui_state.CP, ui_state.CP_SP)
       if key == "NrdrDeviceYawCorrection":

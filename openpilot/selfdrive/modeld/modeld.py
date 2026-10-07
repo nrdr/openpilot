@@ -353,9 +353,11 @@ def main(demo=False):
   else:
     CP = messaging.log_from_bytes(params.get("CarParams", block=True), car.CarParams)
   cloudlog.info("modeld got CarParams: %s", CP.brand)
-  from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_for_model
-  firmware_controller = firmware_controller_for_model(params, CP)
-  model.lat_delay = get_lat_delay(params, model.lat_delay, CP.steerActuatorDelay, firmware_controller=firmware_controller)
+  from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile_for_model
+  from openpilot.nrdr.features.lateral.yaw_control_timing import prediction_delay_schedule
+  firmware_profile = firmware_controller_profile_for_model(params, CP)
+  delay_schedule = prediction_delay_schedule(firmware_profile)
+  model.lat_delay = get_lat_delay(params, model.lat_delay, CP.steerActuatorDelay, delay_schedule=delay_schedule)
 
   # TODO this needs more thought, use .2s extra for now to estimate other delays
   # TODO Move smooth seconds to action function
@@ -403,10 +405,10 @@ def main(demo=False):
     is_rhd = sm["driverMonitoringState"].isRHD
     frame_id = sm["narrowRoadCameraState"].frameId
     v_ego = max(sm["carState"].vEgo, 0.)
-    if sm.updated["lateralDelay"]:
+    if delay_schedule is not None or sm.updated["lateralDelay"]:
       model.lat_delay = get_lat_delay(params, sm["lateralDelay"].lateralDelay, CP.steerActuatorDelay,
-                                      firmware_controller=firmware_controller)
-    lat_delay = model.lat_delay if firmware_controller else model.lat_delay + LAT_SMOOTH_SECONDS
+                                     delay_schedule=delay_schedule, v_ego=v_ego)
+    lat_delay = model.lat_delay + LAT_SMOOTH_SECONDS
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["extrinsicsCalibration"].rpyCalib, dtype=np.float32)
       dc = DEVICE_CAMERAS[(str(sm['deviceState'].deviceType), str(sm['narrowRoadCameraState'].sensor))]

@@ -53,6 +53,8 @@ CAPABILITY_FIELDS = (
   "has_handcrafted_lateral_profile",
   "nrdr_honda_tuning_available",
   "nrdr_yaw_controller_available",
+  "nrdr_firmware_prediction_schedule",
+  "nrdr_firmware_controller_provisional",
   "nrdr_longitudinal_tuning_available",
   "nrdr_manual_steer_ratio_available",
   "nrdr_raw_steer_ratio_available",
@@ -82,7 +84,9 @@ CAPABILITY_LABELS: dict[str, str] = {
   "subaru_has_sng": "Subaru Stop-and-Go available",
   "hyundai_alpha_long_available": "Hyundai Alpha Longitudinal available",
   "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
-  "nrdr_yaw_controller_available": "Clarity Firmware Controller",
+  "nrdr_yaw_controller_available": "Supported Honda Firmware Controller",
+  "nrdr_firmware_prediction_schedule": "Measured Firmware Controller prediction-delay schedule",
+  "nrdr_firmware_controller_provisional": "Provisional Bosch tune fallback, not road-validated for this EPS",
   "nrdr_honda_tuning_available": "Confirmed Honda-specific NRDR tuning available",
   "nrdr_longitudinal_tuning_available": "Vehicle explicitly supported by NRDR longitudinal tuning",
   "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio geometry available",
@@ -209,8 +213,11 @@ def generate_capabilities(params: Params | None = None) -> dict:
   confirmed_identity = confirmed_vehicle_identity(
     CP, selected_fingerprint, selected_brand, selection_present=selection_present,
   )
-  from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
-  caps["nrdr_yaw_controller_available"] = confirmed_identity is not None and yaw_controller_available(CP, CP_SP)
+  from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile
+  firmware_profile = firmware_controller_profile(CP, CP_SP) if confirmed_identity is not None else None
+  caps["nrdr_yaw_controller_available"] = firmware_profile is not None
+  caps["nrdr_firmware_prediction_schedule"] = firmware_profile is not None and firmware_profile.prediction_schedule
+  caps["nrdr_firmware_controller_provisional"] = firmware_profile is not None and firmware_profile.provisional
   caps["nrdr_honda_tuning_available"] = confirmed_identity is not None and confirmed_identity[1] == "honda"
   caps["nrdr_longitudinal_tuning_available"] = confirmed_identity is not None and nrdr_longitudinal_enabled(CP)
   # A selected platform and deserialized CP must agree before exposing a

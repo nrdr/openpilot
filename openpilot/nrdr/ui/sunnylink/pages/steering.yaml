@@ -23,6 +23,7 @@ sections:
       - key: NrdrLateralController
         widget: multiple_button
         title: Controller Type
+        description: On TEG-A010, Firmware Controller uses a provisional Bosch C020 tune, not a road-validated calibration for that EPS.
         options:
         - value: 0
           label: PIF Control

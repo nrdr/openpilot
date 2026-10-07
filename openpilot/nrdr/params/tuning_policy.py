@@ -11,7 +11,6 @@ PIF_KEYS = frozenset(
 LONG_SCALE_KEYS = frozenset(("LongPidTuneScale", "LongPidTuneScaleAggressive", "LongPidTuneScaleStandard",
                             "LongPidTuneScaleRelaxed", "LongPidTuneScaleEcon"))
 YAW_FIXED_KEYS = PIF_KEYS | frozenset((
-  "LagdToggle", "LagdToggleDelay",
   "HondaTorqueLowPassFilter",
   "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",
 ))
@@ -38,7 +37,7 @@ def _enabled(params, key: str) -> bool:
   return str(value).strip().lower() in ("true", "1", "b'1'", "b'true'")
 
 
-def tuning_write_allowed(params, key: str | None) -> bool:
+def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedule: bool = False) -> bool:
   if not key:
     return True
   if key in RETIRED_TUNING_KEYS or key.startswith("NrdrNnlc"):
@@ -49,6 +48,8 @@ def tuning_write_allowed(params, key: str | None) -> bool:
     if key in SUGGESTED_LOCK_KEYS or key.startswith(("NrdrSteerRatio", "LaneCenter", "NrdrLatRateDamping")):
       return False
   if str(params.get("NrdrLateralController")) in ("1", "b'1'"):
+    if firmware_prediction_schedule and key in ("LagdToggle", "LagdToggleDelay"):
+      return False
     if key in YAW_FIXED_KEYS or key.startswith("NrdrLatRateDamping"):
       return False
   return True

@@ -265,7 +265,7 @@ def _remote_bool_value(value: str, compression: bool) -> bool | None:
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
   from openpilot.nrdr.params.tuning_policy import reset_learning_scales, tuning_write_allowed
   onroad = not params.get_bool("IsOffroad")
-  vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {"NrdrHandcraftedLateralTune", "NrdrSuggestedSettings"}
+  vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {"NrdrHandcraftedLateralTune", "NrdrSuggestedSettings", "LagdToggle", "LagdToggleDelay"}
   capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
   handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
   honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
@@ -287,7 +287,7 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     ):
       raise ValueError("This Controller Type is unavailable for the detected vehicle. The selection was not saved.")
   for key, value in params_to_update.items():
-    if not tuning_write_allowed(params, key):
+    if not tuning_write_allowed(params, key, firmware_prediction_schedule=capabilities.get("nrdr_firmware_prediction_schedule") is True):
       cloudlog.warning(f"sunnylinkd.saveParams.locked: '{key}'")
       continue
     # disallow modifications to blocked parameters

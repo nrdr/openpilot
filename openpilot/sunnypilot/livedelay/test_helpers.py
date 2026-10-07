@@ -192,8 +192,9 @@ def test_controlsd_resolves_delay_from_the_captured_live_snapshot_each_frame():
   assert len(calls) == 1
   assert ast.unparse(calls[0].args[0]) == "self.nrdr_lateral_snapshot"
   assert ast.unparse(calls[0].args[2]) == "self.CP.steerActuatorDelay"
-  assert len(calls[0].keywords) == 1 and calls[0].keywords[0].arg == "firmware_controller"
-  assert ast.unparse(calls[0].keywords[0].value) == "getattr(self.LaC, 'uses_firmware_delay', False)"
+  assert [keyword.arg for keyword in calls[0].keywords] == ["delay_schedule", "v_ego"]
+  assert ast.unparse(calls[0].keywords[0].value) == "getattr(self.LaC, 'delay_schedule', None)"
+  assert ast.unparse(calls[0].keywords[1].value) == "CS.vEgo"
   assert 'get_lat_delay(self.params, self.sm["lateralDelay"]' not in controlsd_source
 
 
@@ -201,7 +202,7 @@ def test_modeld_refreshes_each_published_lateral_delay():
   openpilot_root = Path(__file__).resolve().parents[2]
   for relative_path in ("selfdrive/modeld/modeld.py", "sunnypilot/modeld_v2/modeld.py"):
     source = (openpilot_root / relative_path).read_text(encoding="utf-8")
-    assert 'if sm.updated["lateralDelay"]:' in source
+    assert 'if delay_schedule is not None or sm.updated["lateralDelay"]:' in source
 
 
 def test_delay_setting_ranges_match_runtime():

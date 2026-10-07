@@ -144,22 +144,24 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
         self.save_params({key: self._encode(b"0")})
         self.generic_write.assert_not_called()
 
-  def test_geometry_is_shared_but_firmware_fixed_delay_cannot_be_written(self):
+  def test_geometry_is_shared_and_only_scheduled_firmware_delay_is_locked(self):
     self.namespace["_vehicle_tuning_capabilities"].return_value = {
       "nrdr_honda_tuning_available": True,
     }
-    for suggested in (False, True):
-      values = {"NrdrLateralController": 1, "NrdrSuggestedSettings": suggested}
-      self.params.get.side_effect = lambda name, values=values, **_: values.get(name, "0")
-      for key, raw in (("NrdrSteerRatioMode", b"2"), ("LagdToggle", b"0"), ("LagdToggleDelay", b"0.3")):
-        with self.subTest(suggested=suggested, key=key):
-          self.generic_write.reset_mock()
-          value = self._encode(raw)
-          self.save_params({key: value})
-          if suggested or key in ("LagdToggle", "LagdToggleDelay"):
-            self.generic_write.assert_not_called()
-          else:
-            self.generic_write.assert_called_once_with(key, value, False)
+    for scheduled in (False, True):
+      self.namespace["_vehicle_tuning_capabilities"].return_value["nrdr_firmware_prediction_schedule"] = scheduled
+      for suggested in (False, True):
+        values = {"NrdrLateralController": 1, "NrdrSuggestedSettings": suggested}
+        self.params.get.side_effect = lambda name, values=values, **_: values.get(name, "0")
+        for key, raw in (("NrdrSteerRatioMode", b"2"), ("LagdToggle", b"0"), ("LagdToggleDelay", b"0.3")):
+          with self.subTest(scheduled=scheduled, suggested=suggested, key=key):
+            self.generic_write.reset_mock()
+            value = self._encode(raw)
+            self.save_params({key: value})
+            if suggested or (scheduled and key in ("LagdToggle", "LagdToggleDelay")):
+              self.generic_write.assert_not_called()
+            else:
+              self.generic_write.assert_called_once_with(key, value, False)
 
   def test_controller_change_onroad_is_rpc_error_and_never_saves_or_updates_version(self):
     self.params.get_bool.return_value = False

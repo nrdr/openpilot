@@ -49,6 +49,11 @@ def apply_sunnylink_metadata(item: dict) -> dict:
         enablement.append({"type": "not", "condition": {"type": "param", "key": switch, "equals": True}})
     if key in YAW_FIXED_KEYS or key.startswith("NrdrLatRateDamping"):
       enablement.append({"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 1}})
+    if key in ("LagdToggle", "LagdToggleDelay"):
+      enablement.append({"type": "not", "condition": {"type": "all", "conditions": [
+        {"type": "param", "key": "NrdrLateralController", "equals": 1},
+        {"type": "capability", "field": "nrdr_firmware_prediction_schedule", "equals": True},
+      ]}})
     if key in LONG_SCALE_KEYS:
       condition = {"type": "not", "condition": {"type": "param", "key": "HondaLiveLearningGas", "equals": True}}
       enablement.append(condition)

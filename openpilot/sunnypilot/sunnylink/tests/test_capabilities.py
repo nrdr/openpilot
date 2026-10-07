@@ -142,6 +142,33 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
     assert caps["nrdr_raw_steer_ratio_available"] is False
     assert caps["nrdr_firmware_steer_ratio_available"] is False
     assert caps["nrdr_interpolated_torque_pif_blend_available"] is False
+    assert caps["nrdr_firmware_prediction_schedule"] is False
+    assert caps["nrdr_firmware_controller_provisional"] is False
+
+  def test_firmware_profiles_are_exact_and_schedule_is_clarity_only(self, params):
+    from openpilot.cereal import custom
+    from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
+    sp = custom.CarParamsSP.new_message(flags=HondaFlagsSP.EPS_MODIFIED.value)
+    params.put("CarParamsSPPersistent", sp.to_bytes(), block=True)
+    for fingerprint, firmware, available, scheduled, provisional in (
+      ("HONDA_CLARITY", b"39990-TRW-A020", True, True, False),
+      ("HONDA_CIVIC_BOSCH", b"39990-TBA-C020", True, False, False),
+      ("HONDA_CIVIC", b"39990-TEG-A010", True, False, True),
+      ("HONDA_CIVIC", b"39990-TBA-A030", False, False, False),
+      ("HONDA_CIVIC_BOSCH", b"39990-TBA-C120", False, False, False),
+    ):
+      params.put("CarPlatformBundle", {"brand": "honda", "platform": fingerprint}, block=True)
+      put_car_params(params, fingerprint, "honda", firmware)
+      result = generate_capabilities(params)
+      assert result["nrdr_yaw_controller_available"] is available
+      assert result["nrdr_firmware_prediction_schedule"] is scheduled
+      assert result["nrdr_firmware_controller_provisional"] is provisional
+    # A stale Clarity CP cannot lock another selected vehicle's delay settings.
+    put_car_params(params, "HONDA_CLARITY", "honda", b"39990-TRW-A020")
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CIVIC"}, block=True)
+    result = generate_capabilities(params)
+    assert not result["nrdr_yaw_controller_available"]
+    assert not result["nrdr_firmware_prediction_schedule"]
 
   def test_exact_honda_bundle_enables_manual_and_clarity_raw(self, params):
     params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CLARITY"}, block=True)

@@ -157,9 +157,10 @@ class CarTuneReporter:
             f"immutable CP center anchor {selection.cp_ratio:g} | no lane fade")
 
   def _controller_info(self, controller: str, steer_ratio: SteerRatioSelection, CP) -> str:
-    from openpilot.nrdr.features.lateral.controller_selection import yaw_controller_available
-    if self.params.get("NrdrLateralController") == 1 and yaw_controller_available(CP, self._cp_sp()):
-      return "Firmware Controller (VFN EPS)"
+    from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile, firmware_controller_selected
+    if firmware_controller_selected(self.params, CP, self._cp_sp()):
+      profile = firmware_controller_profile(CP, self._cp_sp())
+      return f"Firmware Controller (VFN EPS) | {profile.name}"
     return controller.replace("PID/NNLC", "PIF Control")
 
   def _build(self, CP) -> dict[str, str]:
