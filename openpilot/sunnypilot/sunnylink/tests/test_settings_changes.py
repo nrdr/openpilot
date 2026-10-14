@@ -293,7 +293,7 @@ class TestDevicePowerPolicy(OpenpilotTestCase):
     assert "enabled=ui_state.is_offroad" in canonical_copy
     assert "nrdrparamkey.disable_power_down" in canonical_copy
     assert "prevent automatic\\nshutdown" in canonical_copy
-    assert "battery drain risk" in canonical_copy
+    assert "battery drain" in canonical_copy
     assert "ui_state.is_offroad" in canonical_copy
 
   def test_offroad_timer_is_subordinate_and_not_mislabeled(self, schema):

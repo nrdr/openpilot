@@ -44,8 +44,10 @@ def attach_mici_automatic_shutdown_control(scroller) -> BigParamControl:
   control = BigParamControl(
     tr("prevent automatic\nshutdown"),
     NrdrParamKey.DISABLE_POWER_DOWN,
+    # Two title lines plus the warning must fit the C4's fixed 180px tile.
+    font_size=30,
   )
-  control.set_value(tr("battery drain risk"))
+  control.set_value(tr("battery drain"))
   control.set_enabled(ui_state.is_offroad)
 
   # Keep power behavior together, immediately before reset/reboot/power-off.

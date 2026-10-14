@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
@@ -112,9 +113,10 @@ class TestPowerUiAdapters(unittest.TestCase):
     ui_state = SimpleNamespace(is_offroad=lambda: True)
 
     class FakeControl:
-      def __init__(self, text, param):
+      def __init__(self, text, param, *, font_size=None):
         self.text = text
         self.param = param
+        self.font_size = font_size
         self.value = None
         self.enabled = None
 
@@ -141,8 +143,48 @@ class TestPowerUiAdapters(unittest.TestCase):
     self.assertEqual(scroller.items[4:], original_items[3:])
     self.assertEqual(control.text, "prevent automatic\nshutdown")
     self.assertEqual(control.param, "DisablePowerDown")
-    self.assertEqual(control.value, "battery drain risk")
+    self.assertEqual(control.font_size, 30)
+    self.assertEqual(control.value, "battery drain")
     self.assertTrue(control.enabled())
+
+  def test_mici_param_control_preserves_explicit_font_and_default_behavior(self):
+    # Exercise the production constructor without a window or native Params I/O.
+    root = Path(__file__).resolve().parents[3]
+    source = (root / "openpilot/selfdrive/ui/mici/widgets/button.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    control_class = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "BigParamControl")
+    constructor = next(node for node in control_class.body if isinstance(node, ast.FunctionDef) and node.name == "__init__")
+    control_class.body = [constructor]
+    module = ast.Module(body=[control_class], type_ignores=[])
+
+    class FakeToggle:
+      def __init__(self, text, value, **kwargs):
+        self.text = text
+        self.value = value
+        self.font_size = kwargs["font_size"]
+        self.callback = kwargs["toggle_callback"]
+
+      def set_checked(self, checked):
+        self.checked = checked
+
+    params = SimpleNamespace(get_bool=lambda key, default: key == "DisablePowerDown")
+    namespace = {"BigToggle": FakeToggle, "Params": lambda: params, "Callable": object}
+    exec(compile(module, str(root / "openpilot/selfdrive/ui/mici/widgets/button.py"), "exec"), namespace)
+    control_type = namespace["BigParamControl"]
+    def callback(checked):
+      pass
+
+    compact = control_type("prevent automatic\nshutdown", "DisablePowerDown", callback, font_size=30)
+    self.assertEqual(compact.font_size, 30)
+    self.assertIs(compact.callback, callback)
+    self.assertIs(compact.params, params)
+    self.assertTrue(compact.checked)
+    self.assertEqual(compact.param, "DisablePowerDown")
+
+    unchanged = control_type("another control", "OtherParam")
+    self.assertIsNone(unchanged.font_size)
+    self.assertIsNone(unchanged.callback)
+    self.assertFalse(unchanged.checked)
 
 
 class TestPowerOwnershipBoundaries(unittest.TestCase):
