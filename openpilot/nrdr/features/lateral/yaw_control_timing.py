@@ -32,6 +32,9 @@ COMMAND_DELAY_BP = (10.0, 15.0)  # m/s
 DEFAULT_COMMAND_DELAY_LOW = 0.145  # s
 DEFAULT_COMMAND_DELAY_HIGH = 0.025  # s
 CIVIC_COMMAND_DELAY_LOW = 0.175  # 0.15 source + 0.025 port compensation
+# The TEG-A010 keeps it: with 0.175 applied, plan timing on its owner's routes 12e/134/137/139 (5-12 m/s turns)
+# measured the car 0.05 s early (+0.02/-0.06/-0.06/-0.08), so there is no case for less; mostly highway drives.
+CIVIC_COMMAND_DELAY_CALIBRATIONS = ("civic_bosch_c020", "civic_teg_a010")
 MAX_COMMAND_DELAY = 0.30  # s
 
 
@@ -51,7 +54,7 @@ def _command_delay_setting(settings, key, default: float) -> float:
 
 
 def command_delay(settings, speed: float, *, calibration: str = "clarity_a020") -> float:
-  if calibration == "civic_bosch_c020":
+  if calibration in CIVIC_COMMAND_DELAY_CALIBRATIONS:
     # Do not let persisted Clarity command-delay settings silently retune Civic.
     return float(np.interp(speed, COMMAND_DELAY_BP, (CIVIC_COMMAND_DELAY_LOW, DEFAULT_COMMAND_DELAY_HIGH)))
   low = _command_delay_setting(settings, NrdrParamKey.NRDR_YAW_COMMAND_DELAY_LOW, DEFAULT_COMMAND_DELAY_LOW)

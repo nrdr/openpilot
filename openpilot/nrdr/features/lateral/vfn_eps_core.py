@@ -3,7 +3,7 @@
 Civic C020 calibration/load/P-I trims adapted from JamesL787/openpilot
 59eb99e3183eb68963394daee8e52e51eb034f38. Clarity retains the newer angle-dependent
 R6 conversion below; the Civic source's older constant Clarity R6 is NOT ported.
-TEG-A010 may use the C020 calibration only as an explicitly provisional fallback.
+TEG-A010 has its own calibration (row 3 / TEGA2, measured on its owner's telemetry), still provisional.
 
 The Clarity's LKAS path is not a torque command. The firmware turns our 0xE4 value into a target R5,
 compares it with R6 -- a filtered steering RATE, taken before its angle table (see R6_PER_CENTRE_DEG_S) --
@@ -194,6 +194,29 @@ CIVIC_BOSCH_C020 = EpsFirmwareCalibration(
 CLARITY_EPS_LOAD = (LOAD_K0, LOAD_K1, LOAD_C, LOAD_FRICTION, LOAD_BIAS, LOAD_KROLL)
 # Source fit on Civic C020 firmware-controller route 294 (not its separate PID shadow fit).
 CIVIC_EPS_LOAD = (-5.574, -0.1831, -4.540, -326.5, -83.6, -3.185)
+# Civic (Nidec) TEG-A010 PTM (Tracker1-3200 TEG builds), measured on its owner's 11 telemetry routes
+# (d7cee79a4d45d4cf 0000012d-00000139, 2026-10-14/15; 0x6A0-0x6A3 on bus 0). The car runs command ROW 3
+# (variant TEGA2): its telemetry R5 against the sent E4 sits on row 3 with a median residual of 9 counts
+# (rows 0-2: 1046-1325), on routes 0000012f and 00000139. Row 3's command axis and its P axis, TargetMap-D R5
+# and the TEG image's envelope (= the C020's) are read from the image. Version strings cannot tell a TEGA1
+# car (row 2) from a TEGA2 car (row 3). HONDA_CIVIC is sent 3840 E4 per unit of output, not the C020's 4096.
+# R6: the telemetry R6 word against steeringRateDeg, hands off, route 00000139: -152.5 per deg/s at 0 lag
+# (R^2 0.94); kept flat over angle, like the C020's.
+CIVIC_TEG_A010 = EpsFirmwareCalibration(
+  e4_per_output=3840.0,
+  r5_key_bp=[0, 222, 333, 495, 656, 887, 1108, 1552, 1774],
+  r5_v=[0, 1926, 4938, 8455, 12036, 15926, 20138, 26955, 30000],
+  envelope_bp=[0, 50, 100, 150, 200, 240, 300, 321, 400],
+  envelope_v=[1774, 1774, 1774, 1774, 1774, 1552, 1219, 1108, 1108],
+  r6_per_deg_s=-152.5,
+  kp_key_bp=[3, 173, 441, 665, 887, 1104, 1317, 1610, 1774],
+)
+# TEG column, the same recipe as the Clarity's and the C020's: target = the telemetry's own P + D + KFF*R5/1024
+# (row-independent), engaged, unpressed, |steering torque| < 300, motion lag fitted; 81 min of frames on the 11
+# routes, R^2 0.735. Held out by route it beats the C020 load the TEG used before; by regime on routes 134/139
+# after fitting 133/137: hold 15+ m/s RMS 255 vs 866, turn-in 9-15 m/s 306 vs 430, unwind 15+ 142 vs 714. These
+# drives hold few turns below 9 m/s, so the crawl regimes are untested.
+CIVIC_TEG_EPS_LOAD = (-7.833, -0.169, -8.29, -311.2, 59.18, -4.457)
 
 
 def command_key(e4: float) -> int:

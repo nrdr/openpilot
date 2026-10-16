@@ -8,7 +8,7 @@ import pytest
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.nrdr.features.lateral.controller_selection import (
-  CIVIC_PROFILE, CLARITY_PROFILE, TEG_PLACEHOLDER_PROFILE, firmware_controller_profile,
+  CIVIC_PROFILE, CLARITY_PROFILE, TEG_PROFILE, firmware_controller_profile,
   firmware_controller_selected,
 )
 from openpilot.nrdr.features.lateral import vfn_eps_core as core
@@ -26,7 +26,7 @@ def car(fingerprint, firmware, *, modified=True, tuning="pid", brand="honda"):
 @pytest.mark.parametrize("fingerprint,firmware,profile", [
   ("HONDA_CLARITY", b"39990-TRW-A020\0", CLARITY_PROFILE),
   ("HONDA_CIVIC_BOSCH", b"39990-TBA,C020", CIVIC_PROFILE),
-  ("HONDA_CIVIC", b"39990-TEG,A010\0", TEG_PLACEHOLDER_PROFILE),
+  ("HONDA_CIVIC", b"39990-TEG,A010\0", TEG_PROFILE),
 ])
 def test_exact_profiles_and_selected_controller(fingerprint, firmware, profile):
   cp, sp = car(fingerprint, firmware)
@@ -34,7 +34,7 @@ def test_exact_profiles_and_selected_controller(fingerprint, firmware, profile):
   for value in (1, "1", b"1"):
     assert firmware_controller_selected({"NrdrLateralController": value}, cp, sp)
   assert not firmware_controller_selected({"NrdrLateralController": 0}, cp, sp)
-  assert profile.provisional == (profile is TEG_PLACEHOLDER_PROFILE)
+  assert profile.provisional == (profile is TEG_PROFILE)
 
 
 @pytest.mark.parametrize("fingerprint,firmware", [
@@ -102,7 +102,7 @@ def test_c020_feedforward_respects_source_caps_and_lane_change_bypass(speed):
   assert control.ff_weight == 0. and control.pid.f == 0.
 
 
-@pytest.mark.parametrize("profile", [CIVIC_PROFILE, TEG_PLACEHOLDER_PROFILE])
+@pytest.mark.parametrize("profile", [CIVIC_PROFILE, TEG_PROFILE])
 def test_civic_keeps_shared_prediction_delay_but_not_saved_clarity_command_delay(profile):
   assert prediction_delay_schedule(profile) is None
   assert prediction_delay_schedule(CLARITY_PROFILE) is not None
@@ -161,3 +161,32 @@ def test_calibrations_default_to_the_shared_p_axis_and_honour_their_own():
     assert core.firmware_kp(target, own) == pytest.approx(np.interp(key, own.kp_key_bp, core.KP_V))
   with pytest.raises(ValueError):
     core.EpsFirmwareCalibration(3840., (0, 1), (0, 18), (0, 1), (1774, 1774), -122., r5_per_key=18.04, kp_key_bp=(0, 1))
+
+
+def test_teg_runs_its_measured_row_3_calibration_at_its_own_can_scale():
+  cal = core.CIVIC_TEG_A010
+  assert TEG_PROFILE.calibration == "civic_teg_a010" and TEG_PROFILE.provisional
+  assert cal.e4_per_output == 3840.  # = the HONDA_CIVIC transport limit, see test_tegs_can_and_safety_limits...
+  assert cal.r5_key_bp == (0, 222, 333, 495, 656, 887, 1108, 1552, 1774) and cal.r5_v == core.CIVIC_BOSCH_C020.r5_v
+  assert cal.kp_key_bp == (3, 173, 441, 665, 887, 1104, 1317, 1610, 1774)
+  assert cal.envelope_v == core.CIVIC_BOSCH_C020.envelope_v and cal.r6_per_deg_s == -152.5
+  assert core.CIVIC_TEG_EPS_LOAD == (-7.833, -.169, -8.29, -311.2, 59.18, -4.457)
+  # The owner's telemetry R5 by command key (route 0000012f medians); the map holds them within 3 %.
+  for key, measured in ((40, 338), (80, 685), (120, 1032), (160, 1379), (200, 1726), (240, 2360)):
+    assert np.interp(key, cal.r5_key_bp, cal.r5_v) == pytest.approx(measured, rel=.03)
+  # The C020 placeholder it replaces asked about twice the R5 this car makes for a small command.
+  assert core.r5_from_output(.05, 10., core.CIVIC_BOSCH_C020) / core.r5_from_output(.05, 10., cal) > 1.9
+
+
+@pytest.mark.parametrize("output", np.linspace(-.85, .85, 19))
+def test_teg_command_map_round_trip(output):
+  target = core.r5_from_output(output, 20., core.CIVIC_TEG_A010)
+  assert core.output_from_r5(target, core.CIVIC_TEG_A010) == pytest.approx(output, abs=.002)
+
+
+@pytest.mark.parametrize("load,rate", [(500., 0.), (-1500., 0.), (800., 40.), (-800., -40.), (-4000., 120.), (0., 0.)])
+@pytest.mark.parametrize("guess", [0., 15000., -15000.])
+def test_teg_nonlinear_inverse_satisfies_its_firmware_law(load, rate, guess):
+  cal = core.CIVIC_TEG_A010
+  target = core.r5_for_motion(load, rate, guess, cal=cal)
+  assert core.firmware_output(target, rate, cal=cal) == pytest.approx(load, abs=1e-6)

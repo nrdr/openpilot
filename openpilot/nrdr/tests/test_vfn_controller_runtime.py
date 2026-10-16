@@ -55,14 +55,16 @@ SUPPORTED_CIVICS = [
 
 
 @pytest.mark.parametrize("changes", SUPPORTED_CIVICS)
-def test_civic_wrapper_uses_complete_c020_tune_without_mutating_carparams(changes):
-  from openpilot.nrdr.features.lateral.vfn_eps_core import CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE
+def test_civic_wrapper_uses_its_own_calibration_and_the_c020_trims_without_mutating_carparams(changes):
+  from openpilot.nrdr.features.lateral.vfn_eps_core import (CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_P_SCALE,
+                                                            CIVIC_I_SCALE, CIVIC_TEG_A010, CIVIC_TEG_EPS_LOAD)
   cp, sp = car(**changes)
   before = repr(cp)
   control = LatControlFirmware(cp, sp, None, .01)
   assert repr(cp) == before
-  assert control.core.ff.cal is CIVIC_BOSCH_C020
-  assert control.core.ff.load_coefficients == CIVIC_EPS_LOAD
+  teg = changes["fingerprint"] == "HONDA_CIVIC"
+  assert control.core.ff.cal is (CIVIC_TEG_A010 if teg else CIVIC_BOSCH_C020)
+  assert control.core.ff.load_coefficients == (CIVIC_TEG_EPS_LOAD if teg else CIVIC_EPS_LOAD)
   assert control.core.p_scale == CIVIC_P_SCALE and control.core.i_scale == CIVIC_I_SCALE
   assert control.delay_schedule is None
   assert control.firmware_profile.provisional == (changes["fingerprint"] == "HONDA_CIVIC")

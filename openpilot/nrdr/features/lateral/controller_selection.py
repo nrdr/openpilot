@@ -1,8 +1,9 @@
 """Drive-latched firmware control, with exact EPS-family admission.
 
 Firmware version strings identify the family, not the contents of a modified image.
-The owner must still confirm the flashed build. TEG-A010 is an explicit, unvalidated
-owner-requested C020 calibration fallback, never a generic Honda fallback.
+The owner must still confirm the flashed build. TEG-A010 runs its own calibration, measured on one
+TEGA2 (command row 3) car's telemetry; it stays provisional until a TEGA1 (row 2) car is ruled out
+or read, and it is never a generic Honda fallback.
 """
 from dataclasses import dataclass
 
@@ -21,13 +22,13 @@ class FirmwareControllerProfile:
 
 CLARITY_PROFILE = FirmwareControllerProfile("Clarity A020", "clarity_a020", prediction_schedule=True)
 CIVIC_PROFILE = FirmwareControllerProfile("Civic Bosch C020", "civic_bosch_c020")
-TEG_PLACEHOLDER_PROFILE = FirmwareControllerProfile(
-  "Civic TEG-A010 / Bosch C020 placeholder (not road-validated)", "civic_bosch_c020", provisional=True,
+TEG_PROFILE = FirmwareControllerProfile(
+  "Civic TEG-A010 row 3 (TEGA2, measured on one car)", "civic_teg_a010", provisional=True,
 )
 _PROFILES = {
   ("HONDA_CLARITY", "39990-TRW-A020"): CLARITY_PROFILE,
   ("HONDA_CIVIC_BOSCH", "39990-TBA-C020"): CIVIC_PROFILE,
-  ("HONDA_CIVIC", "39990-TEG-A010"): TEG_PLACEHOLDER_PROFILE,
+  ("HONDA_CIVIC", "39990-TEG-A010"): TEG_PROFILE,
 }
 
 
