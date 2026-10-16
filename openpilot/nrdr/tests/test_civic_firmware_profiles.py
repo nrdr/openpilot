@@ -149,3 +149,15 @@ def test_tegs_can_and_safety_limits_are_not_replaced_with_bosch_limits():
   limits = {key.attr: value.value for key, value in zip(assignment.value.keys, assignment.value.values, strict=True)}
   assert limits["HONDA_CIVIC"] == 3840
   assert limits["HONDA_CIVIC_BOSCH"] == 4096
+
+
+def test_calibrations_default_to_the_shared_p_axis_and_honour_their_own():
+  assert core.CIVIC_BOSCH_C020.kp_key_bp == core.CLARITY_A020.kp_key_bp == tuple(core.KP_KEY_BP)
+  c020 = core.CIVIC_BOSCH_C020
+  own = core.EpsFirmwareCalibration(c020.e4_per_output, c020.r5_key_bp, c020.r5_v, c020.envelope_bp, c020.envelope_v,
+                                    c020.r6_per_deg_s, kp_key_bp=(0, 111, 222, 333, 499, 665, 887, 1108, 1774))
+  for target in np.linspace(0., 30000., 61):
+    key = np.interp(target, own.r5_v, own.r5_key_bp)
+    assert core.firmware_kp(target, own) == pytest.approx(np.interp(key, own.kp_key_bp, core.KP_V))
+  with pytest.raises(ValueError):
+    core.EpsFirmwareCalibration(3840., (0, 1), (0, 18), (0, 1), (1774, 1774), -122., r5_per_key=18.04, kp_key_bp=(0, 1))

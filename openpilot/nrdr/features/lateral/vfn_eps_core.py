@@ -148,23 +148,27 @@ FF_CRAWL_SPEED_BP = [5.0, 8.0]   # m/s
 
 
 class EpsFirmwareCalibration:
-  """Per-image command map, envelope and rate feedback; no shared mutable state."""
+  """Per-image command map, P key axis, envelope and rate feedback; no shared mutable state."""
 
   def __init__(self, e4_per_output, r5_key_bp, r5_v, envelope_bp, envelope_v, r6_per_deg_s,
-               *, r5_per_key=None, r6_angle_bp=None, r6_angle_gain=None):
+               *, r5_per_key=None, r6_angle_bp=None, r6_angle_gain=None, kp_key_bp=None):
     self.e4_per_output = e4_per_output
     self.r5_key_bp, self.r5_v = tuple(r5_key_bp), tuple(r5_v)
     self.envelope_bp, self.envelope_v = tuple(envelope_bp), tuple(envelope_v)
     self.r6_per_deg_s = r6_per_deg_s
     self.r6_angle_bp, self.r6_angle_gain = r6_angle_bp, r6_angle_gain
     self.r5_per_key = r5_per_key
+    # The P row's key axis is row-indexed in the image like the command map; KP_V is the same on every PTM row.
+    self.kp_key_bp = tuple(KP_KEY_BP if kp_key_bp is None else kp_key_bp)
     if r5_per_key is not None:
+      if self.kp_key_bp != tuple(KP_KEY_BP):
+        raise ValueError("a linear command map uses the shared Clarity P pieces")
       self.kp_pieces = tuple(KP_PIECES)
     else:
       # Kp(key(R5)) has knots at BOTH maps' breakpoints. Keeping only the P
       # breakpoints would make the quadratic inverse wrong on C020's nonlinear map.
-      knots = sorted(set(r5_v) | {float(np.interp(k, r5_key_bp, r5_v)) for k in KP_KEY_BP if k <= r5_key_bp[-1]})
-      kps = [float(np.interp(np.interp(r, r5_v, r5_key_bp), KP_KEY_BP, KP_V)) for r in knots]
+      knots = sorted(set(r5_v) | {float(np.interp(k, r5_key_bp, r5_v)) for k in self.kp_key_bp if k <= r5_key_bp[-1]})
+      kps = [float(np.interp(np.interp(r, r5_v, r5_key_bp), self.kp_key_bp, KP_V)) for r in knots]
       pieces = [(lo, hi, kp_lo, (kp_hi - kp_lo) / (hi - lo))
                 for lo, hi, kp_lo, kp_hi in zip(knots[:-1], knots[1:], kps[:-1], kps[1:], strict=True)]
       self.kp_pieces = (*pieces, (knots[-1], math.inf, kps[-1], 0.0))
