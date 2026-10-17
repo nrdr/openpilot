@@ -8,7 +8,8 @@ changing it requires offroad confirmation. PIF's Device Yaw Correction is separa
 | --- | --- | --- |
 | HONDA_CLARITY / 39990-TRW-A020, modified EPS | Existing Clarity A020 | Measured speed schedule |
 | HONDA_CIVIC_BOSCH / 39990-TBA-C020, modified EPS | Civic C020 TargetMapD / Tracker4500 / Norm1650 / P117to265 / D737 / KFF45 | Normal live/manual path |
-| HONDA_CIVIC / 39990-TEG-A010, modified EPS | **Provisional C020 placeholder, not road-validated for TEG** | Normal live/manual path |
+| HONDA_CIVIC / 39990-TEG-A010, modified EPS | TEG-A010 corrected PTM build, command row 3 (provisional until driven on that build) | Normal live/manual path |
+| HONDA_INSIGHT / 39990-TXM-A040, modified EPS | Insight TXM-A040 corrected PTM build (the Clarity's own command map and P table, 4096 E4 per unit, measured load, R6 from its A table) | Clarity's measured speed schedule |
 
 PID CarParams and a matching firmware steer-ratio profile are also required. No
 other Civic, firmware version, diesel, CR-V, or generic Honda inherits the fallback.
@@ -27,7 +28,7 @@ Model-specific smoothing remains separate, as in the source implementation.
 
 Command delay is a separate interpolated curvature history buffer, not a blocking
 sleep. It fades between 10 and 15 m/s. Clarity retains its saved endpoints, default
-0.145 / 0.025 seconds. Civic uses fixed 0.175 / 0.025 seconds (source 0.150 / 0.000
+0.145 / 0.025 seconds. Civic (and the Insight) uses fixed 0.175 / 0.025 seconds (source 0.150 / 0.000
 plus the existing port's 0.025-second model-action compensation); saved Clarity
 command-delay settings do not retune Civic. These are model-dependent calibrations,
 not a guarantee for every driving model.

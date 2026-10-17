@@ -4,7 +4,7 @@ Firmware version strings identify the family, not the contents of a modified ima
 The owner must still confirm the flashed build. TEG-A010 runs its own calibration for the corrected PTM
 build (command row 3; rows 2 and 3 make the same command there), with R6 and load measured on one
 car's telemetry. It stays provisional until it has been driven on that build, and it is never a
-generic Honda fallback.
+generic Honda fallback. Insight TXM-A040 runs its corrected PTM build's calibration, which has been driven.
 """
 from dataclasses import dataclass
 
@@ -26,10 +26,14 @@ CIVIC_PROFILE = FirmwareControllerProfile("Civic Bosch C020", "civic_bosch_c020"
 TEG_PROFILE = FirmwareControllerProfile(
   "Civic TEG-A010 corrected PTM, row 3 (not yet driven)", "civic_teg_a010", provisional=True,
 )
+INSIGHT_PROFILE = FirmwareControllerProfile(
+  "Insight TXM-A040 corrected PTM", "insight_txm_a040", prediction_schedule=True,
+)
 _PROFILES = {
   ("HONDA_CLARITY", "39990-TRW-A020"): CLARITY_PROFILE,
   ("HONDA_CIVIC_BOSCH", "39990-TBA-C020"): CIVIC_PROFILE,
   ("HONDA_CIVIC", "39990-TEG-A010"): TEG_PROFILE,
+  ("HONDA_INSIGHT", "39990-TXM-A040"): INSIGHT_PROFILE,
 }
 
 

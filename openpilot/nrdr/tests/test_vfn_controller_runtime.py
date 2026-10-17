@@ -80,6 +80,22 @@ def test_civic_wrapper_uses_its_own_calibration_and_the_c020_trims_without_mutat
         assert logged.f == 0. and logged.epsFfWeight == 0.
 
 
+def test_insight_wrapper_uses_its_own_calibration_the_c020_trims_and_the_clarity_schedule():
+  from openpilot.nrdr.features.lateral.vfn_eps_core import (CIVIC_I_SCALE, CIVIC_P_SCALE, INSIGHT_TXM_A040,
+                                                            INSIGHT_TXM_EPS_LOAD)
+  cp, sp = car(fingerprint="HONDA_INSIGHT", firmware=b"39990-TXM,A040")
+  before = repr(cp)
+  control = LatControlFirmware(cp, sp, None, .01)
+  assert repr(cp) == before
+  assert control.core.ff.cal is INSIGHT_TXM_A040 and control.core.ff.load_coefficients == INSIGHT_TXM_EPS_LOAD
+  assert control.core.p_scale == CIVIC_P_SCALE and control.core.i_scale == CIVIC_I_SCALE
+  assert control.delay_schedule is not None and not control.firmware_profile.provisional
+  for _ in range(60):
+    tick(control, active=False, speed=5., desired=15.)
+  _, _, logged = tick(control, speed=5., desired=60.)
+  assert logged.commandDelay == pytest.approx(.175)
+
+
 @pytest.mark.parametrize("changes", SUPPORTED_CIVICS)
 @pytest.mark.parametrize("speed,delay", [(5., .175), (12.5, .10), (20., .025)])
 def test_civic_wrapper_uses_its_command_delay_and_preserves_shared_steer_ratio(changes, speed, delay):

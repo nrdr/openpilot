@@ -8,7 +8,7 @@ import pytest
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.nrdr.features.lateral.controller_selection import (
-  CIVIC_PROFILE, CLARITY_PROFILE, TEG_PROFILE, firmware_controller_profile,
+  CIVIC_PROFILE, CLARITY_PROFILE, INSIGHT_PROFILE, TEG_PROFILE, firmware_controller_profile,
   firmware_controller_selected,
 )
 from openpilot.nrdr.features.lateral import vfn_eps_core as core
@@ -27,6 +27,7 @@ def car(fingerprint, firmware, *, modified=True, tuning="pid", brand="honda"):
   ("HONDA_CLARITY", b"39990-TRW-A020\0", CLARITY_PROFILE),
   ("HONDA_CIVIC_BOSCH", b"39990-TBA,C020", CIVIC_PROFILE),
   ("HONDA_CIVIC", b"39990-TEG,A010\0", TEG_PROFILE),
+  ("HONDA_INSIGHT", b"39990-TXM,A040\0", INSIGHT_PROFILE),
 ])
 def test_exact_profiles_and_selected_controller(fingerprint, firmware, profile):
   cp, sp = car(fingerprint, firmware)
@@ -210,3 +211,37 @@ def test_teg_nonlinear_inverse_satisfies_its_firmware_law(load, rate, guess):
   cal = core.CIVIC_TEG_A010
   target = core.r5_for_motion(load, rate, guess, cal=cal)
   assert core.firmware_output(target, rate, cal=cal) == pytest.approx(load, abs=1e-6)
+
+
+def _extended_torque_limits():
+  import ast
+  root = Path(__file__).resolve().parents[3]
+  tree = ast.parse((root / "opendbc_repo/opendbc/sunnypilot/car/honda/interface_ext.py").read_text())
+  assignment, = [node for node in tree.body if isinstance(node, ast.Assign)
+                  and any(isinstance(target, ast.Name) and target.id == "_EXTENDED_TORQUE_LIMITS" for target in node.targets)]
+  return {key.attr: value.value for key, value in zip(assignment.value.keys, assignment.value.values, strict=True)}
+
+
+def test_insight_runs_the_corrected_ptm_at_this_trees_can_scale():
+  cal = core.INSIGHT_TXM_A040
+  assert INSIGHT_PROFILE.calibration == "insight_txm_a040" and not INSIGHT_PROFILE.provisional
+  assert prediction_delay_schedule(INSIGHT_PROFILE) == prediction_delay_schedule(CLARITY_PROFILE)
+  assert cal.e4_per_output == _extended_torque_limits()["HONDA_INSIGHT"] == 4096
+  # rows 0-1 of the corrected image are the Clarity's own command map and P table
+  assert (cal.r5_key_bp, cal.r5_v, cal.kp_key_bp) == (core.CLARITY_A020.r5_key_bp, core.CLARITY_A020.r5_v,
+                                                     core.CLARITY_A020.kp_key_bp)
+  assert cal.kp_pieces == core.CLARITY_A020.kp_pieces and cal.envelope_v == (1774,) * 9
+  assert cal.r6_per_deg_s == -131.15 and core.INSIGHT_TXM_EPS_LOAD == (-4.876, -.1376, -4.452, -397.2, 65.41, -4.29)
+  # R6 per published deg/s follows its own A table: 1.0 at centre, ~1.22 past 120 deg
+  assert core.firmware_r6(1.0, 0.0, cal) == pytest.approx(-131.15)
+  assert core.firmware_r6(1.0, 150.0, cal) == pytest.approx(-131.15 * 1.2156)
+  assert command_delay(None, 5.0, calibration="insight_txm_a040") == pytest.approx(.175)
+
+
+@pytest.mark.parametrize("u", np.linspace(.02, .93, 40))
+def test_insight_asks_the_clarity_target_for_the_same_e4(u):
+  # the same 0xE4 value makes the same firmware target on both images; this tree just sends the Insight 4096 per unit
+  e4 = u * 3840.
+  assert core.r5_from_output(e4 / 4096., 20., core.INSIGHT_TXM_A040) == pytest.approx(core.r5_from_output(u, 20., core.CLARITY_A020))
+  target = core.r5_from_output(u, 20., core.CLARITY_A020)
+  assert core.output_from_r5(target, core.INSIGHT_TXM_A040) == pytest.approx(core.output_from_r5(target, core.CLARITY_A020) * 3840 / 4096)
