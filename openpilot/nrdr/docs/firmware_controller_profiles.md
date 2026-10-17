@@ -28,9 +28,8 @@ corrected build; that is not independent validation of this port.
 Older builds report the same EPS version strings as these corrected builds.
 Family admission cannot verify the actual flashed image. Confirm the flashed
 build separately before selecting Firmware Controller; do not pair these
-calibrations with the older images. This software update does not flash the EPS.
-An EPS version string identifies a family, not the flashed build: confirm the
-image separately. No ECU flashing or safety-limit changes are part of this port.
+calibrations with the older images. This software update does not flash the EPS
+or change safety limits.
 
 ## Timing
 
@@ -56,12 +55,16 @@ load fit, fixed P trims (115 / 125 / 115%) and I trims (75 / 95 / 100%). Its fir
 law inversion includes both the command-map and P-map knots. Clarity keeps its
 newer angle-dependent R6 conversion and all existing core numerical behavior.
 
-The TEG exception deliberately uses the complete C020 controller calibration,
-not a hybrid of Clarity load/P-I trims. Its real vehicle geometry and CAN range
-are still retained: TEG sends through its existing 3840-count transport, whereas
-the fitted C020 model assumes 4096. Its plant/normalization is consequently only a
-placeholder; there is no claim that commands or resulting motion are equivalent.
-Unknown physical firmware behavior cannot be inferred from this substitution.
+TEG-A010 now uses its corrected firmware's command row 3 and shared Clarity P
+knots, with its own telemetry-derived column load and angle-dependent R6. It
+retains the C020 base gains, P/I trims and Civic command delay. Its existing
+3840-count transport and user-selected geometry are unchanged. It remains
+provisional, especially at crawl speeds not covered by the source telemetry.
+
+Insight TXM-A040 uses the corrected firmware's Clarity command map and P table,
+its own load and angle-dependent R6, the C020 base gains/P-I trims, Civic command
+delay, and Clarity prediction schedule. Its 4096-count transport is accounted
+for in the inversion; no transport or safety limit is increased.
 
 Shared steer-ratio selection, driver override, torque clipping, safety checks,
 inactive reset/history behavior and single output LPF are preserved. Optimized
@@ -81,9 +84,13 @@ The Civic crawl gate/friction-width schedule is included. The older Clarity
 constant-R6 model from the Civic branch is not imported. No unmeasured TEG yaw
 calibration is added, and neither controller is converted to live car-yaw feedback.
 The C020 high-speed envelope is firmware-derived; the original source drive did
-not validate its high-speed rail.
+not validate its high-speed rail. PRs #21 (`a8aa41534e50`) and #22
+(`5f54846231dd`) supply the corrected TEG and Insight calibrations described
+above. PRs #19/#20 were withdrawn/superseded; their older multi-image
+calibrations and universal Clarity delay schedule are not included.
 
 Host checks validate numerical parity, profile admission, shared schedule wiring,
 lane-change bypass and generated Sunnylink definitions. They do not replace native
 C4 tests, recorded-drive replay or progressive road validation. Do not promote
-this patch to release branches or call the TEG placeholder validated on this basis.
+this patch to release branches or call the provisional TEG calibration validated
+on this basis.
