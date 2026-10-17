@@ -5,9 +5,10 @@ delay and output filter. Geometry is supplied by the shared steer-ratio selectio
 just as for PIF; choosing this controller must not replace the user's ratio choice.
 Optimized lane changes remain an explicit owner-requested adaptation. The command
 delay ends (NrdrYawCommandDelayLow/High) remain Clarity-specific. Civic uses the
-source Civic schedule plus the existing SunnyPilot port compensation. TEG-A010 is
-an explicit owner-requested provisional C020 fallback; its CAN range stays 3840,
-not C020's 4096. No physical equivalence or road validation is implied.
+source Civic schedule plus the existing SunnyPilot port compensation. TEG-A010 has
+its own calibration (the corrected PTM build's row 3, 3840 E4 per unit, its own
+measured load and R6) and keeps the C020's base gains, trims and command delay; it
+stays provisional.
 """
 import numpy as np
 
@@ -16,7 +17,8 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile
 from openpilot.nrdr.features.lateral.vfn_eps_core import (
-  CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_I_SCALE, CIVIC_P_SCALE, HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
+  CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_I_SCALE, CIVIC_P_SCALE, CIVIC_TEG_A010, CIVIC_TEG_EPS_LOAD,
+  HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
 )
 from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, command_delay, prediction_delay_schedule
 from openpilot.nrdr.features.lateral.latcontrol_pid import _eps_modified_steering_pressed
@@ -37,11 +39,13 @@ class LatControlFirmware(LatControl):
       raise ValueError("Firmware control requires a supported modified EPS family with PID CarParams")
     super().__init__(CP, CP_SP, CI, dt)
     self.delay_schedule = prediction_delay_schedule(self.firmware_profile)
-    if self.firmware_profile.calibration == "civic_bosch_c020":
-      # Source Bosch base gains as well as its fixed trims, including on the
-      # owner-requested TEG fallback. Never retune CP or increase CAN/safety limits.
+    if self.firmware_profile.calibration in ("civic_bosch_c020", "civic_teg_a010"):
+      # Source Bosch base gains as well as its fixed trims, also on the TEG, whose
+      # trims are not measured. Never retune CP or increase CAN/safety limits.
+      cal, load = ((CIVIC_TEG_A010, CIVIC_TEG_EPS_LOAD) if self.firmware_profile.calibration == "civic_teg_a010"
+                   else (CIVIC_BOSCH_C020, CIVIC_EPS_LOAD))
       self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt,
-        ff=HondaEpsFirmwareFeedforward(dt, cal=CIVIC_BOSCH_C020, load=CIVIC_EPS_LOAD),
+        ff=HondaEpsFirmwareFeedforward(dt, cal=cal, load=load),
         p_scale=CIVIC_P_SCALE, i_scale=CIVIC_I_SCALE)
     else:
       self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt)

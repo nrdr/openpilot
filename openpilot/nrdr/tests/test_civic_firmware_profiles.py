@@ -8,7 +8,7 @@ import pytest
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.nrdr.features.lateral.controller_selection import (
-  CIVIC_PROFILE, CLARITY_PROFILE, TEG_PLACEHOLDER_PROFILE, firmware_controller_profile,
+  CIVIC_PROFILE, CLARITY_PROFILE, TEG_PROFILE, firmware_controller_profile,
   firmware_controller_selected,
 )
 from openpilot.nrdr.features.lateral import vfn_eps_core as core
@@ -26,7 +26,7 @@ def car(fingerprint, firmware, *, modified=True, tuning="pid", brand="honda"):
 @pytest.mark.parametrize("fingerprint,firmware,profile", [
   ("HONDA_CLARITY", b"39990-TRW-A020\0", CLARITY_PROFILE),
   ("HONDA_CIVIC_BOSCH", b"39990-TBA,C020", CIVIC_PROFILE),
-  ("HONDA_CIVIC", b"39990-TEG,A010\0", TEG_PLACEHOLDER_PROFILE),
+  ("HONDA_CIVIC", b"39990-TEG,A010\0", TEG_PROFILE),
 ])
 def test_exact_profiles_and_selected_controller(fingerprint, firmware, profile):
   cp, sp = car(fingerprint, firmware)
@@ -34,7 +34,7 @@ def test_exact_profiles_and_selected_controller(fingerprint, firmware, profile):
   for value in (1, "1", b"1"):
     assert firmware_controller_selected({"NrdrLateralController": value}, cp, sp)
   assert not firmware_controller_selected({"NrdrLateralController": 0}, cp, sp)
-  assert profile.provisional == (profile is TEG_PLACEHOLDER_PROFILE)
+  assert profile.provisional == (profile is TEG_PROFILE)
 
 
 @pytest.mark.parametrize("fingerprint,firmware", [
@@ -102,7 +102,7 @@ def test_c020_feedforward_respects_source_caps_and_lane_change_bypass(speed):
   assert control.ff_weight == 0. and control.pid.f == 0.
 
 
-@pytest.mark.parametrize("profile", [CIVIC_PROFILE, TEG_PLACEHOLDER_PROFILE])
+@pytest.mark.parametrize("profile", [CIVIC_PROFILE, TEG_PROFILE])
 def test_civic_keeps_shared_prediction_delay_but_not_saved_clarity_command_delay(profile):
   assert prediction_delay_schedule(profile) is None
   assert prediction_delay_schedule(CLARITY_PROFILE) is not None
@@ -149,3 +149,64 @@ def test_tegs_can_and_safety_limits_are_not_replaced_with_bosch_limits():
   limits = {key.attr: value.value for key, value in zip(assignment.value.keys, assignment.value.values, strict=True)}
   assert limits["HONDA_CIVIC"] == 3840
   assert limits["HONDA_CIVIC_BOSCH"] == 4096
+
+
+def test_calibrations_default_to_the_shared_p_axis_and_honour_their_own():
+  assert core.CIVIC_BOSCH_C020.kp_key_bp == core.CLARITY_A020.kp_key_bp == tuple(core.KP_KEY_BP)
+  c020 = core.CIVIC_BOSCH_C020
+  own = core.EpsFirmwareCalibration(c020.e4_per_output, c020.r5_key_bp, c020.r5_v, c020.envelope_bp, c020.envelope_v,
+                                    c020.r6_per_deg_s, kp_key_bp=(0, 111, 222, 333, 499, 665, 887, 1108, 1774))
+  for target in np.linspace(0., 30000., 61):
+    key = np.interp(target, own.r5_v, own.r5_key_bp)
+    assert core.firmware_kp(target, own) == pytest.approx(np.interp(key, own.kp_key_bp, core.KP_V))
+  with pytest.raises(ValueError):
+    core.EpsFirmwareCalibration(3840., (0, 1), (0, 18), (0, 1), (1774, 1774), -122., r5_per_key=18.04, kp_key_bp=(0, 1))
+
+
+# Command rows 2 and 3 as the images hold them (axis, R5).
+TEG_ROW_AXES = {2: (0, 111, 222, 333, 499, 665, 887, 1108, 1774), 3: (0, 222, 333, 495, 656, 887, 1108, 1552, 1774)}
+TEG_EARLIER_ROW_3_R5 = (0, 1926, 4938, 8455, 12036, 15926, 20138, 26955, 30000)  # Tracker1-3200 build
+TEG_FIXED_ROW_2_R5 = (0, 2000, 4000, 6000, 9009, 12000, 16000, 20000, 32000)  # corrected PTM build (04147917)
+
+
+def test_teg_runs_the_corrected_ptm_builds_row_3_at_its_own_can_scale():
+  cal = core.CIVIC_TEG_A010
+  assert TEG_PROFILE.calibration == "civic_teg_a010" and TEG_PROFILE.provisional
+  assert cal.e4_per_output == 3840.  # = the HONDA_CIVIC transport limit, see test_tegs_can_and_safety_limits...
+  assert cal.r5_key_bp == TEG_ROW_AXES[3] and cal.r5_v == (0, 4000, 6000, 8937, 11838, 16000, 20000, 28000, 32000)
+  assert cal.kp_key_bp == tuple(core.KP_KEY_BP)  # the corrected build moved rows 0-5 P onto the Clarity's knots
+  assert cal.envelope_v == core.CIVIC_BOSCH_C020.envelope_v and cal.r6_per_deg_s == -152.5
+  # R6 per published deg/s by |angle| band, measured on routes 133/134/137, within 1.5%
+  for angle, measured in ((7.5, -151.4), (30., -152.2), (67.5, -165.7), (120., -170.4), (200., -176.4)):
+    assert core.firmware_r6(1.0, angle, cal) == pytest.approx(measured, rel=.015)
+  assert core.CIVIC_TEG_EPS_LOAD == (-7.833, -.169, -8.29, -311.2, 59.18, -4.457)
+  # Why row 3: the owner's telemetry R5 by command key (route 0000012f medians, earlier build) sits on that
+  # build's row 3 within 3 %.
+  for key, measured in ((40, 338), (80, 685), (120, 1032), (160, 1379), (200, 1726), (240, 2360)):
+    assert np.interp(key, TEG_ROW_AXES[3], TEG_EARLIER_ROW_3_R5) == pytest.approx(measured, rel=.03)
+
+
+@pytest.mark.parametrize("output", np.linspace(.02, 1., 50))
+def test_teg_makes_the_clarity_command_on_both_rows(output):
+  # The PTM rule: at 3840 E4 per unit, the same output asks for the Clarity's R5 and Kp. Rows 2 (TEGA1) and
+  # 3 (TEGA2) of the corrected build agree, so the variant no longer matters. The residue is knot rounding.
+  teg = core.r5_from_output(output, 20., core.CIVIC_TEG_A010)
+  clarity = core.r5_from_output(output, 20., core.CLARITY_A020)
+  assert teg == pytest.approx(clarity, rel=.005, abs=2.)
+  key = abs(core.command_key(-output * 3840.))
+  assert np.interp(key, TEG_ROW_AXES[2], TEG_FIXED_ROW_2_R5) == pytest.approx(abs(teg), rel=.005, abs=2.)
+  assert core.firmware_kp(teg, core.CIVIC_TEG_A010) == pytest.approx(core.firmware_kp(clarity, core.CLARITY_A020), rel=.005)
+
+
+@pytest.mark.parametrize("output", np.linspace(-.85, .85, 19))
+def test_teg_command_map_round_trip(output):
+  target = core.r5_from_output(output, 20., core.CIVIC_TEG_A010)
+  assert core.output_from_r5(target, core.CIVIC_TEG_A010) == pytest.approx(output, abs=.002)
+
+
+@pytest.mark.parametrize("load,rate", [(500., 0.), (-1500., 0.), (800., 40.), (-800., -40.), (-4000., 120.), (0., 0.)])
+@pytest.mark.parametrize("guess", [0., 15000., -15000.])
+def test_teg_nonlinear_inverse_satisfies_its_firmware_law(load, rate, guess):
+  cal = core.CIVIC_TEG_A010
+  target = core.r5_for_motion(load, rate, guess, cal=cal)
+  assert core.firmware_output(target, rate, cal=cal) == pytest.approx(load, abs=1e-6)
