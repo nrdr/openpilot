@@ -12,7 +12,6 @@ from setproctitle import setproctitle
 from openpilot.cereal import log
 from opendbc.car.structs import car
 import openpilot.cereal.messaging as messaging
-import openpilot.system.sentry as sentry
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
@@ -31,7 +30,6 @@ def launcher(proc: str, name: str, ready_event=None) -> None:
 
     # add daemon name tag to logs
     cloudlog.bind(daemon=name)
-    sentry.set_tag("daemon", name)
 
     # exec the process
     if ready_event is None:
@@ -43,7 +41,7 @@ def launcher(proc: str, name: str, ready_event=None) -> None:
   except Exception:
     # can't install the crash handler because sys.excepthook doesn't play nice
     # with threads, so catch it here.
-    sentry.capture_exception()
+    cloudlog.exception("crash")
     raise
   finally:
     if ready_event is not None:

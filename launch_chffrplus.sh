@@ -24,17 +24,17 @@ function agnos_init {
   sudo chmod 660 /dev/adsprpc-smd /dev/ion /dev/kgsl-3d0
 
   # Check if AGNOS update is required
-  if [ $(< /VERSION) != "$AGNOS_VERSION" ]; then
+  if [ "$(< /VERSION)" != "$AGNOS_VERSION" ]; then
     AGNOS_PY="$DIR/openpilot/common/hardware/comma/agnos.py"
     MANIFEST="$DIR/openpilot/system/hardware/comma/agnos.json"
     # Stale updater zipapp still imports pyserial; repo root serial/ shim is on PYTHONPATH.
     export PYTHONPATH="$DIR${PYTHONPATH:+:$PYTHONPATH}"
-    if $AGNOS_PY --verify $MANIFEST; then
+    if "$AGNOS_PY" --verify "$MANIFEST"; then
       sudo reboot
     fi
     while true; do
-      $DIR/openpilot/common/hardware/comma/updater $AGNOS_PY $MANIFEST
-      if $AGNOS_PY --swap $MANIFEST; then
+      "$DIR/openpilot/common/hardware/comma/updater" "$AGNOS_PY" "$MANIFEST"
+      if "$AGNOS_PY" --swap "$MANIFEST"; then
         sudo reboot
       fi
     done
@@ -43,7 +43,7 @@ function agnos_init {
 
 function launch {
   # Remove orphaned git lock if it exists on boot
-  [ -f "$DIR/.git/index.lock" ] && rm -f $DIR/.git/index.lock
+  [ -f "$DIR/.git/index.lock" ] && rm -f "$DIR/.git/index.lock"
 
   # Check to see if there's a valid overlay-based update available. Conditions
   # are as follows:
@@ -55,7 +55,7 @@ function launch {
   #    that completed successfully and synced to disk.
 
   if [ -f "${DIR}/.overlay_init" ]; then
-    find ${DIR}/.git -newer ${DIR}/.overlay_init | grep -q '.' 2> /dev/null
+    find "${DIR}/.git" -newer "${DIR}/.overlay_init" | grep -q '.' 2> /dev/null
     if [ $? -eq 0 ]; then
       echo "${DIR} has been modified, skipping overlay update installation"
     else
@@ -64,9 +64,9 @@ function launch {
           echo "Valid overlay update found, installing"
           LAUNCHER_LOCATION="${BASH_SOURCE[0]}"
 
-          mv $DIR /data/safe_staging/old_openpilot
-          mv "${STAGING_ROOT}/finalized" $DIR
-          cd $DIR
+          mv "$DIR" /data/safe_staging/old_openpilot
+          mv "${STAGING_ROOT}/finalized" "$DIR"
+          cd "$DIR"
 
           echo "Restarting launch script ${LAUNCHER_LOCATION}"
           unset AGNOS_VERSION
@@ -80,7 +80,7 @@ function launch {
   fi
 
   # handle pythonpath
-  ln -sfn $(pwd) /data/pythonpath
+  ln -sfn "$(pwd)" /data/pythonpath
   export PYTHONPATH="$PWD"
 
   # submodule package symlinks for PYTHONPATH imports on device.
@@ -101,7 +101,7 @@ function launch {
 
   # start manager
   cd openpilot/system/manager
-  if [ ! -f $DIR/prebuilt ]; then
+  if [ ! -f "$DIR/prebuilt" ]; then
     ./build.py
   fi
   ./manager.py

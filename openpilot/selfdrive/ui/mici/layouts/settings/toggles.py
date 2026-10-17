@@ -42,9 +42,12 @@ class TogglesLayoutMici(NavScroller):
   def __init__(self):
     super().__init__()
 
-    self._personality_toggle = BigMultiParamToggle("driving personality", "LongitudinalPersonality", ["aggressive", "standard", "relaxed", "econ"])
+    self._personality_toggle = BigMultiParamToggle("driving personality", "LongitudinalPersonality", ["aggressive", "standard", "relaxed", "econ"],
+                                                   description="Standard is recommended. Aggressive follows closer, relaxed leaves more space, " +
+                                                               "and econ softens acceleration.")
     self._experimental_btn = BigToggle("experimental mode", initial_state=ui_state.params.get_bool("ExperimentalMode"),
-                                       toggle_callback=self._on_experimental_mode)
+                                       toggle_callback=self._on_experimental_mode,
+                                       description="Let the driving model control gas and brakes. These are alpha features. Expect mistakes.")
     is_metric_toggle = BigParamControl("use metric units", "IsMetric")
     ldw_toggle = BigParamControl("lane departure warnings", "IsLdwEnabled")
     self._lane_centering_panel = LaneCenteringLayoutMici()
@@ -54,9 +57,11 @@ class TogglesLayoutMici(NavScroller):
       gui_app.texture("icons_mici/settings/device/lkas.png", 72, 58),
     )
     self._lane_centering_btn.set_click_callback(lambda: gui_app.push_widget(self._lane_centering_panel))
-    always_on_dm_toggle = BigParamControl("always-on driver monitor", "AlwaysOnDM")
+    always_on_dm_toggle = BigParamControl("always-on driver monitor", "AlwaysOnDM",
+                                          description="Monitor the driver even when sunnypilot is not engaged.")
     record_front = BigParamControl("record & upload cabin camera", "RecordFront", toggle_callback=restart_needed_callback)
-    record_mic = BigParamControl("record & upload mic audio", "RecordAudio", toggle_callback=restart_needed_callback)
+    record_mic = BigParamControl("record & upload mic audio", "RecordAudio", toggle_callback=restart_needed_callback,
+                                  description="Record microphone audio while driving. Audio is included in dashcam videos in sunnylink.")
     enable_openpilot = BigParamControl("enable sunnypilot", "OpenpilotEnabledToggle", toggle_callback=restart_needed_callback)
 
     self._scroller.add_widgets([

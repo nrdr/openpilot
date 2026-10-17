@@ -1,0 +1,69 @@
+October 17 upstream sync candidate
+
+Base: nrdr-development e1d7156b5d
+SunnyPilot: 27c132984df60e9ef42ebd1a805738b8c851356f
+MVL openpilot sp-honda-dev-202608: cb15c04e918b759688cb354b1bbc9b3c5a47a65c
+MVL opendbc: cf46117420f283b3e38241c00d728a191aa9fccc
+
+What changes on Honda
+
+- Keep the Civic PCM sent-command model and 10 Hz transmit-horizon correction.
+  Add MVL's positive-acceleration speed-lead floor and alpha-learning guard.
+  The Civic gates use the planner request, not its separate PID correction.
+  Other Nidec PCM platforms receive the upstream speed-lead guard too.
+- Interceptor behavior DOES change: integral gain is now 0.3, and the pedal
+  multiplier is 0.35/0.4/0.6/1.0 at 0/3/6/10 m/s. These are MVL's measured
+  ILX-based changes, not proof of improvement on every Honda. NRDR's explicit
+  Roen multiplier override remains 1.0. No baseline-parity claim is made.
+- Integra uses ABS movement checks when ENGINE_DATA is absent. Matching safety
+  RX checks are included, with no change to torque or acceleration TX limits.
+- Include Bosch HUD simplification and 2027 CR-V Hybrid support.
+- Register MVL's 21 new lateral gain/shape keys. They have no active consumer
+  in this controller yet; this does not override NRDR firmware calibrations.
+
+What stays put
+
+Firmware controller, measured SR/geometry, controller selection, delay schedules,
+lane-change policy, Civic PCM rise/authority limits, immutable settings/provider
+boundary, persistent learner ownership, and driver monitoring remain NRDR-owned.
+The new upstream Panda revision includes transport/debug/build cleanup and needs
+an isolated native build; do not flash hardware as part of this host-only task.
+
+Deferred instead of silently replacing working pieces
+
+- Generic ONNX/warp model compiler migration, model adapters/artifacts, tinygrad
+  pin changes, default model changes and paired CI publishing jobs. Keep current
+  camera bundles, runtime timing metadata and Chestnut downloader. New generic
+  hardwared Chestnut telemetry is deferred too: modeld still owns that service.
+- DEC sunset: removes an existing driving-mode feature and needs a separate
+  migration/test run. Existing DEC preference and behavior remain intact.
+- MVL's UI-only radar handback change: the companion controller/provider path is
+  not present here. Keep the existing onroad-cycle request, not a dead toggle.
+- The AGNOS updater zipapp swap: retain the validated updater/serial shim while
+  adopting safe shell quoting where it overlaps.
+
+Independent SunnyPilot fixes and tooling were integrated: MADS no-entry cleanup,
+UI descriptions/icons/eSIM work, locationd typo, missing-localizer-message gates,
+driver-camera IR offroad option (not driver-monitor removal), Sentry retirement,
+file chunk manifest fixes, and Cabana/replay/tooling updates. NRDR's custom UI,
+font overrides, settings navigation, preference preservation and four driving
+personalities remain intact. The old model compiler's get_existing_chunks API
+was retained, with explicit chunk/failed-rebuild regressions.
+
+Validation before native staging
+
+Host Honda suite: 290 tests and 72 subtests passed, including 7 new sync checks.
+Host NRDR compatibility suite: 453 tests and 304 subtests passed, 1 Linux-only
+skip. One Windows background-persistence timing failure occurred on the first
+wide run; its isolated rerun and the complete wide rerun passed without code
+changes. Host results do not validate native C++/Panda builds or road behavior.
+
+Native verification should stage the root source, merged opendbc and the exact
+Panda revision. Keep the installed C4 checkout, settings and firmware untouched.
+Build pandad/Panda and run Honda safety, controller, settings/runtime and model
+compatibility tests. No new ONNX download or generic-compiler migration is part
+of this candidate; existing model assets and tinygrad remain pinned.
+
+The task-local .codex-upstream-audit/commit-audit.json records every missing
+non-merge SunnyPilot/MVL commit and its disposition. Its host runner and XML
+outputs remain task artifacts, not deployed application code.
