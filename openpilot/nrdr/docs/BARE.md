@@ -67,9 +67,15 @@ geometry, live delay .360-.379 s, logged model horizon .435-.454 s; model action
 matched extraction at that horizon. On curvy roads, changing-curvature alignment
 was about .23 s publish-to-raw gyro and .27 s publish-to-nominal CAN yaw, with
 about .054 s publish age. Fused DeviceMotion yaw lagged raw gyro by about .07 s.
-Raw CAN yaw had a standstill zero near 512 and the opposite sign to the Clarity
-assumption. These observations are not substituted into this candidate's timing,
-gain, geometry or yaw calibration. No Civic live-yaw feedback is enabled.
+Raw CAN yaw had a standstill zero near 512; its scale remains unvalidated. The
+earlier apparent sign mismatch was an analysis-convention error: raw CAN yaw and
+calibrated device-frame yaw are both clockwise-positive (positive model curvature
+was a right turn in the road-camera footage). Clarity's yaw_rate.py also describes
+raw CAN as clockwise-positive; carState.yawRate separately negates it into its own
+convention. There is no proven Civic-versus-Clarity sign reversal. These
+observations do not validate applying Clarity's calibration to Civic and are not
+substituted into this candidate's timing, gain, geometry or yaw calibration. No
+Civic live-yaw feedback is enabled.
 
 ## Isolated native validation
 
