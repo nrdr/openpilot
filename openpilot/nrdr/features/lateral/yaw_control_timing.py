@@ -34,7 +34,9 @@ DEFAULT_COMMAND_DELAY_HIGH = 0.025  # s
 CIVIC_COMMAND_DELAY_LOW = 0.175  # 0.15 source + 0.025 port compensation
 # The TEG-A010 keeps it: with 0.175 applied, plan timing on its owner's routes 12e/134/137/139 (5-12 m/s turns)
 # measured the car 0.05 s early (+0.02/-0.06/-0.06/-0.08), so there is no case for less; mostly highway drives.
-CIVIC_COMMAND_DELAY_CALIBRATIONS = ("civic_bosch_c020", "civic_teg_a010")
+# The Insight takes it too: its source command delay is the C020's 0.15 s (JamesL787 ns-bosch-radar-testing, the
+# calibration it drove on).
+CIVIC_COMMAND_DELAY_CALIBRATIONS = ("civic_bosch_c020", "civic_teg_a010", "insight_txm_a040")
 MAX_COMMAND_DELAY = 0.30  # s
 
 

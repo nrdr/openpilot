@@ -8,7 +8,9 @@ delay ends (NrdrYawCommandDelayLow/High) remain Clarity-specific. Civic uses the
 source Civic schedule plus the existing SunnyPilot port compensation. TEG-A010 has
 its own calibration (the corrected PTM build's row 3, 3840 E4 per unit, its own
 measured load and R6) and keeps the C020's base gains, trims and command delay; it
-stays provisional.
+stays provisional. Insight TXM-A040 has its own calibration for its corrected PTM build
+(the Clarity's own map and P table, 4096 E4 per unit, measured load, R6 from its A table)
+with the C020's trims, the Civic command delay and the Clarity's model-delay schedule.
 """
 import numpy as np
 
@@ -17,7 +19,8 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile
 from openpilot.nrdr.features.lateral.vfn_eps_core import (
-  CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_I_SCALE, CIVIC_P_SCALE, CIVIC_TEG_A010, CIVIC_TEG_EPS_LOAD,
+  CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_I_SCALE, CIVIC_P_SCALE, CIVIC_TEG_A010, CIVIC_TEG_EPS_LOAD, INSIGHT_TXM_A040,
+  INSIGHT_TXM_EPS_LOAD,
   HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
 )
 from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, command_delay, prediction_delay_schedule
@@ -29,6 +32,12 @@ GAIN_BP = [0.0, 11.175, 11.176, 22.352]
 KP = [0.018, 0.024, 0.048, 0.060]
 KI = [0.006, 0.008, 0.016, 0.020]
 ANGLE_RATE_LIMIT = 300.0
+# Calibrations with their own image constants and column load; the Clarity uses the module defaults.
+_OWN_CALIBRATIONS = {
+  "civic_bosch_c020": (CIVIC_BOSCH_C020, CIVIC_EPS_LOAD),
+  "civic_teg_a010": (CIVIC_TEG_A010, CIVIC_TEG_EPS_LOAD),
+  "insight_txm_a040": (INSIGHT_TXM_A040, INSIGHT_TXM_EPS_LOAD),
+}
 
 
 class LatControlFirmware(LatControl):
@@ -39,11 +48,10 @@ class LatControlFirmware(LatControl):
       raise ValueError("Firmware control requires a supported modified EPS family with PID CarParams")
     super().__init__(CP, CP_SP, CI, dt)
     self.delay_schedule = prediction_delay_schedule(self.firmware_profile)
-    if self.firmware_profile.calibration in ("civic_bosch_c020", "civic_teg_a010"):
-      # Source Bosch base gains as well as its fixed trims, also on the TEG, whose
+    if self.firmware_profile.calibration in _OWN_CALIBRATIONS:
+      # Source Bosch base gains as well as its fixed trims, also on the TEG and the Insight, whose
       # trims are not measured. Never retune CP or increase CAN/safety limits.
-      cal, load = ((CIVIC_TEG_A010, CIVIC_TEG_EPS_LOAD) if self.firmware_profile.calibration == "civic_teg_a010"
-                   else (CIVIC_BOSCH_C020, CIVIC_EPS_LOAD))
+      cal, load = _OWN_CALIBRATIONS[self.firmware_profile.calibration]
       self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt,
         ff=HondaEpsFirmwareFeedforward(dt, cal=cal, load=load),
         p_scale=CIVIC_P_SCALE, i_scale=CIVIC_I_SCALE)

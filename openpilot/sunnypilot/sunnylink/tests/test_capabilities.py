@@ -145,7 +145,7 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
     assert caps["nrdr_firmware_prediction_schedule"] is False
     assert caps["nrdr_firmware_controller_provisional"] is False
 
-  def test_firmware_profiles_are_exact_and_schedule_is_clarity_only(self, params):
+  def test_firmware_profiles_are_exact_and_carry_their_schedule(self, params):
     from openpilot.cereal import custom
     from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
     sp = custom.CarParamsSP.new_message(flags=HondaFlagsSP.EPS_MODIFIED.value)
@@ -154,6 +154,7 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
       ("HONDA_CLARITY", b"39990-TRW-A020", True, True, False),
       ("HONDA_CIVIC_BOSCH", b"39990-TBA-C020", True, False, False),
       ("HONDA_CIVIC", b"39990-TEG-A010", True, False, True),
+      ("HONDA_INSIGHT", b"39990-TXM-A040", True, True, False),
       ("HONDA_CIVIC", b"39990-TBA-A030", False, False, False),
       ("HONDA_CIVIC_BOSCH", b"39990-TBA-C120", False, False, False),
     ):

@@ -230,6 +230,28 @@ CIVIC_TEG_A010 = EpsFirmwareCalibration(
 # drives hold few turns below 9 m/s, so the crawl regimes are untested.
 CIVIC_TEG_EPS_LOAD = (-7.833, -0.169, -8.29, -311.2, 59.18, -4.457)
 
+# Insight 39990-TXM-A040, corrected PTM build only: 39990-TXM,A040-PTM-20261016b (RWD sha256 7ba37432...), a data-only
+# fix of the released PTM (rwd 833a41bf, the 08-08 C020Surface Trk1-4000 build). The release wrote TargetMap-D onto
+# row 0's key axis, which is the Clarity's (0, 111, ..., 1663), so it ran 1.14-1.53x the Clarity at outputs 0.10-0.30.
+# The corrected build puts the Clarity's own command map and P table on rows 0-5, returns row 6 to stock and flattens
+# A280 in rows 0-3: rows 0-1 are then the Clarity's tables exactly (SH-2A emulation matches the Clarity's output at
+# every key). Row 0 is live: all three variant records (TXMA0/1/2) select row 0. Road-proven on JamesL787
+# ns-bosch-radar-testing (f3a6a124bd) on this build. Both builds report 39990-TXM,A040: a car on the released image must
+# be reflashed with this calibration.
+# This tree sends the Insight 4096 E4 per unit of output (opendbc _EXTENDED_TORQUE_LIMITS), not 3840, so the 1663 key
+# clamp binds at u ~0.94; the inversion uses that scale, so the firmware target is unchanged. The envelope was not
+# located in the image: flat (the key clamp binds first). R6 is computed from its A table (centre divisor 17613),
+# per published deg/s. Load: the owner's konik route 0000001e, the Clarity recipe, in firmware output counts (so it
+# holds across the reflash); route 00000020 held out scores R^2 0.70 / 0.75 against 0.70 / 0.75 for a fit on it.
+INSIGHT_TXM_R6_ANGLE_BP = (0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 180, 210, 240, 270, 300, 360, 420, 480)
+INSIGHT_TXM_R6_ANGLE_GAIN = (1.0, 1.0247, 1.0326, 1.052, 1.0852, 1.1305, 1.1692, 1.207, 1.2242, 1.2239, 1.2156, 1.2234,
+                             1.2254, 1.2249, 1.2273, 1.2253, 1.2279, 1.2436, 1.1917)
+INSIGHT_TXM_A040 = EpsFirmwareCalibration(
+  4096.0, R5_KEY_BP, R5_V, [0, 50, 100, 150, 200, 250, 300, 350, 400], [1774] * 9, -131.15,
+  r5_per_key=R5_PER_KEY, r6_angle_bp=INSIGHT_TXM_R6_ANGLE_BP, r6_angle_gain=INSIGHT_TXM_R6_ANGLE_GAIN,
+)
+INSIGHT_TXM_EPS_LOAD = (-4.876, -0.1376, -4.452, -397.2, 65.41, -4.29)
+
 
 def command_key(e4: float) -> int:
   return int(math.trunc(math.trunc(e4 * 56756 / 32768) / 4))
