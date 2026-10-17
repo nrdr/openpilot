@@ -110,16 +110,21 @@ class TestProcessReadiness(unittest.TestCase):
       mock.patch.object(process_module.importlib, "import_module", return_value=module),
       mock.patch.object(process_module, "setproctitle"),
       mock.patch.object(process_module.messaging, "reset_context"),
-      mock.patch.object(process_module.cloudlog, "bind"),
-      mock.patch.object(process_module.sentry, "set_tag"),
+      mock.patch.object(process_module.cloudlog, "bind") as bind,
+      mock.patch.object(process_module.cloudlog, "exception") as log_exception,
     ):
       launcher("openpilot.system.testd", "testd", ready_event)
       module.main.assert_called_once_with(ready_event)
       ready_event.clear.assert_called_once_with()
+      bind.assert_called_once_with(daemon="testd")
+      log_exception.assert_not_called()
 
       module.main.reset_mock()
+      bind.reset_mock()
       launcher("openpilot.system.testd", "testd")
       module.main.assert_called_once_with()
+      bind.assert_called_once_with(daemon="testd")
+      log_exception.assert_not_called()
 
   def test_launcher_clears_readiness_after_exception_and_reraises(self) -> None:
     error = RuntimeError("process failed")
@@ -131,14 +136,13 @@ class TestProcessReadiness(unittest.TestCase):
       mock.patch.object(process_module, "setproctitle"),
       mock.patch.object(process_module.messaging, "reset_context"),
       mock.patch.object(process_module.cloudlog, "bind"),
-      mock.patch.object(process_module.sentry, "set_tag"),
-      mock.patch.object(process_module.sentry, "capture_exception") as capture_exception,
+      mock.patch.object(process_module.cloudlog, "exception") as log_exception,
       self.assertRaises(RuntimeError) as raised,
     ):
       launcher("openpilot.system.testd", "testd", ready_event)
 
     self.assertIs(raised.exception, error)
-    capture_exception.assert_called_once_with()
+    log_exception.assert_called_once_with("crash")
     ready_event.clear.assert_called_once_with()
 
   def test_launcher_clears_readiness_after_keyboard_interrupt(self) -> None:
@@ -151,13 +155,26 @@ class TestProcessReadiness(unittest.TestCase):
       mock.patch.object(process_module.messaging, "reset_context"),
       mock.patch.object(process_module.cloudlog, "bind"),
       mock.patch.object(process_module.cloudlog, "warning") as warning,
-      mock.patch.object(process_module.sentry, "set_tag"),
-      mock.patch.object(process_module.sentry, "capture_exception") as capture_exception,
+      mock.patch.object(process_module.cloudlog, "exception") as log_exception,
     ):
       launcher("openpilot.system.testd", "testd", ready_event)
 
     warning.assert_called_once_with("child openpilot.system.testd got SIGINT")
-    capture_exception.assert_not_called()
+    log_exception.assert_not_called()
+    ready_event.clear.assert_called_once_with()
+
+  def test_launcher_clears_readiness_when_import_fails(self) -> None:
+    error = ImportError("test process is missing")
+    ready_event = mock.Mock()
+    with (
+      mock.patch.object(process_module.importlib, "import_module", side_effect=error),
+      mock.patch.object(process_module.cloudlog, "exception") as log_exception,
+      self.assertRaises(ImportError) as raised,
+    ):
+      launcher("openpilot.system.testd", "testd", ready_event)
+
+    self.assertIs(raised.exception, error)
+    log_exception.assert_called_once_with("crash")
     ready_event.clear.assert_called_once_with()
 
 
