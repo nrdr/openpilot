@@ -124,6 +124,18 @@ class TestControllerUiLabels(unittest.TestCase):
     path = ROOT / "openpilot/sunnypilot/sunnylink/settings_ui.json"
     self.assertEqual(json.loads(path.read_text(encoding="utf-8")), self.schema)
 
+  def test_controller_copy_requires_the_corrected_firmware_not_the_old_placeholder(self):
+    panel = _panel(self.schema, "steering", "nrdr_pidf_ground")
+    selector = next(item for item in panel["items"] if item["key"] == "NrdrLateralController")
+    self.assertIn("not the Bosch placeholder", selector["description"])
+    self.assertIn("04147917", selector["details"])
+    self.assertIn("7ba37432", selector["details"])
+    self.assertIn("same version strings", selector["details"])
+    source = (ROOT / "openpilot/nrdr/ui/settings/pidf_ground.py").read_text(encoding="utf-8")
+    self.assertNotIn("uses the Bosch C020 tune", source)
+    self.assertIn("04147917", source)
+    self.assertIn("7ba37432", source)
+
 
 if __name__ == "__main__":
   unittest.main()

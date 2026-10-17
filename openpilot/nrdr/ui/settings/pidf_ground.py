@@ -105,8 +105,11 @@ class PidfGroundLayout(Widget):
     super()._update_state()
     self._controller.action_item.set_enabled(ui_state.is_offroad())
     profile = firmware_controller_profile(ui_state.CP, ui_state.CP_SP)
-    self._controller.set_description(tr("TEG-A010 uses the Bosch C020 tune as a provisional placeholder, not a road-validated calibration.")
-                                     if profile is not None and profile.provisional else "")
+    self._controller.set_description(tr("TEG-A010 uses its own provisional calibration for the corrected PTM firmware (04147917). "
+                                        + "The older firmware is not compatible; this calibration is not yet road-validated.")
+                                     if profile is not None and profile.provisional else
+                                     tr("Insight TXM-A040 requires the corrected PTM firmware (7ba37432), not the older released build.")
+                                     if profile is not None and profile.calibration == "insight_txm_a040" else "")
     for key, item in self._tuning_items.items():
       available = key != "NrdrDeviceYawCorrection" or supports_interpolated_torque_pif(ui_state.CP, ui_state.CP_SP)
       if key == "NrdrDeviceYawCorrection":

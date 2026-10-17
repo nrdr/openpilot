@@ -23,7 +23,8 @@ sections:
       - key: NrdrLateralController
         widget: multiple_button
         title: Controller Type
-        description: On TEG-A010, Firmware Controller uses a provisional Bosch C020 tune, not a road-validated calibration for that EPS.
+        description: Firmware Controller requires the matching modified EPS build. TEG-A010 uses its own provisional corrected-PTM calibration, not the Bosch placeholder.
+        details: TEG-A010 requires the corrected PTM firmware (RWD SHA256 starts 04147917); its calibration is not yet road-validated. Insight TXM-A040 requires the corrected PTM firmware (7ba37432). Older builds report the same version strings but are not compatible with these calibrations. Confirm the actual flashed build before selecting Firmware Controller. PIF and Device Yaw Correction remain separate.
         options:
         - value: 0
           label: PIF Control

@@ -13,6 +13,22 @@ changing it requires offroad confirmation. PIF's Device Yaw Correction is separa
 
 PID CarParams and a matching firmware steer-ratio profile are also required. No
 other Civic, firmware version, diesel, CR-V, or generic Honda inherits the fallback.
+
+## Required corrected firmware
+
+The Civic TEG-A010 calibration requires
+`39990-TEG,A010-20261016b-PTMFix-ClarityEquivMap-ClarityPKnots-Row6Stock-A280FlatRows023`
+(RWD SHA-256 starts `04147917`). It replaces the Bosch placeholder, but remains
+provisional: it has not yet been road-validated on this corrected build.
+
+The Insight TXM-A040 calibration requires `39990-TXM,A040-PTM-20261016b`
+(RWD SHA-256 starts `7ba37432`). Its source configuration has been driven on the
+corrected build; that is not independent validation of this port.
+
+Older builds report the same EPS version strings as these corrected builds.
+Family admission cannot verify the actual flashed image. Confirm the flashed
+build separately before selecting Firmware Controller; do not pair these
+calibrations with the older images. This software update does not flash the EPS.
 An EPS version string identifies a family, not the flashed build: confirm the
 image separately. No ECU flashing or safety-limit changes are part of this port.
 
