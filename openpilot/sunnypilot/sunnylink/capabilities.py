@@ -86,7 +86,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
   "nrdr_yaw_controller_available": "Supported Honda Firmware Controller",
   "nrdr_firmware_prediction_schedule": "Measured Firmware Controller prediction-delay schedule",
-  "nrdr_firmware_controller_provisional": "Provisional Bosch tune fallback, not road-validated for this EPS",
+  "nrdr_firmware_controller_provisional": "Provisional firmware-specific calibration; confirm the required EPS build before driving",
   "nrdr_honda_tuning_available": "Confirmed Honda-specific NRDR tuning available",
   "nrdr_longitudinal_tuning_available": "Vehicle explicitly supported by NRDR longitudinal tuning",
   "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio geometry available",

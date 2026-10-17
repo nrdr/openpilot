@@ -78,6 +78,12 @@ class TestProtocolVersion(OpenpilotTestCase):
 
 
 class TestOpaquePerBrandFlags(OpenpilotTestCase):
+  def test_provisional_firmware_label_does_not_describe_the_retired_bosch_fallback(self):
+    label = CAPABILITY_LABELS["nrdr_firmware_controller_provisional"]
+    assert "firmware-specific" in label
+    assert "required EPS build" in label
+    assert "Bosch" not in label
+
   def test_handcrafted_lateral_profile_field_present(self):
     assert "has_handcrafted_lateral_profile" in CAPABILITY_FIELDS
 
