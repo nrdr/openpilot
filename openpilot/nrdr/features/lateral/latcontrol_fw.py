@@ -6,8 +6,9 @@ just as for PIF; choosing this controller must not replace the user's ratio choi
 Optimized lane changes remain an explicit owner-requested adaptation. The command
 delay ends (NrdrYawCommandDelayLow/High) remain Clarity-specific. Civic uses the
 source Civic schedule plus the existing SunnyPilot port compensation. TEG-A010 has
-its own measured calibration (row 3, 3840 E4 per unit, its own load and R6) and
-keeps the C020's base gains, trims and command delay; it stays provisional.
+its own calibration (the corrected PTM build's row 3, 3840 E4 per unit, its own
+measured load and R6) and keeps the C020's base gains, trims and command delay; it
+stays provisional.
 """
 import numpy as np
 

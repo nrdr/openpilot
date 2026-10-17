@@ -163,19 +163,39 @@ def test_calibrations_default_to_the_shared_p_axis_and_honour_their_own():
     core.EpsFirmwareCalibration(3840., (0, 1), (0, 18), (0, 1), (1774, 1774), -122., r5_per_key=18.04, kp_key_bp=(0, 1))
 
 
-def test_teg_runs_its_measured_row_3_calibration_at_its_own_can_scale():
+# Command rows 2 and 3 as the images hold them (axis, R5).
+TEG_ROW_AXES = {2: (0, 111, 222, 333, 499, 665, 887, 1108, 1774), 3: (0, 222, 333, 495, 656, 887, 1108, 1552, 1774)}
+TEG_EARLIER_ROW_3_R5 = (0, 1926, 4938, 8455, 12036, 15926, 20138, 26955, 30000)  # Tracker1-3200 build
+TEG_FIXED_ROW_2_R5 = (0, 2000, 4000, 6000, 9009, 12000, 16000, 20000, 32000)  # corrected PTM build (04147917)
+
+
+def test_teg_runs_the_corrected_ptm_builds_row_3_at_its_own_can_scale():
   cal = core.CIVIC_TEG_A010
   assert TEG_PROFILE.calibration == "civic_teg_a010" and TEG_PROFILE.provisional
   assert cal.e4_per_output == 3840.  # = the HONDA_CIVIC transport limit, see test_tegs_can_and_safety_limits...
-  assert cal.r5_key_bp == (0, 222, 333, 495, 656, 887, 1108, 1552, 1774) and cal.r5_v == core.CIVIC_BOSCH_C020.r5_v
-  assert cal.kp_key_bp == (3, 173, 441, 665, 887, 1104, 1317, 1610, 1774)
+  assert cal.r5_key_bp == TEG_ROW_AXES[3] and cal.r5_v == (0, 4000, 6000, 8937, 11838, 16000, 20000, 28000, 32000)
+  assert cal.kp_key_bp == tuple(core.KP_KEY_BP)  # the corrected build moved rows 0-5 P onto the Clarity's knots
   assert cal.envelope_v == core.CIVIC_BOSCH_C020.envelope_v and cal.r6_per_deg_s == -152.5
+  # R6 per published deg/s by |angle| band, measured on routes 133/134/137, within 1.5%
+  for angle, measured in ((7.5, -151.4), (30., -152.2), (67.5, -165.7), (120., -170.4), (200., -176.4)):
+    assert core.firmware_r6(1.0, angle, cal) == pytest.approx(measured, rel=.015)
   assert core.CIVIC_TEG_EPS_LOAD == (-7.833, -.169, -8.29, -311.2, 59.18, -4.457)
-  # The owner's telemetry R5 by command key (route 0000012f medians); the map holds them within 3 %.
+  # Why row 3: the owner's telemetry R5 by command key (route 0000012f medians, earlier build) sits on that
+  # build's row 3 within 3 %.
   for key, measured in ((40, 338), (80, 685), (120, 1032), (160, 1379), (200, 1726), (240, 2360)):
-    assert np.interp(key, cal.r5_key_bp, cal.r5_v) == pytest.approx(measured, rel=.03)
-  # The C020 placeholder it replaces asked about twice the R5 this car makes for a small command.
-  assert core.r5_from_output(.05, 10., core.CIVIC_BOSCH_C020) / core.r5_from_output(.05, 10., cal) > 1.9
+    assert np.interp(key, TEG_ROW_AXES[3], TEG_EARLIER_ROW_3_R5) == pytest.approx(measured, rel=.03)
+
+
+@pytest.mark.parametrize("output", np.linspace(.02, 1., 50))
+def test_teg_makes_the_clarity_command_on_both_rows(output):
+  # The PTM rule: at 3840 E4 per unit, the same output asks for the Clarity's R5 and Kp. Rows 2 (TEGA1) and
+  # 3 (TEGA2) of the corrected build agree, so the variant no longer matters. The residue is knot rounding.
+  teg = core.r5_from_output(output, 20., core.CIVIC_TEG_A010)
+  clarity = core.r5_from_output(output, 20., core.CLARITY_A020)
+  assert teg == pytest.approx(clarity, rel=.005, abs=2.)
+  key = abs(core.command_key(-output * 3840.))
+  assert np.interp(key, TEG_ROW_AXES[2], TEG_FIXED_ROW_2_R5) == pytest.approx(abs(teg), rel=.005, abs=2.)
+  assert core.firmware_kp(teg, core.CIVIC_TEG_A010) == pytest.approx(core.firmware_kp(clarity, core.CLARITY_A020), rel=.005)
 
 
 @pytest.mark.parametrize("output", np.linspace(-.85, .85, 19))

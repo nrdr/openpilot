@@ -3,7 +3,8 @@
 Civic C020 calibration/load/P-I trims adapted from JamesL787/openpilot
 59eb99e3183eb68963394daee8e52e51eb034f38. Clarity retains the newer angle-dependent
 R6 conversion below; the Civic source's older constant Clarity R6 is NOT ported.
-TEG-A010 has its own calibration (row 3 / TEGA2, measured on its owner's telemetry), still provisional.
+TEG-A010 has its own calibration (the corrected PTM build's row 3, R6 and load from its owner's telemetry),
+still provisional.
 
 The Clarity's LKAS path is not a torque command. The firmware turns our 0xE4 value into a target R5,
 compares it with R6 -- a filtered steering RATE, taken before its angle table (see R6_PER_CENTRE_DEG_S) --
@@ -194,22 +195,33 @@ CIVIC_BOSCH_C020 = EpsFirmwareCalibration(
 CLARITY_EPS_LOAD = (LOAD_K0, LOAD_K1, LOAD_C, LOAD_FRICTION, LOAD_BIAS, LOAD_KROLL)
 # Source fit on Civic C020 firmware-controller route 294 (not its separate PID shadow fit).
 CIVIC_EPS_LOAD = (-5.574, -0.1831, -4.540, -326.5, -83.6, -3.185)
-# Civic (Nidec) TEG-A010 PTM (Tracker1-3200 TEG builds), measured on its owner's 11 telemetry routes
-# (d7cee79a4d45d4cf 0000012d-00000139, 2026-10-14/15; 0x6A0-0x6A3 on bus 0). The car runs command ROW 3
-# (variant TEGA2): its telemetry R5 against the sent E4 sits on row 3 with a median residual of 9 counts
-# (rows 0-2: 1046-1325), on routes 0000012f and 00000139. Row 3's command axis and its P axis, TargetMap-D R5
-# and the TEG image's envelope (= the C020's) are read from the image. Version strings cannot tell a TEGA1
-# car (row 2) from a TEGA2 car (row 3). HONDA_CIVIC is sent 3840 E4 per unit of output, not the C020's 4096.
-# R6: the telemetry R6 word against steeringRateDeg, hands off, route 00000139: -152.5 per deg/s at 0 lag
-# (R^2 0.94); kept flat over angle, like the C020's.
+# Civic (Nidec) TEG-A010, corrected PTM build only:
+# 39990-TEG,A010-20261016b-PTMFix-ClarityEquivMap-ClarityPKnots-Row6Stock-A280FlatRows023 (RWD sha256
+# 04147917...), a data-only fix of the Tracker1-3200 build. Its owner's telemetry (d7cee79a4d45d4cf
+# 0000012d-00000139, 2026-10-14/15, 0x6A0-0x6A3 on bus 0, on the earlier build) puts the car on command ROW 3
+# (variant TEGA2): R5 against the sent E4 had a median residual of 9 counts on row 3 against 1046-1325 on
+# rows 0-2. The fix keeps each row's own key axis and writes the Clarity's R5 for that key into rows 0-5
+# (a knot past the 1663 key clamp sits on the line through the Clarity's 30000 at 1663), and it moves rows 0-5
+# P onto the Clarity's knots. So rows 2 and 3 now make the same R5 for the same key, and the TEGA1/TEGA2
+# question no longer changes the command. Row 3 and the envelope (= the C020's) are read from the image.
+# HONDA_CIVIC is sent 3840 E4 per unit of output, as the Clarity is, not the C020's 4096.
+# R6 and the column load below come from that telemetry, the earlier build. The fix touches neither the rate
+# path (tracker-1 3200, NORM 1650) nor the row 0-5 P/D/KFF values, so they carry over. R6: the telemetry R6 word
+# (0x6A1 w1, tracker-1's filtered output) at centre, -152.5 per deg/s (route 00000139, R^2 0.94). Its angle shape is
+# measured per published deg/s (the rate this feedforward differentiates): the R6 word against d(0x14A angle)/dt, both
+# as 0.2 s window means, routes 00000133/134/137 (centre -149.8 / -152.4 / -151.9). By |angle| band 0-15 / 15-45 /
+# 45-90 / 90-150 / 150-250 / 250-420 deg: 1.000 / 1.006 / 1.094 / 1.126 / 1.165 / 1.093; the routes agree within
+# 0.02-0.04 up to 250 deg. Flat was 9-15% weak past 45 deg. Same CAN layout as the Clarity: R6 is flat against 0x18F
+# (the raw rate) to 150 deg, and 0x14A's angle and rate are the published ones.
+CIVIC_TEG_A010_R6_BP = (0.0, 30.0, 67.5, 120.0, 200.0, 335.0)
+CIVIC_TEG_A010_R6_GAIN = (1.0, 1.006, 1.094, 1.126, 1.165, 1.093)
 CIVIC_TEG_A010 = EpsFirmwareCalibration(
   e4_per_output=3840.0,
   r5_key_bp=[0, 222, 333, 495, 656, 887, 1108, 1552, 1774],
-  r5_v=[0, 1926, 4938, 8455, 12036, 15926, 20138, 26955, 30000],
+  r5_v=[0, 4000, 6000, 8937, 11838, 16000, 20000, 28000, 32000],
   envelope_bp=[0, 50, 100, 150, 200, 240, 300, 321, 400],
   envelope_v=[1774, 1774, 1774, 1774, 1774, 1552, 1219, 1108, 1108],
-  r6_per_deg_s=-152.5,
-  kp_key_bp=[3, 173, 441, 665, 887, 1104, 1317, 1610, 1774],
+  r6_per_deg_s=-152.5, r6_angle_bp=CIVIC_TEG_A010_R6_BP, r6_angle_gain=CIVIC_TEG_A010_R6_GAIN,
 )
 # TEG column, the same recipe as the Clarity's and the C020's: target = the telemetry's own P + D + KFF*R5/1024
 # (row-independent), engaged, unpressed, |steering torque| < 300, motion lag fitted; 81 min of frames on the 11

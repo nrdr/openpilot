@@ -1,9 +1,10 @@
 """Drive-latched firmware control, with exact EPS-family admission.
 
 Firmware version strings identify the family, not the contents of a modified image.
-The owner must still confirm the flashed build. TEG-A010 runs its own calibration, measured on one
-TEGA2 (command row 3) car's telemetry; it stays provisional until a TEGA1 (row 2) car is ruled out
-or read, and it is never a generic Honda fallback.
+The owner must still confirm the flashed build. TEG-A010 runs its own calibration for the corrected PTM
+build (command row 3; rows 2 and 3 make the same command there), with R6 and load measured on one
+car's telemetry. It stays provisional until it has been driven on that build, and it is never a
+generic Honda fallback.
 """
 from dataclasses import dataclass
 
@@ -23,7 +24,7 @@ class FirmwareControllerProfile:
 CLARITY_PROFILE = FirmwareControllerProfile("Clarity A020", "clarity_a020", prediction_schedule=True)
 CIVIC_PROFILE = FirmwareControllerProfile("Civic Bosch C020", "civic_bosch_c020")
 TEG_PROFILE = FirmwareControllerProfile(
-  "Civic TEG-A010 row 3 (TEGA2, measured on one car)", "civic_teg_a010", provisional=True,
+  "Civic TEG-A010 corrected PTM, row 3 (not yet driven)", "civic_teg_a010", provisional=True,
 )
 _PROFILES = {
   ("HONDA_CLARITY", "39990-TRW-A020"): CLARITY_PROFILE,
