@@ -86,7 +86,7 @@ opendbc or generated schema bindings.
 
 Pinned dependencies:
 
-- opendbc: `ef8c94a9ca7e77bd502271d44f778ab66d516334`, based on comma `b3bd79a659`.
+- opendbc: `f821d62a4b044933bdbf102f08e3b2d1d3c70f71`, based on comma `b3bd79a659`.
 - msgq: `0e266c1dbcf7328beee3e57b4a8688555387c877`.
 - Panda: `a59195163c32a3a375ea6c86715dc08fd0984c1b`.
 - tinygrad: `02e698160eed1751738212144a7ea2cfb160b3f1`.
