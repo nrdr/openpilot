@@ -112,7 +112,9 @@ Stock build inputs downloaded and SHA-256 checked on the host:
 - driving ONNX: 60,918,562 bytes, `65a08adc31d5c456219687d99b7bf5e44d61dae2d49ea67850e76105c7248cce`.
 - DM ONNX: 7,844,499 bytes, `dee5a294e8afaacc9295ac5d100e00733ecac278e79264b96331e40a3ede1b04`.
 
-Git archives contain LFS pointers, so add these actual working-tree model inputs
+Create source archives with LFS filters disabled (`-c filter.lfs.process= -c
+filter.lfs.required=false`) so they contain pointers rather than downloading the
+optional 800 MB model. Add the two actual working-tree model inputs separately
 to a build bundle. All submodule source checkouts total roughly 57 MB before
 build outputs. Model inputs are about 69 MB. The optional Chestnut precompiled
 model is an additional 800 MB and is not needed to compile the small-model C4
