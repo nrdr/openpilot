@@ -6,6 +6,7 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.mici.layouts.settings.initial_cruise_speed import InitialCruiseSpeedButton
+from openpilot.nrdr.ui import FIRMWARE_DESCRIPTION, firmware_ready
 
 PERSONALITY_TO_INT = log.LongitudinalPersonality.schema.enumerants
 
@@ -36,6 +37,14 @@ class TogglesLayoutMici(NavScroller):
     enable_openpilot = BigParamControl("enable openpilot", "OpenpilotEnabledToggle", toggle_callback=restart_needed_callback,
                                        description="Enable to use openpilot driver assistance.\n" +
                                                    "Disable to use your car's stock driver assistance.")
+    self._firmware_toggle = BigToggle("firmware controller", initial_state=ui_state.params.get("NrdrLateralController", return_default=True) == 1,
+                                     toggle_callback=lambda state: ui_state.params.put("NrdrLateralController", int(state), block=True),
+                                     description=FIRMWARE_DESCRIPTION)
+    self._firmware_toggle.set_enabled(lambda: not ui_state.started and firmware_ready(ui_state.CP, ui_state.params))
+    self._ratio_toggle = BigMultiParamToggle("steer ratio", "NrdrSteerRatioMode", ["manual", "comma", "measured", "firmware"],
+                                            description="Geometry for Firmware Controller only. " +
+                                                        "Missing measured curves use the Comma learner. Configure offroad.")
+    self._ratio_toggle.set_enabled(lambda: not ui_state.started and firmware_ready(ui_state.CP, ui_state.params))
 
     self._scroller.add_widgets([
       self._personality_toggle,
@@ -46,6 +55,8 @@ class TogglesLayoutMici(NavScroller):
       record_front,
       record_mic,
       enable_openpilot,
+      self._firmware_toggle,
+      self._ratio_toggle,
     ])
 
     # Toggle lists
@@ -95,3 +106,6 @@ class TogglesLayoutMici(NavScroller):
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
+    self._firmware_toggle.set_checked(ui_state.params.get("NrdrLateralController", return_default=True) == 1)
+    mode = ui_state.params.get("NrdrSteerRatioMode", return_default=True)
+    self._ratio_toggle.set_value(self._ratio_toggle._options[mode if mode in (0, 1, 2, 3) else 1])

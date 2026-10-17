@@ -98,3 +98,6 @@ build/
 .context/
 PLAN.md
 TASK.md
+# Local, isolated bare integration checks
+/.bare-testdeps/
+/.bare-validation/

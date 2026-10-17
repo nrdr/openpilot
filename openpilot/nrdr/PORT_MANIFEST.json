@@ -1,0 +1,16 @@
+{
+  "source_commit": "e1d7156b5d25ee38f24f63a4a04b125675448d39",
+  "comma_master": "35e78a9d9518855ec0dacec919e719624a28131f",
+  "source_blobs": {
+    "openpilot/nrdr/features/lateral/vfn_eps_core.py": "f29d68c340e5ddc177f9328a827375940497eb95",
+    "openpilot/nrdr/features/lateral/integral_pid.py": "259bc283989331037ec42bc75bb85d990cc07cdd",
+    "openpilot/nrdr/features/lateral/vfn_geometry.py": "4a3a4d07ca98f596438324b36de32b586adf37f5",
+    "openpilot/nrdr/features/lateral/honda_vgr.py": "609ff625dc76073077185b4de90eb32e66528133",
+    "openpilot/nrdr/features/lateral/hybrid_steer_ratio.py": "e17573aa4a8cb368be8889dccfff0cbac9890a5b",
+    "openpilot/nrdr/features/lateral/steer_ratio_tuning.py": "37d1016a6a34179e50b47cda67f972aa2aa2ad80"
+  },
+  "stock_blobs": {
+    "openpilot/selfdrive/controls/lib/latcontrol_pid.py": "48074c823de1f0c5021c3de95463cf2085b61b72",
+    "openpilot/selfdrive/controls/tests/test_latcontrol.py": "47dd4f7f8e92526efb735408d4858689fb03d55a"
+  }
+}

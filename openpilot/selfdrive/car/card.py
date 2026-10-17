@@ -20,6 +20,7 @@ from opendbc.car.car_helpers import get_car, interfaces
 from opendbc.car.interfaces import CarInterfaceBase, RadarInterfaceBase
 from openpilot.selfdrive.pandad import can_capnp_to_list, can_list_to_can_capnp
 from openpilot.selfdrive.car.cruise import VCruiseHelper
+from openpilot.nrdr.hooks.lateral import apply_startup_policy, read_settings
 
 REPLAY = "REPLAY" in os.environ
 
@@ -108,6 +109,7 @@ class Car:
       self.CI, self.CP = CI, CI.CP
       self.RI = RI
 
+    apply_startup_policy(self.CP, read_settings(self.params))
     self.CP.alternativeExperience = 0
     openpilot_enabled_toggle = self.params.get_bool("OpenpilotEnabledToggle")
     controller_available = self.CI.CC is not None and openpilot_enabled_toggle and not self.CP.dashcamOnly

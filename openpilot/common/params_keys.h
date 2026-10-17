@@ -6,6 +6,19 @@
 #include "openpilot/cereal/gen/cpp/log.capnp.h"
 
 inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
+    // NRDR_BARE_PARAMS_BEGIN (generated from openpilot.nrdr.params)
+    {"NrdrLateralController", {PERSISTENT, INT, "0"}},
+    {"NrdrFirmwareImage", {PERSISTENT, STRING, ""}},
+    {"NrdrSteerRatioMode", {PERSISTENT, INT, "1"}},
+    {"NrdrSteerRatioManualCenter", {PERSISTENT, FLOAT, "15.38"}},
+    {"NrdrSteerRatioManualFinal", {PERSISTENT, FLOAT, "10.93"}},
+    {"NrdrSteerRatioHybrid", {PERSISTENT, BOOL, "0"}},
+    {"NrdrSteerRatioSourceB", {PERSISTENT, INT, "3"}},
+    {"NrdrSteerRatioBlendStart", {PERSISTENT, FLOAT, "25"}},
+    {"NrdrOptimizedLaneChanges", {PERSISTENT, BOOL, "1"}},
+    {"NrdrYawCommandDelayLow", {PERSISTENT, FLOAT, "0.145"}},
+    {"NrdrYawCommandDelayHigh", {PERSISTENT, FLOAT, "0.025"}},
+    // NRDR_BARE_PARAMS_END
     {"AccessToken", {CLEAR_ON_MANAGER_START | DONT_LOG, STRING}},
     {"AdbEnabled", {PERSISTENT, BOOL}},
     {"AlwaysOnDM", {PERSISTENT, BOOL}},

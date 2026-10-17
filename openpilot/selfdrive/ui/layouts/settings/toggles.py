@@ -6,6 +6,7 @@ from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.layouts.settings.initial_cruise_speed import InitialCruiseSpeedControl
+from openpilot.nrdr.ui import FIRMWARE_DESCRIPTION, firmware_ready
 
 PERSONALITY_TO_INT = log.LongitudinalPersonality.schema.enumerants
 
@@ -136,6 +137,21 @@ class TogglesLayout(Widget):
         self._toggles["InitialCruiseSpeedKph"] = self._initial_cruise_speed
 
     self._scroller = Scroller(list(self._toggles.values()), line_separator=True, spacing=0)
+    self._firmware_toggle = toggle_item(
+      "Firmware Controller", FIRMWARE_DESCRIPTION,
+      self._params.get("NrdrLateralController", return_default=True) == 1,
+      callback=lambda state: self._params.put("NrdrLateralController", int(state), block=True), icon="chffr_wheel.png",
+    )
+    self._firmware_toggle.action_item.set_enabled(lambda: not ui_state.started and firmware_ready(ui_state.CP, self._params))
+    self._scroller.add_widget(self._firmware_toggle)
+    self._ratio_toggle = multiple_button_item(
+      "Steer Ratio", "Geometry for Firmware Controller only. Missing measured curves use the Comma learner. Configure offroad.",
+      buttons=["Manual", "Comma", "Measured", "Firmware"], button_width=180,
+      callback=lambda index: self._params.put("NrdrSteerRatioMode", index, block=True),
+      selected_index=self._params.get("NrdrSteerRatioMode", return_default=True), icon="chffr_wheel.png",
+    )
+    self._ratio_toggle.action_item.set_enabled(lambda: not ui_state.started and firmware_ready(ui_state.CP, self._params))
+    self._scroller.add_widget(self._ratio_toggle)
 
     ui_state.add_engaged_transition_callback(self._update_toggles)
 
@@ -154,6 +170,9 @@ class TogglesLayout(Widget):
   def _update_toggles(self):
     ui_state.update_params()
     self._initial_cruise_speed.action_item.refresh()
+    self._firmware_toggle.action_item.set_state(self._params.get("NrdrLateralController", return_default=True) == 1)
+    mode = self._params.get("NrdrSteerRatioMode", return_default=True)
+    self._ratio_toggle.action_item.set_selected_button(mode if mode in (0, 1, 2, 3) else 1)
 
     if ui_state.CP is not None:
       self._long_personality_setting.action_item.set_enabled(ui_state.has_longitudinal_control)

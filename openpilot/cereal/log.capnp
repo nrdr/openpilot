@@ -903,6 +903,14 @@ struct ControlsState @0x97ff69c53601abf1 {
     output @7 :Float32;
     saturated @8 :Bool;
     steeringAngleDesiredDeg @9 :Float32;
+    # NRDR firmware-inversion diagnostics; stock controllers leave these zero.
+    epsFfActive @10 :Bool;
+    epsFfFeedforward @11 :Float32;
+    epsFfR5 @12 :Float32;
+    epsFfLoad @13 :Float32;
+    epsFfDesiredRate @14 :Float32;
+    epsFfWeight @15 :Float32;
+    commandDelay @16 :Float32;
    }
 
   struct LateralTorqueState {

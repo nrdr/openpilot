@@ -21,6 +21,7 @@ from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.selfdrive.controls.lib.longcontrol import LongControl
 from openpilot.selfdrive.modeld.modeld import LAT_SMOOTH_SECONDS
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
+from openpilot.nrdr.hooks.lateral import create_firmware_controller, read_settings, LatControlFirmware, prediction_delay
 
 State = log.SelfdriveState.OpenpilotState
 LaneChangeState = log.LaneChangeState
@@ -52,8 +53,12 @@ class Controls:
 
     self.LoC = LongControl(self.CP)
     self.VM = VehicleModel(self.CP)
+    settings = read_settings(self.params)  # Latch settings at startup, never on an active frame.
+    firmware_controller = create_firmware_controller(self.CP, self.CI, DT_CTRL, settings)
     self.LaC: LatControl
-    if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
+    if firmware_controller is not None:
+      self.LaC = firmware_controller
+    elif self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       self.LaC = LatControlAngle(self.CP, self.CI, DT_CTRL)
     elif self.CP.steerControlType == car.CarParams.SteerControlType.curvature:
       self.LaC = LatControlCurvature(self.CP, self.CI, DT_CTRL)
@@ -76,11 +81,17 @@ class Controls:
     # Update VehicleModel
     lp = self.sm['vehicleParameters']
     x = max(lp.stiffnessFactor, 0.1)
-    sr = max(self.CP.steerRatio if getattr(self.LaC, "tuned", False) else lp.steerRatio, 0.1)
+    sr = max(lp.steerRatio, 0.1)
+    if isinstance(self.LaC, LatControlFirmware):
+      self.LaC.prepare_geometry(lp.steerRatio, self.sm['selfdriveState'].active, self.sm.valid['vehicleParameters'])
+      sr = self.LaC.comma_ratio
     self.VM.update_params(x, sr)
 
-    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - lp.angleOffsetDeg)
-    self.curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
+    if isinstance(self.LaC, LatControlFirmware):
+      self.curvature = self.LaC.selection.measured_curvature(self.VM, CS.steeringAngleDeg, CS.vEgo, lp.roll, lp.angleOffsetDeg)
+    else:
+      steer_angle_without_offset = math.radians(CS.steeringAngleDeg - lp.angleOffsetDeg)
+      self.curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
 
     # Update Torque Params
     if self.CP.lateralTuning.which() == 'torque':
@@ -91,8 +102,8 @@ class Controls:
 
     long_plan = self.sm['longitudinalPlan']
     model_v2 = self.sm['modelV2']
-    if isinstance(self.LaC, LatControlPID):
-      self.LaC.lane_changing = model_v2.meta.laneChangeState != LaneChangeState.off
+    if isinstance(self.LaC, LatControlFirmware):
+      self.LaC.lane_change_state = model_v2.meta.laneChangeState.raw
 
     CC = car.CarControl.new_message()
     CC.enabled = self.sm['selfdriveState'].enabled
@@ -128,6 +139,8 @@ class Controls:
       new_desired_curvature = model_v2.action.desiredCurvature if CC.latActive else self.curvature
     self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll)
     lat_delay = self.sm["lateralDelay"].lateralDelay + LAT_SMOOTH_SECONDS
+    if isinstance(self.LaC, LatControlFirmware):
+      lat_delay = prediction_delay(self.LaC.profile, CS.vEgo, lat_delay)
 
     actuators.curvature = self.desired_curvature
     steer, lateral_output, lac_log = self.LaC.update(CC.latActive, CS, self.VM, lp,
