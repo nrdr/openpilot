@@ -153,6 +153,12 @@ class CarTuneReporter:
       return (f"{prefix} | {selection.raw_profile.name} | audited near-lock anchor 435.7 deg " +
               f"(VM ratio {selection.raw_profile.ratio_at(435.7):.6f}), endpoint-clamped | " +
               f"source {selection.raw_profile.provenance}")
+    if (rack_map := selection.rack_map) is not None:
+      table = rack_map.table
+      kind = "yaw-measured" if table.measured else "spec-predicted"
+      return (f"{prefix} | {rack_map.profile.name} Table-A shape on the {kind} rack map | " +
+              f"ratio {table.ratio_v[0]:g}->{table.ratio_v[-1]:g}, slip factor {table.slip_factor:g} " +
+              f"(CP {selection.cp_ratio:g} unused) | source {table.provenance} | no lane fade")
     return (f"{prefix} | {selection.firmware_profile.name} relative Table-A shape | " +
             f"immutable CP center anchor {selection.cp_ratio:g} | no lane fade")
 

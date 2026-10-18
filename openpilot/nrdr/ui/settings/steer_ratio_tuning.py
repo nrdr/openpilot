@@ -59,7 +59,8 @@ class SteerRatioTuningLayout(Widget):
     return multiple_button_item_sp(
       title=lambda: tr(title), param=param, button_width=215,
       buttons=[lambda: tr("Manual"), lambda: tr("Comma"), lambda: tr("Measured"), lambda: tr("Firmware")],
-      description=lambda: tr("Measured uses fixed logged data, not on-road learning. Firmware requires a recognized EPS. " +
+      description=lambda: tr("Measured uses fixed logged data, not on-road learning. Firmware requires a recognized EPS and uses " +
+                             "the car's rack map: yaw-measured where one exists, else predicted from its specs. " +
                              "Unavailable sources and invalid hybrid blends are rejected."),
     )
 
