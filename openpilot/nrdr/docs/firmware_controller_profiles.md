@@ -8,22 +8,39 @@ changing it requires offroad confirmation. PIF's Device Yaw Correction is separa
 | --- | --- | --- |
 | HONDA_CLARITY / 39990-TRW-A020, modified EPS | Existing Clarity A020 | Measured speed schedule |
 | HONDA_CIVIC_BOSCH / 39990-TBA-C020, modified EPS | Civic C020 TargetMapD / Tracker4500 / Norm1650 / P117to265 / D737 / KFF45 | Normal live/manual path |
-| HONDA_CIVIC / 39990-TEG-A010, modified EPS | TEG-A010 corrected PTM build, command row 3 (provisional until driven on that build) | Normal live/manual path |
-| HONDA_INSIGHT / 39990-TXM-A040, modified EPS | Insight TXM-A040 corrected PTM build (the Clarity's own command map and P table, 4096 E4 per unit, measured load, R6 from its A table) | Clarity's measured speed schedule |
+| HONDA_CIVIC / 39990-TEG-A010, modified EPS | TEG-A010 corrected PTM build, command row 3 (driven on that build) | Normal live/manual path |
+| HONDA_INSIGHT / 39990-TXM-A040, modified EPS | Insight TXM-A040 corrected PTM build (the Clarity's own command map and P table, 3840 E4 per unit, measured load, R6 from its A table) | Clarity's measured speed schedule |
+| HONDA_CIVIC_BOSCH / 39990-TBA-C120, modified EPS | C120 corrected PTM starting calibration: rows 0-4 the Clarity's R5 per key (3840 E4 per unit, its image's key clamp 1663), R6 from its A table, the C020's load and trims | Normal live/manual path |
+| HONDA_CIVIC_BOSCH / 39990-TGG-A120, modified EPS | TGG-A120 corrected PTM starting calibration: row 0, built for 4096 E4 per unit but sent 3840 (its key clamp 1663), R6 from its A table (the C020's), the C020's load and trims | Normal live/manual path |
+| HONDA_CIVIC / 39990-TBA-A030, modified EPS | A030 corrected PTM starting calibration: the TEG-A010's row 3 on every row, R6 from its A table (the TEG's), the TEG's measured load | Normal live/manual path |
+| HONDA_CRV_5G / 39990-TLA-A040, modified EPS | CR-V A040 corrected PTM starting calibration: row 0, key clamp 1774, R6 from its A table, the owner's measured load, untrimmed | Normal live/manual path |
+| HONDA_CRV_5G / 39990-TLA-A220, modified EPS | CR-V A220 corrected PTM starting calibration: rows 0-5 Clarity-equivalent, its own envelope, the A040's A table, R6, load and trims | Normal live/manual path |
 
 PID CarParams and a matching firmware steer-ratio profile are also required. No
-other Civic, firmware version, diesel, CR-V, or generic Honda inherits the fallback.
+other Civic, firmware version, diesel, CR-V, or generic Honda inherits a calibration.
+The five starting calibrations are provisional: their firmware fields are read from
+each corrected image, while load, trims and command delay are carried from the
+nearest measured car until the owner's drives measure them.
 
 ## Required corrected firmware
 
 The Civic TEG-A010 calibration requires
 `39990-TEG,A010-20261016b-PTMFix-ClarityEquivMap-ClarityPKnots-Row6Stock-A280FlatRows023`
-(RWD SHA-256 starts `04147917`). It replaces the Bosch placeholder, but remains
-provisional: it has not yet been road-validated on this corrected build.
+(RWD SHA-256 starts `04147917`). It replaces the Bosch placeholder. It has been
+driven on this corrected build (owner's route `0000013d`, 2026-10-17): the car runs
+the corrected map (median R5 residual 35 counts over 104k frames, against 822 for the
+earlier build's), the column load
+holds out at R^2 0.810 (the same as a refit), and its telemetry R6 word agrees with the R6 computed from its Table A
+(-156.16 at centre) within 0.8% on unrailed frames.
 
 The Insight TXM-A040 calibration requires `39990-TXM,A040-PTM-20261016b`
 (RWD SHA-256 starts `7ba37432`). Its source configuration has been driven on the
 corrected build; that is not independent validation of this port.
+
+The starting calibrations require, by RWD SHA-256 prefix: Civic Bosch TBA-C120
+`9261b8db`, Civic TGG-A120 `6640806d`, Civic TBA-A030 `55c37266`, CR-V TLA-A040
+`2e6a8802`, CR-V TLA-A220 `2c992997` (each `...-20261016b-PTMFix-ClarityEquivMap-...`).
+The controller logs the required build at start and shows it in its description.
 
 Older builds report the same EPS version strings as these corrected builds.
 Family admission cannot verify the actual flashed image. Confirm the flashed
@@ -58,13 +75,13 @@ newer angle-dependent R6 conversion and all existing core numerical behavior.
 TEG-A010 now uses its corrected firmware's command row 3 and shared Clarity P
 knots, with its own telemetry-derived column load and angle-dependent R6. It
 retains the C020 base gains, P/I trims and Civic command delay. Its existing
-3840-count transport and user-selected geometry are unchanged. It remains
-provisional, especially at crawl speeds not covered by the source telemetry.
+3840-count transport and user-selected geometry are unchanged. Crawl speeds
+are still thinly covered by its owner's drives (few turns below 9 m/s).
 
 Insight TXM-A040 uses the corrected firmware's Clarity command map and P table,
 its own load and angle-dependent R6, the C020 base gains/P-I trims, Civic command
-delay, and Clarity prediction schedule. Its 4096-count transport is accounted
-for in the inversion; no transport or safety limit is increased.
+delay, and Clarity prediction schedule. It is sent 3840 counts per unit, the
+image's own command clamp (as the Clarity); no transport or safety limit is increased.
 
 Shared steer-ratio selection, driver override, torque clipping, safety checks,
 inactive reset/history behavior and single output LPF are preserved. Optimized

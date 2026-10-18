@@ -604,7 +604,7 @@
                   "widget": "multiple_button",
                   "title": "Controller Type",
                   "description": "Firmware Controller requires the matching modified EPS build. TEG-A010 uses its own provisional corrected-PTM calibration, not the Bosch placeholder.",
-                  "details": "TEG-A010 requires the corrected PTM firmware (RWD SHA256 starts 04147917); its calibration is not yet road-validated. Insight TXM-A040 requires the corrected PTM firmware (7ba37432). Older builds report the same version strings but are not compatible with these calibrations. Confirm the actual flashed build before selecting Firmware Controller. PIF and Device Yaw Correction remain separate.",
+                  "details": "TEG-A010 requires the corrected PTM firmware (RWD SHA256 starts 04147917); its calibration has been driven on that build. Insight TXM-A040 requires the corrected PTM firmware (7ba37432). Starting calibrations, not yet road-validated, cover the corrected builds of Civic Bosch TBA-C120 (9261b8db), Civic TGG-A120 (6640806d), Civic TBA-A030 (55c37266), CR-V TLA-A040 (2e6a8802) and CR-V TLA-A220 (2c992997). Older builds report the same version strings but are not compatible with these calibrations. Confirm the actual flashed build before selecting Firmware Controller. PIF and Device Yaw Correction remain separate.",
                   "options": [
                     {
                       "value": 0,
