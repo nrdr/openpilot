@@ -48,6 +48,19 @@ def write_record(destination: Path, record: dict) -> None:
   temporary.replace(destination)
 
 
+def compile_targets_match(recorded: str, current: str) -> bool:
+  """Compare the full target, not Device.DEFAULT's device-family shorthand."""
+  from tinygrad.helpers import Target
+  try:
+    if not recorded or not current:
+      return False
+    recorded_targets = tuple(Target.parse(target) for target in recorded.split(';'))
+    current_targets = tuple(Target.parse(target) for target in current.split(';'))
+    return all(target.device for target in recorded_targets + current_targets) and recorded_targets == current_targets
+  except (AttributeError, RuntimeError):
+    return False
+
+
 def build(selection: dict, source_artifact: Path, source_dir: Path, camera: tuple[int, int]) -> dict:
   source_artifact = source_artifact.resolve()
   source_sha, recipe = rebuild_recipe(selection, source_artifact)
@@ -85,6 +98,7 @@ def build(selection: dict, source_artifact: Path, source_dir: Path, camera: tupl
 def verify(selection: dict, source_artifact: Path, camera: tuple[int, int]) -> dict:
   import numpy as np
   from tinygrad.device import Device
+  from tinygrad.helpers import DEV
   from openpilot.sunnypilot.modeld_v2.helpers import load_oob
   from openpilot.sunnypilot.modeld_v2.model_adapters import get_model_adapter
   from openpilot.sunnypilot.modeld_v2.parse_model_outputs import Parser
@@ -97,7 +111,7 @@ def verify(selection: dict, source_artifact: Path, camera: tuple[int, int]) -> d
       record.get("tinygrad_ref") != TINYGRAD_RUNTIME_REF or record.get("source_artifact_sha256") != source_sha or
       record.get("model_ref") != selection["ref"] or record.get("model_name") != selection["internalName"] or
       record.get("camera") != list(camera) or record.get("source_models") != recipe["source_models"] or
-      record.get("device") != Device.DEFAULT or record.get("artifact_sha256") != artifact_sha256(target)):
+      not compile_targets_match(record.get("device"), repr(DEV)) or record.get("artifact_sha256") != artifact_sha256(target)):
     raise ModelAdmissionError("Rebuild provenance, backend, camera, or artifact changed; refusing verification")
   # Revoke an earlier admission before executing any changed verification path.
   record["verified"] = False
@@ -150,6 +164,8 @@ def main():
   parser.add_argument("--source-dir", type=Path)
   parser.add_argument("--camera", required=True, help="WIDTHxHEIGHT")
   args = parser.parse_args()
+  # build() uses this default too; set it before importing tinygrad in verify().
+  os.environ.setdefault('DEV', 'CPU:LLVM')
   camera = tuple(map(int, args.camera.split("x")))
   if len(camera) != 2 or camera not in ((1344, 760), (1928, 1208)):
     parser.error("Expected a supported C3/C4 camera resolution")

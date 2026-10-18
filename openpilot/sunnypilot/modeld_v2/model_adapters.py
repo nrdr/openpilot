@@ -83,8 +83,13 @@ class LegacyModelAdapter(BaseModelAdapter):
 
     metadata = self.jits['metadata']
     self.frame_copy_size = nv12_copy_size(*self.nv12_info[:3])
+    # Unified artifacts pack raw frames into the policy input. Separate
+    # artifacts always run a warp first, including when hosted on Chestnut.
+    self.is_unified = 'run_policy' not in self.jits
+    if self.is_unified and 'model' not in metadata:
+      raise ValueError('Unified legacy artifact is missing model metadata')
 
-    if self.chestnut:
+    if self.is_unified:
       self.WARP_DEV = self.DEV
 
     if 'model' in metadata:
@@ -93,9 +98,10 @@ class LegacyModelAdapter(BaseModelAdapter):
       self.vision_output_slices = model_metadata['output_slices']
       self._vision_input_names = [key for key in self.input_shapes if 'img' in key]
       self.frame_skip = derive_frame_skip({}, self.input_shapes)
-      if self.chestnut:
+      if self.is_unified:
         self.input_queues, self.numpy_inputs, self.frame_slots = stock_make_input_queues(
           self.input_shapes, self.frame_skip, device=self.QUEUE_DEV, frame_copy_size=self.frame_copy_size)
+        self._vision_input_names = list(self.frame_slots)
       else:
         self.input_queues, self.numpy_inputs = make_supercombo_input_queues(self.input_shapes, self.frame_skip, device=self.QUEUE_DEV)
       self.run_policy = self.jits['run_policy'] if 'run_policy' in self.jits else self.jits[(self.cam_w, self.cam_h)]
@@ -115,9 +121,13 @@ class LegacyModelAdapter(BaseModelAdapter):
       self.input_queues, self.numpy_inputs = make_split_input_queues(vision_metadata['input_shapes'], first_policy_meta['input_shapes'],
                                                                      self.frame_skip, device=self.QUEUE_DEV)
 
-    self.run_warp = self._load_warp()
+    if not self.is_unified and (self.cam_w, self.cam_h) not in self.jits:
+      # Generic external warps use input_frame/M_inv, not the legacy
+      # frame/big_frame call contract. They cannot replace a missing legacy JIT.
+      raise ValueError(f'Legacy model lacks an embedded {self.cam_w}x{self.cam_h} camera warp; rebuild it for this camera')
+    self.run_warp = None if self.is_unified else self._load_warp()
     self._init_common()
-    if not self.chestnut:
+    if not self.is_unified:
       yuv_size = self.frame_buf_params[self._road_key][3]
       frame_tensor = Tensor(np.zeros(yuv_size, dtype=np.uint8), device=self.WARP_DEV).contiguous().realize()
       big_frame_tensor = Tensor(np.zeros(yuv_size, dtype=np.uint8), device=self.WARP_DEV).contiguous().realize()
@@ -125,7 +135,7 @@ class LegacyModelAdapter(BaseModelAdapter):
                     frame=frame_tensor, big_frame=big_frame_tensor)
 
   def copy_frames(self, bufs):
-    if self.chestnut:
+    if self.is_unified:
       for key in self._vision_input_names:
         if key in bufs:
           data = bufs[key].data if hasattr(bufs[key], 'data') else bufs[key]
@@ -143,12 +153,12 @@ class LegacyModelAdapter(BaseModelAdapter):
   def reset_warmup_buffers(self):
     for v in self.numpy_inputs.values():
       v[:] = 0
-    if not self.chestnut:
+    if not self.is_unified:
       self.full_frames.clear()
       self._blob_cache.clear()
 
   def run(self):
-    if self.chestnut:
+    if self.is_unified:
       return self.run_policy(**{k: self.input_queues[k] for k in POLICY_INPUTS if k in self.input_queues})
 
     warped = self.run_warp(**{k: self.input_queues[k] for k in ('tfm', 'big_tfm')},
@@ -170,7 +180,9 @@ class NativeTinygradAdapter(BaseModelAdapter):
     self.frame_copy_size = stride * (y_height + uv_height)
 
     self.input_shapes_orig = self.jits['metadata']['input_shapes']
-    self._vision_input_names = [k for k in self.input_shapes_orig if 'img' in k]
+    # ONNX inputs also include recurrent state_img_q. Camera identity is a
+    # two-slot interface, not a substring search through model state tensors.
+    self._vision_input_names = ['img', 'big_img']
     self.vision_output_slices = pickle.loads(codecs.decode(self.jits['metadata']['metadata']['output_slices'].encode(), 'base64'))
 
     self.run_warp = self._load_warp()
