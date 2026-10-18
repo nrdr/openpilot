@@ -133,8 +133,10 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertIn("same version strings", selector["details"])
     source = (ROOT / "openpilot/nrdr/ui/settings/pidf_ground.py").read_text(encoding="utf-8")
     self.assertNotIn("uses the Bosch C020 tune", source)
-    self.assertIn("04147917", source)
-    self.assertIn("7ba37432", source)
+    # The device shows each profile's required corrected build, which the profile carries.
+    self.assertIn("profile.required_rwd", source)
+    from openpilot.nrdr.features.lateral.controller_selection import INSIGHT_PROFILE, TEG_PROFILE
+    self.assertEqual((TEG_PROFILE.required_rwd, INSIGHT_PROFILE.required_rwd), ("04147917", "7ba37432"))
 
 
 if __name__ == "__main__":

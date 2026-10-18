@@ -67,7 +67,7 @@ def test_civic_wrapper_uses_its_own_calibration_and_the_c020_trims_without_mutat
   assert control.core.ff.load_coefficients == (CIVIC_TEG_EPS_LOAD if teg else CIVIC_EPS_LOAD)
   assert control.core.p_scale == CIVIC_P_SCALE and control.core.i_scale == CIVIC_I_SCALE
   assert control.delay_schedule is None
-  assert control.firmware_profile.provisional == (changes["fingerprint"] == "HONDA_CIVIC")
+  assert not control.firmware_profile.provisional
   # User PIF/yaw settings cannot leak into either firmware profile.
   control.set_live_tuning_snapshot(ParamSnapshot(1, {"NrdrDeviceYawCorrection": True, "LatFScaleHighway": 500,
                                                    "NrdrLatRateDampingHighway": 300}))

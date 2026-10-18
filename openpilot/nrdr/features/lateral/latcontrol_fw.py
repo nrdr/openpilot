@@ -7,9 +7,9 @@ Optimized lane changes remain an explicit owner-requested adaptation. The comman
 delay ends (NrdrYawCommandDelayLow/High) remain Clarity-specific. Civic uses the
 source Civic schedule plus the existing SunnyPilot port compensation. TEG-A010 has
 its own calibration (the corrected PTM build's row 3, 3840 E4 per unit, its own
-measured load and R6) and keeps the C020's base gains, trims and command delay; it
-stays provisional. Insight TXM-A040 has its own calibration for its corrected PTM build
-(the Clarity's own map and P table, 4096 E4 per unit, measured load, R6 from its A table)
+measured load, R6 from its A table) and keeps the C020's base gains, trims and command delay; it has
+been driven on its corrected build. Insight TXM-A040 has its own calibration for its corrected PTM build
+(the Clarity's own map and P table, 3840 E4 per unit, measured load, R6 from its A table)
 with the C020's trims, the Civic command delay and the Clarity's model-delay schedule.
 """
 import numpy as np
@@ -19,8 +19,9 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile
 from openpilot.nrdr.features.lateral.vfn_eps_core import (
-  CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_I_SCALE, CIVIC_P_SCALE, CIVIC_TEG_A010, CIVIC_TEG_EPS_LOAD, INSIGHT_TXM_A040,
-  INSIGHT_TXM_EPS_LOAD,
+  CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_I_SCALE, CIVIC_P_SCALE, CIVIC_TBA_A030, CIVIC_TBA_C120, CIVIC_TEG_A010,
+  CIVIC_TEG_EPS_LOAD, CIVIC_TGG_A120, CRV_I_SCALE, CRV_P_SCALE, CRV_TLA_A040, CRV_TLA_A220, CRV_TLA_EPS_LOAD,
+  INSIGHT_TXM_A040, INSIGHT_TXM_EPS_LOAD,
   HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
 )
 from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, command_delay, prediction_delay_schedule
@@ -32,11 +33,17 @@ GAIN_BP = [0.0, 11.175, 11.176, 22.352]
 KP = [0.018, 0.024, 0.048, 0.060]
 KI = [0.006, 0.008, 0.016, 0.020]
 ANGLE_RATE_LIMIT = 300.0
-# Calibrations with their own image constants and column load; the Clarity uses the module defaults.
+# Calibrations with their own image constants, column load and residual-PID trims; the Clarity uses the module defaults.
 _OWN_CALIBRATIONS = {
-  "civic_bosch_c020": (CIVIC_BOSCH_C020, CIVIC_EPS_LOAD),
-  "civic_teg_a010": (CIVIC_TEG_A010, CIVIC_TEG_EPS_LOAD),
-  "insight_txm_a040": (INSIGHT_TXM_A040, INSIGHT_TXM_EPS_LOAD),
+  "civic_bosch_c020": (CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
+  "civic_teg_a010": (CIVIC_TEG_A010, CIVIC_TEG_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
+  "insight_txm_a040": (INSIGHT_TXM_A040, INSIGHT_TXM_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
+  # Corrected-PTM starting calibrations: load and trims carried from the nearest measured car (see vfn_eps_core)
+  "civic_tba_c120": (CIVIC_TBA_C120, CIVIC_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
+  "civic_tgg_a120": (CIVIC_TGG_A120, CIVIC_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
+  "civic_tba_a030": (CIVIC_TBA_A030, CIVIC_TEG_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
+  "crv_tla_a040": (CRV_TLA_A040, CRV_TLA_EPS_LOAD, CRV_P_SCALE, CRV_I_SCALE),
+  "crv_tla_a220": (CRV_TLA_A220, CRV_TLA_EPS_LOAD, CRV_P_SCALE, CRV_I_SCALE),
 }
 
 
@@ -51,15 +58,15 @@ class LatControlFirmware(LatControl):
     if self.firmware_profile.calibration in _OWN_CALIBRATIONS:
       # Source Bosch base gains as well as its fixed trims, also on the TEG and the Insight, whose
       # trims are not measured. Never retune CP or increase CAN/safety limits.
-      cal, load = _OWN_CALIBRATIONS[self.firmware_profile.calibration]
+      cal, load, p_scale, i_scale = _OWN_CALIBRATIONS[self.firmware_profile.calibration]
       self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt,
         ff=HondaEpsFirmwareFeedforward(dt, cal=cal, load=load),
-        p_scale=CIVIC_P_SCALE, i_scale=CIVIC_I_SCALE)
+        p_scale=p_scale, i_scale=i_scale)
     else:
       self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt)
-    cloudlog.info("Firmware Controller profile=%s calibration=%s provisional=%s prediction_schedule=%s",
+    cloudlog.info("Firmware Controller profile=%s calibration=%s provisional=%s prediction_schedule=%s required_rwd=%s",
                   self.firmware_profile.name, self.firmware_profile.calibration,
-                  self.firmware_profile.provisional, self.delay_schedule)
+                  self.firmware_profile.provisional, self.delay_schedule, self.firmware_profile.required_rwd or "-")
     self.cmd_delay = CommandDelay(dt)
     self.model_v2 = None
     self.prev_angle = 0.0

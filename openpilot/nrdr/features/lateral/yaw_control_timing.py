@@ -37,6 +37,15 @@ CIVIC_COMMAND_DELAY_LOW = 0.175  # 0.15 source + 0.025 port compensation
 # The Insight takes it too: its source command delay is the C020's 0.15 s (JamesL787 ns-bosch-radar-testing, the
 # calibration it drove on).
 CIVIC_COMMAND_DELAY_CALIBRATIONS = ("civic_bosch_c020", "civic_teg_a010", "insight_txm_a040")
+# Calibrations whose town command delay is fixed (their source's measured or inferred value + 0.025 s port
+# compensation), so persisted Clarity command-delay settings never retune them.
+FIXED_COMMAND_DELAY_LOW = dict.fromkeys(CIVIC_COMMAND_DELAY_CALIBRATIONS, CIVIC_COMMAND_DELAY_LOW)
+# Corrected-PTM starting calibrations: the C120, TGG-A120 and A030 take the C020's / TEG's 0.15 s; the CR-Vs the
+# default 0.12 s (their owner's PID drive ran late, not early). Each + 0.025 s port compensation, re-checked with
+# plan timing after a drive.
+FIXED_COMMAND_DELAY_LOW.update({"civic_tba_c120": CIVIC_COMMAND_DELAY_LOW, "civic_tgg_a120": CIVIC_COMMAND_DELAY_LOW,
+                                "civic_tba_a030": CIVIC_COMMAND_DELAY_LOW, "crv_tla_a040": DEFAULT_COMMAND_DELAY_LOW,
+                                "crv_tla_a220": DEFAULT_COMMAND_DELAY_LOW})
 MAX_COMMAND_DELAY = 0.30  # s
 
 
@@ -56,9 +65,9 @@ def _command_delay_setting(settings, key, default: float) -> float:
 
 
 def command_delay(settings, speed: float, *, calibration: str = "clarity_a020") -> float:
-  if calibration in CIVIC_COMMAND_DELAY_CALIBRATIONS:
-    # Do not let persisted Clarity command-delay settings silently retune Civic.
-    return float(np.interp(speed, COMMAND_DELAY_BP, (CIVIC_COMMAND_DELAY_LOW, DEFAULT_COMMAND_DELAY_HIGH)))
+  if calibration in FIXED_COMMAND_DELAY_LOW:
+    # Do not let persisted Clarity command-delay settings silently retune another car.
+    return float(np.interp(speed, COMMAND_DELAY_BP, (FIXED_COMMAND_DELAY_LOW[calibration], DEFAULT_COMMAND_DELAY_HIGH)))
   low = _command_delay_setting(settings, NrdrParamKey.NRDR_YAW_COMMAND_DELAY_LOW, DEFAULT_COMMAND_DELAY_LOW)
   high = _command_delay_setting(settings, NrdrParamKey.NRDR_YAW_COMMAND_DELAY_HIGH, DEFAULT_COMMAND_DELAY_HIGH)
   return float(np.interp(speed, COMMAND_DELAY_BP, (low, high)))
