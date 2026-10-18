@@ -335,13 +335,17 @@ are not replaced by this result.
 
 Compatible-cache preparation and activation
 
-At this final-evidence handoff, the parent had started a READ-ONLY compatible-
-cache preparation plan after all gates passed. No copying/preparation of the
-installed cache had been reported completed and no activation is claimed.
-Preparation is parent-owned, with no activation, particularly because C4 auto-
-updates are enabled. Any later cache copy, promotion or installed source change
-must be separately verified and recorded; these isolated passes are not such
-an installation. This worker performed no SSH, push, activation or deployment.
+After the gates passed, the parent inspected a read-only plan, then prepared
+the verified 1c397 artifact and its relative migration record beside the
+untouched original Pop chunks in /data/media/0/models. Artifact publication
+preceded the marker; neither existing files nor a conflicting marker could
+be overwritten. Private evidence: /data/nrdr-validation/pop-cache-prep/apply-f3358qf2.
+All original chunks, the saved selection, production settings and installed
+e1d7156 source were checked unchanged. OffroadMode remained false; the device
+was naturally offroad with noOutput. This is non-activating dependency prep,
+not an installation, reboot, firmware flash or road-validation result. Normal
+automatic updates remain enabled; the compatible cache avoids stranding this
+exact saved Pop selection when the published runtime is later installed.
 
 Evidence locations
 
