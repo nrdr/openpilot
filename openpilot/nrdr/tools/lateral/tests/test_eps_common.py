@@ -1,0 +1,46 @@
+import numpy as np
+import pytest
+
+from openpilot.nrdr.tools.lateral import eps_common
+
+
+def test_yaw_decode_ramps_the_clockwise_correction_in():
+  scale, _, right = eps_common.YAW_RATE_CALIBRATION["HONDA_CIVIC"]
+  assert eps_common.yaw_rate_deg_s(0.0, scale, right) == 0.0
+  assert eps_common.yaw_rate_deg_s(-10.0, scale, right) == pytest.approx(-10.0 * scale)  # left: no correction
+  assert eps_common.yaw_rate_deg_s(4.0, scale, right) == pytest.approx(4.0 * scale + right / 2)
+  assert eps_common.yaw_rate_deg_s(10.0, scale, right) == pytest.approx(10.0 * scale + right)
+  assert eps_common.vsa_counts(bytes([0x80, 0x00])) == 512
+
+
+@pytest.mark.parametrize("fingerprint,eps_fw", [
+  ("HONDA_CLARITY", "39990-TRW-A020"), ("HONDA_CIVIC", "39990-TEG-A010"), ("HONDA_INSIGHT", "39990-TXM-A040"),
+  ("HONDA_CIVIC_BOSCH", "39990-TBA-C020"),
+])
+def test_vgr_inverse_samples_the_exact_table(fingerprint, eps_fw):
+  profile = eps_common.vgr_profile(fingerprint, eps_fw)
+  linear, angle = eps_common.vgr_inverse(profile)
+  assert np.all(np.diff(angle) > 0) and np.all(np.diff(linear) > 0)
+  for a in (3.0, 47.0, 133.0, 301.0):
+    assert np.interp(a, angle, linear) == pytest.approx(profile.physical_to_linear(a), abs=0.01)
+
+
+def test_unknown_eps_has_no_profile_or_calibration():
+  assert eps_common.vgr_profile("HONDA_CIVIC", "39990-XXX-A000") is None
+  assert eps_common.vgr_profile("HONDA_CIVIC", None) is None
+  assert eps_common.firmware_profile("HONDA_CIVIC", None) is None
+  assert eps_common.prediction_schedule(None) is None
+
+
+def test_event_names_cover_old_and_new_logs():
+  assert eps_common.VEHICLE_PARAMETERS == ("vehicleParameters", "liveParameters")
+  assert eps_common.DEVICE_POSE == ("deviceMotion", "livePose")
+
+
+def test_rack_map_finds_the_cars_map_when_the_tree_has_rack_maps():
+  # guards the lookup against renames in honda_rack_map: with the module present, a mapped car must get its map
+  pytest.importorskip("openpilot.nrdr.features.lateral.honda_rack_map")
+  rack = eps_common.rack_map("HONDA_CIVIC", b"39990-TEG,A010\x00\x00", 15.38)
+  assert rack is not None and rack.table.ratio_v[0] == pytest.approx(14.16)
+  assert eps_common.rack_map("HONDA_CIVIC", b"39990-TBA,C020\x00\x00", 15.38) is None  # never borrowed
+
