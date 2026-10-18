@@ -369,8 +369,8 @@ class FirstRunSetup:
       return
     self.shown = True
     gui_app.push_widget(ConfirmDialog(
-      tr("Download the recommended Pop V2 driving model? It downloads in the background over Wi-Fi."),
-      tr("Download model"),
+      tr("Request compatible Pop V2? Saved model choices stay unchanged. If unavailable, the request stays pending without downloading or switching models."),
+      tr("Request model"),
       callback=self._model_selected,
     ))
 

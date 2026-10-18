@@ -13,6 +13,7 @@ import pytest
 
 from openpilot.cereal import custom
 from openpilot.nrdr.features.services import ModelAdmissionError, TINYGRAD_RUNTIME_REF
+from openpilot.nrdr.features.services.model_manager import select_default_model
 
 
 class ParamsMemory:
@@ -23,9 +24,16 @@ class ParamsMemory:
   def get(self, key):
     return self.values.get(key)
 
+  def get_bool(self, key):
+    return bool(self.values.get(key, False))
+
   def put(self, key, value, **_kwargs):
     self.values[key] = value
     self.writes.append((key, value))
+
+  def remove(self, key):
+    self.values.pop(key, None)
+    self.writes.append((key, None))
 
 
 def saved_pop(minimum=19):
@@ -62,6 +70,31 @@ def test_selector_v19_retains_exact_pop_preference_and_replaces_only_stale_runne
   assert helpers.get_active_model_runner(params) == int(custom.ModelManagerSP.Runner.tinygrad)
   assert params.values['ModelManager_ActiveBundle'] == raw
   assert params.writes == [('ModelRunnerTypeCache', int(custom.ModelManagerSP.Runner.tinygrad))]
+
+
+def test_first_run_waits_on_legacy_catalog_and_keeps_stock_until_a_compatible_download_finishes(helpers):
+  params = ParamsMemory({'NrdrAutoSelectModel': True, 'ModelRunnerTypeCache': int(custom.ModelManagerSP.Runner.tinygrad)})
+  legacy = custom.ModelManagerSP.ModelBundle(**saved_pop())
+  legacy.models = [{'type': 'chunked', 'artifact': {'fileName': 'pop.pkl', 'downloadUri': {
+    'uri': 'https://example.invalid/pop.pkl', 'sha256': '6dcaddf515ec60b860d20cab5b0892cb855082e5db56e7992d27833aa485227b'}}}]
+  select_default_model(params, (legacy,))
+  assert params.writes == []
+  assert params.get_bool('NrdrAutoSelectModel')
+  assert params.get('ModelManager_DownloadRef') is None
+  assert helpers.get_active_bundle(params) is None
+  assert helpers.get_active_model_runner(params) == int(custom.ModelManagerSP.Runner.stock)
+
+  # Use the real Capnp enum/text fields too, not only SimpleNamespace fixtures.
+  compatible = custom.ModelManagerSP.ModelBundle(**legacy.to_dict())
+  compatible.ref = 'new-compiled-pop'
+  compatible.tinygradRef = TINYGRAD_RUNTIME_REF
+  compatible.models[0].artifact.fileName = 'compatible-pop.pkl'
+  compatible.models[0].artifact.downloadUri.sha256 = 'a' * 64
+  select_default_model(params, (legacy, compatible))
+  assert params.get('ModelManager_DownloadRef') == 'new-compiled-pop'
+  assert not params.get_bool('NrdrAutoSelectModel')
+  assert helpers.get_active_bundle(params) is None  # Queuing isn't a preference switch.
+  assert helpers.get_active_model_runner(params) == int(custom.ModelManagerSP.Runner.stock)
 
 
 @pytest.mark.parametrize('raw', [saved_pop(18), {'invalid': True}, 'not a bundle'])
