@@ -10,12 +10,16 @@ Merged/adapted opendbc: f6f8ab891a760f34098b90f6ea0c6cd9c1fd6ddc
 Panda: 4230530f5ec4c7f11971f868ae9930b3547346eb
 Tinygrad: fe5d3169ba4f41d0947ad174925f413cbea9d056
 msgq: e7396e76dadbb49e374d4b664ff6bbb43a39bcb0
+Validated runtime root: ad0549fd9df563a54d0fef05e9b1dfb8295e2e0d
+Validated runtime opendbc: f6f8ab891a760f34098b90f6ea0c6cd9c1fd6ddc
 
 Full model/compiler migration and DEC retirement were explicitly approved.
 The latest MVL d841/ebf delta is included with the flag-based HUD adaptation
 described below. No new PCM, learner, safety or geometry changes accompany
-that final HUD delta. Native/numerical validation of this final combination is
-PENDING; the earlier 5269 native pass must not be relabeled as a final pass.
+that final HUD delta. Isolated native and frozen-input numerical gates passed
+on the exact validated runtime revisions above. This later documentation-only
+update does not become a newly executed runtime revision. The historical 5269
+results remain separate, and no road comfort/safety validation is claimed.
 
 Integration history and disposition
 
@@ -172,8 +176,8 @@ heads remain present; genuine policy hidden_state survives when vision does
 not declare one. Recurrent history and action extraction are unchanged. New
 tests exercise actual metadata readers on ONNX metadata bytes and actual
 imported ModelState.run/Parser on Linux, not only source/AST checks. Comparison
-gates and head coverage were not relaxed. Final native cached/fresh verification
-and numerical reruns remain pending as recorded below.
+gates and head coverage were not relaxed. Native cached/fresh verification and
+the final numerical reruns passed, with source-specific evidence below.
 
 DEC retirement and other SunnyPilot changes
 
@@ -249,6 +253,14 @@ Source-specific host evidence (overlapping suites; NEVER sum totals)
 - Separate earlier readiness suite: 18 passed; release/overlay suite: 58 passed.
   Changed Python Ruff and diff checks passed. Latest runtime static import/
   export audit at 98347d8: 114 roots, 506 parsed modules, zero issues.
+- Parent's optional settings/schema validation rerun on ad0549 passed on HOST,
+  not natively. settings SHA256:
+  a44eb29c11dfa7b163473054f1201a5206d539058949980ab187c15d389c0660
+  schema SHA256:
+  7d7c91184c0723104dbdb390bca5af6294c675a2ae612ad09e90a1fc63f154f0
+  The native optional test skip is not relabeled as native execution. Parent's
+  task-private cache/comparison unit suite also passed 38 tests; this is not
+  part of the native or numerical run counts.
 
 Host platform doubles/bridges do not execute native C++/solver/safety/GPU code.
 The 17 collection errors remain honest Windows dependency/IPC/hardware limits,
@@ -272,13 +284,64 @@ Native and numerical evidence, kept separate by source
   passed except the returned hidden_state head (warm max 190.2053, p95 19.2710),
   traced to the export bug above. Other heads/raw nets/plans/actions passing
   was NOT accepted as permission to omit that head or loosen the gate.
-- 98347d8 retry was launched in the isolated candidate: full build/default
-  smoke, untouched cached Pop verification, backup, fresh original-ONNX rebuild,
-  fresh verification and all native pytest. Results are PENDING in these notes.
-- Final f6f8ab891 HUD combination also requires parent review and native full
-  checks. The final four numerical runs must use the final runtime source and
-  fresh artifact with unchanged frozen gates, including hidden_state. Their
-  results are PENDING; no final driving-promotion claim is made here.
+- 98347d817dbdd9a20c29889a358da4ed81baaaef retry completed successfully:
+  SCons 13s, default DM/driving smoke 10s, untouched cached selected artifact
+  verification 6s, original-ONNX rebuild 263s and fresh verification 7s.
+  The unchanged cached artifact was
+  218d4f10f1dc05c0f8fee8541669aacde6d652533f05832d6bc1df31476e5749;
+  verifying it proved compatibility with its old overlapping policy metadata,
+  before backup and rebuilding rather than silently rewriting that evidence.
+  Fresh artifact SHA256:
+  1c397da5b17dcf1acd565dc88992377a510c44c216f93be18c0dc4e8da9221b8
+  Native pytest: 4366 passed, 2094 subtests passed, 607 skipped, zero failures/
+  errors in 257.15s (guardian observation 267s). Audit: eight repositories,
+  4611 tracked files; installed e1d7156 baseline and 194 settings unchanged.
+- FINAL ad0549fd9df563a54d0fef05e9b1dfb8295e2e0d with opendbc
+  f6f8ab891a760f34098b90f6ea0c6cd9c1fd6ddc completed native checks:
+  SCons 13s, default DM/driving smoke 9s and selected fresh-artifact verification
+  5s, all exit 0. Native pytest: 4382 passed, 2094 subtests passed, 607 skipped,
+  zero failures/errors in 251.81s (guardian observation 261s). The actual XML
+  contains all 24 feature-contract cases, including eight imported ModelState
+  cases, and all 16 HUD cases; none of these 40 cases were skipped or omitted.
+  Source audit: eight repositories, 4612 tracked files, 272 hydrated LFS assets
+  and one optional pointer; audit passed. Installed e1d7156 source and all 194
+  compared production settings remained unchanged.
+
+Final frozen-input V2 numerical comparison
+
+Run a8f87889af394b2caa20502946878537 completed exit 0 on the FINAL runtime and
+fresh 1c397 artifact identified above. All four baseline/candidate children
+exited 0. Each passed six controlled and 450 actual GPU visibility checks
+before warp using native cache flush and exact GPU readback. Inputs were 225
+contiguous two-camera frames: 97 warmup, 128 scored. Fixed timing, selection,
+fixtures, output coverage and all 38 metrics retained their frozen policy.
+
+All four warm comparison groups passed: baseline repeat, candidate repeat and
+both baseline/candidate comparisons. Both cold self-repeats were bitwise exact;
+the cold cross comparison also passed, but remains diagnostic in policy scope.
+Every hidden_state maximum absolute difference was 0.0, including cross-source
+comparisons. No hidden-state exemption, dropped head or threshold change was
+used to obtain this result.
+
+Policy SHA256:
+a501eaaecfd9e936402469e8dcb038a952da89288228f013f8e0263c5a88e19a
+Frozen manifest SHA256:
+084a31688dd75daeeb2bd314d0ad06a1bd750165141824a669037adf301afb0a
+This is numerical engineering compatibility for the selected Pop model on
+these fixed exterior inputs/timing. It does not establish road/safety
+equivalence, comfort improvements, correct delay calibration, scheduler Hz
+improvement or optional Chestnut compatibility. Baseline drive diagnoses above
+are not replaced by this result.
+
+Compatible-cache preparation and activation
+
+At this final-evidence handoff, the parent had started a READ-ONLY compatible-
+cache preparation plan after all gates passed. No copying/preparation of the
+installed cache had been reported completed and no activation is claimed.
+Preparation is parent-owned, with no activation, particularly because C4 auto-
+updates are enabled. Any later cache copy, promotion or installed source change
+must be separately verified and recorded; these isolated passes are not such
+an installation. This worker performed no SSH, push, activation or deployment.
 
 Evidence locations
 
@@ -287,6 +350,14 @@ runners, XML reports, source-specific handoffs and latent-export evidence.
 Parent Build Reports/2026-10-17-native-validation/ holds native logs/results,
 tracked-source/settings audits, original model hashes and numerical evidence;
 upstream-reviewed-retry-result.json is the 5269 result, NOT the final retry.
+upstream-hidden-fix-{result.json,native-tests.xml,native-tests.log} records the
+98347d8 cached/fresh rebuild and native checks. upstream-final-hud- equivalents
+record the FINAL ad0549/f6f8 native checks. Final comparison result:
+model-comparison-v2-result-a8f87889af394b2caa20502946878537.json
+Raw output directory (13 files):
+model-comparison-v2-outputs-a8f87889af394b2caa20502946878537
+settings-schema-validation.json records the distinct host-only schema check.
 Build Reports/2026-10-17-civic-drive/ holds the independent baseline drive
-reports. These task artifacts are not deployed runtime code. Final native/
-numerical evidence will be recorded only after the parent provides results.
+reports. These task artifacts are not deployed runtime code. Reported final
+results were checked against fetched native XML/logs and numerical result JSON;
+the runtime identity above, not this documentation commit, owns those results.
