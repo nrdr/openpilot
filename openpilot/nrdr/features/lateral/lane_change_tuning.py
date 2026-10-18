@@ -135,8 +135,12 @@ def shape_lane_change_curvature(selection, VM, measured_angle: float, speed: flo
     zero_angle = selection.desired_angle_no_offset(VM, measured_angle, speed, roll, 0.0)
     target_angle = selection.desired_angle_no_offset(VM, measured_angle, speed, roll, desired_curvature)
     shaped_angle = zero_angle + scale * (target_angle - zero_angle)
-    linear_angle = selection.linearize_measured_angle(shaped_angle)
-    shaped = -VM.calc_curvature(math.radians(linear_angle), speed, roll)
+    if (rack_map := getattr(selection, "rack_map", None)) is not None:
+      # The measured map carries its own slip factor; convert back through it, as the angles above were.
+      shaped = -rack_map.curvature_from_angle(shaped_angle, speed, roll)
+    else:
+      linear_angle = selection.linearize_measured_angle(shaped_angle)
+      shaped = -VM.calc_curvature(math.radians(linear_angle), speed, roll)
     if not math.isfinite(shaped):
       return desired_curvature
     # A reduction must never amplify or reverse the requested curvature.
