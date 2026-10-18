@@ -44,3 +44,14 @@ def test_rack_map_finds_the_cars_map_when_the_tree_has_rack_maps():
   assert rack is not None and rack.table.ratio_v[0] == pytest.approx(14.16)
   assert eps_common.rack_map("HONDA_CIVIC", b"39990-TBA,C020\x00\x00", 15.38) is None  # never borrowed
 
+
+@pytest.mark.parametrize("path,expected", (
+  (r"C:\drive\0000013d--8de8634497--43\rlog.zst", 43),
+  ("/drive/0000013d--8de8634497--43/rlog.zst", 43),
+  (r"C:\drive\rlog_10.zst", 10),
+  ("/drive/rlog_2.bz2", 2),
+))
+def test_plan_timing_orders_segment_numbers_on_both_platforms(path, expected):
+  from openpilot.nrdr.tools.lateral.eps_plan_timing import seg_number
+  assert seg_number(path) == expected
+

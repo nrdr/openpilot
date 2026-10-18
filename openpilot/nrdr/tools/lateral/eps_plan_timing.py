@@ -35,7 +35,7 @@ VSA_LATENCY = 0.017  # s, measured on the Clarity against rear-wheel-speed yaw; 
 
 
 def seg_number(path):
-  m = re.search(r'(?:rlog_|--|/)(\d+)(?:\.zst|\.bz2|/rlog)', path)
+  m = re.search(r'(?:rlog_|--|/)(\d+)(?:\.zst|\.bz2|/rlog)', os.fspath(path).replace('\\', '/'))
   return int(m.group(1)) if m else 0
 
 
