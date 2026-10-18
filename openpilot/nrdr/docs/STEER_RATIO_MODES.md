@@ -59,9 +59,12 @@ angle offset cancels) and `sf` the slip factor, fitted from how `R` changes with
 | Civic TEG-A010, TBA-A030 (the same 2016-18 sedan, same Table A) | 14.16 -> 13.78 (293 deg) | -0.00067 | 15.38 | 0000012d-00000139 (0000013d agrees) |
 | Insight TXM-A040 | 17.86 -> 17.17 (221 deg) | -0.00066 | 15.0 | 0000001e |
 
-The Firmware controller and the curvature-measuring controllers use the full map (`angle_from_curvature`,
-`curvature_from_angle`). Paths that carry no speed (controlsd's measured angle, lane-change shaping, a hybrid with
-a Firmware source) use the same ratio by angle without the measured slip factor, through VehicleModel at the CP ratio.
+With a single-source Firmware rack map selected, the Firmware controller, curvature-measuring controllers and
+controlsd's current-curvature measurement use the full map (`angle_from_curvature`, `curvature_from_angle`), including
+its slip factor. Controlsd first updates VehicleModel from the frame's accepted snapshot, then passes the raw wheel
+angle, separate angle offset, speed and roll through that same selection; other modes retain their VehicleModel
+formula. Speed-free paths (lane-change shaping and a hybrid's Firmware source) still use the same ratio by angle
+without the measured slip factor, through VehicleModel at the CP ratio.
 On the TEG, CP's 15.38 delivered 6-11% more curvature than asked on the owner's drives, most in slow turns past
 150 deg; the map holds the measured curvature within ~1-3%.
 

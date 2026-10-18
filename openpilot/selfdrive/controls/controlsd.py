@@ -107,13 +107,13 @@ class Controls(ControlsExt):
 
     # Update VehicleModel
     lp = self.sm['vehicleParameters']
-    x, sr, _angle_offset, measured_steer_angle = vehicle_model_state(self, lp, CS, lat_active)
+    x, sr, angle_offset, _measured_steer_angle = vehicle_model_state(self, lp, CS, lat_active)
     self.lat_delay = get_lat_delay(self.nrdr_lateral_snapshot, self.sm["lateralDelay"].lateralDelay, self.CP.steerActuatorDelay,
                                    delay_schedule=getattr(self.LaC, "delay_schedule", None), v_ego=CS.vEgo)
     self.VM.update_params(x, sr)
 
-    steer_angle_without_offset = math.radians(measured_steer_angle)
-    self.curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
+    self.curvature = self.steer_ratio_latch.selection.measured_curvature(
+      self.VM, CS.steeringAngleDeg, CS.vEgo, lp.roll, angle_offset_deg=angle_offset)
 
     # Update Torque Params
     if self.CP.lateralTuning.which() == 'torque':
