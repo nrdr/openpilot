@@ -1,122 +1,292 @@
 October 17 upstream sync candidate
 
-Base: nrdr-development e1d7156b5d
+Scope and exact source cutoff
+
+Base: nrdr-development e1d7156b5d25ee38f24f63a4a04b125675448d39
 SunnyPilot: 27c132984df60e9ef42ebd1a805738b8c851356f
-MVL openpilot sp-honda-dev-202608: cb15c04e918b759688cb354b1bbc9b3c5a47a65c
-MVL opendbc: cf46117420f283b3e38241c00d728a191aa9fccc
-Merged opendbc candidate: 47a1c2ef90e54571a4fa51584333e3f742aabf6a
+MVL openpilot sp-honda-dev-202608: d8419fbe04aa0ad65fb4d010033505c1a5253213
+MVL opendbc: ebf264749b82942390583ff915f032b4e1301b0f
+Merged/adapted opendbc: f6f8ab891a760f34098b90f6ea0c6cd9c1fd6ddc
 Panda: 4230530f5ec4c7f11971f868ae9930b3547346eb
 Tinygrad: fe5d3169ba4f41d0947ad174925f413cbea9d056
+msgq: e7396e76dadbb49e374d4b664ff6bbb43a39bcb0
 
-Honda behavior changes
+Full model/compiler migration and DEC retirement were explicitly approved.
+The latest MVL d841/ebf delta is included with the flag-based HUD adaptation
+described below. No new PCM, learner, safety or geometry changes accompany
+that final HUD delta. Native/numerical validation of this final combination is
+PENDING; the earlier 5269 native pass must not be relabeled as a final pass.
 
-- Keep Civic PCM sent-command modeling, authority/rise limits and 10 Hz
+Integration history and disposition
+
+- 16d6bbfdc6: MVL Honda merge through cb15/cf461 with NRDR adaptations.
+- 01429ccfd4: SunnyPilot non-model changes; the initial runtime deferral was
+  superseded by the later explicit full-migration approval, not left pending.
+- 3ef4770729: readiness tests follow Sentry removal without losing readiness
+  checks; retained error/logging paths are exercised.
+- d3f2d0e6aa: full generic model/compiler migration and DEC sunset.
+- c9c665b355: catalog refreshes cannot overwrite compiled model cache state.
+- daaf6fb812: explicit logical camera inputs, split Chestnut frame routing,
+  and full backend-target matching, including CPU:LLVM and USB+AMD:LLVM.
+- 6ee04e7c8b: restore canonical selection hook/service exports and correct
+  stale DEC interfaces, UI fixture isolation and download-slot regressions.
+- 5269e75cb5: only request compiler-compatible first-run Pop builds.
+- 98347d817d: preserve the real vision feature during policy-output merges.
+- Opendbc f6f8ab891: merge ebf264 and adapt the ALT_RADAR HUD condition.
+
+The task-local per-commit audit at daaf6f classified 128 SunnyPilot non-merge
+commits: 126 included with NRDR adaptations, one baseline/superseded duplicate
+pairing-button change, and one deferred updater change. It also classified
+seven MVL root commits (six included, one radar-handback UI deferral) and all
+16 incoming opendbc commits through cf461. The later d841 root commit only
+repoints opendbc; ebf264 adds one HUD condition. Thus the final MVL cutoffs
+cover eight root commits and 17 opendbc commits, with the same UI omission.
+These are history dispositions, not counts of independently tested features.
+Existing speed-learner bounds already ported to NRDR are retained, not claimed
+as newly implemented fixes. Commit-specific reasons remain in commit-audit.json.
+
+Honda behavior changes and retained boundaries
+
+- Keep Civic PCM sent-command modeling, authority/rise limits and the 10 Hz
   transmit-horizon correction. Add MVL's positive-acceleration speed-lead floor
   and alpha-learning guard. The Civic gates use the planner request rather
   than its separate PID correction. Other Nidec PCM cars gain the guard too.
-- Interceptor behavior DOES change: integral gain is now 0.3, and pedal scaling
-  is 0.35/0.4/0.6/1.0 at 0/3/6/10 m/s. These are upstream ILX-based changes,
-  not proof of improvement for every Honda. NRDR's Roen override remains 1.0.
-  Do not claim interceptor/Clarity baseline parity for the MVL integration.
+  This is not a demonstrated cure for the baseline drive's remaining jolts.
+- Full MVL integration deliberately CHANGES interceptor behavior: integral
+  gain is 0.3, and pedal scaling is 0.35/0.4/0.6/1.0 at 0/3/6/10 m/s. These
+  are upstream ILX-based changes, not proof of improvement on every Honda.
+  NRDR's Roen override remains 1.0. Do not claim Clarity/interceptor baseline
+  parity for the full integration just because the Civic PCM helper survives.
 - Integra uses ABS movement checks when ENGINE_DATA is absent, with matching
-  safety RX tests. Torque/acceleration TX limits are unchanged. Includes Bosch
-  HUD simplification and 2027 CR-V Hybrid support.
+  RX tests. Torque/acceleration TX limits are unchanged. Includes Integra
+  brake-assist handling, Bosch HUD simplification and 2027 CR-V Hybrid support.
 - MVL's 21 new Honda gain/shape keys are registered but not consumed here;
   they do not replace NRDR firmware calibrations or typed provider ownership.
+- Parameter specs/catalog/snapshots and providers retain their ownership.
+  Opendbc receives typed immutable configuration; no real-time raw Params
+  reads, competing defaults or controller-owned persistence were reintroduced.
+- Firmware calibrations, measured SR/geometry, speed-dependent firmware delay
+  schedules, lane-change policy and source timestamps remain NRDR-owned.
 
-Model/runtime migration (explicitly approved)
+Latest MVL HUD adaptation
 
-The full generic ONNX/warp compiler, native and legacy model adapters, current
-default CD210 model, precompiled Cinque Terre v2 Chestnut default, and paired
-Chestnut telemetry are included. hardwared owns USB/power/link chestnutState;
-modeld owns chestnutGpuState. No duplicate publisher owns the same service.
-Existing hardware liveness/cache workers are preserved.
+ebf264 is "RDM-off for ALT_RADAR cars, to prevent handsoff expiration". It adds
+RDM_OFF=1 and LANE_ASSIST_BEEP_OFF=1 for ALT_RADAR even with extended HUD. The
+incoming condition referenced HONDA_BOSCH_ALT_RADAR after its import had been
+removed; actual function calls reproduced NameError for every extended-HUD
+case, including non-ALT cars. The merge uses HondaFlags.BOSCH_ALT_RADAR instead.
+Normal extended HUDs retain their previous payload. Single/A+B HUD routing,
+lane visibility and steering-required alerts are unchanged. The target class
+includes RDX MMR, MDX 4G, Odyssey MMR and TLX 2G, not the normal Nidec Civic.
+The intended timeout improvement has not been verified in any of those cars.
 
-Firmware calibrations, measured SR/geometry, speed-dependent firmware delay
-schedules, lane-change policy, and source timestamps remain NRDR-owned. Both
-model runners stamp the same action horizon/frame identity before adjacent
-modelV2/modelDataV2SP publications. This migration is NOT evidence that the
-observed controlsd scheduling shortfall, early turn-in or PCM hesitation is fixed.
+New tests call the real create_lkas_hud with a capture packer and assert exact
+payloads/routing across extended/normal HUD, ALT/non-ALT radar, stock/openpilot
+longitudinal and lateral-active/inactive combinations. They are not a CAN-bus
+or on-car execution claim. No learner, PCM, geometry or safety file changed in
+this two-file opendbc delta from 47a1c2e.
+
+Model/runtime migration
+
+Included: generic ONNX and separate warp compilation, native and legacy model
+adapters, current CD210 default, precompiled Cinque Terre v2 Chestnut default,
+per-model tinygrad compiler provenance, and paired Chestnut telemetry.
+hardwared owns USB/power/link chestnutState; modeld owns chestnutGpuState.
+No duplicate publisher owns the same service. Existing hardware liveness/cache
+workers are preserved. Logical img/big_img camera inputs exclude recurrent
+state_img_q. Legacy frame routing follows artifact layout, not Chestnut alone.
+
+Both model runners stamp the same action horizon/frame identity before adjacent
+modelV2/modelDataV2SP publications. This preserves the metadata consumed by
+lane centering and firmware timing; it is not a timing recalibration.
 
 New compiler builds use temporary outputs, reload/check their ABI, then replace
 the model and provenance stamp. A failed compile leaves the prior artifact
 untouched; mismatched/interrupted artifact+stamp pairs fail admission. SCons
-declares both outputs, so a missing stamp forces rebuilding. Both C3/C4 camera
-warps are covered; compiler CPU affinity is inherited, not pinned to offline CPU7.
-Chestnut warp link failure returns a build error rather than fake success.
-Release gates check source/compiler hashes, QCOM backend, all shared-camera
-warps, and exact model weights without executing pickle contents.
+declares both outputs, so a missing stamp forces rebuilding. C3/C4 warp build
+targets are included; that does not imply live validation on both devices.
+Compiler CPU affinity is inherited, not pinned to offline CPU7. Chestnut warp
+link failure is a build error, not fake success. Release gates check compiler/
+source hashes, QCOM backend, shared-camera warps and exact model weights without
+executing pickle contents. The optional Chestnut/custom big-model path has NOT
+received native GPU/hardware validation here; the C4 has no Chestnut connected.
 
-Selected-model promotion gate
+Selected-model identity, compatibility and first-run requests
 
-Saved model preferences and overrides are retained, including selector-v19 Pop
-Model v2 (PMV2/index59), lat 0 and long .3. Model source ref is NEVER inferred to
-be tinygrad compiler ref. New bundle schema/parser/publisher metadata carries
+Saved preferences and overrides are retained, including selector-v19 Pop Model
+v2 (PMV2/index59), lat 0 and long .3. Model source ref is NEVER inferred to be
+tinygrad compiler ref. Bundle schema/parser/publisher metadata carries
 tinygradRef separately. Stale runner caches cannot select stock over a saved
-preference. Unsupported/corrupt selections fail explicitly, never silently
+preference. Unsupported/corrupt saved selections fail explicitly, never silently
 becoming the default. Catalog mismatch does not delete the saved selection.
 
-The old Pop artifact SHA is
-6dcaddf515ec60b860d20cab5b0892cb855082e5db56e7992d27833aa485227b.
-It is not admitted merely because new defaults compile. Its source-pinned
-rebuild recipe uses comma source revision 62bf6fb072880905a4c490f0f4f4a6b3c23346ec:
-driving_vision.onnx SHA940e9006a25f27f0b6e85da798e6a8fd1f6dd492dd7d0b9ff1a9436460f46129
-driving_policy.onnx SHA853c6634746ff439a848349d00e4d5581cd941f13f7c1862c31b72a31cc24858.
-Frame-history spacing is derived from the original input shapes, not retuned.
-Original cached chunks and Params are never overwritten by the rebuild tool.
+NrdrAutoSelectModel defaults to 0. Confirming the first-run recommended-Pop
+dialog sets a pending request; it is not unconditional fresh-install selection.
+Automatic Pop picks require an explicit current tinygradRef, tinygrad runner,
+PKL URI and complete SHA256. With no eligible build, the request stays pending,
+existing saved/queued choices remain untouched and no new choice is written.
+Stock can remain selected only when there was no saved selection. The dialog
+now explains compatible-build/pending behavior rather than promising an
+unsupported immediate download. This filter does not change the separate
+upstream automatic Chestnut-small-slot default queue.
 
-Native offline steps (inside isolated candidate, no vehicle messaging):
+Original selected Pop artifact SHA256:
+6dcaddf515ec60b860d20cab5b0892cb855082e5db56e7992d27833aa485227b
+It is not admitted merely because new defaults compile. Its pinned rebuild
+recipe uses comma source revision 62bf6fb072880905a4c490f0f4f4a6b3c23346ec:
+driving_vision.onnx SHA256:
+940e9006a25f27f0b6e85da798e6a8fd1f6dd492dd7d0b9ff1a9436460f46129
+driving_policy.onnx SHA256:
+853c6634746ff439a848349d00e4d5581cd941f13f7c1862c31b72a31cc24858
+Frame-history spacing comes from original input shapes, not a retune. Original
+chunks and production Params are never overwritten by the rebuild tool.
+Other legacy bundles lacking compatible provenance or an exact pinned rebuild
+recipe remain explicitly unsupported until migrated or republished.
+
+Native offline rebuild/verify steps, inside the isolated candidate only:
   python -m openpilot.nrdr.tools.model_rebuild build --selection saved-pop.json
     --source-artifact <original-pop.pkl> --source-dir <exact-ONNX-directory>
     --camera 1344x760
   python -m openpilot.nrdr.tools.model_rebuild verify --selection saved-pop.json
     --source-artifact <original-pop.pkl> --camera 1344x760
 Use DEV=QCOM IMAGE=1 FLOAT16=1 NOLOCALS=1 JIT_BATCH_SIZE=0 OPENPILOT_HACKS=1
-and matching candidate PYTHONPATH/tinygrad source for both commands.
-The verifier checks exact backend/camera/provenance, six synthetic frame runs,
-finite outputs, real parser/plan outputs, and response to changed inputs. Only
-then does it record admission. Synthetic smoke is NOT road/closed-loop validation.
-Native selected-model rebuild/smoke remains REQUIRED before driving promotion.
-Other legacy bundles without compiler provenance or an exact rebuild recipe
-remain explicitly unsupported until similarly migrated or republished.
+and matching candidate PYTHONPATH/tinygrad source for both commands. Verification
+checks exact full backend/camera/provenance, six synthetic frames, finite raw
+and parsed plan outputs and changed-input response before recording admission.
+Synthetic smoke is NOT road, closed-loop comfort or safety validation.
 
-DEC retirement
+Vision feature export correction
 
-DEC's independent mode-selection logic, planner integration, UI and runtime
-parameter reads are removed. The old wire ordinal is deprecated rather than
-reused, and the old key remains a false-default tombstone for downgrade
-compatibility. Explicit ExperimentalMode remains the single mode authority.
-Native/Sunnylink preference preservation, Honda-only Econ, and existing NRDR
-longitudinal/lead safety policy remain in place.
+The pinned vision ONNX declares hidden_state at 1064:1576; its policy ONNX does
+not declare hidden_state. Both new metadata readers had invented policy 0:512
+as a fallback, and dict merging overwrote the true vision feature with plan
+bytes. Saved native runs confirmed baseline export equals raw vision and the
+bad candidate export equals raw policy 0:512 exactly. Correct vision features
+matched baseline exactly in both cold/warm repeats. This was an export contract
+bug, not evidence that a numerical tolerance or the baseline needed changing.
 
-Remaining omissions / independent decisions
+98347d8 removes the invented declaration from both readers and uses one shared
+vision-preserving merge in ModelState.run and model_rebuild.verify. Cached
+artifacts containing the bogus policy metadata remain compatible. All other
+heads remain present; genuine policy hidden_state survives when vision does
+not declare one. Recurrent history and action extraction are unchanged. New
+tests exercise actual metadata readers on ONNX metadata bytes and actual
+imported ModelState.run/Parser on Linux, not only source/AST checks. Comparison
+gates and head coverage were not relaxed. Final native cached/fresh verification
+and numerical reruns remain pending as recorded below.
 
-- MVL's radar-handback UI change has no companion controller in the requested
-  MVL branch. The companion exists on a different alphatogglesp branch and also
-  broadens diagnostic transport whitelists (including communication-enable).
-  It can be adapted through immutable host/provider state, but importing only
-  its UI would suppress the existing restart request. Current candidate retains
-  the working restart request and existing safety/transport restrictions. This
-  is a concrete remaining cross-branch decision, not claimed complete.
-- The AGNOS updater zipapp swap remains deferred: retain the validated NRDR
-  updater/serial shim while adapting safe shell quoting. Full model/DEC approval
-  did not authorize replacing that independently validated update path.
+DEC retirement and other SunnyPilot changes
 
-Other SunnyPilot fixes/tooling include MADS no-entry cleanup, UI/eSIM work,
-locationd/localizer gates, driver-camera IR offroad option (not DM removal),
-Sentry retirement and updated readiness regression tests, file chunks and
-Cabana/replay. Firmware flashing, C4 access and pushing are parent-owned.
+DEC's independent mode logic, planner integration, UI and runtime parameter
+reads are removed. Its wire ordinal is deprecated, not reused; its parameter
+remains a false-default downgrade tombstone. Explicit ExperimentalMode remains
+the single mode authority. Surviving native/Sunnylink preference-preservation
+hooks, Honda-only Econ and NRDR longitudinal/lead policies remain in place.
 
-Host evidence before native staging
+Other included work: duplicate MADS no-entry alert fix; UI settings descriptions,
+alert/touch fixes, eSIM profile management and QR support; localizer alert and
+critical-service fixes; offroad driver-camera IR option (NOT DM removal);
+Sentry retirement with updated readiness tests; file chunk/replay/download and
+Cabana's ImGui migration; route parsing, shell quoting and CI/build tooling.
+Upstream commits/reverts are taken at their final cutoff state, not presented
+as separately active behavior. The existing NRDR pairing layout is retained
+instead of counting the superseded duplicate-button change as a new fix.
 
-Combined NRDR/lateral/model/UI suite: 1014 passed, 296 subtests passed, two
-platform skips, including six independent selection migration regressions.
-Honda suite: 290 passed, 72 subtests. Launcher/readiness: 18 passed.
-Release builder/overlay ownership: 58 passed. These suites overlap; do not add
-totals. Host suites use documented platform I/O doubles, not native runtimes.
-Independent static import/export audit: 489 modules, zero findings. The stale
-fingerprint helper import found during audit was repaired to opendbc structs.
-Native C++/solver/safety/model execution and road behavior are NOT host passes.
+Intentional omissions / remaining decisions
 
-Task-local .codex-upstream-audit/ contains the per-commit audit, exact host runner,
-native suite lists and XML evidence. These are task artifacts, not deployed code.
+- MVL radar-handback UI 8ad8ada771 is intentionally deferred. The required
+  controller companion is absent from the requested MVL branch, though it
+  exists on a separate alphatogglesp branch. That companion also broadens
+  diagnostic transport whitelists, including communication-enable. It could
+  be adapted across the immutable host/provider boundary, but UI alone would
+  suppress the working restart request. This candidate preserves that request
+  and current transport restrictions. Latest d841/ebf does not add the companion.
+- SunnyPilot AGNOS updater bundle change f15544b482 is intentionally deferred.
+  Keep the validated NRDR updater zipapp/serial shim; shell quoting fixes were
+  adapted separately. Model/DEC approval was not an updater replacement test.
+- Optional custom/Chestnut runtime, other unported legacy model artifacts,
+  live C3 camera execution and public-road behavior are not claimed validated.
+  No firmware flashing, new diagnostic authority or production deployment is
+  part of this upstream worker's changes. Parent owns device/release actions.
+
+Original drive findings are BASELINE observations
+
+The October 17 Civic circle ran clean e1d7156b5d with opendbc 528bd887ba, not
+this integration. Early turn-in analysis suggests a prediction-horizon and
+model/lane-centering interaction; measured geometry is broadly close, not a
+proven perfect ratio. PCM analysis shows coupled speed-servo/gas-ceiling
+transitions, negative integral corrections, inverse sensitivity and some brake
+handoffs, not simply every event being a zero gas command. These are supported
+hypotheses from closed-loop logs, not a new controller tune or a claimed cure.
+
+Baseline timing analysis found roughly 85.7 Hz effective controlsd delivery
+while longitudinal-active versus 98.8 Hz lateral-only, with card/E4 near 99 Hz.
+State fingerprints support actual held commands/fewer updates rather than just
+logger loss. Core-4 contention is indicated, but the logs do not isolate every
+function's contribution. Separate bounded native replay benchmarks measure
+learner cost on little cores 0-2; they do not establish core-4 or onroad Hz
+causality. Nothing here demonstrates that the runtime migration fixed early
+turn-in, PCM comfort or scheduling. No replacement delay/gain is certified.
+
+Source-specific host evidence (overlapping suites; NEVER sum totals)
+
+- Early full-migration snapshot, full-migration-final.xml: 1014 passed,
+  296 subtests, two platform skips. This predates later follow-ups.
+- Opendbc 47a1c2e, honda-post-migration.xml: 290 passed, 72 subtests.
+- 6ee04e7 repair snapshot, repair-all-nrdr-final.xml: 2258 passed, 612 subtests,
+  eight skips, 17 collection errors; focused repairs 104 passed, 84 subtests,
+  one skip. Sunnylink/schema compiler suites: 154 passed, one skip.
+- 5269e75 first-run snapshot, automatic-model-all-nrdr-final.xml: 2264 passed,
+  626 subtests, eight skips, same 17 collection errors.
+- 98347d8, latent-contract-final-all-nrdr.xml: 2280 passed, 626 subtests,
+  16 skips, same 17 collection errors; no executed-test failures. Focused
+  adapter/admission/selection/feature suite: 66 passed, eight Windows skips.
+  Existing compiler/parser suites with host lifecycle bridge: 38 passed,
+  three existing skips. The new eight real imported runtime cases run on Linux.
+- Opendbc f6f8ab891 HUD delta: 16 new matrix cases pass. Broader Honda suite
+  honda-alt-radar-final.xml: 306 passed, 72 subtests. Before adaptation the
+  old pin failed four cases; incoming unchanged ebf264 failed eight NameErrors.
+- Separate earlier readiness suite: 18 passed; release/overlay suite: 58 passed.
+  Changed Python Ruff and diff checks passed. Latest runtime static import/
+  export audit at 98347d8: 114 roots, 506 parsed modules, zero issues.
+
+Host platform doubles/bridges do not execute native C++/solver/safety/GPU code.
+The 17 collection errors remain honest Windows dependency/IPC/hardware limits,
+not passing or excluded files; the native gate includes them. One prior broad
+host run hit an async provider timeout; unchanged focused rerun passed 259
+tests/58 subtests, followed by two broad runs with no executed-test failures.
+No provider timing assertions were weakened to obtain those results.
+
+Native and numerical evidence, kept separate by source
+
+- Earlier daaf6f native run exposed failures, including retired DEC test
+  interfaces and fixture isolation; 6ee/5269 repaired actual contracts. Parent
+  separately repaired pytest-mock loading and TMPDIR/source-root harness setup.
+- 5269e75 completed isolated native build, default DM/driving wrapper smoke,
+  selected Pop verification of the previously rebuilt artifact and the full
+  native suite: 4342 passed,
+  2094 subtests passed, 607 skipped, zero failures/errors. Source audit covered
+  eight repositories/4610 tracked files; installed source and 194 compared
+  production settings remained unchanged. This is a historical 5269 result.
+- Its v2 four-run comparison had bitwise-repeatable A/A runs. Cross-run gates
+  passed except the returned hidden_state head (warm max 190.2053, p95 19.2710),
+  traced to the export bug above. Other heads/raw nets/plans/actions passing
+  was NOT accepted as permission to omit that head or loosen the gate.
+- 98347d8 retry was launched in the isolated candidate: full build/default
+  smoke, untouched cached Pop verification, backup, fresh original-ONNX rebuild,
+  fresh verification and all native pytest. Results are PENDING in these notes.
+- Final f6f8ab891 HUD combination also requires parent review and native full
+  checks. The final four numerical runs must use the final runtime source and
+  fresh artifact with unchanged frozen gates, including hidden_state. Their
+  results are PENDING; no final driving-promotion claim is made here.
+
+Evidence locations
+
+Task-local .codex-upstream-audit/ holds per-commit dispositions, exact host
+runners, XML reports, source-specific handoffs and latent-export evidence.
+Parent Build Reports/2026-10-17-native-validation/ holds native logs/results,
+tracked-source/settings audits, original model hashes and numerical evidence;
+upstream-reviewed-retry-result.json is the 5269 result, NOT the final retry.
+Build Reports/2026-10-17-civic-drive/ holds the independent baseline drive
+reports. These task artifacts are not deployed runtime code. Final native/
+numerical evidence will be recorded only after the parent provides results.
