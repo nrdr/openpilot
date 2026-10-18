@@ -173,7 +173,7 @@ def test_lane_change_shaping_reduces_request_without_reversing_it(curvature):
   assert abs(shaped) < abs(curvature)
 
 
-@pytest.mark.parametrize("speed, delay", [(5., .145), (12.5, .085), (20., .025)])
+@pytest.mark.parametrize("speed, delay", [(5., .145), (12.5, .135), (20., .125)])
 def test_default_command_delay_holds_the_request_back_on_speed(speed, delay):
   control = controller()
   for _ in range(50):

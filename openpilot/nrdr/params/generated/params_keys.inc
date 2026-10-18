@@ -149,4 +149,4 @@
     {"HondaCivicRadarTryout", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrYawDelaySchedule", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrYawCommandDelayLow", {PERSISTENT | BACKUP, FLOAT, "0.145"}},
-    {"NrdrYawCommandDelayHigh", {PERSISTENT | BACKUP, FLOAT, "0.025"}},
+    {"NrdrYawCommandDelayHigh", {PERSISTENT | BACKUP, FLOAT, "0.125"}},

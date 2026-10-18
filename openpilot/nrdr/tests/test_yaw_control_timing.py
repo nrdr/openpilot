@@ -17,13 +17,13 @@ def test_reference_schedule_is_the_refit_table():
 
 
 @pytest.mark.parametrize("settings, speed, expected", [
-  (None, 0., .145), (None, 12.5, .085), (None, 30., .025),
+  (None, 0., .145), (None, 12.5, .135), (None, 30., .125),
   (ParamSnapshot(1, {}), 5., .145),
   (ParamSnapshot(1, {"NrdrYawCommandDelayLow": .2, "NrdrYawCommandDelayHigh": .05}), 12.5, .125),
   (ParamSnapshot(1, {"NrdrYawCommandDelayLow": 9., "NrdrYawCommandDelayHigh": -1.}), 5., timing.MAX_COMMAND_DELAY),
   (ParamSnapshot(1, {"NrdrYawCommandDelayLow": 9., "NrdrYawCommandDelayHigh": -1.}), 20., 0.),
   (ParamSnapshot(1, {"NrdrYawCommandDelayLow": math.nan, "NrdrYawCommandDelayHigh": b"x"}), 5., .145),
-  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": math.nan, "NrdrYawCommandDelayHigh": b"x"}), 20., .025),
+  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": math.nan, "NrdrYawCommandDelayHigh": b"x"}), 20., .125),
 ])
 def test_command_delay_defaults_fade_and_bounds(settings, speed, expected):
   assert timing.command_delay(settings, speed) == pytest.approx(expected)
