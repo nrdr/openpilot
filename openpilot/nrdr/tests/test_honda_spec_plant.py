@@ -20,11 +20,13 @@ MEASURED = {
   "insight": (spec.INSIGHT_SPEC, PROFILE["Insight TXM-A040"], INSIGHT_TXM_A040_RACK),
   "teg": (spec.CIVIC_2016_SEDAN_SPEC, PROFILE["Civic C120/A030/TEG"], CIVIC_TEG_A010_RACK),
 }
-# JamesL787 ns-bosch-radar-testing honda_eps_calibrations: (last angle, ratio at centre, 6th point, last, slip factor)
+# Geometry from JamesL787 ns-bosch-radar-testing honda_eps_calibrations;
+# slip factors refitted after the single-driver axle-allocation correction.
+# (last angle, ratio at centre, 6th point, last, slip factor)
 SOURCE = {
-  "Civic Bosch TBA-C120": (399.6, 14.472, 14.175, 12.956, -0.000676),
-  "Civic hatch TGG-A120": (379.8, 14.878, 14.615, 13.518, -0.000632),
-  "CR-V TLA-A040": (414.0, 16.822, 16.533, 15.33, -0.000585),
+  "Civic Bosch TBA-C120": (399.6, 14.472, 14.175, 12.956, -0.000675),
+  "Civic hatch TGG-A120": (379.8, 14.878, 14.615, 13.518, -0.000624),
+  "CR-V TLA-A040": (414.0, 16.822, 16.533, 15.33, -0.000589),
 }
 
 
@@ -37,6 +39,17 @@ def _r0_gain(name):
 def _slip_gain(name):
   s, _, table = MEASURED[name]
   return table.slip_factor / spec.spec_slip_factor(s) * spec.SPEC_SLIP_GAIN
+
+
+@pytest.mark.parametrize("car", (spec.CLARITY_SPEC, spec.CIVIC_SPORT_SEDAN_SPEC, spec.INSIGHT_SPEC,
+                                spec.CIVIC_2016_SEDAN_SPEC, spec.CIVIC_2019_SEDAN_SPEC,
+                                spec.CIVIC_HATCH_SPORT_SPEC, spec.CRV_2017_SPEC))
+def test_driver_mass_is_added_to_each_axle_once(car):
+  front, rear = spec.spec_axle_masses(car)
+  curb = car.curb_mass_lb * spec.LB
+  assert front + rear == pytest.approx(curb + spec.DRIVER_KG)
+  assert front - curb * car.front_weight_fraction == pytest.approx(50.0)
+  assert rear - curb * (1.0 - car.front_weight_fraction) == pytest.approx(30.0)
 
 
 def test_the_constants_are_the_mean_over_the_measured_cars():
@@ -76,8 +89,9 @@ def test_spec_maps_attach_to_their_exact_car_and_invert(table):
 @pytest.mark.parametrize("table", (CIVIC_TBA_C120_SPEC_RACK, CIVIC_TGG_A120_SPEC_RACK, CRV_TLA_A040_SPEC_RACK), ids=lambda t: t.name)
 def test_spec_maps_match_the_source_tree(table):
   last, centre, sixth, end, slip = SOURCE[table.name]
-  assert (table.ratio_bp[-1], table.ratio_v[0], table.ratio_v[5], table.ratio_v[-1], table.slip_factor) == \
-    pytest.approx((last, centre, sixth, end, slip), abs=1e-3)
+  assert (table.ratio_bp[-1], table.ratio_v[0], table.ratio_v[5], table.ratio_v[-1]) == \
+    pytest.approx((last, centre, sixth, end), abs=1e-3)
+  assert table.slip_factor == pytest.approx(slip, abs=1e-9)
 
 
 

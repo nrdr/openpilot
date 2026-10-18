@@ -24,7 +24,9 @@ DRIVER_FRONT_KG = 50.0
 # R0 = SPEC_R0_GAIN * lin(lock) / road angle at lock: mean over the four yaw-measured cars (held out 1.13-1.17)
 SPEC_R0_GAIN = 1.149
 # sf = -SPEC_SLIP_GAIN * (m_front^0.2 - m_rear^0.2) / L: mean over the same cars (held out -9.7..+4.4%)
-SPEC_SLIP_GAIN = 0.00416
+# Refit to the same four measured maps after allocating the driver's 80 kg
+# exactly once (50 kg front, 30 kg rear). This coefficient is empirical.
+SPEC_SLIP_GAIN = 0.0055454
 SPEC_TABLE_POINTS = 12
 
 
@@ -63,10 +65,16 @@ def spec_r0(spec: HondaSteeringSpec, profile: HondaVgrProfile) -> float:
   return SPEC_R0_GAIN * profile.physical_to_linear(spec.lock_deg) / (spec.lock_deg / spec.lock_ratio)
 
 
+def spec_axle_masses(spec: HondaSteeringSpec) -> tuple[float, float]:
+  curb_mass = spec.curb_mass_lb * LB
+  front = curb_mass * spec.front_weight_fraction + DRIVER_FRONT_KG
+  rear = curb_mass * (1.0 - spec.front_weight_fraction) + DRIVER_KG - DRIVER_FRONT_KG
+  return front, rear
+
+
 def spec_slip_factor(spec: HondaSteeringSpec) -> float:
-  mass = spec.curb_mass_lb * LB + DRIVER_KG
-  front = mass * spec.front_weight_fraction + DRIVER_FRONT_KG
-  return -SPEC_SLIP_GAIN * (front ** 0.2 - (mass - front) ** 0.2) / spec.wheelbase
+  front, rear = spec_axle_masses(spec)
+  return -SPEC_SLIP_GAIN * (front ** 0.2 - rear ** 0.2) / spec.wheelbase
 
 
 def spec_ratio_table(spec: HondaSteeringSpec, profile: HondaVgrProfile) -> tuple[tuple, tuple, float]:

@@ -71,13 +71,16 @@ Every measured map above is Table A, then a tan, then one centre ratio R0: `k L 
 2% from 15 to 230 deg on all four cars. For an image nobody has measured, `honda_spec_plant.py` predicts R0 from the
 road-wheel angle at lock that Honda publishes (lock-to-lock turns and Honda's steering ratio, which is the ratio at
 lock) through that image's own Table A, `R0 = 1.149 * lin(lock) / road angle at lock`, and the slip factor from the
-axle loads, `sf = -0.00416 * (m_front^0.2 - m_rear^0.2) / L`. Both constants are the mean over the four measured cars.
+axle loads, `sf = -0.0055454 * (m_front^0.2 - m_rear^0.2) / L`. Both constants are the mean over the four measured cars.
+The driver's 80 kg is added once: 50 kg on the front axle and 30 kg on the rear. The slip coefficient was refitted
+to the same four measured maps after correcting the original fallback formula's duplicate front-axle allocation;
+the measured maps themselves are unchanged.
 Held out one car at a time, R0 lands within 1.6% rms (2.5% worst) and the slip factor within 10%. The Insight and the
 TEG share published geometry yet measure 4.4% apart, so published specs cannot do better than ~2.5%; a car's own
 measurement replaces its spec map. The tables' provenance says `spec`.
 
 | Car / EPS | Specs (lock turns, Honda ratio) | Ratio near centre -> lock | Slip factor |
 | --- | --- | --- | --- |
-| Civic Bosch TBA-C120 (2019-21 sedan) | 2.22, 10.94 | 14.47 -> 12.96 (400 deg) | -0.000676 |
-| Civic hatch TGG-A120 (Sport) | 2.11, 11.12 | 14.88 -> 13.52 (380 deg) | -0.000632 |
-| CR-V TLA-A040 (2017-19) | 2.30, 12.3 | 16.82 -> 15.33 (414 deg) | -0.000585 |
+| Civic Bosch TBA-C120 (2019-21 sedan) | 2.22, 10.94 | 14.47 -> 12.96 (400 deg) | -0.000675 |
+| Civic hatch TGG-A120 (Sport) | 2.11, 11.12 | 14.88 -> 13.52 (380 deg) | -0.000624 |
+| CR-V TLA-A040 (2017-19) | 2.30, 12.3 | 16.82 -> 15.33 (414 deg) | -0.000589 |
