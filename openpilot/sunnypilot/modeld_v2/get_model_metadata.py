@@ -38,9 +38,6 @@ def make_metadata_dict(onnx_path):
   input_shapes = dict(_get_name_and_shape(x) for x in model["graph"]["input"])
   metadata = {prop["key"]: prop["value"] for prop in model["metadata_props"]}
 
-  if 'hidden_state' not in output_slices:
-    output_slices['hidden_state'] = slice(0, 512)
-
   return {
     'input_shapes': input_shapes,
     'output_slices': output_slices,

@@ -140,8 +140,10 @@ def verify(selection: dict, source_artifact: Path, camera: tuple[int, int]) -> d
     if not arrays or not all(array.size and np.isfinite(array).all() for array in arrays):
       raise ModelAdmissionError("Selected model produced empty/non-finite synthetic outputs")
     parsed = parser.parse_vision_outputs({key: arrays[0][None, sl] for key, sl in adapter.vision_output_slices.items()})
+    vision_hidden_state = parsed.get('hidden_state')
     for array, slices in zip(arrays[1:], adapter._policy_slices_list, strict=True):
-      parsed.update(parser.parse_policy_outputs({key: array[None, sl] for key, sl in slices.items()}))
+      policy = parser.parse_policy_outputs({key: array[None, sl] for key, sl in slices.items()})
+      parsed = parser.merge_policy_outputs(parsed, policy, vision_hidden_state=vision_hidden_state)
     if "plan" not in parsed or not np.isfinite(parsed["plan"]).all():
       raise ModelAdmissionError("Selected model plan parsing failed")
     flat = np.concatenate(arrays)

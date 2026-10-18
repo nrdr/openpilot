@@ -153,3 +153,14 @@ class Parser:
 
   def parse_policy_outputs(self, outs: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     return self.parse_outputs(outs)
+
+  @staticmethod
+  def merge_policy_outputs(outs: dict[str, np.ndarray], policy: dict[str, np.ndarray], *,
+                           vision_hidden_state: np.ndarray | None) -> dict[str, np.ndarray]:
+    outs.update(policy)
+    # The exported feature belongs to this frame's vision network, just like
+    # feat_q. Older compilers invented an overlapping policy hidden_state;
+    # keep the real latent without dropping it or changing any other head.
+    if vision_hidden_state is not None:
+      outs['hidden_state'] = vision_hidden_state
+    return outs

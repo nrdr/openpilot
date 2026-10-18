@@ -100,8 +100,7 @@ def make_metadata_dict(model_path):
     assert output_slices_raw is not None, 'output_slices not found in metadata'
 
     output_slices = pickle.loads(codecs.decode(output_slices_raw.encode(), "base64"))
-    if 'hidden_state' not in output_slices:
-      output_slices['hidden_state'] = slice(0, 512)
+    # Preserve declarations exactly. Policy plan bytes are not a missing latent.
 
     meta_dict = {
       'model_checkpoint': get_metadata_value_by_name(model, 'model_checkpoint'),

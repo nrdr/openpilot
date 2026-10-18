@@ -201,6 +201,7 @@ class ModelState(ModelStateBase):
       vision_output = raw_outputs[0].numpy().flatten()
       vision_sliced = {k: vision_output[np.newaxis, v] for k, v in self.vision_output_slices.items()}
       outputs = self.parser.parse_vision_outputs(vision_sliced)
+      vision_hidden_state = outputs.get('hidden_state')
 
       if 'prev_feat' in self.numpy_inputs and 'hidden_state' in self.vision_output_slices:
         (self.numpy_inputs['prev_feat'].flat if self.adapter.is_native else self.numpy_inputs['prev_feat'])[:] = \
@@ -215,7 +216,7 @@ class ModelState(ModelStateBase):
             if any(key in self._policy_slices_list[j] for j, k in enumerate(self._policy_keys) if 'on' in k.lower()):
               parsed.pop(key, None)
 
-        outputs.update(parsed)
+        outputs = self.parser.merge_policy_outputs(outputs, parsed, vision_hidden_state=vision_hidden_state)
 
       if 'planplus' in outputs and 'plan' in outputs:
         outputs['plan'] = outputs['plan'] + outputs['planplus']
