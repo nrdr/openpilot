@@ -29,7 +29,7 @@ BOOL_DEFAULTS = {
   "RecordFront": True,
   "RecordAudio": True,
   "LaneTurnDesire": True,
-  "DynamicExperimentalControl": True,
+  "DynamicExperimentalControl": False,
   "SmartCruiseControlVision": True,
   "CustomAccIncrementsEnabled": True,
   "MadsMainCruiseAllowed": False,
@@ -97,7 +97,7 @@ def _stored_fingerprint(params: Params) -> str:
       cp_bytes = params.get(key)
       if not cp_bytes:
         continue
-      from openpilot.cereal import car
+      from opendbc.car.structs import car
       with car.CarParams.from_bytes(cp_bytes) as CP:
         if CP.carFingerprint:
           return str(CP.carFingerprint)

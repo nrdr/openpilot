@@ -3,14 +3,12 @@ from openpilot.system.ui.lib.multilang import tr
 
 CRUISE_PARAMS = (
   "CustomAccIncrementsEnabled",
-  "DynamicExperimentalControl",
   "SmartCruiseControlVision",
   "SmartCruiseControlMap",
 )
 
 UI_CONSTRAINT_PARAMS = (
   "ExperimentalMode",
-  "DynamicExperimentalControl",
   "CustomAccIncrementsEnabled",
   "SmartCruiseControlVision",
   "SmartCruiseControlMap",
@@ -42,7 +40,6 @@ def apply_cruise_preferences(layout, state, values, has_long, has_icbm):
 
   editable = state.is_offroad()
   layout.custom_acc_toggle.action_item.set_enabled(editable)
-  layout.dec_toggle.action_item.set_enabled(editable)
   layout.scc_v_toggle.action_item.set_enabled(editable)
   layout.scc_m_toggle.action_item.set_enabled(editable)
   layout._on_custom_acc_toggle(layout.custom_acc_toggle.action_item.get_state())

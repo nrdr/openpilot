@@ -63,7 +63,6 @@ FEATURE_CONSUMERS = {
   "openpilot/selfdrive/ui/sunnypilot/onroad/speed_limit.py": "openpilot.nrdr.features.driver_policy.speed_limit",
   "openpilot/nrdr/hooks/selfdrived.py": "openpilot.nrdr.features.driver_policy.hud_submode",
   "openpilot/sunnypilot/selfdrive/car/cruise_ext.py": "openpilot.nrdr.features.driver_policy.speed_limit",
-  "openpilot/sunnypilot/selfdrive/controls/lib/dec/dec.py": "openpilot.nrdr.features.driver_policy.dec",
   "openpilot/sunnypilot/selfdrive/controls/lib/longitudinal_planner.py": "openpilot.nrdr.features.driver_policy.speed_limit_assist",
   "openpilot/sunnypilot/selfdrive/controls/lib/speed_limit/speed_limit_resolver.py": "openpilot.nrdr.features.driver_policy.speed_limit",
 }

@@ -16,7 +16,7 @@ from openpilot.common.hardware.hw import Paths
 from openpilot.selfdrive.modeld.helpers import chestnut_present
 
 # SET ME TO THE EXACT JSON VERSION WE SET IN SUNNYPILOT_MODELS REPO
-REQUIRED_JSON_VERSION = 19
+REQUIRED_JSON_VERSION = 20
 
 CUSTOM_MODEL_PATH = Paths.model_root()
 ModelManager = custom.ModelManagerSP
@@ -53,7 +53,9 @@ def is_bundle_version_compatible(bundle: dict) -> bool:
   required to load the model. This function ensures that:
     the bundle MUST match the `REQUIRED_JSON_VERSION` set here in helpers.
   """
-  return bundle.get("minimumSelectorVersion", 0) == REQUIRED_JSON_VERSION
+  # Version 19 selections use the same selector fields. Compiler ABI is a
+  # separate admission check; preserving selection must not mean trusting its JIT.
+  return bundle.get("minimumSelectorVersion", 0) in (19, REQUIRED_JSON_VERSION)
 
 
 def _bundle_artifacts(bundle: custom.ModelManagerSP.ModelBundle) -> list[tuple[str, str]]:
@@ -119,7 +121,12 @@ def _parse_active_bundle(raw_bundle) -> "custom.ModelManagerSP.ModelBundle | Non
 
 def get_selected_bundle(params: Params | None = None, source: str = "qcom") -> "custom.ModelManagerSP.ModelBundle | None":
   params = params or Params()
-  return _parse_active_bundle(params.get(ACTIVE_BUNDLE_KEYS[source]))
+  raw = params.get(ACTIVE_BUNDLE_KEYS[source])
+  bundle = _parse_active_bundle(raw)
+  if raw and bundle is None:
+    from openpilot.nrdr.features.services import ModelAdmissionError
+    raise ModelAdmissionError(f"Saved {source} model selection is unsupported or malformed; preference retained, no default substituted")
+  return bundle
 
 
 def get_active_source(chestnut: bool | None = None, chestnut_active: bool | None = None,
@@ -161,8 +168,7 @@ def _validate_active_bundle(params: Params, source: str, available_bundles: list
 
   active_bundle = _parse_active_bundle(raw_bundle)
   if active_bundle is None or _bundle_needs_reset(active_bundle, available_bundles):
-    cloudlog.warning(f"Active model bundle invalid for {source}; resetting to default")
-    params.remove(key)
+    cloudlog.error(f"Active model bundle for {source} needs repair/migration; selection retained, not reset to default")
     _LAST_VALIDATED_RAW[key] = None
   else:
     _LAST_VALIDATED_RAW[key] = raw_bundle
@@ -178,8 +184,8 @@ def validate_active_bundles(params: Params, source_bundles: dict[str, list[custo
 def get_active_model_runner(params: Params | None = None, force_check: bool = False) -> int:
   params = params or Params()
   cached_runner_type = params.get("ModelRunnerTypeCache")
-  if cached_runner_type is not None and not force_check:
-    return cached_runner_type
+  # The runner cache is derived state, never authority over a saved selection.
+  # Re-evaluate here (manager/UI only) so an old stock cache cannot bypass ABI admission.
   runner_type = custom.ModelManagerSP.Runner.stock
   if active_bundle := get_active_bundle(params):
     runner_type = active_bundle.runner.raw

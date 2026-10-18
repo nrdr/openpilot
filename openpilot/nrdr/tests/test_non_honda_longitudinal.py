@@ -24,7 +24,6 @@ from openpilot.selfdrive.modeld.constants import ModelConstants, index_function
 from openpilot.nrdr.features.driver_policy.dec import enforce_mode_dwell, slow_down_threshold
 from openpilot.nrdr.features.longitudinal import policy
 from openpilot.nrdr.features.longitudinal.longitudinal_mpc import apply_standstill_gap
-from openpilot.sunnypilot.selfdrive.controls.lib.dec.constants import WMACConstants
 
 ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = Path(__file__).parent / "fixtures" / "longitudinal_baseline"
@@ -60,7 +59,7 @@ def environment(**overrides):
     "cloudlog": NS(info=lambda *_: None, warning=lambda *_: None),
     "messaging": NS(SubMaster=object, PubMaster=object), "structs": NS(CarParams=object, CarParamsSP=object),
     "time": NS(monotonic=lambda: 100.0), "Literal": Literal, "interp": np.interp,
-    "WMACConstants": WMACConstants, "enforce_mode_dwell": enforce_mode_dwell, "slow_down_threshold": slow_down_threshold,
+    "enforce_mode_dwell": enforce_mode_dwell, "slow_down_threshold": slow_down_threshold,
     "nrdr_longitudinal_enabled": policy.nrdr_longitudinal_enabled,
     "longitudinal_personality": policy.longitudinal_personality,
     "NrdrLongControl": forbidden, "NrdrLongitudinalPlanner": forbidden, "NrdrLongitudinalMpc": forbidden,
@@ -267,24 +266,14 @@ def test_honda_planner_still_constructs_nrdr_policy():
   assert planner.mpc.kwargs['nrdr_enabled'] is True
 
 
-@pytest.mark.parametrize("radarless", [True, False])
-def test_dec_sequence_matches_baseline(radarless):
-  current, baseline = pair(SUNNY + 'dec/dec.py', environment())
-  CP = cp()
-  CP.radarUnavailable = radarless
-  params = NS(get_bool=lambda _: True)
-  controllers = [module['DynamicExperimentalController'](CP, NS(crash_cnt=0), params=params) for module in (current, baseline)]
-  for frame in range(120):
-    sm = {'carState': NS(vEgo=frame % 31, vCruise=100, standstill=frame % 15 == 0),
-          'radarState': NS(leadOne=NS(present=frame % 7 == 0)),
-          'modelV2': NS(position=NS(x=np.linspace(0., (frame % 20) * 15., 33 if frame % 11 else 0)),
-                        orientation=NS(x=np.zeros(33))),
-          'selfdriveState': NS(experimentalMode=True)}
-    for controller in controllers:
-      controller._mpc.crash_cnt = int(frame % 13 == 0)
-      controller.update(sm)
-    a, b = controllers
-    assert (a.mode(), a._has_slow_down, a._urgency, a._has_slowness) == (b.mode(), b._has_slow_down, b._urgency, b._has_slowness)
+def test_dec_retirement_does_not_leave_a_second_mode_authority():
+  assert not (ROOT / (SUNNY + 'dec/dec.py')).exists()
+  sunny_source = (ROOT / (SUNNY + 'longitudinal_planner.py')).read_text(encoding='utf-8')
+  assert 'DynamicExperimentalController' not in sunny_source
+  assert 'dynamic_experimental_controller' not in sunny_source
+  core_source = (ROOT / (CORE + 'longitudinal_planner.py')).read_text(encoding='utf-8')
+  assert "sm['selfdriveState'].experimentalMode" in core_source
+  assert '.is_e2e(' not in core_source
 
 
 def test_non_honda_gap_button_ignores_nrdr_submode_and_reservations():
@@ -323,8 +312,7 @@ def test_speed_limit_map_calculation_matches_baseline():
 
 def test_sunny_planner_selects_baseline_sla_and_resolver():
   source = NS(cruise=0)
-  custom = NS(LongitudinalPlanSP=NS(LongitudinalPlanSource=source,
-                                  DynamicExperimentalControl=NS(DynamicExperimentalControlState=object)))
+  custom = NS(LongitudinalPlanSP=NS(LongitudinalPlanSource=source))
   baseline_sla = object()
   env = environment(custom=custom, EventsSP=lambda: object(),
                     DynamicExperimentalController=lambda *_: object(), SmartCruiseControl=lambda: object(),

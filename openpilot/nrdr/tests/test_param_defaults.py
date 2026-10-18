@@ -16,7 +16,7 @@ EXPECTED_BOOL_DEFAULTS = {
   "RecordFront": True,
   "RecordAudio": True,
   "LaneTurnDesire": True,
-  "DynamicExperimentalControl": True,
+  "DynamicExperimentalControl": False,
   "SmartCruiseControlVision": True,
   "CustomAccIncrementsEnabled": True,
   "MadsMainCruiseAllowed": False,
@@ -275,7 +275,7 @@ class TestParamDefaults(unittest.TestCase):
   def test_retired_friction_is_not_seeded_or_migrated(self):
     keys = ("NrdrInterpolatedTorqueFriction", "NrdrInterpolatedTorqueFrictionStandard",
             "NrdrInterpolatedTorqueFrictionHighway")
-    for existing in ({}, {keys[0]: 0.31}, dict(zip(keys, (0.31, 0.15, 0.07)))):
+    for existing in ({}, {keys[0]: 0.31}, dict(zip(keys, (0.31, 0.15, 0.07), strict=True))):
       with self.subTest(existing=existing):
         params = FakeParams(existing, put_errors=set(keys))
         _apply(self.defaults, params)

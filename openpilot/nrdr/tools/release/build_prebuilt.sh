@@ -398,6 +398,18 @@ unset SKIP_TINYGRAD_COMPILE
 run_scons --minimal
 run_scons panda/
 
+# Generic model compiles are atomic whole files. Split large release payloads
+# only after compilation; provenance hashes cover the same concatenated bytes.
+python3 - <<'PY'
+from pathlib import Path
+from openpilot.common.file_chunker import chunk_file, get_chunk_targets
+models = Path('openpilot/selfdrive/modeld/models')
+for name in ('driving_tinygrad.pkl', 'dmonitoring_model_tinygrad.pkl', 'big_driving_tinygrad.pkl'):
+    path = models / name
+    if path.is_file() and path.stat().st_size > 45 * 1024 * 1024:
+        chunk_file(str(path), get_chunk_targets(str(path), path.stat().st_size))
+PY
+
 echo "[-] Ensuring no submodules in release"
 if test "$(git submodule status --recursive | wc -l)" -gt 0; then
   git submodule status --recursive

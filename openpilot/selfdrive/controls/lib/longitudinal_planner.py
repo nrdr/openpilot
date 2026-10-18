@@ -192,10 +192,10 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     output_should_stop_e2e = sm['modelV2'].action.shouldStop
     if self.nrdr is not None:
       output_a_target_e2e = self.nrdr.launch_accel(
-        sm, T_IDXS_MPC, action_t, v_ego, output_should_stop_e2e, output_a_target_e2e, self.is_e2e(sm),
+        sm, T_IDXS_MPC, action_t, v_ego, output_should_stop_e2e, output_a_target_e2e, sm['selfdriveState'].experimentalMode,
       )
 
-    is_e2e = self.is_e2e(sm)
+    is_e2e = sm['selfdriveState'].experimentalMode
 
     self.a_cruise = get_cruise_accel(is_e2e, v_cruise, v_ego,
                                      self.a_cruise, steer_angle_without_offset, self.CP, self.dt,

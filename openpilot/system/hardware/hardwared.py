@@ -28,6 +28,7 @@ from openpilot.sunnypilot.system.statsd import statlog
 from openpilot.system.hardware.power_monitoring import PowerMonitoring
 from openpilot.system.hardware.fan_controller import FanController
 from openpilot.system.hardware.chestnut.status import ChestnutStatus
+from openpilot.system.hardware.chestnut.monitoring import chestnut_state_thread
 from openpilot.common.version import terms_version, training_version, get_build_metadata, terms_version_sp
 from openpilot.nrdr.features.services.hardware import apply_startup_policy, initialize_onboarding
 
@@ -769,6 +770,7 @@ def main():
 
   if COMMA_HARDWARE:
     threads.append(threading.Thread(target=touch_thread, args=(end_event,)))
+    threads.append(threading.Thread(target=chestnut_state_thread, args=(end_event,)))
 
   for t in [telemetry_thread, *threads]:
     t.start()

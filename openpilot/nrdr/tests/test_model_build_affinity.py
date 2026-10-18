@@ -1,18 +1,15 @@
-"""Exercise SConscript command assembly without SCons, native modules, or a GPU."""
-
+"""Exercise generic compiler build wiring without SCons, native modules or a GPU."""
 import ast
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 import shlex
 from types import SimpleNamespace
-import unittest
 
-from openpilot.common.file_chunker import get_chunk_targets
+import pytest
 
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
-SCONSCRIPT = REPO_ROOT / "openpilot/selfdrive/modeld/SConscript"
-MODEL_DIR = "/repo/openpilot/selfdrive/modeld"
+ROOT = Path(__file__).resolve().parents[3]
+SCONSCRIPT = ROOT / 'openpilot/selfdrive/modeld/SConscript'
+MODEL_DIR = '/repo/openpilot/selfdrive/modeld'
 
 
 class WithoutImports(ast.NodeTransformer):
@@ -26,11 +23,8 @@ class WithoutImports(ast.NodeTransformer):
 class BuildFile:
   def __init__(self, path):
     path = str(path)
-    self.abspath = str(PurePosixPath("/repo", path[1:]) if path.startswith("#") else PurePosixPath(MODEL_DIR, path))
-    self.relpath = self.abspath.removeprefix("/repo/")
-
-  def File(self, path):
-    return BuildFile(str(PurePosixPath(self.abspath, path)))
+    self.abspath = str(PurePosixPath('/repo', path[1:]) if path.startswith('#') else PurePosixPath(MODEL_DIR, path))
+    self.relpath = self.abspath.removeprefix('/repo/')
 
   def __str__(self):
     return self.abspath
@@ -44,16 +38,16 @@ class BuildAction:
 
 class BuildEnvironment:
   def __init__(self):
-    self.commands = []
-    self.side_effects = []
-    self.executed = []
-    self.chunk_estimates = {}
+    self.commands, self.side_effects, self.executed = [], [], []
 
   def Clone(self):
     return self
 
   def Dir(self, path):
     return BuildFile(path)
+
+  def PrependENVPath(self, *_args):
+    pass
 
   def Command(self, targets, sources, actions):
     node = SimpleNamespace(targets=targets, sources=sources, actions=actions)
@@ -68,165 +62,68 @@ class BuildEnvironment:
     return 0
 
 
-def assemble_build(arch, chestnut=False, device="mici", skip=False, all_cameras=None, onnx_size=100):
-  # Run production control flow and f-strings, but replace imports and all I/O.
-  # This checks build wiring, not QCOM execution or on-device model correctness.
-  tree = WithoutImports().visit(ast.parse(SCONSCRIPT.read_text(encoding="utf-8")))
+def assemble_build(arch, chestnut=False, link=True, skip=False):
+  tree = WithoutImports().visit(ast.parse(SCONSCRIPT.read_text(encoding='utf-8')))
   env = BuildEnvironment()
-  chunked = []
-  def record_chunk_targets(path, size):
-    env.chunk_estimates[path] = size
-    return [path + ".manifest", path + ".000"]
-  environment = {"SKIP_TINYGRAD_COMPILE": "1" if skip else None, "PREBUILT_ALL_CAMERAS": all_cameras}
-  namespace = {
-    "arch": arch,
-    "env": env,
-    "Import": lambda *args: None,
-    "File": BuildFile,
-    "Dir": BuildFile,
-    "Action": BuildAction,
-    "Value": lambda value: value,
-    "glob": SimpleNamespace(glob=lambda *args, **kwargs: ["tinygrad_repo/tinygrad/engine/jit.py"]),
-    "os": SimpleNamespace(
-      getenv=environment.get,
-      path=SimpleNamespace(
-        isfile=lambda path: True,
-        join=lambda *parts: str(PurePosixPath(*parts)),
-        getsize=lambda path: onnx_size,
-        expanduser=lambda path: "/home/test",
-      ),
-    ),
-    "HARDWARE": SimpleNamespace(get_device_type=lambda: device),
-    "_ar_ox_fisheye": SimpleNamespace(width=1928, height=1208),
-    "_os_fisheye": SimpleNamespace(width=1344, height=760),
-    "MEDMODEL_INPUT_SIZE": (512, 256),
-    "DM_INPUT_SIZE": (1440, 960),
-    "ModelConstants": SimpleNamespace(MODEL_RUN_FREQ=20, MODEL_CONTEXT_FREQ=10),
-    "TG_INPUT_DEVICES_PATH": f"{MODEL_DIR}/models/tg_input_devices.json",
-    "chestnut_present": lambda: chestnut,
-    "modeld_pkl_path": lambda big: f"{MODEL_DIR}/models/{'big_' if big else ''}driving_tinygrad.pkl",
-    "get_existing_chunks": lambda path: [path + ".000"],
-    "get_chunk_targets": record_chunk_targets,
-    "chunk_file": lambda path, chunks: chunked.append((path, chunks)),
-    "link_up": lambda: True,
-  }
-  exec(compile(tree, str(SCONSCRIPT), "exec"), namespace)
-  driving = [node for node in env.commands if isinstance(node.targets, list) and "driving_tinygrad.pkl" in node.targets[0]]
-  return env, driving, chunked
+  namespace = {'arch': arch, 'env': env, 'Import': lambda *_: None, 'File': BuildFile, 'Dir': BuildFile,
+                   'Action': BuildAction, 'Value': lambda v: v, 'chestnut_present': lambda: chestnut, 'link_up': lambda: link,
+                   'time': SimpleNamespace(sleep=lambda *_: None),
+                   'glob': SimpleNamespace(glob=lambda *a, **k: ['tinygrad_repo/tinygrad/engine/jit.py']),
+                   'os': SimpleNamespace(getenv=lambda key: '1' if key == 'SKIP_TINYGRAD_COMPILE' and skip else None,
+                                      path=SimpleNamespace(isfile=lambda _: True, join=lambda *p: str(PurePosixPath(*p)),
+                                                          expanduser=lambda _: '/home/test')),
+                   '_ar_ox_fisheye': SimpleNamespace(width=1928, height=1208), '_os_fisheye': SimpleNamespace(width=1344, height=760),
+                   'MEDMODEL_INPUT_SIZE': (512, 256), 'DM_INPUT_SIZE': (1440, 960),
+                   'get_nv12_info': lambda w, h: (w, h, h // 2, w * (h + h // 2))}
+  exec(compile(tree, str(SCONSCRIPT), 'exec'), namespace)
+  return env
 
 
-class TestModelBuildAffinity(unittest.TestCase):
-  def test_driving_compiler_inherits_affinity_and_keeps_backend_arguments(self):
-    cases = (
-      ("comma_arm64", False, "mici", ["1344x760"]),
-      ("comma_arm64", True, "mici", ["1344x760"]),
-      ("comma_arm64", False, "tici", ["1928x1208"]),
-      ("x86_64", False, "pc", ["1928x1208", "1344x760"]),
-      ("Darwin", False, "pc", ["1928x1208", "1344x760"]),
-    )
-    for arch, chestnut, device, resolutions in cases:
-      with self.subTest(arch=arch, chestnut=chestnut, device=device):
-        env, nodes, chunked = assemble_build(arch, chestnut, device)
-        self.assertEqual(len(nodes), 2 if chestnut else 1)
-        for big, node in enumerate(nodes):
-          prefix = "big_" if big else ""
-          pkl = f"{MODEL_DIR}/models/{prefix}driving_tinygrad.pkl"
-          onnx = f"{MODEL_DIR}/models/{prefix}driving_supercombo.onnx"
-          if big:
-            self.assertIsInstance(node.actions, BuildAction)
-            self.assertIsNone(node.actions.function([], [], env))
-            command = env.executed[-1]
-            self.assertIn((f"{MODEL_DIR}/models/.chestnut.lock", node), env.side_effects)
-          else:
-            command, chunk_action = node.actions
-            self.assertIsInstance(chunk_action, BuildAction)
-            chunk_action.function([], [], env)
-          words = shlex.split(command)
-          # Environment assignments must be followed directly by python3, never
-          # a taskset wrapper that rejects an offline or disallowed CPU.
-          executable = next(index for index, word in enumerate(words) if "=" not in word)
-          self.assertEqual(words[executable:], [
-            "python3", f"{MODEL_DIR}/compile_modeld.py",
-            "--model-size", "512x256", "--camera-resolutions", *resolutions,
-            "--onnx", onnx, "--output", pkl, "--frame-skip", "2",
-          ])
-          flags = dict(word.split("=", 1) for word in words[:executable])
-          expected = ({
-            "DEBUG": "1", "DEV": "USB+AMD:LLVM", "FRAME_DEV": "CPU", "FLOAT16": "1",
-            "JIT_BATCH_SIZE": "0", "GMMU": "0", "TC_OPT": "2", "TC_OCCUPANCY_OPT": "1",
-          } if big else {
-            "DEV": "QCOM", "IMAGE": "1", "FLOAT16": "1", "NOLOCALS": "1", "JIT_BATCH_SIZE": "0", "OPENPILOT_HACKS": "1",
-          } if arch == "comma_arm64" else {"DEV": "CPU", "HOME": "/home/test"} if arch == "Darwin" else {"DEV": "CPU:LLVM"})
-          self.assertEqual(flags, expected)
-          self.assertEqual(chunked[-1], (pkl, node.targets))
-          self.assertEqual(node.targets, [pkl + ".manifest", pkl + ".000"])
-          dependencies = [str(source) for source in node.sources]
-          self.assertIn(onnx + ".000", dependencies)
-          self.assertIn(f"{MODEL_DIR}/compile_modeld.py", dependencies)
-          self.assertIn("#tinygrad_repo/tinygrad/engine/jit.py", dependencies)
-          self.assertIn("/repo/openpilot/common/file_chunker.py", dependencies)
-
-  def test_prebuilt_camera_coverage_and_normal_device_selection(self):
-    for device in ("mici", "tici", "tizi"):
-      for chestnut in (False, True):
-        for all_cameras in (None, "0", "true", "1"):
-          with self.subTest(device=device, chestnut=chestnut, all_cameras=all_cameras):
-            env, driving, _ = assemble_build("comma_arm64", chestnut, device, all_cameras=all_cameras)
-            resolutions = (["1928x1208", "1344x760"] if all_cameras == "1" else
-                           ["1344x760"] if device == "mici" else ["1928x1208"])
-            self.assertEqual(len(driving), 2 if chestnut else 1)
-            for node in driving:
-              if isinstance(node.actions, BuildAction):
-                node.actions.function([], [], env)
-                command = env.executed[-1]
-              else:
-                command = node.actions[0]
-              words = shlex.split(command)
-              self.assertEqual(words[words.index("--camera-resolutions") + 1:words.index("--onnx")], resolutions)
-              self.assertIn(" ".join(resolutions), node.sources)
-
-            warps = [node for node in env.commands if isinstance(node.targets, str) and "/dm_warp_" in node.targets]
-            self.assertEqual([node.targets for node in warps], [
-              f"{MODEL_DIR}/models/dm_warp_{resolution}_tinygrad.pkl" for resolution in resolutions
-            ])
-            for resolution, node in zip(resolutions, warps, strict=True):
-              words = shlex.split(node.actions)
-              executable = words.index("python3")
-              self.assertEqual(words[executable:], [
-                "python3", f"{MODEL_DIR}/compile_dm_warp.py",
-                "--camera-resolution", resolution, "--warp-to", "1440x960", "--output", node.targets,
-              ])
-              self.assertIn("DEV=QCOM", words[:executable])
-
-  def test_skip_tinygrad_compile_still_skips_driving_model(self):
-    for chestnut in (False, True):
-      with self.subTest(chestnut=chestnut):
-        _, nodes, chunked = assemble_build("comma_arm64", chestnut, skip=True)
-        self.assertEqual(nodes, [])
-        self.assertEqual(chunked, [])
-
-  def test_chunk_budget_covers_every_driving_camera_without_inflating_dm(self):
-    onnx_size = 50 * 1024 * 1024
-    single_camera_budget = 2 * onnx_size + 10 * 1024 * 1024
-    for chestnut in (False, True):
-      for arch, flag, count in (("comma_arm64", None, 1), ("comma_arm64", "1", 2), ("x86_64", None, 2)):
-        with self.subTest(arch=arch, chestnut=chestnut, all_cameras=flag):
-          env, driving, _ = assemble_build(arch, chestnut, all_cameras=flag, onnx_size=onnx_size)
-          for node in driving:
-            pkl = node.targets[0].removesuffix(".manifest")
-            budget = env.chunk_estimates[pkl]
-            self.assertEqual(budget, count * single_camera_budget)
-            reserved = len(get_chunk_targets(pkl, budget)) - 1
-            if count == 2:
-              # The first real dual-camera C4 build produced 176.36 MB; the
-              # previous single-camera estimate reserved only three chunks.
-              needed = len(get_chunk_targets(pkl, 176_360_000)) - 1
-              self.assertGreaterEqual(reserved, needed)
-            else:
-              self.assertEqual(reserved, 3)
-          dm = f"{MODEL_DIR}/models/dmonitoring_model_tinygrad.pkl"
-          self.assertEqual(env.chunk_estimates[dm], single_camera_budget)
+@pytest.mark.parametrize('arch', ['comma_arm64', 'Darwin', 'x86_64'])
+@pytest.mark.parametrize('chestnut', [False, True])
+def test_generic_build_inherits_affinity_and_declares_provenance(arch, chestnut):
+  env = assemble_build(arch, chestnut)
+  assert len(env.commands) == (8 if chestnut else 6)
+  for node in env.commands:
+    assert len(node.targets) == 2
+    pkl, stamp = node.targets
+    assert stamp == pkl + '.nrdr-abi.json'
+    if isinstance(node.actions, BuildAction) and callable(node.actions.function):
+      assert node.actions.function([], [], env) == 0
+      command = env.executed[-1]
+      assert (f'{MODEL_DIR}/models/.chestnut.lock', node) in env.side_effects
+    else:
+      command = node.actions.function if isinstance(node.actions, BuildAction) else node.actions
+    words = shlex.split(command)
+    executable = next(i for i, word in enumerate(words) if '=' not in word)
+    assert words[executable:executable + 2] == ['python3', '/repo/openpilot/nrdr/tools/model_compile.py']
+    assert 'taskset' not in command
+    assert words[words.index('--output') + 1] == pkl
+    assert any(str(source).endswith('model_artifacts.json') for source in node.sources)
+    assert any(str(source).endswith('model_artifacts.py') for source in node.sources)
+    assert '#tinygrad_repo/tinygrad/engine/jit.py' in node.sources
+    if words[executable + 2] == 'onnx':
+      assert '--out-of-band' in words and '--device-input' in words
+    elif 'dm_warp' in pkl:
+      assert words[words.index('--layout') + 1] == 'luma'
+    else:
+      assert words[words.index('--frames') + 1] == '2'
+  targets = [node.targets[0] for node in env.commands]
+  for stem in ('driving_warp', 'dm_warp'):
+    for resolution in ('1928x1208', '1344x760'):
+      assert f'{MODEL_DIR}/models/{stem}_{resolution}_tinygrad.pkl' in targets
+  assert not any('big_driving_tinygrad.pkl' in path for path in targets)
 
 
-if __name__ == "__main__":
-  unittest.main()
+def test_missing_chestnut_link_is_a_failed_build_not_a_fake_success():
+  env = assemble_build('comma_arm64', chestnut=True, link=False)
+  actions = [node.actions for node in env.commands if isinstance(node.actions, BuildAction) and callable(node.actions.function)]
+  assert len(actions) == 2
+  assert all(action.function([], [], env) == 1 for action in actions)
+  assert env.executed == []
+
+
+def test_explicit_ci_skip_still_builds_all_camera_warps():
+  env = assemble_build('comma_arm64', chestnut=False, skip=True)
+  assert len(env.commands) == 4
+  assert all('_warp_' in node.targets[0] for node in env.commands)

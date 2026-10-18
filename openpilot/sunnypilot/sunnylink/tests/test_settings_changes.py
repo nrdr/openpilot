@@ -250,10 +250,9 @@ class TestSpuriousOffroadGatesDropped(OpenpilotTestCase):
     assert item is not None
     assert "offroad_only" not in _flatten_rule_types(item.get("enablement"))
 
-  def test_dynamic_experimental_has_no_offroad_only(self, schema):
+  def test_dynamic_experimental_is_retired(self, schema):
     item = _find_item(schema, "DynamicExperimentalControl")
-    assert item is not None
-    assert "offroad_only" not in _flatten_rule_types(item.get("enablement"))
+    assert item is None
 
 
 class TestDevicePowerPolicy(OpenpilotTestCase):

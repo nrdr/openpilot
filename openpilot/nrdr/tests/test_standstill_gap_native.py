@@ -47,7 +47,6 @@ def simulate_stop(monkeypatch, extra, e2e, lead_slot):
   monkeypatch.setattr(LongitudinalPlannerSP, "__init__", lambda *_: None)
   monkeypatch.setattr(LongitudinalPlannerSP, "update", lambda *_: None)
   monkeypatch.setattr(LongitudinalPlannerSP, "update_targets", lambda self, sm, v, a, cruise: (cruise, a))
-  monkeypatch.setattr(LongitudinalPlannerSP, "is_e2e", lambda self, sm: e2e)
   cp = car.CarParams.new_message()
   cp.brand = "honda"
   cp.carFingerprint = "HONDA_CLARITY"

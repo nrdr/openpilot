@@ -66,15 +66,23 @@ runs:
           done < <(echo "$ARTIFACT" | jq -r '.chunks[].file_name')
           echo "$NUM_CHUNKS" > "${DEST_DIR}/${CANONICAL}.chunkmanifest"
 
+          if [ "$CANONICAL" != "big_driving_tinygrad.pkl" ]; then
+            ORIGINAL=$(echo "$ARTIFACT" | jq -r '.file_name')
+            ENCODED_URL=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${BASE_URL}/${ORIGINAL}.nrdr-abi.json', safe=':/'))")
+            printf '%s\t%s\n' "$ENCODED_URL" "${DEST_DIR}/${CANONICAL}.nrdr-abi.json" >> "$DOWNLOAD_LIST"
+          fi
+
           if [ "$CANONICAL" = "dmonitoring_model_tinygrad.pkl" ]; then
             for warp in dm_warp_1928x1208_tinygrad.pkl dm_warp_1344x760_tinygrad.pkl; do
               ENCODED_URL=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${BASE_URL}/${warp}', safe=':/'))")
               printf '%s\t%s\n' "$ENCODED_URL" "${DEST_DIR}/${warp}" >> "$DOWNLOAD_LIST"
+              printf '%s\t%s\n' "${ENCODED_URL}.nrdr-abi.json" "${DEST_DIR}/${warp}.nrdr-abi.json" >> "$DOWNLOAD_LIST"
             done
           elif [ "$CANONICAL" = "big_driving_tinygrad.pkl" ]; then
             for warp in big_driving_warp_1928x1208_tinygrad.pkl big_driving_warp_1344x760_tinygrad.pkl; do
               ENCODED_URL=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${BASE_URL}/${warp}', safe=':/'))")
               printf '%s\t%s\n' "$ENCODED_URL" "${DEST_DIR}/${warp}" >> "$DOWNLOAD_LIST"
+              printf '%s\t%s\n' "${ENCODED_URL}.nrdr-abi.json" "${DEST_DIR}/${warp}.nrdr-abi.json" >> "$DOWNLOAD_LIST"
             done
           fi
         }

@@ -15,12 +15,10 @@ from openpilot.common.realtime import Ratekeeper
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware.hw import Paths
 
-from openpilot.cereal import log, messaging, custom
-from openpilot.sunnypilot.models.default_chestnut import DefaultChestnutDownloader, needs_default_chestnut_download
+from openpilot.cereal import messaging, custom
 from openpilot.sunnypilot.models.fetcher import ModelFetcher
 from openpilot.sunnypilot.models.helpers import (ACTIVE_BUNDLE_KEYS, get_active_bundle, get_selected_bundle,
                                                   resolve_bundle_by_ref, validate_active_bundles, verify_file)
-from openpilot.nrdr.features.services.model_manager import select_default_model
 
 # (connect, read) seconds. read is per-request inactivity, not a total cap
 DOWNLOAD_TIMEOUT = (30, 30)
@@ -46,7 +44,6 @@ class ModelManagerSP:
     self._chunk_size = 128 * 1000  # 128 KB chunks
     self._download_start_times: dict[str, float] = {}  # Track start time per model
     self._download_ref: bytes | str | None = None
-    self._default_chestnut = DefaultChestnutDownloader()
 
   def _download_interrupted(self) -> bool:
     # only removal cancels: a different ref is a queued selection that
@@ -297,26 +294,6 @@ class ModelManagerSP:
     """Main entry point for downloading a model bundle"""
     asyncio.run(self._download_bundle(model_bundle, destination_path, source))
 
-  def _ensure_default_chestnut_model(self) -> None:
-    if not needs_default_chestnut_download(self.params, self.chestnut_present):
-      return
-    if self.params.get("ModelManager_DownloadRef") is not None:
-      return
-    if not self._default_chestnut.should_attempt():
-      return
-
-    network_type = self.sm['deviceState'].networkType
-    if network_type == log.DeviceState.NetworkType.none:
-      return
-    if self.sm['deviceState'].networkMetered:
-      cloudlog.debug("Skipping default chestnut model download on metered network")
-      return
-
-    try:
-      self._default_chestnut.run(self, self.source_models, self.params)
-    except Exception as e:
-      cloudlog.exception(f"Default chestnut model download failed: {e}")
-
   def _process_download_requests(self) -> None:
     # loops so a ref queued during a download starts in the same tick, without
     # the bar dropping to idle for a tick between the two transfers
@@ -350,16 +327,13 @@ class ModelManagerSP:
         self.available_models = self.source_models[ModelFetcher.active_source(self.chestnut_present)]
         validate_active_bundles(self.params, self.source_models)
         self.active_bundle = get_active_bundle(self.params, chestnut=self.chestnut_present)
-        select_default_model(self.params, self.available_models)
 
         if get_selected_bundle(self.params, "chestnut") is not None and get_selected_bundle(self.params, "qcom") is None:
           if self.params.get("ModelManager_DownloadRef") is None:
             from openpilot.sunnypilot.models.model_name import DEFAULT_MODEL_REF
-            if DEFAULT_MODEL_REF:
-              self.params.put("ModelManager_DownloadRef", DEFAULT_MODEL_REF)
+            self.params.put("ModelManager_DownloadRef", DEFAULT_MODEL_REF)
 
         self._process_download_requests()
-        self._ensure_default_chestnut_model()
 
         if self.params.get("ModelManager_ClearCache"):
           self.clear_model_cache()
@@ -385,6 +359,7 @@ class ModelManagerSP:
         for model in selected_bundle.models:
           if model.artifact.fileName:
             active_files.append(model.artifact.fileName)
+            active_files.append(model.artifact.fileName + '.nrdr-migration.json')
 
     # Remove all files except active ones (including their chunk files)
     model_dir = Paths.model_root()

@@ -90,12 +90,15 @@ class ModelParser:
     model_bundle.minimumSelectorVersion = int(bundle["minimum_selector_version"])
     model_bundle.overrides = ModelParser._parse_overrides(bundle.get("overrides", {}))
     model_bundle.ref = bundle.get("ref")
+    model_bundle.tinygradRef = bundle.get("tinygrad_ref", "")
+    model_bundle.onnxSha256 = bundle.get("onnx_sha256", "")
 
     return model_bundle
 
   @staticmethod
   def parse_models(json_data: dict) -> list[custom.ModelManagerSP.ModelBundle]:
-    found_bundles = [ModelParser._parse_bundle(bundle) for bundle in json_data.get("bundles", [])]
+    found_bundles = [ModelParser._parse_bundle({"tinygrad_ref": json_data.get("tinygrad_ref", ""), **bundle})
+                     for bundle in json_data.get("bundles", [])]
     return [bundle for bundle in found_bundles if is_bundle_version_compatible(bundle.to_dict())]
 
 
@@ -138,8 +141,8 @@ class ModelCache:
 
 class ModelFetcher:
   """Handles fetching and caching of model data from remote source"""
-  MODEL_URL = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_v22.json"
-  MODEL_URL_CHESTNUT = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_chestnut_v25.json"
+  MODEL_URL = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_v23.json"
+  MODEL_URL_CHESTNUT = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_chestnut_v27.json"
 
   MODEL_SOURCES = {
     "qcom": (MODEL_URL, ""),

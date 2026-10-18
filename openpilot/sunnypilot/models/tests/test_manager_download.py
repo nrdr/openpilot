@@ -675,7 +675,7 @@ class TestActiveBundleValidation(OpenpilotTestCase):
       validate_active_bundles(params, {"qcom": [], "chestnut": []})
     params.remove.assert_not_called()
 
-  def test_reset_recomputes_runner_from_surviving_slot(self):
+  def test_missing_catalog_entry_retains_preference_and_other_slot_runner(self):
     tinygrad = int(custom.ModelManagerSP.Runner.tinygrad)
     big_raw = self._raw_bundle("big", runner=tinygrad)
     params = self._params(qcom=self._raw_bundle("gone"), chestnut=big_raw)
@@ -683,7 +683,8 @@ class TestActiveBundleValidation(OpenpilotTestCase):
                "chestnut": [custom.ModelManagerSP.ModelBundle(**big_raw)]}
     with mock.patch("openpilot.sunnypilot.models.helpers.chestnut_present", return_value=True):
       validate_active_bundles(params, catalog)
-    params.remove.assert_called_once_with("ModelManager_ActiveBundle")
+    params.remove.assert_not_called()
+    assert get_selected_bundle(params, 'qcom').ref == 'gone'
     runner_puts = [call for call in params.put.call_args_list if call.args[0] == "ModelRunnerTypeCache"]
     assert [call.args[1] for call in runner_puts] == [tinygrad]
 
