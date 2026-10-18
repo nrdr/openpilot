@@ -174,13 +174,66 @@ assert "openpilot.nrdr.ui.onroad.mici_onroad" not in sys.modules
     except ModuleNotFoundError as error:
       self.skipTest(f"native UI dependencies unavailable: {error}")
 
-    for legacy_name, (canonical_name, expected_exports) in UI_MODULES.items():
-      with self.subTest(module=legacy_name):
-        legacy = import_module(legacy_name)
-        canonical = import_module(canonical_name)
-        self.assertEqual(legacy.__all__, expected_exports)
-        for name in expected_exports:
-          self.assertIs(getattr(legacy, name), getattr(canonical, name))
+    # Import the real layouts, but do not require running car services or read
+    # saved device preferences. A child process also prevents the UI singleton
+    # from leaving these fixture dependencies in another test's module cache.
+    script = r'''
+import capnp
+from importlib import import_module
+from unittest import mock
+from openpilot.cereal import messaging
+from openpilot.common import params
+
+
+class MemoryParams:
+  def get(self, key, *args, **kwargs):
+    return None
+
+  def get_bool(self, key, default=False):
+    return default
+
+  def get_int(self, key, default=0):
+    return default
+
+  def get_float(self, key, default=0.0):
+    return default
+
+
+class PureSubMaster:
+  requested = set()
+
+  def __init__(self, services, *args, **kwargs):
+    self.requested.update(services)
+    self.services = services
+    self.frame = -1
+    self.data = {}
+    self.updated = dict.fromkeys(services, False)
+    self.recv_frame = dict.fromkeys(services, 0)
+    self.logMonoTime = dict.fromkeys(services, 0)
+    for service in services:
+      try:
+        message = messaging.new_message(service)
+      except capnp.KjException:
+        message = messaging.new_message(service, 0)
+      self.data[service] = getattr(message.as_reader(), service)
+
+  def __getitem__(self, service):
+    return self.data[service]
+
+
+with mock.patch.object(params, "Params", MemoryParams), mock.patch.object(messaging, "SubMaster", PureSubMaster):
+  for legacy_name, (canonical_name, expected_exports) in UI_MODULES.items():
+    legacy = import_module(legacy_name)
+    canonical = import_module(canonical_name)
+    assert legacy.__all__ == expected_exports, legacy_name
+    for name in expected_exports:
+      assert getattr(legacy, name) is getattr(canonical, name), (legacy_name, name)
+  assert {"deviceState", "modelV2"} <= PureSubMaster.requested
+'''
+    repository_root = Path(__file__).resolve().parents[3]
+    result = subprocess.run([sys.executable, "-c", f"UI_MODULES = {UI_MODULES!r}\n" + script],
+                            cwd=repository_root, capture_output=True, text=True)
+    self.assertEqual(result.returncode, 0, f"{result.stdout}\n{result.stderr}")
 
   def test_portable_onroad_facade_preserves_runtime_object_identity(self):
     legacy = import_module("openpilot.sunnypilot.nrdr.circular_alerts")

@@ -113,10 +113,11 @@ def test_pop_recipe_pins_exact_sources_and_preserves_selection(tmp_path, runtime
 
 
 def test_committed_runtime_manifest_matches_the_checked_out_source():
-  manifest = json.loads(admission.MANIFEST.read_text(encoding='utf-8'))
   root = Path(__file__).resolve().parents[3] / 'tinygrad_repo'
   if not (root / 'tinygrad/engine/jit.py').exists():
     pytest.skip('Native source bundle must include tinygrad source')
+  manifest = admission.runtime_provenance()
+  assert manifest['abi'] == admission.ARTIFACT_ABI
   assert manifest['tinygrad_ref'] == admission.TINYGRAD_RUNTIME_REF
   for name, digest in manifest['tinygrad_files'].items():
     assert hashlib.sha256((root / name).read_bytes().replace(b'\r\n', b'\n')).hexdigest() == digest

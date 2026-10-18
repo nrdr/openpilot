@@ -73,6 +73,39 @@ def test_unsupported_saved_selection_cannot_turn_into_default(raw, helpers):
   assert params.writes == []
 
 
+@pytest.mark.parametrize('qcom', [None, saved_pop(), 'test-qcom'])
+@pytest.mark.parametrize('chestnut_present', [False, True])
+def test_chestnut_download_preserves_qcom_slot_and_admission(tmp_path, helpers, qcom, chestnut_present):
+  source = Path(__file__).resolve().parents[3] / 'openpilot/sunnypilot/models/manager.py'
+  cls = next(node for node in ast.parse(source.read_text(encoding='utf-8')).body if isinstance(node, ast.ClassDef) and node.name == 'ModelManagerSP')
+  method = next(node for node in cls.body if isinstance(node, ast.AsyncFunctionDef) and node.name == '_download_bundle')
+  namespace = {'custom': custom, 'os': os, 'ACTIVE_BUNDLE_KEYS': helpers.ACTIVE_BUNDLE_KEYS,
+               'get_active_bundle': helpers.get_active_bundle, 'DownloadCancelled': type('Cancelled', (Exception,), {})}
+  exec(compile(ast.Module(body=[method], type_ignores=[]), str(source), 'exec'), namespace)
+  params = ParamsMemory({'ModelManager_ActiveBundle': qcom})
+  selected = custom.ModelManagerSP.ModelBundle(**saved_pop())
+  selected.ref = 'downloaded-chestnut'
+  manager = SimpleNamespace(params=params, chestnut_present=chestnut_present, active_bundle=None,
+                            _report_status=lambda: None, _download_interrupted=lambda: False)
+  download = namespace['_download_bundle'](manager, selected, str(tmp_path), 'chestnut')
+  if not chestnut_present and qcom == 'test-qcom':
+    with pytest.raises(ModelAdmissionError, match='Saved qcom model selection is unsupported or malformed'):
+      asyncio.run(download)
+    assert selected.status == custom.ModelManagerSP.DownloadStatus.failed
+    assert manager.active_bundle is None
+  else:
+    asyncio.run(download)
+    assert selected.status == custom.ModelManagerSP.DownloadStatus.downloaded
+    if chestnut_present:
+      assert manager.active_bundle.ref == 'downloaded-chestnut'
+    elif qcom is None:
+      assert manager.active_bundle is None
+    else:
+      assert manager.active_bundle.to_dict() == qcom
+  assert params.values['ModelManager_ActiveBundle'] == qcom
+  assert [key for key, _ in params.writes] == ['ModelManager_ActiveBundleChestnut']
+
+
 def test_catalog_mismatch_keeps_saved_preference(monkeypatch, helpers):
   raw = saved_pop()
   params = ParamsMemory({'ModelManager_ActiveBundle': raw})

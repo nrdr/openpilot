@@ -1,4 +1,5 @@
 import ast
+import __future__
 from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
@@ -169,7 +170,9 @@ class TestPowerUiAdapters(unittest.TestCase):
 
     params = SimpleNamespace(get_bool=lambda key, default: key == "DisablePowerDown")
     namespace = {"BigToggle": FakeToggle, "Params": lambda: params, "Callable": object}
-    exec(compile(module, str(root / "openpilot/selfdrive/ui/mici/widgets/button.py"), "exec"), namespace)
+    # The extracted constructor's UI-only annotations do not need native types.
+    exec(compile(module, str(root / "openpilot/selfdrive/ui/mici/widgets/button.py"), "exec",
+                 flags=__future__.annotations.compiler_flag), namespace)
     control_type = namespace["BigParamControl"]
     def callback(checked):
       pass

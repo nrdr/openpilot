@@ -19,6 +19,7 @@ from openpilot.cereal import messaging, custom
 from openpilot.sunnypilot.models.fetcher import ModelFetcher
 from openpilot.sunnypilot.models.helpers import (ACTIVE_BUNDLE_KEYS, get_active_bundle, get_selected_bundle,
                                                   resolve_bundle_by_ref, validate_active_bundles, verify_file)
+from openpilot.nrdr.features.services.model_manager import select_default_model
 
 # (connect, read) seconds. read is per-request inactivity, not a total cap
 DOWNLOAD_TIMEOUT = (30, 30)
@@ -338,6 +339,7 @@ class ModelManagerSP:
         self.available_models = self.source_models[ModelFetcher.active_source(self.chestnut_present)]
         validate_active_bundles(self.params, self.source_models)
         self.active_bundle = get_active_bundle(self.params, chestnut=self.chestnut_present)
+        select_default_model(self.params, self.available_models)
 
         if get_selected_bundle(self.params, "chestnut") is not None and get_selected_bundle(self.params, "qcom") is None:
           if self.params.get("ModelManager_DownloadRef") is None:

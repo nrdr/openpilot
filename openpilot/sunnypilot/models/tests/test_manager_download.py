@@ -376,10 +376,10 @@ class TestManagerDownload(ManagerDownloadTestBase):
 
   def _make_params_with_store(self):
     params = mock.MagicMock()
-    store = {}
+    store = {"ModelManager_DownloadRef": b"0"}
 
     def get(key, *args, **kwargs):
-      return store.get(key, b"0")  # b"0" -> download not cancelled
+      return store.get(key)  # Only the real download request is nonempty.
 
     def put(key, value, *args, **kwargs):
       store[key] = value
@@ -421,6 +421,7 @@ class TestManagerDownload(ManagerDownloadTestBase):
       assert "ModelManager_ActiveBundleChestnut" in store, "chestnut download must write the chestnut slot"
       assert "ModelManager_ActiveBundle" not in store, "chestnut download must not touch the qcom slot"
       assert self.manager.selected_bundle.status == custom.ModelManagerSP.DownloadStatus.downloaded
+      assert self.manager.active_bundle is None, "empty qcom slot must stay empty when no Chestnut is connected"
     self.run_with_server(body)
 
 

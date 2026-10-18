@@ -404,7 +404,11 @@ class TestControllerCleanup(OpenpilotTestCase):
     ]
     controller = panel["items"][0]
     assert [(o["value"], o["label"]) for o in controller["options"]] == [(0, "PIF Control"), (1, "Firmware Controller")]
-    assert "description" not in controller and "details" not in controller
+    assert "matching modified EPS build" in controller["description"]
+    assert "TEG-A010 uses its own provisional corrected-PTM calibration, not the Bosch placeholder" in controller["description"]
+    assert "RWD SHA256 starts 04147917" in controller["details"]
+    assert "Older builds report the same version strings but are not compatible" in controller["details"]
+    assert "PIF and Device Yaw Correction remain separate" in controller["details"]
     assert "offroad_only" in _flatten_rule_types(controller["enablement"])
     assert _references_capability_field(controller["options"][1]["enablement"], "nrdr_yaw_controller_available")
     correction = panel["items"][2]

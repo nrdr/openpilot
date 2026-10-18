@@ -10,7 +10,10 @@ from openpilot.common.file_chunker import open_file_chunked
 
 TINYGRAD_RUNTIME_REF = "fe5d3169ba4f41d0947ad174925f413cbea9d056"
 ARTIFACT_ABI = "generic-onnx-warp-v1"
-MANIFEST = Path(__file__).resolve().parents[2] / "config" / "model_artifacts.json"
+_MANIFEST = Path(__file__).resolve().parents[2] / "config" / "model_artifacts.json"
+
+__all__ = ("ARTIFACT_ABI", "TINYGRAD_RUNTIME_REF", "ModelAdmissionError", "admit_default_artifact",
+           "admit_selected_artifact", "artifact_sha256", "runtime_provenance", "write_artifact_record")
 
 
 class ModelAdmissionError(RuntimeError):
@@ -23,7 +26,7 @@ def artifact_sha256(path: str | Path) -> str:
 
 
 def runtime_provenance() -> dict:
-  manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+  manifest = json.loads(_MANIFEST.read_text(encoding="utf-8"))
   if manifest.get("abi") != ARTIFACT_ABI or manifest.get("tinygrad_ref") != TINYGRAD_RUNTIME_REF:
     raise ModelAdmissionError("Model provenance manifest and runtime disagree")
   root = Path(__file__).resolve().parents[4] / "tinygrad_repo"
