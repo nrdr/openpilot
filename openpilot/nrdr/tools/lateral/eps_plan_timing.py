@@ -132,7 +132,8 @@ def main():
       print(f'  {name:20s}       -   (only {m.sum()} frames)')
       continue
     print(f'  {name:20s} {best_shift(tf[m], plan[m], yt, k):+.2f}   ({m.sum()} frames)')
-  print(f'takeovers: {takeovers} ({takeovers / max(eng_min, 0.1):.2f} per engaged minute)')
+  print(f'reported steeringPressed rising edges: {takeovers} ({takeovers / max(eng_min, 0.1):.2f} per engaged minute; '
+        + 'not verified driver interventions)')
 
 
 if __name__ == '__main__':
