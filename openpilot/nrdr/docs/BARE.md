@@ -130,4 +130,15 @@ not prove its peak build/temp footprint fits the device's 8.9 GB free space.
 
 Local host has WSL installed but no Linux distribution, no Docker, and no native
 Linux/ARM compiler. Python compilation, schema loading and host tests are not a
-native C4 build; native compilation is an outstanding validation step.
+native C4 build.
+
+On October 17, source `0bacb8e950766211db93953bd1d32883288d7a43` with the opendbc
+pin above passed a full native C4 SCons build in an isolated checkout, including
+the small driving/DM models, camera warps, solvers, pandad and Panda binaries.
+Native regressions: 513 passed, 29 subtests passed, 248 skipped. The skips were
+abstract safety bases or unsupported regen/second-speed cases; all 25 concrete
+Clarity hybrid safety checks ran. Installed source and 199 saved settings were
+verified unchanged. No firmware was flashed and bare was not installed or driven.
+These are compile/unit/model-compiler checks, not closed-loop validation. The
+optional Chestnut model and native UI launch were not exercised. Later changes
+to this paragraph only record that result; the tested runtime remains unchanged.
