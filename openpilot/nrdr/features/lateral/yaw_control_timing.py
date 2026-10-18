@@ -46,9 +46,15 @@ _PREDICTION_SCHEDULE_V = {
 # model's plan 0.12-0.14 s early on 5-12 m/s turns. 0.12 s fixed that; the defaults add 0.025 s that
 # stands in for the source branch's model-action interpolation, which this port does not carry.
 # Other models aim differently, so both ends are settings; the delay fades between them on speed.
+# The high end was 0.025 (none from the source): those drives measured 5-12 m/s turns only. By speed band
+# (JamesL787, 2026-10-18) the Clarity ran 0.12 / 0.14 / 0.10 s early at 17 / 16 / 25 m/s with no command delay
+# (routes 3f1 / 3f5, a Mountain-Dew-style action head; 0.10 s is the 1667-frame highway band), so 0.10 + 0.025.
 COMMAND_DELAY_BP = (10.0, 15.0)  # m/s
 DEFAULT_COMMAND_DELAY_LOW = 0.145  # s
-DEFAULT_COMMAND_DELAY_HIGH = 0.025  # s
+DEFAULT_COMMAND_DELAY_HIGH = 0.125  # s
+# The other fixed calibrations' high end, unchanged: the Insight's Cinque route needed ~0.05 s at 12-20 m/s, and no
+# CR-V timing has been measured.
+FIXED_COMMAND_DELAY_HIGH = 0.025  # s
 CIVIC_COMMAND_DELAY_LOW = 0.175  # 0.15 source + 0.025 port compensation
 # The TEG-A010 keeps it: with 0.175 applied, plan timing on its owner's routes 12e/134/137/139 (5-12 m/s turns)
 # measured the car 0.05 s early (+0.02/-0.06/-0.06/-0.08), so there is no case for less; mostly highway drives.
@@ -93,7 +99,7 @@ def command_delay(settings, speed: float, *, calibration: str = "clarity_a020") 
   if calibration in FIXED_COMMAND_DELAY_LOW:
     # Do not let persisted Clarity command-delay settings silently retune another car.
     low = FIXED_COMMAND_DELAY_LOW[calibration]
-    high = low if calibration in CIVIC_FLAT_COMMAND_DELAY_CALIBRATIONS else DEFAULT_COMMAND_DELAY_HIGH
+    high = low if calibration in CIVIC_FLAT_COMMAND_DELAY_CALIBRATIONS else FIXED_COMMAND_DELAY_HIGH
     return float(np.interp(speed, COMMAND_DELAY_BP, (low, high)))
   low = _command_delay_setting(settings, NrdrParamKey.NRDR_YAW_COMMAND_DELAY_LOW, DEFAULT_COMMAND_DELAY_LOW)
   high = _command_delay_setting(settings, NrdrParamKey.NRDR_YAW_COMMAND_DELAY_HIGH, DEFAULT_COMMAND_DELAY_HIGH)

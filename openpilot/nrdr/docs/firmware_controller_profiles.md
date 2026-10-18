@@ -62,8 +62,9 @@ fixed 0.075 seconds. lagd told the TEG 0.37-0.39 seconds, which ran it early.
 Model-specific smoothing remains separate, as in the source implementation.
 
 Command delay is a separate interpolated curvature history buffer, not a blocking
-sleep. It fades between 10 and 15 m/s. Clarity retains its saved endpoints, default
-0.145 / 0.025 seconds. The Insight uses fixed 0.175 / 0.025 seconds and the Civics
+sleep. It moves between its ends from 10 to 15 m/s. Clarity retains its saved endpoints,
+default 0.145 / 0.125 seconds (the high end was 0.025 until the Clarity, on an action-head
+model, measured 0.10-0.14 seconds early above 15 m/s without it). The Insight uses fixed 0.175 / 0.025 seconds and the Civics
 0.175 seconds at every speed, since they ran as early on the highway as in town
 (source 0.150 plus the existing port's 0.025-second model-action compensation); saved
 Clarity command-delay settings do not retune them. These are model-dependent
