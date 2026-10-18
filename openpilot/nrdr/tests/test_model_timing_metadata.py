@@ -115,7 +115,10 @@ def test_production_helper_attaches_atomic_timing_without_changing_model_action(
   baseline_action = (action.desiredCurvature, action.desiredAcceleration, action.shouldStop)
 
   helper(model, compatibility, action_time)
+  assert (action.lateralSource, action.delayInput) == ("unknown", "unknown")  # a caller that does not know yet
+  helper(model, compatibility, action_time, lateral_source="plan", delay_input="none")
 
+  assert (action.lateralSource, action.delayInput) == ("plan", "none")
   assert model.valid is valid
   assert model.logMonoTime == 987654321
   assert (action.desiredCurvature, action.desiredAcceleration, action.shouldStop) == baseline_action

@@ -1168,6 +1168,22 @@ struct ModelDataV2 {
     desiredAcceleration @1 :Float32;
     shouldStop @2 :Bool;
     lateralActionTime @3 :Float32; # Seconds from the source vision frame to the lateral action target; zero means unavailable.
+    lateralSource @4 :LateralSource;  # where desiredCurvature came from; unknown in older logs
+    delayInput @5 :DelayInput;        # which model input carries the told lateral delay; unknown in older logs
+
+    enum LateralSource {
+      unknown @0;
+      plan @1;           # read off the plan at lateralActionTime (floored at MIN_STABLE_DELAY)
+      actionHead @2;     # the model's own action output
+      curvatureHead @3;  # the model's desired_curvature output (non-tinygrad models)
+    }
+
+    enum DelayInput {
+      unknown @0;
+      none @1;
+      actionT @2;
+      lateralControlParams @3;
+    }
   }
 
   deprecated :group {

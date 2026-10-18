@@ -41,6 +41,7 @@ from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeController
 from openpilot.nrdr.features.services import admit_default_artifact
+from openpilot.nrdr.features.lateral.model_source import delay_input, lateral_source
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 
@@ -78,10 +79,14 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
                                 shouldStop=bool(stop))
 
 
-def set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t: float) -> None:
-  """Attach one source identity and horizon before either model event is sent."""
+def set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t: float,
+                              lateral_source: str = "unknown", delay_input: str = "unknown") -> None:
+  """Attach one source identity and horizon before either model event is sent, and where the steering came from
+  (nrdr.features.lateral.model_source) so the Firmware Controller can size its command delay."""
   action_time = float(lat_action_t)
   modelv2_send.modelV2.action.lateralActionTime = action_time
+  modelv2_send.modelV2.action.lateralSource = lateral_source
+  modelv2_send.modelV2.action.delayInput = delay_input
   mdv2sp_send.valid = modelv2_send.valid
   mdv2sp_send.modelDataV2SP.modelMonoTime = modelv2_send.logMonoTime
   mdv2sp_send.modelDataV2SP.lateralActionTime = action_time
@@ -450,7 +455,8 @@ def main(demo=False):
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,
                      frame_drop_ratio, meta_main.timestamp_eof, model_execution_time, extrinsics_calibration_seen)
       modelv2_send.modelV2.big = model.chestnut
-      set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t)
+      set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t,
+                                lateral_source=lateral_source(model_output, mlsim=True), delay_input=delay_input(model.npy))
 
       desire_state = modelv2_send.modelV2.meta.desireState
       l_lane_change_prob = desire_state[log.Desire.laneChangeLeft]

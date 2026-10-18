@@ -68,7 +68,7 @@ def test_shared_geometry_is_not_locked_by_controller_selection(key):
 def test_only_measured_firmware_schedule_locks_live_manual_delay(key):
   from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
   params = MemoryParams(NrdrLateralController=1, **{key: .31})
-  assert tuning_write_allowed(params, key)  # Civic keeps live/manual delay
+  assert tuning_write_allowed(params, key)  # no prediction schedule: live/manual delay
   assert not tuning_write_allowed(params, key, firmware_prediction_schedule=True)
   item = apply_sunnylink_metadata({"key": key})
   assert item["enablement"][-1] == {"type": "not", "condition": {"type": "all", "conditions": [

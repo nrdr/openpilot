@@ -4163,7 +4163,7 @@
               "key": "LagdToggle",
               "widget": "toggle",
               "title": "Live Learning Steer Delay",
-              "description": "Learn steering delay. Clarity Firmware Controller uses its measured speed schedule instead; Civic Firmware Controller uses this live/manual delay path normally.",
+              "description": "Learn steering delay. The Firmware Controller uses its measured speed schedule instead.",
               "enablement": [
                 {
                   "type": "not",
@@ -4205,8 +4205,8 @@
               "key": "LagdToggleDelay",
               "widget": "option",
               "title": "Adjust Software Delay",
-              "description": "Additional software delay when live learning is off. Clarity Firmware Controller uses a measured speed schedule; Civic Firmware Controller uses this value normally.",
-              "details": "Software delay is added to the vehicle's actuator delay. Clarity Firmware Controller instead uses 0.15/0.08/0.10/0.20/0.30 seconds at 3.5/7/12/20/30 m/s, smoothly interpolated. Saved settings are preserved for other controllers. Civic has no measured prediction schedule yet. Firmware command delay and model-specific smoothing are separate. Default additional software delay is 0.2 seconds.",
+              "description": "Additional software delay when live learning is off. The Firmware Controller uses a measured speed schedule instead.",
+              "details": "Software delay is added to the vehicle's actuator delay. Clarity Firmware Controller instead uses 0.15/0.08/0.10/0.20/0.30 seconds at 3.5/7/12/20/30 m/s, smoothly interpolated. The Civics use their own (TEG-A010 0.20 seconds; C020 0.28 seconds, 0.26 on the highway). Saved settings are preserved for other controllers. Firmware command delay and model-specific smoothing are separate. Default additional software delay is 0.2 seconds.",
               "min": 0.05,
               "max": 1.0,
               "step": 0.01,
