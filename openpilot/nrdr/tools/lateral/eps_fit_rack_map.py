@@ -15,7 +15,6 @@ The printed table is a honda_rack_map.RackMapTable (ratio_bp, ratio_v, slip_fact
 import argparse
 import bz2
 import glob
-import re
 
 import numpy as np
 import zstandard as zstd
@@ -24,7 +23,7 @@ from openpilot.cereal import log
 from opendbc.car.honda.interface import CarInterface
 from opendbc.car.honda.values import CAR
 from opendbc.car.vehicle_model import VehicleModel, calc_slip_factor
-from openpilot.nrdr.tools.lateral.eps_common import RIGHT_LOSS_BP, VEHICLE_PARAMETERS, vgr_inverse, vgr_profile
+from openpilot.nrdr.tools.lateral.eps_common import RIGHT_LOSS_BP, VEHICLE_PARAMETERS, log_segment_number as seg, vgr_inverse, vgr_profile
 
 G = 9.81
 
@@ -39,11 +38,6 @@ def firmware_cp_geometry(car):
 WHEEL_TO_YAW_LAG = ([3.75, 7.0, 12.0, 20.0, 30.0], [0.08, 0.06, 0.06, 0.08, 0.10])  # s, measured on the Clarity
 EDGES = [3, 10, 20, 45, 70, 100, 150, 200, 260, 350, 450]   # |wheel angle| bands, deg
 VB = [2.5, 5, 7, 9, 12, 15, 20, 25, 40]                     # speed bands, m/s
-
-
-def seg(p):
-  m = re.search(r'(?:rlog_|--)(\d+)(?:\.zst|\.bz2|/rlog)', p)
-  return int(m.group(1)) if m else 0
 
 
 def read_route(pattern, bus):

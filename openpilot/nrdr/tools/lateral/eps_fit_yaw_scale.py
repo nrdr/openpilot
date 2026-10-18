@@ -11,20 +11,14 @@ ramped in over RIGHT_LOSS_BP counts, the form eps_common.YAW_RATE_CALIBRATION de
 import argparse
 import bz2
 import glob
-import re
 
 import numpy as np
 import zstandard as zstd
 
 from openpilot.cereal import log
-from openpilot.nrdr.tools.lateral.eps_common import RIGHT_LOSS_BP
+from openpilot.nrdr.tools.lateral.eps_common import RIGHT_LOSS_BP, log_segment_number as seg
 
 GPS_LAG = 0.4  # s, GPS bearing behind the car
-
-
-def seg(p):
-  m = re.search(r'(?:rlog_|--)(\d+)(?:\.zst|\.bz2|/rlog)', p)
-  return int(m.group(1)) if m else 0
 
 
 def read_route(pattern, bus):

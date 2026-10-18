@@ -4,6 +4,8 @@ Offline only: nothing here runs on the car. Ported from JamesL787 ns-bosch-radar
 tools measured every calibration in vfn_eps_core (rows, R6, column load, command delay, rack maps, yaw scales).
 """
 from types import SimpleNamespace
+import os
+import re
 
 import numpy as np
 
@@ -33,6 +35,13 @@ VEHICLE_PARAMETERS = ("vehicleParameters", "liveParameters")
 DEVICE_POSE = ("deviceMotion", "livePose")
 RIGHT_LOSS_BP = (3.0, 5.0)  # counts from zero over which the clockwise under-read comes in
 VSA_ADDR = 0x94
+
+
+def log_segment_number(path) -> int:
+  """Route folders and flat downloads, with either Windows or POSIX separators."""
+  normalized = os.fspath(path).replace('\\', '/')
+  match = re.search(r'(?:rlog_|--|/)(\d+)(?:\.zst|\.bz2|/rlog|--rlog)', normalized)
+  return int(match.group(1)) if match else 0
 
 
 def vsa_counts(dat) -> int:

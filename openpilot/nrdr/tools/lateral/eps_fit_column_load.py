@@ -20,7 +20,6 @@ Telemetry layouts (--source):
 import argparse
 import bz2
 import glob
-import re
 import struct
 
 import numpy as np
@@ -28,17 +27,12 @@ import zstandard as zstd
 
 from openpilot.cereal import log
 from openpilot.nrdr.features.lateral import vfn_eps_core as core
-from openpilot.nrdr.tools.lateral.eps_common import VEHICLE_PARAMETERS, calibration
+from openpilot.nrdr.tools.lateral.eps_common import VEHICLE_PARAMETERS, calibration, log_segment_number as seg
 
 NAMES = ('k0', 'k1', 'c', 'friction', 'j', 'bias', 'kroll')
 s16 = lambda b, i: struct.unpack('>h', b[i:i + 2])[0]  # noqa: E731
 u16 = lambda b, i: struct.unpack('>H', b[i:i + 2])[0]  # noqa: E731
 BUS = {'clarity': 0, 'c020': 1, 'teg': 0, 'e4': None}
-
-
-def seg(p):
-  m = re.search(r'(?:rlog_|--)(\d+)(?:\.zst|\.bz2|/rlog)', p)
-  return int(m.group(1)) if m else 0
 
 
 def read_route(pattern, source, cal):

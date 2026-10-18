@@ -25,6 +25,7 @@ import numpy as np
 import zstandard
 
 from openpilot.cereal import log
+from openpilot.nrdr.tools.lateral.eps_common import log_segment_number
 
 CLARITY_R5_PER_KEY = 18.04
 TX = {0: (0, 99, 258, 447, 643, 862, 1111, 1549, 1774), 1: (0, 115, 254, 449, 654, 862, 1111, 1549, 1774),
@@ -59,7 +60,7 @@ def load(files, bus):
 
 
 def main(car, pattern, lag=1, image_e4=3840.0):
-  A = load(sorted(glob.glob(pattern)), 0 if car == 'teg' else 1)
+  A = load(sorted(glob.glob(pattern), key=log_segment_number), 0 if car == 'teg' else 1)
   W = A[:, 1:]
   r5 = (W[:, 2] * 65536 + u16(W[:, 3]) + W[:, 5]) if car == 'teg' else (W[:, 4] * 65536 + u16(W[:, 5]) + W[:, 8])
   k = np.trunc(np.trunc(A[:, 0] * 56756 / 32768) / 4)

@@ -19,14 +19,13 @@ their URL, not by list position, or the timeline is scrambled.
 import argparse
 import glob
 import os
-import re
 import sys
 
 import numpy as np
 import zstandard as zstd
 
 from openpilot.cereal import log
-from openpilot.nrdr.tools.lateral.eps_common import DEFAULT_YAW_RATE_CALIBRATION, YAW_RATE_CALIBRATION, yaw_rate_deg_s
+from openpilot.nrdr.tools.lateral.eps_common import DEFAULT_YAW_RATE_CALIBRATION, YAW_RATE_CALIBRATION, log_segment_number, yaw_rate_deg_s
 
 T_IDX = 10.0 * (np.arange(33) / 32) ** 2
 T_FIT = (T_IDX >= 0.1) & (T_IDX <= 1.5)
@@ -35,8 +34,7 @@ VSA_LATENCY = 0.017  # s, measured on the Clarity against rear-wheel-speed yaw; 
 
 
 def seg_number(path):
-  m = re.search(r'(?:rlog_|--|/)(\d+)(?:\.zst|\.bz2|/rlog)', os.fspath(path).replace('\\', '/'))
-  return int(m.group(1)) if m else 0
+  return log_segment_number(path)
 
 
 def rlog_paths(args):

@@ -50,8 +50,16 @@ def test_rack_map_finds_the_cars_map_when_the_tree_has_rack_maps():
   ("/drive/0000013d--8de8634497--43/rlog.zst", 43),
   (r"C:\drive\rlog_10.zst", 10),
   ("/drive/rlog_2.bz2", 2),
+  (r"C:\drive\device_route--10--rlog.zst", 10),
+  ("/drive/device_route--2--rlog.zst", 2),
 ))
 def test_plan_timing_orders_segment_numbers_on_both_platforms(path, expected):
   from openpilot.nrdr.tools.lateral.eps_plan_timing import seg_number
   assert seg_number(path) == expected
+  assert eps_common.log_segment_number(path) == expected
+
+
+def test_flat_downloads_sort_numerically_not_lexically():
+  files = [f"/drive/route--{segment}--rlog.zst" for segment in (0, 1, 10, 11, 2)]
+  assert [eps_common.log_segment_number(p) for p in sorted(files, key=eps_common.log_segment_number)] == [0, 1, 2, 10, 11]
 
