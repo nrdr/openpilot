@@ -5,7 +5,7 @@ from openpilot.nrdr.features.lateral import vfn_eps_core as core
 from openpilot.nrdr.features.lateral.controller_selection import (
   A030_PROFILE, C120_PROFILE, CRV_A040_PROFILE, CRV_A220_PROFILE, TGG_PROFILE,
 )
-from openpilot.nrdr.features.lateral.yaw_control_timing import command_delay
+from openpilot.nrdr.features.lateral.yaw_control_timing import command_delay, prediction_delay_schedule
 
 STARTING_PROFILES = (C120_PROFILE, TGG_PROFILE, A030_PROFILE, CRV_A040_PROFILE, CRV_A220_PROFILE)
 # Corrected-PTM starting calibrations. Golden R5 for the same 0xE4 at 20 m/s, from JamesL787 ns-bosch-radar-testing
@@ -36,7 +36,9 @@ STARTING_GOLDEN_R5 = {
 def test_starting_calibrations_match_the_source_tree_and_their_build(name):
   cal, rwd, e4, clamp = STARTING[name]
   profile = next(p for p in STARTING_PROFILES if p.calibration == name)
-  assert profile.required_rwd == rwd and profile.provisional and not profile.prediction_schedule
+  assert profile.required_rwd == rwd and profile.provisional
+  # the Civics take their measured sibling's delay schedule; the CR-Vs keep live/manual delay
+  assert profile.prediction_schedule == name.startswith("civic_")
   assert cal.e4_per_output == e4 and cal.key_clamp == clamp
   for e4_value, expected in zip(STARTING_E4, STARTING_GOLDEN_R5[name], strict=True):
     assert core.r5_from_output(e4_value / cal.e4_per_output, 20., cal) == pytest.approx(expected, abs=0.5)
@@ -60,6 +62,20 @@ def test_starting_calibration_vehicle_side_and_command_delay():
     assert command_delay({"NrdrYawCommandDelayLow": 0.3}, 5.0, calibration=name) == pytest.approx(.175)
   for name in ("crv_tla_a040", "crv_tla_a220"):
     assert command_delay({"NrdrYawCommandDelayLow": 0.3}, 5.0, calibration=name) == pytest.approx(.145)
+  # above 15 m/s the Civics hold theirs (as the C020 and TEG, measured); the CR-Vs, unmeasured, keep the old fade
+  for name in ("civic_tba_c120", "civic_tgg_a120", "civic_tba_a030"):
+    assert command_delay({"NrdrYawCommandDelayHigh": 0.3}, 30.0, calibration=name) == pytest.approx(.175)
+  for name in ("crv_tla_a040", "crv_tla_a220"):
+    assert command_delay({"NrdrYawCommandDelayHigh": 0.3}, 30.0, calibration=name) == pytest.approx(.025)
+
+
+@pytest.mark.parametrize("name,sibling", [("civic_tba_a030", "civic_teg_a010"), ("civic_tba_c120", "civic_bosch_c020"),
+                                          ("civic_tgg_a120", "civic_bosch_c020")])
+def test_starting_civics_are_told_their_siblings_measured_lag(name, sibling):
+  from openpilot.nrdr.features.lateral.controller_selection import _PROFILES
+  profiles = {p.calibration: p for p in _PROFILES.values()}
+  assert prediction_delay_schedule(profiles[name]) == prediction_delay_schedule(profiles[sibling])
+  assert prediction_delay_schedule(profiles[name]) != prediction_delay_schedule(profiles["clarity_a020"])
   # The CR-V's key clamp is 1774 (the C120's 1663), though its row ends at key 1663, so R5 is flat from there to the clamp.
   assert core.key_ceiling(20., core.CRV_TLA_A040) == 1774 and core.key_ceiling(20., core.CIVIC_TBA_C120) == 1663
   assert core.CIVIC_TBA_A030.r5_v == core.CIVIC_TEG_A010.r5_v and core.CIVIC_TBA_A030.r6_angle_gain == core.CIVIC_TEG_A010.r6_angle_gain

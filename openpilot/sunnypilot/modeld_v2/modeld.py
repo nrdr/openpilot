@@ -47,6 +47,7 @@ from openpilot.sunnypilot.modeld_v2.model_adapters import get_model_adapter
 from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeController
 from openpilot.nrdr.features.services import admit_selected_artifact, admit_default_artifact
+from openpilot.nrdr.features.lateral.model_source import delay_input, lateral_source
 
 PROCESS_NAME = "openpilot.selfdrive.modeld.modeld_tinygrad"
 BIG_MODEL_TIMEOUT = 60
@@ -482,7 +483,8 @@ def main(demo=False):
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,
                      frame_drop_ratio, meta_main.timestamp_eof, model_execution_time, live_calib_seen, meta_constants)
       modelv2_send.modelV2.big = model.chestnut
-      set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t)
+      set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t,
+                                lateral_source=lateral_source(model_output, model.mlsim), delay_input=delay_input(model.numpy_inputs))
       drivingdata_send.drivingModelData.action.lateralActionTime = modelv2_send.modelV2.action.lateralActionTime
 
       desire_state = modelv2_send.modelV2.meta.desireState
