@@ -134,7 +134,7 @@ def test_invalid_mode_is_manual_and_unsupported_explicit_modes_fall_back_for_who
   assert no_firmware.ratio_at(200.0) == pytest.approx(16.5)
 
 
-def test_firmware_mode_uses_exact_profile_and_immutable_cp_anchor():
+def test_firmware_mode_uses_exact_profile_and_keeps_cp_ratio_in_vehicle_model():
   selection = resolve_steer_ratio_selection(cp(firmware=b"39990-TRW-A020"), settings(mode=3, center=25.0, final=8.0))
   assert selection.firmware_vgr_selected
   assert selection.ratio_at(200.0) == pytest.approx(16.5)

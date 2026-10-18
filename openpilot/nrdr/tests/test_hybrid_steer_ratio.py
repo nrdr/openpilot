@@ -63,8 +63,13 @@ def test_clarity_measured_to_firmware_25_30_and_reverse_rejection():
   assert valid.available and valid.hybrid.start == 25 and valid.hybrid.end == 30
   assert valid.firmware_vgr_selected  # Preserve the existing NNLC incompatibility guard.
   assert valid.hybrid.a.forward(7.5) == pytest.approx(16.5 * 7.5 / 20.66570762352077)
-  assert valid.hybrid.forward(45) == pytest.approx(HONDA_VGR_PROFILES[0].physical_to_linear(45))
-  reverse = resolve_steer_ratio_selection(cp(), settings(3, 2))
+  # Past the blend the Firmware source is the Clarity's yaw-measured rack map on Table A, not Table A at CP's ratio.
+  assert valid.hybrid.forward(45) == pytest.approx(valid.firmware_profile.physical_to_linear(45))
+  assert valid.hybrid.forward(45) != pytest.approx(HONDA_VGR_PROFILES[0].physical_to_linear(45), rel=1e-3)
+  # On the measured map the Firmware -> measured pair no longer reverses at 25-30 deg (CP's 16.5 anchor made it
+  # do so); it still reverses with the blend at 180 deg.
+  assert resolve_steer_ratio_selection(cp(), settings(3, 2)).available
+  reverse = resolve_steer_ratio_selection(cp(), settings(3, 2, 180))
   assert not reverse.available and "reverse or flatten" in reverse.unavailable_reason
 
 
@@ -103,7 +108,7 @@ def test_disabled_hybrid_preserves_legacy_single_source(mode):
 def test_invalid_active_edit_retains_last_accepted_geometry_and_inactive_falls_back():
   initial = resolve_steer_ratio_selection(cp(), settings())
   latch = SteerRatioModeLatch(initial)
-  invalid = resolve_steer_ratio_selection(cp(), settings(3, 2))
+  invalid = resolve_steer_ratio_selection(cp(), settings(3, 2, 180))
   assert latch.update(invalid, True) is initial
   assert latch.rejected_reason == invalid.unavailable_reason
   assert latch.update(invalid, False) is invalid
@@ -200,7 +205,7 @@ def test_control_hook_reports_accepted_geometry_and_rejected_active_request():
   vehicle_model_state(controls, live, car_state, True)
   assert len(reports) == 2 and not reports[0]["active"] and reports[1]["active"]
   accepted = controls.steer_ratio_latch.selection
-  reader.snapshot = settings(3, 2)
+  reader.snapshot = settings(3, 2, 180)
   vehicle_model_state(controls, live, car_state, True)
   assert controls.steer_ratio_latch.selection is accepted
   assert reports[-1]["source_a"] == 3 and reports[-1]["source_b"] == 2

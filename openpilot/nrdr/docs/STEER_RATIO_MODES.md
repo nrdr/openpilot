@@ -32,7 +32,7 @@ Invalid source choices, invalid angles, and blends that reverse/flatten the mapp
 - **Manual** linearly interpolates the two global values against absolute measured steering-wheel angle only for exact supported Honda endpoint-metadata fingerprints. Unsupported Hondas and non-Hondas resolve to CP-static fallback and the sliders are disabled. There is no lane-change fade.
 - **Comma** uses the last valid, finite `vehicleParameters.steerRatio` as one scalar. It uses immutable `CP.steerRatio` before the first valid sample and holds its last valid sample across transient message invalidity.
 - **NRDR Measured Curve** uses a fixed matching car/EPS profile, not live learning. `HONDA_CLARITY` preserves every original non-monotonic logged median through `247.5` degrees and adds one separately audited bilateral near-lock anchor at `435.7` degrees. It interpolates the raw-domain evidence, converts it into the small-angle ratio expected by `VehicleModel`, and clamps beyond `435.7` degrees. `HONDA_CIVIC` with exact TEG-A010 EPS uses the provisional September 13 vehicle-model-domain curve, with data-derived anchors at 3.292–58.671 degrees and endpoint holds outside that range. Unsupported car/EPS combinations resolve to CP-static fallback; no related-car curve is borrowed.
-- **Firmware** requires an exact recognized `HondaVgrProfile`. EPS Table A supplies relative shape only, so immutable `CP.steerRatio` is the absolute center anchor. Unsupported firmware resolves once to CP-static fallback; no family match is borrowed.
+- **Firmware** requires an exact recognized `HondaVgrProfile`. EPS Table A supplies relative shape only. Where the exact car and EPS have a rack map (`honda_rack_map.py`), that map is the absolute anchor: yaw-measured for the Clarity TRW-A020, Civic Bosch TBA-C020, Civic TEG-A010 (and the TBA-A030, the same car) and Insight TXM-A040, predicted from the car's published specs for the Civic Bosch TBA-C120, Civic hatch TGG-A120 and CR-V TLA-A040 (see below). Otherwise immutable `CP.steerRatio` is. Unsupported firmware resolves once to CP-static fallback; no family match is borrowed, and a map applies only to the car/EPS images it lists (one image covers another only when it is the same car).
 
 ## Raw Clarity provenance
 
@@ -43,3 +43,41 @@ Invalid source choices, invalid angles, and blends that reverse/flatten the mapp
 Bin centers are `2.5, 7.5, 12.5, 17.5, 22.5, 27.5, 32.5, 37.5, 42.5, 47.5, 52.5, 57.5, 62.5, 67.5, 72.5, 77.5, 82.5, 87.5, 92.5, 107.5, 182.5, 217.5, 247.5` degrees. Their raw-domain medians are `19.679678, 20.665984, 19.948804, 19.330348, 19.362985, 19.307147, 19.150893, 18.394874, 18.300584, 18.578655, 18.087309, 17.979249, 18.036352, 17.710230, 17.497041, 17.279111, 17.025118, 17.088272, 16.797072, 16.530043, 15.739778, 15.319622, 15.279368`. Runtime prepends angle zero with the first median, then appends the separately audited `435.7` / `15.435171905851` near-lock anchor.
 
 The archived medians use `theta / atan(wheel_angle)`, while openpilot's vehicle model expects a small-angle ratio. At the clamped absolute query angle `theta`, runtime therefore returns `theta / tan(theta / raw_ratio)` (radians), with the raw ratio as the zero-angle limit. This yields `14.8701034355` at `247.5` degrees, `14.1656734608` at `435.7` degrees, and about `14.1751986062` at the Clarity's `433.8`-degree half-lock. Full hashes, extraction gates, segment IDs, limitations, and the independent historical fit cross-check are recorded in [`CLARITY_RAW_STEER_RATIO_EVIDENCE.md`](../features/lateral/CLARITY_RAW_STEER_RATIO_EVIDENCE.md).
+
+## Measured rack maps (Firmware)
+
+A rack map is fitted against the car's own VSA yaw sensor (0x94, scale checked against GPS heading) with
+JamesL787 `tools/lateral/fit_rack_map.py`, in VehicleModel's form with both of its constants measured:
+`lin = R(angle) * L * [k (1 - sf v^2) - g sf roll]`, where `lin` is Table A's linear angle of the physical wheel
+angle. `R` is the effective rack ratio by wheel angle after Table A (the mean of left- and right-turn medians, so an
+angle offset cancels) and `sf` the slip factor, fitted from how `R` changes with speed inside one angle band.
+
+| Car / EPS | Ratio near centre -> largest angle | Slip factor | CP ratio it replaces | Routes |
+| --- | --- | --- | --- | --- |
+| Clarity TRW-A020 | 17.34 -> 16.02 (400 deg) | -0.0005 | 16.5 | 341-36b |
+| Civic Bosch TBA-C020 | 14.93 -> 14.27 (283 deg) | -0.00065 | 15.38 | 294/289/2b7/2c6/2d4/1b8/251 |
+| Civic TEG-A010, TBA-A030 (the same 2016-18 sedan, same Table A) | 14.16 -> 13.78 (293 deg) | -0.00067 | 15.38 | 0000012d-00000139 (0000013d agrees) |
+| Insight TXM-A040 | 17.86 -> 17.17 (221 deg) | -0.00066 | 15.0 | 0000001e |
+
+The Firmware controller and the curvature-measuring controllers use the full map (`angle_from_curvature`,
+`curvature_from_angle`). Paths that carry no speed (controlsd's measured angle, lane-change shaping, a hybrid with
+a Firmware source) use the same ratio by angle without the measured slip factor, through VehicleModel at the CP ratio.
+On the TEG, CP's 15.38 delivered 6-11% more curvature than asked on the owner's drives, most in slow turns past
+150 deg; the map holds the measured curvature within ~1-3%.
+
+## Spec-predicted rack maps (Firmware)
+
+Every measured map above is Table A, then a tan, then one centre ratio R0: `k L (1 - sf v^2) = tan(lin / R0)`, within
+2% from 15 to 230 deg on all four cars. For an image nobody has measured, `honda_spec_plant.py` predicts R0 from the
+road-wheel angle at lock that Honda publishes (lock-to-lock turns and Honda's steering ratio, which is the ratio at
+lock) through that image's own Table A, `R0 = 1.149 * lin(lock) / road angle at lock`, and the slip factor from the
+axle loads, `sf = -0.00416 * (m_front^0.2 - m_rear^0.2) / L`. Both constants are the mean over the four measured cars.
+Held out one car at a time, R0 lands within 1.6% rms (2.5% worst) and the slip factor within 10%. The Insight and the
+TEG share published geometry yet measure 4.4% apart, so published specs cannot do better than ~2.5%; a car's own
+measurement replaces its spec map. The tables' provenance says `spec`.
+
+| Car / EPS | Specs (lock turns, Honda ratio) | Ratio near centre -> lock | Slip factor |
+| --- | --- | --- | --- |
+| Civic Bosch TBA-C120 (2019-21 sedan) | 2.22, 10.94 | 14.47 -> 12.96 (400 deg) | -0.000676 |
+| Civic hatch TGG-A120 (Sport) | 2.11, 11.12 | 14.88 -> 13.52 (380 deg) | -0.000632 |
+| CR-V TLA-A040 (2017-19) | 2.30, 12.3 | 16.82 -> 15.33 (414 deg) | -0.000585 |
