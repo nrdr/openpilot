@@ -187,6 +187,17 @@ class ModelManagerSP:
           is_cached = True
 
       if is_cached:
+        if len(artifact.chunks) > 0:
+          from openpilot.common.file_chunker import get_manifest_path
+          manifest_path = get_manifest_path(full_path)
+          temporary_manifest = manifest_path + '.tmp'
+          with open(temporary_manifest, 'w') as stream:  # noqa: ASYNC230
+            stream.write(str(len(artifact.chunks)))
+          os.replace(temporary_manifest, manifest_path)
+          # open_file_chunked prefers a whole file. Remove a shadowing old
+          # compile only after every replacement chunk passed its hash check.
+          if os.path.isfile(full_path):  # noqa: ASYNC240
+            os.remove(full_path)
         artifact.downloadProgress.status = custom.ModelManagerSP.DownloadStatus.cached
         artifact.downloadProgress.progress = 100
         artifact.downloadProgress.eta = 0

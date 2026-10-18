@@ -320,6 +320,10 @@ class TestManagerDownload(ManagerDownloadTestBase):
       for i, data in enumerate(CHUNK_BODIES):
         with open(get_chunk_name(base_path, i, len(CHUNK_BODIES)), 'wb') as f:
           f.write(data)
+      with open(base_path, 'wb') as f:
+        f.write(b'old whole file must not shadow verified replacement chunks')
+      with open(get_manifest_path(base_path), 'w') as f:
+        f.write('7')
       self._bundle.ref = "test-ref"
       params, store = self._make_params_with_store()
       store["ModelManager_DownloadRef"] = None  # removed -> cancelled
@@ -365,6 +369,9 @@ class TestManagerDownload(ManagerDownloadTestBase):
       assert DownloadHandler.request_paths == [], "cached bundle must not hit the network"
       assert [round(p) for p in self.reported[:3]] == [33, 67, 100]
       assert artifact.downloadProgress.status == custom.ModelManagerSP.DownloadStatus.cached
+      assert not os.path.isfile(base_path)
+      with open(get_manifest_path(base_path)) as f:
+        assert f.read() == str(len(CHUNK_BODIES))
     self.run_with_server(body)
 
   def _make_params_with_store(self):
