@@ -99,4 +99,3 @@ def test_the_a030s_spec_prediction_would_be_2_percent_off_the_tegs_measured_map(
   # why the A030 takes the TEG's measured map (honda_rack_map): its specs and Table A are the TEG's
   s, profile, table = MEASURED["teg"]
   assert spec.spec_r0(s, profile) / spec.r0_of_table(table.ratio_bp, table.ratio_v, profile) == pytest.approx(1.016, abs=0.003)
-

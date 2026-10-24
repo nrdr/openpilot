@@ -62,4 +62,3 @@ def test_plan_timing_orders_segment_numbers_on_both_platforms(path, expected):
 def test_flat_downloads_sort_numerically_not_lexically():
   files = [f"/drive/route--{segment}--rlog.zst" for segment in (0, 1, 10, 11, 2)]
   assert [eps_common.log_segment_number(p) for p in sorted(files, key=eps_common.log_segment_number)] == [0, 1, 2, 10, 11]
-

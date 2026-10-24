@@ -142,4 +142,3 @@ def test_the_map_is_built_once_not_every_frame():
   first, second = firmware_selection(CP), firmware_selection(CP)
   assert first.rack_map is second.rack_map is not None
   assert first.rack_map.name == "Civic TEG-A010 measured rack map"
-

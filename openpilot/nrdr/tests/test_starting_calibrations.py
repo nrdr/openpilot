@@ -81,4 +81,3 @@ def test_every_civic_and_the_insight_are_sent_their_images_3840():
   # at 3840 the full output reaches the clamp: u = 1 decodes to key 1662, the last key under it (1773 at 4096, clamped
   # from u ~0.94 on)
   assert core.command_key(-1.0 * 3840) == -1662 and core.command_key(-1.0 * 4096) == -1773
-
