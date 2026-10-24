@@ -18,6 +18,7 @@ from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.nrdr.hooks import initialize_live_parameter_settings
 from openpilot.nrdr.params import read_bool, read_float
+from openpilot.nrdr.features.longitudinal.civic_pcm import pcm_reference
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
@@ -127,6 +128,11 @@ class ControlsExt(ModelStateBase):
     CC_SP.intelligentCruiseButtonManagement.state = icbm_src.state
     CC_SP.intelligentCruiseButtonManagement.sendButton = icbm_src.sendButton
     CC_SP.intelligentCruiseButtonManagement.vTarget = icbm_src.vTarget
+
+    (CC_SP.civicPcmEnabled, CC_SP.civicPcmReferenceSpeed, CC_SP.civicPcmReferenceMonoTime) = pcm_reference(
+      self.CP, self.CP_SP, sm['longitudinalPlan'].speeds, sm.logMonoTime['longitudinalPlan'],
+      sm.all_checks(['longitudinalPlan']),
+    )
 
     return CC_SP
 

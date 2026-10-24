@@ -388,6 +388,9 @@ struct CarControlSP @0xa5cd762cd951a455 {
   leadOne @2 :LeadData;
   leadTwo @3 :LeadData;
   intelligentCruiseButtonManagement @4 :IntelligentCruiseButtonManagement;
+  civicPcmEnabled @5 :Bool;
+  civicPcmReferenceSpeed @6 :Float32;
+  civicPcmReferenceMonoTime @7 :UInt64;
 
   struct Param {
     key @0 :Text;
