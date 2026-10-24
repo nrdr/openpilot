@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from openpilot.nrdr.features.lateral.honda_rack_map import RackMapGeometry, rack_map_geometry
 from openpilot.nrdr.features.lateral.honda_vgr import HondaVgrProfile, get_honda_vgr_profile, normalize_honda_eps_firmware
 from openpilot.nrdr.features.lateral.hybrid_steer_ratio import AngleSource, HybridGeometry, BLEND_START_DEFAULT, build_hybrid
 
@@ -172,7 +173,8 @@ class SteerRatioSelection:
   manual_final: float
   manual_outer_angle_deg: float
   raw_profile: RawSteerRatioProfile | None = None
-  firmware_profile: HondaVgrProfile | None = None
+  # Table A alone (anchored to CP) or, where the car has a rack map (yaw-measured or spec-predicted), Table A on it
+  firmware_profile: HondaVgrProfile | RackMapGeometry | None = None
   unavailable_reason: str = ""
   hybrid_requested: bool = False
   hybrid: HybridGeometry | None = None
@@ -198,6 +200,13 @@ class SteerRatioSelection:
     if self.hybrid is not None:
       return SteerRatioMode.FIRMWARE in (self.hybrid.a.mode, self.hybrid.b.mode)
     return self.effective_mode is SteerRatioMode.FIRMWARE and self.firmware_profile is not None
+
+  @property
+  def rack_map(self) -> RackMapGeometry | None:
+    """The car's rack map, when Firmware alone is the geometry: then the control paths use its slip factor too."""
+    if self.hybrid is None and self.firmware_vgr_selected and isinstance(self.firmware_profile, RackMapGeometry):
+      return self.firmware_profile
+    return None
 
   def ratio_at(self, measured_angle_deg: float, live_comma_ratio: float | None = None) -> float:
     if self.hybrid is not None:
@@ -236,6 +245,8 @@ class SteerRatioSelection:
   def measured_curvature(self, VM, measured_angle_deg: float, speed: float, roll: float,
                          angle_offset_deg: float = 0.0) -> float:
     self.configure_vehicle_model(VM, measured_angle_deg)
+    if (rack_map := self.rack_map) is not None:
+      return -rack_map.curvature_from_angle(measured_angle_deg - angle_offset_deg, speed, roll)
     linear_angle = self.linearize_measured_angle(measured_angle_deg - angle_offset_deg)
     return -VM.calc_curvature(math.radians(linear_angle), speed, roll)
 
@@ -265,6 +276,8 @@ class SteerRatioSelection:
   def desired_angle_no_offset(self, VM, measured_angle_deg: float, speed: float, roll: float,
                               desired_curvature: float) -> float:
     self.configure_vehicle_model(VM, measured_angle_deg)
+    if (rack_map := self.rack_map) is not None:
+      return rack_map.angle_from_curvature(-desired_curvature, speed, roll)
     linear_angle = math.degrees(VM.get_steer_from_curvature(-desired_curvature, speed, roll))
     return self.physicalize_desired_angle(linear_angle)
 
@@ -341,6 +354,9 @@ def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | N
   outer_angle = metadata.outer_angle if metadata is not None else GENERIC_MANUAL_OUTER_ANGLE_DEG
   raw_profile = get_raw_steer_ratio_profile(CP)
   firmware_profile = get_honda_vgr_profile(CP)
+  # A car with a rack map (measured against its yaw sensor, else predicted from its specs) anchors Table A to it
+  # instead of CP's ratio.
+  firmware_profile = rack_map_geometry(CP, firmware_profile, cp_ratio) or firmware_profile
 
   effective_mode: SteerRatioMode | None = mode
   unavailable_reason = ""
