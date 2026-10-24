@@ -66,7 +66,7 @@ def test_civic_wrapper_uses_its_own_calibration_and_the_c020_trims_without_mutat
   assert control.core.ff.cal is (CIVIC_TEG_A010 if teg else CIVIC_BOSCH_C020)
   assert control.core.ff.load_coefficients == (CIVIC_TEG_EPS_LOAD if teg else CIVIC_EPS_LOAD)
   assert control.core.p_scale == CIVIC_P_SCALE and control.core.i_scale == CIVIC_I_SCALE
-  assert control.delay_schedule is None
+  assert control.delay_schedule[1] == ((.20,) * 5 if teg else (.28, .28, .28, .26, .26))  # its own measured lag
   assert not control.firmware_profile.provisional
   # User PIF/yaw settings cannot leak into either firmware profile.
   control.set_live_tuning_snapshot(ParamSnapshot(1, {"NrdrDeviceYawCorrection": True, "LatFScaleHighway": 500,
@@ -75,7 +75,7 @@ def test_civic_wrapper_uses_its_own_calibration_and_the_c020_trims_without_mutat
     for _ in range(100):
       output, _, logged = tick(control, state=state)
       assert math.isfinite(output) and abs(output) <= control.steer_max
-      assert logged.commandDelay == pytest.approx(.025)
+      assert logged.commandDelay == pytest.approx(.175)  # held flat above 15 m/s
       if state in (2, 3):
         assert logged.f == 0. and logged.epsFfWeight == 0.
 
@@ -97,7 +97,7 @@ def test_insight_wrapper_uses_its_own_calibration_the_c020_trims_and_the_clarity
 
 
 @pytest.mark.parametrize("changes", SUPPORTED_CIVICS)
-@pytest.mark.parametrize("speed,delay", [(5., .175), (12.5, .10), (20., .025)])
+@pytest.mark.parametrize("speed,delay", [(5., .175), (12.5, .175), (20., .175)])
 def test_civic_wrapper_uses_its_command_delay_and_preserves_shared_steer_ratio(changes, speed, delay):
   control = controller(**changes)
   cp, _ = car(**changes)
@@ -173,7 +173,7 @@ def test_lane_change_shaping_reduces_request_without_reversing_it(curvature):
   assert abs(shaped) < abs(curvature)
 
 
-@pytest.mark.parametrize("speed, delay", [(5., .145), (12.5, .085), (20., .025)])
+@pytest.mark.parametrize("speed, delay", [(5., .145), (12.5, .135), (20., .125)])
 def test_default_command_delay_holds_the_request_back_on_speed(speed, delay):
   control = controller()
   for _ in range(50):

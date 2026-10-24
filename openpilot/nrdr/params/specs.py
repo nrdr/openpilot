@@ -256,7 +256,7 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("NrdrYawDelaySchedule", ParamType.BOOL, PB, "1", ParamLifecycle.TOMBSTONE, ParamOwner.LATERAL),
   # Command delay remains distinct from model/actuator delay, live in seconds.
   _added("NrdrYawCommandDelayLow", ParamType.FLOAT, PB, "0.145", owner=ParamOwner.LATERAL),
-  _added("NrdrYawCommandDelayHigh", ParamType.FLOAT, PB, "0.025", owner=ParamOwner.LATERAL),
+  _added("NrdrYawCommandDelayHigh", ParamType.FLOAT, PB, "0.125", owner=ParamOwner.LATERAL),
 )
 
 

@@ -11,6 +11,10 @@ measured load, R6 from its A table) and keeps the C020's base gains, trims and c
 been driven on its corrected build. Insight TXM-A040 has its own calibration for its corrected PTM build
 (the Clarity's own map and P table, 3840 E4 per unit, measured load, R6 from its A table)
 with the C020's trims, the Civic command delay and the Clarity's model-delay schedule.
+
+On a plan model (modelV2.action.lateralSource) a scheduled profile's command delay is
+max(MIN_STABLE_DELAY - lateralActionTime, 0) instead (nrdr.features.lateral.model_source):
+the schedule tells the model the car's own lag, and that undoes only the floor.
 """
 import numpy as np
 
@@ -24,6 +28,7 @@ from openpilot.nrdr.features.lateral.vfn_eps_core import (
   INSIGHT_TXM_A040, INSIGHT_TXM_EPS_LOAD,
   HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
 )
+from openpilot.nrdr.features.lateral.model_source import PLAN, CommandDelaySlew, plan_floor_command_delay
 from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, command_delay, prediction_delay_schedule
 from openpilot.nrdr.features.lateral.latcontrol_pid import _eps_modified_steering_pressed
 from openpilot.nrdr.features.lateral.lane_change_tuning import optimized_lane_change_active
@@ -68,6 +73,7 @@ class LatControlFirmware(LatControl):
                   self.firmware_profile.name, self.firmware_profile.calibration,
                   self.firmware_profile.provisional, self.delay_schedule, self.firmware_profile.required_rwd or "-")
     self.cmd_delay = CommandDelay(dt)
+    self.cmd_delay_slew = CommandDelaySlew(dt)
     self.model_v2 = None
     self.prev_angle = 0.0
     self.pressed_duration = 0.0
@@ -75,6 +81,15 @@ class LatControlFirmware(LatControl):
 
   def update_model_v2(self, model_v2):
     self.model_v2 = model_v2
+
+  def _command_delay(self, v_ego: float) -> float:
+    delay = command_delay(self.live_tuning_snapshot, v_ego, calibration=self.firmware_profile.calibration)
+    action = getattr(self.model_v2, "action", None)
+    if self.delay_schedule is not None and str(getattr(action, "lateralSource", "unknown")) == PLAN:
+      floor_delay = plan_floor_command_delay(getattr(action, "lateralActionTime", 0.0))
+      if floor_delay is not None:
+        delay = floor_delay
+    return self.cmd_delay_slew.update(delay)
 
   def reset(self):
     super().reset()
@@ -87,7 +102,7 @@ class LatControlFirmware(LatControl):
     pid_log = log.ControlsState.LateralPIDState.new_message()
     pid_log.steeringAngleDeg = float(CS.steeringAngleDeg)
     pid_log.steeringRateDeg = float(CS.steeringRateDeg)
-    delay = command_delay(self.live_tuning_snapshot, CS.vEgo, calibration=self.firmware_profile.calibration)
+    delay = self._command_delay(CS.vEgo)
     desired_curvature = self.cmd_delay.update(desired_curvature, delay)
     desired = self.steer_ratio_selection.desired_angle_no_offset(
       VM, CS.steeringAngleDeg, CS.vEgo, params.roll, desired_curvature)

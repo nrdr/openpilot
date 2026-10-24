@@ -114,14 +114,25 @@ def test_c020_feedforward_respects_source_caps_and_lane_change_bypass(speed):
   assert control.ff_weight == 0. and control.pid.f == 0.
 
 
-@pytest.mark.parametrize("profile", [CIVIC_PROFILE, TEG_PROFILE])
-def test_civic_keeps_shared_prediction_delay_but_not_saved_clarity_command_delay(profile):
-  assert prediction_delay_schedule(profile) is None
-  assert prediction_delay_schedule(CLARITY_PROFILE) is not None
+@pytest.mark.parametrize("profile,schedule", [
+  (CIVIC_PROFILE, (.28, .28, .28, .26, .26)),
+  (TEG_PROFILE, (.20, .20, .20, .20, .20)),
+])
+def test_civic_has_its_own_prediction_delay_and_not_saved_clarity_command_delay(profile, schedule):
+  bp, values = prediction_delay_schedule(profile)
+  assert bp == prediction_delay_schedule(CLARITY_PROFILE)[0] and values == schedule
+  # the command delay holds above 15 m/s: the Civics ran as early there as in town
   settings = {"NrdrLateralController": 1, "NrdrYawCommandDelayLow": .3, "NrdrYawCommandDelayHigh": .3}
   assert [command_delay(settings, speed, calibration=profile.calibration) for speed in (0., 10., 12.5, 15., 30.)] == \
-    pytest.approx([.175, .175, .10, .025, .025])
-  assert all(tuning_write_allowed(settings, key) for key in ("LagdToggle", "LagdToggleDelay"))
+    pytest.approx([.175] * 5)
+  # lagd is locked out once the schedule tells the model the delay
+  assert not any(tuning_write_allowed(settings, key, firmware_prediction_schedule=profile.prediction_schedule)
+                 for key in ("LagdToggle", "LagdToggleDelay"))
+
+
+def test_the_insight_keeps_its_command_delay_fade():
+  assert [command_delay(None, speed, calibration="insight_txm_a040") for speed in (0., 15., 30.)] == \
+    pytest.approx([.175, .025, .025])
 
 
 @pytest.mark.parametrize("key", ["LagdToggle", "LagdToggleDelay"])

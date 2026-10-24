@@ -26,23 +26,24 @@ class FirmwareControllerProfile:
 
 
 CLARITY_PROFILE = FirmwareControllerProfile("Clarity A020", "clarity_a020", prediction_schedule=True)
-CIVIC_PROFILE = FirmwareControllerProfile("Civic Bosch C020", "civic_bosch_c020")
+CIVIC_PROFILE = FirmwareControllerProfile("Civic Bosch C020", "civic_bosch_c020", prediction_schedule=True)
 TEG_PROFILE = FirmwareControllerProfile(
-  "Civic TEG-A010 corrected PTM, row 3", "civic_teg_a010", required_rwd="04147917",
+  "Civic TEG-A010 corrected PTM, row 3", "civic_teg_a010", prediction_schedule=True, required_rwd="04147917",
 )
 INSIGHT_PROFILE = FirmwareControllerProfile(
   "Insight TXM-A040 corrected PTM", "insight_txm_a040", prediction_schedule=True, required_rwd="7ba37432",
 )
 # Corrected-PTM (revision b) starting calibrations: firmware read from each image, the vehicle side carried from
-# the nearest measured car until its owner's drives measure it.
+# the nearest measured car until its owner's drives measure it. The Civics take that car's delay schedule too (the
+# A030 the TEG's, the C120 and TGG the C020's); the CR-Vs keep live/manual delay until a CR-V drive is measured.
 C120_PROFILE = FirmwareControllerProfile(
-  "Civic Bosch TBA-C120 corrected PTM (starting calibration)", "civic_tba_c120", provisional=True, required_rwd="9261b8db",
+  "Civic Bosch TBA-C120 corrected PTM (starting calibration)", "civic_tba_c120", prediction_schedule=True, provisional=True, required_rwd="9261b8db",
 )
 TGG_PROFILE = FirmwareControllerProfile(
-  "Civic TGG-A120 corrected PTM (starting calibration)", "civic_tgg_a120", provisional=True, required_rwd="6640806d",
+  "Civic TGG-A120 corrected PTM (starting calibration)", "civic_tgg_a120", prediction_schedule=True, provisional=True, required_rwd="6640806d",
 )
 A030_PROFILE = FirmwareControllerProfile(
-  "Civic TBA-A030 corrected PTM (starting calibration)", "civic_tba_a030", provisional=True, required_rwd="55c37266",
+  "Civic TBA-A030 corrected PTM (starting calibration)", "civic_tba_a030", prediction_schedule=True, provisional=True, required_rwd="55c37266",
 )
 CRV_A040_PROFILE = FirmwareControllerProfile(
   "CR-V TLA-A040 corrected PTM (starting calibration)", "crv_tla_a040", provisional=True, required_rwd="2e6a8802",
