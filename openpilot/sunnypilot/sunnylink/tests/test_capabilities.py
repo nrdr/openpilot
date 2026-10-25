@@ -158,12 +158,12 @@ class TestOpaquePerBrandFlags(OpenpilotTestCase):
     params.put("CarParamsSPPersistent", sp.to_bytes(), block=True)
     for fingerprint, firmware, available, scheduled, provisional in (
       ("HONDA_CLARITY", b"39990-TRW-A020", True, True, False),
-      ("HONDA_CIVIC_BOSCH", b"39990-TBA-C020", True, False, False),
-      ("HONDA_CIVIC", b"39990-TEG-A010", True, False, False),
+      ("HONDA_CIVIC_BOSCH", b"39990-TBA-C020", True, True, False),
+      ("HONDA_CIVIC", b"39990-TEG-A010", True, True, False),
       ("HONDA_INSIGHT", b"39990-TXM-A040", True, True, False),
-      ("HONDA_CIVIC", b"39990-TBA-A030", True, False, True),
-      ("HONDA_CIVIC_BOSCH", b"39990-TBA-C120", True, False, True),
-      ("HONDA_CIVIC_BOSCH", b"39990-TGG-A120", True, False, True),
+      ("HONDA_CIVIC", b"39990-TBA-A030", True, True, True),
+      ("HONDA_CIVIC_BOSCH", b"39990-TBA-C120", True, True, True),
+      ("HONDA_CIVIC_BOSCH", b"39990-TGG-A120", True, True, True),
       ("HONDA_CRV_5G", b"39990-TLA-A040", True, False, True),
       ("HONDA_CRV_5G", b"39990-TLA-A220", True, False, True),
       ("HONDA_CIVIC", b"39990-TBA-C120", False, False, False),
