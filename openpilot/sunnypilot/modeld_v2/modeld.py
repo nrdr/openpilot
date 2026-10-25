@@ -485,7 +485,7 @@ def main(demo=False):
       modelv2_send.modelV2.big = model.chestnut
       set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t,
                                 lateral_source=lateral_source(model_output, model.mlsim), delay_input=delay_input(model.numpy_inputs))
-      drivingdata_send.drivingModelData.action.lateralActionTime = modelv2_send.modelV2.action.lateralActionTime
+      drivingdata_send.drivingModelData.action = modelv2_send.modelV2.action
 
       desire_state = modelv2_send.modelV2.meta.desireState
       l_lane_change_prob = desire_state[log.Desire.laneChangeLeft]

@@ -25,7 +25,8 @@ def lateral_source(model_output, mlsim: bool) -> str:
   """The source, exactly as get_action_from_model / get_curvature_from_output choose it."""
   if "action" in model_output:
     return ACTION_HEAD
-  if not mlsim and model_output.get("desired_curvature") is not None:
+  # Match get_curvature_from_output, including its zero-output plan fallback.
+  if not mlsim and model_output.get("desired_curvature"):
     return CURVATURE_HEAD
   return PLAN
 

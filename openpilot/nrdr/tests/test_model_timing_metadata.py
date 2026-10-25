@@ -158,14 +158,14 @@ def test_standard_driving_model_action_is_copied_after_atomic_timing():
   assert helper_call.lineno < driving_copy.lineno < driving_send_line
 
 
-def test_sunny_driving_model_mirrors_only_atomic_timing_after_fill():
+def test_sunny_driving_model_mirrors_the_complete_action_after_timing():
   publisher = PUBLISHERS[1]
   tree = ast.parse(publisher.read_text(encoding="utf-8"), filename=str(publisher))
   fill_call = _calls(tree, "fill_model_msg")[0]
   helper_call = _calls(tree, "set_lateral_action_timing")[0]
-  timing_mirror = _assignment(tree, "drivingdata_send.drivingModelData.action.lateralActionTime")
+  timing_mirror = _assignment(tree, "drivingdata_send.drivingModelData.action")
   driving_send_line = dict(_ordered_sends(tree))["drivingModelData"]
-  assert _attribute_name(timing_mirror.value) == "modelv2_send.modelV2.action.lateralActionTime"
+  assert _attribute_name(timing_mirror.value) == "modelv2_send.modelV2.action"
   assert fill_call.lineno < helper_call.lineno < timing_mirror.lineno < driving_send_line
 
   driving_action = SimpleNamespace(
@@ -180,7 +180,11 @@ def test_sunny_driving_model_mirrors_only_atomic_timing_after_fill():
   )
   modelv2_send = SimpleNamespace(
     valid=True,
-    modelV2=SimpleNamespace(action=SimpleNamespace(lateralActionTime=0.545)),
+    modelV2=SimpleNamespace(action=SimpleNamespace(
+      desiredCurvature=driving_action.desiredCurvature,
+      desiredAcceleration=driving_action.desiredAcceleration,
+      shouldStop=driving_action.shouldStop,
+      lateralActionTime=0.545, lateralSource="plan", delayInput="actionT")),
   )
   baseline_action = (driving_action.desiredCurvature, driving_action.desiredAcceleration, driving_action.shouldStop)
 
@@ -189,8 +193,10 @@ def test_sunny_driving_model_mirrors_only_atomic_timing_after_fill():
     {"drivingdata_send": drivingdata_send, "modelv2_send": modelv2_send},
   )
 
-  assert (driving_action.desiredCurvature, driving_action.desiredAcceleration, driving_action.shouldStop) == baseline_action
-  assert driving_action.lateralActionTime == modelv2_send.modelV2.action.lateralActionTime
+  mirrored = drivingdata_send.drivingModelData.action
+  assert (mirrored.desiredCurvature, mirrored.desiredAcceleration, mirrored.shouldStop) == baseline_action
+  assert mirrored.lateralActionTime == modelv2_send.modelV2.action.lateralActionTime
+  assert (mirrored.lateralSource, mirrored.delayInput) == ("plan", "actionT")
   assert drivingdata_send.valid is False
   assert modelv2_send.valid is True
 

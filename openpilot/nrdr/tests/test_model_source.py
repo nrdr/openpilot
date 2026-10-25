@@ -21,10 +21,46 @@ ROOT = Path(__file__).resolve().parents[2]
   ({"action": np.zeros((1, 2)), "plan": np.zeros((1, 33, 15))}, True, ms.ACTION_HEAD),
   ({"plan": np.zeros((1, 33, 15))}, True, ms.PLAN),                                     # Pop v2, TCP v3
   ({"plan": np.zeros((1, 33, 15)), "desired_curvature": np.zeros((1, 1))}, True, ms.PLAN),
-  ({"plan": np.zeros((1, 33, 15)), "desired_curvature": np.zeros((1, 1))}, False, ms.CURVATURE_HEAD),
+  ({"plan": np.zeros((1, 33, 15)), "desired_curvature": np.zeros((1, 1))}, False, ms.PLAN),
+  ({"plan": np.zeros((1, 33, 15)), "desired_curvature": np.ones((1, 1))}, False, ms.CURVATURE_HEAD),
 ])
 def test_the_source_is_the_one_get_action_from_model_steers_with(output, mlsim, source):
   assert ms.lateral_source(output, mlsim) == source
+
+
+@pytest.mark.parametrize("curvature", [None, 0.0, 0.002, -0.002])
+@pytest.mark.parametrize("mlsim", [False, True])
+def test_source_matches_the_actual_curvature_branch_even_at_zero(curvature, mlsim, monkeypatch):
+  from openpilot.sunnypilot.modeld_v2 import fill_model_msg as publisher
+
+  plan_curvature = 0.019
+  monkeypatch.setattr(publisher, "get_curvature_from_plan", lambda *args: plan_curvature)
+  output = {"plan": np.zeros((1, 33, 15))}
+  if curvature is not None:
+    output["desired_curvature"] = np.array([[curvature]])
+  actual = publisher.get_curvature_from_output(output, output["plan"][0], 20., .275, mlsim)
+  source = ms.lateral_source(output, mlsim)
+  assert source == (ms.PLAN if actual == plan_curvature else ms.CURVATURE_HEAD)
+  assert actual == (plan_curvature if mlsim or not curvature else curvature)
+
+
+@pytest.mark.parametrize("source", [ms.PLAN, ms.CURVATURE_HEAD, ms.ACTION_HEAD])
+def test_sunny_companion_action_keeps_provenance_after_serialization(source):
+  from openpilot.cereal import log, messaging
+
+  publisher = ROOT / "sunnypilot/modeld_v2/modeld.py"
+  tree = ast.parse(publisher.read_text(encoding="utf-8"))
+  mirror, = [node for node in ast.walk(tree) if isinstance(node, ast.Assign) and
+             any(ast.unparse(target) == "drivingdata_send.drivingModelData.action" for target in node.targets)]
+  model = messaging.new_message("modelV2")
+  model.modelV2.action = log.ModelDataV2.Action.new_message(
+    desiredCurvature=-.0125, desiredAcceleration=.625, shouldStop=True,
+    lateralActionTime=.275, lateralSource=source, delayInput="actionT")
+  driving = messaging.new_message("drivingModelData")
+  exec(compile(ast.Module(body=[mirror], type_ignores=[]), str(publisher), "exec"),
+       {"drivingdata_send": driving, "modelv2_send": model})
+  with log.Event.from_bytes(driving.to_bytes()) as restored:
+    assert restored.drivingModelData.action.to_dict() == model.modelV2.action.to_dict()
 
 
 def test_the_delay_input_names_how_the_told_delay_reaches_the_model():
