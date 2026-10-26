@@ -101,11 +101,12 @@ class LongitudinalTuningLayout(Widget):
 
     self._ecu_matched_long = toggle_item_sp(
       param="NrdrHondaEcuMatchedLong",
-      title=lambda: tr("Nidec ECU-Matched Long (Default: OFF)"),
+      title=lambda: tr("Nidec PCM Command Shaping (Default: OFF)"),
       description=lambda: tr(
-        "Honda Nidec only. Shapes the longitudinal command to match the factory ECU: rate-limits the acceleration command to the ECU's " +
-        "ramp rates, applies a speed-dependent coasting deadband (wide at low speed, tight on the highway), and briefly coasts through " +
-        "gas/brake transitions to avoid lurch. Calibrated on the 2019 Pilot; other Nidec cars may need tuning. OFF = stock command path."
+        "Experimental, non-interceptor Honda Nidec PCM control only. Uses Pilot-derived acceleration ramps and a continuous " +
+        "speed-dependent neutral zone for propulsion feedforward. No timed gas/brake blackout. " +
+        "Does not delay braking or change interceptor/stock ACC commands. Pilot values are not a verified Civic calibration. " +
+        "OFF keeps the normal openpilot PCM path; it does not select stock ACC."
       ),
     )
 
