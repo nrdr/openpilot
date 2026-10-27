@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import math
+import os
+import time
 from numbers import Number
 
 from openpilot.cereal import log
@@ -28,12 +30,14 @@ from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 from openpilot.nrdr.hooks import allow_longitudinal, apply_hud_lead, finalize_lateral_torque, stopping_inputs, vehicle_model_state
 from openpilot.nrdr.hooks.controlsd import lane_change_request
 from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
+from openpilot.nrdr.features.longitudinal.civic_pcm import pcm_plan_ready
 
 State = log.SelfdriveState.OpenpilotState
 LaneChangeState = log.LaneChangeState
 LaneChangeDirection = log.LaneChangeDirection
 
 ACTUATOR_FIELDS = tuple(car.CarControl.Actuators.schema.fields.keys())
+REPLAY = "REPLAY" in os.environ
 
 
 class Controls(ControlsExt):
@@ -141,6 +145,13 @@ class Controls(ControlsExt):
     CC.longActive = CC.enabled and allow_longitudinal(CS, self.CI.DRIVABLE_GEARS, self.CP.brand) and \
                     not any(e.overrideLongitudinal for e in self.sm['onroadEvents']) and \
                     (self.CP.openpilotLongitudinalControl or not self.CP_SP.pcmCruiseSpeed)
+    # A fresh carControl publication must not keep an old Civic acceleration
+    # plan alive after its independently transported speed reference expires.
+    now_nanos = self.sm.logMonoTime['selfdriveState'] if REPLAY else time.monotonic_ns()
+    CC.longActive = CC.longActive and pcm_plan_ready(
+      self.CP, self.CP_SP, long_plan.aTarget, self.sm.logMonoTime['longitudinalPlan'], now_nanos,
+      self.sm.all_checks(['longitudinalPlan']),
+    )
 
     actuators = CC.actuators
     actuators.longControlState = self.LoC.long_control_state
