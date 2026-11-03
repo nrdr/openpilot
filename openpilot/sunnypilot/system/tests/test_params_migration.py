@@ -7,7 +7,7 @@ See the LICENSE.md file in the root directory for more details.
 
 from openpilot.common.params import Params
 from openpilot.common.test import OpenpilotTestCase
-from openpilot.sunnypilot.system.params_migration import _migrate_model_bundle_slots
+from openpilot.sunnypilot.system.params_migration import _migrate_lane_guidance_mode, _migrate_model_bundle_slots
 
 
 class TestModelBundleSlotMigration(OpenpilotTestCase):
@@ -41,3 +41,33 @@ class TestModelBundleSlotMigration(OpenpilotTestCase):
     params = Params()
     _migrate_model_bundle_slots(params)
     assert params.get("ModelManager_ActiveBundleChestnut") is None
+
+
+class TestLaneGuidanceModeMigration(OpenpilotTestCase):
+  def setup_method(self):
+    self.params = Params()
+    self.params.remove("LaneGuidanceMode")
+    self.params.put_bool("LaneCentering", False, block=True)
+
+  def test_legacy_lane_centering_becomes_nrdr_mode(self):
+    self.params.put_bool("LaneCentering", True, block=True)
+    _migrate_lane_guidance_mode(self.params)
+    assert self.params.get("LaneGuidanceMode") == 1
+
+  def test_disabled_legacy_setting_becomes_model_only(self):
+    _migrate_lane_guidance_mode(self.params)
+    assert self.params.get("LaneGuidanceMode") == 0
+
+  def test_existing_mode_is_preserved(self):
+    self.params.put("LaneGuidanceMode", 2, block=True)
+    self.params.put_bool("LaneCentering", True, block=True)
+    _migrate_lane_guidance_mode(self.params)
+    assert self.params.get("LaneGuidanceMode") == 2
+    assert self.params.get_bool("LaneCentering") is False
+
+  def test_invalid_existing_mode_fails_closed(self):
+    self.params.put("LaneGuidanceMode", 99, block=True)
+    self.params.put_bool("LaneCentering", True, block=True)
+    _migrate_lane_guidance_mode(self.params)
+    assert self.params.get("LaneGuidanceMode") == 0
+    assert self.params.get_bool("LaneCentering") is False

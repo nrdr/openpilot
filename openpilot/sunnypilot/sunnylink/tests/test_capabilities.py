@@ -238,3 +238,15 @@ class TestCapabilitiesShape(OpenpilotTestCase):
     assert isinstance(caps["brand"], str)
     assert isinstance(caps["steer_control_type"], str)
     assert isinstance(caps["device_type"], str)
+
+  def test_custom_model_capability_tracks_the_active_runner(self, params):
+    from openpilot.cereal import custom
+
+    assert "custom_model_active" in CAPABILITY_FIELDS
+    assert generate_capabilities(params)["custom_model_active"] is False
+
+    params.put("ModelRunnerTypeCache", int(custom.ModelManagerSP.Runner.tinygrad), block=True)
+    assert generate_capabilities(params)["custom_model_active"] is True
+
+    params.put("ModelRunnerTypeCache", int(custom.ModelManagerSP.Runner.stock), block=True)
+    assert generate_capabilities(params)["custom_model_active"] is False

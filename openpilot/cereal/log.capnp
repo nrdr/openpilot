@@ -1170,6 +1170,7 @@ struct ModelDataV2 {
     lateralActionTime @3 :Float32; # Seconds from the source vision frame to the lateral action target; zero means unavailable.
     lateralSource @4 :LateralSource;  # where desiredCurvature came from; unknown in older logs
     delayInput @5 :DelayInput;        # which model input carries the told lateral delay; unknown in older logs
+    laneGuidanceMode @6 :UInt8;       # 0=model-only, 1=NRDR, 2=Blendful; carried atomically with desiredCurvature.
 
     enum LateralSource {
       unknown @0;

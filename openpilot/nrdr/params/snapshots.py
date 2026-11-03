@@ -60,7 +60,7 @@ ENGAGEMENT_LATCHED_LATERAL_KEYS = frozenset(
   key for group in ENGAGEMENT_LATCHED_LATERAL_GROUPS for key in group.keys
 )
 LANE_CENTERING_PARAM_GROUP = ParamGroup((
-  "LaneCentering", "LaneCenteringMinSpeed", "LaneCenteringPauseOnSignal",
+  "LaneGuidanceMode", "LaneCenteringMinSpeed", "LaneCenteringPauseOnSignal",
   "LaneCenterOffset", "LaneCenteringStrength", "LaneCenteringE2EAuthority",
 ))
 LANE_CHANGE_PARAM_GROUP = ParamGroup((

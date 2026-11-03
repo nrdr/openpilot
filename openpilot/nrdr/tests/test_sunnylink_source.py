@@ -17,7 +17,6 @@ HOST_SOURCE_ROOT = REPOSITORY_ROOT / "openpilot" / "sunnypilot" / "sunnylink" / 
 GENERATED_SCHEMA = REPOSITORY_ROOT / "openpilot" / "sunnypilot" / "sunnylink" / "settings_ui.json"
 SUNNYLINK_POLICY_SOURCE = REPOSITORY_ROOT / "openpilot" / "nrdr" / "features" / "services" / "sunnylink.py"
 INHERITED_LANE_CENTERING_KEYS = {
-  "LaneCentering",
   "LaneCenteringE2EAuthority",
   "LaneCenteringPauseOnSignal",
   "LaneCenterOffset",
@@ -103,7 +102,7 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
 
     canonical_keys = set(canonical_references) & catalog_keys
     generated_nrdr_keys = set(generated_references) & catalog_keys
-    self.assertEqual(len(canonical_keys), 69)
+    self.assertEqual(len(canonical_keys), 70)
     # The adapter adds the pending-apply lock to each suggested-profile control.
     self.assertEqual(canonical_keys | {"NrdrHandcraftedLateralTune"}, generated_nrdr_keys)
     self.assertEqual(set(canonical_references) - catalog_keys, INHERITED_LANE_CENTERING_KEYS)

@@ -171,7 +171,7 @@ def test_report_excludes_lane_centering_cohorts_from_tune_attribution():
     {
       "cohort": "lane",
       "routes": ["lane-route-a", "lane-route-b", "lane-route-c", "lane-route-d"],
-      "reason": "LaneCentering enabled",
+      "reason": "Lane guidance correction enabled",
     },
   ]
   assert len(report["lane_placement"]) == 1
@@ -188,6 +188,10 @@ def test_report_excludes_lane_centering_cohorts_from_tune_attribution():
   ({"LaneCentering": " 1"}, set()),
   ({"LaneCentering": "1"}, {"lane"}),
   ({"LaneCentering": "malformed"}, set()),
+  ({"LaneGuidanceMode": "0", "LaneCentering": "1"}, set()),
+  ({"LaneGuidanceMode": "1", "LaneCentering": "0"}, {"lane"}),
+  ({"LaneGuidanceMode": "2", "LaneCentering": "0"}, {"lane"}),
+  ({"LaneGuidanceMode": "malformed", "LaneCentering": "1"}, set()),
 ))
 def test_lane_centering_cohort_exclusion_matches_runtime_get_bool(settings, expected):
   result = ScanResult(contexts={"lane": Context("lane-route", settings=settings)})
@@ -195,6 +199,7 @@ def test_lane_centering_cohort_exclusion_matches_runtime_get_bool(settings, expe
 
 
 def test_lane_centering_settings_are_captured_for_attribution():
+  assert "LaneGuidanceMode" in RELEVANT_PARAMS
   assert "LaneCenteringMinSpeed" in RELEVANT_PARAMS
   assert "LaneCenteringStrength" in RELEVANT_PARAMS
 

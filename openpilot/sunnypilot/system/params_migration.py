@@ -103,6 +103,25 @@ def _migrate_model_bundle_slots(_params):
     cloudlog.exception(f"Error migrating model bundle slots: {e}")
 
 
+def _migrate_lane_guidance_mode(_params):
+  """Convert the former lane-centering bool into the exclusive mode enum once."""
+  try:
+    from openpilot.nrdr.features.lateral.lane_guidance import (
+      LaneGuidanceMode,
+      parse_lane_guidance_mode,
+      set_lane_guidance_mode,
+    )
+    stored = _params.get("LaneGuidanceMode")
+    mode = (LaneGuidanceMode.NRDR if _params.get_bool("LaneCentering") else LaneGuidanceMode.MODEL_ONLY) \
+      if stored is None else parse_lane_guidance_mode(stored)
+    legacy_enabled = mode == LaneGuidanceMode.NRDR
+    if stored != int(mode) or _params.get_bool("LaneCentering") != legacy_enabled:
+      set_lane_guidance_mode(_params, mode)
+      cloudlog.info(f"params_migration: synchronized LaneGuidanceMode={int(mode)} and LaneCentering={legacy_enabled}")
+  except Exception as e:
+    cloudlog.exception(f"Error migrating lane guidance mode: {e}")
+
+
 def run_migration(_params):
   # migrate OnroadScreenOffBrightness
   if _params.get("OnroadScreenOffBrightnessMigrated") != ONROAD_BRIGHTNESS_MIGRATION_VERSION:
@@ -142,3 +161,6 @@ def run_migration(_params):
 
   # seed the chestnut model slot from the pre-split single slot
   _migrate_model_bundle_slots(_params)
+
+  # Replace independent lane-guidance toggles with one mutually exclusive mode.
+  _migrate_lane_guidance_mode(_params)

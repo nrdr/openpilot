@@ -182,13 +182,13 @@ def _build_legacy_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
 CLARITY_CURRENT_LATERAL_2026_08_28 = _build_legacy_honda_profile("HONDA_CLARITY")
 CLARITY_ROAD_TESTED_2026_08_21 = CLARITY_CURRENT_LATERAL_2026_08_28
 
-HANDCRAFTED_LATERAL_VERSION = 22
+HANDCRAFTED_LATERAL_VERSION = 23
 # Oct 1 owner snapshot, PopV2, plus explicitly requested cleanup defaults.
 # The new per-speed damping and optimized lane-change behavior still need road
 # validation; the provenance date is not a claim those additions were tested.
 CIVIC_DIALED_SETTINGS_SHA256 = "c1faf2291527061621c7bdbb2679fd8f90cfa00f0b8acd08fdd27e5ee9770074"
 COMMON_HANDCRAFTED_VALUES = (
-  ("LaneCentering", True), ("LaneCenteringStrength", 0.95),
+  ("LaneGuidanceMode", 1), ("LaneCentering", True), ("LaneCenteringStrength", 0.95),
   ("LaneCenteringMinSpeed", 12), ("LaneCenteringE2EAuthority", 0.0),
   ("LaneCenteringPauseOnSignal", True), ("LaneCenterOffset", 0.0),
   ("LagdToggle", True), ("LagdToggleDelay", 0.4),
@@ -248,7 +248,15 @@ _REQUEST_KEY = NrdrParamKey.NRDR_HANDCRAFTED_LATERAL_TUNE.value
 _CONTEXT_KEY = "NrdrHandcraftedLateralRequest"
 _STATUS_KEY = NrdrParamKey.NRDR_CAR_HANDCRAFTED_INFO.value
 _BLEND_KEY = NrdrParamKey.NRDR_INTERPOLATED_TORQUE_PIF_BLEND.value
-_ENABLE_LAST_KEYS = ("NrdrSteerRatioHybrid", "LaneCentering")
+_ENABLE_LAST_KEYS = ("NrdrSteerRatioHybrid", "LaneCentering", "LaneGuidanceMode")
+
+
+def _profile_value_enables(key: str, value: ProfileValue | None) -> bool:
+  return (key == "LaneGuidanceMode" and value in (1, 2)) or value is True
+
+
+def _profile_disabled_value(key: str) -> ProfileValue:
+  return 0 if key == "LaneGuidanceMode" else False
 
 
 def _params_or_default(params: ProfileParamStore | None) -> ProfileParamStore:
@@ -467,13 +475,13 @@ def get_selected_car_identity(params: ProfileParamStore) -> tuple[bool, str, str
 
 def _ordered_profile_writes(profile: HandcraftedLateralProfile) -> tuple[tuple[str, ProfileValue], ...]:
   values = dict(profile.values)
-  enabled_keys = tuple(key for key in _ENABLE_LAST_KEYS if values.get(key) is True)
+  enabled_keys = tuple(key for key in _ENABLE_LAST_KEYS if _profile_value_enables(key, values.get(key)))
   underlying = tuple(
     (key, value) for key, value in profile.values
     if key not in enabled_keys
   )
   return (
-    *((key, False) for key in enabled_keys),
+    *((key, _profile_disabled_value(key)) for key in enabled_keys),
     *underlying,
     *((key, values[key]) for key in enabled_keys),
   )
@@ -486,7 +494,7 @@ def _restore_safe_pending_state(params: ProfileParamStore, profile: HandcraftedL
     if key not in dict(profile.values):
       continue
     try:
-      _put_verified(params, key, False)
+      _put_verified(params, key, _profile_disabled_value(key))
     except Exception as error:
       errors.append(error)
   try:
@@ -544,7 +552,7 @@ def consume_handcrafted_lateral_request(CP, CP_SP, params: ProfileParamStore | N
   try:
     ordered = _ordered_profile_writes(profile)
     written: list[str] = []
-    enabling = tuple(key for key in _ENABLE_LAST_KEYS if dict(profile.values).get(key) is True)
+    enabling = tuple(key for key in _ENABLE_LAST_KEYS if _profile_value_enables(key, dict(profile.values).get(key)))
     payload_end = len(ordered) - len(enabling)
     for key, value in ordered[:payload_end]:
       _put_verified(params, key, value)

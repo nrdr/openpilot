@@ -81,7 +81,7 @@ SETTINGS_KEYS = (
   "LatPScaleLowSpeed", "LatPScaleStandard", "LatPScaleHighway",
   "LatIScaleLowSpeed", "LatIScaleStandard", "LatIScaleHighway",
   "LatFScaleLowSpeed", "LatFScaleStandard", "LatFScaleHighway",
-  "LaneCentering", "LaneCenteringStrength", "LagdToggle", "LagdToggleDelay",
+  "LaneGuidanceMode", "LaneCentering", "LaneCenteringStrength", "LagdToggle", "LagdToggleDelay",
 )
 REJECTION_COLUMNS = (
   "stale state",

@@ -2,7 +2,13 @@
 
 from collections.abc import Callable
 
+from openpilot.cereal import custom
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.nrdr.features.lateral.lane_guidance import (
+  LaneGuidanceMode,
+  lane_guidance_mode_from_params,
+  set_lane_guidance_mode,
+)
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.selfdrive.controls.lib.lane_centering import (
   LANE_CENTERING_MIN_SPEED_MAX_MPH,
@@ -12,7 +18,7 @@ from openpilot.selfdrive.controls.lib.lane_centering import (
 )
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.lib.styles import style
-from openpilot.system.ui.sunnypilot.widgets.list_view import ListItemSP, toggle_item_sp
+from openpilot.system.ui.sunnypilot.widgets.list_view import ListItemSP, multiple_button_item_sp, toggle_item_sp
 from openpilot.system.ui.sunnypilot.widgets.option_control import OptionControlSP
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.scroller_tici import Scroller
@@ -45,17 +51,18 @@ class LaneCenteringLayout(Widget):
   def __init__(self):
     super().__init__()
 
-    self._lane_centering_toggle = toggle_item_sp(
-      title=tr("Enable Lane Centering"),
-      description=tr("Development feature. Compare a lane-center path with the model after the steering action takes effect. " +
-                     "Uses timing carried with the model action and looks farther ahead as steering delay increases. " +
-                     "Requires two confident boundaries and enough valid road preview. Missing timing, timing over 0.875 seconds, or short preview " +
-                     "fades back to the model. Normal curvature and jerk limits remain in force. Settings apply live; " +
-                     "no disengagement is required. Have a passenger make adjustments while driving."),
-      initial_state=ui_state.params.get_bool("LaneCentering"),
-      enabled=self._write_allowed,
-      callback=self._on_lane_centering,
+    self._lane_guidance_mode = multiple_button_item_sp(
+      title=tr("Lane Guidance"),
+      description=tr("Choose exactly one path. Model Only uses the model unchanged. NRDR applies the delay-aware lane-centering controller below. " +
+                     "Blendful (Alpha) adds SunnyPilot's confidence-weighted correction inside the custom model runner and yields when the model " +
+                     "appears to be going around an obstacle. Blendful requires a non-Default custom model."),
+      buttons=[tr("Model Only"), tr("NRDR"), tr("Blendful")],
+      selected_index=int(lane_guidance_mode_from_params(ui_state.params)),
+      button_width=260,
+      callback=self._on_lane_guidance_mode,
+      inline=False,
     )
+    self._lane_guidance_mode.action_item.set_enabled(self._write_allowed)
     self._pause_on_signal_toggle = toggle_item_sp(
       title=tr("Fade on Turn Signal"),
       description=tr("Fade out the correction while a turn signal is active. Lane-change maneuvers always suspend the correction immediately, " +
@@ -108,7 +115,7 @@ class LaneCenteringLayout(Widget):
     )
 
     self._scroller = Scroller([
-      self._lane_centering_toggle,
+      self._lane_guidance_mode,
       self._minimum_speed_control,
       self._pause_on_signal_toggle,
       self._center_offset_control,
@@ -118,10 +125,19 @@ class LaneCenteringLayout(Widget):
 
   @staticmethod
   def _write_allowed() -> bool:
-    return tuning_write_allowed(ui_state.params, "LaneCentering")  # Unlocked settings still apply live.
+    return tuning_write_allowed(ui_state.params, "LaneGuidanceMode")  # Unlocked settings still apply live.
+
+  @staticmethod
+  def _custom_model_active() -> bool | None:
+    runner = ui_state.params.get("ModelRunnerTypeCache")
+    if runner is None:
+      # CLEAR_ON_ONROAD_TRANSITION makes this briefly unknown while the model
+      # manager rebuilds its derived cache.
+      return None
+    return runner == custom.ModelManagerSP.Runner.tinygrad
 
   def _settings_writable(self) -> bool:
-    return self._write_allowed() and ui_state.params.get_bool("LaneCentering")
+    return self._write_allowed() and lane_guidance_mode_from_params(ui_state.params) == LaneGuidanceMode.NRDR
 
   def _option_item(self, title: str, description: str, param: str, min_value: int, max_value: int,
                    value_change_step: int = 1, use_float_scaling: bool = False,
@@ -141,11 +157,16 @@ class LaneCenteringLayout(Widget):
     )
     return ListItemSP(title=title, description=description, action_item=action)
 
-  def _on_lane_centering(self, state: bool) -> None:
+  def _on_lane_guidance_mode(self, value: int) -> None:
     if not self._write_allowed():
-      self._lane_centering_toggle.action_item.set_state(ui_state.params.get_bool("LaneCentering"))
+      self._refresh()
       return
-    ui_state.params.put_bool("LaneCentering", state, block=True)
+    mode = LaneGuidanceMode(value)
+    if mode == LaneGuidanceMode.BLENDFUL and self._custom_model_active() is not True:
+      self._refresh()
+      return
+    set_lane_guidance_mode(ui_state.params, mode)
+    self._refresh()
 
   def _on_pause_on_signal(self, state: bool) -> None:
     if not self._settings_writable():
@@ -155,7 +176,14 @@ class LaneCenteringLayout(Widget):
     ui_state.params.put_bool("LaneCenteringPauseOnSignal", state, block=True)
 
   def _refresh(self) -> None:
-    self._lane_centering_toggle.action_item.set_state(ui_state.params.get_bool("LaneCentering"))
+    mode = lane_guidance_mode_from_params(ui_state.params)
+    custom_model_active = self._custom_model_active()
+    if mode == LaneGuidanceMode.BLENDFUL and custom_model_active is False:
+      set_lane_guidance_mode(ui_state.params, LaneGuidanceMode.MODEL_ONLY)
+      mode = LaneGuidanceMode.MODEL_ONLY
+    self._lane_guidance_mode.action_item.set_selected_button(int(mode))
+    self._lane_guidance_mode.action_item.set_enabled_buttons(
+      {0, 1, 2} if custom_model_active is True or (custom_model_active is None and mode == LaneGuidanceMode.BLENDFUL) else {0, 1})
     self._pause_on_signal_toggle.action_item.set_state(
       bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)))
     self._minimum_speed_control.action_item.refresh_from_param()

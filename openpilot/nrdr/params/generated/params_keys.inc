@@ -29,6 +29,7 @@
     {"LongPidTuneScaleStandard", {PERSISTENT | BACKUP, INT, "100"}},
     {"LongPidTuneScaleRelaxed", {PERSISTENT | BACKUP, INT, "100"}},
     {"LongPidTuneScaleEcon", {PERSISTENT | BACKUP, INT, "100"}},
+    {"LaneGuidanceMode", {PERSISTENT | BACKUP, INT, "0"}},
     {"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "12"}},
     {"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.95"}},
     {"NrdrPersonalityAccelProfiles", {PERSISTENT | BACKUP, BOOL, "0"}},

@@ -141,11 +141,20 @@ sections:
       label: Lane Centering Stack
       trigger_key: null
       items:
-      - key: LaneCentering
-        widget: toggle
-        title: Enable Lane Centering
-        description: Disabled by default. Development-only, delay-aware lane centering; not road-validated. Settings apply live without disengagement.
-        details: Builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Uses timing carried with the model action; no separate timing message or setting is needed. Looks farther ahead as delay increases and requires enough valid road preview. Missing timing, timing over 0.875 seconds, or short preview fades back to the model; TIME and SHORT explain these states. Checks the corridor farther ahead for diverging markings and reduces authority as confidence falls. When the paths agree, it requests no correction. The combined model and lane command still passes through the normal curvature and jerk limits.
+      - key: LaneGuidanceMode
+        widget: multiple_button
+        title: Lane Guidance
+        description: Choose exactly one path. Model Only leaves the model unchanged, NRDR uses the delay-aware controller below, and Blendful applies SunnyPilot's alpha policy inside the custom model runner.
+        details: NRDR builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Blendful adds a confidence-weighted correction before model smoothing and yields when the model appears to be going around an obstacle. The two correction paths are mutually exclusive. Blendful requires a non-Default custom model.
+        options:
+        - value: 0
+          label: Model Only
+        - value: 1
+          label: NRDR
+        - value: 2
+          label: Blendful
+          enablement:
+          - {type: capability, field: custom_model_active, equals: true}
       - key: LaneCenteringMinSpeed
         widget: option
         title: Minimum Lane Centering Speed
@@ -156,13 +165,13 @@ sections:
         step: 1
         unit: mph
         enablement:
-        - {type: param, key: LaneCentering, equals: true}
+        - {type: param, key: LaneGuidanceMode, equals: 1}
       - key: LaneCenteringPauseOnSignal
         widget: toggle
         title: Fade on Turn Signal
         description: Fade out the correction while a turn signal is active. Lane-change maneuvers always suspend the correction immediately, regardless of this setting.
         enablement:
-        - {type: param, key: LaneCentering, equals: true}
+        - {type: param, key: LaneGuidanceMode, equals: 1}
       - key: LaneCenterOffset
         widget: option
         title: Center Offset
@@ -172,7 +181,7 @@ sections:
         step: 0.01
         unit: meters
         enablement:
-        - {type: param, key: LaneCentering, equals: true}
+        - {type: param, key: LaneGuidanceMode, equals: 1}
       - key: LaneCenteringStrength
         widget: option
         title: Lane-Centering Strength
@@ -182,7 +191,7 @@ sections:
         max: 1.0
         step: 0.05
         enablement:
-        - {type: param, key: LaneCentering, equals: true}
+        - {type: param, key: LaneGuidanceMode, equals: 1}
       - key: LaneCenteringE2EAuthority
         widget: option
         title: Model Break-In
@@ -192,7 +201,7 @@ sections:
         max: 1.0
         step: 0.05
         enablement:
-        - {type: param, key: LaneCentering, equals: true}
+        - {type: param, key: LaneGuidanceMode, equals: 1}
     - id: nrdr_steer_ratio_tuning
       label: Steer Ratio Tuning
       trigger_key: null

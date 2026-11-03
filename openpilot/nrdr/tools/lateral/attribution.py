@@ -49,6 +49,7 @@ ANGLE_EDGES_DEG = (3.0, 10.0, 20.0, 45.0, 1000.0)
 RELEVANT_PARAMS = (
   "LagdToggle",
   "LagdToggleDelay",
+  "LaneGuidanceMode",
   "LaneCentering",
   "LaneCenteringE2EAuthority",
   "LaneCenteringMinSpeed",
@@ -210,10 +211,12 @@ def param_bool(settings: dict[str, str], key: str) -> bool | None:
 
 
 def lane_centering_enabled_cohorts(result: ScanResult) -> set[str]:
-  """Cohorts with lane-centering-modified curvature are not controller-tune evidence."""
+  """Cohorts with either lane-guidance correction are not controller-tune evidence."""
   return {
     cohort for cohort, context in result.contexts.items()
-    if context.settings.get("LaneCentering") == "1"
+    if context.settings.get("LaneGuidanceMode") in ("1", "2") or (
+      "LaneGuidanceMode" not in context.settings and context.settings.get("LaneCentering") == "1"
+    )
   }
 
 
@@ -1004,7 +1007,7 @@ def build_report(result: ScanResult, min_samples: int = 30,
       "routes": sorted({sample.route for sample in included_controls} | {sample.route for sample in included_lanes}),
       "cohorts": contexts,
       "excluded_lane_centering_cohorts": [
-        {"cohort": cohort, "routes": _routes_for_cohort(result, cohort), "reason": "LaneCentering enabled"}
+        {"cohort": cohort, "routes": _routes_for_cohort(result, cohort), "reason": "Lane guidance correction enabled"}
         for cohort in sorted(excluded_cohorts)
       ],
       "errors": result.errors,

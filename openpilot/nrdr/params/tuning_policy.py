@@ -24,6 +24,7 @@ RETIRED_TUNING_KEYS = frozenset((
   "NrdrLaneChangeTorqueFactor", "NrdrLaneChangeFrictionPercent",
 ))
 SUGGESTED_LOCK_KEYS = PIF_KEYS | frozenset((
+  "LaneGuidanceMode",
   "NrdrOptimizedLaneChanges", "LagdToggle", "LagdToggleDelay",
   "NrdrDriverOverrideThreshold", "NrdrOverrideThresholdCenterBoost", "HondaDriverAssistDuringOverride",
   "HondaOverrideFadeUpSecs", "HondaOverrideFadeDownSecs", "HondaOverrideTorqueScale",

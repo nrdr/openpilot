@@ -471,10 +471,19 @@ struct ModelDataV2SP @0xa1680744031fdb2d {
   laneTurnDirection @0 :TurnDirection;
   leftLaneChangeEdgeBlock @1 :Bool;
   rightLaneChangeEdgeBlock @2 :Bool;
+  # Preserve SunnyPilot Blendful's published wire ordinals.
+  blendfulCurvature @3 :Float32;
+  blendfulTrust @4 :Float32;
+  modelCurvature @5 :Float32;
+  blendfulGoingAround @6 :Bool;
+  blendfulLeftProb @7 :Float32;
+  blendfulRightProb @8 :Float32;
+  blendfulLaneWidth @9 :Float32;
+  laneGuidanceMode @10 :UInt8; # 0=model-only, 1=NRDR, 2=Blendful.
   # Optional identity/timing metadata for joining this extension to modelV2.
   # Scalar zero is the unavailable value when reading messages from older builds.
-  modelMonoTime @3 :UInt64;       # Exact logMonoTime of the corresponding modelV2 event.
-  lateralActionTime @4 :Float32;  # Seconds from the source vision frame to the lateral action target.
+  modelMonoTime @11 :UInt64;       # Exact logMonoTime of the corresponding modelV2 event.
+  lateralActionTime @12 :Float32;  # Seconds from the source vision frame to the lateral action target.
 
   enum TurnDirection {
     none @0;
@@ -498,6 +507,12 @@ struct LaneCenteringStateSP @0xcb9fd56c7057593a {
   lookahead @8 :Float32;                 # Evaluation distance, meters.
   minLaneProbability @9 :Float32;        # Lower probability of the two selected boundaries.
   maxLaneStd @10 :Float32;               # Higher standard deviation of the selected boundaries.
+  laneGuidanceMode @11 :UInt8;           # Exact model-frame mode: 0=model-only, 1=NRDR, 2=Blendful.
+  blendfulActive @12 :Bool;              # Blendful has lane trust or is releasing a residual correction.
+  blendfulTrust @13 :Float32;            # Confidence weight applied by Blendful.
+  blendfulCorrectionCurvature @14 :Float32; # Curvature Blendful added to the model command.
+  blendfulGoingAround @15 :Bool;         # Blendful yielded for a likely obstacle-avoidance path.
+  blendfulDetailsValid @16 :Bool;         # Trust/correction came from the sidecar for this exact model frame.
 
   enum Reason {
     unavailable @0;

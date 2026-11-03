@@ -1,5 +1,11 @@
 """Live mici controls for confidence-gated lane centering."""
 
+from openpilot.cereal import custom
+from openpilot.nrdr.features.lateral.lane_guidance import (
+  LaneGuidanceMode,
+  lane_guidance_mode_from_params,
+  set_lane_guidance_mode,
+)
 from openpilot.selfdrive.ui.layouts.settings.common import (
   LANE_CENTER_OFFSET_LABELS,
   LANE_CENTER_OFFSET_VALUES,
@@ -22,11 +28,12 @@ class LaneCenteringLayoutMici(NavScroller):
   def __init__(self):
     super().__init__()
 
-    self._lane_centering_toggle = BigToggle(
-      "lane centering",
-      "applies live; passenger adjustments only while driving",
-      initial_state=ui_state.params.get_bool("LaneCentering"),
-      toggle_callback=self._on_lane_centering,
+    self._lane_guidance_mode = BigMultiToggle(
+      "lane guidance",
+      ["model only", "nrdr", "blendful"],
+      select_callback=self._on_lane_guidance_mode,
+      font_size=40,
+      description="choose one path; blendful needs a custom model",
     )
     self._pause_on_signal_toggle = BigToggle(
       "fade on turn signal",
@@ -58,13 +65,13 @@ class LaneCenteringLayoutMici(NavScroller):
       font_size=40,
     )
 
-    self._lane_centering_toggle.set_enabled(self._write_allowed)
+    self._lane_guidance_mode.set_enabled(self._write_allowed)
     for item in (self._minimum_speed_toggle, self._pause_on_signal_toggle, self._center_offset_toggle,
                  self._strength_toggle, self._model_authority_toggle):
       item.set_enabled(self._settings_writable)
 
     self._scroller.add_widgets([
-      self._lane_centering_toggle,
+      self._lane_guidance_mode,
       self._minimum_speed_toggle,
       self._pause_on_signal_toggle,
       self._center_offset_toggle,
@@ -75,16 +82,36 @@ class LaneCenteringLayoutMici(NavScroller):
 
   @staticmethod
   def _write_allowed() -> bool:
-    return tuning_write_allowed(ui_state.params, "LaneCentering")  # Unlocked settings still apply live.
+    return tuning_write_allowed(ui_state.params, "LaneGuidanceMode")  # Unlocked settings still apply live.
+
+  @staticmethod
+  def _custom_model_active() -> bool | None:
+    runner = ui_state.params.get("ModelRunnerTypeCache")
+    if runner is None:
+      # This derived cache is cleared during the onroad transition. Missing is
+      # temporarily unknown, not proof that the active runner is stock.
+      return None
+    return runner == custom.ModelManagerSP.Runner.tinygrad
 
   def _settings_writable(self) -> bool:
-    return self._write_allowed() and ui_state.params.get_bool("LaneCentering")
+    return self._write_allowed() and lane_guidance_mode_from_params(ui_state.params) == LaneGuidanceMode.NRDR
 
-  def _on_lane_centering(self, state: bool) -> None:
+  def _on_lane_guidance_mode(self, value: str) -> None:
     if not self._write_allowed():
-      self._lane_centering_toggle.set_checked(ui_state.params.get_bool("LaneCentering"))
+      self._refresh()
       return
-    ui_state.params.put_bool("LaneCentering", state, block=True)
+    mode = LaneGuidanceMode(("model only", "nrdr", "blendful").index(value))
+    custom_model_active = self._custom_model_active()
+    if mode == LaneGuidanceMode.BLENDFUL and custom_model_active is None:
+      self._refresh()
+      return
+    if mode == LaneGuidanceMode.BLENDFUL and custom_model_active is False:
+      # BigMultiToggle cycles instead of exposing individually disabled
+      # buttons. Skip the unavailable third state so NRDR can still cycle back
+      # to Model Only on a device running the Default model.
+      mode = LaneGuidanceMode.MODEL_ONLY
+    set_lane_guidance_mode(ui_state.params, mode)
+    self._refresh()
 
   def _on_pause_on_signal(self, state: bool) -> None:
     if not self._settings_writable():
@@ -119,7 +146,14 @@ class LaneCenteringLayoutMici(NavScroller):
     ui_state.params.put("LaneCenteringE2EAuthority", LANE_CENTERING_E2E_AUTHORITY_VALUES[index], block=True)
 
   def _refresh(self) -> None:
-    self._lane_centering_toggle.set_checked(ui_state.params.get_bool("LaneCentering"))
+    mode = lane_guidance_mode_from_params(ui_state.params)
+    if mode == LaneGuidanceMode.BLENDFUL and self._custom_model_active() is False:
+      # Do not merely disguise an unavailable saved mode. Persist the safe
+      # state once a non-tinygrad runner is confirmed. A missing transition
+      # cache is left untouched until the manager republishes it.
+      set_lane_guidance_mode(ui_state.params, LaneGuidanceMode.MODEL_ONLY)
+      mode = LaneGuidanceMode.MODEL_ONLY
+    self._lane_guidance_mode.set_value(("model only", "nrdr", "blendful")[int(mode)])
     self._pause_on_signal_toggle.set_checked(
       bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)))
     self._minimum_speed_toggle.set_value(

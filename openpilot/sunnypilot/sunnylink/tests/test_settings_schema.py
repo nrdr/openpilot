@@ -261,7 +261,7 @@ class TestKnownPanels(OpenpilotTestCase):
     lane_centering = [panel for panel in nrdr["sub_panels"] if panel["id"] == "nrdr_lane_centering_stack"]
     assert len(lane_centering) == 1
     assert [item["key"] for item in lane_centering[0]["items"]] == [
-      "LaneCentering",
+      "LaneGuidanceMode",
       "LaneCenteringMinSpeed",
       "LaneCenteringPauseOnSignal",
       "LaneCenterOffset",

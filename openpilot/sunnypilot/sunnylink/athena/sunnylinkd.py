@@ -261,15 +261,29 @@ def _remote_bool_value(value: str, compression: bool) -> bool | None:
     return None
 
 
+def _remote_int_value(value: str, compression: bool) -> int | None:
+  try:
+    raw = base64.b64decode(value, validate=True)
+    if compression:
+      raw = gzip.decompress(raw)
+    decoded = raw.decode("utf-8")
+    return int(decoded) if decoded in ("0", "1", "2") else None
+  except Exception:
+    return None
+
+
 @dispatcher.add_method
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
   from openpilot.nrdr.params.tuning_policy import reset_learning_scales, tuning_write_allowed
   onroad = not params.get_bool("IsOffroad")
-  vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {"NrdrHandcraftedLateralTune", "NrdrSuggestedSettings", "LagdToggle", "LagdToggleDelay"}
+  vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {
+    "NrdrHandcraftedLateralTune", "NrdrSuggestedSettings", "LagdToggle", "LagdToggleDelay", "LaneGuidanceMode",
+  }
   capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
   handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
   honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
   controller_selection = None
+  lane_guidance_selection = None
   if "NrdrLateralController" in params_to_update:
     # A rejected controller request must be an RPC error, not a success-looking
     # no-op. Selection is drive-latched; never switch the running controller.
@@ -286,6 +300,12 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       controller_selection == 1 and capabilities.get("nrdr_yaw_controller_available") is not True
     ):
       raise ValueError("This Controller Type is unavailable for the detected vehicle. The selection was not saved.")
+  if "LaneGuidanceMode" in params_to_update:
+    lane_guidance_selection = _remote_int_value(params_to_update["LaneGuidanceMode"], compression)
+    if lane_guidance_selection not in (0, 1, 2):
+      raise ValueError("Invalid Lane Guidance mode. The selection was not saved.")
+    if lane_guidance_selection == 2 and capabilities.get("custom_model_active") is not True:
+      raise ValueError("Blendful requires a non-Default custom model. The selection was not saved.")
   for key, value in params_to_update.items():
     if not tuning_write_allowed(params, key, firmware_prediction_schedule=capabilities.get("nrdr_firmware_prediction_schedule") is True):
       cloudlog.warning(f"sunnylinkd.saveParams.locked: '{key}'")
@@ -314,6 +334,9 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
         params.put(key, controller_selection, block=True)
         if str(params.get(key)) not in (str(controller_selection), f"b'{controller_selection}'"):
           raise ValueError("Controller Type readback did not match the requested selection.")
+      elif key == "LaneGuidanceMode":
+        from openpilot.nrdr.features.lateral.lane_guidance import set_lane_guidance_mode
+        set_lane_guidance_mode(params, lane_guidance_selection)
       elif key == "NrdrSuggestedSettings" and requested_bool is False:
         from openpilot.nrdr.params.profiles import disable_suggested_settings
         disable_suggested_settings(params)

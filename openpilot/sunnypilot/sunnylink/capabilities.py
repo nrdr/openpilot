@@ -60,6 +60,7 @@ CAPABILITY_FIELDS = (
   "nrdr_raw_steer_ratio_available",
   "nrdr_firmware_steer_ratio_available",
   "nrdr_interpolated_torque_pif_blend_available",
+  "custom_model_active",
 )
 
 CAPABILITY_LABELS: dict[str, str] = {
@@ -93,6 +94,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "nrdr_raw_steer_ratio_available": "Matching NRDR measured steer-ratio curve available (may be provisional)",
   "nrdr_firmware_steer_ratio_available": "Exact NRDR firmware steer-ratio geometry available",
   "nrdr_interpolated_torque_pif_blend_available": "Modified-EPS Honda interpolated torque/P/I/F control available",
+  "custom_model_active": "Non-Default custom model selected",
 }
 
 # Explicit defaults for non-boolean capability fields
@@ -161,6 +163,8 @@ def generate_capabilities(params: Params | None = None) -> dict:
   caps["is_sp_release"] = params.get_bool("IsReleaseSpBranch")
   caps["is_development"] = params.get_bool("IsDevelopmentBranch")
   caps["stock_longitudinal"] = params.get_bool("ToyotaEnforceStockLongitudinal")
+  # This is the runner manager actually launches; with a Chestnut the big-model slot decides.
+  caps["custom_model_active"] = params.get("ModelRunnerTypeCache") == custom.ModelManagerSP.Runner.tinygrad
   bundle = params.get("CarPlatformBundle")
   bundle_brand = _bundle_field(bundle, "brand")
   bundle_platform = _bundle_field(bundle, "platform")

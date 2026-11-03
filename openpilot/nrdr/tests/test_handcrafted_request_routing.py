@@ -6,7 +6,7 @@ import gzip
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,6 +40,7 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
       get_bool=Mock(return_value=True),
       get=Mock(return_value="0"),
       put=Mock(),
+      put_bool=Mock(),
     )
     self.request = Mock(return_value=True)
     self.generic_write = Mock()
@@ -56,7 +57,7 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
       "ONROAD_WRITE_BLOCKLIST", "HONDA_TUNING_WRITE_KEYS", "allow_param_write",
     }, self.namespace)
     _load_definitions("sunnypilot/sunnylink/athena/sunnylinkd.py", {
-      "BLOCKED_PARAMS", "_remote_bool_value", "saveParams",
+      "BLOCKED_PARAMS", "_remote_bool_value", "_remote_int_value", "saveParams",
     }, self.namespace)
     self.save_params = self.namespace["saveParams"]
 
@@ -209,6 +210,37 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
     with self.assertRaisesRegex(ValueError, "could not be saved"):
       self.save_params({"NrdrLateralController": self._encode(b"1")})
     self.params.put.assert_not_called()
+
+  def test_lane_guidance_mode_is_validated_and_mirrors_the_legacy_bool(self):
+    self.namespace["_vehicle_tuning_capabilities"].return_value = {"custom_model_active": True}
+    for mode in (0, 1, 2):
+      for compression in (False, True):
+        with self.subTest(mode=mode, compression=compression):
+          self.params.put.reset_mock()
+          self.params.put_bool.reset_mock()
+          self.generic_write.reset_mock()
+          self.save_params({"LaneGuidanceMode": self._encode(str(mode).encode(), compression)}, compression)
+          mode_writes = [call for call in self.params.put.call_args_list if call.args[0] == "LaneGuidanceMode"]
+          self.assertEqual(mode_writes, [call("LaneGuidanceMode", mode, block=True)])
+          self.params.put_bool.assert_called_once_with("LaneCentering", mode == 1, block=True)
+          self.generic_write.assert_not_called()
+
+  def test_lane_guidance_rejects_invalid_values_and_blendful_without_a_custom_model(self):
+    self.namespace["_vehicle_tuning_capabilities"].return_value = {"custom_model_active": True}
+    for value in (b"-1", b"3", b"1.0", b" 1", b"+1", b"garbage"):
+      with self.subTest(value=value):
+        self.params.put.reset_mock()
+        self.params.put_bool.reset_mock()
+        with self.assertRaisesRegex(ValueError, "Invalid Lane Guidance"):
+          self.save_params({"LaneGuidanceMode": self._encode(value)})
+        self.params.put.assert_not_called()
+        self.params.put_bool.assert_not_called()
+
+    self.namespace["_vehicle_tuning_capabilities"].return_value = {"custom_model_active": False}
+    with self.assertRaisesRegex(ValueError, "custom model"):
+      self.save_params({"LaneGuidanceMode": self._encode(b"2")})
+    self.params.put.assert_not_called()
+    self.params.put_bool.assert_not_called()
 
 
 if __name__ == "__main__":

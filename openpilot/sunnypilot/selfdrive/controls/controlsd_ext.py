@@ -19,6 +19,13 @@ from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.nrdr.hooks import initialize_live_parameter_settings
 from openpilot.nrdr.params import read_bool, read_float
 from openpilot.nrdr.features.longitudinal.civic_pcm import pcm_reference
+from openpilot.nrdr.features.lateral.lane_guidance import (
+  LaneGuidanceMode,
+  model_action_lane_guidance_mode,
+  model_frame_lane_guidance_mode,
+  nrdr_model_action_allowed,
+  parse_lane_guidance_mode,
+)
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
@@ -44,7 +51,7 @@ class ControlsExt(ModelStateBase):
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
     cloudlog.info("controlsd_ext got CarParamsSP")
 
-    self.sm_services_ext = ['radarState', 'selfdriveStateSP']
+    self.sm_services_ext = ['radarState', 'selfdriveStateSP', 'modelDataV2SP']
     self.pm_services_ext = ['carControlSP', 'laneCenteringStateSP']
 
   def initialize_lateral_control(self, lac, CI, dt):
@@ -66,7 +73,8 @@ class ControlsExt(ModelStateBase):
 
   def update_lane_centering_params(self, snapshot=None) -> None:
     snapshot = self.nrdr_live_params.snapshot if snapshot is None else snapshot
-    self.lane_centering_enabled = read_bool(snapshot, "LaneCentering")
+    self.lane_guidance_mode = parse_lane_guidance_mode(snapshot.get("LaneGuidanceMode"))
+    self.lane_centering_enabled = self.lane_guidance_mode == LaneGuidanceMode.NRDR
     self.lane_centering_min_speed_mph = lane_centering_min_speed_mph(snapshot.get("LaneCenteringMinSpeed"))
     self.lane_centering_pause_on_signal = read_bool(snapshot, "LaneCenteringPauseOnSignal", True)
     # Leave nonfinite inputs visible to the controller's existing fail-closed gate.
@@ -80,6 +88,13 @@ class ControlsExt(ModelStateBase):
       self.update_lane_centering_params()
 
       self._param_update_time = time.monotonic()
+
+  def nrdr_lane_centering_enabled(self, sm: messaging.SubMaster) -> bool:
+    """Permit NRDR only when the current model action atomically selected it."""
+    return nrdr_model_action_allowed(
+      sm['modelV2'].action.laneGuidanceMode,
+      bool(sm.all_checks(['modelV2'])),
+    )
 
   def get_lat_active(self, sm: messaging.SubMaster) -> bool:
     if self.blinker_pause_lateral.update(sm['carState']):
@@ -136,7 +151,7 @@ class ControlsExt(ModelStateBase):
 
     return CC_SP
 
-  def lane_centering_state(self) -> custom.LaneCenteringStateSP:
+  def lane_centering_state(self, sm: messaging.SubMaster) -> custom.LaneCenteringStateSP:
     state = custom.LaneCenteringStateSP.new_message()
     source = self.lane_centering.diagnostics
     state.reason = source.reason.value
@@ -150,6 +165,26 @@ class ControlsExt(ModelStateBase):
     state.lookahead = source.lookahead
     state.minLaneProbability = source.min_lane_probability
     state.maxLaneStd = source.max_lane_std
+    model_sp = sm['modelDataV2SP']
+    mode = model_action_lane_guidance_mode(
+      sm['modelV2'].action.laneGuidanceMode,
+      bool(sm.all_checks(['modelV2'])),
+    )
+    sidecar_mode = model_frame_lane_guidance_mode(
+      model_sp.laneGuidanceMode,
+      bool(sm.all_checks(['modelV2', 'modelDataV2SP'])),
+      model_sp.modelMonoTime,
+      sm.logMonoTime['modelV2'],
+    )
+    state.laneGuidanceMode = int(mode)
+    blendful_details_valid = mode == sidecar_mode == LaneGuidanceMode.BLENDFUL
+    state.blendfulDetailsValid = blendful_details_valid
+    state.blendfulTrust = float(model_sp.blendfulTrust) if blendful_details_valid else 0.0
+    state.blendfulCorrectionCurvature = float(model_sp.blendfulCurvature) if blendful_details_valid else 0.0
+    state.blendfulActive = blendful_details_valid and (
+      state.blendfulTrust > 0.0 or abs(state.blendfulCorrectionCurvature) > 1e-9
+    )
+    state.blendfulGoingAround = bool(model_sp.blendfulGoingAround) if blendful_details_valid else False
     return state
 
   @staticmethod
@@ -171,7 +206,7 @@ class ControlsExt(ModelStateBase):
     CC_SP = self.state_control_ext(sm)
     self.publish_ext(CC_SP, sm, pm)
     if self._lane_centering_state_publish_frame == 0:
-      self.publish_lane_centering_state(self.lane_centering_state(), pm)
+      self.publish_lane_centering_state(self.lane_centering_state(sm), pm)
     self._lane_centering_state_publish_frame = (
       self._lane_centering_state_publish_frame + 1
     ) % LANE_CENTERING_STATE_PUBLISH_INTERVAL

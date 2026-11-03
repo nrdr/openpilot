@@ -41,6 +41,11 @@ from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeController
 from openpilot.nrdr.features.services import admit_default_artifact
+from openpilot.nrdr.features.lateral.lane_guidance import (
+  LaneGuidanceMode,
+  parse_lane_guidance_mode,
+  set_lane_guidance_mode,
+)
 from openpilot.nrdr.features.lateral.model_source import delay_input, lateral_source
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
@@ -455,8 +460,18 @@ def main(demo=False):
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,
                      frame_drop_ratio, meta_main.timestamp_eof, model_execution_time, extrinsics_calibration_seen)
       modelv2_send.modelV2.big = model.chestnut
+      # The standard runner cannot apply Blendful, but it still arbitrates the
+      # mutually exclusive selector on this exact model action.
+      lane_guidance_mode = parse_lane_guidance_mode(params.get("LaneGuidanceMode", return_default=True))
+      if lane_guidance_mode == LaneGuidanceMode.BLENDFUL:
+        # Do not leave an unavailable selection armed to resume automatically
+        # after a future runner change.
+        set_lane_guidance_mode(params, LaneGuidanceMode.MODEL_ONLY, block=False)
+        lane_guidance_mode = LaneGuidanceMode.MODEL_ONLY
       set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t,
                                 lateral_source=lateral_source(model_output, mlsim=True), delay_input=delay_input(model.npy))
+      modelv2_send.modelV2.action.laneGuidanceMode = int(lane_guidance_mode)
+      mdv2sp_send.modelDataV2SP.laneGuidanceMode = int(lane_guidance_mode)
 
       desire_state = modelv2_send.modelV2.meta.desireState
       l_lane_change_prob = desire_state[log.Desire.laneChangeLeft]

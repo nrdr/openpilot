@@ -1284,11 +1284,32 @@
               "trigger_key": null,
               "items": [
                 {
-                  "key": "LaneCentering",
-                  "widget": "toggle",
-                  "title": "Enable Lane Centering",
-                  "description": "Disabled by default. Development-only, delay-aware lane centering; not road-validated. Settings apply live without disengagement.",
-                  "details": "Builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Uses timing carried with the model action; no separate timing message or setting is needed. Looks farther ahead as delay increases and requires enough valid road preview. Missing timing, timing over 0.875 seconds, or short preview fades back to the model; TIME and SHORT explain these states. Checks the corridor farther ahead for diverging markings and reduces authority as confidence falls. When the paths agree, it requests no correction. The combined model and lane command still passes through the normal curvature and jerk limits.",
+                  "key": "LaneGuidanceMode",
+                  "widget": "multiple_button",
+                  "title": "Lane Guidance",
+                  "description": "Choose exactly one path. Model Only leaves the model unchanged, NRDR uses the delay-aware controller below, and Blendful applies SunnyPilot's alpha policy inside the custom model runner.",
+                  "details": "NRDR builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Blendful adds a confidence-weighted correction before model smoothing and yields when the model appears to be going around an obstacle. The two correction paths are mutually exclusive. Blendful requires a non-Default custom model.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Model Only"
+                    },
+                    {
+                      "value": 1,
+                      "label": "NRDR"
+                    },
+                    {
+                      "value": 2,
+                      "label": "Blendful",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "custom_model_active",
+                          "equals": true
+                        }
+                      ]
+                    }
+                  ],
                   "enablement": [
                     {
                       "type": "not",
@@ -1321,8 +1342,8 @@
                   "enablement": [
                     {
                       "type": "param",
-                      "key": "LaneCentering",
-                      "equals": true
+                      "key": "LaneGuidanceMode",
+                      "equals": 1
                     },
                     {
                       "type": "not",
@@ -1350,8 +1371,8 @@
                   "enablement": [
                     {
                       "type": "param",
-                      "key": "LaneCentering",
-                      "equals": true
+                      "key": "LaneGuidanceMode",
+                      "equals": 1
                     },
                     {
                       "type": "not",
@@ -1383,8 +1404,8 @@
                   "enablement": [
                     {
                       "type": "param",
-                      "key": "LaneCentering",
-                      "equals": true
+                      "key": "LaneGuidanceMode",
+                      "equals": 1
                     },
                     {
                       "type": "not",
@@ -1416,8 +1437,8 @@
                   "enablement": [
                     {
                       "type": "param",
-                      "key": "LaneCentering",
-                      "equals": true
+                      "key": "LaneGuidanceMode",
+                      "equals": 1
                     },
                     {
                       "type": "not",
@@ -1449,8 +1470,8 @@
                   "enablement": [
                     {
                       "type": "param",
-                      "key": "LaneCentering",
-                      "equals": true
+                      "key": "LaneGuidanceMode",
+                      "equals": 1
                     },
                     {
                       "type": "not",

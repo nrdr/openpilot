@@ -444,7 +444,7 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     "LagdToggle", "LagdToggleDelay",
     "NrdrSteerRatioHybrid", "NrdrSteerRatioMode", "NrdrSteerRatioBlendStart",
     "NrdrSteerRatioSourceB", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
-    "LaneCentering", "LaneCenteringMinSpeed", "LaneCenteringPauseOnSignal",
+    "LaneGuidanceMode", "LaneCenteringMinSpeed", "LaneCenteringPauseOnSignal",
     "LaneCenterOffset", "LaneCenteringStrength", "LaneCenteringE2EAuthority",
   )
 
@@ -526,7 +526,7 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
 
 class TestLiveLaneCentering(OpenpilotTestCase):
   @parameterized.expand([
-    "LaneCentering", "LaneCenteringMinSpeed", "LaneCenteringPauseOnSignal",
+    "LaneGuidanceMode", "LaneCenteringMinSpeed", "LaneCenteringPauseOnSignal",
     "LaneCenterOffset", "LaneCenteringStrength", "LaneCenteringE2EAuthority",
   ], names=["key"])
   def test_live_edits_preserve_only_feature_dependency(self, schema, key):
@@ -535,9 +535,17 @@ class TestLiveLaneCentering(OpenpilotTestCase):
     rules = item.get("enablement")
     assert "offroad_only" not in _flatten_rule_types(rules)
     assert "not_engaged" not in _flatten_rule_types(rules)
-    if key != "LaneCentering":
-      assert "LaneCentering" in json.dumps(rules)
-      assert '"equals": true' in json.dumps(rules)
+    if key != "LaneGuidanceMode":
+      assert "LaneGuidanceMode" in json.dumps(rules)
+      assert '"equals": 1' in json.dumps(rules)
+
+  def test_lane_guidance_selector_is_mutually_exclusive_and_gates_blendful(self, schema):
+    item = _find_item(schema, "LaneGuidanceMode")
+    assert item["widget"] == "multiple_button"
+    assert [(option["value"], option["label"]) for option in item["options"]] == [
+      (0, "Model Only"), (1, "NRDR"), (2, "Blendful"),
+    ]
+    assert "custom_model_active" in json.dumps(item["options"][2]["enablement"])
 
 
 class TestNotEngagedReplacement(OpenpilotTestCase):

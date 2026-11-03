@@ -126,6 +126,7 @@ def test_controlsd_uses_current_action_and_preserves_model_validity(model_valid,
     lane_centering=SimpleNamespace(update=lambda *args, **kwargs: captured.append((args, kwargs))),
     lane_centering_min_speed_mph=12, lane_centering_enabled=True, lane_center_offset=0.0,
     lane_centering_e2e_authority=0.0, lane_centering_strength=1.0, lane_centering_pause_on_signal=True,
+    nrdr_lane_centering_enabled=lambda _sm: True,
   )
   namespace = {
     "self": controls, "model_v2": model, "new_desired_curvature": model.action.desiredCurvature,

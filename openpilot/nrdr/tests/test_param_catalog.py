@@ -25,14 +25,14 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "1fed2234100e595815d77a0d280f7a08ce0290ca6a4eceec2707047b7b252c24"
+REGISTRY_METADATA_SHA256 = "8dd9b1e7fc991a7b00cfe0e6524315d8641a61893a3bf775b4f597ec767b1a80"
 
 
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 152)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 151)
+    self.assertEqual(len(PARAM_SPECS), 153)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 152)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
 

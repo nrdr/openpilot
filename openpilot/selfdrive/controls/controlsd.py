@@ -173,7 +173,7 @@ class Controls(ControlsExt):
     new_desired_curvature = self.lane_centering.update(
       new_desired_curvature, model_v2, CS.vEgo,
       self.lane_centering_min_speed_mph,
-      self.lane_centering_enabled,
+      self.nrdr_lane_centering_enabled(self.sm),
       self.lane_center_offset,
       self.lane_centering_e2e_authority,
       self.lane_centering_strength,

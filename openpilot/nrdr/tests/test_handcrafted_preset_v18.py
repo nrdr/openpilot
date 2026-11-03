@@ -22,7 +22,7 @@ CONTEXT_KEY = "NrdrHandcraftedLateralRequest"
 BLEND_KEY = "NrdrInterpolatedTorquePifBlend"
 
 COMMON_VALUES = (
-  ("LaneCentering", True), ("LaneCenteringStrength", 0.95), ("LaneCenteringMinSpeed", 12),
+  ("LaneGuidanceMode", 1), ("LaneCentering", True), ("LaneCenteringStrength", 0.95), ("LaneCenteringMinSpeed", 12),
   ("LaneCenteringE2EAuthority", 0.0), ("LaneCenteringPauseOnSignal", True), ("LaneCenterOffset", 0.0),
   ("LagdToggle", True), ("LagdToggleDelay", 0.4),
 )
@@ -155,24 +155,24 @@ def request_profile(CP, CP_SP, params):
 def test_current_static_lookup_and_honda_hybrid_profiles_are_exact():
   static_civic = get_handcrafted_lateral_profile("HONDA_CIVIC")
   assert static_civic is not None
-  assert static_civic.version == 22
+  assert static_civic.version == 23
   assert static_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
 
   static_clarity = get_handcrafted_lateral_profile("HONDA_CLARITY")
   assert static_clarity is not None
-  assert static_clarity.version == 22
+  assert static_clarity.version == 23
   assert static_clarity.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + CLARITY_GEOMETRY_VALUES + TORQUE_VALUES
 
   civic = vehicle_cp()
   runtime_civic = get_handcrafted_lateral_profile(civic.carFingerprint, civic, cp_sp())
   assert runtime_civic is not None
-  assert runtime_civic.version == 22
+  assert runtime_civic.version == 23
   assert runtime_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
 
   clarity = vehicle_cp("HONDA_CLARITY", controller="torque", firmware=b"39990-TRW-A020\x00")
   runtime_clarity = get_handcrafted_lateral_profile(clarity.carFingerprint, clarity, cp_sp())
   assert runtime_clarity is not None
-  assert runtime_clarity.version == 22
+  assert runtime_clarity.version == 23
   assert runtime_clarity.values == COMMON_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + CLARITY_GEOMETRY_VALUES
 
 
@@ -257,7 +257,7 @@ def test_request_writes_exact_json_context_before_legacy_boolean():
   assert profile is not None
   firmware = sorted((str(fw.ecu), bytes(fw.fwVersion).hex()) for fw in civic.carFw)
   assert params.values[CONTEXT_KEY] == {
-    "version": 22,
+    "version": 23,
     "fingerprint": "HONDA_CIVIC",
     "brand": "honda",
     "controller": "pid",
@@ -332,7 +332,7 @@ def test_old_unbound_boolean_is_terminally_cleared_without_tune_writes():
 
 def test_fresh_apply_is_blocking_verified_and_enables_compound_features_last():
   civic = vehicle_cp()
-  params = selected_params(civic, {**PRESERVED_VALUES, "LaneCentering": True, BLEND_KEY: True})
+  params = selected_params(civic, {**PRESERVED_VALUES, "LaneGuidanceMode": 2, "LaneCentering": True, BLEND_KEY: True})
   request_profile(civic, cp_sp(), params)
 
   profile = get_handcrafted_lateral_profile(civic.carFingerprint, civic, cp_sp())
@@ -340,12 +340,14 @@ def test_fresh_apply_is_blocking_verified_and_enables_compound_features_last():
   written = consume_handcrafted_lateral_request(civic, cp_sp(), params)
 
   assert dict(profile.values).items() <= params.values.items()
-  assert written[:1] == ["LaneCentering"]
-  assert written[-1:] == ["LaneCentering"]
+  assert written[:2] == ["LaneCentering", "LaneGuidanceMode"]
+  assert written[-2:] == ["LaneCentering", "LaneGuidanceMode"]
   assert params.calls[0][:3] == ("put_bool", "LaneCentering", False)
+  assert params.calls[1][:3] == ("put", "LaneGuidanceMode", 0)
   assert all(call[1] != BLEND_KEY for call in params.calls)
   payload_calls = [call for call in params.calls if call[1] in dict(profile.values)]
-  assert payload_calls[-1][:3] == ("put_bool", "LaneCentering", True)
+  assert payload_calls[-2][:3] == ("put_bool", "LaneCentering", True)
+  assert payload_calls[-1][:3] == ("put", "LaneGuidanceMode", 1)
   assert [call[1] for call in payload_calls] == written
   assert params.calls[-2] == ("put", CONTEXT_KEY, {}, True)
   assert params.calls[-1] == ("put_bool", REQUEST_KEY, False, True)
@@ -371,7 +373,7 @@ def test_apply_preserves_steer_ratio_calibration_state_and_learning_policy():
 
 def test_interrupted_apply_restores_bound_request_with_blend_and_lane_centering_off_then_retries():
   civic = vehicle_cp()
-  params = selected_params(civic, {"LaneCentering": True, BLEND_KEY: True})
+  params = selected_params(civic, {"LaneGuidanceMode": 2, "LaneCentering": True, BLEND_KEY: True})
   original_context = request_profile(civic, cp_sp(), params)
   params.fail_once_keys.add("HondaCenterScale")
 
@@ -380,11 +382,12 @@ def test_interrupted_apply_restores_bound_request_with_blend_and_lane_centering_
 
   assert params.values[BLEND_KEY] is True  # retired value is not consumed or rewritten
   assert params.values["LaneCentering"] is False
+  assert params.values["LaneGuidanceMode"] == 0
   assert params.values[CONTEXT_KEY] == original_context
   assert params.values[REQUEST_KEY] is True
   assert params.values["ParamsVersion"] == 5
-  assert [call[1] for call in params.calls[-3:]] == [
-    "LaneCentering", CONTEXT_KEY, REQUEST_KEY,
+  assert [call[1] for call in params.calls[-4:]] == [
+    "LaneCentering", "LaneGuidanceMode", CONTEXT_KEY, REQUEST_KEY,
   ]
 
   params.calls.clear()
@@ -394,6 +397,7 @@ def test_interrupted_apply_restores_bound_request_with_blend_and_lane_centering_
   assert params.values[CONTEXT_KEY] == {}
   assert params.values[BLEND_KEY] is True
   assert params.values["LaneCentering"] is True
+  assert params.values["LaneGuidanceMode"] == 1
 
 
 def test_completed_request_never_auto_reapplies_after_customization():
@@ -424,7 +428,7 @@ for name in ('capnp', 'numpy', 'pyray', 'zmq', 'openpilot.common.params'):
   sys.modules[name] = None
 from openpilot.nrdr.params import get_handcrafted_lateral_profile
 profile = get_handcrafted_lateral_profile('HONDA_CIVIC')
-assert profile is not None and profile.version == 22
+assert profile is not None and profile.version == 23
 """
   subprocess.run(
     [sys.executable, "-c", script], cwd=repo_root, env=environment,

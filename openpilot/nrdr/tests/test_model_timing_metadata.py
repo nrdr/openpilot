@@ -76,6 +76,7 @@ def test_model_v2_action_timing_field_is_additive_and_zero_when_unavailable():
   assert "desiredAcceleration @1 :Float32;" in body
   assert "shouldStop @2 :Bool;" in body
   assert "lateralActionTime @3 :Float32;" in body
+  assert "laneGuidanceMode @6 :UInt8;" in body
   assert "zero means unavailable" in body
 
 
@@ -88,8 +89,11 @@ def test_model_data_v2_sp_timing_fields_are_additive_and_optional_by_default():
   assert "laneTurnDirection @0 :TurnDirection;" in body
   assert "leftLaneChangeEdgeBlock @1 :Bool;" in body
   assert "rightLaneChangeEdgeBlock @2 :Bool;" in body
-  assert "modelMonoTime @3 :UInt64;" in body
-  assert "lateralActionTime @4 :Float32;" in body
+  assert "blendfulCurvature @3 :Float32;" in body
+  assert "blendfulLaneWidth @9 :Float32;" in body
+  assert "laneGuidanceMode @10 :UInt8;" in body
+  assert "modelMonoTime @11 :UInt64;" in body
+  assert "lateralActionTime @12 :Float32;" in body
   assert "zero is the unavailable value" in body
 
 
@@ -148,6 +152,19 @@ def test_publishers_attach_exact_model_identity_and_actual_action_time(publisher
   assert action_assignment.lineno < fill_call.lineno < helper_call.lineno < metadata_send_line
 
 
+@pytest.mark.parametrize("publisher", PUBLISHERS, ids=("standard-modeld", "sunnypilot-modeld-v2"))
+def test_publishers_attach_lane_guidance_mode_to_the_atomic_model_action(publisher: Path):
+  tree = ast.parse(publisher.read_text(encoding="utf-8"), filename=str(publisher))
+  action_mode = _assignment(tree, "modelv2_send.modelV2.action.laneGuidanceMode")
+  sidecar_mode = _assignment(tree, "mdv2sp_send.modelDataV2SP.laneGuidanceMode")
+  model_send_line = dict(_ordered_sends(tree))["modelV2"]
+
+  assert ast.unparse(action_mode.value) == "int(lane_guidance_mode)"
+  assert ast.unparse(sidecar_mode.value) == "int(lane_guidance_mode)"
+  assert action_mode.lineno < model_send_line
+  assert sidecar_mode.lineno < model_send_line
+
+
 def test_standard_driving_model_action_is_copied_after_atomic_timing():
   publisher = PUBLISHERS[0]
   tree = ast.parse(publisher.read_text(encoding="utf-8"), filename=str(publisher))
@@ -173,6 +190,7 @@ def test_sunny_driving_model_mirrors_the_complete_action_after_timing():
     desiredAcceleration=0.625,
     shouldStop=True,
     lateralActionTime=0.0,
+    laneGuidanceMode=0,
   )
   drivingdata_send = SimpleNamespace(
     valid=False,
@@ -184,7 +202,7 @@ def test_sunny_driving_model_mirrors_the_complete_action_after_timing():
       desiredCurvature=driving_action.desiredCurvature,
       desiredAcceleration=driving_action.desiredAcceleration,
       shouldStop=driving_action.shouldStop,
-      lateralActionTime=0.545, lateralSource="plan", delayInput="actionT")),
+      lateralActionTime=0.545, lateralSource="plan", delayInput="actionT", laneGuidanceMode=2)),
   )
   baseline_action = (driving_action.desiredCurvature, driving_action.desiredAcceleration, driving_action.shouldStop)
 
@@ -196,6 +214,7 @@ def test_sunny_driving_model_mirrors_the_complete_action_after_timing():
   mirrored = drivingdata_send.drivingModelData.action
   assert (mirrored.desiredCurvature, mirrored.desiredAcceleration, mirrored.shouldStop) == baseline_action
   assert mirrored.lateralActionTime == modelv2_send.modelV2.action.lateralActionTime
+  assert mirrored.laneGuidanceMode == 2
   assert (mirrored.lateralSource, mirrored.delayInput) == ("plan", "actionT")
   assert drivingdata_send.valid is False
   assert modelv2_send.valid is True

@@ -35,6 +35,7 @@ class NrdrParamKey(StrEnum):
   LONG_PID_TUNE_SCALE_STANDARD = "LongPidTuneScaleStandard"
   LONG_PID_TUNE_SCALE_RELAXED = "LongPidTuneScaleRelaxed"
   LONG_PID_TUNE_SCALE_ECON = "LongPidTuneScaleEcon"
+  LANE_GUIDANCE_MODE = "LaneGuidanceMode"
   LANE_CENTERING_MIN_SPEED = "LaneCenteringMinSpeed"
   LANE_CENTERING_STRENGTH = "LaneCenteringStrength"
   NRDR_PERSONALITY_ACCEL_PROFILES = "NrdrPersonalityAccelProfiles"
@@ -189,6 +190,7 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.LONG_PID_TUNE_SCALE_STANDARD,
   NrdrParamKey.LONG_PID_TUNE_SCALE_RELAXED,
   NrdrParamKey.LONG_PID_TUNE_SCALE_ECON,
+  NrdrParamKey.LANE_GUIDANCE_MODE,
   NrdrParamKey.LANE_CENTERING_MIN_SPEED,
   NrdrParamKey.LANE_CENTERING_STRENGTH,
   NrdrParamKey.NRDR_PERSONALITY_ACCEL_PROFILES,

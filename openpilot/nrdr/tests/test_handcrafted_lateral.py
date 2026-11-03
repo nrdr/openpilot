@@ -19,7 +19,7 @@ from openpilot.nrdr.params import (
   handcrafted_lateral_profile_supported,
   handcrafted_lateral_success_marker,
 )
-from openpilot.nrdr.params.profiles import _request_context
+from openpilot.nrdr.params.profiles import _ordered_profile_writes, _request_context
 
 
 EXPECTED_FINGERPRINTS = (
@@ -151,7 +151,7 @@ def active_clarity_profile():
   return get_handcrafted_lateral_profile("HONDA_CLARITY", clarity_cp(), clarity_cp_sp())
 
 
-PROFILE_WRITE_COUNT = len(active_clarity_profile().values) + 2  # both enable-last keys are written OFF first
+PROFILE_WRITE_COUNT = len(_ordered_profile_writes(active_clarity_profile()))
 VERSION_INDEX = PROFILE_WRITE_COUNT
 MARKER_INDEX = VERSION_INDEX + 1
 SUGGESTED_INDEX = MARKER_INDEX + 1
@@ -169,14 +169,14 @@ def pending_params(values=None, **kwargs):
   }, **kwargs)
 
 
-def test_profiles_are_fingerprint_scoped_and_current_version_is_v22():
+def test_profiles_are_fingerprint_scoped_and_current_version_is_v23():
   assert HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS == EXPECTED_FINGERPRINTS
   assert tuple(HANDCRAFTED_LATERAL_PROFILES) == EXPECTED_FINGERPRINTS
-  assert get_handcrafted_lateral_profile("HONDA_CLARITY").version == 22
+  assert get_handcrafted_lateral_profile("HONDA_CLARITY").version == 23
   for fingerprint in EXPECTED_FINGERPRINTS:
     profile = get_handcrafted_lateral_profile(fingerprint)
     assert profile.fingerprint == fingerprint
-    assert profile.version == 22
+    assert profile.version == 23
     assert len(profile.values) == len(dict(profile.values))
   assert get_handcrafted_lateral_profile("HONDA_CIVIC_2022") is None
 
@@ -195,7 +195,7 @@ def test_clarity_v17_is_exact_47_key_reviewed_oracle():
 def test_v20_lane_defaults_are_strength_095_and_zero_model_break_in_for_every_profile():
   from openpilot.nrdr.params.profiles import COMMON_HANDCRAFTED_VALUES
   assert dict(COMMON_HANDCRAFTED_VALUES) == {
-    "LaneCentering": True, "LaneCenteringStrength": 0.95,
+    "LaneGuidanceMode": 1, "LaneCentering": True, "LaneCenteringStrength": 0.95,
     "LaneCenteringMinSpeed": 12, "LaneCenteringE2EAuthority": 0.0,
     "LaneCenteringPauseOnSignal": True, "LaneCenterOffset": 0.0,
     "LagdToggle": True, "LagdToggleDelay": 0.4,
@@ -274,7 +274,7 @@ def test_success_is_blocking_ordered_verified_versioned_and_auto_clears():
   marker = handcrafted_lateral_success_marker(active_clarity_profile())
   assert params.values["NrdrCarHandcraftedInfo"] == marker
   assert written[0] == "NrdrSteerRatioHybrid"
-  assert written[-2:] == ["NrdrSteerRatioHybrid", "LaneCentering"]
+  assert written[-3:] == ["NrdrSteerRatioHybrid", "LaneCentering", "LaneGuidanceMode"]
   assert params.calls[0][:3] == ("put_bool", "NrdrSteerRatioHybrid", False)
   assert params.calls[-5][:3] == ("put", "ParamsVersion", 6)
   assert params.calls[-4][:3] == ("put", "NrdrCarHandcraftedInfo", marker)
@@ -446,8 +446,8 @@ def test_silent_payload_write_keeps_card_startup_safe_and_retry_pending():
   assert card_continued
   assert params.values["NrdrHandcraftedLateralTune"] is True
   assert params.values["NrdrSteerRatioHybrid"] is False
-  assert [call[1] for call in params.calls[-4:]] == [
-    "NrdrSteerRatioHybrid", "LaneCentering", "NrdrHandcraftedLateralRequest", "NrdrHandcraftedLateralTune",
+  assert [call[1] for call in params.calls[-5:]] == [
+    "NrdrSteerRatioHybrid", "LaneCentering", "LaneGuidanceMode", "NrdrHandcraftedLateralRequest", "NrdrHandcraftedLateralTune",
   ]
   assert "NrdrCarHandcraftedInfo" not in params.values
   assert params.values["ParamsVersion"] == 5
@@ -461,8 +461,8 @@ def test_post_write_request_clear_failure_rejournals_true_and_disables_blend():
 
   assert params.values["NrdrHandcraftedLateralTune"] is True
   assert params.values["NrdrSteerRatioHybrid"] is False
-  assert [call[1] for call in params.calls[-4:]] == [
-    "NrdrSteerRatioHybrid", "LaneCentering", "NrdrHandcraftedLateralRequest", "NrdrHandcraftedLateralTune",
+  assert [call[1] for call in params.calls[-5:]] == [
+    "NrdrSteerRatioHybrid", "LaneCentering", "LaneGuidanceMode", "NrdrHandcraftedLateralRequest", "NrdrHandcraftedLateralTune",
   ]
 
 
@@ -604,7 +604,7 @@ def test_pending_or_unavailable_status_preserves_any_prior_success_marker():
   assert handcrafted_lateral_profile_status(clarity_cp(firmware=False), clarity_cp_sp(), params).startswith(old_marker)
 
 
-def test_prior_success_marker_is_preserved_until_v22_is_applied():
+def test_prior_success_marker_is_preserved_until_v23_is_applied():
   old_marker = "Last applied: Honda Clarity Current Lateral 2026-08-28 (v16) [HONDA_CLARITY]"
   params = pending_params({
     "NrdrHandcraftedLateralTune": False,
@@ -612,7 +612,7 @@ def test_prior_success_marker_is_preserved_until_v22_is_applied():
   })
 
   assert handcrafted_lateral_profile_status(clarity_cp(), clarity_cp_sp(), params) == \
-    f"{old_marker} | current profile v22 not applied"
+    f"{old_marker} | current profile v23 not applied"
 
 
 def test_native_apply_callback_is_a_durable_blocking_command():
