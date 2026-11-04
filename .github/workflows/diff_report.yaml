@@ -2,6 +2,10 @@ name: diff report
 
 on:
   pull_request_target:
+    # Do not wait for process replay on PR targets that do not run tests.
+    branches-ignore:
+      - nrdr-development
+      - nrdr-architecture-development
     types: [opened, synchronize, reopened]
 
 jobs:

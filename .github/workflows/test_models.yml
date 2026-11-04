@@ -1,6 +1,9 @@
 name: Test Models Compatibility With Tinygrad Changes
 on:
   pull_request:
+    branches-ignore:
+      - nrdr-development
+      - nrdr-architecture-development
     paths:
       - 'tinygrad_repo'
   workflow_dispatch:

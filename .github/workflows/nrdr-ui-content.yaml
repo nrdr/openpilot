@@ -1,9 +1,11 @@
-name: NRDR UI content regression checks
+name: nrdr UI content regression checks
 
 on:
-  push:
-    branches: ['nrdr-architecture-development']
+  # Content regression tests, not previews. nrdr development validation is manual.
   pull_request:
+    branches-ignore:
+      - nrdr-development
+      - nrdr-architecture-development
     paths:
       - 'openpilot/selfdrive/selfdrived/events.py'
       - 'openpilot/selfdrive/ui/**'

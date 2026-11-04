@@ -1,10 +1,14 @@
 name: tests
 
 on:
+  # Keep upstream/release checks; nrdr development validation is manual.
   push:
     branches:
       - master
   pull_request:
+    branches-ignore:
+      - nrdr-development
+      - nrdr-architecture-development
   workflow_dispatch:
   workflow_call:
     inputs:

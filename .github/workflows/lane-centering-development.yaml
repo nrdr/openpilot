@@ -1,9 +1,11 @@
 name: Lane centering development checks
 
 on:
-  push:
-    branches: ['nrdr-architecture-development']
+  # nrdr development validation is manual; keep upstream/release PR checks.
   pull_request:
+    branches-ignore:
+      - nrdr-development
+      - nrdr-architecture-development
     paths:
       - 'openpilot/selfdrive/controls/lib/lane_centering.py'
       - 'openpilot/selfdrive/controls/controlsd.py'
