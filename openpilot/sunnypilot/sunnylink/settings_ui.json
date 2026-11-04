@@ -1840,11 +1840,11 @@
               },
               "items": [
                 {
-                  "key": "NrdrDriverOverrideThreshold",
+                  "key": "NrdrOverrideThresholdCenterBoost",
                   "widget": "option",
-                  "title": "Driver Override Threshold",
-                  "description": "Raw steering torque reading above which you count as steering (override); default 1400.",
-                  "details": "Raw steering torque sensor reading above which you are considered to be steering (driver override). On cars with a different stock threshold, this value is applied proportionally so 1200 still represents the stock threshold.",
+                  "title": "Driver Override Threshold (During Straights)",
+                  "description": "Override threshold within the straight-ahead steering-angle band configured by Center Boost Degrees. This uses wheel angle, not detected road curvature. Default: 1200. Set equal to the curves threshold to use the same threshold at all angles.",
+                  "details": "The existing straight-ahead threshold and saved value are unchanged. A higher value requires more driver torque to register an override. This threshold only applies when Center Boost Degrees is greater than zero and the absolute steering angle is within that band.",
                   "min": 100,
                   "max": 5000,
                   "step": 100,
@@ -1868,11 +1868,11 @@
                   ]
                 },
                 {
-                  "key": "NrdrOverrideThresholdCenterBoost",
+                  "key": "NrdrDriverOverrideThreshold",
                   "widget": "option",
-                  "title": "Override Threshold Center Boost",
-                  "description": "Lower override threshold used within the Center Boost band; set equal to Driver Override Threshold to disable.",
-                  "details": "When the wheel is within the Center Boost degree band (on a straight), this lower override threshold applies instead of the one above - so you can override easily on straights while curves keep the higher threshold and do not drop torque from a false override. Set equal to Driver Override Threshold to disable.",
+                  "title": "Driver Override Threshold (During Curves)",
+                  "description": "Override threshold outside the straight-ahead steering-angle band, or at all angles when that band is disabled. Default: 1400. 1200 represents the stock threshold, scaled proportionally on cars with a different stock threshold.",
+                  "details": "The existing general override threshold and saved value are unchanged. A higher value requires more driver torque to register an override. The separate straights threshold applies inside the configured steering-angle band; this does not classify the road as straight or curved.",
                   "min": 100,
                   "max": 5000,
                   "step": 100,

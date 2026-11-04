@@ -95,6 +95,23 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertEqual(local["label_callback"](125), "+1.25 m")
     self.assertEqual(tuple(web[k] for k in ("min", "max", "step", "unit")), (0.0, 5.0, 0.25, "m"))
 
+  def test_override_threshold_labels_keep_keys_and_show_straights_before_curves(self):
+    native = _native_class("override_tuning.py", "OverrideTuningLayout")(lambda: None)
+    remote = _panel(self.schema, "steering", "nrdr_override")["items"]
+    expected = [
+      ("NrdrOverrideThresholdCenterBoost", "Driver Override Threshold (During Straights)"),
+      ("NrdrDriverOverrideThreshold", "Driver Override Threshold (During Curves)"),
+    ]
+    for index, (key, title) in enumerate(expected):
+      with self.subTest(key=key):
+        local, web = native._scroller[index], remote[index]
+        self.assertEqual((local["param"], local["title"]()), (key, title))
+        self.assertEqual((web["key"], web["title"]), (key, title))
+        self.assertEqual(local["description"](), web["description"])
+        self.assertEqual(tuple(local[k] for k in ("min_value", "max_value", "value_change_step")), (100, 5000, 100))
+        self.assertEqual(tuple(web[k] for k in ("min", "max", "step")), (100, 5000, 100))
+        self.assertEqual(local["label_callback"](1500), "1500")
+
   def test_device_yaw_switch_is_near_top_separate_from_full_controller_and_locked_consistently(self):
     key = "NrdrDeviceYawCorrection"
     native = _native_class("pidf_ground.py", "PidfGroundLayout")(lambda: None, lambda: None)

@@ -20,27 +20,26 @@ class OverrideTuningLayout(Widget):
   def _initialize_items(self):
     self._driver_override_threshold = option_item_sp(
       param="NrdrDriverOverrideThreshold",
-      title=lambda: tr("Driver Override Threshold (Default: 1400)"),
+      title=lambda: tr("Driver Override Threshold (During Curves)"),
       min_value=100,
       max_value=5000,
       value_change_step=100,
       description=lambda: tr(
-        "Raw steering torque sensor reading above which you are considered to be steering (driver override). 1200 is Honda's stock threshold; " +
-        "on the few cars with a different stock threshold, your value is applied proportionally so 1200 always means stock."
+        "Override threshold outside the straight-ahead steering-angle band, or at all angles when that band is disabled. Default: 1400. " +
+        "1200 represents the stock threshold, scaled proportionally on cars with a different stock threshold."
       ),
       label_callback=lambda value: f"{value}",
     )
 
     self._driver_override_threshold_cb = option_item_sp(
       param="NrdrOverrideThresholdCenterBoost",
-      title=lambda: tr("Override Threshold Center Boost (Default: 1200)"),
+      title=lambda: tr("Driver Override Threshold (During Straights)"),
       min_value=100,
       max_value=5000,
       value_change_step=100,
       description=lambda: tr(
-        "When the wheel is within the Center Boost degree band (on a straight), this lower override threshold applies instead of the one " +
-        "above - so you can override easily on straights while curves keep the higher threshold and don't drop torque from a false override. " +
-        "Set equal to Driver Override Threshold to disable."
+        "Override threshold within the straight-ahead steering-angle band configured by Center Boost Degrees. This uses wheel angle, " +
+        "not detected road curvature. Default: 1200. Set equal to the curves threshold to use the same threshold at all angles."
       ),
       label_callback=lambda value: f"{value}",
     )
@@ -88,8 +87,8 @@ class OverrideTuningLayout(Widget):
     )
 
     return [
-      self._driver_override_threshold,
       self._driver_override_threshold_cb,
+      self._driver_override_threshold,
       LineSeparatorSP(40),
       self._driver_assist_during_override,
       self._override_fade_down,
