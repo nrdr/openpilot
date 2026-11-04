@@ -217,8 +217,8 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
       for compression in (False, True):
         with self.subTest(percent=percent, compression=compression):
           stored = {}
-          self.params.get.side_effect = lambda key, **_: stored.get(key, 0)
-          self.params.put.side_effect = lambda key, value, **_: stored.update({key: value})
+          self.params.get.side_effect = lambda key, _stored=stored, **_: _stored.get(key, 0)
+          self.params.put.side_effect = lambda key, value, _stored=stored, **_: _stored.update({key: value})
           self.save_params({key: self._encode(str(percent).encode(), compression)}, compression)
           self.assertEqual(stored[key], percent)
           self.generic_write.assert_not_called()
