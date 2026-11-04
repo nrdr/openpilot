@@ -1,6 +1,10 @@
 """Execute production button/constraint code with no device or native services."""
 
 import ast
+import bisect
+from abc import abstractmethod
+from collections import defaultdict
+from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
 from types import SimpleNamespace as NS
@@ -114,8 +118,8 @@ class Button(IntEnum):
     return int(self)
 
 
-def button_stack(*, long_enabled=True, brand="honda"):
-  params = RecordingParams({"ExperimentalMode": True})
+def button_stack(*, long_enabled=True, brand="honda", initial_mode=True):
+  params = RecordingParams({"ExperimentalMode": initial_mode})
   namespace = {"ButtonType": Button, "Params": lambda: params, "structs": NS(CarParams=object),
                "DISTANCE_LONG_PRESS": 50, "EventNameSP": NS(experimentalModeSwitched="switched"),
                "consume_button_press": lambda _: True,
@@ -128,11 +132,12 @@ def button_stack(*, long_enabled=True, brand="honda"):
   helper.personality = 1
   events = []
 
-  def tick(pressed=None, *, reserved=False, available=True):
+  def tick(pressed=None, *, reserved=False, available=True, flush_writes=True):
     cs = NS(cruiseState=NS(available=available), buttonEvents=[] if pressed is None else [NS(type=Button.gapAdjustCruise, pressed=pressed)])
     helper.update(cs, NS(add=events.append), params.get_bool("ExperimentalMode"), distance_button_reserved=reserved)
     changed = namespace["NrdrSelfdrive"].update_personality(helper, cs, reserved)
-    params.flush()
+    if flush_writes:
+      params.flush()
     return changed
 
   return helper, params, events, tick
@@ -243,3 +248,132 @@ def test_selfdrived_always_passes_reservation_to_button_tracker():
 def test_runtime_longitudinal_gate_is_still_required():
   source = (ROOT / "openpilot/selfdrive/selfdrived/selfdrived.py").read_text(encoding="utf-8")
   assert 'self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl' in source
+
+
+def alert_stack(helper):
+  """Run the production event factory, dispatcher and alert manager without cereal."""
+  status = NS(normal=0)
+  size = NS(none=0, small=1, mid=2)
+  visual = audible = NS(none=0)
+  namespace = {"bisect": bisect, "IntEnum": IntEnum, "abstractmethod": abstractmethod, "DT_CTRL": 0.01,
+               "AlertCallbackType": object, "AlertStatus": status, "AlertSize": size, "VisualAlert": visual, "AudibleAlert": audible,
+               "log": NS(SelfdriveState=NS(AlertStatus=object, AlertSize=object, AudibleAlert=object)),
+               "car": NS(CarControl=NS(HUDControl=NS(VisualAlert=object))),
+               "defaultdict": defaultdict, "dataclass": dataclass,
+               "custom": NS(OnroadEventSP=NS(EventName=NS(experimentalModeSwitched="switched"))),
+               "LONGITUDINAL_PERSONALITY_MAP": {1: "standard"}}
+  load_definitions("openpilot/sunnypilot/selfdrive/selfdrived/events_base.py",
+                   {"Priority", "ET", "Alert", "NormalPermanentAlert", "EventsBase"}, namespace)
+  load_definitions("openpilot/sunnypilot/selfdrive/selfdrived/events.py", {"experimental_mode_switched_alert", "EventsSP"}, namespace)
+
+  # Evaluate the real mapping entry, so an unwired callback cannot pass these tests.
+  source = ROOT / "openpilot/sunnypilot/selfdrive/selfdrived/events.py"
+  tree = ast.parse(source.read_text(encoding="utf-8"))
+  mapping = next(n.value for n in tree.body if isinstance(n, ast.AnnAssign) and ast.unparse(n.target) == "EVENTS_SP")
+  entry = next(v for k, v in zip(mapping.keys, mapping.values, strict=True) if ast.unparse(k) == "EventNameSP.experimentalModeSwitched")
+  namespace["EVENTS_SP"] = {"switched": eval(compile(ast.Expression(entry), str(source), "eval"), namespace)}
+  namespace["EVENT_NAME_SP"] = {"switched": "experimentalModeSwitched"}
+  namespace["EmptyAlert"] = namespace["NormalPermanentAlert"]("", duration=0.)
+  load_definitions("openpilot/selfdrive/selfdrived/alertmanager.py", {"AlertEntry", "AlertManager"}, namespace)
+
+  source = ROOT / "openpilot/selfdrive/selfdrived/selfdrived.py"
+  tree = ast.parse(source.read_text(encoding="utf-8"))
+  cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "SelfdriveD")
+  method = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "update_alerts")
+  exec(compile(ast.Module(body=[method], type_ignores=[]), str(source), "exec"), namespace)
+
+  helper.events = NS(create_alerts=lambda *_: [])
+  helper.events_sp = namespace["EventsSP"]()
+  helper.AM = namespace["AlertManager"]()
+  helper.sm = NS(frame=1)
+  helper.enabled = True
+  helper.is_metric = False
+  helper.state_machine = NS(current_alert_types=[namespace["ET"].WARNING], soft_disable_timer=0)
+  return NS(**namespace)
+
+
+@pytest.mark.parametrize("initial_mode", (False, True))
+@pytest.mark.parametrize("write_flushed", (False, True))
+def test_experimental_alert_uses_button_result_before_param_poller_catches_up(initial_mode, write_flushed):
+  helper, params, events, tick = button_stack(initial_mode=initial_mode)
+  runtime = alert_stack(helper)
+  helper.experimental_mode = initial_mode  # params_thread has not observed the toggle yet.
+  hold(tick, flush_writes=False)
+  assert events == ["switched"]
+  assert params.get_bool("ExperimentalMode") is initial_mode
+  assert params.queue == [("ExperimentalMode", not initial_mode)]
+  if write_flushed:
+    params.flush()  # The disk writer and params_thread can catch up independently.
+  helper.events_sp.add(events[0])
+  runtime.update_alerts(helper, NS())
+
+  alert = helper.AM.current_alert
+  assert alert.alert_text_1 == ("Experimental Mode Off" if initial_mode else "Experimental Mode On")
+  assert alert.alert_text_2 == ""
+  assert alert.alert_type == "experimentalModeSwitched/warning"
+  assert alert.event_type == runtime.ET.WARNING
+  assert alert.duration == 150  # Preserve the existing 1.5-second warning.
+  assert alert.priority == runtime.Priority.LOWER
+  assert alert.alert_size == runtime.AlertSize.small
+  assert alert.alert_status == runtime.AlertStatus.normal
+  assert alert.visual_alert == runtime.VisualAlert.none
+  assert alert.audible_alert == runtime.AudibleAlert.none
+  assert params.actions == [("put", "ExperimentalMode", not initial_mode)]
+
+  # Once queued, the displayed message must not track later param/thread changes.
+  helper.events_sp.clear()
+  params.flush()
+  helper.experimental_mode = not initial_mode
+  helper.sm.frame += 1
+  runtime.update_alerts(helper, NS())
+  assert helper.AM.current_alert is alert
+
+
+def test_repeated_toggles_get_independent_alert_snapshots():
+  helper, _, events, tick = button_stack()
+  runtime = alert_stack(helper)
+  snapshots = []
+  for expected in ("Experimental Mode Off", "Experimental Mode On", "Experimental Mode Off"):
+    hold(tick)
+    helper.events_sp.add(events[-1])
+    runtime.update_alerts(helper, NS())
+    snapshots.append(helper.AM.current_alert)
+    assert snapshots[-1].alert_text_1 == expected
+    helper.events_sp.clear()
+    tick(False)
+    helper.sm.frame += 50
+
+  assert [alert.alert_text_1 for alert in snapshots] == ["Experimental Mode Off", "Experimental Mode On", "Experimental Mode Off"]
+  assert len({id(alert) for alert in snapshots}) == 3
+
+
+def test_event_specific_state_preserves_other_callbacks_and_warning_filter():
+  helper, _, _, _ = button_stack()
+  runtime = alert_stack(helper)
+  seen = []
+
+  def other_callback(*args):
+    seen.append(args)
+    return runtime.NormalPermanentAlert("Other warning")
+
+  runtime.EVENTS_SP["other"] = {runtime.ET.WARNING: other_callback}
+  runtime.EVENT_NAME_SP["other"] = "other"
+  helper.events_sp.event_counters["other"] = 0
+  helper.events_sp.add("other")
+  helper.events_sp.add("switched")
+  helper._experimental_mode = True
+  cs = NS()
+  runtime.update_alerts(helper, cs)
+  assert seen == [(helper.CP, cs, helper.sm, False, 0, "standard")]
+  assert helper.AM.alerts["experimentalModeSwitched/warning"].alert.alert_text_1 == "Experimental Mode On"
+
+  helper.state_machine.current_alert_types = [runtime.ET.PERMANENT]
+  runtime.update_alerts(helper, cs)
+  assert len(seen) == 1
+  assert helper.AM.current_alert is runtime.EmptyAlert
+
+  # Legacy callers still pass their original callback arguments unchanged.
+  helper.events_sp.remove("switched")
+  alerts = helper.events_sp.create_alerts([runtime.ET.WARNING], ["legacy"])
+  assert alerts[0].alert_text_1 == "Other warning"
+  assert seen[-1] == ("legacy",)

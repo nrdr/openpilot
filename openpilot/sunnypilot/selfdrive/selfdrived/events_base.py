@@ -82,7 +82,7 @@ class AlertBase(Alert):
     super().__init__(alert_text_1, alert_text_2, alert_status, alert_size, priority, visual_alert, audible_alert, duration)
 
 
-AlertCallbackType = Callable[[car.CarParams, car.CarState, messaging.SubMaster, bool, int, log.ControlsState], Alert]
+AlertCallbackType = Callable[[car.CarParams, car.CarState, messaging.SubMaster, bool, int, log.ControlsState], Alert] | Callable[[bool], Alert]
 
 
 # ********** alert callback functions **********
@@ -120,9 +120,11 @@ class EventsBase:
   def contains(self, event_type: str) -> bool:
     return any(event_type in self.get_events_mapping().get(e, {}) for e in self.events)
 
-  def create_alerts(self, event_types: list[str], callback_args=None):
+  def create_alerts(self, event_types: list[str], callback_args=None, *, callback_args_by_event=None):
     if callback_args is None:
       callback_args = []
+    if callback_args_by_event is None:
+      callback_args_by_event = {}
 
     ret = []
     for e in self.events:
@@ -131,7 +133,7 @@ class EventsBase:
         if et in types:
           alert = self.get_events_mapping()[e][et]
           if not isinstance(alert, Alert):
-            alert = alert(*callback_args)
+            alert = alert(*callback_args_by_event.get(e, callback_args))
 
           if DT_CTRL * (self.event_counters[e] + 1) >= alert.creation_delay:
             alert.alert_type = f"{self.get_event_name(e)}/{et}"

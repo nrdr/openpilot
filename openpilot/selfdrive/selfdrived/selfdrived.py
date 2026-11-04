@@ -596,7 +596,11 @@ class SelfdriveD(CruiseHelper):
                      self.state_machine.soft_disable_timer, pers]
 
     alerts = self.events.create_alerts(self.state_machine.current_alert_types, callback_args)
-    alerts_sp = self.events_sp.create_alerts(self.state_machine.current_alert_types, callback_args)
+    # Use the button's latched result, not the asynchronously written/polled ExperimentalMode param.
+    alerts_sp = self.events_sp.create_alerts(
+      self.state_machine.current_alert_types, callback_args,
+      callback_args_by_event={custom.OnroadEventSP.EventName.experimentalModeSwitched: [self._experimental_mode]},
+    )
 
     self.AM.add_many(self.sm.frame, alerts + alerts_sp)
     self.AM.process_alerts(self.sm.frame, clear_event_types)
