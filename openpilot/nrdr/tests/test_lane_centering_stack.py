@@ -69,7 +69,7 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertNotIn('"LaneCenteringMinSpeed"', source)
     self.assertEqual(generated.count('{"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "12"}}'), 1)
     self.assertEqual(generated.count('{"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.95"}}'), 1)
-    self.assertEqual(generated.count('{"LaneGuidanceMode", {PERSISTENT | BACKUP, INT, "0"}}'), 1)
+    self.assertEqual(generated.count('{"LaneGuidanceMode", {PERSISTENT | BACKUP, INT, "2"}}'), 1)
 
   def test_controls_are_rehomed_out_of_developer_pages(self) -> None:
     developer_sources = (
@@ -407,13 +407,13 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertIn("value_normalizer=lane_centering_min_speed_mph", tici)
     self.assertIn("lane_centering_min_speed_mph(ui_state.params.get", mici)
 
-  def test_migration_is_restrictive_and_does_not_enable_lane_centering(self) -> None:
+  def test_sunny_default_keeps_legacy_star_disabled_and_tuning_unchanged(self) -> None:
     source = PARAM_HEADER.read_text(encoding="utf-8")
     generated = PARAM_INCLUDE.read_text(encoding="utf-8")
     self.assertIn('{"LaneCentering", {PERSISTENT | BACKUP, BOOL, "0"}}', source)
     self.assertIn('{"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "12"}}', generated)
     self.assertIn('{"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.95"}}', generated)
-    self.assertIn('{"LaneGuidanceMode", {PERSISTENT | BACKUP, INT, "0"}}', generated)
+    self.assertIn('{"LaneGuidanceMode", {PERSISTENT | BACKUP, INT, "2"}}', generated)
     self.assertIn("5 m/s controller floor", NRDR_STEERING.read_text(encoding="utf-8"))
 
   def test_driver_override_is_wired_without_other_starpilot_controls(self) -> None:

@@ -1,6 +1,7 @@
 import ast
 from pathlib import Path
 import unittest
+from unittest.mock import Mock
 
 from openpilot.nrdr.features.lateral.lane_guidance import (
   LaneGuidanceMode,
@@ -12,6 +13,8 @@ from openpilot.nrdr.features.lateral.lane_guidance import (
   parse_lane_guidance_mode,
   set_lane_guidance_mode,
 )
+from openpilot.nrdr.params.profiles import HANDCRAFTED_LATERAL_PROFILES
+from openpilot.nrdr.params.specs import PARAM_SPECS_BY_KEY
 
 
 class MemoryParams:
@@ -21,6 +24,9 @@ class MemoryParams:
 
   def get(self, key):
     return self.values.get(key)
+
+  def get_bool(self, key):
+    return self.values.get(key) in (True, "1", b"1")
 
   def put(self, key, value, *, block=False):
     self.values[key] = value
@@ -143,6 +149,101 @@ class TestLaneGuidanceMode(unittest.TestCase):
     self.assertIn("set_lane_guidance_mode(params, LaneGuidanceMode.MODEL_ONLY, block=False)", source)
     self.assertIn("modelv2_send.modelV2.action.laneGuidanceMode = int(lane_guidance_mode)", source)
     self.assertIn("mdv2sp_send.modelDataV2SP.laneGuidanceMode = int(lane_guidance_mode)", source)
+
+    tree = ast.parse(source)
+    guard = next(node for node in ast.walk(tree) if isinstance(node, ast.If)
+                 and ast.unparse(node.test) == "lane_guidance_mode == LaneGuidanceMode.BLENDFUL")
+    code = compile(ast.Module(body=[guard], type_ignores=[]), "standard_modeld_guard", "exec")
+    for mode in LaneGuidanceMode:
+      with self.subTest(mode=mode):
+        params = MemoryParams({"LaneGuidanceMode": int(mode), "LaneCentering": mode == LaneGuidanceMode.NRDR})
+        namespace = {"params": params, "lane_guidance_mode": mode, "LaneGuidanceMode": LaneGuidanceMode,
+                     "set_lane_guidance_mode": set_lane_guidance_mode}
+        exec(code, namespace)
+        expected = LaneGuidanceMode.MODEL_ONLY if mode == LaneGuidanceMode.BLENDFUL else mode
+        self.assertEqual(namespace["lane_guidance_mode"], expected)
+        self.assertEqual(params.values["LaneGuidanceMode"], int(expected))
+        self.assertEqual(params.values["LaneCentering"], expected == LaneGuidanceMode.NRDR)
+
+
+class TestLaneGuidanceMigration(unittest.TestCase):
+  def setUp(self):
+    # Exercise the actual startup migration without loading native Params/hardware.
+    root = Path(__file__).resolve().parents[3]
+    path = root / "openpilot/sunnypilot/system/params_migration.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    migration = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                     and node.name == "_migrate_lane_guidance_mode")
+    self.cloudlog = Mock()
+    namespace = {"cloudlog": self.cloudlog}
+    exec(compile(ast.Module(body=[migration], type_ignores=[]), str(path), "exec"), namespace)
+    self.migrate = namespace["_migrate_lane_guidance_mode"]
+
+  def tearDown(self):
+    self.cloudlog.exception.assert_not_called()
+
+  def assert_migration(self, params, expected):
+    self.migrate(params)
+    self.assertEqual(params.values["LaneGuidanceMode"], int(expected))
+    self.assertEqual(params.get_bool("LaneCentering"), expected == LaneGuidanceMode.NRDR)
+    self.assertTrue(all(write[3] for write in params.writes))
+    writes = list(params.writes)
+    self.migrate(params)
+    self.assertEqual(params.writes, writes, "repeat startup must not rewrite a settled choice")
+
+  def test_fresh_install_matches_generated_sunny_default(self):
+    params = MemoryParams()
+    self.assert_migration(params, LaneGuidanceMode.BLENDFUL)
+    self.assertEqual(params.values["LaneGuidanceMode"], int(PARAM_SPECS_BY_KEY["LaneGuidanceMode"].default))
+    self.assertFalse(params.values["LaneCentering"])
+
+  def test_full_reset_returns_to_sunny(self):
+    for mode in LaneGuidanceMode:
+      with self.subTest(mode=mode):
+        params = MemoryParams({"LaneGuidanceMode": int(mode), "LaneCentering": mode == LaneGuidanceMode.NRDR})
+        params.values.clear()
+        self.assert_migration(params, LaneGuidanceMode.BLENDFUL)
+
+  def test_saved_modes_win_over_missing_or_conflicting_legacy_bool(self):
+    for mode in LaneGuidanceMode:
+      for legacy in (None, False, True):
+        with self.subTest(mode=mode, legacy=legacy):
+          values = {"LaneGuidanceMode": int(mode)}
+          if legacy is not None:
+            values["LaneCentering"] = legacy
+          self.assert_migration(MemoryParams(values), mode)
+
+  def test_legacy_choices_are_preserved_when_canonical_mode_is_absent(self):
+    for legacy, expected in ((False, LaneGuidanceMode.MODEL_ONLY), (True, LaneGuidanceMode.NRDR)):
+      with self.subTest(legacy=legacy):
+        self.assert_migration(MemoryParams({"LaneCentering": legacy}), expected)
+
+  def test_out_of_range_saved_modes_still_fail_closed(self):
+    for mode in (-1, 3, 255):
+      for legacy in (False, True):
+        with self.subTest(mode=mode, legacy=legacy):
+          self.assert_migration(MemoryParams({"LaneGuidanceMode": mode, "LaneCentering": legacy}), LaneGuidanceMode.MODEL_ONLY)
+
+  def test_unsupported_model_cleared_off_is_not_rearmed_on_next_startup(self):
+    params = MemoryParams({"LaneGuidanceMode": 2, "LaneCentering": False})
+    set_lane_guidance_mode(params, LaneGuidanceMode.MODEL_ONLY)
+    params.writes.clear()
+    self.assert_migration(params, LaneGuidanceMode.MODEL_ONLY)
+    self.assertFalse(params.writes)
+
+  def test_handcrafted_presets_keep_their_explicit_star_choice(self):
+    self.assertTrue(HANDCRAFTED_LATERAL_PROFILES)
+    for name, profile in HANDCRAFTED_LATERAL_PROFILES.items():
+      with self.subTest(profile=name):
+        params = MemoryParams(dict(profile.values))
+        self.assertEqual(params.values["LaneGuidanceMode"], 1)
+        self.assert_migration(params, LaneGuidanceMode.NRDR)
+        self.assertFalse(params.writes)
+
+  def test_device_migration_precedes_generic_default_seeding(self):
+    root = Path(__file__).resolve().parents[3]
+    source = (root / "openpilot/system/manager/manager.py").read_text(encoding="utf-8")
+    self.assertLess(source.index("run_migration(params)"), source.index("for k in params.all_keys():"))
 
 
 if __name__ == "__main__":

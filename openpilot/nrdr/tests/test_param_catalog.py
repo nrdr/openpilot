@@ -25,7 +25,7 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "28f91581827b26cc8ef9005ca69b3a65a4b7949f3ee4693fd23afbfed23f017e"
+REGISTRY_METADATA_SHA256 = "6de9e6e99dc2b55f5f0a86c67d7eaba8dda6f593e069a0661687051d5c2d7674"
 
 
 class TestParamCatalog(unittest.TestCase):
@@ -67,6 +67,14 @@ class TestParamCatalog(unittest.TestCase):
     self.assertIs(spec.param_type, ParamType.INT)
     self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
     self.assertEqual(spec.default, "12")
+    self.assertIs(spec.lifecycle, ParamLifecycle.SETTING)
+    self.assertIs(spec.owner, ParamOwner.LATERAL)
+
+  def test_lane_guidance_defaults_to_sunny_for_unset_params(self) -> None:
+    spec = PARAM_SPECS_BY_KEY["LaneGuidanceMode"]
+    self.assertIs(spec.param_type, ParamType.INT)
+    self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
+    self.assertEqual(spec.default, "2")
     self.assertIs(spec.lifecycle, ParamLifecycle.SETTING)
     self.assertIs(spec.owner, ParamOwner.LATERAL)
 

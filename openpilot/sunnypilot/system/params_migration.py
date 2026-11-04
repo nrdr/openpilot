@@ -104,7 +104,7 @@ def _migrate_model_bundle_slots(_params):
 
 
 def _migrate_lane_guidance_mode(_params):
-  """Convert the former lane-centering bool into the exclusive mode enum once."""
+  """Default new/reset installs to Sunny while preserving saved and legacy choices."""
   try:
     from openpilot.nrdr.features.lateral.lane_guidance import (
       LaneGuidanceMode,
@@ -112,8 +112,13 @@ def _migrate_lane_guidance_mode(_params):
       set_lane_guidance_mode,
     )
     stored = _params.get("LaneGuidanceMode")
-    mode = (LaneGuidanceMode.NRDR if _params.get_bool("LaneCentering") else LaneGuidanceMode.MODEL_ONLY) \
-      if stored is None else parse_lane_guidance_mode(stored)
+    if stored is not None:
+      mode = parse_lane_guidance_mode(stored)
+    elif _params.get("LaneCentering") is None:
+      # Missing is a fresh/reset install; a stored False is an explicit legacy Off.
+      mode = LaneGuidanceMode.BLENDFUL
+    else:
+      mode = LaneGuidanceMode.NRDR if _params.get_bool("LaneCentering") else LaneGuidanceMode.MODEL_ONLY
     legacy_enabled = mode == LaneGuidanceMode.NRDR
     if stored != int(mode) or _params.get_bool("LaneCentering") != legacy_enabled:
       set_lane_guidance_mode(_params, mode)

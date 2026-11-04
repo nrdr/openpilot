@@ -127,7 +127,7 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("LongPidTuneScaleEcon", ParamType.INT, PB, "100", owner=ParamOwner.LONGITUDINAL),
   # 0=model only, 1=NRDR lane centering, 2=Blendful. This single enum is the
   # runtime source of truth so the two correction paths can never stack.
-  _added("LaneGuidanceMode", ParamType.INT, PB, "0", owner=ParamOwner.LATERAL),
+  _added("LaneGuidanceMode", ParamType.INT, PB, "2", owner=ParamOwner.LATERAL),
   # Canonical whole mph. Runtime converts this value with CV.MPH_TO_MS.
   _added("LaneCenteringMinSpeed", ParamType.INT, PB, "12", owner=ParamOwner.LATERAL),
   # Direct 0.0-1.0 lane-center pull. 0.30 preserves the deployed StarPilot gain.
