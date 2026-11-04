@@ -29,7 +29,9 @@ def restore_params(params, values):
 
 
 def apply_cruise_preferences(layout, state, values, has_long, has_icbm):
-  _restore_params(state.params, values)
+  # Vision SCC is never deleted by the layout. Replaying its snapshot here
+  # could queue an old True after a newer explicit Off from the user/Sunnylink.
+  _restore_params(state.params, {key: value for key, value in values.items() if key != "SmartCruiseControlVision"})
 
   if state.is_offroad():
     layout.custom_acc_toggle.set_description(tr("You can set this now. It activates once your car is detected and supports custom cruise increments."))

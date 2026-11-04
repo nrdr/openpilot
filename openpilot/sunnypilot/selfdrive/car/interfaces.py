@@ -58,7 +58,10 @@ def _cleanup_unsupported_params(CP: structs.CarParams, CP_SP: structs.CarParamsS
   if not CP.openpilotLongitudinalControl and CP_SP.pcmCruiseSpeed:
     cloudlog.warning("openpilot Longitudinal Control and ICBM not available, cleaning up params")
     params.remove("CustomAccIncrementsEnabled")
-    params.remove("SmartCruiseControlVision")
+    # Keep unsupported SCC disabled without turning a saved Off into an unset
+    # preference that nrdr's next boot would seed True again.
+    if params.get("SmartCruiseControlVision") is not False:
+      params.put_bool("SmartCruiseControlVision", False, block=True)
     params.remove("SmartCruiseControlMap")
 
   set_speed_limit_assist_availability(CP, CP_SP, params)

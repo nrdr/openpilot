@@ -126,7 +126,10 @@ class SelfdriveD(CruiseHelper):
     if not self.CP.alphaLongitudinalAvailable:
       self.params.remove("AlphaLongitudinalEnabled")
     if not self.CP.openpilotLongitudinalControl:
-      self.params.remove("ExperimentalMode")
+      # Preserve the disabled marker across reboots; deleting it would let
+      # nrdr's fresh-install default silently enable experimental mode again.
+      if self.params.get("ExperimentalMode") is not False:
+        self.params.put_bool("ExperimentalMode", False, block=True)
 
     self.CS_prev = car.CarState.new_message()
     self.AM = AlertManager()
