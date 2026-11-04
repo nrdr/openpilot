@@ -125,12 +125,15 @@ class LatControlFirmware(LatControl):
       optimized = optimized_lane_change_active(self.live_tuning_snapshot, state)
       output = self.core.update(desired, params.angleOffsetDeg, CS.steeringAngleDeg, CS.vEgo, params.roll,
                                 pressed, steer_limited_by_safety, optimized_lane_change=optimized)
-      output = float(np.clip(output, -self.steer_max, self.steer_max))
+      # A command row may stop adding assist before the host's normalized limit.
+      # Saturation reporting must follow the same usable ceiling as the core.
+      output_limit = min(self.steer_max, self.core.ff.cal.output_ceiling())
+      output = float(np.clip(output, -output_limit, output_limit))
       pid_log.p = float(self.core.pid.p)
       pid_log.i = float(self.core.pid.i)
       pid_log.f = float(self.core.pid.f)
       pid_log.saturated = bool(self._check_saturation(
-        self.steer_max - abs(output) < 1e-3, CS, steer_limited_by_safety, curvature_limited))
+        output_limit - abs(output) < 1e-3, CS, steer_limited_by_safety, curvature_limited))
     ff = self.core.ff
     pid_log.epsFfActive = bool(active)
     pid_log.epsFfWeight = float(self.core.ff_weight)

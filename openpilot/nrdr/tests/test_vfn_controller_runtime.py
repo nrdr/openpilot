@@ -293,3 +293,16 @@ def test_manual_ratio_changes_yaw_target_without_changing_fixed_gains():
                                   False, -.002, None, False, .3)[1])
     assert (control.core.pid.k_p, control.core.pid.k_i) == gains
   assert targets[1] / targets[0] == pytest.approx(20 / 12)
+
+
+@pytest.mark.parametrize("firmware", (b"39990-TLA-A040", b"39990-TLA-A220"))
+@pytest.mark.parametrize("steer_max", (1., .5))
+def test_crv_saturation_uses_the_lower_of_the_row_ceiling_and_host_limit(firmware, steer_max):
+  control = controller(fingerprint="HONDA_CRV_5G", firmware=firmware)
+  control.steer_max = steer_max
+  limit = min(steer_max, 3841 / 4096)
+  for _ in range(200):
+    output, _, logged = tick(control, angle=0., speed=20., desired=100.)
+    assert abs(output) <= limit
+  assert output == pytest.approx(limit, abs=1e-6)
+  assert logged.saturated

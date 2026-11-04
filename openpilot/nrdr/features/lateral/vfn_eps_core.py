@@ -206,6 +206,17 @@ class EpsFirmwareCalibration:
     self.kp_r5_bp = tuple(p[0] for p in self.kp_pieces)
     self.kp_r5_v = tuple(p[2] for p in self.kp_pieces)
 
+  def output_ceiling(self) -> float:
+    """Largest useful command before the row ends or the input clamps.
+
+    The CR-V's 4096-count transport reaches its row's last key at E4 3841
+    (rounded up); larger commands add no R5. All other admitted images keep
+    1.0. Do not include the speed envelope or change any calibration here.
+    Adapted from JamesL787/openpilot 6a2ac5424fb19e4f753badb4e44da6ded3f9542b.
+    """
+    key = min(self.key_clamp, self.r5_key_bp[-1])
+    return min(1.0, math.ceil(key * 4.0 * 32768.0 / 56756.0) / self.e4_per_output)
+
 
 CLARITY_A020 = EpsFirmwareCalibration(
   E4_PER_OUTPUT, R5_KEY_BP, R5_V, ENVELOPE_BP, ENVELOPE_V, R6_PER_CENTRE_DEG_S,
@@ -509,12 +520,15 @@ class HondaEpsLateralCore:
       self.ff_ramp = self.ff_weight = 0.0
     ff = self.ff_weight * ff_full
 
+    # Keep anti-windup and both output clamps at the end of the usable row.
+    limit = self.ff.cal.output_ceiling()
+    self.pid.set_limits(limit, -limit)
     i_scale = speed_band(v_ego, self.i_scale)
     self.pid.update(error, speed=v_ego, feedforward=ff,
                     freeze_integrator=steer_limited or steering_pressed or v_ego < INTEGRATOR_MIN_SPEED,
                     integrator_gain_scale=i_scale,
                     reset_integrator=i_scale <= 0.0 or v_ego < INTEGRATOR_MIN_SPEED)
-    output = max(min(self.pid.p * speed_band(v_ego, self.p_scale) + self.pid.i + self.pid.d + ff, 1.0), -1.0)
+    output = max(min(self.pid.p * speed_band(v_ego, self.p_scale) + self.pid.i + self.pid.d + ff, limit), -limit)
 
     if self.output_lpf_enabled:
       self.output_lpf.update_alpha(speed_band(v_ego, self.output_lpf_tau))
@@ -522,5 +536,5 @@ class HondaEpsLateralCore:
     else:
       self.output_lpf.x = output
       self.output_lpf.initialized = True
-    self.output = max(min(output, 1.0), -1.0)
+    self.output = max(min(output, limit), -limit)
     return self.output
