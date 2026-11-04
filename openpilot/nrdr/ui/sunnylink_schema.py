@@ -44,6 +44,10 @@ def apply_sunnylink_metadata(item: dict) -> dict:
     merged.setdefault(field, copy.deepcopy(expected_value))
   if key:
     enablement = copy.deepcopy(merged.get("enablement", []))
+    if key == "MaxTimeOffroad":
+      # The upstream timer stays on Device; its nrdr shutdown override now
+      # lives under Steering. Keep the cross-page exclusion at the UI boundary.
+      enablement.append({"type": "param", "key": "DisablePowerDown", "equals": False})
     if key in SUGGESTED_LOCK_KEYS or key.startswith(("NrdrSteerRatio", "LaneCenter", "NrdrLatRateDamping")):
       for switch in ("NrdrSuggestedSettings", "NrdrHandcraftedLateralTune"):
         enablement.append({"type": "not", "condition": {"type": "param", "key": switch, "equals": True}})

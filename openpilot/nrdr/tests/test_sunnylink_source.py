@@ -10,6 +10,7 @@ import yaml
 
 from openpilot.nrdr.params.generated.keys import NrdrParamKey
 from openpilot.nrdr.ui.sunnylink import ITEM_SOURCE_FILES, MACRO_SOURCE, PAGE_SOURCE_FILES, SOURCE_FILES, SOURCE_ROOT
+from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_schema, DEFAULT_SRC
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
@@ -23,9 +24,6 @@ INHERITED_LANE_CENTERING_KEYS = {
 }
 EXPECTED_SOURCE_FILES = (
   "_macros.yaml",
-  "items/device.yaml",
-  "pages/cruise.yaml",
-  "pages/software.yaml",
   "pages/steering.yaml",
 )
 
@@ -61,8 +59,8 @@ def _honda_tuning_write_keys() -> frozenset[str]:
 class TestSunnylinkSourceOwnership(unittest.TestCase):
   def test_manifest_is_explicit_complete_and_deterministic(self):
     self.assertEqual(MACRO_SOURCE, "_macros.yaml")
-    self.assertEqual(ITEM_SOURCE_FILES, ("items/device.yaml",))
-    self.assertEqual(PAGE_SOURCE_FILES, ("pages/cruise.yaml", "pages/software.yaml", "pages/steering.yaml"))
+    self.assertEqual(ITEM_SOURCE_FILES, ())
+    self.assertEqual(PAGE_SOURCE_FILES, ("pages/steering.yaml",))
     self.assertEqual(SOURCE_FILES, EXPECTED_SOURCE_FILES)
     actual = tuple(sorted(path.relative_to(SOURCE_ROOT).as_posix() for path in SOURCE_ROOT.rglob("*.yaml")))
     self.assertEqual(actual, tuple(sorted(EXPECTED_SOURCE_FILES)))
@@ -73,8 +71,6 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
     self.assertEqual(set(macros["macros"]), {"handcrafted_apply_offroad"})
 
     expected_pages = {
-      "pages/cruise.yaml": ("cruise", "smart_cruise", ["nrdr"]),
-      "pages/software.yaml": ("software", "updates", ["nrdr"]),
       "pages/steering.yaml": ("steering", "lane_change", ["nrdr", "nrdr_special"]),
     }
     for relative_path, (page_id, anchor, section_ids) in expected_pages.items():
@@ -85,12 +81,9 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
         self.assertEqual(document["after_section"], anchor)
         self.assertEqual([section["id"] for section in document["sections"]], section_ids)
 
-    device = _yaml_document("items/device.yaml")
-    self.assertEqual(set(device), {"page_id", "section_id", "after_item", "items", "extend_enablement"})
-    self.assertEqual((device["page_id"], device["section_id"], device["after_item"]),
-                     ("device", "general", "OnroadUploads"))
-    self.assertEqual([item["key"] for item in device["items"]], ["DisablePowerDown"])
-    self.assertEqual([extension["item_key"] for extension in device["extend_enablement"]], ["MaxTimeOffroad"])
+    nrdr = _yaml_document("pages/steering.yaml")["sections"][0]
+    self.assertEqual([item["key"] for item in nrdr["items"]],
+                     ["NrdrSuggestedSettings", "NrdrRemoteForceUpdate", "DisablePowerDown"])
 
   def test_all_active_generated_nrdr_settings_keys_have_canonical_source(self):
     catalog_keys = {key.value for key in NrdrParamKey}
@@ -98,11 +91,11 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
     for relative_path in SOURCE_FILES:
       _collect_keys(_yaml_document(relative_path), canonical_references)
     generated_references: list[str] = []
-    _collect_keys(json.loads(GENERATED_SCHEMA.read_text(encoding="utf-8")), generated_references)
+    _collect_keys(compile_schema(DEFAULT_SRC), generated_references)
 
     canonical_keys = set(canonical_references) & catalog_keys
     generated_nrdr_keys = set(generated_references) & catalog_keys
-    self.assertEqual(len(canonical_keys), 70)
+    self.assertEqual(len(canonical_keys), 71)
     # The adapter adds the pending-apply lock to each suggested-profile control.
     self.assertEqual(canonical_keys | {"NrdrHandcraftedLateralTune"}, generated_nrdr_keys)
     self.assertEqual(set(canonical_references) - catalog_keys, INHERITED_LANE_CENTERING_KEYS)

@@ -159,7 +159,7 @@ validate_source_tree() {
   [ -d "$SOURCE_DIR/openpilot/third_party" ] || die "missing nested third_party tree"
   [ -d "$SOURCE_DIR/openpilot/selfdrive/modeld/models" ] || die "missing nested model tree"
 
-  for item in events.py events_sp.py driver_monitoring.py mads.py backend_env.sh restore_comm_events.py; do
+  for item in events.py events_sp.py driver_monitoring.py mads.py backend_env.sh restore_comm_events.py strip_monitoring_ui.py; do
     [ -f "$CLEAN_OVERLAY_DIR/$item" ] || die "missing clean overlay file: $CLEAN_OVERLAY_DIR/$item"
   done
   [ -f "$SOURCE_DIR/openpilot/nrdr/tools/release/validate_model_artifacts.py" ] || die "missing model artifact validator"
@@ -248,6 +248,7 @@ apply_clean_overlay() {
   # Source/nightly policy is independent: clean must keep communication-fault
   # alerts and disengagement handlers even when development source omits them.
   python3 "$CLEAN_OVERLAY_DIR/restore_comm_events.py" "$BUILD_DIR"
+  python3 "$CLEAN_OVERLAY_DIR/strip_monitoring_ui.py" "$BUILD_DIR"
 
   # Clean releases retain the host seam but replace its NRDR-owned backend policy.
   replace_once "$BUILD_DIR/openpilot/nrdr/ui/home/layout.py" \

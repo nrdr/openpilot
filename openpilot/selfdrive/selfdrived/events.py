@@ -617,6 +617,11 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: too_distracted_alert,
   },
 
+  EventName.driverMonitoringFault: {
+    ET.NO_ENTRY: NoEntryAlert("Driver Monitoring Unavailable: Reboot Your Device"),
+    ET.SOFT_DISABLE: soft_disable_alert("Driver Monitoring Unavailable"),
+  },
+
   EventName.excessiveActuation: {
     ET.SOFT_DISABLE: soft_disable_alert("Excessive Actuation"),
     ET.NO_ENTRY: NoEntryAlert("Excessive Actuation"),

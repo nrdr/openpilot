@@ -7,6 +7,8 @@ import unittest
 
 import yaml
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.ui.lane_guidance import LANE_GUIDANCE_LABELS, LANE_GUIDANCE_MODES
+from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_schema, DEFAULT_SRC
 from openpilot.nrdr.features.lateral.lane_guidance import (
   LaneGuidanceMode,
   lane_guidance_mode_from_params,
@@ -137,6 +139,7 @@ class TestLaneCenteringStack(unittest.TestCase):
         namespace = {"ui_state": SimpleNamespace(params=memory, engaged=True, is_offroad=lambda: False),
                      "tuning_write_allowed": tuning_write_allowed,
                      "LaneGuidanceMode": LaneGuidanceMode,
+                     "LANE_GUIDANCE_LABELS": LANE_GUIDANCE_LABELS, "LANE_GUIDANCE_MODES": LANE_GUIDANCE_MODES,
                      "lane_guidance_mode_from_params": lane_guidance_mode_from_params,
                      "set_lane_guidance_mode": set_lane_guidance_mode,
                      "custom": SimpleNamespace(ModelManagerSP=SimpleNamespace(
@@ -149,7 +152,7 @@ class TestLaneCenteringStack(unittest.TestCase):
         panel._refresh = lambda refreshes=refreshes, memory=memory: refreshes.append(dict(memory.values))
         self.assertTrue(panel._write_allowed())
         self.assertFalse(panel._settings_writable())
-        panel._on_lane_guidance_mode(1 if class_name == "LaneCenteringLayout" else "nrdr")
+        panel._on_lane_guidance_mode(2 if class_name == "LaneCenteringLayout" else "Star")
         self.assertEqual(memory.values["LaneGuidanceMode"], 1)
         self.assertTrue(memory.values["LaneCentering"])
         self.assertEqual(refreshes[-1]["LaneGuidanceMode"], 1)
@@ -158,14 +161,29 @@ class TestLaneCenteringStack(unittest.TestCase):
         self.assertFalse(memory.values["LaneCenteringPauseOnSignal"])
         if class_name == "LaneCenteringLayoutMici":
           memory.values["ModelRunnerTypeCache"] = 0
-          panel._on_lane_guidance_mode("blendful")
-          self.assertEqual(memory.values["LaneGuidanceMode"], 0)
-          self.assertFalse(memory.values["LaneCentering"])
+          panel._on_lane_guidance_mode("Sunny")
+          self.assertEqual(memory.values["LaneGuidanceMode"], 1)
+          self.assertTrue(memory.values["LaneCentering"])
         for lock in ("NrdrSuggestedSettings", "NrdrHandcraftedLateralTune"):
           memory.values[lock] = True
           self.assertFalse(panel._write_allowed())
           self.assertFalse(panel._settings_writable())
+          before = dict(memory.values)
+          panel._on_lane_guidance_mode(0 if class_name == "LaneCenteringLayout" else "Off")
+          self.assertEqual(memory.values, before)
           memory.values[lock] = False
+
+        # Exercise a full display-order cycle with a custom runner, the Default
+        # runner, and a missing transition cache. Sunny must never trap C4 at Off.
+        for runner in (1, 0, None):
+          memory.values.update(LaneGuidanceMode=0, LaneCentering=False, ModelRunnerTypeCache=runner)
+          selections = (1, 2, 0) if class_name == "LaneCenteringLayout" else ("Sunny", "Star", "Off")
+          sunny_result = 2 if runner == 1 else 0 if class_name == "LaneCenteringLayout" else 1
+          for selection, expected in zip(selections, (sunny_result, 1, 0), strict=True):
+            panel._on_lane_guidance_mode(selection)
+            self.assertEqual(memory.values["LaneGuidanceMode"], expected)
+            self.assertEqual(memory.values["LaneCentering"], expected == 1)
+            self.assertEqual(panel._settings_writable(), expected == 1)
 
   def test_unavailable_blendful_resets_saved_and_visible_native_mode(self) -> None:
     class MemoryParams:
@@ -188,8 +206,8 @@ class TestLaneCenteringStack(unittest.TestCase):
       def set_selected_button(self, value):
         self.value = value
 
-      def set_enabled_buttons(self, _values):
-        pass
+      def set_enabled_buttons(self, values):
+        self.enabled = values
 
       def set_state(self, _value):
         pass
@@ -219,6 +237,7 @@ class TestLaneCenteringStack(unittest.TestCase):
           "ui_state": SimpleNamespace(params=memory),
           "tuning_write_allowed": tuning_write_allowed,
           "LaneGuidanceMode": LaneGuidanceMode,
+          "LANE_GUIDANCE_LABELS": LANE_GUIDANCE_LABELS, "LANE_GUIDANCE_MODES": LANE_GUIDANCE_MODES,
           "lane_guidance_mode_from_params": lane_guidance_mode_from_params,
           "set_lane_guidance_mode": set_lane_guidance_mode,
           "custom": SimpleNamespace(ModelManagerSP=SimpleNamespace(Runner=SimpleNamespace(tinygrad=1))),
@@ -253,14 +272,17 @@ class TestLaneCenteringStack(unittest.TestCase):
         panel._refresh()
         self.assertEqual(memory.values["LaneGuidanceMode"], 0)
         self.assertFalse(memory.values["LaneCentering"])
-        self.assertEqual(lane_action.value, 0 if class_name == "LaneCenteringLayout" else "model only")
+        self.assertEqual(lane_action.value, 0 if class_name == "LaneCenteringLayout" else "Off")
+        if class_name == "LaneCenteringLayout":
+          self.assertEqual(lane_action.enabled, {0, 2})
 
         if class_name == "LaneCenteringLayoutMici":
-          memory.values["LaneGuidanceMode"] = 1
-          lane_action.value = "blendful"  # BigMultiToggle updates its display before the callback.
-          panel._on_lane_guidance_mode("blendful")
-          self.assertEqual(memory.values["LaneGuidanceMode"], 0)
-          self.assertEqual(lane_action.value, "model only")
+          memory.values["LaneGuidanceMode"] = 0
+          lane_action.value = "Sunny"  # BigMultiToggle updates its display before the callback.
+          panel._on_lane_guidance_mode("Sunny")
+          self.assertEqual(memory.values["LaneGuidanceMode"], 1)
+          self.assertTrue(memory.values["LaneCentering"])
+          self.assertEqual(lane_action.value, "Star")
 
         # ModelRunnerTypeCache is cleared briefly during an onroad transition.
         # Unknown capability must preserve an already valid Blendful choice,
@@ -270,25 +292,35 @@ class TestLaneCenteringStack(unittest.TestCase):
         memory.values.pop("ModelRunnerTypeCache", None)
         panel._refresh()
         self.assertEqual(memory.values["LaneGuidanceMode"], 2)
-        self.assertEqual(lane_action.value, 2 if class_name == "LaneCenteringLayout" else "blendful")
+        self.assertEqual(lane_action.value, 1 if class_name == "LaneCenteringLayout" else "Sunny")
 
         memory.values["LaneGuidanceMode"] = 1
-        panel._on_lane_guidance_mode(2 if class_name == "LaneCenteringLayout" else "blendful")
+        panel._on_lane_guidance_mode(1 if class_name == "LaneCenteringLayout" else "Sunny")
         self.assertEqual(memory.values["LaneGuidanceMode"], 1)
-        self.assertEqual(lane_action.value, 1 if class_name == "LaneCenteringLayout" else "nrdr")
+        self.assertEqual(lane_action.value, 2 if class_name == "LaneCenteringLayout" else "Star")
+
+        # Refresh must translate stored values in both directions, not use
+        # the persisted ordinal as the button index after reordering.
+        memory.values["ModelRunnerTypeCache"] = 1
+        for index, mode in enumerate(LANE_GUIDANCE_MODES):
+          memory.values["LaneGuidanceMode"] = int(mode)
+          panel._refresh()
+          self.assertEqual(lane_action.value, index if class_name == "LaneCenteringLayout" else LANE_GUIDANCE_LABELS[index])
+          if class_name == "LaneCenteringLayout":
+            self.assertEqual(lane_action.enabled, {0, 1, 2})
 
   def test_sunnylink_stack_is_nested_under_nrdr_lateral_tuning(self) -> None:
     self.assertFalse((SUNNYLINK_ROOT / "settings_ui_src/pages/lane_centering.yaml").exists())
     source_extension = yaml.safe_load(NRDR_STEERING.read_text(encoding="utf-8"))
     source_developer = yaml.safe_load((SUNNYLINK_ROOT / "settings_ui_src/pages/developer.yaml").read_text(encoding="utf-8"))
-    compiled = json.loads((SUNNYLINK_ROOT / "settings_ui.json").read_text(encoding="utf-8"))
+    compiled = compile_schema(DEFAULT_SRC)
 
     nrdr_section = next(section for section in source_extension["sections"] if section["id"] == "nrdr")
-    self.assertEqual(nrdr_section["title"], "nrdr Lateral Tuning")
+    self.assertEqual(nrdr_section["title"], "nrdr")
     source_panels = [panel for panel in nrdr_section["sub_panels"] if panel["id"] == "nrdr_lane_centering_stack"]
     self.assertEqual(len(source_panels), 1)
     source_panel = source_panels[0]
-    self.assertEqual(source_panel["label"], "Lane Centering Stack")
+    self.assertEqual(source_panel["label"], "Lane Centering Method")
     self.assertIsNone(source_panel["trigger_key"])
 
     source_keys: list[str] = []
@@ -318,10 +350,10 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertIn("5 m/s controller floor", minimum_speed["description"])
     self.assertEqual(items[0]["key"], "LaneGuidanceMode")
     self.assertEqual([(option["value"], option["label"]) for option in items[0]["options"]],
-                     [(0, "Model Only"), (1, "NRDR"), (2, "Blendful")])
+                     [(0, "Off"), (2, "Sunny"), (1, "Star")])
     self.assertIn("mutually exclusive", items[0]["details"])
     self.assertIn("requires a non-Default custom model", items[0]["details"])
-    self.assertIn("custom_model_active", json.dumps(items[0]["options"][2]["enablement"]))
+    self.assertIn("custom_model_active", json.dumps(items[0]["options"][1]["enablement"]))
     self.assertEqual(items[2]["title"], "Fade on Turn Signal")
     self.assertIn("always suspend", items[2]["description"])
     self.assertIn("regardless of this setting", items[2]["description"])
@@ -341,10 +373,10 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertFalse(any(page["id"] == "lane_centering" for page in compiled["panels"]))
     compiled_steering = next(page for page in compiled["panels"] if page["id"] == "steering")
     compiled_nrdr = next(section for section in compiled_steering["sections"] if section["id"] == "nrdr")
-    self.assertEqual(compiled_nrdr["title"], "nrdr Lateral Tuning")
+    self.assertEqual(compiled_nrdr["title"], "nrdr")
     compiled_panels = [panel for panel in compiled_nrdr["sub_panels"] if panel["id"] == "nrdr_lane_centering_stack"]
     self.assertEqual(len(compiled_panels), 1)
-    self.assertEqual(compiled_panels[0]["label"], "Lane Centering Stack")
+    self.assertEqual(compiled_panels[0]["label"], "Lane Centering Method")
     self.assertIsNone(compiled_panels[0]["trigger_key"])
     compiled_keys: list[str] = []
     _collect_keys(compiled_panels[0], compiled_keys)
@@ -444,7 +476,7 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertIn('"laneCenteringStateSP"', ui_state)
     self.assertIn("class LaneCenteringStatusElement", developer_elements)
     self.assertIn('getattr(reason, "raw", reason)', status_helper)
-    self.assertIn('return UiElement(value, "LANE CTR", "", color)', developer_elements)
+    self.assertIn('return UiElement(value, "Star", "", color)', developer_elements)
     status_source = developer_elements[developer_elements.index("class LaneCenteringStatusElement"):]
     self.assertNotIn("callback", status_source)
 
@@ -510,12 +542,12 @@ class TestLaneCenteringStack(unittest.TestCase):
           reason=reasons.disabled, active=False))
         rendered = element.update(sm, False)
         self.assertEqual((rendered.value, rendered.label, rendered.color),
-                         (expected_value, "BLENDFUL", expected_color))
+                         (expected_value, "Sunny", expected_color))
 
     sm = SubMasterHarness(laneCenteringStateSP=SimpleNamespace(
       laneGuidanceMode=2, blendfulDetailsValid=False, reason=reasons.disabled, active=False))
     rendered = element.update(sm, False)
-    self.assertEqual((rendered.value, rendered.label, rendered.color), ("SYNC", "BLENDFUL", amber))
+    self.assertEqual((rendered.value, rendered.label, rendered.color), ("SYNC", "Sunny", amber))
 
   def test_diagnostics_cannot_feed_control_branches_state_or_returns(self) -> None:
     controller = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/lib/lane_centering.py").read_text(encoding="utf-8")

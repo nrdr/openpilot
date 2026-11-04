@@ -566,8 +566,8 @@
         },
         {
           "id": "nrdr",
-          "title": "nrdr Lateral Tuning",
-          "description": "Lateral tuning specific to the nrdr fork.",
+          "title": "nrdr",
+          "description": "nrdr settings for steering, cruise, device, and driver monitoring. Longitudinal tuning is Honda-only unless an exact non-Honda profile is explicitly approved in the software. Other cars use the baseline Sunnypilot longitudinal path and ignore saved nrdr tuning values.",
           "items": [
             {
               "key": "NrdrSuggestedSettings",
@@ -581,6 +581,25 @@
                   "equals": true
                 }
               ],
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                }
+              ]
+            },
+            {
+              "key": "NrdrRemoteForceUpdate",
+              "widget": "toggle",
+              "title": "Force Update",
+              "description": "Flip ON to run the full updater chain (check, download, install, reboot). Only works while the car is off.",
+              "details": "Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status for progress."
+            },
+            {
+              "key": "DisablePowerDown",
+              "widget": "toggle",
+              "title": "Prevent Automatic Shutdown",
+              "description": "Prevents openpilot's automatic offroad shutdowns after the vehicle is turned off.",
+              "details": "When enabled, this bypasses the Max Time Offroad timer and its low-voltage and estimated-battery safeguards, and can drain the vehicle battery. When disabled, those safeguards resume after a 60-second grace period. Manual Power Off still works.",
               "enablement": [
                 {
                   "type": "offroad_only"
@@ -713,7 +732,7 @@
                   "key": "NrdrOptimizedLaneChanges",
                   "widget": "toggle",
                   "title": "Optimized Lane Changes",
-                  "description": "Use the fixed NRDR lane-change profile. During the maneuver, disable torque blending, feedforward, and rate damping for either controller.",
+                  "description": "Use the fixed nrdr lane-change profile. During the maneuver, disable torque blending, feedforward, and rate damping for either controller.",
                   "enablement": [
                     {
                       "type": "not",
@@ -1280,27 +1299,23 @@
             },
             {
               "id": "nrdr_lane_centering_stack",
-              "label": "Lane Centering Stack",
+              "label": "Lane Centering Method",
               "trigger_key": null,
               "items": [
                 {
                   "key": "LaneGuidanceMode",
                   "widget": "multiple_button",
-                  "title": "Lane Guidance",
-                  "description": "Choose exactly one path. Model Only leaves the model unchanged, NRDR uses the delay-aware controller below, and Blendful applies SunnyPilot's alpha policy inside the custom model runner.",
-                  "details": "NRDR builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Blendful adds a confidence-weighted correction before model smoothing and yields when the model appears to be going around an obstacle. The two correction paths are mutually exclusive. Blendful requires a non-Default custom model.",
+                  "title": "Lane Centering Method",
+                  "description": "Choose exactly one method. Off leaves the model unchanged, Sunny applies SunnyPilot's alpha policy inside the custom model runner, and Star uses nrdr's delay-aware controller and the tuning below.",
+                  "details": "Star builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Sunny adds a confidence-weighted correction before model smoothing and yields when the model appears to be going around an obstacle. The two correction paths are mutually exclusive. Sunny requires a non-Default custom model.",
                   "options": [
                     {
                       "value": 0,
-                      "label": "Model Only"
-                    },
-                    {
-                      "value": 1,
-                      "label": "NRDR"
+                      "label": "Off"
                     },
                     {
                       "value": 2,
-                      "label": "Blendful",
+                      "label": "Sunny",
                       "enablement": [
                         {
                           "type": "capability",
@@ -1308,6 +1323,10 @@
                           "equals": true
                         }
                       ]
+                    },
+                    {
+                      "value": 1,
+                      "label": "Star"
                     }
                   ],
                   "enablement": [
@@ -1533,7 +1552,7 @@
                   "widget": "multiple_button",
                   "title": "Ratio A \u2014 Near Center / Single Source",
                   "description": "The only source with Hybrid OFF; the near-center source with Hybrid ON.",
-                  "details": "Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. NRDR Measured Curve uses fixed logged data; it does not learn while you drive. Clarity retains its audited 435.7-degree near-lock anchor. Civic TEG-A010 uses provisional v0, with data-derived anchors at 3.3-58.7 degrees and linear interpolation between them. Outside that range the nearest anchor is held as an unmeasured estimate. This Civic draft is not road-validated and has no fitted speed correction. A disabled NRDR option means no matching car/EPS data profile. Firmware uses an exact recognized EPS shape, anchored to the car's rack map, yaw-measured where one exists (Clarity, Civic C020, Civic TEG-A010 and A030, Insight) or predicted from its published specs (Civic C120, TGG-A120, CR-V A040), and to its stock center ratio otherwise. Settings are captured from one live snapshot. Background polling has a 0.5-second cycle, but this does not prove Sunnylink delivery or active-controller consumption. Configure experimental settings while parked. Existing settings are not changed automatically.",
+                  "details": "Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. nrdr Measured Curve uses fixed logged data; it does not learn while you drive. Clarity retains its audited 435.7-degree near-lock anchor. Civic TEG-A010 uses provisional v0, with data-derived anchors at 3.3-58.7 degrees and linear interpolation between them. Outside that range the nearest anchor is held as an unmeasured estimate. This Civic draft is not road-validated and has no fitted speed correction. A disabled nrdr option means no matching car/EPS data profile. Firmware uses an exact recognized EPS shape, anchored to the car's rack map, yaw-measured where one exists (Clarity, Civic C020, Civic TEG-A010 and A030, Insight) or predicted from its published specs (Civic C120, TGG-A120, CR-V A040), and to its stock center ratio otherwise. Settings are captured from one live snapshot. Background polling has a 0.5-second cycle, but this does not prove Sunnylink delivery or active-controller consumption. Configure experimental settings while parked. Existing settings are not changed automatically.",
                   "options": [
                     {
                       "value": 0,
@@ -1552,7 +1571,7 @@
                     },
                     {
                       "value": 2,
-                      "label": "NRDR Measured Curve",
+                      "label": "nrdr Measured Curve",
                       "enablement": [
                         {
                           "type": "capability",
@@ -1648,7 +1667,7 @@
                     },
                     {
                       "value": 2,
-                      "label": "NRDR Measured Curve",
+                      "label": "nrdr Measured Curve",
                       "enablement": [
                         {
                           "type": "capability",
@@ -1755,7 +1774,7 @@
                   "widget": "option",
                   "title": "Manual Override Final Ratio",
                   "description": "Ratio used near the end of wheel travel. Default 10.93.",
-                  "details": "NRDR blends smoothly from the on-center number to this final number using hidden car-specific outer-angle metadata. Cars without exact metadata keep their stock ratio instead.",
+                  "details": "nrdr blends smoothly from the on-center number to this final number using hidden car-specific outer-angle metadata. Cars without exact metadata keep their stock ratio instead.",
                   "min": 8.0,
                   "max": 25.0,
                   "step": 0.01,
@@ -2236,6 +2255,313 @@
                         "key": "NrdrHandcraftedLateralTune",
                         "equals": true
                       }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nrdr_longitudinal",
+              "label": "Longitudinal Tuning",
+              "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_longitudinal_tuning_available",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "HondaLiveLearningGas",
+                  "widget": "toggle",
+                  "title": "Live Learning Gas",
+                  "description": "Allows Honda gas and wind compensation factors to learn live while driving.",
+                  "details": "Fresh installs default OFF when a gas pedal interceptor is detected and ON otherwise. Your selection is preserved afterward. While ON, all longitudinal PID personality scales are held at 100%.",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                },
+                {
+                  "key": "StaticFeedforwardLong",
+                  "widget": "toggle",
+                  "title": "Keep Feedforward Static",
+                  "description": "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; feedforward (kf) stays tuned.",
+                  "details": "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle."
+                },
+                {
+                  "key": "NrdrHondaEcuMatchedLong",
+                  "widget": "toggle",
+                  "title": "Honda Nidec: PCM command shaping",
+                  "description": "Experimental non-interceptor PCM propulsion shaping. OFF keeps the normal openpilot PCM path, not stock ACC.",
+                  "details": "Uses Pilot-derived acceleration ramps and a continuous speed-dependent neutral zone for propulsion feedforward. No timed gas/brake blackout. Does not delay braking or change interceptor/stock ACC commands. Pilot values are not a verified Civic calibration. Default OFF."
+                },
+                {
+                  "key": "NrdrHondaFullBrakeAuthority",
+                  "widget": "toggle",
+                  "title": "Full Nidec Brake Authority",
+                  "description": "Allows supported Honda Nidec longitudinal control to use the full normalized brake-command range.",
+                  "details": "Enabled by default. Disable to retain the upstream brake-command headroom. This setting operates independently of Live Learning Gas."
+                },
+                {
+                  "key": "NrdrRoenAccelerationLimits",
+                  "widget": "toggle",
+                  "title": "Roen Nidec Acceleration Limits",
+                  "description": "Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.",
+                  "details": "Disabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s\u00b2 through 5 m/s, fading to 2.0 m/s\u00b2 at 20 m/s; the controller fades from 4.0 to 3.0 m/s\u00b2, while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas."
+                },
+                {
+                  "key": "HondaBoschARadar",
+                  "widget": "toggle",
+                  "title": "Honda Bosch-A Radar (experimental)",
+                  "description": "Decodes the factory radar on supported Honda Bosch-A vehicles with stock longitudinal or openpilot Alpha Long.",
+                  "details": "EXPERIMENTAL \u2014 The reverse-engineered object format has not been road-validated on every supported model. Disable this setting if radar tracks look incorrect. With Alpha Long, these tracks feed openpilot's lead tracking and longitudinal commands; factory Honda AEB/CMBS remains unavailable."
+                },
+                {
+                  "key": "NrdrHondaDashVariantB",
+                  "widget": "toggle",
+                  "title": "Honda Dashboard Variant B",
+                  "description": "Turn ON if your cluster is Variant B (4 dashed lane lines). Placeholder for now - has no effect yet.",
+                  "details": "Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is Variant B. Placeholder for now - has no effect until the rounding correction is built."
+                },
+                {
+                  "key": "LongPidTuneScaleAggressive",
+                  "widget": "option",
+                  "title": "Distance 1 / Aggressive PID Scale",
+                  "description": "Scales the longitudinal PID controller for the Aggressive personality (distance setting 1).",
+                  "details": "Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LongPidTuneScaleStandard",
+                  "widget": "option",
+                  "title": "Distance 2 / Standard PID Scale",
+                  "description": "Scales the longitudinal PID controller for the Standard personality (distance setting 2).",
+                  "details": "Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LongPidTuneScaleRelaxed",
+                  "widget": "option",
+                  "title": "Distance 3 / Relaxed PID Scale",
+                  "description": "Scales the longitudinal PID controller for the Relaxed personality (distance setting 3).",
+                  "details": "Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LongPidTuneScaleEcon",
+                  "widget": "option",
+                  "title": "Distance 4 / Econ PID Scale",
+                  "description": "Scales the longitudinal PID controller for the Econ personality (distance setting 4).",
+                  "details": "Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "HondaLiveLearningGas",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrCruiseOverspeedAllowance",
+                  "widget": "option",
+                  "title": "Set-Speed Overshoot Allowance",
+                  "description": "Allows the cruise target to follow vehicle speed by up to this amount above the set speed when no other speed target is lower.",
+                  "details": "0 mph preserves stock behavior.",
+                  "min": 0,
+                  "max": 10,
+                  "step": 1,
+                  "unit": "mph"
+                },
+                {
+                  "key": "NrdrCruiseMismatchCorrection",
+                  "widget": "option",
+                  "title": "Cruise Mismatch Correction",
+                  "description": "Correct slight variances in final cruising target speed to better match the current and set speeds.",
+                  "details": "Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.",
+                  "min": 95.0,
+                  "max": 105.0,
+                  "step": 0.1,
+                  "unit": "%"
+                },
+                {
+                  "key": "NrdrStandstillGapExtra",
+                  "widget": "option",
+                  "title": "Extra Stopped Lead Gap",
+                  "description": "Additional lead clearance retained through creeping and at a complete stop. 0 preserves existing behavior.",
+                  "details": "Adds to the planner's distance floor, not the distance-bar time gap. Measured bumper clearance can vary with lead sensing and braking. Configure offroad; applies on the next engagement. Requires nrdr-supported openpilot longitudinal control; stock ACC and unapproved non-Honda vehicles are unchanged.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.25,
+                  "unit": "m",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaStoppingDecelRate",
+                  "widget": "option",
+                  "title": "Stopping Decel Rate",
+                  "description": "Brake-rate limiter used while coming to a stop (carcontroller).",
+                  "min": 0,
+                  "max": 100,
+                  "step": 1
+                },
+                {
+                  "key": "HondaStopAccel",
+                  "widget": "option",
+                  "title": "Stop Accel",
+                  "description": "Target acceleration once stopped (holds the brake).",
+                  "min": -4.0,
+                  "max": 0.0,
+                  "step": 0.01
+                },
+                {
+                  "key": "HondaStoppingDecelRateLong",
+                  "widget": "option",
+                  "title": "Planner Stopping Rate",
+                  "description": "How quickly commanded deceleration ramps down while coming to a stop.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01
+                },
+                {
+                  "key": "HondaVEgoStopping",
+                  "widget": "option",
+                  "title": "vEgo Stopping",
+                  "description": "Speed (m/s) below which the planner treats the car as stopping.",
+                  "min": 0.0,
+                  "max": 3.0,
+                  "step": 0.01
+                },
+                {
+                  "key": "HondaVEgoStarting",
+                  "widget": "option",
+                  "title": "vEgo Starting",
+                  "description": "Speed (m/s) above which the car is considered moving again.",
+                  "min": 0.0,
+                  "max": 3.0,
+                  "step": 0.01
+                }
+              ]
+            },
+            {
+              "id": "nrdr_driver_monitoring",
+              "label": "Driver Monitoring",
+              "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_driver_monitoring_tuning_available",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "NrdrDriverMonitoringReminderPercent",
+                  "widget": "option",
+                  "needs_onroad_cycle": true,
+                  "title": "First Reminder Timing",
+                  "description": "100% uses upstream timing. Higher values wait longer before the first reminder; lower values warn sooner. The gaps between later warnings stay unchanged, so later warnings shift with the first reminder. Camera-failure protections, lockouts, and the no-response interval are unchanged.",
+                  "details": "No disable option. At 250%, vision reminders occur at 12.5, 15.5, and 20.5 seconds; wheel reminders occur at 12.5, 22.5, and 32.5 seconds. Each sequence then keeps the unchanged 5-second no-response interval. Changes apply after reboot. Monitoring does not guarantee an emergency stop.",
+                  "min": 50,
+                  "max": 250,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
                     }
                   ]
                 }
@@ -2823,292 +3149,6 @@
                       "equals": true
                     }
                   ]
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "id": "nrdr",
-          "title": "nrdr Longitudinal Tuning",
-          "description": "NRDR longitudinal tuning is Honda-only unless an exact non-Honda profile is explicitly approved in the software. Other cars use the baseline Sunnypilot longitudinal path and ignore saved NRDR tuning values.",
-          "items": [],
-          "sub_panels": [
-            {
-              "id": "nrdr_longitudinal",
-              "label": "Longitudinal Tuning",
-              "trigger_key": null,
-              "trigger_condition": {
-                "type": "capability",
-                "field": "nrdr_longitudinal_tuning_available",
-                "equals": true
-              },
-              "items": [
-                {
-                  "key": "HondaLiveLearningGas",
-                  "widget": "toggle",
-                  "title": "Live Learning Gas",
-                  "description": "Allows Honda gas and wind compensation factors to learn live while driving.",
-                  "details": "Fresh installs default OFF when a gas pedal interceptor is detected and ON otherwise. Your selection is preserved afterward. While ON, all longitudinal PID personality scales are held at 100%.",
-                  "enablement": [
-                    {
-                      "type": "offroad_only"
-                    }
-                  ]
-                },
-                {
-                  "key": "StaticFeedforwardLong",
-                  "widget": "toggle",
-                  "title": "Keep Feedforward Static",
-                  "description": "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; feedforward (kf) stays tuned.",
-                  "details": "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle."
-                },
-                {
-                  "key": "NrdrHondaEcuMatchedLong",
-                  "widget": "toggle",
-                  "title": "Honda Nidec: PCM command shaping",
-                  "description": "Experimental non-interceptor PCM propulsion shaping. OFF keeps the normal openpilot PCM path, not stock ACC.",
-                  "details": "Uses Pilot-derived acceleration ramps and a continuous speed-dependent neutral zone for propulsion feedforward. No timed gas/brake blackout. Does not delay braking or change interceptor/stock ACC commands. Pilot values are not a verified Civic calibration. Default OFF."
-                },
-                {
-                  "key": "NrdrHondaFullBrakeAuthority",
-                  "widget": "toggle",
-                  "title": "Full Nidec Brake Authority",
-                  "description": "Allows supported Honda Nidec longitudinal control to use the full normalized brake-command range.",
-                  "details": "Enabled by default. Disable to retain the upstream brake-command headroom. This setting operates independently of Live Learning Gas."
-                },
-                {
-                  "key": "NrdrRoenAccelerationLimits",
-                  "widget": "toggle",
-                  "title": "Roen Nidec Acceleration Limits",
-                  "description": "Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.",
-                  "details": "Disabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s\u00b2 through 5 m/s, fading to 2.0 m/s\u00b2 at 20 m/s; the controller fades from 4.0 to 3.0 m/s\u00b2, while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas."
-                },
-                {
-                  "key": "HondaBoschARadar",
-                  "widget": "toggle",
-                  "title": "Honda Bosch-A Radar (experimental)",
-                  "description": "Decodes the factory radar on supported Honda Bosch-A vehicles with stock longitudinal or openpilot Alpha Long.",
-                  "details": "EXPERIMENTAL \u2014 The reverse-engineered object format has not been road-validated on every supported model. Disable this setting if radar tracks look incorrect. With Alpha Long, these tracks feed openpilot's lead tracking and longitudinal commands; factory Honda AEB/CMBS remains unavailable."
-                },
-                {
-                  "key": "NrdrHondaDashVariantB",
-                  "widget": "toggle",
-                  "title": "Honda Dashboard Variant B",
-                  "description": "Turn ON if your cluster is Variant B (4 dashed lane lines). Placeholder for now - has no effect yet.",
-                  "details": "Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is Variant B. Placeholder for now - has no effect until the rounding correction is built."
-                },
-                {
-                  "key": "LongPidTuneScaleAggressive",
-                  "widget": "option",
-                  "title": "Distance 1 / Aggressive PID Scale",
-                  "description": "Scales the longitudinal PID controller for the Aggressive personality (distance setting 1).",
-                  "details": "Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
-                  "min": 0,
-                  "max": 500,
-                  "step": 5,
-                  "unit": "%",
-                  "visibility": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "HondaLiveLearningGas",
-                        "equals": true
-                      }
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "HondaLiveLearningGas",
-                        "equals": true
-                      }
-                    }
-                  ]
-                },
-                {
-                  "key": "LongPidTuneScaleStandard",
-                  "widget": "option",
-                  "title": "Distance 2 / Standard PID Scale",
-                  "description": "Scales the longitudinal PID controller for the Standard personality (distance setting 2).",
-                  "details": "Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
-                  "min": 0,
-                  "max": 500,
-                  "step": 5,
-                  "unit": "%",
-                  "visibility": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "HondaLiveLearningGas",
-                        "equals": true
-                      }
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "HondaLiveLearningGas",
-                        "equals": true
-                      }
-                    }
-                  ]
-                },
-                {
-                  "key": "LongPidTuneScaleRelaxed",
-                  "widget": "option",
-                  "title": "Distance 3 / Relaxed PID Scale",
-                  "description": "Scales the longitudinal PID controller for the Relaxed personality (distance setting 3).",
-                  "details": "Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
-                  "min": 0,
-                  "max": 500,
-                  "step": 5,
-                  "unit": "%",
-                  "visibility": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "HondaLiveLearningGas",
-                        "equals": true
-                      }
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "HondaLiveLearningGas",
-                        "equals": true
-                      }
-                    }
-                  ]
-                },
-                {
-                  "key": "LongPidTuneScaleEcon",
-                  "widget": "option",
-                  "title": "Distance 4 / Econ PID Scale",
-                  "description": "Scales the longitudinal PID controller for the Econ personality (distance setting 4).",
-                  "details": "Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.",
-                  "min": 0,
-                  "max": 500,
-                  "step": 5,
-                  "unit": "%",
-                  "visibility": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "HondaLiveLearningGas",
-                        "equals": true
-                      }
-                    }
-                  ],
-                  "enablement": [
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "HondaLiveLearningGas",
-                        "equals": true
-                      }
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrCruiseOverspeedAllowance",
-                  "widget": "option",
-                  "title": "Set-Speed Overshoot Allowance",
-                  "description": "Allows the cruise target to follow vehicle speed by up to this amount above the set speed when no other speed target is lower.",
-                  "details": "0 mph preserves stock behavior.",
-                  "min": 0,
-                  "max": 10,
-                  "step": 1,
-                  "unit": "mph"
-                },
-                {
-                  "key": "NrdrCruiseMismatchCorrection",
-                  "widget": "option",
-                  "title": "Cruise Mismatch Correction",
-                  "description": "Correct slight variances in final cruising target speed to better match the current and set speeds.",
-                  "details": "Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.",
-                  "min": 95.0,
-                  "max": 105.0,
-                  "step": 0.1,
-                  "unit": "%"
-                },
-                {
-                  "key": "NrdrStandstillGapExtra",
-                  "widget": "option",
-                  "title": "Extra Stopped Lead Gap",
-                  "description": "Additional lead clearance retained through creeping and at a complete stop. 0 preserves existing behavior.",
-                  "details": "Adds to the planner's distance floor, not the distance-bar time gap. Measured bumper clearance can vary with lead sensing and braking. Configure offroad; applies on the next engagement. Requires NRDR-supported openpilot longitudinal control; stock ACC and unapproved non-Honda vehicles are unchanged.",
-                  "min": 0.0,
-                  "max": 5.0,
-                  "step": 0.25,
-                  "unit": "m",
-                  "enablement": [
-                    {
-                      "type": "offroad_only"
-                    },
-                    {
-                      "type": "capability",
-                      "field": "has_longitudinal_control",
-                      "equals": true
-                    }
-                  ]
-                },
-                {
-                  "key": "HondaStoppingDecelRate",
-                  "widget": "option",
-                  "title": "Stopping Decel Rate",
-                  "description": "Brake-rate limiter used while coming to a stop (carcontroller).",
-                  "min": 0,
-                  "max": 100,
-                  "step": 1
-                },
-                {
-                  "key": "HondaStopAccel",
-                  "widget": "option",
-                  "title": "Stop Accel",
-                  "description": "Target acceleration once stopped (holds the brake).",
-                  "min": -4.0,
-                  "max": 0.0,
-                  "step": 0.01
-                },
-                {
-                  "key": "HondaStoppingDecelRateLong",
-                  "widget": "option",
-                  "title": "Planner Stopping Rate",
-                  "description": "How quickly commanded deceleration ramps down while coming to a stop.",
-                  "min": 0.0,
-                  "max": 5.0,
-                  "step": 0.01
-                },
-                {
-                  "key": "HondaVEgoStopping",
-                  "widget": "option",
-                  "title": "vEgo Stopping",
-                  "description": "Speed (m/s) below which the planner treats the car as stopping.",
-                  "min": 0.0,
-                  "max": 3.0,
-                  "step": 0.01
-                },
-                {
-                  "key": "HondaVEgoStarting",
-                  "widget": "option",
-                  "title": "vEgo Starting",
-                  "description": "Speed (m/s) above which the car is considered moving again.",
-                  "min": 0.0,
-                  "max": 3.0,
-                  "step": 0.01
                 }
               ]
             }
@@ -3748,18 +3788,6 @@
               "title": "Onroad Uploads"
             },
             {
-              "key": "DisablePowerDown",
-              "widget": "toggle",
-              "title": "Prevent Automatic Shutdown",
-              "description": "Prevents openpilot's automatic offroad shutdowns after the vehicle is turned off.",
-              "details": "When enabled, this bypasses the Max Time Offroad timer and its low-voltage and estimated-battery safeguards, and can drain the vehicle battery. When disabled, those safeguards resume after a 60-second grace period. Manual Power Off still works.",
-              "enablement": [
-                {
-                  "type": "offroad_only"
-                }
-              ]
-            },
-            {
               "key": "MaxTimeOffroad",
               "widget": "option",
               "title": "Max Time Offroad",
@@ -3871,21 +3899,6 @@
               ]
             }
           ]
-        },
-        {
-          "id": "nrdr",
-          "title": "nrdr Force Update",
-          "description": "Trigger a remote device update.",
-          "items": [
-            {
-              "key": "NrdrRemoteForceUpdate",
-              "widget": "toggle",
-              "title": "Force Update",
-              "description": "Flip ON to run the full updater chain (check, download, install, reboot). Only works while the car is off.",
-              "details": "Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status below for progress."
-            }
-          ],
-          "sub_panels": []
         }
       ]
     },

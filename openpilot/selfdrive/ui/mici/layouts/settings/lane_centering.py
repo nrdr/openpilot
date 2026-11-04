@@ -21,6 +21,7 @@ from openpilot.selfdrive.controls.lib.lane_centering import lane_centering_min_s
 from openpilot.selfdrive.ui.mici.widgets.button import BigMultiToggle, BigToggle
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.ui.lane_guidance import LANE_GUIDANCE_LABELS, LANE_GUIDANCE_MODES
 from openpilot.system.ui.widgets.scroller import NavScroller
 
 
@@ -29,11 +30,11 @@ class LaneCenteringLayoutMici(NavScroller):
     super().__init__()
 
     self._lane_guidance_mode = BigMultiToggle(
-      "lane guidance",
-      ["model only", "nrdr", "blendful"],
+      "Lane Centering Method",
+      list(LANE_GUIDANCE_LABELS),
       select_callback=self._on_lane_guidance_mode,
       font_size=40,
-      description="choose one path; blendful needs a custom model",
+      description="choose one method; Sunny needs a custom model; tuning below applies to Star",
     )
     self._pause_on_signal_toggle = BigToggle(
       "fade on turn signal",
@@ -100,16 +101,13 @@ class LaneCenteringLayoutMici(NavScroller):
     if not self._write_allowed():
       self._refresh()
       return
-    mode = LaneGuidanceMode(("model only", "nrdr", "blendful").index(value))
+    mode = LANE_GUIDANCE_MODES[LANE_GUIDANCE_LABELS.index(value)]
     custom_model_active = self._custom_model_active()
-    if mode == LaneGuidanceMode.BLENDFUL and custom_model_active is None:
-      self._refresh()
-      return
-    if mode == LaneGuidanceMode.BLENDFUL and custom_model_active is False:
+    if mode == LaneGuidanceMode.BLENDFUL and custom_model_active is not True:
       # BigMultiToggle cycles instead of exposing individually disabled
-      # buttons. Skip the unavailable third state so NRDR can still cycle back
-      # to Model Only on a device running the Default model.
-      mode = LaneGuidanceMode.MODEL_ONLY
+      # buttons. Skip Sunny when unavailable OR temporarily unknown, so the
+      # Off -> Sunny -> Star display order cannot trap the user at Off.
+      mode = LaneGuidanceMode.NRDR
     set_lane_guidance_mode(ui_state.params, mode)
     self._refresh()
 
@@ -153,7 +151,7 @@ class LaneCenteringLayoutMici(NavScroller):
       # cache is left untouched until the manager republishes it.
       set_lane_guidance_mode(ui_state.params, LaneGuidanceMode.MODEL_ONLY)
       mode = LaneGuidanceMode.MODEL_ONLY
-    self._lane_guidance_mode.set_value(("model only", "nrdr", "blendful")[int(mode)])
+    self._lane_guidance_mode.set_value(LANE_GUIDANCE_LABELS[LANE_GUIDANCE_MODES.index(mode)])
     self._pause_on_signal_toggle.set_checked(
       bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)))
     self._minimum_speed_toggle.set_value(

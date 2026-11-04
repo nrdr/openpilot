@@ -10,6 +10,7 @@ from openpilot.nrdr.features.lateral.lane_guidance import (
   set_lane_guidance_mode,
 )
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.ui.lane_guidance import LANE_GUIDANCE_MODES
 from openpilot.selfdrive.controls.lib.lane_centering import (
   LANE_CENTERING_MIN_SPEED_MAX_MPH,
   LANE_CENTERING_MIN_SPEED_MIN_MPH,
@@ -52,12 +53,13 @@ class LaneCenteringLayout(Widget):
     super().__init__()
 
     self._lane_guidance_mode = multiple_button_item_sp(
-      title=tr("Lane Guidance"),
-      description=tr("Choose exactly one path. Model Only uses the model unchanged. NRDR applies the delay-aware lane-centering controller below. " +
-                     "Blendful (Alpha) adds SunnyPilot's confidence-weighted correction inside the custom model runner and yields when the model " +
-                     "appears to be going around an obstacle. Blendful requires a non-Default custom model."),
-      buttons=[tr("Model Only"), tr("NRDR"), tr("Blendful")],
-      selected_index=int(lane_guidance_mode_from_params(ui_state.params)),
+      title=tr("Lane Centering Method"),
+      description=tr("Choose exactly one method. Off uses the model unchanged. Sunny adds SunnyPilot's confidence-weighted alpha correction " +
+                     "inside the custom model runner and yields when the model appears to be going around an obstacle. " +
+                     "Sunny requires a non-Default custom model. Star uses nrdr's delay-aware lane-centering controller and the tuning below. " +
+                     "Sunny and Star are mutually exclusive."),
+      buttons=[tr("Off"), tr("Sunny"), tr("Star")],
+      selected_index=LANE_GUIDANCE_MODES.index(lane_guidance_mode_from_params(ui_state.params)),
       button_width=260,
       callback=self._on_lane_guidance_mode,
       inline=False,
@@ -161,7 +163,7 @@ class LaneCenteringLayout(Widget):
     if not self._write_allowed():
       self._refresh()
       return
-    mode = LaneGuidanceMode(value)
+    mode = LANE_GUIDANCE_MODES[value]
     if mode == LaneGuidanceMode.BLENDFUL and self._custom_model_active() is not True:
       self._refresh()
       return
@@ -181,9 +183,9 @@ class LaneCenteringLayout(Widget):
     if mode == LaneGuidanceMode.BLENDFUL and custom_model_active is False:
       set_lane_guidance_mode(ui_state.params, LaneGuidanceMode.MODEL_ONLY)
       mode = LaneGuidanceMode.MODEL_ONLY
-    self._lane_guidance_mode.action_item.set_selected_button(int(mode))
+    self._lane_guidance_mode.action_item.set_selected_button(LANE_GUIDANCE_MODES.index(mode))
     self._lane_guidance_mode.action_item.set_enabled_buttons(
-      {0, 1, 2} if custom_model_active is True or (custom_model_active is None and mode == LaneGuidanceMode.BLENDFUL) else {0, 1})
+      {0, 1, 2} if custom_model_active is True or (custom_model_active is None and mode == LaneGuidanceMode.BLENDFUL) else {0, 2})
     self._pause_on_signal_toggle.action_item.set_state(
       bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)))
     self._minimum_speed_control.action_item.refresh_from_param()

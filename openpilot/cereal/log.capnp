@@ -80,6 +80,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     commIssue @43;
     commIssueAvgFreq @44;
     tooDistracted @45;
+    driverMonitoringFault @105;
     posenetInvalid @46;
     preLaneChangeLeft @48;
     preLaneChangeRight @49;

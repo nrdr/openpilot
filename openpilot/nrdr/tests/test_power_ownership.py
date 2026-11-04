@@ -250,12 +250,16 @@ class TestPowerOwnershipBoundaries(unittest.TestCase):
     self.assertNotIn("prevent automatic", mici_source.lower())
 
   def test_sunnylink_device_item_is_canonically_owned(self):
-    canonical_source = (self.repository_root / "openpilot/nrdr/ui/sunnylink/items/device.yaml").read_text(encoding="utf-8")
+    canonical_source = (self.repository_root / "openpilot/nrdr/ui/sunnylink/pages/steering.yaml").read_text(encoding="utf-8")
     host_source = (self.repository_root / "openpilot/sunnypilot/sunnylink/settings_ui_src/pages/device.yaml").read_text(encoding="utf-8")
     native_source = (self.repository_root / "openpilot/nrdr/ui/settings/device_power.py").read_text(encoding="utf-8")
 
     self.assertIn("key: DisablePowerDown", canonical_source)
-    self.assertIn("item_key: MaxTimeOffroad", canonical_source)
+    from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
+    timer = apply_sunnylink_metadata({"key": "MaxTimeOffroad", "enablement": [{"type": "offroad_only"}]})
+    self.assertEqual(timer["enablement"], [
+      {"type": "offroad_only"}, {"type": "param", "key": "DisablePowerDown", "equals": False},
+    ])
     self.assertNotIn("DisablePowerDown", host_source)
     self.assertNotIn("deferred", native_source.lower())
 

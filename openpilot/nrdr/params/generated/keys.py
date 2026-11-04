@@ -8,6 +8,7 @@ class NrdrParamKey(StrEnum):
   HONDA_BOSCH_A_RADAR = "HondaBoschARadar"
   OFFROAD_NEOS_UPDATE = "Offroad_NeosUpdate"
   RECORD_AUDIO_FEEDBACK = "RecordAudioFeedback"
+  NRDR_DRIVER_MONITORING_REMINDER_PERCENT = "NrdrDriverMonitoringReminderPercent"
   REMOTE_ACCESS_PIN_ENABLED = "RemoteAccessPinEnabled"
   REMOTE_ACCESS_PIN_SALT = "RemoteAccessPinSalt"
   REMOTE_ACCESS_PIN_HASH = "RemoteAccessPinHash"
@@ -163,6 +164,7 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.HONDA_BOSCH_A_RADAR,
   NrdrParamKey.OFFROAD_NEOS_UPDATE,
   NrdrParamKey.RECORD_AUDIO_FEEDBACK,
+  NrdrParamKey.NRDR_DRIVER_MONITORING_REMINDER_PERCENT,
   NrdrParamKey.REMOTE_ACCESS_PIN_ENABLED,
   NrdrParamKey.REMOTE_ACCESS_PIN_SALT,
   NrdrParamKey.REMOTE_ACCESS_PIN_HASH,

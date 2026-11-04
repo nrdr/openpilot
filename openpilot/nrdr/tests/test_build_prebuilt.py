@@ -189,6 +189,7 @@ def make_source(tmp_path: Path, entries: list[str], existing_entries: list[str])
     (clean_overlay / name).write_text("# clean overlay fixture\n", encoding="utf-8")
   shutil.copy2(CLEAN_OVERLAY / "backend_env.sh", clean_overlay / "backend_env.sh")
   shutil.copy2(CLEAN_OVERLAY / "restore_comm_events.py", clean_overlay / "restore_comm_events.py")
+  shutil.copy2(CLEAN_OVERLAY / "strip_monitoring_ui.py", clean_overlay / "strip_monitoring_ui.py")
 
   # A deliberately broken copy at the pre-migration location proves preflight
   # uses tools/release/release_files.py, not release/release_files.py.
@@ -667,6 +668,8 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
     Path("openpilot/nrdr/ui/home/layout.py"),
     Path("openpilot/nrdr/ui/home/mici.py"),
     Path("openpilot/nrdr/ui/settings/party_tricks.py"),
+    Path("openpilot/nrdr/ui/sunnylink/pages/steering.yaml"),
+    Path("openpilot/sunnypilot/sunnylink/settings_ui.json"),
   )
   for relative in overlay_targets:
     copy_file_from_source(relative, build)
@@ -723,3 +726,5 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
 
   party_tricks = (build / "openpilot/nrdr/ui/settings/party_tricks.py").read_text(encoding="utf-8")
   assert "      self._reregister_item," not in party_tricks
+  for relative in ("openpilot/nrdr/ui/sunnylink/pages/steering.yaml", "openpilot/sunnypilot/sunnylink/settings_ui.json"):
+    assert "NrdrDriverMonitoringReminderPercent" not in (build / relative).read_text(encoding="utf-8")

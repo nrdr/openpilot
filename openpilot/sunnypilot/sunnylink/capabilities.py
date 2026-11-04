@@ -17,6 +17,7 @@ from openpilot.common.hardware import HARDWARE
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
 from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
+from openpilot.nrdr.hooks.driver_monitoring import monitoring_customization_available
 from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   RAW_STEER_RATIO_PROFILES, get_raw_steer_ratio_profile, get_steer_ratio_metadata,
@@ -61,6 +62,7 @@ CAPABILITY_FIELDS = (
   "nrdr_firmware_steer_ratio_available",
   "nrdr_interpolated_torque_pif_blend_available",
   "custom_model_active",
+  "nrdr_driver_monitoring_tuning_available",
 )
 
 CAPABILITY_LABELS: dict[str, str] = {
@@ -88,13 +90,14 @@ CAPABILITY_LABELS: dict[str, str] = {
   "nrdr_yaw_controller_available": "Supported Honda Firmware Controller",
   "nrdr_firmware_prediction_schedule": "Measured Firmware Controller prediction-delay schedule",
   "nrdr_firmware_controller_provisional": "Provisional firmware-specific calibration; confirm the required EPS build before driving",
-  "nrdr_honda_tuning_available": "Confirmed Honda-specific NRDR tuning available",
-  "nrdr_longitudinal_tuning_available": "Vehicle explicitly supported by NRDR longitudinal tuning",
-  "nrdr_manual_steer_ratio_available": "NRDR manual steer-ratio geometry available",
-  "nrdr_raw_steer_ratio_available": "Matching NRDR measured steer-ratio curve available (may be provisional)",
-  "nrdr_firmware_steer_ratio_available": "Exact NRDR firmware steer-ratio geometry available",
+  "nrdr_honda_tuning_available": "Confirmed Honda-specific nrdr tuning available",
+  "nrdr_longitudinal_tuning_available": "Vehicle explicitly supported by nrdr longitudinal tuning",
+  "nrdr_manual_steer_ratio_available": "nrdr manual steer-ratio geometry available",
+  "nrdr_raw_steer_ratio_available": "Matching nrdr measured steer-ratio curve available (may be provisional)",
+  "nrdr_firmware_steer_ratio_available": "Exact nrdr firmware steer-ratio geometry available",
   "nrdr_interpolated_torque_pif_blend_available": "Modified-EPS Honda interpolated torque/P/I/F control available",
   "custom_model_active": "Non-Default custom model selected",
+  "nrdr_driver_monitoring_tuning_available": "nrdr driver-monitoring reminder tuning (not in clean builds)",
 }
 
 # Explicit defaults for non-boolean capability fields
@@ -165,6 +168,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
   caps["stock_longitudinal"] = params.get_bool("ToyotaEnforceStockLongitudinal")
   # This is the runner manager actually launches; with a Chestnut the big-model slot decides.
   caps["custom_model_active"] = params.get("ModelRunnerTypeCache") == custom.ModelManagerSP.Runner.tinygrad
+  caps["nrdr_driver_monitoring_tuning_available"] = monitoring_customization_available()
   bundle = params.get("CarPlatformBundle")
   bundle_brand = _bundle_field(bundle, "brand")
   bundle_platform = _bundle_field(bundle, "platform")

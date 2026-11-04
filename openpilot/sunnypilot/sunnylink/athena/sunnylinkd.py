@@ -52,10 +52,13 @@ BLOCKED_PARAMS = {
   "AdbEnabled",
   "CompletedSunnylinkConsentVersion",
   "CompletedTrainingVersion",
+  "DriverLockoutCount",  # Monitoring-owned state, not a user setting.
+  "DriverTooDistracted",
   "GithubUsername",  # Could grant SSH access
   "GithubSshKeys",   # Direct SSH key injection
   "HasAcceptedTerms",
   "HasAcceptedTermsSP",
+  "IsOffroad",  # Manager-owned state; remote clients must not forge parked-only guards.
   "NrdrHandcraftedLateralRequest",  # Device-generated vehicle/version binding; never accept remote context.
   "OnroadCycleRequested",      # Prevent remote cycle trigger
   "ParamsVersion",         # Device-managed version counter
@@ -276,6 +279,20 @@ def _remote_int_value(value: str, compression: bool) -> int | None:
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
   from openpilot.nrdr.params.tuning_policy import reset_learning_scales, tuning_write_allowed
   onroad = not params.get_bool("IsOffroad")
+  monitoring_selection = None
+  if "NrdrDriverMonitoringReminderPercent" in params_to_update:
+    from openpilot.nrdr.hooks.driver_monitoring import monitoring_customization_available, validate_reminder_percent
+    if onroad or not monitoring_customization_available():
+      raise ValueError("Monitoring reminder timing is only editable offroad in non-clean builds.")
+    try:
+      decoded = base64.b64decode(params_to_update["NrdrDriverMonitoringReminderPercent"], validate=True)
+      if compression:
+        decoded = gzip.decompress(decoded)
+      monitoring_selection = validate_reminder_percent(decoded)
+    except (ValueError, TypeError, OSError) as error:
+      raise ValueError("Invalid monitoring reminder timing. Nothing was saved.") from error
+    if monitoring_selection is None:
+      raise ValueError("Monitoring reminder timing must be 50–250% in 5% steps.")
   vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {
     "NrdrHandcraftedLateralTune", "NrdrSuggestedSettings", "LagdToggle", "LagdToggleDelay", "LaneGuidanceMode",
   }
@@ -303,9 +320,9 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
   if "LaneGuidanceMode" in params_to_update:
     lane_guidance_selection = _remote_int_value(params_to_update["LaneGuidanceMode"], compression)
     if lane_guidance_selection not in (0, 1, 2):
-      raise ValueError("Invalid Lane Guidance mode. The selection was not saved.")
+      raise ValueError("Invalid Lane Centering Method. The selection was not saved.")
     if lane_guidance_selection == 2 and capabilities.get("custom_model_active") is not True:
-      raise ValueError("Blendful requires a non-Default custom model. The selection was not saved.")
+      raise ValueError("Sunny requires a non-Default custom model. The selection was not saved.")
   for key, value in params_to_update.items():
     if not tuning_write_allowed(params, key, firmware_prediction_schedule=capabilities.get("nrdr_firmware_prediction_schedule") is True):
       cloudlog.warning(f"sunnylinkd.saveParams.locked: '{key}'")
@@ -327,7 +344,13 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       continue
 
     try:
-      if key == "NrdrLateralController":
+      if key == "NrdrDriverMonitoringReminderPercent":
+        if not params.get_bool("IsOffroad"):
+          raise ValueError("Monitoring reminder timing cannot be changed after the car starts.")
+        params.put(key, monitoring_selection, block=True)
+        if params.get(key) != monitoring_selection:
+          raise ValueError("Monitoring reminder timing readback did not match.")
+      elif key == "NrdrLateralController":
         # Recheck road state immediately before the write, including stale UI.
         if not params.get_bool("IsOffroad"):
           raise ValueError("Controller Type cannot be changed after the car starts.")
@@ -349,8 +372,8 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
         reset_learning_scales(params)
     except Exception as e:
       cloudlog.error(f"sunnylinkd.saveParams.exception {e}")
-      if key == "NrdrLateralController":
-        raise ValueError("Controller Type could not be saved. Refresh settings to read the device's selection.") from e
+      if key in ("NrdrLateralController", "NrdrDriverMonitoringReminderPercent"):
+        raise ValueError("Setting could not be saved. Refresh settings to read the device's selection.") from e
 
   # Increment version counter for frontend change detection
   try:

@@ -255,6 +255,11 @@ class SelfdriveD(CruiseHelper):
 
     # Handle DM
     if not self.CP.notCar:
+      # DM must fail closed even when generic comm faults are suppressed or the
+      # driving model is settling. Keep SubMaster's replay/ignore semantics.
+      if (not SIMULATION or REPLAY) and not self.sm.all_checks(['driverMonitoringState']):
+        self.events.add(EventName.driverMonitoringFault)
+
       # Block engaging until lockout times out or ignition reset
       if self.sm['driverMonitoringState'].lockout and not self.dm_lockout_set:
         self.params.put_bool("DriverTooDistracted", True)

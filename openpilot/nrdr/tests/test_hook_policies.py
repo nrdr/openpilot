@@ -53,19 +53,16 @@ class TestHookPolicies(unittest.TestCase):
     apply_hud_lead(hud, SimpleNamespace(present=False, dRel=99.0, vLead=99.0))
     self.assertEqual((hud.leadDistance, hud.leadVLead), (0.0, 0.0))
 
-  def test_driver_monitoring_policy_retains_disabled_timeout_values(self):
-    settings = SimpleNamespace()
-    apply_driver_monitoring_policy(settings)
-
-    self.assertEqual(settings._WHEELTOUCH_POLICY_ALERT_1_TIMEOUT, 86400.0 - 15.0)
-    self.assertEqual(settings._WHEELTOUCH_POLICY_ALERT_2_TIMEOUT, 86400.0 - 6.0)
-    self.assertEqual(settings._WHEELTOUCH_POLICY_ALERT_3_TIMEOUT, 86400.0)
-    self.assertEqual(settings._VISION_POLICY_ALERT_1_TIMEOUT, 86400.0 - 8.0)
-    self.assertEqual(settings._VISION_POLICY_ALERT_2_TIMEOUT, 86400.0 - 6.0)
-    self.assertEqual(settings._VISION_POLICY_ALERT_3_TIMEOUT, 86400.0)
-    self.assertEqual(settings._NO_RESPONSE_TIMEOUT, 86400.0)
-    self.assertEqual(settings._MAX_ALERT_3, 86400)
-    self.assertEqual(settings._MAX_NO_RESPONSE, 86400)
+  def test_driver_monitoring_default_keeps_upstream_timeouts(self):
+    settings = SimpleNamespace(
+      _WHEELTOUCH_POLICY_ALERT_1_TIMEOUT=5., _WHEELTOUCH_POLICY_ALERT_2_TIMEOUT=15., _WHEELTOUCH_POLICY_ALERT_3_TIMEOUT=25.,
+      _VISION_POLICY_ALERT_1_TIMEOUT=5., _VISION_POLICY_ALERT_2_TIMEOUT=8., _VISION_POLICY_ALERT_3_TIMEOUT=13.,
+      _NO_RESPONSE_TIMEOUT=5., _MAX_ALERT_3=2, _MAX_NO_RESPONSE=1,
+    )
+    before = vars(settings).copy()
+    apply_driver_monitoring_policy(settings, 100)
+    for key, value in before.items():
+      self.assertEqual(getattr(settings, key), value)
 
   def test_auto_lkas_rearms_only_after_main_becomes_unavailable(self):
     auto_lkas = AutoLkas()

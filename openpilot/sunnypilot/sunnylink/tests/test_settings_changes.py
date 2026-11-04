@@ -256,12 +256,15 @@ class TestSpuriousOffroadGatesDropped(OpenpilotTestCase):
 
 
 class TestDevicePowerPolicy(OpenpilotTestCase):
-  def test_prevent_shutdown_is_offroad_only_and_precedes_timer(self, schema):
-    section = _find_section(schema, "device", "general")
+  def test_prevent_shutdown_is_offroad_only_in_steering_nrdr(self, schema):
+    section = _find_section(schema, "steering", "nrdr")
     assert section is not None
     keys = [item["key"] for item in section["items"]]
     prevent_index = keys.index("DisablePowerDown")
-    assert keys[prevent_index + 1] == "MaxTimeOffroad"
+    assert "MaxTimeOffroad" not in keys
+    device = _find_section(schema, "device", "general")
+    assert "MaxTimeOffroad" in [item["key"] for item in device["items"]]
+    assert "DisablePowerDown" not in [item["key"] for item in device["items"]]
 
     prevent = section["items"][prevent_index]
     assert prevent["widget"] == "toggle"
@@ -357,7 +360,7 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     assert (item.get("min"), item.get("max"), item.get("step"), item.get("unit")) == (0, 500, 5, "%")
 
   def test_longitudinal_panel_follows_toggle_then_option_order(self, schema):
-    section = _find_section(schema, "cruise", "nrdr")
+    section = _find_section(schema, "steering", "nrdr")
     assert section is not None
     panel = next(sub_panel for sub_panel in section.get("sub_panels", []) if sub_panel.get("id") == "nrdr_longitudinal")
     items = panel.get("items", [])

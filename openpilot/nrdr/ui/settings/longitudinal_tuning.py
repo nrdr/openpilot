@@ -19,9 +19,9 @@ class LongitudinalTuningLayout(Widget):
 
     self._tuning_items = self._initialize_items()
     status = ListItem(
-      title=lambda: tr("NRDR longitudinal active") if nrdr_longitudinal_enabled(ui_state.CP) else tr("Baseline longitudinal - NRDR tuning inactive"),
-      description=lambda: tr("NRDR tuning is enabled for Honda only unless an exact non-Honda vehicle profile is explicitly approved in the software. " +
-                             "Saved NRDR settings do not enable it on another car. Baseline Sunnypilot features remain available."),
+      title=lambda: tr("nrdr longitudinal active") if nrdr_longitudinal_enabled(ui_state.CP) else tr("Baseline longitudinal - nrdr tuning inactive"),
+      description=lambda: tr("nrdr tuning is enabled for Honda only unless an exact non-Honda vehicle profile is explicitly approved in the software. " +
+                             "Saved nrdr settings do not enable it on another car. Baseline Sunnypilot features remain available."),
     )
     self._scroller = Scroller([status, *self._tuning_items], line_separator=False, spacing=0)
 
@@ -35,7 +35,7 @@ class LongitudinalTuningLayout(Widget):
         "Additional lead clearance retained through creeping and at a complete stop. " +
         "This adds to the planner's distance floor, not the distance-bar time gap. " +
         "0 preserves existing behavior. Measured bumper clearance can vary with lead sensing and braking. " +
-        "Configure offroad; applies on the next engagement. Requires NRDR-supported openpilot longitudinal control."
+        "Configure offroad; applies on the next engagement. Requires nrdr-supported openpilot longitudinal control."
       ),
     )
     self._long_pid_tune_scale_aggressive = option_item_sp(

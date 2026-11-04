@@ -6,7 +6,7 @@ import gzip
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -211,6 +211,67 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
       self.save_params({"NrdrLateralController": self._encode(b"1")})
     self.params.put.assert_not_called()
 
+  def test_monitoring_timing_validates_and_reads_back_offroad(self):
+    key = "NrdrDriverMonitoringReminderPercent"
+    for percent in (50, 100, 250):
+      for compression in (False, True):
+        with self.subTest(percent=percent, compression=compression):
+          stored = {}
+          self.params.get.side_effect = lambda key, **_: stored.get(key, 0)
+          self.params.put.side_effect = lambda key, value, **_: stored.update({key: value})
+          self.save_params({key: self._encode(str(percent).encode(), compression)}, compression)
+          self.assertEqual(stored[key], percent)
+          self.generic_write.assert_not_called()
+
+  def test_monitoring_timing_rejects_disable_and_malformed_requests(self):
+    key = "NrdrDriverMonitoringReminderPercent"
+    for value in (b"0", b"49", b"251", b"99", b"100.0", b" 100", b"nan", b"\xff"):
+      with self.subTest(value=value), self.assertRaises(ValueError):
+        self.save_params({key: self._encode(value)})
+    self.params.put.assert_not_called()
+    self.generic_write.assert_not_called()
+
+  def test_monitoring_timing_rejects_onroad_clean_and_racing_transitions(self):
+    key = "NrdrDriverMonitoringReminderPercent"
+    request = {key: self._encode(b"250")}
+    self.params.get_bool.return_value = False
+    with self.assertRaisesRegex(ValueError, "offroad"):
+      self.save_params(request)
+    self.params.get_bool.return_value = True
+    with patch("openpilot.nrdr.hooks.driver_monitoring.monitoring_customization_available", return_value=False):
+      with self.assertRaisesRegex(ValueError, "non-clean"):
+        self.save_params(request)
+    self.params.get_bool.side_effect = [True, False]
+    with self.assertRaisesRegex(ValueError, "could not be saved"):
+      self.save_params(request)
+    self.params.put.assert_not_called()
+    self.generic_write.assert_not_called()
+
+  def test_monitoring_timing_readback_failure_is_reported(self):
+    with self.assertRaisesRegex(ValueError, "could not be saved"):
+      self.save_params({"NrdrDriverMonitoringReminderPercent": self._encode(b"250")})
+
+  def test_remote_road_state_cannot_unlock_monitoring_timing(self):
+    stored = {"IsOffroad": False}
+    self.params.get_bool.side_effect = lambda key: bool(stored.get(key, False))
+    self.params.get.side_effect = lambda key, **_: stored.get(key, 0)
+    self.params.put.side_effect = lambda key, value, **_: stored.update({key: value})
+    self.generic_write.side_effect = lambda key, value, compression: stored.update({key: base64.b64decode(value) == b"1"})
+    self.save_params({"IsOffroad": self._encode(b"1")})
+    self.generic_write.assert_not_called()
+    self.assertFalse(stored["IsOffroad"])
+    with self.assertRaisesRegex(ValueError, "offroad"):
+      self.save_params({"NrdrDriverMonitoringReminderPercent": self._encode(b"250")})
+    self.assertNotIn("NrdrDriverMonitoringReminderPercent", stored)
+
+  def test_remote_requests_cannot_reset_or_poison_monitoring_lockout(self):
+    for key in ("DriverLockoutCount", "DriverTooDistracted"):
+      for raw in (b"0", b"-100", b"999999"):
+        with self.subTest(key=key, raw=raw):
+          self.save_params({key: self._encode(raw)})
+          self.generic_write.assert_not_called()
+          self.assertFalse(any(call.args[0] == key for call in self.params.put.call_args_list))
+
   def test_lane_guidance_mode_is_validated_and_mirrors_the_legacy_bool(self):
     self.namespace["_vehicle_tuning_capabilities"].return_value = {"custom_model_active": True}
     for mode in (0, 1, 2):
@@ -231,7 +292,7 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
       with self.subTest(value=value):
         self.params.put.reset_mock()
         self.params.put_bool.reset_mock()
-        with self.assertRaisesRegex(ValueError, "Invalid Lane Guidance"):
+        with self.assertRaisesRegex(ValueError, "Invalid Lane Centering Method"):
           self.save_params({"LaneGuidanceMode": self._encode(value)})
         self.params.put.assert_not_called()
         self.params.put_bool.assert_not_called()

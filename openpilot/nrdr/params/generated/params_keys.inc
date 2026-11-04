@@ -2,6 +2,7 @@
     {"HondaBoschARadar", {PERSISTENT, BOOL, "1"}},
     {"Offroad_NeosUpdate", {CLEAR_ON_MANAGER_START, JSON}},
     {"RecordAudioFeedback", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrDriverMonitoringReminderPercent", {PERSISTENT | BACKUP, INT, "100"}},
     {"RemoteAccessPinEnabled", {PERSISTENT, BOOL}},
     {"RemoteAccessPinSalt", {PERSISTENT | DONT_LOG, BYTES}},
     {"RemoteAccessPinHash", {PERSISTENT | DONT_LOG, BYTES}},

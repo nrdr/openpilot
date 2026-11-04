@@ -85,7 +85,7 @@ class TestControllerUiLabels(unittest.TestCase):
     layout = cls.__new__(cls)
     layout._initialize_items()
     local = layout._standstill_gap
-    web = next(item for item in _panel(self.schema, "cruise", "nrdr_longitudinal")["items"]
+    web = next(item for item in _panel(self.schema, "steering", "nrdr_longitudinal")["items"]
                if item["key"] == "NrdrStandstillGapExtra")
     self.assertEqual(web["title"], "Extra Stopped Lead Gap")
     self.assertEqual(local["title"](), "Extra Stopped Lead Gap (Default: 0 m)")

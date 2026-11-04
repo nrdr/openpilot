@@ -90,14 +90,14 @@ class SteerRatioTuningLayout(Widget):
       return tr("Unavailable — see details")
     if selection.hybrid is not None:
       return tr(f"Hybrid · {selection.hybrid.start:g}–{selection.hybrid.end:g}°")
-    return tr(selection.effective_label)
+    return tr(selection.effective_label.replace("NRDR", "nrdr"))
 
   def _status_details(self) -> str:
     if ui_state.CP is None:
       return tr("Waiting for car")
     selection = resolve_steer_ratio_selection(ui_state.CP, ui_state.params)
     detail = selection.effective_label if selection.available else selection.unavailable_reason
-    return tr(detail + ". Configured preview, not proof of live controller consumption. " +
+    return tr(detail.replace("NRDR", "nrdr") + ". Configured preview, not proof of live controller consumption. " +
               "Comma preview uses the stock anchor; runtime uses its last valid learned ratio. " +
               "Invalid hybrid edits hold the last accepted geometry while active; startup uses stock fallback.")
 
