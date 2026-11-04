@@ -50,7 +50,7 @@ from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeController
 from openpilot.nrdr.features.services import admit_selected_artifact, admit_default_artifact
 from openpilot.nrdr.features.lateral.model_source import delay_input, lateral_source
-from openpilot.nrdr.features.lateral.lane_guidance import LaneGuidanceMode, parse_lane_guidance_mode
+from openpilot.nrdr.features.lateral.lane_guidance import LaneGuidanceMode, lane_guidance_mode_from_params
 
 PROCESS_NAME = "openpilot.selfdrive.modeld.modeld_tinygrad"
 BIG_MODEL_TIMEOUT = 60
@@ -416,7 +416,7 @@ def main(demo=False):
       camera_offset_helper.set_offset(params.get("CameraOffset", return_default=True))
     # Lane-guidance mode is live and safety-critical. Read it every model frame
     # so selecting Model Only takes effect on the next output, not seconds later.
-    lane_guidance_mode = parse_lane_guidance_mode(params.get("LaneGuidanceMode", return_default=True))
+    lane_guidance_mode = lane_guidance_mode_from_params(params)
     lat_delay = model.lat_delay + model.LAT_SMOOTH_SECONDS
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["extrinsicsCalibration"].rpyCalib, dtype=np.float32)

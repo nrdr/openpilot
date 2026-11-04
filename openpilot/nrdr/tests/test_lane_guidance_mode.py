@@ -28,6 +28,12 @@ class MemoryParams:
   def get_bool(self, key):
     return self.values.get(key) in (True, "1", b"1")
 
+  def get_raw(self, key):
+    value = self.values.get(key)
+    if value is None or isinstance(value, bytes):
+      return value
+    return str(int(value) if type(value) is bool else value).encode()
+
   def put(self, key, value, *, block=False):
     self.values[key] = value
     self.writes.append(("put", key, value, block))
@@ -134,7 +140,7 @@ class TestLaneGuidanceMode(unittest.TestCase):
       if isinstance(node, ast.Assign)
       and any(isinstance(target, ast.Name) and target.id == "lane_guidance_mode" for target in node.targets)
       and isinstance(node.value, ast.Call)
-      and getattr(node.value.func, "id", None) == "parse_lane_guidance_mode"
+      and getattr(node.value.func, "id", None) == "lane_guidance_mode_from_params"
     ]
     self.assertEqual(len(assignments), 1)
     assignment = assignments[0]

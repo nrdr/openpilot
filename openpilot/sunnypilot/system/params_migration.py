@@ -109,22 +109,28 @@ def _migrate_lane_guidance_mode(_params):
     from openpilot.nrdr.features.lateral.lane_guidance import (
       LaneGuidanceMode,
       parse_lane_guidance_mode,
-      set_lane_guidance_mode,
+      restore_lane_guidance_mode,
     )
-    stored = _params.get("LaneGuidanceMode")
+    # Typed get() conflates missing, empty and malformed INT values. Only two
+    # genuinely absent files authorize the fresh-install Sunny default.
+    stored = _params.get_raw("LaneGuidanceMode")
+    legacy = _params.get_raw("LaneCentering")
     if stored is not None:
       mode = parse_lane_guidance_mode(stored)
-    elif _params.get("LaneCentering") is None:
+    elif legacy is None:
       # Missing is a fresh/reset install; a stored False is an explicit legacy Off.
       mode = LaneGuidanceMode.BLENDFUL
     else:
-      mode = LaneGuidanceMode.NRDR if _params.get_bool("LaneCentering") else LaneGuidanceMode.MODEL_ONLY
+      mode = LaneGuidanceMode.NRDR if legacy == b"1" else LaneGuidanceMode.MODEL_ONLY
     legacy_enabled = mode == LaneGuidanceMode.NRDR
-    if stored != int(mode) or _params.get_bool("LaneCentering") != legacy_enabled:
-      set_lane_guidance_mode(_params, mode)
+    if stored != str(int(mode)).encode() or legacy != (b"1" if legacy_enabled else b"0"):
+      restore_lane_guidance_mode(_params, mode)
       cloudlog.info(f"params_migration: synchronized LaneGuidanceMode={int(mode)} and LaneCentering={legacy_enabled}")
   except Exception as e:
     cloudlog.exception(f"Error migrating lane guidance mode: {e}")
+    # Do not continue into generic default seeding after a storage error: that
+    # could replace an unreadable explicit choice with Sunny.
+    raise
 
 
 def run_migration(_params):

@@ -191,13 +191,25 @@ class BackupManagerSP:
 
   def _apply_config(self, config_data: dict[str, str]) -> None:
     """Applies configuration data from a backup, but only for parameters marked as backupable."""
+    from openpilot.nrdr.features.lateral.lane_guidance import lane_guidance_mode_from_backup, restore_lane_guidance_mode
     backupable_params = [k.decode('utf-8') for k in self.params.all_keys(ParamKeyFlag.BACKUP)]
     backupable_set_lower = {p.lower() for p in backupable_params}
+    lane_mode = lane_guidance_mode_from_backup(config_data)
+    if lane_mode is not None:
+      if not {"laneguidancemode", "lanecentering"} <= backupable_set_lower:
+        raise ValueError("Lane-centering backup is incompatible with this parameter registry")
+      # Apply this explicit source choice once, before unrelated settings.
+      # A legacy-only Off/Star must override a freshly seeded destination Sunny.
+      # Errors propagate to restore_backup(), which reports a failed restore.
+      restore_lane_guidance_mode(self.params, lane_mode)
 
     restored_count = 0
     skipped_count = 0
 
     for param, encoded_value in config_data.items():
+      if param.lower() in ("laneguidancemode", "lanecentering"):
+        restored_count += 1
+        continue
       if param.lower() in backupable_set_lower:
         # Find real param name (with correct casing)
         real_param = next(p for p in backupable_params if p.lower() == param.lower())

@@ -43,7 +43,7 @@ from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeC
 from openpilot.nrdr.features.services import admit_default_artifact
 from openpilot.nrdr.features.lateral.lane_guidance import (
   LaneGuidanceMode,
-  parse_lane_guidance_mode,
+  lane_guidance_mode_from_params,
   set_lane_guidance_mode,
 )
 from openpilot.nrdr.features.lateral.model_source import delay_input, lateral_source
@@ -462,7 +462,7 @@ def main(demo=False):
       modelv2_send.modelV2.big = model.chestnut
       # The standard runner cannot apply Blendful, but it still arbitrates the
       # mutually exclusive selector on this exact model action.
-      lane_guidance_mode = parse_lane_guidance_mode(params.get("LaneGuidanceMode", return_default=True))
+      lane_guidance_mode = lane_guidance_mode_from_params(params)
       if lane_guidance_mode == LaneGuidanceMode.BLENDFUL:
         # Do not leave an unavailable selection armed to resume automatically
         # after a future runner change.

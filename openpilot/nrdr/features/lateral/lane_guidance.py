@@ -7,6 +7,7 @@ remain understandable after a downgrade.
 
 from __future__ import annotations
 
+import base64
 from enum import IntEnum
 from typing import Protocol
 
@@ -18,6 +19,7 @@ class LaneGuidanceMode(IntEnum):
 
 class LaneGuidanceParamStore(Protocol):
   def get(self, key: str): ...
+  def get_raw(self, key: str) -> bytes | None: ...
   def put(self, key: str, value: int, *, block: bool = False) -> None: ...
   def put_bool(self, key: str, value: bool, *, block: bool = False) -> None: ...
 
@@ -53,12 +55,43 @@ def parse_lane_guidance_mode(value) -> LaneGuidanceMode:
 
 def lane_guidance_mode_from_params(params: LaneGuidanceParamStore) -> LaneGuidanceMode:
   try:
-    value = params.get("LaneGuidanceMode")
+    # A typed/defaulting read can hide corruption or accept noncanonical INT
+    # spellings. Only the exact stored enum bytes may enable a correction.
+    value = params.get_raw("LaneGuidanceMode")
   except Exception:
     # Unknown registries and transient storage failures must not enable either
     # correction path.
     value = None
   return parse_lane_guidance_mode(value)
+
+
+def lane_guidance_mode_from_backup(config_data: dict[str, str]) -> LaneGuidanceMode | None:
+  """Resolve only choices explicitly present in this backup, not destination defaults."""
+  choices = {}
+  for key, encoded in config_data.items():
+    normalized = key.lower()
+    if normalized not in ("laneguidancemode", "lanecentering"):
+      continue
+    if normalized in choices:
+      raise ValueError("Duplicate lane-centering keys in backup")
+    choices[normalized] = encoded
+  # Canonical mode wins over a conflicting legacy bool in the same backup.
+  if "laneguidancemode" in choices:
+    return parse_lane_guidance_mode(base64.b64decode(choices["laneguidancemode"], validate=True))
+  if "lanecentering" in choices:
+    legacy = base64.b64decode(choices["lanecentering"], validate=True).lower()
+    if legacy not in (b"0", b"false", b"no", b"1", b"true", b"yes"):
+      raise ValueError("Invalid legacy lane-centering choice in backup")
+    return LaneGuidanceMode.NRDR if legacy in (b"1", b"true", b"yes") else LaneGuidanceMode.MODEL_ONLY
+  return None
+
+
+def restore_lane_guidance_mode(params: LaneGuidanceParamStore, mode: LaneGuidanceMode) -> None:
+  """Blocking pair restore with readback; failure must not be reported as success."""
+  set_lane_guidance_mode(params, mode)
+  if params.get_raw("LaneGuidanceMode") != str(int(mode)).encode() \
+      or params.get_raw("LaneCentering") != (b"1" if mode == LaneGuidanceMode.NRDR else b"0"):
+    raise OSError("Lane-centering restore did not persist; backup restore is incomplete")
 
 
 def model_frame_lane_guidance_mode(model_mode, model_message_valid: bool,

@@ -167,6 +167,26 @@ class Params:
   def get_bool(self, key, block=False):
     return bool(params_get_bool(self.p, self.check_key(key), block))
 
+  def get_raw(self, key):
+    """Read exact stored bytes, distinguishing absent (None) from empty (b'').
+
+    No type conversion or registry default is applied. Unlike the native string
+    getter, filesystem errors other than a missing key remain errors.
+    """
+    k = self.check_key(key)
+    path = Path(self.get_param_path(k))
+    try:
+      return path.read_bytes()
+    except FileNotFoundError:
+      # A missing store directory or dangling key symlink is a storage fault,
+      # not evidence of a fresh/unset setting.
+      path.parent.stat()
+      try:
+        path.lstat()
+      except FileNotFoundError:
+        return None
+      raise
+
   def _put_cast(self, key, dat):
     return ensure_bytes(self.python2cpp(type(dat), self.get_type(key), dat, key))
 

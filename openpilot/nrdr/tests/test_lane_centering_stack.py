@@ -118,6 +118,10 @@ class TestLaneCenteringStack(unittest.TestCase):
       def get(self, key, return_default=False):
         return self.values.get(key)
 
+      def get_raw(self, key):
+        value = self.values.get(key)
+        return None if value is None else str(int(value)).encode()
+
       def get_bool(self, key):
         return bool(self.values.get(key))
 
@@ -192,6 +196,10 @@ class TestLaneCenteringStack(unittest.TestCase):
 
       def get(self, key, return_default=False):
         return self.values.get(key)
+
+      def get_raw(self, key):
+        value = self.values.get(key)
+        return None if value is None else str(int(value)).encode()
 
       def put(self, key, value, block=False):
         self.values[key] = value
