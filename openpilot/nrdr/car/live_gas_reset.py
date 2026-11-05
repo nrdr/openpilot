@@ -57,7 +57,7 @@ def consume_reset(params, sm, card, *, read_cp=stored_cp, meta_path=LEARNER_META
       result = "Not reset: vehicle or request changed."
       return
     if meta_path.exists():
-      result = "Not reset: cannot confirm the saved learner belongs to this Honda."
+      result = "Not reset: could not match the saved learner metadata to this Honda."
       if json.loads(meta_path.read_text(encoding="utf-8")).get("car_fingerprint") != fingerprint:
         return
 

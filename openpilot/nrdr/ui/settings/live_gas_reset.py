@@ -19,9 +19,13 @@ def submit():
       cloudlog.warning(f"Live gas reset request rejected: {error}")
 
 
+def reset_description():
+  return tr("Clears gas and wind learning shared across Hondas on this device. " +
+            "Wind returns to baseline, which may change when braking starts on the next drive. Brake tuning is kept.")
+
+
 def description():
-  return tr("Clears learned gas response, gas confidence and wind compensation. Keeps the learning switch and other tuning.") + " " + (
-    ui_state.params.get(STATUS) or "")
+  return reset_description() + " " + (ui_state.params.get(STATUS) or "")
 
 
 def large_reset_button():
@@ -31,7 +35,7 @@ def large_reset_button():
 
   def confirm():
     if available():
-      gui_app.push_widget(ConfirmDialog(tr("Clear learned gas response and wind compensation for the next drive?"),
+      gui_app.push_widget(ConfirmDialog(tr("Clear this device's shared Honda gas and wind learning?"),
                                         tr("Reset"), tr("Cancel"), callback=lambda result: submit() if result == DialogResult.CONFIRM else None))
 
   return button_item_sp(lambda: tr("Reset Live Learning Gas"), lambda: tr("Reset"), description=description, callback=confirm, enabled=available)
@@ -54,6 +58,6 @@ def mici_reset_button():
         self.set_value(label)
 
   button = GasResetButton(tr("reset live gas"), tr("reset live gas"), gui_app.texture("icons_mici/settings/device/lkas.png", 122, 64),
-                          submit, red=True, description=tr("Clear learned gas response, gas confidence and wind compensation. Other tuning is kept."))
+                          submit, red=True, description=reset_description())
   button.set_enabled(available)
   return button

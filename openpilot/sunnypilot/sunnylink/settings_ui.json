@@ -2287,8 +2287,8 @@
                   "widget": "toggle",
                   "requires_attestation": true,
                   "title": "Reset Live Learning Gas",
-                  "description": "Clear learned Honda gas response and wind compensation for the next drive.",
-                  "details": "Park and turn the ignition off first. Turn ON once to clear gas factors and learning confidence across all speed bands, plus the wind factor. The device turns this back OFF after processing; check Reset Status for the outcome. This does not change the Live Learning Gas switch, PID scales, or other tuning.",
+                  "description": "Clear gas and wind learning shared across Hondas on this device.",
+                  "details": "Wind returns to baseline, which may change when braking starts on the next drive. Brake tuning, PID scales, and the learning switch are kept. Park and turn the ignition off, then turn this ON once. When it turns back OFF, check Live Gas Reset Status for the outcome.",
                   "visibility": [
                     {
                       "type": "capability",
