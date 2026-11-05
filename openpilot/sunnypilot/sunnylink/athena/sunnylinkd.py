@@ -62,6 +62,7 @@ BLOCKED_PARAMS = {
   "NrdrHandcraftedLateralRequest",  # Device-generated vehicle/version binding; never accept remote context.
   "OnroadCycleRequested",      # Prevent remote cycle trigger
   "ParamsVersion",         # Device-managed version counter
+  "NrdrLiveGasResetStatus",  # Only the device can bind a request or acknowledge its completion.
 }
 
 
@@ -277,8 +278,17 @@ def _remote_int_value(value: str, compression: bool) -> int | None:
 
 @dispatcher.add_method
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
+  from openpilot.nrdr.car.live_gas_reset import REQUEST, request_reset, stored_cp
   from openpilot.nrdr.params.tuning_policy import reset_learning_scales, tuning_write_allowed
   onroad = not params.get_bool("IsOffroad")
+  if REQUEST in params_to_update:
+    selected = _remote_bool_value(params_to_update[REQUEST], compression)
+    if selected is None or (selected and len(params_to_update) != 1):
+      raise ValueError("Request a live gas reset separately using a boolean.")
+    if selected:
+      request_reset(params, stored_cp(params))
+    # An OFF echo is not a request, cancellation, or acknowledgment.
+    params_to_update = {key: value for key, value in params_to_update.items() if key != REQUEST}
   monitoring_selection = None
   if "NrdrDriverMonitoringReminderPercent" in params_to_update:
     from openpilot.nrdr.hooks.driver_monitoring import monitoring_customization_available, validate_reminder_percent

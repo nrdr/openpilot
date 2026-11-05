@@ -22,6 +22,7 @@ from openpilot.common.hardware.hw import Paths
 
 from openpilot.sunnypilot.system.params_migration import run_migration
 from openpilot.nrdr.params import apply_defaults as apply_nrdr_defaults
+from openpilot.nrdr.car.live_gas_reset import consume_reset
 
 
 def manager_init() -> None:
@@ -162,6 +163,10 @@ def manager_thread() -> None:
     ignition_prev = ignition
 
     ensure_running(managed_processes.values(), started, params=params, CP=sm['carParams'], not_run=ignore)
+    try:
+      consume_reset(params, sm, managed_processes["card"])
+    except Exception:
+      cloudlog.exception("Failed to process live gas reset")
 
     running = ' '.join("{}{}\u001b[0m".format("\u001b[32m" if p.is_healthy() else "\u001b[31m", p.name)
                        for p in managed_processes.values() if p.proc)

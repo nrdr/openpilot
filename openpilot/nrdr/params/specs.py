@@ -192,6 +192,8 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("HondaOverrideTorqueScale", ParamType.INT, PB, "0", owner=ParamOwner.HONDA),
   _added("HondaDriverAssistDuringOverride", ParamType.BOOL, PB, "1", owner=ParamOwner.HONDA),
   _added("HondaLiveLearningGas", ParamType.BOOL, PB, owner=ParamOwner.HONDA),
+  _added("NrdrResetLiveGas", ParamType.BOOL, (M,), "0", ParamLifecycle.COMMAND, ParamOwner.HONDA),
+  _added("NrdrLiveGasResetStatus", ParamType.STRING, (M,), lifecycle=ParamLifecycle.STATUS, owner=ParamOwner.HONDA),
   _added("HondaTorqueLowPassFilter", ParamType.BOOL, PB, "1", owner=ParamOwner.HONDA),
   _added("HondaLpfTauLowSpeed", ParamType.FLOAT, PB, "0.1", owner=ParamOwner.HONDA),
   _added("HondaLpfTauStandard", ParamType.FLOAT, PB, "0.02", owner=ParamOwner.HONDA),

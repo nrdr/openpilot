@@ -86,6 +86,8 @@
     {"HondaOverrideTorqueScale", {PERSISTENT | BACKUP, INT, "0"}},
     {"HondaDriverAssistDuringOverride", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"HondaLiveLearningGas", {PERSISTENT | BACKUP, BOOL}},
+    {"NrdrResetLiveGas", {CLEAR_ON_MANAGER_START, BOOL, "0"}},
+    {"NrdrLiveGasResetStatus", {CLEAR_ON_MANAGER_START, STRING}},
     {"HondaTorqueLowPassFilter", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"HondaLpfTauLowSpeed", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
     {"HondaLpfTauStandard", {PERSISTENT | BACKUP, FLOAT, "0.02"}},

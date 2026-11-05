@@ -152,6 +152,7 @@ Lane centering adds a bounded correction to the model's steering request. Even a
 <summary><strong>Longitudinal tuning</strong></summary>
 
 - **Live Learning Gas** learns gas response and wind compensation. While it is ON, the four personality PID scales stay at 100%.
+- **Reset Live Learning Gas** is a one-time action for a confirmed Honda with ignition off. Find it under Device on C4, nrdr → Longitudinal Tuning on C3X, or Steering → nrdr → Longitudinal Tuning on Sunnylink. It clears gas factors, gas-learning confidence (including legacy and speed-band values), wind compensation, and their saved validation metadata. It leaves the learning switch, PID scales, brake, launch, speed and lateral tuning alone. On Sunnylink, wait for the switch to turn back off and check **Live Gas Reset Status** for completion.
 - **Distance 1–4 PID Scales** change feedback for Aggressive, Standard, Relaxed, and Econ. They apply only with a gas-pedal interceptor and Live Learning Gas OFF.
 - **Keep Feedforward Static** lets a personality scale change P and I without multiplying the tuned feedforward.
 - **Nidec ECU-Matched Long**, **Full Nidec Brake Authority**, and **Roen Nidec Acceleration Limits** change Nidec gas/brake shaping and authority. They are vehicle-specific; do not copy another car's result blindly.

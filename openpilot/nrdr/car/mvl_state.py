@@ -4,8 +4,11 @@ Keep filesystem operations out of opendbc and off the control thread. The
 one-key/second schedule follows MVL 657358074; queued snapshots coalesce.
 """
 import math
+from pathlib import Path
 from threading import Event, Lock, Thread
 
+
+LEARNER_META_PATH = Path("/data/honda_learner_meta.json")
 
 MVL_STATE_KEYS = {
   "brake_pid": "HondaBrakePIDParams",

@@ -440,6 +440,21 @@ sections:
         details: Fresh installs default OFF when a gas pedal interceptor is detected and ON otherwise. Your selection is preserved afterward. While ON, all longitudinal PID personality scales are held at 100%.
         enablement:
         - $ref: '#/macros/offroad'
+      - key: NrdrResetLiveGas
+        widget: toggle
+        title: Reset Live Learning Gas
+        description: Clear learned Honda gas response and wind compensation for the next drive.
+        details: Park and turn the ignition off first. Turn ON once to clear gas factors and learning confidence across all speed bands, plus the wind factor. The device turns this back OFF after processing; check Reset Status for the outcome. This does not change the Live Learning Gas switch, PID scales, or other tuning.
+        requires_attestation: true
+        visibility:
+        - {type: capability, field: nrdr_honda_tuning_available, equals: true}
+        enablement:
+        - $ref: '#/macros/offroad'
+      - key: NrdrLiveGasResetStatus
+        widget: info
+        title: Live Gas Reset Status
+        visibility:
+        - {type: capability, field: nrdr_honda_tuning_available, equals: true}
       - key: StaticFeedforwardLong
         widget: toggle
         title: Keep Feedforward Static

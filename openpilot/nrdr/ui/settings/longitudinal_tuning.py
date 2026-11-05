@@ -6,6 +6,7 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.list_view import ListItem
 from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
+from openpilot.nrdr.ui.settings.live_gas_reset import available as gas_reset_available, large_reset_button
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP
@@ -238,8 +239,10 @@ class LongitudinalTuningLayout(Widget):
       ),
     )
 
+    self._reset_live_gas = large_reset_button()
     return [
       self._live_learning_gas,
+      self._reset_live_gas,
       LineSeparatorSP(40),
       self._static_feedforward_long,
       self._ecu_matched_long,
@@ -274,6 +277,7 @@ class LongitudinalTuningLayout(Widget):
       item.set_visible(not learning)
       item.action_item.set_enabled(enabled and not learning)
     self._live_learning_gas.action_item.set_enabled(enabled and ui_state.is_offroad())
+    self._reset_live_gas.action_item.set_enabled(gas_reset_available())
     self._standstill_gap.action_item.set_enabled(
       enabled and ui_state.is_offroad() and bool(ui_state.CP and ui_state.CP.openpilotLongitudinalControl)
     )

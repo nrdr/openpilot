@@ -92,6 +92,8 @@ class NrdrParamKey(StrEnum):
   HONDA_OVERRIDE_TORQUE_SCALE = "HondaOverrideTorqueScale"
   HONDA_DRIVER_ASSIST_DURING_OVERRIDE = "HondaDriverAssistDuringOverride"
   HONDA_LIVE_LEARNING_GAS = "HondaLiveLearningGas"
+  NRDR_RESET_LIVE_GAS = "NrdrResetLiveGas"
+  NRDR_LIVE_GAS_RESET_STATUS = "NrdrLiveGasResetStatus"
   HONDA_TORQUE_LOW_PASS_FILTER = "HondaTorqueLowPassFilter"
   HONDA_LPF_TAU_LOW_SPEED = "HondaLpfTauLowSpeed"
   HONDA_LPF_TAU_STANDARD = "HondaLpfTauStandard"
@@ -248,6 +250,8 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.HONDA_OVERRIDE_TORQUE_SCALE,
   NrdrParamKey.HONDA_DRIVER_ASSIST_DURING_OVERRIDE,
   NrdrParamKey.HONDA_LIVE_LEARNING_GAS,
+  NrdrParamKey.NRDR_RESET_LIVE_GAS,
+  NrdrParamKey.NRDR_LIVE_GAS_RESET_STATUS,
   NrdrParamKey.HONDA_TORQUE_LOW_PASS_FILTER,
   NrdrParamKey.HONDA_LPF_TAU_LOW_SPEED,
   NrdrParamKey.HONDA_LPF_TAU_STANDARD,

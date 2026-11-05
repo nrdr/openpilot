@@ -38,6 +38,7 @@ def _native_class(filename, name):
   env = {
     "Widget": object, "Callable": Callable, "tr": lambda text: text,
     "get_native_option_spec": get_native_option_spec,
+    "large_reset_button": lambda: object(),
     "NavButton": lambda *_: SimpleNamespace(set_click_callback=lambda *_: None),
     "Scroller": lambda items, **_: items, "LineSeparatorSP": lambda *_: None,
     **{factory: lambda **kwargs: kwargs for factory in (
