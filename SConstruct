@@ -329,6 +329,9 @@ progress_count = 0
 build_product_nodes = set()
 progress_total = max(1, count_scons_nodes(env.arg2nodes(BUILD_TARGETS or [Dir('.')], env.fs.Entry)))
 
+from openpilot.common.scons_cache import recover_object_targets  # noqa: E402
+recover_object_targets(build_product_nodes)
+
 def progress_function(node):
   global progress_count
   if progress_count >= progress_total:
