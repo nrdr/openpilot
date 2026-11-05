@@ -25,7 +25,7 @@ from openpilot.nrdr.features.lateral.controller_selection import firmware_contro
 from openpilot.nrdr.features.lateral.vfn_eps_core import (
   CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_I_SCALE, CIVIC_P_SCALE, CIVIC_TBA_A030, CIVIC_TBA_C120, CIVIC_TEG_A010,
   CIVIC_TEG_EPS_LOAD, CIVIC_TGG_A120, CIVIC_TGG_EPS_LOAD, CRV_I_SCALE, CRV_P_SCALE, CRV_TLA_A040, CRV_TLA_A220, CRV_TLA_EPS_LOAD,
-  INSIGHT_TXM_A040, INSIGHT_TXM_EPS_LOAD,
+  INSIGHT_TXM_A040, INSIGHT_TXM_EPS_LOAD, RDX_TJB_A220, RDX_TJB_EPS_LOAD,
   HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
 )
 from openpilot.nrdr.features.lateral.model_source import PLAN, CommandDelaySlew, plan_floor_command_delay
@@ -49,6 +49,7 @@ _OWN_CALIBRATIONS = {
   "civic_tba_a030": (CIVIC_TBA_A030, CIVIC_TEG_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
   "crv_tla_a040": (CRV_TLA_A040, CRV_TLA_EPS_LOAD, CRV_P_SCALE, CRV_I_SCALE),
   "crv_tla_a220": (CRV_TLA_A220, CRV_TLA_EPS_LOAD, CRV_P_SCALE, CRV_I_SCALE),
+  "rdx_tjb_a220": (RDX_TJB_A220, RDX_TJB_EPS_LOAD, (1., 1., 0.7), (1., 1., 1.)),
 }
 
 

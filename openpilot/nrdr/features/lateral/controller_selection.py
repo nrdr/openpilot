@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile, normalize_honda_eps_firmware
+from openpilot.nrdr.features.lateral.rdx_identity import RDX_CARS, confirmed_rdx
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,7 @@ CRV_A040_PROFILE = FirmwareControllerProfile(
 CRV_A220_PROFILE = FirmwareControllerProfile(
   "CR-V TLA-A220 corrected PTM (starting calibration)", "crv_tla_a220", provisional=True, required_rwd="2c992997",
 )
+RDX_PROFILE = FirmwareControllerProfile("Acura RDX TJB-A220 Route-A RomCRC", "rdx_tjb_a220", provisional=True, required_rwd="3dd8b91b")
 _PROFILES = {
   ("HONDA_CLARITY", "39990-TRW-A020"): CLARITY_PROFILE,
   ("HONDA_CIVIC_BOSCH", "39990-TBA-C020"): CIVIC_PROFILE,
@@ -61,11 +63,16 @@ _PROFILES = {
   ("HONDA_CIVIC", "39990-TBA-A030"): A030_PROFILE,
   ("HONDA_CRV_5G", "39990-TLA-A040"): CRV_A040_PROFILE,
   ("HONDA_CRV_5G", "39990-TLA-A220"): CRV_A220_PROFILE,
+  ("ACURA_RDX_3G", "39990-TJB-A220"): RDX_PROFILE,
+  ("ACURA_RDX_3G_MMR", "39990-TJB-A220"): RDX_PROFILE,
 }
 
 
 def _firmware_family(CP) -> FirmwareControllerProfile | None:
   if CP is None or str(getattr(CP, "brand", "")) != "honda":
+    return None
+  if str(getattr(CP, "carFingerprint", "")) in RDX_CARS and not confirmed_rdx(CP):
+    # Decide before modeld waits for CarParamsSP. A logged family string alone is not admission.
     return None
   for firmware in getattr(CP, "carFw", ()):
     if firmware.ecu == "eps":

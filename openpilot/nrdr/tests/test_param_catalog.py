@@ -25,19 +25,23 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "935b0c4e40fc38401def1287bbea4b0fe29beb041379dd5027783226badb64c7"
+REGISTRY_METADATA_SHA256 = "84e95e7b11394803fd9c7c099362d9e8010c1a5135e665146ecfa26953188bda"
 
 
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 156)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 155)
+    self.assertEqual(len(PARAM_SPECS), 157)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 156)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
 
     metadata = "\n".join(f"{spec.action.value}|{spec.key}|{spec.cpp_attributes}" for spec in PARAM_SPECS) + "\n"
     self.assertEqual(sha256(metadata.encode()).hexdigest(), REGISTRY_METADATA_SHA256)
+    receipt = PARAM_SPECS_BY_KEY["NrdrRdxRouteAConfirmation"]
+    self.assertEqual(receipt.flags, (ParamFlag.PERSISTENT, ParamFlag.DONT_LOG))
+    self.assertIsNone(receipt.default)
+    self.assertIs(receipt.lifecycle, ParamLifecycle.STATE)
 
   def test_device_yaw_switch_defaults_on_without_reviving_retired_sliders(self) -> None:
     spec = PARAM_SPECS_BY_KEY["NrdrDeviceYawCorrection"]

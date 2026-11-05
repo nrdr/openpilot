@@ -8,6 +8,8 @@ from openpilot.nrdr.features.lateral.honda_rack_map import (
   CIVIC_TEG_A010_RACK, RACK_MAP_TABLES, RackMapGeometry, RackMapTable, get_rack_map_table,
 )
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
+from openpilot.nrdr.features.lateral.rdx_identity import RDX_CARS
+from openpilot.nrdr.features.lateral.rdx_rack import RDX_POSITION
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import SteerRatioMode, resolve_steer_ratio_selection
 
 STEER_RATIO = {"HONDA_CLARITY": 16.5, "HONDA_CIVIC_BOSCH": 15.38, "HONDA_CIVIC": 15.38, "HONDA_INSIGHT": 15.0}
@@ -126,6 +128,9 @@ def test_other_modes_and_hybrid_firmware_source():
 def test_tables_are_valid_and_inside_their_table_a():
   for table in RACK_MAP_TABLES:
     profile = get_honda_vgr_profile(cp(table.fingerprint, table.firmware[0].encode()))
+    if table.fingerprint in RDX_CARS:
+      assert profile is None  # the table exists, but the diagnostic part number never authorizes its use
+      profile = RDX_POSITION
     assert profile is not None and table.ratio_bp[-1] < profile.physical_knots[-1]
   with pytest.raises(ValueError):
     RackMapTable("bad", "HONDA_CLARITY", ("39990-TRW-A020",), 2.75, (10.0, 5.0), (17.0, 16.0), -0.0005, "")

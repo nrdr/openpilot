@@ -37,6 +37,7 @@ import math
 import numpy as np
 
 from openpilot.nrdr.features.lateral.honda_vgr import HONDA_VGR_PROFILES, HondaVgrProfile
+from openpilot.nrdr.features.lateral.rdx_rack import RDX_POSITION, RdxMeasuredPosition
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.nrdr.features.lateral.integral_pid import IntegralScaledPIDController as PIDController
 
@@ -85,7 +86,7 @@ R6_CLAMP = 32765.0
 COMPUTED_R6_ANGLE_BP = (0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 180, 210, 240, 270, 300, 360, 420, 480)  # |angle|
 
 
-def computed_r6(profile: HondaVgrProfile, norm: float = 1650.0) -> tuple[float, tuple, tuple]:
+def computed_r6(profile: HondaVgrProfile | RdxMeasuredPosition, norm: float = 1650.0) -> tuple[float, tuple, tuple]:
   """(R6 per published deg/s at centre, |angle| axis, gain by angle) from an image's Table A; see above."""
   def slope(a: float) -> float:
     lo = max(a - 10.0, 0.0)
@@ -130,8 +131,8 @@ FRICTION_WIDTH_SPEED_BP = [8.0, 15.0]  # m/s
 FRICTION_WIDTH_V = [20.0, FRICTION_WIDTH_DEG_S]  # deg/s
 
 
-def friction_width(v_ego: float) -> float:
-  return float(np.interp(v_ego, FRICTION_WIDTH_SPEED_BP, FRICTION_WIDTH_V))
+def friction_width(v_ego: float, widths=FRICTION_WIDTH_V) -> float:
+  return float(np.interp(v_ego, FRICTION_WIDTH_SPEED_BP, widths))
 
 
 # Smoothing, picked in the closed-loop replay of route 352 over three plants (nominal, the 353 fit, +15 ms
@@ -179,7 +180,8 @@ class EpsFirmwareCalibration:
   """Per-image command map, P key axis, envelope and rate feedback; no shared mutable state."""
 
   def __init__(self, e4_per_output, r5_key_bp, r5_v, envelope_bp, envelope_v, r6_per_deg_s,
-               *, r5_per_key=None, r6_angle_bp=None, r6_angle_gain=None, kp_key_bp=None, key_clamp=KEY_CLAMP):
+               *, r5_per_key=None, r6_angle_bp=None, r6_angle_gain=None, kp_key_bp=None, kp_v=KP_V,
+               key_clamp=KEY_CLAMP, friction_width_v=FRICTION_WIDTH_V):
     self.e4_per_output = e4_per_output
     # The command-input clamp, the header word just before the row 0 command map: 1663 (E4 3840) on every image here
     # except the CR-V's, which clamp at 1774 (E4 4096).
@@ -189,17 +191,18 @@ class EpsFirmwareCalibration:
     self.r6_per_deg_s = r6_per_deg_s
     self.r6_angle_bp, self.r6_angle_gain = r6_angle_bp, r6_angle_gain
     self.r5_per_key = r5_per_key
+    self.friction_width_v = tuple(friction_width_v)
     # The P row's key axis is row-indexed in the image like the command map; KP_V is the same on every PTM row.
     self.kp_key_bp = tuple(KP_KEY_BP if kp_key_bp is None else kp_key_bp)
     if r5_per_key is not None:
-      if self.kp_key_bp != tuple(KP_KEY_BP):
+      if self.kp_key_bp != tuple(KP_KEY_BP) or tuple(kp_v) != tuple(KP_V):
         raise ValueError("a linear command map uses the shared Clarity P pieces")
       self.kp_pieces = tuple(KP_PIECES)
     else:
       # Kp(key(R5)) has knots at BOTH maps' breakpoints. Keeping only the P
       # breakpoints would make the quadratic inverse wrong on C020's nonlinear map.
       knots = sorted(set(r5_v) | {float(np.interp(k, r5_key_bp, r5_v)) for k in self.kp_key_bp if k <= r5_key_bp[-1]})
-      kps = [float(np.interp(np.interp(r, r5_v, r5_key_bp), self.kp_key_bp, KP_V)) for r in knots]
+      kps = [float(np.interp(np.interp(r, r5_v, r5_key_bp), self.kp_key_bp, kp_v)) for r in knots]
       pieces = [(lo, hi, kp_lo, (kp_hi - kp_lo) / (hi - lo))
                 for lo, hi, kp_lo, kp_hi in zip(knots[:-1], knots[1:], kps[:-1], kps[1:], strict=True)]
       self.kp_pieces = (*pieces, (knots[-1], math.inf, kps[-1], 0.0))
@@ -358,6 +361,20 @@ CRV_TLA_A220 = EpsFirmwareCalibration(
 )
 
 
+# Route-A TJB uses E4 / 4 internally, P >> 6, and a scaled pinion speed reference.
+# Convert its axes and P units into the units of the existing inverse, as in
+# JamesL787 6c3432036109101fcff3d967298406e1d362fdc0. Do not substitute Clarity P values.
+_TJB_AXIS_SCALE = 56756 / 32768
+RDX_TJB_EPS_LOAD = (-11.19, -0.1363, -2.479, -241.5, 119.2, -3.592)
+RDX_TJB_A220 = EpsFirmwareCalibration(
+  4096., tuple(round(a * _TJB_AXIS_SCALE) for a in range(0, 1025, 128)),
+  (0, 3968, 7936, 11904, 15872, 19840, 23808, 27776, 30000),
+  (0, 400), (1774, 1774), -120.1, r6_angle_bp=COMPUTED_R6_ANGLE_BP, r6_angle_gain=computed_r6(RDX_POSITION)[2],
+  kp_key_bp=tuple(round(a * _TJB_AXIS_SCALE) for a in (0, 58, 109, 243, 320, 448, 640, 896, 1024)),
+  kp_v=(112, 128, 144, 176, 208, 240, 256, 272, 272), key_clamp=1774, friction_width_v=(20., 15.),
+)
+
+
 def command_key(e4: float) -> int:
   return int(math.trunc(math.trunc(e4 * 56756 / 32768) / 4))
 
@@ -463,7 +480,7 @@ class HondaEpsFirmwareFeedforward:
     self.prev_angle = desired_angle_no_offset
 
     angle = desired_angle_no_offset + self.lead_s * self.rate
-    width = self.friction_width if self.friction_width is not None else friction_width(v_ego)
+    width = self.friction_width if self.friction_width is not None else friction_width(v_ego, self.cal.friction_width_v)
     self.load = column_load(angle, self.rate, v_ego, roll, width, self.load_coefficients)
     cap = min(R5_CAP, R5_CAP_ENVELOPE_FRAC * float(np.interp(key_ceiling(v_ego, self.cal), self.cal.r5_key_bp, self.cal.r5_v)))
     self.r5 = max(min(r5_for_motion(self.load, self.rate, self.r5, angle, self.cal), cap), -cap)

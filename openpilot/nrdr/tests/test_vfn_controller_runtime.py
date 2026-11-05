@@ -165,6 +165,42 @@ def test_inactive_control_resets_and_reengagement_limits_requested_angle_rate():
   assert requested - previous == pytest.approx(3.)
 
 
+def test_confirmed_rdx_does_not_ride_through_a_one_frame_dropout(monkeypatch):
+  from openpilot.nrdr.tests.test_rdx_route_a import MODIFIED, rdx, simulate_receipt
+  cp = rdx()
+  simulate_receipt(monkeypatch, cp)
+  control = LatControlFirmware(cp, MODIFIED, None, .01)
+  assert control.core.p_scale == (1., 1., .7) and control.core.i_scale == (1., 1., 1.)
+  assert control.steer_ratio_selection.rack_map is None
+  assert control.delay_schedule is None  # no forced Clarity schedule on an RDX
+  for _ in range(200):
+    output, _, _ = tick(control, angle=17., desired=20.)
+  assert output != 0. and control.core.ff_weight > 0.
+  output, previous, log = tick(control, active=False)
+  assert output == log.output == 0. and not log.active
+  assert control.core.ff_weight == control.core.output == control.core.pid.i == 0.
+  assert control.core.ff.prev_angle is None
+  _, requested, _ = tick(control, desired=100.)
+  assert requested - previous <= 3.0001
+
+
+@pytest.mark.parametrize("fingerprint,stock_limit", [("ACURA_RDX_3G", 4095), ("ACURA_RDX_3G_MMR", 4076)])
+def test_rdx_requires_real_carparams_identity_and_the_exact_transport(monkeypatch, fingerprint, stock_limit):
+  from openpilot.nrdr.tests.test_rdx_route_a import MODIFIED, simulate_receipt
+  from openpilot.nrdr.features.lateral.controller_selection import RDX_PROFILE, firmware_controller_profile
+  cp = car_structs.CarParams.new_message(
+    brand="honda", carFingerprint=fingerprint, carVin="TEST1234567890123", fingerprintSource="fw",
+    carFw=[{"ecu": "eps", "address": 0x18DA30F1, "fwVersion": b"39990-TJB,A220\0\0"}])
+  cp.lateralTuning.init("pid")
+  simulate_receipt(monkeypatch, cp)
+  cp.lateralParams.torqueBP = cp.lateralParams.torqueV = [0, stock_limit]
+  assert firmware_controller_profile(cp, MODIFIED) is None
+  cp.lateralParams.torqueBP = cp.lateralParams.torqueV = [0, 4096]
+  assert firmware_controller_profile(cp, MODIFIED) is RDX_PROFILE
+  cp.carFw[0].fwVersion = b"39990-TJB-A220\0\0"
+  assert firmware_controller_profile(cp, MODIFIED) is None
+
+
 @pytest.mark.parametrize("curvature", [-.01, -.001, .001, .01])
 def test_lane_change_shaping_reduces_request_without_reversing_it(curvature):
   control = controller()

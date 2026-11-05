@@ -8,7 +8,7 @@ from openpilot.nrdr.features.lateral import vfn_eps_core as core
 
 CALIBRATIONS = (
   core.CLARITY_A020, core.CIVIC_BOSCH_C020, core.CIVIC_TEG_A010, core.INSIGHT_TXM_A040,
-  core.CIVIC_TBA_C120, core.CIVIC_TGG_A120, core.CIVIC_TBA_A030, core.CRV_TLA_A040, core.CRV_TLA_A220,
+  core.CIVIC_TBA_C120, core.CIVIC_TGG_A120, core.CIVIC_TBA_A030, core.CRV_TLA_A040, core.CRV_TLA_A220, core.RDX_TJB_A220,
 )
 CRV_LIMIT = 3841 / 4096  # round up to the first integer E4 that decodes to key 1663
 

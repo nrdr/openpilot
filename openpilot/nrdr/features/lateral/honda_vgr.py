@@ -4,6 +4,9 @@ import math
 
 import numpy as np
 
+from openpilot.nrdr.features.lateral.rdx_identity import RDX_CARS, confirmed_rdx
+from openpilot.nrdr.features.lateral.rdx_rack import RDX_POSITION, RdxMeasuredPosition
+
 
 __all__ = (
   "HONDA_VGR_PROFILES",
@@ -155,10 +158,12 @@ def normalize_honda_eps_firmware(version) -> str:
   return str(version).split("\0", 1)[0].strip().replace(",", "-")
 
 
-def get_honda_vgr_profile(CP) -> HondaVgrProfile | None:
+def get_honda_vgr_profile(CP) -> HondaVgrProfile | RdxMeasuredPosition | None:
   if str(getattr(CP, "brand", "")).lower() != "honda":
     return None
   fingerprint = str(getattr(CP, "carFingerprint", ""))
+  if fingerprint in RDX_CARS:
+    return RDX_POSITION if confirmed_rdx(CP) else None
   for firmware in getattr(CP, "carFw", ()):
     if firmware.ecu != "eps":
       continue

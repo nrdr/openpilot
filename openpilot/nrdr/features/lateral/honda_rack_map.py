@@ -18,7 +18,7 @@ same car (the TEG-A010's covers the TBA-A030: the same 2016-18 Civic sedan, same
 Table A). Any other image nobody has measured gets a map predicted from its own car's published specs through its
 own Table A (honda_spec_plant); its table says "spec" in its provenance.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 import math
 
@@ -27,6 +27,8 @@ import numpy as np
 from openpilot.nrdr.features.lateral.honda_spec_plant import CIVIC_2019_SEDAN_SPEC, CIVIC_HATCH_SPORT_SPEC, CRV_2017_SPEC, \
   HondaSteeringSpec, spec_ratio_table
 from openpilot.nrdr.features.lateral.honda_vgr import HONDA_VGR_PROFILES, HondaVgrProfile, normalize_honda_eps_firmware
+from openpilot.nrdr.features.lateral.rdx_identity import RDX_CARS, confirmed_rdx
+from openpilot.nrdr.features.lateral.rdx_rack import RdxMeasuredPosition
 
 GRAVITY = 9.81
 # Angle grid the map is solved on: Table A's knots plus this many even steps (the source uses the same grid)
@@ -55,7 +57,7 @@ class RackMapTable:
 
   @property
   def measured(self) -> bool:  # fitted against the car's yaw sensor, not predicted from its specs
-    return not self.provenance.startswith("spec")
+    return not self.provenance.startswith(("spec", "inferred:"))
 
 
 # Clarity TRW-A020: routes 341-36b (owner JamesL787). The effective ratio still falls with angle after Table A,
@@ -116,7 +118,16 @@ CIVIC_TGG_A120_RACK = RackMapTable(
   slip_factor=-0.00079, provenance="VSA yaw (GPS-checked), TGG routes 0000000b-00000010",
 )
 
-MEASURED_RACK_MAP_TABLES = (CLARITY_TRW_A020_RACK, CIVIC_TBA_C020_RACK, CIVIC_TEG_A010_RACK, INSIGHT_TXM_A040_RACK, CIVIC_TGG_A120_RACK)
+RDX_TJB_A220_RACK = RackMapTable(
+  "RDX TJB-A220", "ACURA_RDX_3G", ("39990-TJB-A220",), 2.75,
+  ratio_bp=(5., 15., 29.1, 51.8, 83.4, 117.6, 169., 200., 300., 400.),
+  ratio_v=(18.54, 17., 16.58, 16.53, 16.23, 16.01, 15.79, 15.69, 15.25, 14.61),
+  slip_factor=-0.00101, provenance="2019 RDX VSA yaw, routes b8/c6/c7/cc/d2; extrapolated beyond 169 deg",
+)
+RDX_MMR_RACK = replace(RDX_TJB_A220_RACK, fingerprint="ACURA_RDX_3G_MMR",
+                       provenance="inferred: same TJB-A220 rack; measurements from 2019 RDX only")
+MEASURED_RACK_MAP_TABLES = (CLARITY_TRW_A020_RACK, CIVIC_TBA_C020_RACK, CIVIC_TEG_A010_RACK, INSIGHT_TXM_A040_RACK,
+                            CIVIC_TGG_A120_RACK, RDX_TJB_A220_RACK)
 
 
 def _spec_table(name: str, fingerprint: str, firmware: str, table_a: str, spec: HondaSteeringSpec) -> RackMapTable:
@@ -135,7 +146,7 @@ CIVIC_TGG_A120_SPEC_RACK = _spec_table("Civic hatch TGG-A120", "HONDA_CIVIC_BOSC
 CRV_TLA_A040_SPEC_RACK = _spec_table("CR-V TLA-A040", "HONDA_CRV_5G", "39990-TLA-A040", "CR-V TLA-A040", CRV_2017_SPEC)
 SPEC_RACK_MAP_TABLES = (CIVIC_TBA_C120_SPEC_RACK, CRV_TLA_A040_SPEC_RACK)
 
-RACK_MAP_TABLES = MEASURED_RACK_MAP_TABLES + SPEC_RACK_MAP_TABLES
+RACK_MAP_TABLES = MEASURED_RACK_MAP_TABLES + SPEC_RACK_MAP_TABLES + (RDX_MMR_RACK,)
 _TABLE_BY_CAR_FIRMWARE = {(table.fingerprint, firmware): table for table in RACK_MAP_TABLES for firmware in table.firmware}
 
 
@@ -144,6 +155,8 @@ def get_rack_map_table(CP) -> RackMapTable | None:
   if str(getattr(CP, "brand", "")).lower() != "honda":
     return None
   fingerprint = str(getattr(CP, "carFingerprint", ""))
+  if fingerprint in RDX_CARS:
+    return _TABLE_BY_CAR_FIRMWARE[(fingerprint, "39990-TJB-A220")] if confirmed_rdx(CP) else None
   for firmware in getattr(CP, "carFw", ()):
     if firmware.ecu == "eps":
       table = _TABLE_BY_CAR_FIRMWARE.get((fingerprint, normalize_honda_eps_firmware(firmware.fwVersion)))
@@ -160,7 +173,7 @@ class RackMapGeometry:
   every speed-free consumer (controlsd's measured angle, lane-change shaping, the hybrid) uses the map's
   ratio by angle. Those cannot carry the map's slip factor; the two control paths that know the speed,
   angle_from_curvature and curvature_from_angle, use the full map."""
-  profile: HondaVgrProfile
+  profile: HondaVgrProfile | RdxMeasuredPosition
   table: RackMapTable
   cp_ratio: float
   angle_grid: np.ndarray = field(init=False, repr=False, compare=False)
@@ -182,7 +195,8 @@ class RackMapGeometry:
 
   @property
   def name(self) -> str:
-    return f"{self.table.name} {'measured' if self.table.measured else 'spec'} rack map"
+    source = "inferred" if self.table.provenance.startswith("inferred:") else "measured" if self.table.measured else "spec"
+    return f"{self.table.name} {source} rack map"
 
   @property
   def center_ratio(self) -> float:
@@ -225,11 +239,11 @@ class RackMapGeometry:
 
 
 @lru_cache(maxsize=16)
-def _geometry(profile: HondaVgrProfile, table: RackMapTable, cp_ratio: float) -> RackMapGeometry:
+def _geometry(profile: HondaVgrProfile | RdxMeasuredPosition, table: RackMapTable, cp_ratio: float) -> RackMapGeometry:
   return RackMapGeometry(profile, table, cp_ratio)
 
 
-def rack_map_geometry(CP, profile: HondaVgrProfile | None, cp_ratio: float) -> RackMapGeometry | None:
+def rack_map_geometry(CP, profile: HondaVgrProfile | RdxMeasuredPosition | None, cp_ratio: float) -> RackMapGeometry | None:
   """controlsd resolves the selection every frame; building the map's grid costs ~1 ms, so each is built once."""
   table = get_rack_map_table(CP)
   if profile is None or table is None:

@@ -15,6 +15,7 @@ changing it requires offroad confirmation. PIF's Device Yaw Correction is separa
 | HONDA_CIVIC / 39990-TBA-A030, modified EPS | A030 corrected PTM starting calibration: the TEG-A010's row 3 on every row, R6 from its A table (the TEG's), the TEG's measured load | The TEG-A010's speed schedule |
 | HONDA_CRV_5G / 39990-TLA-A040, modified EPS | CR-V A040 corrected PTM starting calibration: row 0, key clamp 1774, R6 from its A table, the owner's measured load, untrimmed | Normal live/manual path |
 | HONDA_CRV_5G / 39990-TLA-A220, modified EPS | CR-V A220 corrected PTM starting calibration: rows 0-5 Clarity-equivalent, its own envelope, the A040's A table, R6, load and trims | Normal live/manual path |
+| ACURA_RDX_3G or ACURA_RDX_3G_MMR / 39990-TJB,A220 | Route-A Trk1641 RomCRC only. **Unavailable while its full trusted RWD digest is missing.** The MMR shares the 2019 vehicle measurements; no separate MMR fit. | Normal live/manual path |
 
 PID CarParams and a matching firmware steer-ratio profile are also required. No
 other Civic, firmware version, diesel, CR-V, or generic Honda inherits a calibration.
@@ -23,6 +24,31 @@ each corrected image, while load, trims and command delay are carried from the
 nearest measured car until the owner's drives measure them.
 
 ## Required corrected firmware
+
+### Acura RDX: staged, not enabled
+
+The [donor calibration](https://github.com/Biscuit-Labs/openpilot/blob/01e5a3b8ce2cd7876f03adb03d72c0ec55663dd7/openpilot/selfdrive/controls/lib/honda_eps_calibrations.py#L342-L399)
+names `RDX-PTM-101526-RomCRC.rwd` and publishes only SHA-256 prefix `3dd8b91b`.
+The prefix is **not** an allowlist entry. The trusted full SHA-256 is unset, so even an exact rack with a saved
+controller selection cannot offer or run this profile or use its rack map. No RWD is distributed or flashed.
+
+To unlock a future reviewed build: obtain the original Route-A **RWD container** and an independently trusted full
+SHA-256 from the builder. Hash the container, not the decrypted payload, verify the full match, and review a change
+pinning that digest in `rdx_identity.py`. Confirm that specific build was flashed to the actual rack; diagnostics
+cannot prove it. The private, non-backed-up `NrdrRdxRouteAConfirmation` state binds that confirmation to the exact
+fingerprint and SHA-256 of the 17-character VIN as well as the full image digest. Nothing creates it automatically;
+there is no public confirmation toggle. Revoke it on any reflash/rack swap, even with an unchanged version string.
+Receipt changes require an offroad process restart. The pinned production transport remains at 4095 on 3G and
+4076 on MMR; neither is the required linear 4096 map. A separate no-CAN bench configuration is not production
+admission. Before enabling a real car, the transport and controller must use the same verified authorization,
+and inactive and fallback PIF wire output must be checked against the baseline. Pinning a hash alone cannot do this.
+
+The admitted profile still needs the explicit controller selection. Firmware geometry remains separately selectable.
+The donor's measured pinion-rate curve is not a firmware Table A. Rack/load came from a 2019 RDX; angle geometry
+past 169 degrees is extrapolated. TJB's own P knots/values and E4 scale 4096 are used, R6 is -120.1 per deg/s
+at centre, high-speed P trim is 0.7 and the friction knee is 15 deg/s. Command delay uses the nrdr port defaults
+0.145/0.025 s; no inherited Clarity prediction schedule. Unlike the donor, a single inactive frame sends zero
+and resets the controller: no retained integrator or feedforward. No Panda change or road validation is implied.
 
 The Civic TEG-A010 calibration requires
 `39990-TEG,A010-20261016b-PTMFix-ClarityEquivMap-ClarityPKnots-Row6Stock-A280FlatRows023`

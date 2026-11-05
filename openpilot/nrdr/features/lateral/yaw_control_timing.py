@@ -69,7 +69,7 @@ FIXED_COMMAND_DELAY_LOW = dict.fromkeys(CIVIC_COMMAND_DELAY_CALIBRATIONS, CIVIC_
 # plan timing after a drive.
 FIXED_COMMAND_DELAY_LOW.update({"civic_tba_c120": CIVIC_COMMAND_DELAY_LOW, "civic_tgg_a120": CIVIC_COMMAND_DELAY_LOW,
                                 "civic_tba_a030": CIVIC_COMMAND_DELAY_LOW, "crv_tla_a040": DEFAULT_COMMAND_DELAY_LOW,
-                                "crv_tla_a220": DEFAULT_COMMAND_DELAY_LOW})
+                                "crv_tla_a220": DEFAULT_COMMAND_DELAY_LOW, "rdx_tjb_a220": DEFAULT_COMMAND_DELAY_LOW})
 # The Civics hold it above 15 m/s too: they ran as early there as in town (TEG -0.13 to -0.17 s at 12-40 m/s with
 # it faded out; C020 -0.16 s at 20-40 m/s on route 380), and the C120, TGG and A030 follow them. The Insight's
 # highway timing did not need it; the CR-Vs have no timing measured.
