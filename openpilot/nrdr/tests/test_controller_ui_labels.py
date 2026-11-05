@@ -29,14 +29,16 @@ def _panel(schema, page_id, panel_id):
   return next(p for p in section["sub_panels"] if p["id"] == panel_id)
 
 
-def _native_class(filename, name):
+def _native_class(filename, name, *, saved_bools=None):
   # Execute the real layout construction with inert widget factories. Hardware
   # and IPC imports are deliberately excluded; this checks copy, not rendering.
   path = ROOT / "openpilot/nrdr/ui/settings" / filename
   tree = ast.parse(path.read_text(encoding="utf-8"))
   tree.body = [n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == name]
+  saved_bools = dict(saved_bools or {})
   env = {
     "Widget": object, "Callable": Callable, "tr": lambda text: text,
+    "ui_state": SimpleNamespace(params=SimpleNamespace(get_bool=lambda key: saved_bools.get(key, False))),
     "get_native_option_spec": get_native_option_spec,
     "large_reset_button": lambda: object(),
     "NavButton": lambda *_: SimpleNamespace(set_click_callback=lambda *_: None),
@@ -95,6 +97,20 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertTrue(local["use_float_scaling"])
     self.assertEqual(local["label_callback"](125), "+1.25 m")
     self.assertEqual(tuple(web[k] for k in ("min", "max", "step", "unit")), (0.0, 5.0, 0.25, "m"))
+
+  def test_engine_braking_uses_saved_state_without_automatic_param_binding(self):
+    for saved in (False, True):
+      with self.subTest(saved=saved):
+        cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout",
+                            saved_bools={"NrdrExperimentalEngineBraking": saved})
+        layout = cls.__new__(cls)
+        layout._initialize_items()
+        engine = layout._engine_braking
+        self.assertIs(engine["initial_state"], saved)
+        # ToggleSP writes bound params after callbacks, bypassing a rejected save.
+        self.assertNotIn("param", engine)
+        self.assertEqual(engine["callback"], layout._set_engine_braking)
+        self.assertTrue(callable(engine["enabled"]))
 
   def test_honda_pcm_mode_and_wind_order_copy_and_parked_restart_rules(self):
     cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout")
