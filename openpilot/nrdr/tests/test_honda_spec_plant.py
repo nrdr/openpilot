@@ -55,7 +55,8 @@ def test_driver_mass_is_added_to_each_axle_once(car):
 def test_the_constants_are_the_mean_over_the_measured_cars():
   assert spec.SPEC_R0_GAIN == pytest.approx(np.mean([_r0_gain(n) for n in MEASURED]), abs=0.002)
   assert spec.SPEC_SLIP_GAIN == pytest.approx(np.mean([_slip_gain(n) for n in MEASURED]), rel=0.01)
-  assert {t.name for t in MEASURED_RACK_MAP_TABLES} == {m[2].name for m in MEASURED.values()}
+  # These four reference cars fitted the constants; newer measured racks are not training inputs.
+  assert {m[2].name for m in MEASURED.values()} <= {t.name for t in MEASURED_RACK_MAP_TABLES}
 
 
 @pytest.mark.parametrize("name", MEASURED)

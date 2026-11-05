@@ -84,7 +84,6 @@ def test_teg_centre_is_measured_not_cp():
 
 @pytest.mark.parametrize("fingerprint,firmware", (
   ("HONDA_CIVIC_BOSCH", b"39990-TBA-C120"),
-  ("HONDA_CIVIC_BOSCH", b"39990-TGG-A120"),
   ("HONDA_CRV_5G", b"39990-TLA-A040"),
 ))
 def test_unmeasured_images_steer_on_their_spec_map(fingerprint, firmware):
@@ -93,6 +92,12 @@ def test_unmeasured_images_steer_on_their_spec_map(fingerprint, firmware):
   selection = firmware_selection(CP)
   assert selection.firmware_vgr_selected and selection.rack_map is not None
   assert not selection.rack_map.table.measured and selection.rack_map.profile is get_honda_vgr_profile(CP)
+
+
+def test_tgg_uses_the_measured_hatch_not_the_sedan_or_spec_map():
+  table = firmware_selection(cp("HONDA_CIVIC_BOSCH", b"39990-TGG,A120")).rack_map.table
+  assert table.measured and (table.ratio_v[0], table.ratio_v[-1], table.slip_factor) == (15.09, 13.94, -0.00079)
+  assert get_rack_map_table(cp("HONDA_CIVIC_BOSCH", b"39990-TGG,A020")) is None
 
 
 @pytest.mark.parametrize("fingerprint,firmware", (

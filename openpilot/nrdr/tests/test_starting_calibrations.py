@@ -57,7 +57,8 @@ def test_starting_calibration_vehicle_side_and_command_delay():
   assert _OWN_CALIBRATIONS["crv_tla_a040"][1:] == (core.CRV_TLA_EPS_LOAD, (1., 1., 1.), (1., 1., 1.))
   assert _OWN_CALIBRATIONS["crv_tla_a220"][1:] == _OWN_CALIBRATIONS["crv_tla_a040"][1:]
   assert _OWN_CALIBRATIONS["civic_tba_a030"][1] == core.CIVIC_TEG_EPS_LOAD
-  assert _OWN_CALIBRATIONS["civic_tba_c120"][1] == _OWN_CALIBRATIONS["civic_tgg_a120"][1] == core.CIVIC_EPS_LOAD
+  assert _OWN_CALIBRATIONS["civic_tba_c120"][1] == core.CIVIC_EPS_LOAD
+  assert _OWN_CALIBRATIONS["civic_tgg_a120"][1] == (-15.67, -0.157, -5.449, -388.8, 75.77, -0.6084)
   for name in ("civic_tba_c120", "civic_tgg_a120", "civic_tba_a030"):
     assert command_delay({"NrdrYawCommandDelayLow": 0.3}, 5.0, calibration=name) == pytest.approx(.175)
   for name in ("crv_tla_a040", "crv_tla_a220"):

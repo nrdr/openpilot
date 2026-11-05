@@ -311,8 +311,11 @@ CIVIC_TBA_C120 = EpsFirmwareCalibration(
 # Civic hatch 39990-TGG-A120 (RWD 6640806d...). Both variant records (TGGA5, TGGA6) select row 0. Built for 4096 E4 per
 # unit: each key carries the Clarity's R5 at key x 3840/4096, and P sits on the Clarity's knots at the same scale. It
 # clamps its command input at key 1663 = E4 3840, so it is sent 3840 (per unit of output 0.94x the R5 the map was built
-# for, reaching the clamp at full output). It shares the C020's Table A, so the C020's computed R6; load, trims and
+# for, reaching the clamp at full output). It shares the C020's Table A, so the C020's computed R6; trims and
 # command delay the C020's.
+# JamesL787 bac2b6e1c08b970c30cf623b09effd1c8db21679: fit through the older
+# 08-07 image those drives actually ran. The wheel/column fit, not its command map, carries over.
+CIVIC_TGG_EPS_LOAD = (-15.67, -0.157, -5.449, -388.8, 75.77, -0.6084)
 CIVIC_TGG_A120 = EpsFirmwareCalibration(
   3840.0, (0, 103, 263, 459, 660, 862, 1111, 1549, 1774), (0, 1740, 4443, 7769, 11167, 14579, 18798, 26202, 30002),
   (0, 50, 100, 150, 200, 250, 300, 350, 400), (1774,) * 9, CIVIC_C020_R6[0],

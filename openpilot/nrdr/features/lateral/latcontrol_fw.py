@@ -24,7 +24,7 @@ from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile
 from openpilot.nrdr.features.lateral.vfn_eps_core import (
   CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_I_SCALE, CIVIC_P_SCALE, CIVIC_TBA_A030, CIVIC_TBA_C120, CIVIC_TEG_A010,
-  CIVIC_TEG_EPS_LOAD, CIVIC_TGG_A120, CRV_I_SCALE, CRV_P_SCALE, CRV_TLA_A040, CRV_TLA_A220, CRV_TLA_EPS_LOAD,
+  CIVIC_TEG_EPS_LOAD, CIVIC_TGG_A120, CIVIC_TGG_EPS_LOAD, CRV_I_SCALE, CRV_P_SCALE, CRV_TLA_A040, CRV_TLA_A220, CRV_TLA_EPS_LOAD,
   INSIGHT_TXM_A040, INSIGHT_TXM_EPS_LOAD,
   HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
 )
@@ -45,7 +45,7 @@ _OWN_CALIBRATIONS = {
   "insight_txm_a040": (INSIGHT_TXM_A040, INSIGHT_TXM_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
   # Corrected-PTM starting calibrations: load and trims carried from the nearest measured car (see vfn_eps_core)
   "civic_tba_c120": (CIVIC_TBA_C120, CIVIC_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
-  "civic_tgg_a120": (CIVIC_TGG_A120, CIVIC_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
+  "civic_tgg_a120": (CIVIC_TGG_A120, CIVIC_TGG_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
   "civic_tba_a030": (CIVIC_TBA_A030, CIVIC_TEG_EPS_LOAD, CIVIC_P_SCALE, CIVIC_I_SCALE),
   "crv_tla_a040": (CRV_TLA_A040, CRV_TLA_EPS_LOAD, CRV_P_SCALE, CRV_I_SCALE),
   "crv_tla_a220": (CRV_TLA_A220, CRV_TLA_EPS_LOAD, CRV_P_SCALE, CRV_I_SCALE),
