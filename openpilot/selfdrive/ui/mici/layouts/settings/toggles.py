@@ -48,6 +48,11 @@ class TogglesLayoutMici(NavScroller):
     self._experimental_btn = BigToggle("experimental mode", initial_state=ui_state.params.get_bool("ExperimentalMode"),
                                        toggle_callback=self._on_experimental_mode,
                                        description="Let the driving model control gas and brakes. These are alpha features. Expect mistakes.")
+    self._accel_boost_toggle = BigParamControl(
+      "acceleration boost", "AccelBoostSP",
+      description="Sunny's boost in Experimental Mode. Off by default; inactive in Econ.",
+    )
+    self._accel_boost_toggle.set_enabled(lambda: ui_state.CP is not None and ui_state.has_longitudinal_control)
     is_metric_toggle = BigParamControl("use metric units", "IsMetric")
     ldw_toggle = BigParamControl("lane departure warnings", "IsLdwEnabled")
     self._lane_centering_panel = LaneCenteringLayoutMici()
@@ -67,6 +72,7 @@ class TogglesLayoutMici(NavScroller):
     self._scroller.add_widgets([
       self._personality_toggle,
       self._experimental_btn,
+      self._accel_boost_toggle,
       is_metric_toggle,
       ldw_toggle,
       self._lane_centering_btn,
@@ -79,6 +85,7 @@ class TogglesLayoutMici(NavScroller):
     # Toggle lists
     self._refresh_toggles = (
       ("ExperimentalMode", self._experimental_btn),
+      ("AccelBoostSP", self._accel_boost_toggle),
       ("IsMetric", is_metric_toggle),
       ("IsLdwEnabled", ldw_toggle),
       ("AlwaysOnDM", always_on_dm_toggle),

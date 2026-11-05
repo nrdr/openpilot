@@ -241,6 +241,12 @@ sections:
       - type: capability
         field: has_icbm
         equals: true
+  - key: AccelBoostSP
+    widget: toggle
+    title: Acceleration Boost
+    description: Sunny's boost in Experimental Mode. Off by default; inactive in Econ.
+    enablement:
+    - $ref: '#/macros/longitudinal'
   - key: SmartCruiseControlMap
     widget: toggle
     title: Map

@@ -3252,6 +3252,19 @@
               ]
             },
             {
+              "key": "AccelBoostSP",
+              "widget": "toggle",
+              "title": "Acceleration Boost",
+              "description": "Sunny's boost in Experimental Mode. Off by default; inactive in Econ.",
+              "enablement": [
+                {
+                  "type": "capability",
+                  "field": "has_longitudinal_control",
+                  "equals": true
+                }
+              ]
+            },
+            {
               "key": "SmartCruiseControlMap",
               "widget": "toggle",
               "title": "Map",

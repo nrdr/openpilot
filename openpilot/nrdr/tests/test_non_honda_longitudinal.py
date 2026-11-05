@@ -66,6 +66,7 @@ def environment(**overrides):
     "apply_standstill_gap": apply_standstill_gap,
     "is_honda_bosch_a_radar": lambda _: False, "_LEAD_ACCEL_TAU": 1.5,
     "V_CRUISE_MAX": 145, "V_CRUISE_UNSET": 255,
+    "AccelBoostSP": lambda: NS(enabled=False, update_params=lambda: None),
   }
   env.update(overrides)
   return env
@@ -187,6 +188,9 @@ class FakePlannerSP:
 
   def is_e2e(self, sm):
     return sm['selfdriveState'].experimentalMode
+
+  def apply_accel_boost(self, _sm, e2e_accel, _mpc_accel, _cruise_accel, **_kwargs):
+    return e2e_accel
 
 
 class FakePlannerMpc:

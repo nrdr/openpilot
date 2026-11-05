@@ -58,6 +58,11 @@ class CruiseLayout(Widget):
       description=tr("Use map data to estimate the appropriate speed to drive through turns ahead."),
       param="SmartCruiseControlMap")
 
+    self.accel_boost_toggle = toggle_item_sp(
+      title=tr("Acceleration Boost"),
+      description=tr("Sunny's boost in Experimental Mode. Off by default; inactive in Econ."),
+      param="AccelBoostSP")
+
     self.custom_acc_toggle = toggle_item_sp(
       title=tr("Custom ACC Speed Increments"),
       description="",
@@ -87,6 +92,7 @@ class CruiseLayout(Widget):
       self.icbm_toggle,
       self.scc_v_toggle,
       self.scc_m_toggle,
+      self.accel_boost_toggle,
       self.custom_acc_toggle,
       self.custom_acc_short_increment,
       self.custom_acc_long_increment,
@@ -118,6 +124,7 @@ class CruiseLayout(Widget):
     if ui_state.CP is not None and ui_state.CP_SP is not None:
       has_icbm = ui_state.has_icbm
       has_long = ui_state.has_longitudinal_control
+      self.accel_boost_toggle.action_item.set_enabled(has_long)
 
       if ui_state.CP_SP.intelligentCruiseButtonManagementAvailable and not has_long:
         self.icbm_toggle.action_item.set_enabled(ui_state.is_offroad())
@@ -154,6 +161,7 @@ class CruiseLayout(Widget):
     else:
       has_icbm = has_long = False
       self.icbm_toggle.action_item.set_enabled(False)
+      self.accel_boost_toggle.action_item.set_enabled(False)
       self.icbm_toggle.set_description(tr(ONROAD_ONLY_DESCRIPTION))
 
     show_custom_acc_desc = False

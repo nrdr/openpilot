@@ -117,7 +117,7 @@ def test_cruise_refresh_cannot_replay_stale_vision_choice(has_cp, has_long, has_
   update = method("openpilot/selfdrive/ui/sunnypilot/layouts/settings/cruise.py", "CruiseLayout", "_update_state")
   execute([ast.ClassDef(name="CruiseLayout", bases=[ast.Name(id="Widget", ctx=ast.Load())], keywords=[], body=[update], decorator_list=[])], namespace)
   layout = namespace["CruiseLayout"]()
-  for attr in ("icbm_toggle", "custom_acc_toggle", "scc_v_toggle", "scc_m_toggle"):
+  for attr in ("icbm_toggle", "custom_acc_toggle", "scc_v_toggle", "scc_m_toggle", "accel_boost_toggle"):
     setattr(layout, attr, Mock(description="", action_item=Mock(get_state=lambda: False)))
   layout._on_custom_acc_toggle = Mock()
   if when == "queued_before":

@@ -207,6 +207,10 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     cruise_should_stop = (bool(v_ego < self.nrdr.v_ego_stopping and self.a_cruise < 0.1)
                           if self.nrdr is not None else should_stop(v_ego, self.a_cruise))
 
+    output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(
+      self, sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise,
+    )
+
     candidates = [(output_a_target_mpc, self.mpc.source, output_should_stop_mpc),
                   (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop)]
     if is_e2e:
