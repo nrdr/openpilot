@@ -65,6 +65,23 @@ Counterexample: in the evening drives there were 2,094 otherwise eligible zero-b
 
 ## Near-set acceleration and stock coverage
 
+### Separate wind-credit bench trial (not enabled on the car)
+
+The live stop veto above is independent of the trial. On 18c (585.03–590.45 s)
+the reconstructed baseline was zero on all 247 comparable brake packets;
+the trial sent 4–8 counts. On 18b (225–233 s), the baseline was again zero;
+the trial sent 1–10 counts on 398 comparable packets. These are commands, not
+measured pressure or stopping distances. A separate 1,277-frame window kept
+zero brake in both runs. No new driver setting enables the trial.
+
+Brake and propulsion aren't independent on the wire: on that second descent
+all 79 sampled ACC_HUD messages also changed from a nonzero PCM speed to zero
+through the *existing* brake interlock; gas allowance was zero in both runs.
+This is not a timed overspeed feature. Pressure and engine torque need to be
+measured together before attributing any change in deceleration to the pump.
+
+### Near-set and stock comparison
+
 Across all nine previously screened approaches, the offline one-second projection capped the speed target on at least some cruise-selected samples in every
 approach. It did not alter either gas allowance or a lead-selected frame. On 18d/13 the command trim reached 6.38 m/s (46 sampled ticks); the original
 host was already tapering: at ~1 mph below set, request +0.44 vs actual +0.67, allowance 198. At crossing, +0.009 vs +0.55, allowance 133. This was
