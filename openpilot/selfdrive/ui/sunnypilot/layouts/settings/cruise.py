@@ -109,6 +109,7 @@ class CruiseLayout(Widget):
   def show_event(self):
     self._set_current_panel(PanelType.CRUISE)
     self._scroller.show_event()
+    self.accel_boost_toggle.action_item.set_state(ui_state.params.get_bool("AccelBoostSP"))
     self.icbm_toggle.show_description(True)
     self.custom_acc_toggle.show_description(True)
 
@@ -119,6 +120,8 @@ class CruiseLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
+    # Reflect external/Sunnylink changes without replaying a saved preference.
+    self.accel_boost_toggle.action_item.set_state(ui_state.params.get_bool("AccelBoostSP"))
     pending_preferences = snapshot_params(ui_state.params, CRUISE_PARAMS)
 
     if ui_state.CP is not None and ui_state.CP_SP is not None:

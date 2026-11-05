@@ -10,8 +10,10 @@ import json
 import subprocess
 from collections import deque
 from collections.abc import Callable
+from enum import IntEnum
 from types import SimpleNamespace as NS
 from typing import Union
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -569,3 +571,57 @@ def test_sunnylink_source_compiles_the_boost_toggle():
         yield from items(value)
   assert list(items(compiled)) == list(items(stored))
   assert len(list(items(compiled))) == 1
+
+
+@pytest.mark.parametrize('initial', (False, True))
+@pytest.mark.parametrize('has_cp,has_long', ((True, True), (True, False), (False, False)))
+@pytest.mark.parametrize('refresh', ('show_event', '_update_state'))
+def test_c3x_boost_refresh_reads_external_choice_without_writes(initial, has_cp, has_long, refresh):
+  from openpilot.nrdr.tests.test_experimental_button_regressions import RecordingParams
+  from openpilot.nrdr.tests.test_optional_longitudinal_preferences import execute, method
+
+  params = RecordingParams({'AccelBoostSP': initial})
+  widget = type('Widget', (), {'_update_state': lambda self: None})
+  env = {'Widget': widget, 'Callable': Callable, 'Params': lambda: params}
+
+  def load_class(relative, name, base, methods):
+    # Keep the production constructor and state accessors; omit drawing only.
+    execute([ast.ClassDef(name=name, bases=[ast.Name(id=base, ctx=ast.Load())], keywords=[],
+                          body=[method(relative, name, m) for m in methods], decorator_list=[])], env)
+    return env[name]
+
+  load_class('openpilot/system/ui/widgets/toggle.py', 'Toggle', 'Widget', ('__init__', 'get_state', 'set_state'))
+  toggle = load_class('openpilot/system/ui/sunnypilot/widgets/toggle.py', 'ToggleSP', 'Toggle', ('__init__',))
+  action = load_class('openpilot/system/ui/widgets/list_view.py', 'ToggleAction', 'Widget', ('get_state', 'set_state'))
+
+  def toggle_item(**kwargs):
+    control = action()
+    control.toggle = toggle(param=kwargs['param'], callback=kwargs.get('callback'))
+    control.enabled, control.set_enabled = True, Mock()
+    return Mock(action_item=control, description=kwargs.get('description', ''))
+
+  state = NS(params=params, has_longitudinal_control=has_long, has_icbm=False, is_offroad=lambda: True,
+             CP=NS(alphaLongitudinalAvailable=True, pcmCruise=False) if has_cp else None,
+             CP_SP=NS(intelligentCruiseButtonManagementAvailable=False) if has_cp else None)
+  env = h.definitions(h.ROOT / 'openpilot/nrdr/ui/settings_policy.py', dict(env, tr=lambda text: text))
+  env.update(IntEnum=IntEnum, tr_noop=lambda text: text, ui_state=state, toggle_item_sp=toggle_item,
+             option_item_sp=Mock(), simple_button_item_sp=Mock(), Scroller=Mock(), SpeedLimitSettingsLayout=Mock())
+  module = h.definitions(h.ROOT / 'openpilot/selfdrive/ui/sunnypilot/layouts/settings/cruise.py', env)
+  layout = module['CruiseLayout']()
+  boost_control = layout.accel_boost_toggle.action_item
+  assert boost_control.get_state() is initial
+  assert params.actions == []  # Construction does not rewrite saved choices.
+  layout.show_event()
+  assert params.actions == []
+
+  # Both external directions must refresh on reopening and while visible,
+  # even without car parameters or longitudinal capability.
+  for external in (not initial, initial):
+    params.put_bool('AccelBoostSP', external, block=True)
+    expected_actions = [a for a in params.actions if a[1] == 'AccelBoostSP']
+    for _ in range(3):
+      getattr(layout, refresh)()
+      assert boost_control.get_state() is external
+      params.flush()
+      assert params.get_bool('AccelBoostSP') is external
+      assert [a for a in params.actions if a[1] == 'AccelBoostSP'] == expected_actions
