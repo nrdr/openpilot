@@ -145,7 +145,7 @@ class TestControllerUiLabels(unittest.TestCase):
   def test_controller_copy_requires_the_corrected_firmware_not_the_old_placeholder(self):
     panel = _panel(self.schema, "steering", "nrdr_pidf_ground")
     selector = next(item for item in panel["items"] if item["key"] == "NrdrLateralController")
-    self.assertIn("not the Bosch placeholder", selector["description"])
+    self.assertIn("exact modified steering firmware revision", selector["description"])
     self.assertIn("04147917", selector["details"])
     self.assertIn("7ba37432", selector["details"])
     self.assertIn("same version strings", selector["details"])

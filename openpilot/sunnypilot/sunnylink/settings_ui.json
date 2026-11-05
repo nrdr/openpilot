@@ -622,7 +622,7 @@
                   "key": "NrdrLateralController",
                   "widget": "multiple_button",
                   "title": "Controller Type",
-                  "description": "Firmware Controller requires the matching modified EPS build. TEG-A010 uses its own provisional corrected-PTM calibration, not the Bosch placeholder.",
+                  "description": "Choose PIF or Firmware Controller while parked. Firmware Controller needs the exact modified steering firmware revision its tune was built for.",
                   "details": "TEG-A010 requires the corrected PTM firmware (RWD SHA256 starts 04147917); its calibration has been driven on that build. Insight TXM-A040 requires the corrected PTM firmware (7ba37432). Starting calibrations, not yet road-validated, cover the corrected builds of Civic Bosch TBA-C120 (9261b8db), Civic TGG-A120 (6640806d), Civic TBA-A030 (55c37266), CR-V TLA-A040 (2e6a8802) and CR-V TLA-A220 (2c992997). Older builds report the same version strings but are not compatible with these calibrations. Confirm the actual flashed build before selecting Firmware Controller. PIF and Device Yaw Correction remain separate.",
                   "options": [
                     {
@@ -684,7 +684,7 @@
                   "key": "NrdrDeviceYawCorrection",
                   "widget": "toggle",
                   "title": "Use Device Yaw Correction",
-                  "description": "Blends 1% device-yaw torque feedback with 99% PIF. Not used by Firmware Controller. Optimized lane changes bypass it.",
+                  "description": "Mix 1% device-yaw torque feedback with 99% PIF output. This is the legacy option; use Firmware Controller for a matching rack. Optimized lane changes temporarily disable the blend.",
                   "details": "Defaults ON. The blend strength, acceleration factor, and friction remain fixed. Below 4.5 mph the torque leg uses steering-angle feedback, transitioning to the device's calibrated yaw estimate by 11.2 mph. Missing, stale, or invalid yaw falls back to PIF when yaw is required. Available only for supported modified-EPS Honda PIF setups. Firmware Controller never uses this blend. Turn Suggested Settings OFF to unlock this switch.",
                   "visibility": [
                     {
@@ -732,7 +732,7 @@
                   "key": "NrdrOptimizedLaneChanges",
                   "widget": "toggle",
                   "title": "Optimized Lane Changes",
-                  "description": "Use the fixed nrdr lane-change profile. During the maneuver, disable torque blending, feedforward, and rate damping for either controller.",
+                  "description": "Temporarily lowers the effective steer ratio on entry and turns off torque blending, feedforward, and rate damping during a lane change. This can smooth out aggressive lane changes on older models.",
                   "enablement": [
                     {
                       "type": "not",
@@ -1190,7 +1190,7 @@
                   "key": "HondaCenterScale",
                   "widget": "option",
                   "title": "Center Boost",
-                  "description": "Extra proportional (P) error correction near center; 0.50 is a 50% P boost.",
+                  "description": "Adds steering correction near center on straights. This can help a lazy model or a slightly undertuned PIF setup stay centered. Firmware Controller doesn't use it.",
                   "details": "Multiplies only the proportional term near center. Integral, feedforward, and damping keep their normal values. Available at every speed above the minimum, including the highway.",
                   "min": 0.0,
                   "max": 5.0,
@@ -1306,7 +1306,7 @@
                   "key": "LaneGuidanceMode",
                   "widget": "multiple_button",
                   "title": "Lane Centering Method",
-                  "description": "Choose exactly one method. Off leaves the model unchanged, Sunny applies SunnyPilot's alpha policy inside the custom model runner, and Star uses nrdr's delay-aware controller and the tuning below.",
+                  "description": "Off follows the model without lane-centering corrections. Sunny uses sunnypilot's Blendful inside the model runner. Star adds a lane-centering correction to the final steering request instead.",
                   "details": "Star builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Sunny adds a confidence-weighted correction before model smoothing and yields when the model appears to be going around an obstacle. The two correction paths are mutually exclusive. Sunny requires a non-Default custom model.",
                   "options": [
                     {
@@ -1899,8 +1899,7 @@
                   "key": "HondaDriverAssistDuringOverride",
                   "widget": "toggle",
                   "title": "Assist Pass-Through",
-                  "description": "Resets the EPS lane-assist state so the final override feels like normal driving after fade completes.",
-                  "details": "When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering rack may carry on a more resistive feeling.",
+                  "description": "Stops requesting lane assist when you take over, so you're not steering against it. This can make manual steering feel smoother without switching assist off.",
                   "enablement": [
                     {
                       "type": "not",

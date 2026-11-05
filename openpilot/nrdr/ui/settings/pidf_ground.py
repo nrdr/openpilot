@@ -39,7 +39,7 @@ class PidfGroundLayout(Widget):
         description=tr("Tapers torque near a stable target. Driver input, lane changes, faults and steering limits bypass it."))),
       remember("NrdrDeviceYawCorrection", toggle_item_sp(
         title=tr("Use Device Yaw Correction"), param="NrdrDeviceYawCorrection",
-        description=tr("Blends 1% device-yaw torque feedback with 99% PIF. Not used by Firmware Controller. Optimized lane changes bypass it."))),
+        description=tr("Mix 1% device-yaw torque feedback with 99% PIF output. This is the legacy option; use Firmware Controller for a matching rack. Optimized lane changes temporarily disable the blend."))),
       remember("NrdrOptimizedLaneChanges", toggle_item_sp(
         title=tr("Optimized lane changes"), param="NrdrOptimizedLaneChanges",
         description=tr("nrdr lane-change entry shaping. During the maneuver, uses P/I feedback without torque blend, feedforward or rate damping."))),

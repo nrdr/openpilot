@@ -48,9 +48,8 @@ class OverrideTuningLayout(Widget):
       param="HondaDriverAssistDuringOverride",
       title=lambda: tr("Assist Pass-Through"),
       description=lambda: tr(
-        "When enabled, openpilot resets the EPS internal state which determines whether it is in lane assist mode or not. As such, enabling " +
-        "this will make the final override feel exactly the same as normal driving (after fade is completed), and when disabled the steering " +
-        "rack may carry on a more resistive feeling."
+        "Stops requesting lane assist when you take over, so you're not steering against it. "
+        "This can make manual steering feel smoother without switching assist off."
       ),
     )
 
