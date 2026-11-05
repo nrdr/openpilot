@@ -2,6 +2,7 @@ name: nrdr UI previews
 
 on:
   workflow_dispatch:
+  workflow_call:
   # The default branch is nrdr-clean. This narrow push exception permits the
   # first preview run before workflow_dispatch is registered on that branch.
   push:

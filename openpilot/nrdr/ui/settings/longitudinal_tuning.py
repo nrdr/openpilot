@@ -139,7 +139,7 @@ class LongitudinalTuningLayout(Widget):
       initial_state=ui_state.params.get_bool("NrdrExperimentalEngineBraking"),
       enabled=lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
                       and str(getattr(ui_state.CP, "carFingerprint", "")) == "HONDA_CIVIC",
-      description=lambda: tr("Civic PCM only. Fades into free-cruise engine braking and back over 3 seconds. "
+      description=lambda: tr("Civic PCM only. Fades into free-cruise engine braking and back over 3 seconds. " +
                              "Lead braking and pedal overrides take priority. Off by default; restart required."),
       callback=self._set_engine_braking,
     )

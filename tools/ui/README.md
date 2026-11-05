@@ -124,12 +124,49 @@ This tool does not generate placeholder screenshots.
 - Seven-day downloadable artifacts containing the gallery and diagnostics. Extract
   the ZIP and open `index.html`; GitHub does not serve artifact HTML as a website.
 
-The default branch is `nrdr-clean`; a workflow file present only on the development
-branch is not yet discoverable via manual dispatch. The narrow push trigger
-allows the first run when the parent pushes this UI patch, without changing the
-default branch or registering any broad push CI. That first Actions run must be
-checked through completion before claiming actual captures. This local patch
-does not dispatch, commit, push or pretend that a first capture has completed.
+The default branch is `nrdr-clean`. After the first preview push (`c9e300d626`),
+GitHub reported Actions enabled but no registered preview workflow, checks or
+runs; direct dispatch returned 404. The narrow push trigger remains unchanged,
+but a registered launcher also provides an explicit fallback without modifying
+the default branch or enabling broad CI.
+
+### Registered, opt-in preview launcher
+
+`nrdr-ui-content.yaml` is registered as workflow **367484810**, state `active`
+(API verified 2026-11-05). Its `workflow_dispatch` file exists on
+`nrdr-development`, but authenticated reads of both that file and the workflows
+directory on `nrdr-clean` return 404. Registration is therefore historical, not
+proof of a workflow file on the current default branch. This fallback must be
+verified by an accepted dispatch and a matching run; it is not a guaranteed fix
+for GitHub's registration/event handling. After the launcher patch is pushed to
+`nrdr-development`, try that registered ID with `preview_only=true`:
+
+```sh
+gh workflow run 367484810 --repo nrdr/openpilot --ref nrdr-development -f preview_only=true
+```
+
+The equivalent API request is `POST /repos/nrdr/openpilot/actions/workflows/367484810/dispatches`
+with JSON `{"ref":"nrdr-development","inputs":{"preview_only":true}}`.
+Before dispatch, verify the branch HEAD is the intended reviewed push SHA. After
+dispatch, verify the run's `head_sha` matches it and follow both capture jobs to
+completion. Do not also dispatch the dedicated workflow if its matching push run
+is already capturing that SHA.
+If GitHub rejects the registered-ID dispatch, report the exact response and stop;
+do not change the default branch or repository-wide Actions settings to work
+around it without separate authorization.
+
+The boolean input defaults to **false**: normal manual runs and the existing
+path-filtered PR runs keep the content test job and its steps unchanged. Only a
+manual dispatch with `preview_only=true` skips that job and calls the dedicated
+`nrdr-ui-preview.yaml` via `workflow_call`. The local reusable-workflow reference
+uses the caller's same commit; it does not render default-branch code. The caller
+and callee have read-only repository permissions, pass no secrets, and reuse the
+same two-job native-build/capture matrix, limits, and gallery artifacts. No new
+push trigger is added to the content workflow, and its PR filters are unchanged.
+
+The first Actions run must be checked through completion and its artifacts
+inspected before claiming actual captures. This patch does not itself dispatch,
+commit, push or pretend that a first capture has completed.
 
 At the inspected revision, `tools/op.sh setup` initializes submodules before
 dependency sync; it does **not** restore or replace `.gitmodules`. The workflow

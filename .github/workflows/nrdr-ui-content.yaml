@@ -1,7 +1,7 @@
 name: nrdr UI content regression checks
 
 on:
-  # Content regression tests, not previews. nrdr development validation is manual.
+  # Content regression tests by default; native previews require manual opt-in.
   pull_request:
     branches-ignore:
       - nrdr-development
@@ -17,12 +17,19 @@ on:
       - 'openpilot/nrdr/tests/test_mici_alert_overlay.py'
       - '.github/workflows/nrdr-ui-content.yaml'
   workflow_dispatch:
+    inputs:
+      preview_only:
+        description: 'Capture C3X/C4 UI galleries instead of running content tests'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   ui-content:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.preview_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
@@ -43,3 +50,10 @@ jobs:
             openpilot/nrdr/tests/test_no_donation_promotions.py \
             openpilot/nrdr/tests/test_mici_alert_overlay.py
       # No publication, device access, or branch mutation.
+
+  ui-preview:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_only }}
+    # Resolve the reusable capture matrix from the same commit as this launcher.
+    uses: ./.github/workflows/nrdr-ui-preview.yaml
+    permissions:
+      contents: read

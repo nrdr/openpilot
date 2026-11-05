@@ -63,7 +63,7 @@ class EngineBrakeControl(BigToggle):
     super().__init__(tr("Experimental Engine Braking"),
                      initial_state=ui_state.params.get_bool("NrdrExperimentalEngineBraking"),
                      toggle_callback=self._select, font_size=34,
-                     description=tr("Civic PCM only. Fades into free-cruise engine braking and back over 3 seconds. "
+                     description=tr("Civic PCM only. Fades into free-cruise engine braking and back over 3 seconds. " +
                                     "Lead braking and pedal overrides take priority. Off by default; restart required."))
     self.set_enabled(lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
                      and str(ui_state.CP.carFingerprint) == "HONDA_CIVIC")
@@ -86,7 +86,7 @@ class EngineBrakeControl(BigToggle):
 class OverspeedAllowanceControl(BigButton):
   def __init__(self):
     super().__init__(tr("Set-Speed Overshoot Allowance"), font_size=30,
-                     description=tr("Allows up to this much above the set speed when no other speed target is lower. "
+                     description=tr("Allows up to this much above the set speed when no other speed target is lower. " +
                                     "0 mph preserves stock behavior."))
     self.set_enabled(self._available)
     self.set_click_callback(self._show_choices)

@@ -1,8 +1,8 @@
 """Shared native/remote tuning admission rules. No vehicle actuation or I/O."""
 
 SUGGESTED_DESCRIPTION = (
-  "Use the November 5 lateral setup: Sunny and matched Firmware Controller/steer ratio where supported. "
-  "Tested with PopV2; your model stays unchanged. Confirm the exact modified EPS build before using firmware control. "
+  "Use the November 5 lateral setup: Sunny and matched Firmware Controller/steer ratio where supported. " +
+  "Tested with PopV2; your model stays unchanged. Confirm the exact modified EPS build before using firmware control. " +
   "Turning this off keeps the settings and unlocks tuning."
 )
 PIF_KEYS = frozenset(
