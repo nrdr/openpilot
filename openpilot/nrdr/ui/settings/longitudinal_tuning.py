@@ -93,10 +93,7 @@ class LongitudinalTuningLayout(Widget):
     self._static_feedforward_long = toggle_item_sp(
       param="StaticFeedforwardLong",
       title=lambda: tr("Keep Feedforward Static (Default: OFF)"),
-      description=lambda: tr(
-        "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value " +
-        "instead of being scaled along with it. The lateral PID scales have their own toggle in Lateral Tuning."
-      ),
+      description=lambda: tr("On: feedforward stays the same. Off: feedforward scales with the rest of the PID tune."),
     )
 
     self._ecu_matched_long = toggle_item_sp(
