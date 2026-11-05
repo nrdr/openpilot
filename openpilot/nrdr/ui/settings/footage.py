@@ -4,10 +4,9 @@ import re
 import socket
 import subprocess
 
-import numpy as np
 import pyray as rl
-import qrcode
 
+from openpilot.common.qrcode import make_texture
 from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.hardware.hw import Paths
@@ -98,24 +97,10 @@ class FootageQrDialog(Widget):
 
   def _generate_qr_code(self) -> None:
     try:
-      qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
-      qr.add_data(self._url)
-      qr.make(fit=True)
-
-      pil_img = qr.make_image(fill_color="black", back_color="white").convert('RGBA')
-      img_array = np.array(pil_img, dtype=np.uint8)
-
       if self.qr_texture and self.qr_texture.id != 0:
         rl.unload_texture(self.qr_texture)
-
-      rl_image = rl.Image()
-      rl_image.data = rl.ffi.cast("void *", img_array.ctypes.data)
-      rl_image.width = pil_img.width
-      rl_image.height = pil_img.height
-      rl_image.mipmaps = 1
-      rl_image.format = rl.PixelFormat.PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
-
-      self.qr_texture = rl.load_texture_from_image(rl_image)
+      # Match the existing black-on-white QR with a four-module quiet border.
+      self.qr_texture = make_texture(self._url, inverted=False)
     except Exception:
       cloudlog.exception("footage QR generation failed")
       self.qr_texture = None

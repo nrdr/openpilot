@@ -90,6 +90,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgles2 libegl1 ffmpeg
+      - name: Check screenshot extraction with full FFmpeg
+        run: |
+          # The repository's small FFmpeg build can record video, but lacks
+          # filters used to extract the gallery. Use Ubuntu's full build here.
+          export PATH="/usr/bin:$PATH"
+          test "$(command -v ffmpeg)" = /usr/bin/ffmpeg
+          test "$(command -v ffprobe)" = /usr/bin/ffprobe
+          "$GITHUB_WORKSPACE/.venv/bin/python" -B -m unittest \
+            tools.ui.tests.test_capture_preview.TestPreview.test_real_encoder_extraction_with_test_pattern_not_ui_capture -v
       - name: Restore native build cache
         uses: actions/cache@v6
         with:
@@ -101,11 +110,12 @@ jobs:
         run: '"$GITHUB_WORKSPACE/.venv/bin/scons" --minimal -j2'
       - name: Capture native settings and onroad menus
         timeout-minutes: 7
-        run: >-
-          "$GITHUB_WORKSPACE/.venv/bin/python" tools/ui/capture_preview.py
-          --device ${{ matrix.device }}
-          --output "${{ runner.temp }}/ui-preview"
-          --timeout 180
+        run: |
+          export PATH="/usr/bin:$PATH"
+          "$GITHUB_WORKSPACE/.venv/bin/python" tools/ui/capture_preview.py \
+            --device ${{ matrix.device }} \
+            --output "${{ runner.temp }}/ui-preview" \
+            --timeout 180
       - name: Upload preview gallery and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
