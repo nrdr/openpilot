@@ -241,11 +241,14 @@ class TestPreview(unittest.TestCase):
     with tempfile.TemporaryDirectory() as folder:
       args = ["capture_preview.py", "--output", folder]
       with (patch.object(sys, "argv", args), patch.object(preview, "check_host"),
+            # Linux platform probing can call subprocess.check_output too.
+            patch.object(preview.platform, "platform", return_value="test-host"),
             patch.object(preview.subprocess, "check_output", side_effect=["abc\n", ""]),
             patch.object(preview, "run_bounded", side_effect=RuntimeError("native dependency missing")) as run):
         self.assertEqual(preview.main(), 1)
       self.assertEqual(run.call_count, 2)  # The other layout still gets attempted.
       report = json.loads((Path(folder) / "manifest.json").read_text())
+      self.assertEqual(report["host"], "test-host")
       self.assertTrue(all(d["status"] == "failed" for d in report["devices"].values()))
       self.assertNotIn("<img ", (Path(folder) / "index.html").read_text(encoding="utf-8"))
 
