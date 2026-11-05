@@ -169,7 +169,7 @@ def capture_worker(device: str, output: Path) -> None:
     raise RuntimeError("Refusing to run on a physical device")
   with OpenpilotPrefix(), patch.object(HARDWARE, "get_device_type", return_value=device):
     from openpilot.selfdrive.ui.tests.diff import replay
-    from tools.ui.preview_scenarios import build_preview_script, setup_vehicle_fixture
+    from tools.ui.preview_scenarios import TELEMETRY_SERVICES, build_preview_script, setup_vehicle_fixture
     replay.setup_state()  # Must precede importing UI singletons, as in the stock runner.
     setup_vehicle_fixture()
     from openpilot.selfdrive.ui.tests.diff import replay_script
@@ -180,8 +180,10 @@ def capture_worker(device: str, output: Path) -> None:
     def build(pm, main_layout, variant):
       return build_preview_script(pm, main_layout, variant, device, markers)
 
+    pub_master = replay.PubMaster
     # No account/network polling for the stock deterministic test dongle.
     with (patch.object(replay_script, "build_script", build), patch.object(replay, "DIFF_OUT_DIR", str(output)),
+          patch.object(replay, "PubMaster", lambda services: pub_master([*services, *TELEMETRY_SERVICES])),
           patch.object(PrimeState, "start", return_value=None)):
       replay.run_replay("tizi" if device == "tici" else "mici")
     validate_markers(markers, device)

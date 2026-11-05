@@ -22,8 +22,8 @@ route downloads, deployment, or publishing are involved.
 
 | Device | UI identity / layout | Native render size | Captures |
 | --- | --- | --- | --- |
-| C3X | `tici` / big `MainLayout` | 2160 × 1080 | 17 views, listed below |
-| C4 | `mici` / `MiciMainLayout` | 536 × 240 | 15 views, listed below |
+| C3X | `tici` / big `MainLayout` | 2160 × 1080 | 20 views, listed below |
+| C4 | `mici` / `MiciMainLayout` | 536 × 240 | 18 views, listed below |
 
 These are **real rendered UI pixels with synthetic replay messages**, not device
 screenshots or driving validation. Onroad has no camera feed or model output;
@@ -45,6 +45,8 @@ scrolled to the requested control. No widget is reparented, rescaled, or invente
 | Override | `OverrideTuningLayout` | **Unsupported:** no native mici override menu |
 | Lane centering | Existing lateral subpanel | Existing Toggles lane-centering panel |
 | Driver monitoring | Native Always-On DM toggle, scrolled into view | Native Always-On DM control, centered in carousel |
+| Sunny acceleration boost | Cruise toggle, offroad and onroad | Toggles carousel, offroad and onroad |
+| Right-side developer display | Existing developer HUD with synthetic readings | Existing five-row strip: REAL, DESIRE, DIST, LSPD, LCTR |
 | Onroad | HUD, sidebar, personality, longitudinal, lane-centering and DM settings | HUD, settings carousel, personality, PCM, lane-centering and DM settings |
 
 **Unsupported on both:** advanced nrdr DM reminder-timing tuning exists only in
@@ -62,10 +64,14 @@ centering and unlocks suggested/handcrafted tuning only in temporary preview Par
 It also marks optional first-run setup complete so the offline-map download
 prompt does not cover the home screen. It does not request any maps.
 It never starts a controller, sends CAN, clicks a tuning action, or changes a real
-vehicle setting. Onroad means ignition-on, disengaged synthetic UI state; its
-settings captures retain native restrictions. No special floating tuning menu
+vehicle setting. Onroad settings use ignition-on, disengaged synthetic UI state
+and retain native restrictions. The developer checkpoint alone uses synthetic
+engaged display messages: 3.5-degree actual steering, 4-degree desired steering,
+35-meter lead distance, 20 m/s ego speed, -1 m/s relative speed, and Sunny lane
+centering active. These are display fixtures, not computed control outputs.
+No special floating tuning menu
 exists in this checkout: the onroad settings views use the same real settings tree.
-Engine-braking and overshoot values are checked unchanged at every checkpoint;
+Engine-braking, overshoot and acceleration-boost values are checked unchanged at every checkpoint;
 the compact selector is opened through the existing control's registered callback.
 The first five compact longitudinal-control indices are unchanged.
 
@@ -102,7 +108,7 @@ Prime account polling is disabled for the test dongle; no real account is used.
 
 The short script opens real settings widgets, checks ignition/nav-stack/viewport
 state, and gives C4's actual delayed onroad transition time to finish. It records
-under 30 seconds at 60 FPS per device (23.3s tici / about 21.3s mici). The default
+under 30 seconds at 60 FPS per device (26.4s tici / about 24.4s mici). The default
 replay wall-time limit is 180 seconds per device (`--timeout 1..600`); probing is
 capped at 60 seconds and a single batched extraction at 120 seconds. Adding menus
 does not add repeated full video decodes. Timeout terminates the worker and its

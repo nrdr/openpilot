@@ -15,7 +15,10 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 from tools.ui import capture_preview as preview
-from tools.ui.preview_scenarios import MICI_LONGITUDINAL_INDEX, READ_ONLY_KEYS, build_preview_script, focus_item, open_read_only_selector, setup_vehicle_fixture
+from tools.ui.preview_scenarios import (
+  MICI_LONGITUDINAL_INDEX, READ_ONLY_KEYS, TELEMETRY_SERVICES, build_preview_script, focus_item, open_read_only_selector,
+  send_developer_telemetry, setup_vehicle_fixture,
+)
 
 
 def checkpoints(device="tici"):
@@ -40,7 +43,36 @@ class TestPreview(unittest.TestCase):
       setup_vehicle_fixture()
     params.put_bool.assert_any_call("NrdrFirstRunSetupDone", True, block=True)
     params.put_bool.assert_any_call("NrdrSuggestedSettings", False, block=True)
+    params.put_bool.assert_any_call("AccelBoostSP", False, block=True)
+    params.put.assert_any_call("DevUIInfo", 0, block=True)
     self.assertFalse(any(call.args[0].startswith("Osm") for call in params.method_calls))
+
+  def test_developer_samples_are_explicit_valid_display_messages(self):
+    messages = {}
+
+    def new_message(service):
+      messages[service] = SimpleNamespace(valid=False)
+      return messages[service]
+
+    cereal = ModuleType("openpilot.cereal")
+    cereal.messaging = SimpleNamespace(new_message=new_message)
+    pm = Mock()
+    with patch.dict(sys.modules, {"openpilot.cereal": cereal}):
+      send_developer_telemetry(pm)
+    self.assertEqual(tuple(messages), TELEMETRY_SERVICES)
+    self.assertTrue(all(message.valid for message in messages.values()))
+    self.assertEqual(messages["carState"].carState["steeringAngleDeg"], 3.5)
+    self.assertEqual(messages["controlsState"].controlsState["lateralControlState"]["pidState"]["steeringAngleDesiredDeg"], 4.0)
+    self.assertEqual(messages["radarState"].radarState["leadOne"]["dRel"], 35.0)
+    self.assertEqual(messages["laneCenteringStateSP"].laneCenteringStateSP["laneGuidanceMode"], 2)
+    self.assertEqual(pm.send.call_count, len(TELEMETRY_SERVICES))
+
+  def test_steer_ratio_labels_avoid_missing_dash_glyphs(self):
+    source = (preview.ROOT / "openpilot/nrdr/ui/settings/steer_ratio_tuning.py").read_text(encoding="utf-8")
+    self.assertIn("Ratio A: Near Center / Single Source", source)
+    self.assertIn("Ratio B: Beyond the Blend", source)
+    self.assertNotIn("\u2014", source)
+    self.assertNotIn("\u2013", source)
 
   def test_device_environment_is_explicit_and_isolated(self):
     inherited = {"BIG": "1", "SCALE": "0.4", "WINDOWED": "1", "RECORD_SPEED": "4", "BURN_IN": "1",
@@ -169,9 +201,10 @@ class TestPreview(unittest.TestCase):
       self.assertIn(name, preview.UNSUPPORTED["mici"])
     for device, names in preview.SCENARIOS.items():
       self.assertEqual(len(names), len(set(names)))
-      self.assertLessEqual(len(names), 17)
+      self.assertLessEqual(len(names), 20)
       self.assertTrue({"engine-braking", "overshoot"} <= set(names))
       self.assertTrue({"onroad-personality", "onroad-lane-centering", "onroad-dm"} <= set(names))
+      self.assertTrue({"accel-boost", "onroad-accel-boost", "onroad-developer"} <= set(names))
       self.assertIn("advanced-dm", preview.UNSUPPORTED[device])
 
   def test_new_compact_controls_follow_unchanged_first_five(self):
@@ -183,14 +216,14 @@ class TestPreview(unittest.TestCase):
     self.assertIn("overshoot-selector", preview.SCENARIOS["mici"])
 
   def test_selector_opens_without_selecting_or_changing_params(self):
-    values = dict(zip(READ_ONLY_KEYS, (False, 0), strict=True))
+    values = dict(zip(READ_ONLY_KEYS, (False, 0, False), strict=True))
     params = SimpleNamespace(get=values.get)
     selector = SimpleNamespace(select=Mock())
     gui = SimpleNamespace(_nav_stack=[object()])
     control = SimpleNamespace(enabled=True, _click_callback=lambda: gui._nav_stack.append(selector))
     self.assertIs(open_read_only_selector(control, gui, params), selector)
     selector.select.assert_not_called()
-    self.assertEqual(values, dict(zip(READ_ONLY_KEYS, (False, 0), strict=True)))
+    self.assertEqual(values, dict(zip(READ_ONLY_KEYS, (False, 0, False), strict=True)))
     control._click_callback = lambda: values.update(NrdrCruiseOverspeedAllowance=1)
     with self.assertRaisesRegex(AssertionError, "changed tuning params"):
       open_read_only_selector(control, gui, params)
@@ -223,7 +256,8 @@ class TestPreview(unittest.TestCase):
       state = SimpleNamespace(update_params=Mock(), CP=SimpleNamespace(brand="honda", carFingerprint="HONDA_CIVIC"),
                               params=SimpleNamespace(get=lambda key: None))
       nrdr = SimpleNamespace(_lateral_layout=object(), _longitudinal_layout=object())
-      settings = SimpleNamespace(_panels={0: SimpleNamespace(instance=nrdr), 1: SimpleNamespace(instance=object())})
+      settings = SimpleNamespace(_panels={0: SimpleNamespace(instance=nrdr), 1: SimpleNamespace(instance=object()),
+                                         2: SimpleNamespace(instance=object())})
       main = SimpleNamespace(_onboarding_window=SimpleNamespace(completed=True), _layouts={1: settings}, _set_mode_for_state=Mock())
       imports = {
         "openpilot.cereal": {"log": object(), "messaging": object()},
@@ -233,7 +267,7 @@ class TestPreview(unittest.TestCase):
         "openpilot.selfdrive.ui.ui_state": {"ui_state": state},
         "openpilot.system.ui.lib.application": {"gui_app": gui},
         "openpilot.selfdrive.ui.layouts.main": {"MainState": SimpleNamespace(SETTINGS=1)},
-        "openpilot.selfdrive.ui.layouts.settings.settings": {"PanelType": SimpleNamespace(NRDR=0, TOGGLES=1)},
+        "openpilot.selfdrive.ui.layouts.settings.settings": {"PanelType": SimpleNamespace(NRDR=0, TOGGLES=1, CRUISE=2)},
         "openpilot.nrdr.ui.settings.layout": {"PanelType": object()},
         "openpilot.nrdr.ui.settings.lateral_tuning": {"LateralPanel": object()},
       }
@@ -247,7 +281,7 @@ class TestPreview(unittest.TestCase):
       names = [event.setup.__defaults__[0] for _, event in entries
                if event.setup is not None and "checkpoint" in getattr(event.setup, "__code__", SimpleNamespace(co_freevars=())).co_freevars]
       self.assertEqual(names, list(preview.SCENARIOS[device]))
-      self.assertEqual(markers["end_frame"], 1398 if device == "tici" else 1276)
+      self.assertEqual(markers["end_frame"], 1581 if device == "tici" else 1459)
       self.assertLessEqual(entries[-1][0], 30 * 60)
       self.assertEqual([frame for frame, _ in entries], sorted(frame for frame, _ in entries))
       self.assertEqual(markers["unsupported"], preview.UNSUPPORTED[device])

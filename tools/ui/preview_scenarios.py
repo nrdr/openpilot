@@ -2,11 +2,12 @@
 
 SCENARIOS = {
   "tici": ("offroad", "settings", "lateral", "longitudinal", "longitudinal-pcm", "engine-braking", "overshoot", "steer-ratio", "override",
-           "lane-centering", "dm", "onroad", "onroad-sidebar", "onroad-personality", "onroad-longitudinal",
-           "onroad-lane-centering", "onroad-dm"),
+           "lane-centering", "dm", "accel-boost", "onroad", "onroad-sidebar", "onroad-personality", "onroad-longitudinal",
+           "onroad-lane-centering", "onroad-dm", "onroad-accel-boost", "onroad-developer"),
   "mici": ("offroad", "settings", "longitudinal-pcm", "longitudinal-learning", "engine-braking", "overshoot", "overshoot-selector",
-           "lane-centering", "dm", "onroad",
-           "onroad-settings", "onroad-personality", "onroad-longitudinal-pcm", "onroad-lane-centering", "onroad-dm"),
+           "lane-centering", "dm", "accel-boost", "onroad",
+           "onroad-settings", "onroad-personality", "onroad-longitudinal-pcm", "onroad-lane-centering", "onroad-dm",
+           "onroad-accel-boost", "onroad-developer"),
 }
 UNSUPPORTED = {
   "tici": {
@@ -23,7 +24,8 @@ UNSUPPORTED = {
   },
 }
 FIXTURE = "Synthetic Honda Civic/Nidec identity, openpilot longitudinal, no gas interceptor or EPS firmware; not a vehicle recording."
-READ_ONLY_KEYS = ("NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance")
+READ_ONLY_KEYS = ("NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance", "AccelBoostSP")
+TELEMETRY_SERVICES = ("carState", "carControl", "controlsState", "radarState", "laneCenteringStateSP")
 MICI_LONGITUDINAL_INDEX = {"longitudinal-pcm": 2, "longitudinal-learning": 0, "engine-braking": 5, "overshoot": 6, "overshoot-selector": 6}
 
 
@@ -50,9 +52,28 @@ def setup_vehicle_fixture():
     params.put(key, cp.to_bytes(), block=True)
   params.put("CarParamsSPPersistent", cp_sp.to_bytes(), block=True)
   for key, value in {"NrdrSuggestedSettings": False, "NrdrHandcraftedLateralTune": False,
-                     "NrdrFirstRunSetupDone": True, "AlwaysOnDM": True}.items():
+                     "NrdrFirstRunSetupDone": True, "AlwaysOnDM": True, "AccelBoostSP": False}.items():
     params.put_bool(key, value, block=True)
   params.put("LaneGuidanceMode", 1, block=True)  # Star, solely to expose its tuning controls.
+  params.put("DevUIInfo", 0, block=True)
+
+
+def send_developer_telemetry(pm):
+  """Synthetic display readings only. No controller, vehicle or CAN process runs."""
+  from openpilot.cereal import messaging
+
+  values = {
+    "carState": {"vEgo": 20.0, "steeringAngleDeg": 3.5, "standstill": False},
+    "carControl": {"latActive": True},
+    "controlsState": {"curvature": 0.001, "lateralControlState": {"pidState": {"active": True, "steeringAngleDesiredDeg": 4.0}}},
+    "radarState": {"leadOne": {"present": True, "dRel": 35.0, "vRel": -1.0}},
+    "laneCenteringStateSP": {"laneGuidanceMode": 2, "blendfulDetailsValid": True, "blendfulTrust": 0.8, "blendfulActive": True},
+  }
+  for service, fields in values.items():
+    message = messaging.new_message(service)
+    message.valid = True
+    setattr(message, service, fields)
+    pm.send(service, message)
 
 
 def focus_item(scroller, item, horizontal):
@@ -98,6 +119,7 @@ def build_preview_script(pm, main_layout, variant, device, markers):
     lateral = nrdr._lateral_layout
     longitudinal = nrdr._longitudinal_layout
     toggles = settings._panels[PanelType.TOGGLES].instance
+    cruise = settings._panels[PanelType.CRUISE].instance
 
   def send_state(started):
     if started:
@@ -109,14 +131,21 @@ def build_preview_script(pm, main_layout, variant, device, markers):
     pm.send("deviceState", state)
     alert = messaging.new_message("selfdriveState")
     alert.selfdriveState.personality = log.LongitudinalPersonality.standard
+    if selected.get("route") == "developer":
+      alert.selfdriveState.enabled = True
+      alert.selfdriveState.active = True
+      alert.selfdriveState.state = log.SelfdriveState.OpenpilotState.enabled
+      send_developer_telemetry(pm)
     pm.send("selfdriveState", alert)
 
   def navigate(route):
     checks = []
     scroller = None
+    ui_state.params.put("DevUIInfo", 2 if route == "developer" else 0, block=True)
+    ui_state.update_params()
     if big:
       top = main_layout
-      if route in ("offroad", "onroad", "sidebar"):
+      if route in ("offroad", "onroad", "sidebar", "developer"):
         main_layout._set_mode_for_state()
         if route == "sidebar":
           main_layout._sidebar.set_visible(True)
@@ -125,6 +154,10 @@ def build_preview_script(pm, main_layout, variant, device, markers):
         widget = main_layout._layouts[state]
         if route == "sidebar":
           checks.append((main_layout._sidebar, "is_visible", True))
+      elif route == "accel-boost":
+        main_layout.open_settings(PanelType.CRUISE)
+        checks.extend(((main_layout, "_current_mode", MainState.SETTINGS), (settings, "_current_panel", PanelType.CRUISE)))
+        widget, scroller = cruise.accel_boost_toggle, cruise._scroller
       elif route in ("dm", "personality"):
         main_layout.open_settings(PanelType.TOGGLES)
         checks.extend(((main_layout, "_current_mode", MainState.SETTINGS), (settings, "_current_panel", PanelType.TOGGLES)))
@@ -150,9 +183,11 @@ def build_preview_script(pm, main_layout, variant, device, markers):
     else:
       gui_app.pop_widgets_to(main_layout, instant=True)
       top = main_layout
-      if route in ("offroad", "onroad"):
+      if route in ("offroad", "onroad", "developer"):
         widget = main_layout._home_layout if route == "offroad" else main_layout._onroad_layout
         main_layout._scroll_to(widget, smooth=False)
+        if route == "developer":
+          widget = widget._strip_dev_ui
       else:
         settings_mici = main_layout._settings_layout
         gui_app.push_widget(settings_mici)
@@ -166,13 +201,15 @@ def build_preview_script(pm, main_layout, variant, device, markers):
           if route == "overshoot-selector":
             top = widget = open_read_only_selector(widget, gui_app, ui_state.params)
             scroller = None
-        elif route in ("dm", "personality", "lane-centering"):
+        elif route in ("dm", "personality", "lane-centering", "accel-boost"):
           top = settings_mici._toggles_panel
           gui_app.push_widget(top)
           if route == "lane-centering":
             top = top._lane_centering_panel
             gui_app.push_widget(top)
             widget = top._lane_guidance_mode
+          elif route == "accel-boost":
+            widget = top._accel_boost_toggle
           else:
             widget = dict(top._refresh_toggles)["AlwaysOnDM"] if route == "dm" else top._personality_toggle
           scroller = top._scroller
@@ -185,7 +222,7 @@ def build_preview_script(pm, main_layout, variant, device, markers):
       focus_item(selected["scroller"], selected["widget"], horizontal=not big)
 
   def checkpoint(name):
-    assert tuple(ui_state.params.get(key) for key in READ_ONLY_KEYS) == saved_tuning, "Preview changed engine-braking/overshoot params"
+    assert tuple(ui_state.params.get(key) for key in READ_ONLY_KEYS) == saved_tuning, "Preview changed protected tuning params"
     assert ui_state.started == name.startswith("onroad"), f"Wrong started state for {name}"
     assert gui_app._should_render and not gui_app.widget_in_stack(main_layout._onboarding_window)
     assert gui_app._nav_stack[-1] is selected["top"], f"Wrong navigation stack for {name}"
@@ -195,6 +232,12 @@ def build_preview_script(pm, main_layout, variant, device, markers):
     assert widget.is_visible and widget.rect.width > 0 and widget.rect.height > 0
     x, y = widget.rect.x + widget.rect.width / 2, widget.rect.y + widget.rect.height / 2
     assert 0 <= x <= gui_app.width and 0 <= y <= gui_app.height, f"Requested {name} control is outside the viewport"
+    if selected["route"] == "developer":
+      assert ui_state.developer_ui == 2, "Right-side developer display is not enabled"
+      for service in TELEMETRY_SERVICES:
+        assert ui_state.sm.alive[service] and ui_state.sm.valid[service] and ui_state.sm.recv_frame[service] > ui_state.started_frame, service
+      assert ui_state.sm["controlsState"].lateralControlState.which() == "pidState"
+      assert ui_state.sm["carState"].steeringAngleDeg == 3.5 and ui_state.sm["radarState"].leadOne.dRel == 35.0
     markers["captures"][name] = {
       "frame": gui_app.frame, "started": bool(ui_state.started), "route": selected["route"],
       "widget_class": f"{type(widget).__module__}.{type(widget).__name__}",

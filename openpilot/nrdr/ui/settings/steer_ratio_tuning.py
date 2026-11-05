@@ -26,15 +26,15 @@ class SteerRatioTuningLayout(Widget):
       description=lambda: tr("Experimental: configure while parked. Blend A into B across 5 degrees. " +
                              "OFF keeps your existing single-source selection. No speed-based switch."),
     )
-    self._source_a = self._source_item("NrdrSteerRatioMode", "Ratio A — Near Center / Single Source")
+    self._source_a = self._source_item("NrdrSteerRatioMode", "Ratio A: Near Center / Single Source")
     self._blend_start = option_item_sp(
       title=lambda: tr("Blend Starts At"), param="NrdrSteerRatioBlendStart", min_value=0, max_value=18000,
       value_change_step=100, use_float_scaling=True,
-      label_callback=lambda value: f"{value / 100:g}–{value / 100 + 5:g}°",
+      label_callback=lambda value: f"{value / 100:g}-{value / 100 + 5:g}°",
       description=lambda: tr("Angle from straight ahead, in either direction. Source B takes over fully 5 degrees later. " +
                              "The same transition is followed in reverse when unwinding."),
     )
-    self._source_b = self._source_item("NrdrSteerRatioSourceB", "Ratio B — Beyond the Blend")
+    self._source_b = self._source_item("NrdrSteerRatioSourceB", "Ratio B: Beyond the Blend")
     self._manual_center = option_item_sp(
       param="NrdrSteerRatioManualCenter", title=lambda: tr("Manual Override On-Center Ratio (Default: 15.38)"),
       min_value=800, max_value=2500, value_change_step=1, use_float_scaling=True,
@@ -87,9 +87,9 @@ class SteerRatioTuningLayout(Widget):
       return tr("Waiting for car")
     selection = resolve_steer_ratio_selection(ui_state.CP, ui_state.params)
     if not selection.available:
-      return tr("Unavailable — see details")
+      return tr("Unavailable: see details")
     if selection.hybrid is not None:
-      return tr(f"Hybrid · {selection.hybrid.start:g}–{selection.hybrid.end:g}°")
+      return tr(f"Hybrid: {selection.hybrid.start:g}-{selection.hybrid.end:g}°")
     return tr(selection.effective_label.replace("NRDR", "nrdr"))
 
   def _status_details(self) -> str:
