@@ -39,7 +39,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
         return inner_self.offroad
 
       def get(inner_self, key):
-        assert key == "ParamsVersion"
+        assert key in ("ParamsVersion", "NrdrSuggestedSettings", "NrdrHandcraftedLateralTune", "NrdrLateralController")
         return None
 
       def put(inner_self, key, value, block=False):
