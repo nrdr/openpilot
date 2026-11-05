@@ -237,13 +237,13 @@ class TestLaneGuidanceMigration(unittest.TestCase):
     self.assert_migration(params, LaneGuidanceMode.MODEL_ONLY)
     self.assertFalse(params.writes)
 
-  def test_handcrafted_presets_keep_their_explicit_star_choice(self):
+  def test_handcrafted_presets_keep_their_explicit_sunny_choice(self):
     self.assertTrue(HANDCRAFTED_LATERAL_PROFILES)
     for name, profile in HANDCRAFTED_LATERAL_PROFILES.items():
       with self.subTest(profile=name):
         params = MemoryParams(dict(profile.values))
-        self.assertEqual(params.values["LaneGuidanceMode"], 1)
-        self.assert_migration(params, LaneGuidanceMode.NRDR)
+        self.assertEqual(params.values["LaneGuidanceMode"], 2)
+        self.assert_migration(params, LaneGuidanceMode.BLENDFUL)
         self.assertFalse(params.writes)
 
   def test_device_migration_precedes_generic_default_seeding(self):

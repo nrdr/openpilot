@@ -32,14 +32,76 @@ def vehicle_model():
     steerRatioRear=0, steerRatio=16.5, tireStiffnessFront=200000, tireStiffnessRear=200000))
 
 
-def tick(control, *, active=True, state=0, angle=20., speed=15., desired=20.):
+def tick(control, *, active=True, state=0, angle=20., speed=15., desired=20., pressed=False, torque=0., limited=False):
   control.update_model_v2(SimpleNamespace(meta=SimpleNamespace(laneChangeState=SimpleNamespace(raw=state))))
   cs = SimpleNamespace(vEgo=speed, steeringAngleDeg=angle, steeringRateDeg=0.,
-                       steeringPressed=False, steeringTorque=0.)
+                       steeringPressed=pressed, steeringTorque=torque)
   vm = vehicle_model()
   curvature = control.steer_ratio_selection.measured_curvature(vm, desired, speed, 0.)
   return control.update(active, cs, vm, SimpleNamespace(roll=0., angleOffsetDeg=0.),
-                        False, curvature, None, False, .2)
+                        limited, curvature, None, False, .2)
+
+
+def recovery_controller(duration):
+  live = SimpleNamespace(override_fade_up_s=duration)
+  reads = []
+
+  def get_live_tuning(*, refresh_if_uninitialized):
+    assert refresh_if_uninitialized is False  # never poll Params from the lateral update
+    reads.append(live.override_fade_up_s)
+    return live
+
+  ci = SimpleNamespace(interface_config=SimpleNamespace(honda=SimpleNamespace(
+    provider=SimpleNamespace(get_live_tuning=get_live_tuning))))
+  cp, sp = car()
+  control = LatControlFirmware(cp, sp, ci, .01)
+  control.core.output_lpf_enabled = False
+  control.core.pid.i = control.core.output = .2
+  return control, live, reads
+
+
+@pytest.mark.parametrize("duration", [.01, .5, 1.5])
+def test_override_decay_uses_existing_press_detector_and_live_honda_recovery(duration):
+  control, live, reads = recovery_controller(duration)
+  # A short co-direction press is still filtered out, so it cannot arm decay.
+  tick(control, angle=0., desired=0., pressed=True, torque=1., limited=True)
+  assert not control.pressed_prev and math.isinf(control.core.since_press_s)
+  tick(control, angle=0., desired=0., limited=True)
+  assert control.core.pid.i == .2
+  # An opposing press qualifies immediately, but freezes rather than decays while held.
+  tick(control, angle=0., desired=0., pressed=True, torque=-1., limited=True)
+  assert control.pressed_prev and control.core.pid.i == .2
+  tick(control, angle=0., desired=0., limited=True)
+  held = .2 * math.exp(-.01 / .5)
+  assert control.core.pid.i == pytest.approx(held)
+  live.override_fade_up_s = 0.
+  tick(control, angle=0., desired=0., limited=True)
+  assert control.core.pid.i == pytest.approx(held)
+  assert reads == [duration] * 4 + [0.]
+
+
+def test_override_decay_respects_a_short_configured_window_and_disengagement():
+  control, _, _ = recovery_controller(.01)
+  tick(control, angle=0., desired=0., pressed=True, torque=-1., limited=True)
+  for _ in range(2):  # configured 10 ms plus the delayed limiter feedback frame
+    tick(control, angle=0., desired=0., limited=True)
+  held = control.core.pid.i
+  tick(control, angle=0., desired=0., limited=True)
+  assert held == pytest.approx(.2 * math.exp(-.02 / .5))
+  assert control.core.pid.i == held
+  tick(control, active=False, angle=0., desired=0.)
+  assert math.isinf(control.core.since_press_s) and not control.pressed_prev
+  control.core.pid.i = .2
+  tick(control, angle=0., desired=0., limited=True)
+  assert control.core.pid.i == .2
+
+
+def test_no_honda_provider_keeps_existing_freeze_behavior():
+  control = controller()
+  control.core.pid.i = .2
+  tick(control, angle=0., desired=0., pressed=True, torque=-1., limited=True)
+  tick(control, angle=0., desired=0., limited=True)
+  assert control.core.pid.i == .2
 
 
 @pytest.mark.parametrize("changes", [{"fingerprint": "HONDA_CIVIC"}, {"firmware": b"39990-TRW-A010"}, {"modified": False}])

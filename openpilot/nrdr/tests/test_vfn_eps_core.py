@@ -97,6 +97,88 @@ def _hold(core, frames, des=20.0, angle=20.0, v=10.0, pressed=False):
     core.update(des, 0.0, angle, v, 0.0, pressed, False)
 
 
+def _override_tick(core, *, pressed=False, limited=True, recovery=.5, speed=15., error=0.):
+  core.update(error, 0., 0., speed, 0., pressed, limited, override_fade_up_s=recovery)
+  return core.pid.i
+
+
+@pytest.mark.parametrize("integral", [-.2, .2])
+@pytest.mark.parametrize("recovery", [.01, .5, 1.5])
+def test_override_recovery_decays_stored_i_with_upstream_time_constant(integral, recovery):
+  core = _core()
+  core.pid.i = integral
+  for _ in range(40):
+    assert _override_tick(core, pressed=True, recovery=recovery) == integral
+  assert _override_tick(core, recovery=recovery) == pytest.approx(integral * math.exp(-DT_CTRL / .5))
+  assert core.since_press_s == DT_CTRL
+
+
+@pytest.mark.parametrize("integral", [-.2, .2])
+def test_only_the_configured_release_window_including_feedback_frame_bleeds(integral):
+  core = _core()
+  core.pid.i = integral
+  _override_tick(core, pressed=True, recovery=.02)
+  for frame in range(1, 4):
+    assert _override_tick(core, recovery=.02) == pytest.approx(integral * math.exp(-frame * DT_CTRL / .5))
+  held = core.pid.i
+  for _ in range(50):
+    assert _override_tick(core, recovery=.02, error=10.) == held
+
+
+@pytest.mark.parametrize("limited", [False, True])
+def test_held_press_never_bleeds_or_integrates(limited):
+  core = _core()
+  core.pid.i = .2
+  for _ in range(100):
+    assert _override_tick(core, pressed=True, limited=limited, error=10.) == .2
+
+
+def test_unrelated_limits_without_a_press_freeze_i():
+  core = _core()
+  core.pid.i = .2
+  for _ in range(100):
+    assert _override_tick(core, error=10.) == .2
+  assert math.isinf(core.since_press_s)
+
+
+def test_unlimited_release_integrates_normally_without_bleeding():
+  core = _core()
+  core.pid.i = .2
+  _override_tick(core, pressed=True)
+  assert _override_tick(core, limited=False) == .2
+  assert _override_tick(core, limited=False, error=1.) > .2
+
+
+def test_zero_recovery_disables_bleed_even_in_the_feedback_frame():
+  core = _core()
+  core.pid.i = .2
+  _override_tick(core, pressed=True, recovery=0.)
+  assert _override_tick(core, recovery=0.) == .2
+
+
+def test_recovery_duration_is_live_and_reset_clears_press_history():
+  core = _core()
+  core.pid.i = .2
+  _override_tick(core, pressed=True, recovery=1.5)
+  for _ in range(10):
+    _override_tick(core, recovery=1.5)
+  held = core.pid.i
+  assert _override_tick(core, recovery=.01) == held
+  core.reset()
+  assert math.isinf(core.since_press_s) and core.pid.i == 0.
+  core.pid.i = .2
+  assert _override_tick(core, recovery=1.5) == .2
+
+
+@pytest.mark.parametrize("speed,scales", [(1.99, (1., 1., 1.)), (15., (0., 0., 0.))])
+def test_override_recovery_preserves_existing_integrator_reset_rules(speed, scales):
+  core = _core()
+  core.i_scale = scales
+  _override_tick(core, pressed=True)
+  core.pid.i = .2
+  assert _override_tick(core, speed=speed) == 0.
+
+
 def test_feedforward_waits_for_the_wheel_to_join_the_path():
   core = _core()
   _hold(core, 100, des=60.0, angle=20.0)   # engaged 40 deg off the path

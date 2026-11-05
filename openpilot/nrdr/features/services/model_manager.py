@@ -22,13 +22,15 @@ def select_default_model(params, available_models) -> None:
     return
   # A first-run request is not permission to replace an existing preference,
   # including a legacy selection waiting for a compatible rebuild.
-  if params.get("ModelManager_ActiveBundle") or params.get("ModelManager_ActiveBundleChestnut"):
+  if any(params.get(key) is not None for key in ("ModelManager_ActiveBundle", "ModelManager_ActiveBundleChestnut")):
     return
-  candidates = [model for model in available_models if model.ref and "pop" in model.displayName.lower() and
-                "v2" in model.displayName.lower() and _compatible_automatic_download(model)]
+  candidates = [model for model in available_models if model.ref and getattr(model, "internalName", "") == "PMV2" and
+                _compatible_automatic_download(model)]
   if candidates:
     params.put("ModelManager_DownloadRef", max(candidates, key=lambda model: model.index).ref)
-    params.remove("NrdrAutoSelectModel")
+    # Keep a completed/opt-out value: deleting it looks like an unset preference
+    # after a reboot or a later model removal.
+    params.put_bool("NrdrAutoSelectModel", False)
 
 
 __all__ = ("select_default_model",)

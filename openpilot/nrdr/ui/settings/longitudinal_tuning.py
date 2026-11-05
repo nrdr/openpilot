@@ -134,6 +134,15 @@ class LongitudinalTuningLayout(Widget):
       ),
     )
 
+    self._engine_braking = toggle_item_sp(
+      title=lambda: tr("Experimental Engine Braking"),
+      initial_state=ui_state.params.get_bool("NrdrExperimentalEngineBraking"),
+      enabled=lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
+                      and str(getattr(ui_state.CP, "carFingerprint", "")) == "HONDA_CIVIC",
+      description=lambda: tr("Civic PCM only. Fades into free-cruise engine braking and back over 3 seconds. "
+                             "Lead braking and pedal overrides take priority. Off by default; restart required."),
+      callback=self._set_engine_braking,
+    )
     self._cruise_overspeed_allowance = option_item_sp(
       param="NrdrCruiseOverspeedAllowance",
       title=lambda: tr("Set-Speed Overshoot Allowance (Default: 0 mph)"),
@@ -263,6 +272,7 @@ class LongitudinalTuningLayout(Widget):
       self._long_pid_tune_scale_standard,
       self._long_pid_tune_scale_relaxed,
       self._long_pid_tune_scale_econ,
+      self._engine_braking,
       self._cruise_overspeed_allowance,
       self._cruise_mismatch_correction,
       self._standstill_gap,
@@ -272,6 +282,12 @@ class LongitudinalTuningLayout(Widget):
       self._v_ego_stopping,
       self._v_ego_starting,
     ]
+
+  def _set_engine_braking(self, value):
+    # No param binding: ToggleSP otherwise writes after the guarded callback,
+    # even when the vehicle became ineligible since the last display update.
+    save_pcm_choice(ui_state, "NrdrExperimentalEngineBraking", value)
+    self._engine_braking.action_item.set_state(ui_state.params.get_bool("NrdrExperimentalEngineBraking"))
 
   def _update_state(self):
     super()._update_state()
@@ -289,8 +305,10 @@ class LongitudinalTuningLayout(Widget):
     pcm_enabled = ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
     self._pcm_mode.action_item.set_enabled(pcm_enabled)
     self._wind_brake.action_item.set_enabled(pcm_enabled)
+    self._engine_braking.action_item.set_enabled(pcm_enabled and str(getattr(ui_state.CP, "carFingerprint", "")) == "HONDA_CIVIC")
     self._pcm_mode.action_item.set_selected_button(saved_pcm_mode(ui_state.params))
     self._wind_brake.action_item.set_state(saved_wind_brake(ui_state.params))
+    self._engine_braking.action_item.set_state(ui_state.params.get_bool("NrdrExperimentalEngineBraking"))
     self._standstill_gap.action_item.set_enabled(
       enabled and ui_state.is_offroad() and bool(ui_state.CP and ui_state.CP.openpilotLongitudinalControl)
     )

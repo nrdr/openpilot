@@ -368,17 +368,10 @@ class FirstRunSetup:
       self.shown = True
       return
     self.shown = True
+    # Compatible-model defaults are handled by startup/model manager. This
+    # optional maps decision must not rearm or cancel the owner's model choice.
     gui_app.push_widget(ConfirmDialog(
-      tr("Request compatible Pop V2? Saved model choices stay unchanged. If unavailable, the request stays pending without downloading or switching models."),
-      tr("Request model"),
-      callback=self._model_selected,
-    ))
-
-  def _model_selected(self, result: DialogResult) -> None:
-    if result == DialogResult.CONFIRM:
-      self.params.put_bool("NrdrAutoSelectModel", True)
-    gui_app.push_widget(ConfirmDialog(
-      tr("Also download offline maps for the entire United States (about 6 GB) over Wi-Fi?"),
+      tr("Download offline maps for the entire United States (about 6 GB) over Wi-Fi? This is optional and does not change your model selection."),
       tr("Download maps"),
       callback=self._maps_selected,
     ))

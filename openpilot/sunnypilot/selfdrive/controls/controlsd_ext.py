@@ -19,6 +19,7 @@ from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.nrdr.hooks import initialize_live_parameter_settings
 from openpilot.nrdr.params import read_bool, read_float
 from openpilot.nrdr.features.longitudinal.civic_pcm import pcm_reference
+from openpilot.nrdr.features.longitudinal.engine_braking import engine_brake_context
 from openpilot.nrdr.features.lateral.lane_guidance import (
   LaneGuidanceMode,
   model_action_lane_guidance_mode,
@@ -51,7 +52,8 @@ class ControlsExt(ModelStateBase):
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
     cloudlog.info("controlsd_ext got CarParamsSP")
 
-    self.sm_services_ext = ['radarState', 'selfdriveStateSP', 'modelDataV2SP']
+    self.sm_services_ext = ['radarState', 'selfdriveStateSP', 'modelDataV2SP', 'longitudinalPlanSP']
+    self.engine_braking_enabled = params.get_bool('NrdrExperimentalEngineBraking')
     self.pm_services_ext = ['carControlSP', 'laneCenteringStateSP']
 
   def initialize_lateral_control(self, lac, CI, dt):
@@ -147,6 +149,10 @@ class ControlsExt(ModelStateBase):
     (CC_SP.civicPcmEnabled, CC_SP.civicPcmReferenceSpeed, CC_SP.civicPcmReferenceMonoTime) = pcm_reference(
       self.CP, self.CP_SP, sm['longitudinalPlan'].speeds, sm.logMonoTime['longitudinalPlan'],
       sm.all_checks(['longitudinalPlan']),
+    )
+    (CC_SP.pcmEngineBrakeAllowed, CC_SP.pcmEngineBrakeRequest, CC_SP.pcmEngineBrakeMonoTime) = engine_brake_context(
+      self.CP, self.CP_SP, sm, self.engine_braking_enabled,
+      read_float(self.nrdr_live_params.snapshot, 'NrdrCruiseOverspeedAllowance', 0.0, 0.0, 10.0),
     )
 
     return CC_SP

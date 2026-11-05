@@ -30,7 +30,8 @@ class FakeParams:
 
 
 def bundle(index, display_name, ref, *, compiler=TINYGRAD_RUNTIME_REF):
-  return SimpleNamespace(index=index, displayName=display_name, ref=ref, tinygradRef=compiler, runner="tinygrad",
+  return SimpleNamespace(index=index, displayName=display_name, internalName="PMV2" if display_name.startswith("Pop Model v2") else "other",
+                         ref=ref, tinygradRef=compiler, runner="tinygrad",
                          models=[SimpleNamespace(artifact=SimpleNamespace(fileName="driving.pkl", downloadUri=SimpleNamespace(
                            uri="https://example.invalid/driving.pkl", sha256="a" * 64)))])
 
@@ -111,7 +112,7 @@ class TestSelectDefaultModel(unittest.TestCase):
 
   def test_saved_selection_is_never_replaced_by_first_run_request(self):
     for key in ("ModelManager_ActiveBundle", "ModelManager_ActiveBundleChestnut"):
-      for selection in ({"ref": "saved-legacy-model"}, b"malformed-but-retained"):
+      for selection in ({"ref": "saved-legacy-model"}, b"malformed-but-retained", {}, b"", ""):
         with self.subTest(slot=key, selection=selection):
           params = FakeParams()
           params.values[key] = selection
@@ -172,7 +173,7 @@ class TestSelectDefaultModel(unittest.TestCase):
 
 
 class TestFirstRunModelRequest(unittest.TestCase):
-  def test_dialog_and_confirm_do_not_promise_an_unsupported_model(self):
+  def test_maps_dialog_does_not_rearm_a_model_opt_out(self):
     root = Path(__file__).resolve().parents[3]
     source = root / "openpilot/nrdr/ui/home/layout.py"
     tree = ast.parse(source.read_text(encoding="utf-8"))
@@ -185,13 +186,14 @@ class TestFirstRunModelRequest(unittest.TestCase):
     params = FakeParams(enabled=False)
     setup = namespace["FirstRunSetup"](params)
     setup.update()
-    self.assertIn("compatible", dialogs[0].text.lower())
-    self.assertIn("saved model choices stay unchanged", dialogs[0].text.lower())
-    self.assertIn("pending", dialogs[0].text.lower())
-    self.assertIn("without downloading or switching models", dialogs[0].text.lower())
-    self.assertEqual(dialogs[0].button, "Request model")
+    self.assertIn("offline maps", dialogs[0].text.lower())
+    self.assertIn("does not change your model selection", dialogs[0].text.lower())
+    self.assertEqual(dialogs[0].button, "Download maps")
     dialogs[0].callback(namespace["DialogResult"].CONFIRM)
-    self.assertTrue(params.get_bool("NrdrAutoSelectModel"))
+    self.assertFalse(params.get_bool("NrdrAutoSelectModel"))
+    self.assertTrue(params.get_bool("NrdrFirstRunSetupDone"))
+    self.assertTrue(params.get_bool("OsmLocal"))
+    self.assertEqual(len(dialogs), 1)
     self.assertIsNone(params.get("ModelManager_DownloadRef"))
     before = dict(params.values)
     select_default_model(params, (bundle(59, "Pop Model v2", "legacy", compiler=""),))

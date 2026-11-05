@@ -157,6 +157,7 @@ CIVIC_P_SCALE = (1.15, 1.25, 1.15)
 CIVIC_I_SCALE = (0.75, 0.95, 1.00)
 OUTPUT_LPF_TAU = (0.07, 0.05, 0.01)
 INTEGRATOR_MIN_SPEED = 2.0  # m/s, below this the integrator is held at zero (as vfn)
+OVERRIDE_FADE_I_BLEED_TAU = 0.5  # s, upstream 94d287bb: release stale I during override recovery only
 
 # The feedforward asks for the torque that moves the wheel ALONG the desired path, so it is only right
 # once the wheel is on it. Engaging mid-turn at low speed routinely starts 20-70 deg off (45 engagements on
@@ -515,6 +516,7 @@ class HondaEpsLateralCore:
     self.ff.reset()
     self.ff_ramp = 0.0
     self.ff_weight = 0.0
+    self.since_press_s = math.inf
     self.output_lpf.x = 0.0
     self.output_lpf.initialized = True
     self.output = 0.0
@@ -523,7 +525,8 @@ class HondaEpsLateralCore:
   output_lpf_tau = OUTPUT_LPF_TAU
 
   def update(self, desired_angle_no_offset: float, angle_offset: float, angle: float, v_ego: float, roll: float,
-             steering_pressed: bool, steer_limited: bool, *, optimized_lane_change: bool = False) -> float:
+             steering_pressed: bool, steer_limited: bool, *, optimized_lane_change: bool = False,
+             override_fade_up_s: float = 0.0) -> float:
     error = desired_angle_no_offset + angle_offset - angle
     ff_full = self.ff.update(desired_angle_no_offset, v_ego, roll)
 
@@ -539,6 +542,13 @@ class HondaEpsLateralCore:
     if optimized_lane_change:
       self.ff_ramp = self.ff_weight = 0.0
     ff = self.ff_weight * ff_full
+
+    self.since_press_s = 0.0 if steering_pressed else self.since_press_s + self.dt
+    # Limiter feedback arrives one frame late. Only bleed after this controller's existing press detector
+    # releases, within the configured recovery window; held presses and unrelated limits still freeze I.
+    if (steer_limited and not steering_pressed and override_fade_up_s > 0.0 and
+        self.since_press_s <= override_fade_up_s + self.dt):
+      self.pid.i *= math.exp(-self.dt / OVERRIDE_FADE_I_BLEED_TAU)
 
     # Keep anti-windup and both output clamps at the end of the usable row.
     limit = self.ff.cal.output_ceiling()

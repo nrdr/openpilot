@@ -144,7 +144,18 @@ CIVIC_TBA_C120_SPEC_RACK = _spec_table("Civic Bosch TBA-C120", "HONDA_CIVIC_BOSC
 CIVIC_TGG_A120_SPEC_RACK = _spec_table("Civic hatch TGG-A120", "HONDA_CIVIC_BOSCH", "39990-TGG-A120", "Civic C020/TGG-A120",
                                        CIVIC_HATCH_SPORT_SPEC)
 CRV_TLA_A040_SPEC_RACK = _spec_table("CR-V TLA-A040", "HONDA_CRV_5G", "39990-TLA-A040", "CR-V TLA-A040", CRV_2017_SPEC)
-SPEC_RACK_MAP_TABLES = (CIVIC_TBA_C120_SPEC_RACK, CRV_TLA_A040_SPEC_RACK)
+# Exact spec_rack_table(CRV_2020_SPEC, CRV A040 Table A) output from Biscuit-Labs/openpilot
+# Honda-PTM-Testing 01e5a3b8ce2cd7876f03adb03d72c0ec55663dd7, honda_eps_calibrations.py.
+# Pin its upstream slip calculation here; do not refit or change the existing spec maps.
+CRV_TLA_A220_SPEC_RACK = RackMapTable(
+  "CR-V TLA-A220", "HONDA_CRV_5G", ("39990-TLA-A220",), 2.66,
+  ratio_bp=(5.0, 42.2, 79.4, 116.5, 153.7, 190.9, 228.1, 265.3, 302.5, 339.6, 376.8, 414.0),
+  ratio_v=(16.822, 16.81, 16.78, 16.724, 16.642, 16.533, 16.398, 16.236, 16.049, 15.838, 15.599, 15.33),
+  slip_factor=-0.000534,
+  provenance="spec: Honda 2020+ CR-V, 2.30 lock turns, 12.3 lock ratio, 3514 lb, 58% front through its Table A; " +
+             "R0 +-2.5%, not road-measured; upstream 01e5a3b8",
+)
+SPEC_RACK_MAP_TABLES = (CIVIC_TBA_C120_SPEC_RACK, CRV_TLA_A040_SPEC_RACK, CRV_TLA_A220_SPEC_RACK)
 
 RACK_MAP_TABLES = MEASURED_RACK_MAP_TABLES + SPEC_RACK_MAP_TABLES + (RDX_MMR_RACK,)
 _TABLE_BY_CAR_FIRMWARE = {(table.fingerprint, firmware): table for table in RACK_MAP_TABLES for firmware in table.firmware}

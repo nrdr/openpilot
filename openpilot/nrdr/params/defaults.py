@@ -1,9 +1,12 @@
-"""NRDR startup parameter defaults and forced startup policy."""
+"""nrdr startup parameter defaults and forced startup policy."""
 
 from collections.abc import Callable
 
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
+from openpilot.nrdr.params.profiles import (
+  COMMON_HANDCRAFTED_VALUES, HONDA_FILTER_HANDCRAFTED_VALUES, HONDA_PID_HANDCRAFTED_VALUES, seed_firmware_defaults,
+)
 
 
 STEER_RATIO_MANUAL_DEFAULTS = (15.38, 10.93)
@@ -25,7 +28,7 @@ _LEGACY_STEER_RATIO_ENDPOINTS = {
 BOOL_DEFAULTS = {
   "QuietMode": True,
   "GsmMetered": False,
-  "ExperimentalMode": True,
+  "ExperimentalMode": False,
   "RecordFront": True,
   "RecordAudio": True,
   "LaneTurnDesire": True,
@@ -47,7 +50,7 @@ BOOL_DEFAULTS = {
   "ShowTurnSignals": True,
   "SshEnabled": True,
   "ShowAdvancedControls": True,
-  "LagdToggle": True,
+  "LagdToggle": False,
   "EnableCopyparty": True,
 }
 
@@ -60,15 +63,21 @@ VALUE_DEFAULTS = {
   "SpeedLimitValueOffset": 5,
   "CustomAccShortPressIncrement": 5,
   "CustomAccLongPressIncrement": 1,
-  "NrdrDriverOverrideThreshold": 1400,
-  "NrdrOverrideThresholdCenterBoost": 1200,
+  "NrdrDriverOverrideThreshold": 1500,
+  "NrdrOverrideThresholdCenterBoost": 1000,
   "HondaOverrideFadeDownSecs": 0.50,
-  "HondaOverrideFadeUpSecs": 0.01,
+  "HondaOverrideFadeUpSecs": 2.0,
   "ChevronInfo": 4,
   "DevUIInfo": 3,
   "OnroadScreenOffBrightness": 1,
   "InteractivityTimeout": 120,
 }
+
+# Same baseline as Apply Suggested Settings, but only for keys that have never
+# been saved. Firmware Controller/SR wait for live CP admission; these defaults
+# do not apply the preset lock or copy learned/manual geometry.
+for _key, _value in COMMON_HANDCRAFTED_VALUES + HONDA_FILTER_HANDCRAFTED_VALUES + HONDA_PID_HANDCRAFTED_VALUES:
+  (BOOL_DEFAULTS if type(_value) is bool else VALUE_DEFAULTS)[_key] = _value
 
 
 def _write(params: Params, key: str, value, setter: Callable, *, force: bool = False, block: bool = False) -> bool:
@@ -155,14 +164,25 @@ def _migrate_steer_ratio_settings(params: Params) -> None:
 
 
 def apply_defaults(params: Params) -> None:
+  try:
+    seed_firmware_defaults(params)
+  except Exception:
+    cloudlog.exception("failed to prepare admitted firmware defaults")
   _migrate_steer_ratio_settings(params)
 
   for key, value in BOOL_DEFAULTS.items():
     # Persist QuietMode before manager's generic defaults can seed it as false.
-    _write(params, key, value, params.put_bool, block=key == "QuietMode")
+    _write(params, key, value, params.put_bool, block=True)
 
   for key, value in VALUE_DEFAULTS.items():
-    _write(params, key, value, params.put)
+    _write(params, key, value, params.put, block=True)
+
+  # Request a compatible PopV2 artifact only on first setup. A saved false is
+  # an opt-out, not a missing preference, and model choices always win.
+  if params.get("NrdrFirstRunSetupDone") is None and all(params.get(key) is None for key in (
+    "NrdrAutoSelectModel", "ModelManager_ActiveBundle", "ModelManager_ActiveBundleChestnut", "ModelManager_DownloadRef",
+  )):
+    _write(params, "NrdrAutoSelectModel", True, params.put_bool, block=True)
 
   _write(params, "EnforceTorqueControl", False, params.put_bool, force=True)
   _write(params, "NeuralNetworkLateralControl", False, params.put_bool, force=True)

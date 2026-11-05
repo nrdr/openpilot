@@ -12,7 +12,7 @@ LEGACY_PATH = Path(__file__).resolve().parents[2] / "sunnypilot" / "nrdr" / "man
 EXPECTED_BOOL_DEFAULTS = {
   "QuietMode": True,
   "GsmMetered": False,
-  "ExperimentalMode": True,
+  "ExperimentalMode": False,
   "RecordFront": True,
   "RecordAudio": True,
   "LaneTurnDesire": True,
@@ -34,8 +34,15 @@ EXPECTED_BOOL_DEFAULTS = {
   "ShowTurnSignals": True,
   "SshEnabled": True,
   "ShowAdvancedControls": True,
-  "LagdToggle": True,
+  "LagdToggle": False,
   "EnableCopyparty": True,
+  "LaneCentering": False,
+  "LaneCenteringPauseOnSignal": True,
+  "HondaDriverAssistDuringOverride": True,
+  "HondaSteerDeltaLimiter": False,
+  "NrdrLatStiction": False,
+  "NrdrOptimizedLaneChanges": False,
+  "NrdrTuneLearner": False,
 }
 
 EXPECTED_VALUE_DEFAULTS = {
@@ -47,14 +54,32 @@ EXPECTED_VALUE_DEFAULTS = {
   "SpeedLimitValueOffset": 5,
   "CustomAccShortPressIncrement": 5,
   "CustomAccLongPressIncrement": 1,
-  "NrdrDriverOverrideThreshold": 1400,
-  "NrdrOverrideThresholdCenterBoost": 1200,
+  "NrdrDriverOverrideThreshold": 1500,
+  "NrdrOverrideThresholdCenterBoost": 1000,
   "HondaOverrideFadeDownSecs": 0.5,
-  "HondaOverrideFadeUpSecs": 0.01,
+  "HondaOverrideFadeUpSecs": 2.0,
   "ChevronInfo": 4,
   "DevUIInfo": 3,
   "OnroadScreenOffBrightness": 1,
   "InteractivityTimeout": 120,
+  "LaneGuidanceMode": 2,
+  "LaneCenteringStrength": 1.0,
+  "LaneCenteringMinSpeed": 12,
+  "LaneCenteringE2EAuthority": 0.0,
+  "LaneCenterOffset": 0.0,
+  "LagdToggleDelay": 0.05,
+  "HondaOverrideTorqueScale": 0,
+  "HondaLpfTauLowSpeed": 0.1,
+  "HondaLpfTauStandard": 0.02,
+  "HondaLpfTauHighway": 0.0,
+  "HondaSteerDeltaUp": 4.0,
+  "HondaSteerDeltaDown": 4.0,
+  "LatPScaleLowSpeed": 100, "LatIScaleLowSpeed": 100, "LatFScaleLowSpeed": 100,
+  "LatPScaleStandard": 100, "LatIScaleStandard": 100, "LatFScaleStandard": 150,
+  "LatPScaleHighway": 100, "LatIScaleHighway": 100, "LatFScaleHighway": 200,
+  "NrdrLatRateDampingLowSpeed": 0, "NrdrLatRateDampingStandard": 0, "NrdrLatRateDampingHighway": 0,
+  "HondaCenterScale": 0.0, "HondaCenterBoostThreshold": 5.0, "HondaCenterBoostMinSpeed": 0,
+  "NrdrTuneLearnerStrength": 0, "NrdrTuneLearnerRate": 10,
 }
 
 VERSION_VALUES = {
@@ -186,11 +211,13 @@ class TestParamDefaults(unittest.TestCase):
       ["NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal", "NrdrSteerRatioMode"]
       + [key for key in EXPECTED_BOOL_DEFAULTS if key != "QuietMode"]
       + [key for key in EXPECTED_VALUE_DEFAULTS if key != "LaneTurnValue"]
+      + ["NrdrAutoSelectModel"]
       + list(forced)
     )
     self.assertEqual([call[1] for call in params.calls], expected_keys)
     self.assertTrue(all(call[4] == {"block": True} for call in params.calls[:3]))
-    self.assertTrue(all(call[3:] == ((), {}) for call in params.calls[3:]), "ordinary startup defaults must remain nonblocking")
+    self.assertTrue(all(call[4] == {"block": True} for call in params.calls[:-len(forced)]),
+                    "defaults must be durable before the generic registry fallback")
     bool_start = 3
     bool_end = bool_start + len(EXPECTED_BOOL_DEFAULTS) - 1
     self.assertTrue(all(call[0] == "put_bool" for call in params.calls[bool_start:bool_end]))

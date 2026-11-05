@@ -22,13 +22,13 @@ CONTEXT_KEY = "NrdrHandcraftedLateralRequest"
 BLEND_KEY = "NrdrInterpolatedTorquePifBlend"
 
 COMMON_VALUES = (
-  ("LaneGuidanceMode", 1), ("LaneCentering", True), ("LaneCenteringStrength", 0.95), ("LaneCenteringMinSpeed", 12),
+  ("LaneGuidanceMode", 2), ("LaneCentering", False), ("LaneCenteringStrength", 1.0), ("LaneCenteringMinSpeed", 12),
   ("LaneCenteringE2EAuthority", 0.0), ("LaneCenteringPauseOnSignal", True), ("LaneCenterOffset", 0.0),
-  ("LagdToggle", True), ("LagdToggleDelay", 0.4),
+  ("LagdToggle", False), ("LagdToggleDelay", 0.05),
 )
 HONDA_FILTER_VALUES = (
-  ("NrdrDriverOverrideThreshold", 1400), ("NrdrOverrideThresholdCenterBoost", 1200),
-  ("HondaDriverAssistDuringOverride", True), ("HondaOverrideFadeUpSecs", 0.01),
+  ("NrdrDriverOverrideThreshold", 1500), ("NrdrOverrideThresholdCenterBoost", 1000),
+  ("HondaDriverAssistDuringOverride", True), ("HondaOverrideFadeUpSecs", 2.0),
   ("HondaOverrideFadeDownSecs", 0.5), ("HondaOverrideTorqueScale", 0),
   ("HondaTorqueLowPassFilter", True), ("HondaLpfTauLowSpeed", 0.1), ("HondaLpfTauStandard", 0.02),
   ("HondaLpfTauHighway", 0.0), ("HondaSteerDeltaLimiter", False),
@@ -38,15 +38,14 @@ HONDA_PID_VALUES = (
   ("LatPScaleLowSpeed", 100), ("LatIScaleLowSpeed", 100), ("LatFScaleLowSpeed", 100),
   ("LatPScaleStandard", 100), ("LatIScaleStandard", 100), ("LatFScaleStandard", 150),
   ("LatPScaleHighway", 100), ("LatIScaleHighway", 100), ("LatFScaleHighway", 200),
-  ("NrdrLatStiction", False), ("NrdrOptimizedLaneChanges", True),
+  ("NrdrLatStiction", False), ("NrdrOptimizedLaneChanges", False),
   ("NrdrLatRateDampingLowSpeed", 0), ("NrdrLatRateDampingStandard", 0), ("NrdrLatRateDampingHighway", 0),
   ("HondaCenterScale", 0.0), ("HondaCenterBoostThreshold", 5.0), ("HondaCenterBoostMinSpeed", 0),
   ("NrdrTuneLearner", False), ("NrdrTuneLearnerStrength", 0), ("NrdrTuneLearnerRate", 10),
 )
 HYBRID_VALUES = (("NrdrDeviceYawCorrection", True),)
-CLARITY_GEOMETRY_VALUES = (
-  ("NrdrSteerRatioHybrid", True), ("NrdrSteerRatioMode", 2), ("NrdrSteerRatioSourceB", 3),
-  ("NrdrSteerRatioBlendStart", 10.0), ("NrdrSteerRatioManualCenter", 16.5), ("NrdrSteerRatioManualFinal", 12.74),
+FIRMWARE_VALUES = (
+  ("NrdrSteerRatioHybrid", False), ("NrdrSteerRatioMode", 3), ("NrdrLateralController", 1),
 )
 TORQUE_VALUES = (
   ("TorqueParamsOverrideEnabled", False), ("TorqueParamsOverrideLatAccelFactor", 2.5),
@@ -54,7 +53,6 @@ TORQUE_VALUES = (
 )
 
 PRESERVED_VALUES = {
-  "NrdrSteerRatioMode": 2,
   "NrdrSteerRatioManualCenter": 18.75,
   "NrdrSteerRatioManualFinal": 13.25,
   "CalibrationParams": b"calibration-sentinel",
@@ -155,25 +153,25 @@ def request_profile(CP, CP_SP, params):
 def test_current_static_lookup_and_honda_hybrid_profiles_are_exact():
   static_civic = get_handcrafted_lateral_profile("HONDA_CIVIC")
   assert static_civic is not None
-  assert static_civic.version == 23
+  assert static_civic.version == 24
   assert static_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
 
   static_clarity = get_handcrafted_lateral_profile("HONDA_CLARITY")
   assert static_clarity is not None
-  assert static_clarity.version == 23
-  assert static_clarity.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + CLARITY_GEOMETRY_VALUES + TORQUE_VALUES
+  assert static_clarity.version == 24
+  assert static_clarity.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + TORQUE_VALUES
 
   civic = vehicle_cp()
   runtime_civic = get_handcrafted_lateral_profile(civic.carFingerprint, civic, cp_sp())
   assert runtime_civic is not None
-  assert runtime_civic.version == 23
-  assert runtime_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
+  assert runtime_civic.version == 24
+  assert runtime_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + FIRMWARE_VALUES
 
   clarity = vehicle_cp("HONDA_CLARITY", controller="torque", firmware=b"39990-TRW-A020\x00")
   runtime_clarity = get_handcrafted_lateral_profile(clarity.carFingerprint, clarity, cp_sp())
   assert runtime_clarity is not None
-  assert runtime_clarity.version == 23
-  assert runtime_clarity.values == COMMON_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + CLARITY_GEOMETRY_VALUES
+  assert runtime_clarity.version == 24
+  assert runtime_clarity.values == COMMON_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
 
 
 def test_current_capability_subsets_exclude_inapplicable_groups():
@@ -257,7 +255,7 @@ def test_request_writes_exact_json_context_before_legacy_boolean():
   assert profile is not None
   firmware = sorted((str(fw.ecu), bytes(fw.fwVersion).hex()) for fw in civic.carFw)
   assert params.values[CONTEXT_KEY] == {
-    "version": 23,
+    "version": 24,
     "fingerprint": "HONDA_CIVIC",
     "brand": "honda",
     "controller": "pid",
@@ -340,14 +338,14 @@ def test_fresh_apply_is_blocking_verified_and_enables_compound_features_last():
   written = consume_handcrafted_lateral_request(civic, cp_sp(), params)
 
   assert dict(profile.values).items() <= params.values.items()
-  assert written[:2] == ["LaneCentering", "LaneGuidanceMode"]
-  assert written[-2:] == ["LaneCentering", "LaneGuidanceMode"]
-  assert params.calls[0][:3] == ("put_bool", "LaneCentering", False)
-  assert params.calls[1][:3] == ("put", "LaneGuidanceMode", 0)
+  assert written[:2] == ["LaneGuidanceMode", "NrdrLateralController"]
+  assert written[-2:] == ["LaneGuidanceMode", "NrdrLateralController"]
+  assert params.calls[0][:3] == ("put", "LaneGuidanceMode", 0)
+  assert params.calls[1][:3] == ("put", "NrdrLateralController", 0)
   assert all(call[1] != BLEND_KEY for call in params.calls)
   payload_calls = [call for call in params.calls if call[1] in dict(profile.values)]
-  assert payload_calls[-2][:3] == ("put_bool", "LaneCentering", True)
-  assert payload_calls[-1][:3] == ("put", "LaneGuidanceMode", 1)
+  assert payload_calls[-2][:3] == ("put", "LaneGuidanceMode", 2)
+  assert payload_calls[-1][:3] == ("put", "NrdrLateralController", 1)
   assert [call[1] for call in payload_calls] == written
   assert params.calls[-2] == ("put", CONTEXT_KEY, {}, True)
   assert params.calls[-1] == ("put_bool", REQUEST_KEY, False, True)
@@ -386,8 +384,8 @@ def test_interrupted_apply_restores_bound_request_with_blend_and_lane_centering_
   assert params.values[CONTEXT_KEY] == original_context
   assert params.values[REQUEST_KEY] is True
   assert params.values["ParamsVersion"] == 5
-  assert [call[1] for call in params.calls[-4:]] == [
-    "LaneCentering", "LaneGuidanceMode", CONTEXT_KEY, REQUEST_KEY,
+  assert [call[1] for call in params.calls[-6:]] == [
+    "NrdrSteerRatioHybrid", "LaneCentering", "LaneGuidanceMode", "NrdrLateralController", CONTEXT_KEY, REQUEST_KEY,
   ]
 
   params.calls.clear()
@@ -396,8 +394,9 @@ def test_interrupted_apply_restores_bound_request_with_blend_and_lane_centering_
   assert params.values[REQUEST_KEY] is False
   assert params.values[CONTEXT_KEY] == {}
   assert params.values[BLEND_KEY] is True
-  assert params.values["LaneCentering"] is True
-  assert params.values["LaneGuidanceMode"] == 1
+  assert params.values["LaneCentering"] is False
+  assert params.values["LaneGuidanceMode"] == 2
+  assert params.values["NrdrLateralController"] == 1
 
 
 def test_completed_request_never_auto_reapplies_after_customization():
@@ -428,7 +427,7 @@ for name in ('capnp', 'numpy', 'pyray', 'zmq', 'openpilot.common.params'):
   sys.modules[name] = None
 from openpilot.nrdr.params import get_handcrafted_lateral_profile
 profile = get_handcrafted_lateral_profile('HONDA_CIVIC')
-assert profile is not None and profile.version == 23
+assert profile is not None and profile.version == 24
 """
   subprocess.run(
     [sys.executable, "-c", script], cwd=repo_root, env=environment,

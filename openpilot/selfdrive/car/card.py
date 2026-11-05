@@ -119,22 +119,19 @@ class Car:
       self.CP = self.CI.CP
       self.CP_SP = self.CI.CP_SP
 
-      # A legacy persisted true value is one durable pending command. Complete
-      # it after exact CP/CP_SP identification and before controller startup;
-      # request=false is a strict no-op and never restores manual edits.
-      if self.params.get_bool("NrdrHandcraftedLateralTune"):
-        try:
-          consume_handcrafted_lateral_request(self.CP, self.CP_SP, self.params, startup=True)
-        except HandcraftedLateralUnsafeStateError:
-          # An ordinary interrupted apply can continue only after the blend is
-          # verified OFF and the request is verified pending. If either proof
-          # fails, abort before FirmwareQueryDone/controller construction.
-          raise
-        except Exception:
-          # Never turn an interrupted one-shot request into an ignition boot
-          # loop. Identity/capability deferrals are quiet no-ops; an exception
-          # here means the durable true request remains for an offroad retry.
-          cloudlog.exception("car: handcrafted lateral apply failed; request retained")
+      # Resolve pending presets or fresh firmware defaults after live CP/CP_SP
+      # admission and before publishing either CP. The consumer guards saved
+      # choices and is a no-op when neither kind of request is pending.
+      try:
+        consume_handcrafted_lateral_request(self.CP, self.CP_SP, self.params, startup=True)
+      except HandcraftedLateralUnsafeStateError:
+        # Abort before FirmwareQueryDone/CP publication if the consumer cannot
+        # verify its safe failure state.
+        raise
+      except Exception:
+        # The consumer retains explicit requests for retry but retires failed
+        # automatic defaults. Neither ordinary failure should cause a boot loop.
+        cloudlog.exception("car: lateral startup settings apply failed")
 
       # continue onto next fingerprinting step in pandad
       self.params.put_bool("FirmwareQueryDone", True, block=True)

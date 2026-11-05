@@ -31,6 +31,8 @@ class ParamsMemory:
     self.values[key] = value
     self.writes.append((key, value))
 
+  put_bool = put
+
   def remove(self, key):
     self.values.pop(key, None)
     self.writes.append((key, None))

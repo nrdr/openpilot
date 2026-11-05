@@ -21,6 +21,7 @@ class NrdrParamKey(StrEnum):
   NRDR_RDX_ROUTE_A_CONFIRMATION = "NrdrRdxRouteAConfirmation"
   NRDR_DEVICE_YAW_CORRECTION = "NrdrDeviceYawCorrection"
   NRDR_SUGGESTED_SETTINGS = "NrdrSuggestedSettings"
+  NRDR_SUGGESTED_DEFAULTS_PENDING = "NrdrSuggestedDefaultsPending"
   NRDR_LAT_RATE_DAMPING_LOW_SPEED = "NrdrLatRateDampingLowSpeed"
   NRDR_LAT_RATE_DAMPING_STANDARD = "NrdrLatRateDampingStandard"
   NRDR_LAT_RATE_DAMPING_HIGHWAY = "NrdrLatRateDampingHighway"
@@ -43,6 +44,7 @@ class NrdrParamKey(StrEnum):
   NRDR_PERSONALITY_ACCEL_PROFILES = "NrdrPersonalityAccelProfiles"
   NRDR_CRUISE_MISMATCH_CORRECTION = "NrdrCruiseMismatchCorrection"
   NRDR_CRUISE_OVERSPEED_ALLOWANCE = "NrdrCruiseOverspeedAllowance"
+  NRDR_EXPERIMENTAL_ENGINE_BRAKING = "NrdrExperimentalEngineBraking"
   NRDR_STANDSTILL_GAP_EXTRA = "NrdrStandstillGapExtra"
   HONDA_CENTER_SCALE = "HondaCenterScale"
   HONDA_PID_FRICTION = "HondaPidFriction"
@@ -182,6 +184,7 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.NRDR_RDX_ROUTE_A_CONFIRMATION,
   NrdrParamKey.NRDR_DEVICE_YAW_CORRECTION,
   NrdrParamKey.NRDR_SUGGESTED_SETTINGS,
+  NrdrParamKey.NRDR_SUGGESTED_DEFAULTS_PENDING,
   NrdrParamKey.NRDR_LAT_RATE_DAMPING_LOW_SPEED,
   NrdrParamKey.NRDR_LAT_RATE_DAMPING_STANDARD,
   NrdrParamKey.NRDR_LAT_RATE_DAMPING_HIGHWAY,
@@ -204,6 +207,7 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.NRDR_PERSONALITY_ACCEL_PROFILES,
   NrdrParamKey.NRDR_CRUISE_MISMATCH_CORRECTION,
   NrdrParamKey.NRDR_CRUISE_OVERSPEED_ALLOWANCE,
+  NrdrParamKey.NRDR_EXPERIMENTAL_ENGINE_BRAKING,
   NrdrParamKey.NRDR_STANDSTILL_GAP_EXTRA,
   NrdrParamKey.HONDA_CENTER_SCALE,
   NrdrParamKey.HONDA_PID_FRICTION,

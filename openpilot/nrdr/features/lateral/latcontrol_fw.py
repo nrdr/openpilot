@@ -60,6 +60,8 @@ class LatControlFirmware(LatControl):
     if self.firmware_profile is None:
       raise ValueError("Firmware control requires a supported modified EPS family with PID CarParams")
     super().__init__(CP, CP_SP, CI, dt)
+    honda_config = getattr(getattr(CI, "interface_config", None), "honda", None)
+    self.honda_params_provider = getattr(honda_config, "provider", None)
     self.delay_schedule = prediction_delay_schedule(self.firmware_profile)
     if self.firmware_profile.calibration in _OWN_CALIBRATIONS:
       # Source Bosch base gains as well as its fixed trims, also on the TEG and the Insight, whose
@@ -124,8 +126,12 @@ class LatControlFirmware(LatControl):
       self.pressed_prev = pressed
       state = 0 if self.model_v2 is None else self.model_v2.meta.laneChangeState.raw
       optimized = optimized_lane_change_active(self.live_tuning_snapshot, state)
+      # Share the car controller's already-refreshed recovery setting; no new Params reads or polling.
+      override_fade_up_s = (self.honda_params_provider.get_live_tuning(refresh_if_uninitialized=False).override_fade_up_s
+                            if self.honda_params_provider is not None else 0.0)
       output = self.core.update(desired, params.angleOffsetDeg, CS.steeringAngleDeg, CS.vEgo, params.roll,
-                                pressed, steer_limited_by_safety, optimized_lane_change=optimized)
+                                pressed, steer_limited_by_safety, optimized_lane_change=optimized,
+                                override_fade_up_s=override_fade_up_s)
       # A command row may stop adding assist before the host's normalized limit.
       # Saturation reporting must follow the same usable ceiling as the core.
       output_limit = min(self.steer_max, self.core.ff.cal.output_ceiling())

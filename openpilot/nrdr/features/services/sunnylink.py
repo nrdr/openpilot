@@ -12,6 +12,7 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
   "NrdrSuggestedSettings",
   "NrdrLateralController",
   "NrdrDriverMonitoringReminderPercent",
+  "NrdrExperimentalEngineBraking",
 ))
 
 # These controls are surfaced only for an exact, confirmed Honda CP. Keeping

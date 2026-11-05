@@ -19,4 +19,7 @@ class DeviceLayoutMiciSP(DeviceLayoutMici):
   def show_event(self):
     super().show_event()
     self._disable_power_down.refresh()
-    self._longitudinal_controls[-1].refresh()
+    for control in self._longitudinal_controls:
+      refresh = getattr(control, "refresh", None)
+      if callable(refresh):
+        refresh()

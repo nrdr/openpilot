@@ -391,6 +391,9 @@ struct CarControlSP @0xa5cd762cd951a455 {
   civicPcmEnabled @5 :Bool;
   civicPcmReferenceSpeed @6 :Float32;
   civicPcmReferenceMonoTime @7 :UInt64;
+  pcmEngineBrakeAllowed @8 :Bool;
+  pcmEngineBrakeRequest @9 :Bool;
+  pcmEngineBrakeMonoTime @10 :UInt64;
 
   struct Param {
     key @0 :Text;

@@ -1,0 +1,121 @@
+name: nrdr UI previews
+
+on:
+  workflow_dispatch:
+  # The default branch is nrdr-clean. This narrow push exception permits the
+  # first preview run before workflow_dispatch is registered on that branch.
+  push:
+    branches: [nrdr-development]
+    paths:
+      - 'openpilot/selfdrive/ui/**'
+      - 'openpilot/system/ui/**'
+      - 'openpilot/selfdrive/assets/**'
+      - 'openpilot/sunnypilot/selfdrive/assets/**'
+      - 'openpilot/nrdr/ui/**'
+      - 'tools/ui/**'
+      - '.github/workflows/nrdr-ui-preview.yaml'
+  pull_request:
+    paths:
+      - 'openpilot/selfdrive/ui/**'
+      - 'openpilot/system/ui/**'
+      - 'openpilot/selfdrive/assets/**'
+      - 'openpilot/sunnypilot/selfdrive/assets/**'
+      - 'openpilot/nrdr/ui/**'
+      - 'tools/ui/**'
+      - '.github/workflows/nrdr-ui-preview.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nrdr-ui-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: '1'
+  PYTHONPATH: ${{ github.workspace }}
+  PYTHONDONTWRITEBYTECODE: '1'
+  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_KEY_0: lfs.fetchexclude
+  GIT_CONFIG_VALUE_0: openpilot/selfdrive/modeld/models/big_driving_tinygrad.pkl
+
+jobs:
+  capture:
+    name: Preview ${{ matrix.label }} (${{ matrix.device }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - label: C3X
+            device: tici
+          - label: C4
+            device: mici
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check preview tooling (no native dependencies)
+        run: python3 -B -m unittest discover -s tools/ui/tests -v
+      # Reuse the stock Create UI Report job's setup/build and headless backend.
+      # This builds native imports, but does NOT run tools/op.sh test or the full suite.
+      - name: Set up repository dependencies
+        timeout-minutes: 15
+        run: |
+          test -s .gitmodules
+          ./tools/op.sh setup
+          # op.sh initializes the submodules before uv sync. It must preserve
+          # this checkout's .gitmodules URLs and pinned revisions.
+          git diff --exit-code HEAD -- .gitmodules
+          submodule_status="$(git submodule status --recursive)"
+          printf '%s\n' "$submodule_status"
+          if printf '%s\n' "$submodule_status" | grep -qE '^[-+U]'; then
+            echo 'Submodules are absent, conflicted or not at their pinned revisions' >&2
+            exit 1
+          fi
+          test -x "$GITHUB_WORKSPACE/.venv/bin/python"
+          test -x "$GITHUB_WORKSPACE/.venv/bin/scons"
+          "$GITHUB_WORKSPACE/.venv/bin/python" -c 'import sys; assert sys.version_info[:2] == (3, 12), sys.version'
+          # Do not rely on a child shell sourcing activate for subsequent steps.
+          printf '%s\n' "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Verify persisted Python and SCons environment
+        run: |
+          test "$(command -v python3)" = "$GITHUB_WORKSPACE/.venv/bin/python3"
+          test "$(command -v scons)" = "$GITHUB_WORKSPACE/.venv/bin/scons"
+          python3 -c 'import os, sys; from pathlib import Path; assert Path(sys.prefix) == Path(os.environ["GITHUB_WORKSPACE"]) / ".venv"'
+      - name: Install headless rendering and video tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgles2 libegl1 ffmpeg
+      - name: Restore native build cache
+        uses: actions/cache@v6
+        with:
+          path: /tmp/scons_cache
+          key: nrdr-ui-${{ runner.os }}-${{ matrix.device }}-${{ github.sha }}
+          restore-keys: nrdr-ui-${{ runner.os }}-${{ matrix.device }}-
+      - name: Build native dependencies
+        timeout-minutes: 12
+        run: '"$GITHUB_WORKSPACE/.venv/bin/scons" --minimal -j2'
+      - name: Capture native settings and onroad menus
+        timeout-minutes: 7
+        run: >-
+          "$GITHUB_WORKSPACE/.venv/bin/python" tools/ui/capture_preview.py
+          --device ${{ matrix.device }}
+          --output "${{ runner.temp }}/ui-preview"
+          --timeout 180
+      - name: Upload preview gallery and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-preview-${{ matrix.label }}-${{ matrix.device }}-${{ github.sha }}
+          path: ${{ runner.temp }}/ui-preview
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Explain artifact
+        if: always()
+        run: |
+          echo 'Download and extract the ui-preview artifact, then open index.html in a PC browser.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Real UI, synthetic messages, no camera feed. See manifest.json and capture.log for provenance/failures.' >> "$GITHUB_STEP_SUMMARY"
+      # No broad push CI, pull_request_target, secrets, PR comments, publication or device access.

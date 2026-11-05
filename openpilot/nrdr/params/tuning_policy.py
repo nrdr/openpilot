@@ -1,8 +1,9 @@
 """Shared native/remote tuning admission rules. No vehicle actuation or I/O."""
 
 SUGGESTED_DESCRIPTION = (
-  "Last Road Tested: October 1, 2026, with PopV2 Model. Your mileage may vary. "
-  + "Turning back to OFF will preserve these settings and unlock tuning menus."
+  "Use the November 5 lateral setup: Sunny and matched Firmware Controller/steer ratio where supported. "
+  "Tested with PopV2; your model stays unchanged. Confirm the exact modified EPS build before using firmware control. "
+  "Turning this off keeps the settings and unlocks tuning."
 )
 PIF_KEYS = frozenset(
   f"Lat{term}Scale{band}" for term in "PIF" for band in ("LowSpeed", "Standard", "Highway")
@@ -24,7 +25,7 @@ RETIRED_TUNING_KEYS = frozenset((
   "NrdrLaneChangeTorqueFactor", "NrdrLaneChangeFrictionPercent",
 ))
 SUGGESTED_LOCK_KEYS = PIF_KEYS | frozenset((
-  "LaneGuidanceMode",
+  "LaneGuidanceMode", "NrdrLateralController",
   "NrdrOptimizedLaneChanges", "LagdToggle", "LagdToggleDelay",
   "NrdrDriverOverrideThreshold", "NrdrOverrideThresholdCenterBoost", "HondaDriverAssistDuringOverride",
   "HondaOverrideFadeUpSecs", "HondaOverrideFadeDownSecs", "HondaOverrideTorqueScale",

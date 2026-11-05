@@ -33,6 +33,8 @@ def save_pcm_choice(state, key: str, value) -> bool:
     state.params.put(key, value, block=True)
   elif key == "NrdrHondaWindBrake" and type(value) is bool:
     state.params.put_bool(key, value, block=True)
+  elif key == "NrdrExperimentalEngineBraking" and type(value) is bool and state.CP.carFingerprint == CAR.HONDA_CIVIC:
+    state.params.put_bool(key, value, block=True)
   else:
     return False
   # Saving is not evidence that the startup-latched controller has changed.

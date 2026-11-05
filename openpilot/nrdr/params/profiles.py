@@ -1,4 +1,4 @@
-"""Versioned NRDR parameter profiles and their one-shot application contract.
+"""Versioned nrdr parameter profiles and their one-shot application contract.
 
 This module is intentionally safe to import before the native Params library is
 built. Runtime Params and lateral-feature dependencies are loaded only by the
@@ -182,30 +182,29 @@ def _build_legacy_honda_profile(fingerprint: str) -> HandcraftedLateralProfile:
 CLARITY_CURRENT_LATERAL_2026_08_28 = _build_legacy_honda_profile("HONDA_CLARITY")
 CLARITY_ROAD_TESTED_2026_08_21 = CLARITY_CURRENT_LATERAL_2026_08_28
 
-HANDCRAFTED_LATERAL_VERSION = 23
-# Oct 1 owner snapshot, PopV2, plus explicitly requested cleanup defaults.
-# The new per-speed damping and optimized lane-change behavior still need road
-# validation; the provenance date is not a claim those additions were tested.
+HANDCRAFTED_LATERAL_VERSION = 24
+# Owner-approved C4 lateral snapshot, 2026-11-05. Personal learned geometry is
+# deliberately excluded. Firmware control is added only after exact admission.
 CIVIC_DIALED_SETTINGS_SHA256 = "c1faf2291527061621c7bdbb2679fd8f90cfa00f0b8acd08fdd27e5ee9770074"
 COMMON_HANDCRAFTED_VALUES = (
-  ("LaneGuidanceMode", 1), ("LaneCentering", True), ("LaneCenteringStrength", 0.95),
+  ("LaneGuidanceMode", 2), ("LaneCentering", False), ("LaneCenteringStrength", 1.0),
   ("LaneCenteringMinSpeed", 12), ("LaneCenteringE2EAuthority", 0.0),
   ("LaneCenteringPauseOnSignal", True), ("LaneCenterOffset", 0.0),
-  ("LagdToggle", True), ("LagdToggleDelay", 0.4),
+  ("LagdToggle", False), ("LagdToggleDelay", 0.05),
 )
 HONDA_PID_HANDCRAFTED_VALUES = tuple(
   (f"Lat{term}Scale{band}", value)
   for band, feedforward in (("LowSpeed", 100), ("Standard", 150), ("Highway", 200))
   for term, value in (("P", 100), ("I", 100), ("F", feedforward))
 ) + (
-  ("NrdrLatStiction", False), ("NrdrOptimizedLaneChanges", True),
+  ("NrdrLatStiction", False), ("NrdrOptimizedLaneChanges", False),
   ("NrdrLatRateDampingLowSpeed", 0), ("NrdrLatRateDampingStandard", 0), ("NrdrLatRateDampingHighway", 0),
   ("HondaCenterScale", 0.0), ("HondaCenterBoostThreshold", 5.0), ("HondaCenterBoostMinSpeed", 0),
   ("NrdrTuneLearner", False), ("NrdrTuneLearnerStrength", 0), ("NrdrTuneLearnerRate", 10),
 )
 HONDA_FILTER_HANDCRAFTED_VALUES = (
-  ("NrdrDriverOverrideThreshold", 1400), ("NrdrOverrideThresholdCenterBoost", 1200),
-  ("HondaDriverAssistDuringOverride", True), ("HondaOverrideFadeUpSecs", 0.01),
+  ("NrdrDriverOverrideThreshold", 1500), ("NrdrOverrideThresholdCenterBoost", 1000),
+  ("HondaDriverAssistDuringOverride", True), ("HondaOverrideFadeUpSecs", 2.0),
   ("HondaOverrideFadeDownSecs", 0.50), ("HondaOverrideTorqueScale", 0),
   ("HondaTorqueLowPassFilter", True), ("HondaLpfTauLowSpeed", 0.10),
   ("HondaLpfTauStandard", 0.02), ("HondaLpfTauHighway", 0.0),
@@ -213,10 +212,10 @@ HONDA_FILTER_HANDCRAFTED_VALUES = (
 )
 # Strength/friction stay internal constants; only the bypass is user-facing.
 HYBRID_HANDCRAFTED_VALUES = (("NrdrDeviceYawCorrection", True),)
-CLARITY_GEOMETRY_VALUES = (
-  ("NrdrSteerRatioHybrid", True), ("NrdrSteerRatioMode", 2), ("NrdrSteerRatioSourceB", 3),
-  ("NrdrSteerRatioBlendStart", 10.0), ("NrdrSteerRatioManualCenter", 16.5), ("NrdrSteerRatioManualFinal", 12.74),
+FIRMWARE_HANDCRAFTED_VALUES = (
+  ("NrdrSteerRatioHybrid", False), ("NrdrSteerRatioMode", 3), ("NrdrLateralController", 1),
 )
+FIRMWARE_DEFAULTS_KEY = "NrdrSuggestedDefaultsPending"
 TORQUE_HANDCRAFTED_VALUES = (
   ("TorqueParamsOverrideEnabled", False), ("TorqueParamsOverrideLatAccelFactor", 2.5),
   ("TorqueParamsOverrideFriction", 0.1), ("TorqueControlTune", 0.0), ("LateralJerkTorqueController", False),
@@ -228,17 +227,17 @@ def _make_profile(fingerprint: str, values: tuple[tuple[str, ProfileValue], ...]
   if len(values) != len(dict(values)):
     raise ValueError("duplicate handcrafted-lateral setting")
   if any("Calibration" in key or key in ("NrdrLearnStiffness", "NrdrLearnAngleOffset") or
-         ("SteerRatio" in key and (fingerprint != "HONDA_CLARITY" or key not in dict(CLARITY_GEOMETRY_VALUES)))
-         for key, _ in values):
+         ("SteerRatio" in key and (key, value) not in FIRMWARE_HANDCRAFTED_VALUES)
+         for key, value in values):
     raise ValueError("handcrafted preset must preserve vehicle geometry and calibration")
-  return HandcraftedLateralProfile(f"Suggested PopV2 settings 2026-10-01 ({scope})", fingerprint,
+  return HandcraftedLateralProfile(f"Suggested PopV2 settings 2026-11-05 ({scope})", fingerprint,
                                   HANDCRAFTED_LATERAL_VERSION, values)
 
 
 HANDCRAFTED_LATERAL_PROFILES = {
   fingerprint: _make_profile(
     fingerprint, COMMON_HANDCRAFTED_VALUES + HONDA_FILTER_HANDCRAFTED_VALUES + HONDA_PID_HANDCRAFTED_VALUES + HYBRID_HANDCRAFTED_VALUES +
-    (CLARITY_GEOMETRY_VALUES + TORQUE_HANDCRAFTED_VALUES if fingerprint == "HONDA_CLARITY" else ()),
+    (TORQUE_HANDCRAFTED_VALUES if fingerprint == "HONDA_CLARITY" else ()),
     "Honda hybrid",
   )
   for fingerprint in HONDA_TORQUE_MOD_HANDCRAFTED_FINGERPRINTS
@@ -248,15 +247,15 @@ _REQUEST_KEY = NrdrParamKey.NRDR_HANDCRAFTED_LATERAL_TUNE.value
 _CONTEXT_KEY = "NrdrHandcraftedLateralRequest"
 _STATUS_KEY = NrdrParamKey.NRDR_CAR_HANDCRAFTED_INFO.value
 _BLEND_KEY = NrdrParamKey.NRDR_INTERPOLATED_TORQUE_PIF_BLEND.value
-_ENABLE_LAST_KEYS = ("NrdrSteerRatioHybrid", "LaneCentering", "LaneGuidanceMode")
+_ENABLE_LAST_KEYS = ("NrdrSteerRatioHybrid", "LaneCentering", "LaneGuidanceMode", "NrdrLateralController")
 
 
 def _profile_value_enables(key: str, value: ProfileValue | None) -> bool:
-  return (key == "LaneGuidanceMode" and value in (1, 2)) or value is True
+  return (key == "LaneGuidanceMode" and value in (1, 2)) or (key == "NrdrLateralController" and value == 1) or value is True
 
 
 def _profile_disabled_value(key: str) -> ProfileValue:
-  return 0 if key == "LaneGuidanceMode" else False
+  return 0 if key in ("LaneGuidanceMode", "NrdrLateralController") else False
 
 
 def _params_or_default(params: ProfileParamStore | None) -> ProfileParamStore:
@@ -293,6 +292,7 @@ def get_handcrafted_lateral_profile(fingerprint: str, CP=None, CP_SP=None) -> Ha
     scopes.append("native torque options")
   if brand == "honda" and mode == "torque":
     from openpilot.nrdr.features.lateral.capabilities import supports_interpolated_torque_pif
+    from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile
     from openpilot.nrdr.features.lateral.steer_ratio_tuning import get_steer_ratio_metadata
     hybrid = supports_interpolated_torque_pif(CP, CP_SP)
     values += HONDA_FILTER_HANDCRAFTED_VALUES
@@ -303,8 +303,10 @@ def get_handcrafted_lateral_profile(fingerprint: str, CP=None, CP_SP=None) -> Ha
     if hybrid:
       values += HYBRID_HANDCRAFTED_VALUES
       scopes.append("fixed 1% torque / 99% PIF")
-      if fingerprint == "HONDA_CLARITY":
-        values += CLARITY_GEOMETRY_VALUES
+    if firmware_controller_profile(CP, CP_SP) is not None:
+      values += FIRMWARE_HANDCRAFTED_VALUES
+      scopes = [scope for scope in scopes if scope != "fixed 1% torque / 99% PIF"]
+      scopes.append("matched firmware controller / firmware steer ratio")
   return _make_profile(str(fingerprint), values, ", ".join(scopes))
 
 
@@ -455,6 +457,84 @@ def _put_verified(params: ProfileParamStore, key: str, value: ProfileValue) -> N
   _verify_typed(params, key, value)
 
 
+def _param_stamp(params: ProfileParamStore, key: str) -> list[int] | None:
+  try:
+    path = Path(params.get_param_path(key))
+    if not path.is_file():
+      return None
+    stat = path.stat()
+    return [stat.st_dev, stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size]
+  except (AttributeError, OSError, TypeError, ValueError):
+    return None
+
+
+def seed_firmware_defaults(params: ProfileParamStore) -> None:
+  """Remember a genuinely new selector, without enabling an unknown EPS.
+
+  A file stamp distinguishes our seeded zero from an owner subsequently
+  selecting PIF, even when both contain the same value. This receipt is not
+  backed up or shared between devices and never enables the preset lock.
+  """
+  keys = ("NrdrSteerRatioHybrid", "NrdrSteerRatioMode", "NrdrLateralController")
+  if params.get(FIRMWARE_DEFAULTS_KEY) is not None or any(params.get(key) is not None for key in (
+    *keys, "NrdrLearnSteerRatio", "NrdrSuggestedSettings", "NrdrFirstRunSetupDone",
+  )):
+    return
+  # Test doubles and tools without an actual Params directory cannot prove
+  # whether an owner rewrote a selector. Leave the compatible baseline alone.
+  try:
+    if not Path(params.get_param_path()).is_dir():
+      return
+  except (AttributeError, OSError, TypeError, ValueError):
+    return
+  receipt = {}
+  for key, value in zip(keys, (False, 0, 0), strict=True):
+    _put_verified(params, key, value)
+    stamp = _param_stamp(params, key)
+    if stamp is None:
+      return
+    receipt[key] = {"value": value, "stamp": stamp}
+  params.put(FIRMWARE_DEFAULTS_KEY, {"version": HANDCRAFTED_LATERAL_VERSION, "seeded": receipt}, block=True)
+
+
+def consume_firmware_defaults(CP, CP_SP, params: ProfileParamStore) -> list[str]:
+  """Resolve the fresh-install preference once, with live vehicle admission."""
+  pending = params.get(FIRMWARE_DEFAULTS_KEY)
+  if not pending:
+    return []
+  present, fingerprint, brand = get_selected_car_identity(params)
+  if confirmed_vehicle_identity(CP, fingerprint, brand, selection_present=present) is None:
+    return []
+  keys = {key for key, _ in FIRMWARE_HANDCRAFTED_VALUES}
+  receipt = pending.get("seeded") if isinstance(pending, dict) else None
+  valid = isinstance(receipt, dict) and set(receipt) == keys and pending.get("version") == HANDCRAFTED_LATERAL_VERSION
+  if valid:
+    valid = all(isinstance(entry, dict) and _value_matches(params.get(key), entry.get("value")) and
+                entry.get("stamp") is not None and _param_stamp(params, key) == entry["stamp"]
+                for key, entry in receipt.items())
+  profile = get_handcrafted_lateral_profile(str(CP.carFingerprint), CP, CP_SP) if valid else None
+  admitted = profile is not None and all(item in profile.values for item in FIRMWARE_HANDCRAFTED_VALUES)
+  # Retire before applying: an interrupted initialization must not re-enable
+  # control later. The selector is last, after all prerequisites verify.
+  params.put(FIRMWARE_DEFAULTS_KEY, {}, block=True)
+  if params.get(FIRMWARE_DEFAULTS_KEY) != {}:
+    raise RuntimeError("firmware default receipt clear readback mismatch")
+  if not admitted:
+    return []
+  written = []
+  try:
+    for key, value in FIRMWARE_HANDCRAFTED_VALUES:
+      _put_verified(params, key, value)
+      written.append(key)
+  except Exception as apply_error:
+    try:
+      _put_verified(params, "NrdrLateralController", 0)
+    except Exception as cleanup_error:
+      raise HandcraftedLateralUnsafeStateError("could not disable unverified firmware default") from cleanup_error
+    raise apply_error
+  return written
+
+
 def get_selected_car_identity(params: ProfileParamStore) -> tuple[bool, str, str]:
   """Return physical selection presence plus a complete parsed identity.
 
@@ -525,6 +605,8 @@ def consume_handcrafted_lateral_request(CP, CP_SP, params: ProfileParamStore | N
   """
   params = _params_or_default(params)
   if not params.get_bool(_REQUEST_KEY):
+    if startup:
+      return consume_firmware_defaults(CP, CP_SP, params)
     return []
   if not startup and not params.get_bool("IsOffroad"):
     return []
