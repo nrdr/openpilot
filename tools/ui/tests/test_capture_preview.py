@@ -15,7 +15,7 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 from tools.ui import capture_preview as preview
-from tools.ui.preview_scenarios import MICI_LONGITUDINAL_INDEX, READ_ONLY_KEYS, build_preview_script, focus_item, open_read_only_selector
+from tools.ui.preview_scenarios import MICI_LONGITUDINAL_INDEX, READ_ONLY_KEYS, build_preview_script, focus_item, open_read_only_selector, setup_vehicle_fixture
 
 
 def checkpoints(device="tici"):
@@ -27,6 +27,21 @@ def checkpoints(device="tici"):
 
 
 class TestPreview(unittest.TestCase):
+  def test_fixture_skips_optional_first_run_downloads(self):
+    params = Mock()
+    params_module = ModuleType("openpilot.common.params")
+    params_module.Params = Mock(return_value=params)
+    structs_module = ModuleType("opendbc.car.structs")
+    structs_module.car = Mock()
+    cereal_module = ModuleType("openpilot.cereal")
+    cereal_module.custom = Mock()
+    with patch.dict(sys.modules, {"openpilot.common.params": params_module, "opendbc.car.structs": structs_module,
+                                 "openpilot.cereal": cereal_module}):
+      setup_vehicle_fixture()
+    params.put_bool.assert_any_call("NrdrFirstRunSetupDone", True, block=True)
+    params.put_bool.assert_any_call("NrdrSuggestedSettings", False, block=True)
+    self.assertFalse(any(call.args[0].startswith("Osm") for call in params.method_calls))
+
   def test_device_environment_is_explicit_and_isolated(self):
     inherited = {"BIG": "1", "SCALE": "0.4", "WINDOWED": "1", "RECORD_SPEED": "4", "BURN_IN": "1",
                  "OPENPILOT_PREFIX": "live", "SUNNYPILOT_UI": "0", "PYTHONOPTIMIZE": "1", "PRIME_TYPE": "5",

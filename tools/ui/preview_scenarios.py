@@ -49,7 +49,8 @@ def setup_vehicle_fixture():
   for key in ("CarParams", "CarParamsPersistent"):
     params.put(key, cp.to_bytes(), block=True)
   params.put("CarParamsSPPersistent", cp_sp.to_bytes(), block=True)
-  for key, value in {"NrdrSuggestedSettings": False, "NrdrHandcraftedLateralTune": False, "AlwaysOnDM": True}.items():
+  for key, value in {"NrdrSuggestedSettings": False, "NrdrHandcraftedLateralTune": False,
+                     "NrdrFirstRunSetupDone": True, "AlwaysOnDM": True}.items():
     params.put_bool(key, value, block=True)
   params.put("LaneGuidanceMode", 1, block=True)  # Star, solely to expose its tuning controls.
 
