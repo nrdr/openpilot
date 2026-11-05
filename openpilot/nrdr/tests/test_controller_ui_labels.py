@@ -42,7 +42,7 @@ def _native_class(filename, name):
     "NavButton": lambda *_: SimpleNamespace(set_click_callback=lambda *_: None),
     "Scroller": lambda items, **_: items, "LineSeparatorSP": lambda *_: None,
     **{factory: lambda **kwargs: kwargs for factory in (
-      "button_item_sp", "toggle_item_sp", "option_item_sp", "simple_button_item_sp",
+      "button_item_sp", "toggle_item_sp", "option_item_sp", "simple_button_item_sp", "multiple_button_item_sp",
     )},
   }
   exec(compile(tree, str(path), "exec"), env)
@@ -95,6 +95,40 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertTrue(local["use_float_scaling"])
     self.assertEqual(local["label_callback"](125), "+1.25 m")
     self.assertEqual(tuple(web[k] for k in ("min", "max", "step", "unit")), (0.0, 5.0, 0.25, "m"))
+
+  def test_honda_pcm_mode_and_wind_order_copy_and_parked_restart_rules(self):
+    cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout")
+    layout = cls.__new__(cls)
+    local_items = layout._initialize_items()
+    self.assertEqual(local_items[:6], [layout._live_learning_gas, layout._reset_live_gas, None,
+                                      layout._pcm_mode, layout._wind_brake, layout._static_feedforward_long])
+    remote = _panel(self.schema, "steering", "nrdr_longitudinal")["items"]
+    self.assertEqual([item["key"] for item in remote[:6]], [
+      "HondaLiveLearningGas", "NrdrResetLiveGas", "NrdrLiveGasResetStatus",
+      "NrdrHondaPcmMode", "NrdrHondaWindBrake", "StaticFeedforwardLong",
+    ])
+    mode, wind = remote[3:5]
+    self.assertEqual(mode["widget"], "multiple_button")
+    self.assertEqual(mode["options"], [
+      {"label": "Off", "value": 0}, {"label": "ECU-Matched", "value": 1}, {"label": "Experimental", "value": 2},
+    ])
+    self.assertEqual([label() for label in layout._pcm_mode["buttons"]], [o["label"] for o in mode["options"]])
+    for local, web in ((layout._pcm_mode, mode), (layout._wind_brake, wind)):
+      self.assertEqual(local["title"](), web["title"])
+      self.assertIn("Restart required.", local["description"]())
+      self.assertEqual(local["description"](), web["description"])
+      self.assertTrue(web["needs_onroad_cycle"])
+      self.assertEqual(web["enablement"], [{"type": "offroad_only"}, {
+        "type": "capability", "field": "nrdr_honda_pcm_tuning_available", "equals": True,
+      }])
+      self.assertEqual(web["visibility"], web["enablement"][1:])
+    self.assertIn("mmmorks", layout._pcm_mode["description"]())
+    self.assertIn("keeps MVL mapping", mode["details"])
+    self.assertIn("ramp, coast and brake-release rules", layout._pcm_mode["description"]())
+    self.assertIn("Frozen in ECU-Matched and Civic Experimental", layout._live_learning_gas["description"]())
+    self.assertEqual(layout._live_learning_gas["description"](), remote[0]["description"])
+    self.assertIn("Turning it off changes friction-brake demand", wind["details"])
+    self.assertNotIn("NrdrHondaEcuMatchedLong", [item["key"] for item in remote])
 
   def test_override_threshold_labels_keep_keys_and_show_straights_before_curves(self):
     native = _native_class("override_tuning.py", "OverrideTuningLayout")(lambda: None)

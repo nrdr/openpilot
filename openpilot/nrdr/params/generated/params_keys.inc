@@ -97,6 +97,8 @@
     {"NrdrAutoSelectModel", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"StaticFeedforwardLong", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrHondaEcuMatchedLong", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrHondaPcmMode", {PERSISTENT | BACKUP, INT, "0"}},
+    {"NrdrHondaWindBrake", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrHondaFullBrakeAuthority", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrRoenAccelerationLimits", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HondaInjectionTest", {PERSISTENT | BACKUP, BOOL, "0"}},

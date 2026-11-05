@@ -25,14 +25,14 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "84e95e7b11394803fd9c7c099362d9e8010c1a5135e665146ecfa26953188bda"
+REGISTRY_METADATA_SHA256 = "e01e4b7ba68a283d0594d0593918f1b6794b3dd5fa59bc2f2c4f06d933fa3713"
 
 
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 157)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 156)
+    self.assertEqual(len(PARAM_SPECS), 159)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 158)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
 
@@ -50,6 +50,15 @@ class TestParamCatalog(unittest.TestCase):
     self.assertEqual(spec.default, "1")
     self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
     self.assertIs(PARAM_SPECS_BY_KEY["NrdrInterpolatedTorquePifBlend"].lifecycle, ParamLifecycle.TOMBSTONE)
+
+  def test_pcm_mode_defaults_off_and_wind_on_without_migrating_legacy_bool(self) -> None:
+    for key, kind, default in (("NrdrHondaPcmMode", ParamType.INT, "0"), ("NrdrHondaWindBrake", ParamType.BOOL, "1")):
+      spec = PARAM_SPECS_BY_KEY[key]
+      self.assertEqual((spec.param_type, spec.default), (kind, default))
+      self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
+      self.assertIs(spec.lifecycle, ParamLifecycle.SETTING)
+      self.assertIs(spec.owner, ParamOwner.HONDA)
+    self.assertIs(PARAM_SPECS_BY_KEY["NrdrHondaEcuMatchedLong"].lifecycle, ParamLifecycle.TOMBSTONE)
 
   def test_handcrafted_request_context_is_typed_and_not_restored_from_backups(self) -> None:
     spec = PARAM_SPECS_BY_KEY["NrdrHandcraftedLateralRequest"]
@@ -104,6 +113,7 @@ class TestParamCatalog(unittest.TestCase):
 
     tombstones = {spec.key for spec in PARAM_SPECS if spec.lifecycle is ParamLifecycle.TOMBSTONE}
     self.assertEqual(tombstones, {
+      "NrdrHondaEcuMatchedLong",
       "NrdrYawDelaySchedule",
       "NrdrInterpolatedTorquePifBlend", "NrdrInterpolatedTorqueShare", "NrdrInterpolatedTorqueLatAccelFactor",
       "NrdrInterpolatedTorqueFriction", "NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway",

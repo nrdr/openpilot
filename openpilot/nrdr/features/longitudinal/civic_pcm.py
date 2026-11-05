@@ -2,10 +2,11 @@
 import math
 
 from opendbc.car.honda.civic_pcm import uses_civic_pcm
+from opendbc.car.honda.values import HondaFlags
 
 
 def pcm_reference(CP, CP_SP, speeds, mono_time: int, valid: bool) -> tuple[bool, float, int]:
-  if not uses_civic_pcm(CP, CP_SP):
+  if not uses_civic_pcm(CP, CP_SP) or not CP.flags & HondaFlags.NIDEC_PCM_EXPERIMENTAL:
     return False, 0.0, 0
   # Mode selection is independent of freshness. Missing data must remove
   # propulsion, not silently switch command laws while longitudinal is active.

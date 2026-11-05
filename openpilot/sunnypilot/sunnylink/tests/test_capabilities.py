@@ -14,6 +14,7 @@ from __future__ import annotations
 
 
 from opendbc.car.structs import car
+from openpilot.cereal import custom
 from openpilot.common.params import Params
 from openpilot.sunnypilot.sunnylink.capabilities import (
   CAPABILITY_DEFAULTS,
@@ -78,6 +79,29 @@ class TestProtocolVersion(OpenpilotTestCase):
 
 
 class TestOpaquePerBrandFlags(OpenpilotTestCase):
+  def test_pcm_tuning_requires_confirmed_non_interceptor_nidec_openlong(self, params):
+    assert "nrdr_honda_pcm_tuning_available" in CAPABILITY_FIELDS
+    assert generate_capabilities(params)["nrdr_honda_pcm_tuning_available"] is False
+    for fingerprint, interceptor, openlong, expected in (
+      ("HONDA_CIVIC", False, True, True),
+      ("HONDA_CLARITY", False, True, True),
+      ("HONDA_CIVIC", True, True, False),
+      ("HONDA_CIVIC", False, False, False),
+      ("HONDA_CIVIC_BOSCH", False, True, False),
+    ):
+      CP = car.CarParams.new_message()
+      CP.brand, CP.carFingerprint = "honda", fingerprint
+      CP.openpilotLongitudinalControl = openlong
+      CP_SP = custom.CarParamsSP.new_message()
+      CP_SP.enableGasInterceptor = interceptor
+      params.put("CarParamsPersistent", CP.to_bytes(), block=True)
+      params.put("CarParamsSPPersistent", CP_SP.to_bytes(), block=True)
+      assert generate_capabilities(params)["nrdr_honda_pcm_tuning_available"] is expected
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CIVIC_BOSCH"}, block=True)
+    CP.carFingerprint = "HONDA_CIVIC"
+    params.put("CarParamsPersistent", CP.to_bytes(), block=True)
+    assert generate_capabilities(params)["nrdr_honda_pcm_tuning_available"] is False
+
   def test_provisional_firmware_label_does_not_describe_the_retired_bosch_fallback(self):
     label = CAPABILITY_LABELS["nrdr_firmware_controller_provisional"]
     assert "firmware-specific" in label

@@ -75,6 +75,8 @@ def build_sunnypilot_car_config(params, *, start_worker: bool = True,
       bosch_a_radar=nrdr_honda.bosch_a_radar,
       enforce_stock_longitudinal=honda_stock_longitudinal,
       provider=nrdr_honda.provider,
+      nidec_pcm_mode=nrdr_honda.nidec_pcm_mode,
+      nidec_wind_brake=nrdr_honda.nidec_wind_brake,
     ),
     hyundai=HyundaiCarConfig(
       longitudinal_tuning=int(_float_value(

@@ -363,10 +363,11 @@ def test_honda_mpc_retains_fourth_personality_and_fcw_authorization():
 @pytest.mark.parametrize('brand,enabled', [('honda', True), ('toyota', False), ('', False)])
 def test_native_tuning_controls_follow_vehicle_policy(brand, enabled):
   widget = type('Widget', (), {'_update_state': lambda _: None})
-  state = NS(CP=cp(brand), is_offroad=lambda: True, params=NS(get_bool=lambda _: False))
+  state = NS(CP=cp(brand), CP_SP=None, is_offroad=lambda: True, params=NS(get_bool=lambda _: False))
   module = definitions(ROOT / 'openpilot/nrdr/ui/settings/longitudinal_tuning.py', {"Widget": widget, "Callable": Callable,
                        "ui_state": state, "nrdr_longitudinal_enabled": policy.nrdr_longitudinal_enabled,
-                       "gas_reset_available": lambda: enabled})
+                       "gas_reset_available": lambda: enabled, "pcm_tuning_available": lambda *_: False,
+                       "saved_pcm_mode": lambda _: 0, "saved_wind_brake": lambda _: True})
   layout = object.__new__(module['LongitudinalTuningLayout'])
   for band in ('aggressive', 'standard', 'relaxed', 'econ'):
     setattr(layout, '_long_pid_tune_scale_' + band, NS(set_visible=lambda _: None,
@@ -375,6 +376,8 @@ def test_native_tuning_controls_follow_vehicle_policy(brand, enabled):
   layout._live_learning_gas = NS(action_item=NS(set_enabled=lambda value: values.append(('gas', value))))
   layout._reset_live_gas = NS(action_item=NS(set_enabled=lambda value: values.append(('reset', value))))
   layout._standstill_gap = NS(action_item=NS(set_enabled=lambda value: values.append(('gap', value))))
+  layout._pcm_mode = NS(action_item=NS(set_enabled=lambda _: None, set_selected_button=lambda _: None))
+  layout._wind_brake = NS(action_item=NS(set_enabled=lambda _: None, set_state=lambda _: None))
   layout._tuning_items = [layout._live_learning_gas, NS(), NS(action_item=NS(set_enabled=lambda value: values.append(('tune', value))))]
   layout._update_state()
   assert values == [('gas', enabled), ('tune', enabled), ('gas', enabled), ('reset', enabled), ('gap', enabled)]

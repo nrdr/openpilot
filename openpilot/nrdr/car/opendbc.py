@@ -65,6 +65,8 @@ class NrdrHondaParamKey(StrEnum):
   NRDR_CRUISE_BUTTON_SUB_MODE = NrdrParamKey.NRDR_CRUISE_BUTTON_SUB_MODE
   NRDR_HUD_SUB_MODE_UNTIL = NrdrParamKey.NRDR_HUD_SUB_MODE_UNTIL
   NRDR_HONDA_ECU_MATCHED_LONG = NrdrParamKey.NRDR_HONDA_ECU_MATCHED_LONG
+  NRDR_HONDA_PCM_MODE = NrdrParamKey.NRDR_HONDA_PCM_MODE
+  NRDR_HONDA_WIND_BRAKE = NrdrParamKey.NRDR_HONDA_WIND_BRAKE
   NRDR_HONDA_FULL_BRAKE_AUTHORITY = NrdrParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY
   NRDR_ROEN_ACCELERATION_LIMITS = NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS
 
@@ -95,7 +97,6 @@ SLOW_PARAM_GROUPS = (
   (
     OpendbcParamKey.HONDA_LIVE_LEARNING_GAS,
     OpendbcParamKey.HONDA_STOPPING_DECEL_RATE,
-    OpendbcParamKey.NRDR_HONDA_ECU_MATCHED_LONG,
     OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY,
     OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS,
   ),
@@ -251,7 +252,7 @@ class HondaParamsProvider:
       spoof_camera_messages=_bool_value(values.get(OpendbcParamKey.HONDA_SPOOF_CAMERA_MESSAGES), False),
       sub_mode_enabled=_bool_value(values.get(OpendbcParamKey.NRDR_CRUISE_BUTTON_SUB_MODE), False),
       sub_mode_until=_float_value(values.get(OpendbcParamKey.NRDR_HUD_SUB_MODE_UNTIL), 0.0, 0.0),
-      ecu_matched_long=_bool_value(values.get(OpendbcParamKey.NRDR_HONDA_ECU_MATCHED_LONG), False),
+      ecu_matched_long=False,  # Retired live switch; command law is selected once at startup.
       full_brake_authority=_bool_value(values.get(OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY), True),
       roen_acceleration_limits=_bool_value(values.get(OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS), False),
     )
@@ -511,6 +512,8 @@ class NrdrHondaConfig:
 
   bosch_a_radar: bool
   provider: HondaParamsProvider
+  nidec_pcm_mode: int = 0
+  nidec_wind_brake: bool = True
 
 
 def build_nrdr_honda_config(params, *, start_worker: bool = True,
@@ -521,10 +524,18 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
   # The historical Honda interface used Params.get_bool directly, which is false
   # when the registered key has no stored value (it does not consult registry defaults).
   radar_value = _read_param(params, OpendbcParamKey.HONDA_BOSCH_A_RADAR)
+  mode_value = _read_param(params, OpendbcParamKey.NRDR_HONDA_PCM_MODE)
+  # Invalid/missing values select upstream, never an experiment. Do not migrate
+  # the retired bool: it controlled a different algorithm from the donor patch.
+  mode = {"0": 0, "1": 1, "2": 2}.get(
+    mode_value.decode("utf-8", errors="replace") if isinstance(mode_value, bytes) else str(mode_value), 0,
+  )
 
   return NrdrHondaConfig(
     bosch_a_radar=_bool_value(radar_value, False),
     provider=provider,
+    nidec_pcm_mode=mode,
+    nidec_wind_brake=_bool_value(_read_param(params, OpendbcParamKey.NRDR_HONDA_WIND_BRAKE), True),
   )
 
 

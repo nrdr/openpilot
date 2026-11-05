@@ -435,8 +435,8 @@ sections:
       - key: HondaLiveLearningGas
         widget: toggle
         title: Live Learning Gas
-        description: Learns throttle response and wind compensation while driving.
-        details: Fresh installs default OFF when a gas pedal interceptor is detected and ON otherwise. Your selection is preserved afterward. While ON, all longitudinal PID personality scales are held at 100%.
+        description: Learns gas and wind compensation. Frozen in ECU-Matched and Civic Experimental. When ON, longitudinal PID scales stay at 100%.
+        details: Fresh installs default OFF with a gas interceptor and ON otherwise. Your saved switch is kept while learning is frozen.
         enablement:
         - $ref: '#/macros/offroad'
       - key: NrdrResetLiveGas
@@ -454,16 +454,37 @@ sections:
         title: Live Gas Reset Status
         visibility:
         - {type: capability, field: nrdr_honda_tuning_available, equals: true}
+      - key: NrdrHondaPcmMode
+        widget: multiple_button
+        title: 'Honda Nidec: ECU-Matched PCM Command Shaping'
+        description: "Off uses upstream PCM control. ECU-Matched adds mmmorks' ramp, coast and brake-release rules. Experimental uses the Civic trial. No gas interceptor. Restart required."
+        details: ECU-Matched keeps MVL mapping on all non-interceptor Nidecs. Experimental falls back to upstream on unsupported Nidecs. Requires openpilot longitudinal control; configure while parked. Default Off.
+        needs_onroad_cycle: true
+        options:
+        - {label: 'Off', value: 0}
+        - {label: ECU-Matched, value: 1}
+        - {label: Experimental, value: 2}
+        visibility:
+        - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
+        enablement:
+        - $ref: '#/macros/offroad'
+        - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
+      - key: NrdrHondaWindBrake
+        widget: toggle
+        title: Wind Brake
+        description: Subtracts estimated wind drag from brake demand. PCM only; gas compensation is unchanged. Restart required.
+        details: Default ON. Turning it off changes friction-brake demand. Non-interceptor Nidec openpilot longitudinal only; excludes Bosch. Configure while parked.
+        needs_onroad_cycle: true
+        visibility:
+        - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
+        enablement:
+        - $ref: '#/macros/offroad'
+        - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
       - key: StaticFeedforwardLong
         widget: toggle
         title: Keep Feedforward Static
         description: 'On: feedforward stays the same. Off: feedforward scales with the rest of the PID tune.'
         details: When ON, the active personality PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle.
-      - key: NrdrHondaEcuMatchedLong
-        widget: toggle
-        title: 'Honda Nidec: PCM command shaping'
-        description: Uses experimental throttle shaping on cars without a gas interceptor.
-        details: Uses Pilot-derived acceleration ramps and a continuous speed-dependent neutral zone for propulsion feedforward. No timed gas/brake blackout. Does not delay braking or change interceptor/stock ACC commands. Pilot values are not a verified Civic calibration. Default OFF.
       - key: NrdrHondaFullBrakeAuthority
         widget: toggle
         title: Full Nidec Brake Authority

@@ -7,9 +7,10 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.list_view import ListItem
 from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
 from openpilot.nrdr.ui.settings.live_gas_reset import available as gas_reset_available, large_reset_button
+from openpilot.nrdr.ui.honda_pcm import pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
-from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, multiple_button_item_sp, LineSeparatorSP
 
 
 class LongitudinalTuningLayout(Widget):
@@ -97,14 +98,21 @@ class LongitudinalTuningLayout(Widget):
       description=lambda: tr("On: feedforward stays the same. Off: feedforward scales with the rest of the PID tune."),
     )
 
-    self._ecu_matched_long = toggle_item_sp(
-      param="NrdrHondaEcuMatchedLong",
-      title=lambda: tr("Nidec PCM Command Shaping (Default: OFF)"),
+    self._pcm_mode = multiple_button_item_sp(
+      title=lambda: tr("Honda Nidec: ECU-Matched PCM Command Shaping"),
+      buttons=[lambda: tr("Off"), lambda: tr("ECU-Matched"), lambda: tr("Experimental")],
+      button_width=300, callback=lambda value: save_pcm_choice(ui_state, "NrdrHondaPcmMode", value),
       description=lambda: tr(
-        "Experimental, non-interceptor Honda Nidec PCM control only. Uses Pilot-derived acceleration ramps and a continuous " +
-        "speed-dependent neutral zone for propulsion feedforward. No timed gas/brake blackout. " +
-        "Does not delay braking or change interceptor/stock ACC commands. Pilot values are not a verified Civic calibration. " +
-        "OFF keeps the normal openpilot PCM path; it does not select stock ACC."
+        "Off uses upstream PCM control. ECU-Matched adds mmmorks' ramp, coast and brake-release rules. " +
+        "Experimental uses the Civic trial. No gas interceptor. Restart required."
+      ),
+    )
+
+    self._wind_brake = toggle_item_sp(
+      title=lambda: tr("Wind Brake"), initial_state=True,
+      callback=lambda value: save_pcm_choice(ui_state, "NrdrHondaWindBrake", value),
+      description=lambda: tr(
+        "Subtracts estimated wind drag from brake demand. PCM only; gas compensation is unchanged. Restart required."
       ),
     )
 
@@ -158,9 +166,8 @@ class LongitudinalTuningLayout(Widget):
       param="HondaLiveLearningGas",
       title=lambda: tr("Live Learning Gas (Default: OFF with Gas Interceptor)"),
       description=lambda: tr(
-        "Allows Honda gas and wind compensation factors to learn live while driving. Fresh installs default OFF when a gas pedal " +
-        "interceptor is detected and ON otherwise; your selection is preserved afterward. While ON, all longitudinal PID personality " +
-        "scales are held at 100%."
+        "Learns gas and wind compensation. Frozen in ECU-Matched and Civic Experimental. " +
+        "When ON, longitudinal PID scales stay at 100%."
       ),
     )
 
@@ -244,8 +251,9 @@ class LongitudinalTuningLayout(Widget):
       self._live_learning_gas,
       self._reset_live_gas,
       LineSeparatorSP(40),
+      self._pcm_mode,
+      self._wind_brake,
       self._static_feedforward_long,
-      self._ecu_matched_long,
       self._full_brake_authority,
       self._roen_acceleration_limits,
       self._radar_tryout,
@@ -278,6 +286,11 @@ class LongitudinalTuningLayout(Widget):
       item.action_item.set_enabled(enabled and not learning)
     self._live_learning_gas.action_item.set_enabled(enabled and ui_state.is_offroad())
     self._reset_live_gas.action_item.set_enabled(gas_reset_available())
+    pcm_enabled = ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
+    self._pcm_mode.action_item.set_enabled(pcm_enabled)
+    self._wind_brake.action_item.set_enabled(pcm_enabled)
+    self._pcm_mode.action_item.set_selected_button(saved_pcm_mode(ui_state.params))
+    self._wind_brake.action_item.set_state(saved_wind_brake(ui_state.params))
     self._standstill_gap.action_item.set_enabled(
       enabled and ui_state.is_offroad() and bool(ui_state.CP and ui_state.CP.openpilotLongitudinalControl)
     )

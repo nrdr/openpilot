@@ -111,7 +111,6 @@ class TestOpendbcBoundary(unittest.TestCase):
       OpendbcParamKey.HONDA_SPOOF_CAMERA_MESSAGES,
       OpendbcParamKey.NRDR_CRUISE_BUTTON_SUB_MODE,
       OpendbcParamKey.NRDR_HUD_SUB_MODE_UNTIL,
-      OpendbcParamKey.NRDR_HONDA_ECU_MATCHED_LONG,
       OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY,
       OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS,
     })
@@ -122,6 +121,9 @@ class TestOpendbcBoundary(unittest.TestCase):
       OpendbcParamKey.HONDA_GAS_ALPHA,
       OpendbcParamKey.HONDA_GAS_FACTOR,
       OpendbcParamKey.HONDA_WIND_FACTOR,
+      OpendbcParamKey.NRDR_HONDA_ECU_MATCHED_LONG,
+      OpendbcParamKey.NRDR_HONDA_PCM_MODE,
+      OpendbcParamKey.NRDR_HONDA_WIND_BRAKE,
     })
 
   def test_missing_startup_values_preserve_previous_interface_behavior(self):
@@ -129,6 +131,8 @@ class TestOpendbcBoundary(unittest.TestCase):
     config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
     self.assertFalse(config.honda.bosch_a_radar)
     self.assertFalse(config.honda.enforce_stock_longitudinal)
+    self.assertEqual(config.honda.nidec_pcm_mode, 0)
+    self.assertTrue(config.honda.nidec_wind_brake)
     self.assertEqual(config.hyundai.longitudinal_tuning, 0)
     self.assertFalse(config.subaru.stop_and_go)
     self.assertFalse(config.subaru.stop_and_go_manual_parking_brake)
@@ -138,8 +142,24 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertFalse(config.toyota.stop_and_go_hack)
     self.assertEqual([key for key, _ in params.reads], [
       str(NrdrHondaParamKey.HONDA_BOSCH_A_RADAR),
+      str(NrdrHondaParamKey.NRDR_HONDA_PCM_MODE),
+      str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE),
       *(str(key) for key in HOST_STARTUP_DEFAULTS),
     ])
+
+  def test_pcm_choices_are_startup_latched_and_old_bool_does_not_migrate(self):
+    for value, expected in ((None, 0), (True, 0), (False, 0), (3, 0), (-1, 0), (1.0, 0),
+                            (0, 0), (1, 1), (2, 2), (b"1", 1), ("2", 2)):
+      with self.subTest(value=value):
+        params = FakeParams({"NrdrHondaPcmMode": value, "NrdrHondaWindBrake": False, "NrdrHondaEcuMatchedLong": True})
+        config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+        self.assertEqual(config.honda.nidec_pcm_mode, expected)
+        self.assertFalse(config.honda.nidec_wind_brake)
+        params.values.update(NrdrHondaPcmMode=2, NrdrHondaWindBrake=True)
+        config.honda.provider.refresh_all()
+        self.assertEqual(config.honda.nidec_pcm_mode, expected)
+        self.assertFalse(config.honda.nidec_wind_brake)
+        self.assertFalse(config.honda.provider.get_live_tuning().ecu_matched_long)
 
   def test_honda_workers_stay_dormant_until_honda_interface_activation(self):
     params = FakeParams()

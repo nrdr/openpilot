@@ -202,7 +202,11 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("NrdrFirstRunSetupDone", ParamType.BOOL, PB, "0", ParamLifecycle.STATE, ParamOwner.SYSTEM),
   _added("NrdrAutoSelectModel", ParamType.BOOL, PB, "0", owner=ParamOwner.MODEL),
   _added("StaticFeedforwardLong", ParamType.BOOL, PB, "0", owner=ParamOwner.LONGITUDINAL),
-  _added("NrdrHondaEcuMatchedLong", ParamType.BOOL, PB, "0", owner=ParamOwner.HONDA),
+  # Retained for downgrade compatibility only. Never migrate old True to mode 1.
+  _added("NrdrHondaEcuMatchedLong", ParamType.BOOL, PB, "0", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),
+  # Startup-latched: 0=Off, 1=ECU-Matched, 2=Experimental.
+  _added("NrdrHondaPcmMode", ParamType.INT, PB, "0", owner=ParamOwner.HONDA),
+  _added("NrdrHondaWindBrake", ParamType.BOOL, PB, "1", owner=ParamOwner.HONDA),
   _added("NrdrHondaFullBrakeAuthority", ParamType.BOOL, PB, "1", owner=ParamOwner.HONDA),
   _added("NrdrRoenAccelerationLimits", ParamType.BOOL, PB, "0", owner=ParamOwner.HONDA),
   _added("HondaInjectionTest", ParamType.BOOL, PB, "0", owner=ParamOwner.HONDA),
