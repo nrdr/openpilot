@@ -610,7 +610,7 @@
           "sub_panels": [
             {
               "id": "nrdr_pidf_ground",
-              "label": "Controller Tuning Dungeon",
+              "label": "Lateral Tuning",
               "trigger_key": null,
               "trigger_condition": {
                 "type": "capability",
@@ -2274,7 +2274,7 @@
                   "widget": "toggle",
                   "title": "Live Learning Gas",
                   "description": "Learns gas and wind compensation. Frozen in ECU-Matched and Civic Experimental. When ON, longitudinal PID scales stay at 100%.",
-                  "details": "Fresh installs default OFF with a gas interceptor and ON otherwise. Your saved switch is kept while learning is frozen.",
+                  "details": "Learns gas demand and estimated drag while driving. ECU-Matched and Civic Experimental freeze learning. Saved values appear here when the device supplies its settings. Training time is not recorded. Reset Live Learning Gas clears saved gas and wind learning, not speed or brake learning.",
                   "enablement": [
                     {
                       "type": "offroad_only"

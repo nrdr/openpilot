@@ -15,7 +15,7 @@ import os
 from collections.abc import Callable
 
 from openpilot.sunnypilot.sunnylink.capabilities import CAPABILITY_FIELDS, CAPABILITY_LABELS
-from openpilot.nrdr.features.services.sunnylink import inject_car_tune_details
+from openpilot.nrdr.features.services.sunnylink import inject_car_tune_details, inject_live_gas_details
 
 SCHEMA_VERSION = "1.0"
 _DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -66,6 +66,7 @@ def _load_definition() -> dict:
     schema = json.load(f)
   _inject_dynamic_options(schema)
   inject_car_tune_details(schema, _walk_all_items)
+  inject_live_gas_details(schema, _walk_all_items)
   return schema
 
 

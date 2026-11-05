@@ -111,6 +111,20 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
     }
     self.assertFalse(retired_setting_keys & canonical_keys)
 
+  def test_nrdr_menu_matches_requested_order(self):
+    expected = [
+      "Apply Suggested Settings", "Force Update", "Prevent Automatic Shutdown",
+      "Lateral Tuning", "Lane Centering Method", "Steer Ratio Tuning", "Override Tuning",
+      "Steer Filters", "Longitudinal Tuning", "Driver Monitoring",
+    ]
+    source = _yaml_document("pages/steering.yaml")["sections"][0]
+    generated_page = next(p for p in compile_schema(DEFAULT_SRC)["panels"] if p["id"] == "steering")
+    generated = next(s for s in generated_page["sections"] if s["id"] == "nrdr")
+    for section in (source, generated):
+      # Sunnylink renders standalone sub-panels after the section's items.
+      self.assertTrue(all(p.get("trigger_key") is None for p in section["sub_panels"]))
+      self.assertEqual([i["title"] for i in section["items"]] + [p["label"] for p in section["sub_panels"]], expected)
+
   def test_consumer_sources_do_not_redeclare_canonical_nrdr_keys(self):
     canonical_references: list[str] = []
     for relative_path in SOURCE_FILES:

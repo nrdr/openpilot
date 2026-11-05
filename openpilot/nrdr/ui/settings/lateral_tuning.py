@@ -399,7 +399,7 @@ class LateralTuningLayout(Widget):
     )
 
     self._pidf_button = simple_button_item_sp(
-      button_text=lambda: tr("Controller Tuning Dungeon"),
+      button_text=lambda: tr("Lateral Tuning"),
       button_width=800,
       callback=lambda: self._set_panel(LateralPanel.PIDF),
     )

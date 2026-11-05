@@ -18,7 +18,7 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
 # the server-side set co-located with the admission policy prevents a stale or
 # custom remote client from bypassing the vehicle-aware UI.
 HONDA_TUNING_WRITE_KEYS = frozenset((
-  # Controller Tuning Dungeon.
+  # Lateral tuning.
   "NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrDeviceYawCorrection",
   "NrdrLatRateDampingLowSpeed", "NrdrLatRateDampingStandard", "NrdrLatRateDampingHighway",
   "LatPScaleLowSpeed",
@@ -149,6 +149,23 @@ def inject_car_tune_details(schema: dict, walk) -> None:
   walk(schema, visitor)
 
 
+def inject_live_gas_details(schema: dict, walk) -> None:
+  from openpilot.nrdr.car.live_gas_report import live_gas_details
+
+  # Read only when metadata is requested, never on the controls thread. Keep
+  # static help available if an older Params build cannot read these keys.
+  try:
+    details = live_gas_details(Params())
+  except (UnknownKeyName, OSError):
+    return
+
+  def visitor(item: dict) -> None:
+    if item.get("key") == "HondaLiveLearningGas":
+      item["details"] = details
+
+  walk(schema, visitor)
+
+
 __all__ = (
   "HONDA_TUNING_WRITE_KEYS",
   "ONROAD_WRITE_BLOCKLIST",
@@ -156,6 +173,7 @@ __all__ = (
   "_identity_path",
   "allow_param_write",
   "inject_car_tune_details",
+  "inject_live_gas_details",
   "persist_dongle_id",
   "request_stored_handcrafted_lateral_profile",
   "restore_dongle_id",
