@@ -382,9 +382,12 @@ def test_native_tuning_controls_follow_vehicle_policy(brand, enabled):
   layout._standstill_gap = NS(action_item=NS(set_enabled=lambda value: values.append(('gap', value))))
   layout._pcm_mode = NS(action_item=NS(set_enabled=lambda _: None, set_selected_button=lambda _: None))
   layout._wind_brake = NS(action_item=NS(set_enabled=lambda _: None, set_state=lambda _: None))
+  layout._engine_braking = NS(action_item=NS(set_enabled=lambda value: values.append(('engine_enabled', value)),
+                                            set_state=lambda value: values.append(('engine_state', value))))
   layout._tuning_items = [layout._live_learning_gas, NS(), NS(action_item=NS(set_enabled=lambda value: values.append(('tune', value))))]
   layout._update_state()
-  assert values == [('gas', enabled), ('tune', enabled), ('gas', enabled), ('reset', enabled), ('gap', enabled)]
+  assert values == [('gas', enabled), ('tune', enabled), ('gas', enabled), ('reset', enabled),
+                    ('engine_enabled', False), ('engine_state', False), ('gap', enabled)]
 
 
 def test_generated_sunnylink_schema_gates_nrdr_panel_and_econ():
