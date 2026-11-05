@@ -1,5 +1,20 @@
 # Bounded C3X / C4 UI previews
 
+## Verified GitHub galleries
+
+[Run 42102783848](https://github.com/nrdr/openpilot/actions/runs/42102783848)
+passed both native build/capture jobs on 2026-11-05 at `a81358ddd7`: **17 C3X
+views and 15 C4 views**. Download either artifact, extract it, and open
+`index.html`. The ZIP includes full-size screenshots, the source recording,
+and a manifest identifying the exact revision and synthetic inputs.
+
+GitHub had paused this fork's workflows despite its permissions API reporting
+Actions enabled. The owner re-enabled them on the Actions page. The dedicated
+workflow is now registered as **408596848**; matching UI pushes launch normally.
+The earlier registration/host notes below describe the initial investigation,
+not the current availability of GitHub previews. No Linux environment was
+installed on the Windows PC.
+
 This is an artifact-only, desktop capture companion to the existing UI tests. It
 does not change or replace `test_raylib_ui.py`, the stock replay scripts, or the
 existing `Create UI Report` job. No control processes, physical devices, cameras,
@@ -44,6 +59,8 @@ openpilot-longitudinal capability, and reports no gas interceptor or EPS firmwar
 This exposes the existing Honda-gated menus without bypassing their gates; options
 requiring firmware or actual vehicle data remain unavailable. It seeds Star lane
 centering and unlocks suggested/handcrafted tuning only in temporary preview Params.
+It also marks optional first-run setup complete so the offline-map download
+prompt does not cover the home screen. It does not request any maps.
 It never starts a controller, sends CAN, clicks a tuning action, or changes a real
 vehicle setting. Onroad means ignition-on, disengaged synthetic UI state; its
 settings captures retain native restrictions. No special floating tuning menu
@@ -66,7 +83,7 @@ source .venv/bin/activate
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends libgles2 libegl1 ffmpeg
 scons --minimal -j2
-python3 tools/ui/capture_preview.py --device all --output /tmp/nrdr-ui-preview
+PATH="/usr/bin:$PATH" "$PWD/.venv/bin/python" tools/ui/capture_preview.py --device all --output /tmp/nrdr-ui-preview
 ```
 
 Use `--device tici` or `--device mici` to capture one device. Output must be a new
@@ -221,8 +238,8 @@ Concrete missing prerequisites in this checkout:
 - EGL/GLES and Linux ffmpeg must be verified/installed in Ubuntu after it exists;
   the available Windows ffmpeg/ffprobe only validate the portable extraction test.
 
-The code is ready for the first bounded Linux CI attempt, not evidence of a
-successful rendered UI. No screenshots in this patch claim otherwise.
+These Windows-host limitations do not prevent the successful GitHub-hosted
+Linux captures linked at the top of this page.
 
 ## Official machinery inspected
 
