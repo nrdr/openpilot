@@ -2274,7 +2274,7 @@
                   "key": "HondaLiveLearningGas",
                   "widget": "toggle",
                   "title": "Live Learning Gas",
-                  "description": "Allows Honda gas and wind compensation factors to learn live while driving.",
+                  "description": "Learns throttle response and wind compensation while driving.",
                   "details": "Fresh installs default OFF when a gas pedal interceptor is detected and ON otherwise. Your selection is preserved afterward. While ON, all longitudinal PID personality scales are held at 100%.",
                   "enablement": [
                     {
@@ -2286,21 +2286,21 @@
                   "key": "StaticFeedforwardLong",
                   "widget": "toggle",
                   "title": "Keep Feedforward Static",
-                  "description": "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; feedforward (kf) stays tuned.",
+                  "description": "On: feedforward stays the same. Off: feedforward scales with the rest of the PID tune.",
                   "details": "When ON, the active personality PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle."
                 },
                 {
                   "key": "NrdrHondaEcuMatchedLong",
                   "widget": "toggle",
                   "title": "Honda Nidec: PCM command shaping",
-                  "description": "Experimental non-interceptor PCM propulsion shaping. OFF keeps the normal openpilot PCM path, not stock ACC.",
+                  "description": "Uses experimental throttle shaping on cars without a gas interceptor.",
                   "details": "Uses Pilot-derived acceleration ramps and a continuous speed-dependent neutral zone for propulsion feedforward. No timed gas/brake blackout. Does not delay braking or change interceptor/stock ACC commands. Pilot values are not a verified Civic calibration. Default OFF."
                 },
                 {
                   "key": "NrdrHondaFullBrakeAuthority",
                   "widget": "toggle",
                   "title": "Full Nidec Brake Authority",
-                  "description": "Allows supported Honda Nidec longitudinal control to use the full normalized brake-command range.",
+                  "description": "Allows the full brake-command range on supported cars with a gas interceptor.",
                   "details": "Enabled by default. Disable to retain the upstream brake-command headroom. This setting operates independently of Live Learning Gas."
                 },
                 {
@@ -2314,7 +2314,7 @@
                   "key": "HondaBoschARadar",
                   "widget": "toggle",
                   "title": "Honda Bosch-A Radar (experimental)",
-                  "description": "Decodes the factory radar on supported Honda Bosch-A vehicles with stock longitudinal or openpilot Alpha Long.",
+                  "description": "Reads factory radar with stock cruise or Alpha Long on supported cars.",
                   "details": "EXPERIMENTAL \u2014 The reverse-engineered object format has not been road-validated on every supported model. Disable this setting if radar tracks look incorrect. With Alpha Long, these tracks feed openpilot's lead tracking and longitudinal commands; factory Honda AEB/CMBS remains unavailable."
                 },
                 {
@@ -2452,7 +2452,7 @@
                   "key": "NrdrCruiseOverspeedAllowance",
                   "widget": "option",
                   "title": "Set-Speed Overshoot Allowance",
-                  "description": "Allows the cruise target to follow vehicle speed by up to this amount above the set speed when no other speed target is lower.",
+                  "description": "Lets cruise match your current speed within this allowance above set speed unless a lower target applies.",
                   "details": "0 mph preserves stock behavior.",
                   "min": 0,
                   "max": 10,
@@ -2463,7 +2463,7 @@
                   "key": "NrdrCruiseMismatchCorrection",
                   "widget": "option",
                   "title": "Cruise Mismatch Correction",
-                  "description": "Correct slight variances in final cruising target speed to better match the current and set speeds.",
+                  "description": "Adjusts the cruise target if your car consistently runs above or below set speed.",
                   "details": "Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.",
                   "min": 95.0,
                   "max": 105.0,
@@ -2474,7 +2474,7 @@
                   "key": "NrdrStandstillGapExtra",
                   "widget": "option",
                   "title": "Extra Stopped Lead Gap",
-                  "description": "Additional lead clearance retained through creeping and at a complete stop. 0 preserves existing behavior.",
+                  "description": "Targets extra space behind a stopped vehicle; 0 m keeps the usual gap.",
                   "details": "Adds to the planner's distance floor, not the distance-bar time gap. Measured bumper clearance can vary with lead sensing and braking. Configure offroad; applies on the next engagement. Requires nrdr-supported openpilot longitudinal control; stock ACC and unapproved non-Honda vehicles are unchanged.",
                   "min": 0.0,
                   "max": 5.0,
