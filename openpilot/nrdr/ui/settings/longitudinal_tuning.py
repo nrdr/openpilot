@@ -137,10 +137,10 @@ class LongitudinalTuningLayout(Widget):
     self._engine_braking = toggle_item_sp(
       title=lambda: tr("Experimental Engine Braking"),
       initial_state=ui_state.params.get_bool("NrdrExperimentalEngineBraking"),
-      enabled=lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
+      enabled=lambda: pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
                       and str(getattr(ui_state.CP, "carFingerprint", "")) == "HONDA_CIVIC",
       description=lambda: tr("Civic PCM only. Fades into free-cruise engine braking and back over 3 seconds. " +
-                             "Lead braking and pedal overrides take priority. Off by default; restart required."),
+                             "Lead braking and pedal overrides take priority. Off by default; applies live."),
       callback=self._set_engine_braking,
     )
     self._cruise_overspeed_allowance = option_item_sp(
@@ -302,10 +302,11 @@ class LongitudinalTuningLayout(Widget):
       item.action_item.set_enabled(enabled and not learning)
     self._live_learning_gas.action_item.set_enabled(enabled and ui_state.is_offroad())
     self._reset_live_gas.action_item.set_enabled(gas_reset_available())
-    pcm_enabled = ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
+    pcm_available = pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
+    pcm_enabled = ui_state.is_offroad() and pcm_available
     self._pcm_mode.action_item.set_enabled(pcm_enabled)
     self._wind_brake.action_item.set_enabled(pcm_enabled)
-    self._engine_braking.action_item.set_enabled(pcm_enabled and str(getattr(ui_state.CP, "carFingerprint", "")) == "HONDA_CIVIC")
+    self._engine_braking.action_item.set_enabled(pcm_available and str(getattr(ui_state.CP, "carFingerprint", "")) == "HONDA_CIVIC")
     self._pcm_mode.action_item.set_selected_button(saved_pcm_mode(ui_state.params))
     self._wind_brake.action_item.set_state(saved_wind_brake(ui_state.params))
     self._engine_braking.action_item.set_state(ui_state.params.get_bool("NrdrExperimentalEngineBraking"))

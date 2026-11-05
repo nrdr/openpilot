@@ -246,7 +246,18 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "LongitudinalPersonality",
       "NrdrHandcraftedLateralTune",
       "NrdrStandstillGapExtra",
+      "NrdrSuggestedSettings",
+      "NrdrLateralController",
+      "NrdrDriverMonitoringReminderPercent",
     ))
+
+  def test_saveParams_allows_live_engine_braking_without_requesting_restart(self):
+    self.fake_params.offroad = False
+    for value in ("1", "0"):
+      encoded = remote_value(value)
+      sunnylinkd.saveParams({"NrdrExperimentalEngineBraking": encoded})
+      assert self.saved_params[-1] == ("NrdrExperimentalEngineBraking", encoded, False)
+    assert all(key != "OnroadCycleRequested" for key, _, _ in self.params_writes)
 
   def test_stopped_gap_requires_offroad_write(self):
     assert allow_param_write("NrdrStandstillGapExtra", onroad=False)

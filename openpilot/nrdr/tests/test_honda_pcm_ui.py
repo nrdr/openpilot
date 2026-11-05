@@ -104,7 +104,8 @@ def test_save_is_parked_only_and_requests_restart_without_claiming_active_state(
 
 
 @pytest.mark.parametrize("key,value", [("NrdrHondaEcuMatchedLong", True), ("NrdrHondaPcmMode", True),
-                                      ("NrdrHondaPcmMode", 3), ("NrdrHondaWindBrake", 1)])
+                                      ("NrdrHondaPcmMode", 3), ("NrdrHondaWindBrake", 1),
+                                      ("NrdrExperimentalEngineBraking", 1), ("NrdrExperimentalEngineBraking", "0")])
 def test_invalid_writes_are_rejected(key, value):
   ui = state()
   assert not save_pcm_choice(ui, key, value)
@@ -321,8 +322,10 @@ def native_layout_with_real_toggle_handlers(ui):
 
 
 @pytest.mark.parametrize("saved", [False, True])
-def test_native_engine_saved_initial_state_refresh_and_guarded_save(saved):
+@pytest.mark.parametrize("offroad", [False, True])
+def test_native_engine_saved_initial_state_refresh_and_live_save(saved, offroad):
   ui = state()
+  ui.is_offroad = lambda: offroad
   ui.params.values["NrdrExperimentalEngineBraking"] = saved
   layout = native_layout_with_real_toggle_handlers(ui)
   engine = layout._engine_braking
@@ -339,11 +342,11 @@ def test_native_engine_saved_initial_state_refresh_and_guarded_save(saved):
   assert not ui.params.writes
   engine.toggle._handle_mouse_release(None)
   assert engine.toggle.get_state() is saved
-  assert ui.params.writes == [("NrdrExperimentalEngineBraking", saved), ("OnroadCycleRequested", True)]
+  assert ui.params.writes == [("NrdrExperimentalEngineBraking", saved)]
 
 
 @pytest.mark.parametrize("saved", [False, True])
-@pytest.mark.parametrize("change", ["onroad", "interceptor", "stock", "missing_cp", "missing_cp_sp", "stale_identity",
+@pytest.mark.parametrize("change", ["interceptor", "stock", "missing_cp", "missing_cp_sp", "stale_identity",
                                    "openlong_off", "clarity", "pilot", "bosch", "non_honda"])
 def test_native_engine_rejected_release_cannot_write_bound_param(change, saved):
   ui = state()
@@ -352,9 +355,7 @@ def test_native_engine_rejected_release_cannot_write_bound_param(change, saved):
   layout._update_state()
   engine = layout._engine_braking
   assert engine.enabled
-  if change == "onroad":
-    ui.is_offroad = lambda: False
-  elif change == "interceptor":
+  if change == "interceptor":
     ui.CP_SP.enableGasInterceptor = True
   elif change == "stock":
     ui.CP_SP.flags |= HondaFlagsSP.STOCK_LONGITUDINAL
@@ -433,23 +434,26 @@ def compact_controls(ui):
   return env["EngineBrakeControl"](), env["OverspeedAllowanceControl"](), pushed, popped
 
 
-def test_mici_engine_refreshes_saved_choice_and_rechecks_parked_state():
+def test_mici_engine_refreshes_saved_choice_and_saves_live_without_restart():
   ui = state()
   engine, _, _, _ = compact_controls(ui)
   assert engine.enabled()
   assert engine.kwargs["initial_state"] is False
   engine._select(True)
-  assert ui.params.writes == [("NrdrExperimentalEngineBraking", True), ("OnroadCycleRequested", True)]
+  assert ui.params.writes == [("NrdrExperimentalEngineBraking", True)]
   assert engine.value is True
   ui.params.values["NrdrExperimentalEngineBraking"] = False
   engine._update_state()
   assert engine.value is False
   ui.params.writes.clear()
   ui.is_offroad = lambda: False
-  assert not engine.enabled()
+  assert engine.enabled()
   engine._select(True)
+  assert engine.value is True
+  assert ui.params.writes == [("NrdrExperimentalEngineBraking", True)]
+  engine._select(False)
   assert engine.value is False
-  assert not ui.params.writes
+  assert ui.params.writes[-1] == ("NrdrExperimentalEngineBraking", False)
 
 
 @pytest.mark.parametrize("car", list(CAR))

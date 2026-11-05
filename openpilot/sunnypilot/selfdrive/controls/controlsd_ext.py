@@ -53,7 +53,6 @@ class ControlsExt(ModelStateBase):
     cloudlog.info("controlsd_ext got CarParamsSP")
 
     self.sm_services_ext = ['radarState', 'selfdriveStateSP', 'modelDataV2SP', 'longitudinalPlanSP']
-    self.engine_braking_enabled = params.get_bool('NrdrExperimentalEngineBraking')
     self.pm_services_ext = ['carControlSP', 'laneCenteringStateSP']
 
   def initialize_lateral_control(self, lac, CI, dt):
@@ -150,9 +149,10 @@ class ControlsExt(ModelStateBase):
       self.CP, self.CP_SP, sm['longitudinalPlan'].speeds, sm.logMonoTime['longitudinalPlan'],
       sm.all_checks(['longitudinalPlan']),
     )
+    snapshot = self.nrdr_live_params.snapshot
     (CC_SP.pcmEngineBrakeAllowed, CC_SP.pcmEngineBrakeRequest, CC_SP.pcmEngineBrakeMonoTime) = engine_brake_context(
-      self.CP, self.CP_SP, sm, self.engine_braking_enabled,
-      read_float(self.nrdr_live_params.snapshot, 'NrdrCruiseOverspeedAllowance', 0.0, 0.0, 10.0),
+      self.CP, self.CP_SP, sm, read_bool(snapshot, 'NrdrExperimentalEngineBraking', False),
+      read_float(snapshot, 'NrdrCruiseOverspeedAllowance', 0.0, 0.0, 10.0),
     )
 
     return CC_SP

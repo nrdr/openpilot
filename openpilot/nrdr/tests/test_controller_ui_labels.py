@@ -112,6 +112,18 @@ class TestControllerUiLabels(unittest.TestCase):
         self.assertEqual(engine["callback"], layout._set_engine_braking)
         self.assertTrue(callable(engine["enabled"]))
 
+  def test_engine_braking_metadata_is_live_but_still_civic_pcm_only(self):
+    items = _panel(self.schema, "steering", "nrdr_longitudinal")["items"]
+    engine = next(item for item in items if item.get("key") == "NrdrExperimentalEngineBraking")
+    self.assertFalse(engine.get("needs_onroad_cycle", False))
+    self.assertNotIn("Restart required", engine["details"])
+    self.assertIn("Applies live", engine["details"])
+    self.assertEqual(engine["visibility"], engine["enablement"])
+    self.assertEqual(engine["enablement"], [
+      {"type": "capability", "field": "nrdr_honda_pcm_tuning_available", "equals": True},
+      {"type": "capability", "field": "car_fingerprint", "equals": "HONDA_CIVIC"},
+    ])
+
   def test_honda_pcm_mode_and_wind_order_copy_and_parked_restart_rules(self):
     cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout")
     layout = cls.__new__(cls)

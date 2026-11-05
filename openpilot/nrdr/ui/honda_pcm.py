@@ -27,13 +27,18 @@ def saved_wind_brake(params) -> bool:
 
 
 def save_pcm_choice(state, key: str, value) -> bool:
-  if not state.is_offroad() or not pcm_tuning_available(state.CP, state.CP_SP, state.params):
+  if not pcm_tuning_available(state.CP, state.CP_SP, state.params):
+    return False
+  if key == "NrdrExperimentalEngineBraking":
+    if type(value) is not bool or state.CP.carFingerprint != CAR.HONDA_CIVIC:
+      return False
+    state.params.put_bool(key, value, block=True)
+    return True  # Consumed by the live controlsd snapshot, not a startup latch.
+  if not state.is_offroad():
     return False
   if key == "NrdrHondaPcmMode" and type(value) is int and value in (0, 1, 2):
     state.params.put(key, value, block=True)
   elif key == "NrdrHondaWindBrake" and type(value) is bool:
-    state.params.put_bool(key, value, block=True)
-  elif key == "NrdrExperimentalEngineBraking" and type(value) is bool and state.CP.carFingerprint == CAR.HONDA_CIVIC:
     state.params.put_bool(key, value, block=True)
   else:
     return False
