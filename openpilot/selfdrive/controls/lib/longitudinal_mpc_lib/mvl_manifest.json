@@ -49,7 +49,8 @@
   "validation": {
     "command": "python -m pytest openpilot/nrdr/tests/test_mvl_host_parity.py openpilot/nrdr/tests/test_mvl_plannerd_lifecycle.py openpilot/nrdr/tests/test_mvl_host_native.py openpilot/nrdr/tests/test_mvl_cruise.py openpilot/nrdr/tests/test_experimental_button_regressions.py",
     "scope": "Pinned git blob verification; exact AST comparison of copied algorithms and optimizer definition; differential controller/planner/solver-input/FCW/boost tests; polluted custom-settings isolation; legacy non-Honda equivalence.",
-    "not_validated": "Native acados optimizer, native capnp startup, device/vehicle or on-road behavior. Parent owns C4 tests/deployment."
+    "native_release_gate": "Run test_mvl_host_native against the native acados solver, capnp imports, startup policy, settings and controller parity on the C4, then repeat acceptance checks after building the exact installed revision.",
+    "not_validated": "Physical actuator response, on-road behavior, future learned-state convergence, or the donor author's private settings. Source parity and native software tests are not road validation."
   },
   "configuration_contract": {
     "effective_selections": "Driver cruise set speed and four personality selector remain effective. Honda mode is startup-latched; no live setting toggles it.",
