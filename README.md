@@ -4,11 +4,11 @@
 
 ## Overview
 
-This fork supports the Proper Torque Modification available for select Honda platforms. We are calling this **PTC**.
+This fork supports the Proper Torque Mod (**PTM**) available for select Honda platforms.
 
 [Check your car's torque-mod status and files](https://docs.google.com/spreadsheets/d/1edkzOjTJfXRjE9v0nHh0uVFfhPFSkYnI3sg0oVliRkU/edit). The sheet is the source of truth for supported cars, rack firmware, and the file intended for each EPS.
 
-PTC combines modified EPS firmware with software that knows how that firmware behaves. The firmware and the software tune are a pair: using one without the other can produce the wrong steering response.
+PTM combines modified EPS firmware with software that knows how that firmware behaves. The firmware and the software tune are a pair: using one without the other can produce the wrong steering response.
 
 ## Getting started
 
@@ -16,17 +16,17 @@ PTC combines modified EPS firmware with software that knows how that firmware be
 
 1. Check the status sheet for your exact car and EPS firmware.
 2. Factory-reset the device before changing branches. This is required when moving between NRDR, clean, bare, or another fork.
-3. From the openpilot root, run `python3 flash.py`, choose the latest PTC firmware listed for your exact rack, and follow every prompt. Read the [EPS flashing guide](eps_tools/README.md) before starting.
+3. From the openpilot root, run `python3 flash.py`, choose the latest PTM firmware listed for your exact rack, and follow every prompt. Read the [EPS flashing guide](eps_tools/README.md) before starting.
 4. Install the branch that matches how much experimentation you want.
 5. Start with the branch defaults. Change one setting at a time and keep notes.
 
-These branches are tuned for the current PTC firmware. Legacy **2X** and other older torque mods have a different, non-linear response and are not the tuning target.
+These branches are tuned for the current PTM firmware. Legacy **2X** and other older torque mods have a different, non-linear response and are not the tuning target.
 
 ## What works
 
-Validated PTC files are designed to provide more usable steering authority than the older legacy torque-mod files. The fork adds a static Honda PID base, rack-aware steering geometry, steering filters, driver-override handling, and optional vehicle-specific tuning tools.
+Validated PTM files are designed to provide more usable steering authority than the older legacy torque-mod files. The fork adds a static Honda PID base, rack-aware steering geometry, steering filters, driver-override handling, and optional vehicle-specific tuning tools.
 
-On the seven PTC Honda platform fingerprints in the current code, the base is static at every speed: `kp = 0.03`, `ki = 0.01`, and `kf = 0.000012`. Optional Low, Standard, and Highway P/I/F controls scale that base; **100% means no change**.
+On the seven PTM Honda platform fingerprints in the current code, the base is static at every speed: `kp = 0.03`, `ki = 0.01`, and `kf = 0.000012`. Optional Low, Standard, and Highway P/I/F controls scale that base; **100% means no change**.
 
 This is research software, not a safety certification and not a self-driving system. The driver must supervise it at all times.
 
@@ -50,8 +50,8 @@ Many Hondas also have a non-linear variable steering ratio inside the rack. A si
 
 ### Bare branches
 
-- **`nrdr-bare`** — stock openpilot plus the hardcoded PTC tune and the minimal dynamic steer-ratio/controller integration needed for it. It omits the larger NRDR feature set. Uses `connect.comma.ai`.
-- **`nrdr-bare-only-tune`** — stock openpilot with only the hardcoded PTC tuning dependency. It lacks dynamic steer-ratio tuning and the wider lateral enhancements, so it may not track as well on non-linear racks, but it is the smallest and most upstreamable branch. Uses `connect.comma.ai`.
+- **`nrdr-bare`** — stock openpilot plus the hardcoded PTM tune and the minimal dynamic steer-ratio/controller integration needed for it. It omits the larger NRDR feature set. Uses `connect.comma.ai`.
+- **`nrdr-bare-only-tune`** — stock openpilot with only the hardcoded PTM tuning dependency. It lacks dynamic steer-ratio tuning and the wider lateral enhancements, so it may not track as well on non-linear racks, but it is the smallest and most upstreamable branch. Uses `connect.comma.ai`.
 
 <details>
 <summary>Source and QC branches</summary>
