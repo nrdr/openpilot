@@ -4,26 +4,6 @@ import math
 from opendbc.car.honda.civic_pcm import uses_civic_pcm
 
 
-class EngineBrakeSettingsReporter:
-  """Record the choice consumed by controls, not just permission to activate."""
-  def __init__(self):
-    self.last = None
-
-  def update(self, live, generation: int, *, enabled: bool, allowance_mph: float, supported: bool) -> None:
-    signature = (enabled, allowance_mph, supported)
-    if signature == self.last:
-      return
-    self.last = signature
-    # Use the parameter worker's existing log queue: no disk I/O in controls.
-    # A diagnostic failure must never affect actuation or mutate the setting.
-    try:
-      live.record_applied_settings("pcm_engine_braking", generation,
-                                   configured_enabled=enabled, allowance_mph=allowance_mph,
-                                   supported=supported)
-    except Exception:
-      pass
-
-
 def engine_brake_context(CP, CP_SP, sm, enabled: bool, allowance_mph: float) -> tuple[bool, bool, int]:
   services = ['carState', 'selfdriveState', 'radarState', 'longitudinalPlan', 'longitudinalPlanSP']
   if not enabled or not uses_civic_pcm(CP, CP_SP) or not sm.all_checks(services):

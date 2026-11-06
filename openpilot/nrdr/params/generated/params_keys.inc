@@ -38,7 +38,7 @@
     {"NrdrPersonalityAccelProfiles", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrCruiseMismatchCorrection", {PERSISTENT | BACKUP, FLOAT, "100"}},
     {"NrdrCruiseOverspeedAllowance", {PERSISTENT | BACKUP, INT, "0"}},
-    {"NrdrExperimentalEngineBraking", {PERSISTENT | BACKUP, BOOL}},
+    {"NrdrExperimentalEngineBraking", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrStandstillGapExtra", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
     {"HondaCenterScale", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
     {"HondaPidFriction", {PERSISTENT | BACKUP, FLOAT, "0.0"}},

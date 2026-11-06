@@ -19,9 +19,7 @@ from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.nrdr.hooks import initialize_live_parameter_settings
 from openpilot.nrdr.params import read_bool, read_float
 from openpilot.nrdr.features.longitudinal.civic_pcm import pcm_reference
-from openpilot.nrdr.features.longitudinal.cruise_coast import cruise_coast_context
-from openpilot.nrdr.features.longitudinal.engine_braking import EngineBrakeSettingsReporter, engine_brake_context
-from opendbc.car.honda.civic_pcm import uses_civic_pcm
+from openpilot.nrdr.features.longitudinal.engine_braking import engine_brake_context
 from openpilot.nrdr.features.lateral.lane_guidance import (
   LaneGuidanceMode,
   model_action_lane_guidance_mode,
@@ -48,7 +46,6 @@ class ControlsExt(ModelStateBase):
     self.lane_centering = LaneCenteringController()
     self._lane_centering_state_publish_frame = 0
     initialize_live_parameter_settings(self)
-    self.engine_brake_settings_reporter = EngineBrakeSettingsReporter()
     self.update_lane_centering_params()
 
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
@@ -153,24 +150,9 @@ class ControlsExt(ModelStateBase):
       sm.all_checks(['longitudinalPlan']),
     )
     snapshot = self.nrdr_live_params.snapshot
-    engine_enabled = read_bool(snapshot, 'NrdrExperimentalEngineBraking', False)
-    # The permission helpers reject out-of-range/nonfinite allowances. Do not
-    # turn a corrupt value into a valid ten-mph allowance by clamping it here.
-    overspeed_allowance = read_float(snapshot, 'NrdrCruiseOverspeedAllowance', 0.0)
-    self.engine_brake_settings_reporter.update(
-      self.nrdr_live_params, snapshot.generation, enabled=engine_enabled, allowance_mph=overspeed_allowance,
-      supported=uses_civic_pcm(self.CP, self.CP_SP),
-    )
     (CC_SP.pcmEngineBrakeAllowed, CC_SP.pcmEngineBrakeRequest, CC_SP.pcmEngineBrakeMonoTime) = engine_brake_context(
-      self.CP, self.CP_SP, sm, engine_enabled, overspeed_allowance,
-    )
-    CC_SP.pcmEngineBrakeEnabled = engine_enabled
-    # v1 denial is authoritative; receivers must not fall back to the less
-    # restrictive legacy engine context when this protocol is present.
-    CC_SP.pcmCruiseCoastVersion = 1
-    (CC_SP.pcmCruiseCoastAllowed, CC_SP.pcmCruiseCoastSetSpeed,
-     CC_SP.pcmCruiseCoastMaxSpeed, CC_SP.pcmCruiseCoastMonoTime) = cruise_coast_context(
-      self.CP, self.CP_SP, sm, overspeed_allowance,
+      self.CP, self.CP_SP, sm, read_bool(snapshot, 'NrdrExperimentalEngineBraking', False),
+      read_float(snapshot, 'NrdrCruiseOverspeedAllowance', 0.0, 0.0, 10.0),
     )
 
     return CC_SP

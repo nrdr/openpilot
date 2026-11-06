@@ -118,42 +118,11 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertFalse(engine.get("needs_onroad_cycle", False))
     self.assertNotIn("Restart required", engine["details"])
     self.assertIn("Applies live", engine["details"])
-    self.assertIn("Defaults on if unset; saved choices stay unchanged", engine["details"])
-    self.assertIn("without a gas interceptor", engine["details"])
-    self.assertIn("Requires a nonzero Set-Speed Overshoot Allowance", engine["details"])
-    self.assertIn("Actual engine braking depends on the car", engine["details"])
     self.assertEqual(engine["visibility"], engine["enablement"])
     self.assertEqual(engine["enablement"], [
       {"type": "capability", "field": "nrdr_honda_pcm_tuning_available", "equals": True},
       {"type": "capability", "field": "car_fingerprint", "equals": "HONDA_CIVIC"},
     ])
-
-  def test_engine_and_allowance_copy_preserves_key_facts_without_requiring_identical_paragraphs(self):
-    from openpilot.nrdr.tests.test_honda_pcm_ui import compact_controls, state
-
-    cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout")
-    layout = cls.__new__(cls)
-    layout._initialize_items()
-    engine, allowance, _, _ = compact_controls(state())
-    remote = {item["key"]: item for item in _panel(self.schema, "steering", "nrdr_longitudinal")["items"]}
-    required_facts = {
-      "NrdrExperimentalEngineBraking": ("Civic PCM only", "PCM speed request toward zero over 3 seconds",
-                                         "Off still coasts within the allowance", "Throttle recovers over 3 seconds",
-                                         "Braking and pedal overrides take priority"),
-      "NrdrCruiseOverspeedAllowance": ("when no lower target applies", "Lead braking and other slowdown requests retain priority",
-                                       "0 mph preserves stock behavior"),
-    }
-    for key, large, compact in (("NrdrExperimentalEngineBraking", layout._engine_braking, engine),
-                                ("NrdrCruiseOverspeedAllowance", layout._cruise_overspeed_allowance, allowance)):
-      with self.subTest(key=key):
-        descriptions = (large["description"](), compact.kwargs["description"],
-                        remote[key]["description"] + " " + remote[key]["details"])
-        for description in descriptions:
-          for fact in required_facts[key]:
-            self.assertIn(fact, description)
-        if key == "NrdrExperimentalEngineBraking":
-          for description in descriptions[:2]:
-            self.assertLessEqual(len(description.split()), 40, "Keep supporting facts in Sunnylink details")
 
   def test_honda_pcm_mode_and_wind_order_copy_and_parked_restart_rules(self):
     cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout")

@@ -139,9 +139,8 @@ class LongitudinalTuningLayout(Widget):
       initial_state=ui_state.params.get_bool("NrdrExperimentalEngineBraking"),
       enabled=lambda: pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
                       and str(getattr(ui_state.CP, "carFingerprint", "")) == "HONDA_CIVIC",
-      description=lambda: tr("Civic PCM only. On fades the PCM speed request toward zero over 3 seconds; " +
-                             "Off still coasts within the allowance. Throttle recovers over 3 seconds. " +
-                             "Braking and pedal overrides take priority."),
+      description=lambda: tr("Civic PCM only. Fades into free-cruise engine braking and back over 3 seconds. " +
+                             "Lead braking and pedal overrides take priority. Off by default; applies live."),
       callback=self._set_engine_braking,
     )
     self._cruise_overspeed_allowance = option_item_sp(
@@ -151,8 +150,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=10,
       value_change_step=1,
       description=lambda: tr(
-        "Allows up to this much above set speed when no lower target applies. " +
-        "Lead braking and other slowdown requests retain priority. " +
+        "Allows the cruise target to follow vehicle speed by up to this amount above the set speed when no other speed target is lower. " +
         "0 mph preserves stock behavior."
       ),
       label_callback=lambda value: f"{value} mph",

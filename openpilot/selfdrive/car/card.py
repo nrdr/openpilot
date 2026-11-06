@@ -24,7 +24,6 @@ from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_cap
 
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
 from openpilot.nrdr.params import HandcraftedLateralUnsafeStateError, consume_handcrafted_lateral_request
-from openpilot.nrdr.params.vehicle_defaults import initialize_engine_braking_default
 from openpilot.nrdr.features.driver_policy.stock_cmbs import publish_stock_cmbs_status
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
@@ -120,13 +119,6 @@ class Car:
       self.RI = interfaces[self.CI.CP.carFingerprint].RadarInterface(self.CI.CP, self.CI.CP_SP)
       self.CP = self.CI.CP
       self.CP_SP = self.CI.CP_SP
-
-      # Missing-only vehicle defaults need live admission, before controlsd can
-      # read CP. Preserve every saved On/Off; never seed from a cached vehicle.
-      try:
-        initialize_engine_braking_default(self.CP, self.CP_SP, self.params)
-      except Exception:
-        cloudlog.exception("car: engine braking default initialization failed")
 
       # Resolve pending presets or fresh firmware defaults after live CP/CP_SP
       # admission and before publishing either CP. The consumer guards saved

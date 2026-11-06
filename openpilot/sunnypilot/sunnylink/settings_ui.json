@@ -2556,8 +2556,8 @@
                   "key": "NrdrExperimentalEngineBraking",
                   "widget": "toggle",
                   "title": "Experimental Engine Braking",
-                  "description": "Civic PCM only. On fades the PCM speed request toward zero over 3 seconds; Off still coasts within the allowance. Throttle recovers over 3 seconds. Braking and pedal overrides take priority.",
-                  "details": "Civic PCM without a gas interceptor only. Requires a nonzero Set-Speed Overshoot Allowance. Defaults on if unset; saved choices stay unchanged. Applies live. Actual engine braking depends on the car. Lead braking and other slowdown requests retain priority.",
+                  "description": "Fades into engine braking during free-cruise overshoot, then restores throttle over 3 seconds. Civic PCM only.",
+                  "details": "Off by default. Applies live; switching off clears the fade. Lead-car braking and pedal overrides take priority immediately. The fade shapes commands; actual engine braking depends on the car. Requires a nonzero Set-Speed Overshoot Allowance.",
                   "visibility": [
                     {
                       "type": "capability",
@@ -2587,7 +2587,7 @@
                   "key": "NrdrCruiseOverspeedAllowance",
                   "widget": "option",
                   "title": "Set-Speed Overshoot Allowance",
-                  "description": "Allows up to this much above set speed when no lower target applies. Lead braking and other slowdown requests retain priority.",
+                  "description": "Lets cruise match your current speed within this allowance above set speed unless a lower target applies.",
                   "details": "0 mph preserves stock behavior.",
                   "min": 0,
                   "max": 10,
