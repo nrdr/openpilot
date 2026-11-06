@@ -544,8 +544,8 @@ sections:
       - key: NrdrExperimentalEngineBraking
         widget: toggle
         title: Experimental Engine Braking
-        description: Fades into engine braking during free-cruise overshoot, then restores throttle over 3 seconds. Civic PCM only.
-        details: Defaults on for an eligible Civic PCM without a gas interceptor when no choice is saved. Existing On/Off choices are preserved. Applies live; switching off clears the fade. Lead-car braking and pedal overrides take priority immediately. The fade shapes commands; actual engine braking depends on the car. Requires a nonzero Set-Speed Overshoot Allowance.
+        description: Civic PCM only. On fades the PCM speed request toward zero over 3 seconds; Off still coasts within the allowance. Throttle recovers over 3 seconds. Braking and pedal overrides take priority.
+        details: Civic PCM without a gas interceptor only. Requires a nonzero Set-Speed Overshoot Allowance. Defaults on if unset; saved choices stay unchanged. Applies live. Actual engine braking depends on the car. Lead braking and other slowdown requests retain priority.
         visibility:
         - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
         - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}
@@ -555,7 +555,7 @@ sections:
       - key: NrdrCruiseOverspeedAllowance
         widget: option
         title: Set-Speed Overshoot Allowance
-        description: Lets cruise match your current speed within this allowance above set speed unless a lower target applies.
+        description: Allows up to this much above set speed when no lower target applies. Lead braking and other slowdown requests retain priority.
         details: 0 mph preserves stock behavior.
         min: 0
         max: 10
