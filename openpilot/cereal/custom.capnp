@@ -359,6 +359,7 @@ struct OnroadEventSP @0xda96579883444c35 {
     e2eChime @23;
     laneChangeRoadEdge @24;
     bigModelReady @25;
+    stockCmbsStatusChanged @26;
   }
 }
 
@@ -459,6 +460,16 @@ struct BackupManagerSP @0xf98d843bfd7004a3 {
 struct CarStateSP @0xb86e6369214c01c8 {
   speedLimit @0 :Float32;
   gasInterceptorState @1 :UInt8;
+  # Read-only, original camera-reported user setting, not AEB availability.
+  stockCmbsStatus @2 :StockCmbsStatus;
+  stockCmbsStatusMonoTime @3 :UInt64;
+  stockCmbsOffOrProblem @4 :Bool;
+
+  enum StockCmbsStatus {
+    unknown @0;
+    enabled @1;
+    disabled @2;
+  }
 }
 
 struct LiveMapDataSP @0xf416ec09499d9d19 {

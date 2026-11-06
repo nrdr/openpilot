@@ -24,6 +24,7 @@ from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_cap
 
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
 from openpilot.nrdr.params import HandcraftedLateralUnsafeStateError, consume_handcrafted_lateral_request
+from openpilot.nrdr.features.driver_policy.stock_cmbs import publish_stock_cmbs_status
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 
@@ -212,6 +213,8 @@ class Car:
     # Update carState from CAN
     CS, CS_SP = self.CI.update(can_list)
     CS_SP = convert_to_capnp(CS_SP)
+    if can_list:
+      publish_stock_cmbs_status(self.CI, CS_SP, can_list[-1][0])
 
     # Update radar tracks from CAN
     RD: structs.RadarDataT | None = self.RI.update(can_list)

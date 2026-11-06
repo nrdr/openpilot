@@ -3,6 +3,7 @@ import time
 from openpilot.cereal import log, custom
 from opendbc.car.structs import car
 from openpilot.nrdr.features.driver_policy.hud_submode import consume_button_press
+from openpilot.nrdr.features.driver_policy.stock_cmbs import StockCmbsAlerts
 from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
 
 
@@ -13,6 +14,13 @@ class NrdrSelfdrive:
   def __init__(self, CP=None):
     self.longitudinal_enabled = nrdr_longitudinal_enabled(CP)
     self.sla_button_reserved_until = 0.0
+    self.stock_cmbs_alerts = StockCmbsAlerts()
+
+  def update_stock_cmbs(self, CS, sm, events_sp) -> None:
+    state = sm['carStateSP']
+    valid = CS.canValid and sm.all_checks(['carStateSP'])
+    if self.stock_cmbs_alerts.update(str(state.stockCmbsStatus), state.stockCmbsStatusMonoTime, valid):
+      events_sp.add(custom.OnroadEventSP.EventName.stockCmbsStatusChanged)
 
   def reserve_distance_button(self, sla_state) -> bool:
     if not self.longitudinal_enabled:

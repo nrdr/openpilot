@@ -288,6 +288,7 @@ class SelfdriveD(CruiseHelper):
       self.events_sp.add_from_msg(self.sm['longitudinalPlanSP'].events)
 
     # Add car events, ignore if CAN isn't valid
+    self.nrdr.update_stock_cmbs(CS, self.sm, self.events_sp)
     if CS.canValid:
       car_events = filter_car_events(self.car_events.update(CS, self.CS_prev, self.sm['carControl']).to_msg())
       self.events.add_from_msg(car_events)

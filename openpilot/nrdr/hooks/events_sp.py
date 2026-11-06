@@ -1,7 +1,15 @@
 from openpilot.cereal import custom, log
 from opendbc.car.structs import car
 from openpilot.common.constants import CV
-from openpilot.sunnypilot.selfdrive.selfdrived.events_base import Alert, ET, Priority
+from openpilot.sunnypilot.selfdrive.selfdrived.events_base import Alert, ET, Priority, NormalPermanentAlert
+
+
+def stock_cmbs_status_alert(CP, CS, sm, metric, soft_disable_time, personality):
+  state = sm['carStateSP']
+  status = str(state.stockCmbsStatus)
+  text = f"Stock CMBS: {status.capitalize()}" if status in ("enabled", "disabled") else "Stock CMBS: Status Unknown"
+  detail = "Setting only; factory reports off/fault" if state.stockCmbsOffOrProblem else "Setting only; availability unverified"
+  return NormalPermanentAlert(text, detail, duration=3.)
 
 
 def speed_limit_pre_active_alert(CP, CS, sm, metric, soft_disable_time, personality):
@@ -22,6 +30,9 @@ def apply_events(events, event_name):
   alert_size = log.SelfdriveState.AlertSize
   visual_alert = car.CarControl.HUDControl.VisualAlert
   audible_alert = car.CarControl.HUDControl.AudibleAlert
+
+  # Informational only, also visible when cruise/lateral control is disengaged.
+  events[event_name.stockCmbsStatusChanged] = {ET.PERMANENT: stock_cmbs_status_alert}
 
   events[event_name.controlsMismatchLateral] = {
     ET.WARNING: Alert(
