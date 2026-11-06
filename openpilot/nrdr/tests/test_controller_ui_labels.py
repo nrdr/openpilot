@@ -118,6 +118,8 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertFalse(engine.get("needs_onroad_cycle", False))
     self.assertNotIn("Restart required", engine["details"])
     self.assertIn("Applies live", engine["details"])
+    self.assertIn("Defaults on for an eligible Civic PCM without a gas interceptor when no choice is saved", engine["details"])
+    self.assertIn("Existing On/Off choices are preserved", engine["details"])
     self.assertEqual(engine["visibility"], engine["enablement"])
     self.assertEqual(engine["enablement"], [
       {"type": "capability", "field": "nrdr_honda_pcm_tuning_available", "equals": True},

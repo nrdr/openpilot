@@ -545,7 +545,7 @@ sections:
         widget: toggle
         title: Experimental Engine Braking
         description: Fades into engine braking during free-cruise overshoot, then restores throttle over 3 seconds. Civic PCM only.
-        details: Off by default. Applies live; switching off clears the fade. Lead-car braking and pedal overrides take priority immediately. The fade shapes commands; actual engine braking depends on the car. Requires a nonzero Set-Speed Overshoot Allowance.
+        details: Defaults on for an eligible Civic PCM without a gas interceptor when no choice is saved. Existing On/Off choices are preserved. Applies live; switching off clears the fade. Lead-car braking and pedal overrides take priority immediately. The fade shapes commands; actual engine braking depends on the car. Requires a nonzero Set-Speed Overshoot Allowance.
         visibility:
         - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
         - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}

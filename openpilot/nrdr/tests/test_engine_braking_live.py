@@ -5,7 +5,8 @@ from types import SimpleNamespace as NS
 
 from opendbc.car.honda.engine_braking import EngineBrakeFade, fresh_context
 from opendbc.car.honda.values import CAR, HondaFlags
-from openpilot.nrdr.features.longitudinal.engine_braking import engine_brake_context
+from openpilot.nrdr.features.longitudinal.engine_braking import EngineBrakeSettingsReporter, engine_brake_context
+from opendbc.car.honda.civic_pcm import uses_civic_pcm
 from openpilot.nrdr.params import read_bool, read_float
 from openpilot.nrdr.params.snapshots import CONTROL_GROUPS, LIVE_LATERAL_KEYS, LiveParams, REFRESH_PERIOD
 from openpilot.nrdr.tests.test_engine_braking_context import Messages
@@ -28,6 +29,10 @@ def test_same_controls_instance_consumes_live_choice_and_resets_receiver_fade():
 
   class CountingSnapshot:
     count = 0
+    reports = []
+
+    def record_applied_settings(self, *args, **kwargs):
+      self.reports.append((args, kwargs))
 
     @property
     def snapshot(self):
@@ -47,12 +52,13 @@ def test_same_controls_instance_consumes_live_choice_and_resets_receiver_fade():
   env = {
     'custom': NS(CarControlSP=NS(new_message=lambda: NS(leadOne=NS(), leadTwo=NS(), mads=NS(), intelligentCruiseButtonManagement=NS()))),
     'pcm_reference': lambda *_: (False, 0., 0), 'engine_brake_context': engine_brake_context,
-    'read_bool': read_bool, 'read_float': read_float,
+    'read_bool': read_bool, 'read_float': read_float, 'uses_civic_pcm': uses_civic_pcm,
   }
   exec(compile(tree, str(path), 'exec'), env)
   counted = CountingSnapshot()
   controls = NS(CP=NS(carFingerprint=CAR.HONDA_CIVIC, openpilotLongitudinalControl=True, flags=HondaFlags.NIDEC),
-                CP_SP=NS(enableGasInterceptor=False, flags=0), nrdr_live_params=counted, get_lead_data=lambda *_: None)
+                CP_SP=NS(enableGasInterceptor=False, flags=0), nrdr_live_params=counted, get_lead_data=lambda *_: None,
+                engine_brake_settings_reporter=EngineBrakeSettingsReporter())
   sm = Messages()
   sm['selfdriveStateSP'] = NS(mads=NS(state=0, enabled=False, active=False, available=False),
                             intelligentCruiseButtonManagement=NS(state=0, sendButton=0, vTarget=0))
@@ -95,3 +101,5 @@ def test_same_controls_instance_consumes_live_choice_and_resets_receiver_fade():
   sm['radarState'].leadOne.present = True
   wire, output = frame(105)
   assert not wire.pcmEngineBrakeAllowed and output == (25., 100) and fade.weight == 0
+  assert [report[1]['configured_enabled'] for report in counted.reports] == [False, True, False, True]
+  assert all(report[1]['allowance_mph'] == 5 for report in counted.reports)

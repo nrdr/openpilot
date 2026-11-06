@@ -140,7 +140,7 @@ class LongitudinalTuningLayout(Widget):
       enabled=lambda: pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
                       and str(getattr(ui_state.CP, "carFingerprint", "")) == "HONDA_CIVIC",
       description=lambda: tr("Civic PCM only. Fades into free-cruise engine braking and back over 3 seconds. " +
-                             "Lead braking and pedal overrides take priority. Off by default; applies live."),
+                             "Lead braking and pedal overrides take priority. New choices default on; saved choices stay unchanged. Applies live."),
       callback=self._set_engine_braking,
     )
     self._cruise_overspeed_allowance = option_item_sp(

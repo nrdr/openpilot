@@ -140,7 +140,9 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("NrdrPersonalityAccelProfiles", ParamType.BOOL, PB, "0", ParamLifecycle.TOMBSTONE, ParamOwner.LONGITUDINAL),
   _added("NrdrCruiseMismatchCorrection", ParamType.FLOAT, PB, "100", owner=ParamOwner.LONGITUDINAL),
   _added("NrdrCruiseOverspeedAllowance", ParamType.INT, PB, "0", owner=ParamOwner.LONGITUDINAL),
-  _added("NrdrExperimentalEngineBraking", ParamType.BOOL, PB, "0", owner=ParamOwner.LONGITUDINAL),
+  # No global seed: card initializes an absent choice only after live Civic PCM
+  # admission. A saved Off (including an older default) must remain Off.
+  _added("NrdrExperimentalEngineBraking", ParamType.BOOL, PB, owner=ParamOwner.LONGITUDINAL),
   _added("NrdrStandstillGapExtra", ParamType.FLOAT, PB, "0.0", owner=ParamOwner.LONGITUDINAL),
   _added("HondaCenterScale", ParamType.FLOAT, PB, "0.0", owner=ParamOwner.HONDA),
   _added("HondaPidFriction", ParamType.FLOAT, PB, "0.0", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),
