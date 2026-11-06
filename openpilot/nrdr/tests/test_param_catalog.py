@@ -25,7 +25,7 @@ from specs import (
 )
 
 
-REGISTRY_METADATA_SHA256 = "e01e4b7ba68a283d0594d0593918f1b6794b3dd5fa59bc2f2c4f06d933fa3713"
+REGISTRY_METADATA_SHA256 = "c4433c55bdfe7c6216a6db1f14d5f447d8645d981ef098f8d834c366dec9efd2"
 
 
 class TestParamCatalog(unittest.TestCase):
@@ -35,6 +35,11 @@ class TestParamCatalog(unittest.TestCase):
     self.assertEqual(len(ADDED_PARAM_SPECS), 158)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
+    from openpilot.nrdr.params.generated import ALL_KEYS, ADDED_KEYS, OVERRIDDEN_KEYS
+    self.assertEqual(set(ALL_KEYS), set(PARAM_SPECS_BY_KEY))
+    self.assertEqual(set(ADDED_KEYS), {spec.key for spec in ADDED_PARAM_SPECS})
+    self.assertEqual(set(OVERRIDDEN_KEYS), {spec.key for spec in OVERRIDDEN_PARAM_SPECS})
+    self.assertFalse({"NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance"} & set(ALL_KEYS))
 
     metadata = "\n".join(f"{spec.action.value}|{spec.key}|{spec.cpp_attributes}" for spec in PARAM_SPECS) + "\n"
     self.assertEqual(sha256(metadata.encode()).hexdigest(), REGISTRY_METADATA_SHA256)

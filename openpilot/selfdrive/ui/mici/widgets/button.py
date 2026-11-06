@@ -8,6 +8,8 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import DO_ZOOM
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, TextAlignmentVertical
 from openpilot.common.filter_simple import BounceFilter
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.features.longitudinal.personality import write_personality
 
 if TYPE_CHECKING:
   from openpilot.common.params import Params
@@ -399,14 +401,22 @@ class GreyBigButton(BigButton):
     self._draw_content(self._rect.y)
 
 
-class BigMultiParamToggle(BigMultiToggle):
+class _ParamWritePolicy:
+  @property
+  def enabled(self) -> bool:
+    # Keep caller/hardware gates, and resolve the live mode even between frames.
+    return super().enabled and self._param_write_allowed()
+
+  def _param_write_allowed(self) -> bool:
+    return tuning_write_allowed(self._params, self._param)
+
+
+class BigMultiParamToggle(_ParamWritePolicy, BigMultiToggle):
   def __init__(self, text: str, param: str, options: list[str], toggle_callback: Callable | None = None,
                select_callback: Callable | None = None, *, description: str = "", description_icon: Union[rl.Texture, None] = None):
     assert Params is not None
+    self._param, self._params = param, Params()
     super().__init__(text, options, toggle_callback, select_callback, description=description, description_icon=description_icon)
-    self._param = param
-
-    self._params = Params()
     self._load_value()
 
   def _load_value(self):
@@ -414,23 +424,37 @@ class BigMultiParamToggle(BigMultiToggle):
     self.set_value(self._options[index])
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
+    if not self.enabled:
+      return
     super()._handle_mouse_release(mouse_pos)
+    if not self._param_write_allowed():
+      self._load_value()
+      return
     new_idx = self._options.index(self.value)
-    self._params.put(self._param, new_idx)
+    if self._param == "LongitudinalPersonality":
+      write_personality(self._params, new_idx)
+    else:
+      self._params.put(self._param, new_idx)
 
 
-class BigParamControl(BigToggle):
+class BigParamControl(_ParamWritePolicy, BigToggle):
   def __init__(self, text: str, param: str, toggle_callback: Callable | None = None, *, description: str = "",
                description_icon: Union[rl.Texture, None] = None, font_size: int | None = None):
     assert Params is not None
+    self._param, self._params = param, Params()
     super().__init__(text, "", toggle_callback=toggle_callback, font_size=font_size,
                      description=description, description_icon=description_icon)
     self.param = param
-    self.params = Params()
+    self.params = self._params
     self.set_checked(self.params.get_bool(self.param, False))
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
+    if not self.enabled:
+      return
     super()._handle_mouse_release(mouse_pos)
+    if not self._param_write_allowed():
+      self.refresh()
+      return
     self.params.put_bool(self.param, self._checked, block=True)
 
   def refresh(self):
@@ -438,17 +462,23 @@ class BigParamControl(BigToggle):
 
 
 # TODO: param control base class
-class BigCircleParamControl(BigCircleToggle):
+class BigCircleParamControl(_ParamWritePolicy, BigCircleToggle):
   def __init__(self, icon: rl.Texture, param: str, toggle_callback: Callable | None = None,
                icon_offset: tuple[int, int] = (0, 0), *, description: str = "", description_icon: Union[rl.Texture, None] = None, title: str = ""):
     assert Params is not None
+    self._param, self._params = param, Params()
     super().__init__(icon, toggle_callback, icon_offset=icon_offset, description=description, description_icon=description_icon, title=title)
     self._param = param
-    self.params = Params()
+    self.params = self._params
     self.set_checked(self.params.get_bool(self._param, False))
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
+    if not self.enabled:
+      return
     super()._handle_mouse_release(mouse_pos)
+    if not self._param_write_allowed():
+      self.refresh()
+      return
     self.params.put_bool(self._param, self._checked, block=True)
 
   def refresh(self):

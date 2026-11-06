@@ -14,6 +14,8 @@ V_CRUISE_MIN = 0
 V_CRUISE_MAX = 169
 V_CRUISE_UNSET = 255
 V_CRUISE_INITIAL = 0
+MVL_V_CRUISE_MAX = 145  # Pinned 376c44b; do not change non-MVL/global limits.
+MVL_V_CRUISE_INITIAL = 40
 IMPERIAL_INCREMENT = round(CV.MPH_TO_KPH, 1)  # round here to avoid rounding errors incrementing set speed
 
 ButtonEvent = car.CarState.ButtonEvent
@@ -38,14 +40,16 @@ class VCruiseHelper(VCruiseHelperSP):
     self.v_cruise_kph_last = 0
     self.button_timers = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0}
     self.button_change_states = {btn: {"standstill": False, "enabled": False} for btn in self.button_timers}
-    self.nrdr = NrdrCruise(CP)
+    self.nrdr = None if self.mvl_enabled else NrdrCruise(CP)
+    self.v_cruise_max = MVL_V_CRUISE_MAX if self.mvl_enabled else V_CRUISE_MAX
 
   @property
   def v_cruise_initialized(self):
     return self.v_cruise_kph != V_CRUISE_UNSET
 
   def update_v_cruise(self, CS, enabled, is_metric):
-    self.nrdr.begin_update(is_metric)
+    if self.nrdr is not None:
+      self.nrdr.begin_update(is_metric)
     self.v_cruise_kph_last = self.v_cruise_kph
 
     self.get_minimum_set_speed(is_metric)
@@ -110,13 +114,15 @@ class VCruiseHelper(VCruiseHelperSP):
     if not self.button_change_states[button_type]["enabled"]:
       return
 
-    if not self.nrdr.allow_speed_change():
-      return
-
-    honda_speed = self.nrdr.update_honda_imperial(self, CS, button_type, long_press, V_CRUISE_MAX)
-    if honda_speed is not None:
-      self.v_cruise_kph = honda_speed
-      self.v_cruise_cluster_kph = honda_speed
+    if self.nrdr is not None:
+      if not self.nrdr.allow_speed_change():
+        return
+      honda_speed = self.nrdr.update_honda_imperial(self, CS, button_type, long_press, V_CRUISE_MAX)
+      if honda_speed is not None:
+        self.v_cruise_kph = honda_speed
+        self.v_cruise_cluster_kph = honda_speed
+        return
+    elif self.update_speed_limit_assist_pre_active_confirmed(button_type):
       return
 
     long_press, v_cruise_delta = VCruiseHelperSP.update_v_cruise_delta(self, long_press, v_cruise_delta)
@@ -129,7 +135,7 @@ class VCruiseHelper(VCruiseHelperSP):
     if CS.gasPressed and button_type in (ButtonType.decelCruise, ButtonType.setCruise):
       self.v_cruise_kph = max(self.v_cruise_kph, CS.vEgo * CV.MS_TO_KPH)
 
-    self.v_cruise_kph = np.clip(round(self.v_cruise_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
+    self.v_cruise_kph = np.clip(round(self.v_cruise_kph, 1), self.v_cruise_min, self.v_cruise_max)
 
   def update_button_timers(self, CS, enabled):
     # increment timer for buttons still pressed
@@ -151,6 +157,13 @@ class VCruiseHelper(VCruiseHelperSP):
 
     if any(b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) for b in CS.buttonEvents) and self.v_cruise_initialized:
       self.v_cruise_kph = self.v_cruise_kph_last
+    elif getattr(self, "mvl_enabled", False):
+      # card.py passes an ExperimentalMode bool, NOT the donor's integer
+      # InitialCruiseSpeedKph (default 40). Ignore it; never reinterpret True
+      # as a requested speed. Restore the donor's checked-in default, including
+      # its 40 kph SET floor at standstill; engagement remains hardware-gated.
+      self.v_cruise_kph = int(round(np.clip(max(CS.vEgo * CV.MS_TO_KPH, MVL_V_CRUISE_INITIAL),
+                                          MVL_V_CRUISE_INITIAL, MVL_V_CRUISE_MAX)))
     else:
       # SET uses current speed in every driving mode. Experimental Mode must
       # not silently select a highway target on a residential street.

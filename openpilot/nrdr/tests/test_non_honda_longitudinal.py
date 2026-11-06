@@ -13,6 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 from typing import Literal
 from collections.abc import Callable
+from functools import lru_cache
 
 import numpy as np
 import pytest
@@ -24,6 +25,8 @@ from openpilot.selfdrive.modeld.constants import ModelConstants, index_function
 from openpilot.nrdr.features.driver_policy.dec import enforce_mode_dwell, slow_down_threshold
 from openpilot.nrdr.features.longitudinal import policy
 from openpilot.nrdr.features.longitudinal.longitudinal_mpc import apply_standstill_gap
+from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.mvl_econ import ECON_JERK_FACTOR, ECON_T_FOLLOW
+from openpilot.nrdr.tests.test_mvl_cruise import load_policy
 
 ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = Path(__file__).parent / "fixtures" / "longitudinal_baseline"
@@ -49,6 +52,9 @@ def definitions(path, env):
 
 
 def environment(**overrides):
+  # Run the actual qualified/latching predicate without importing native DBC
+  # bindings in this source-execution suite. Only the enum import is injected.
+  gate = load_policy({})
   env = {
     "np": np, "math": math, "os": os, "DT_CTRL": 0.01, "DT_MDL": 0.05, "CONTROL_N": 17,
     "ACCEL_MIN": -3.5, "ACCEL_MAX": 2.0, "CV": CV, "PIDController": PIDController,
@@ -61,8 +67,13 @@ def environment(**overrides):
     "time": NS(monotonic=lambda: 100.0), "Literal": Literal, "interp": np.interp,
     "enforce_mode_dwell": enforce_mode_dwell, "slow_down_threshold": slow_down_threshold,
     "nrdr_longitudinal_enabled": policy.nrdr_longitudinal_enabled,
+    "mvl_longitudinal_enabled": gate["mvl_longitudinal_enabled"],
+    "nrdr_custom_longitudinal_enabled": gate["nrdr_custom_longitudinal_enabled"],
     "longitudinal_personality": policy.longitudinal_personality,
     "NrdrLongControl": forbidden, "NrdrLongitudinalPlanner": forbidden, "NrdrLongitudinalMpc": forbidden,
+    "MvlLongitudinalPlanner": forbidden,
+    "ECON_JERK_FACTOR": ECON_JERK_FACTOR, "ECON_T_FOLLOW": ECON_T_FOLLOW,
+    "StockCmbsAlerts": lambda: object(),
     "apply_standstill_gap": apply_standstill_gap,
     "is_honda_bosch_a_radar": lambda _: False, "_LEAD_ACCEL_TAU": 1.5,
     "V_CRUISE_MAX": 145, "V_CRUISE_UNSET": 255,
@@ -77,7 +88,7 @@ def pair(relative, env):
 
 
 def cp(brand="toyota"):
-  return NS(brand=brand, carFingerprint="LEXUS_ES_TSS2", openpilotLongitudinalControl=True,
+  return NS(brand=brand, carFingerprint="LEXUS_ES_TSS2", openpilotLongitudinalControl=True, flags=0,
             stopAccel=-0.5, steerRatio=15.0, wheelbase=2.87, longitudinalActuatorDelay=0.3, radarUnavailable=False,
             longitudinalTuning=NS(kiBP=[0., 10., 30.], kiV=[1.2, 0.8, 0.5]))
 
@@ -365,29 +376,36 @@ def test_honda_mpc_retains_fourth_personality_and_fcw_authorization():
 
 
 @pytest.mark.parametrize('brand,enabled', [('honda', True), ('toyota', False), ('', False)])
-def test_native_tuning_controls_follow_vehicle_policy(brand, enabled):
+def test_native_tuning_controls_follow_vehicle_policy(brand, enabled, monkeypatch):
   widget = type('Widget', (), {'_update_state': lambda _: None})
-  state = NS(CP=cp(brand), CP_SP=None, is_offroad=lambda: True, params=NS(get_bool=lambda _: False))
+  state = NS(CP=cp(brand), CP_SP=None, is_offroad=lambda: True, params=NS(get_bool=lambda _: False, get=lambda _: None))
+  # Current UI callbacks use the real shared lock/admission policy. Its nested
+  # import sees the same production predicate with the native enum injected.
+  monkeypatch.setattr(policy, "mvl_longitudinal_enabled", load_policy({})["mvl_longitudinal_enabled"])
+  admission = definitions(ROOT / 'openpilot/nrdr/params/tuning_policy.py', {"lru_cache": lru_cache})
   module = definitions(ROOT / 'openpilot/nrdr/ui/settings/longitudinal_tuning.py', {"Widget": widget, "Callable": Callable,
                        "ui_state": state, "nrdr_longitudinal_enabled": policy.nrdr_longitudinal_enabled,
                        "gas_reset_available": lambda: enabled, "pcm_tuning_available": lambda *_: False,
+                       "live_gas_available": lambda *_: enabled,
+                       "tuning_write_allowed": admission["tuning_write_allowed"], "mvl_tuning_locked": admission["mvl_tuning_locked"],
                        "saved_pcm_mode": lambda _: 0, "saved_wind_brake": lambda _: True})
   layout = object.__new__(module['LongitudinalTuningLayout'])
   for band in ('aggressive', 'standard', 'relaxed', 'econ'):
     setattr(layout, '_long_pid_tune_scale_' + band, NS(set_visible=lambda _: None,
                                                     action_item=NS(set_enabled=lambda _: None)))
   values = []
-  layout._live_learning_gas = NS(action_item=NS(set_enabled=lambda value: values.append(('gas', value))))
+  gas_states = []
+  layout._live_learning_gas = NS(action_item=NS(set_enabled=lambda value: values.append(('gas', value)), set_state=gas_states.append))
   layout._reset_live_gas = NS(action_item=NS(set_enabled=lambda value: values.append(('reset', value))))
   layout._standstill_gap = NS(action_item=NS(set_enabled=lambda value: values.append(('gap', value))))
   layout._pcm_mode = NS(action_item=NS(set_enabled=lambda _: None, set_selected_button=lambda _: None))
   layout._wind_brake = NS(action_item=NS(set_enabled=lambda _: None, set_state=lambda _: None))
-  layout._engine_braking = NS(action_item=NS(set_enabled=lambda value: values.append(('engine_enabled', value)),
-                                            set_state=lambda value: values.append(('engine_state', value))))
   layout._tuning_items = [layout._live_learning_gas, NS(), NS(action_item=NS(set_enabled=lambda value: values.append(('tune', value))))]
   layout._update_state()
-  assert values == [('gas', enabled), ('tune', enabled), ('gas', enabled), ('reset', enabled),
-                    ('engine_enabled', False), ('engine_state', False), ('gap', enabled)]
+  assert values == [('gas', enabled), ('tune', enabled), ('gas', enabled), ('reset', enabled), ('gap', enabled)]
+  assert gas_states == [False]
+  # The retired engine-braking control is absent, not a disabled live widget.
+  assert not hasattr(layout, '_engine_braking')
 
 
 def test_generated_sunnylink_schema_gates_nrdr_panel_and_econ():

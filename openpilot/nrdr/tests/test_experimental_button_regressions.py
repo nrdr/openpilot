@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 
 import pytest
+from openpilot.nrdr.tests.test_mvl_cruise import MVL_FLAG, load_policy
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -118,17 +119,19 @@ class Button(IntEnum):
     return int(self)
 
 
-def button_stack(*, long_enabled=True, brand="honda", initial_mode=True):
-  params = RecordingParams({"ExperimentalMode": initial_mode})
+def button_stack(*, long_enabled=True, brand="honda", initial_mode=True, mvl=False, saved_mvl=False):
+  params = RecordingParams({"ExperimentalMode": initial_mode, "HondaLiveLearningGas": saved_mvl})
   namespace = {"ButtonType": Button, "Params": lambda: params, "structs": NS(CarParams=object),
                "DISTANCE_LONG_PRESS": 50, "EventNameSP": NS(experimentalModeSwitched="switched"),
                "consume_button_press": lambda _: True,
                "nrdr_longitudinal_enabled": lambda cp: cp.brand == "honda",
                "longitudinal_personality": lambda value, _: value,
                "log": NS(LongitudinalPersonality=NS(schema=NS(enumerants=dict.fromkeys(range(4)))))}
+  load_policy(namespace)
   load_definitions("openpilot/sunnypilot/selfdrive/car/cruise_helpers.py", {"CruiseHelper"}, namespace)
   load_definitions("openpilot/nrdr/hooks/selfdrived.py", {"NrdrSelfdrive"}, namespace)
-  helper = namespace["CruiseHelper"](NS(openpilotLongitudinalControl=long_enabled, brand=brand))
+  helper = namespace["CruiseHelper"](NS(openpilotLongitudinalControl=long_enabled, brand=brand,
+                                       flags=MVL_FLAG if mvl else 0))
   helper.personality = 1
   events = []
 
@@ -232,6 +235,32 @@ def test_stock_longitudinal_cannot_toggle_experimental_mode():
   assert not tick(False)
   assert not params.actions
   assert not events
+
+
+@pytest.mark.parametrize("saved_mvl", (False, True))
+@pytest.mark.parametrize("initial_mode", (False, True))
+def test_mvl_hold_never_writes_or_announces_experimental_mode(saved_mvl, initial_mode):
+  helper, params, events, tick = button_stack(mvl=True, saved_mvl=saved_mvl, initial_mode=initial_mode)
+  for _ in range(3):
+    hold(tick)
+    for _ in range(80):
+      tick()
+    tick(False)
+    params.values["HondaLiveLearningGas"] = not params.values["HondaLiveLearningGas"]
+  assert helper.mvl_enabled is True
+  assert params.get_bool("ExperimentalMode") is initial_mode
+  assert not helper.experimental_mode_switched
+  assert not events
+  assert not any(action[1] == "ExperimentalMode" for action in params.actions)
+
+
+@pytest.mark.parametrize("saved_mvl", (False, True))
+def test_unlatched_honda_hold_keeps_legacy_behavior_even_with_saved_choice(saved_mvl):
+  helper, params, events, tick = button_stack(mvl=False, saved_mvl=saved_mvl)
+  hold(tick)
+  assert helper.mvl_enabled is False
+  assert params.get_bool("ExperimentalMode") is False
+  assert events == ["switched"]
 
 
 def test_selfdrived_always_passes_reservation_to_button_tracker():

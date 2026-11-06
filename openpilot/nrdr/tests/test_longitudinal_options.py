@@ -60,7 +60,6 @@ from openpilot.nrdr.features.longitudinal.longitudinal_planner import (
   C3_ACCEL_PROFILE_NORMAL,
   C3_ACCEL_PROFILE_SPORT,
   NrdrLongitudinalPlanner,
-  apply_cruise_overspeed_allowance,
   c3_personality_accel_max,
 )
 
@@ -254,8 +253,13 @@ def test_on_device_longitudinal_items_follow_toggle_then_option_order():
       continue
     if node.value.func.id not in ("toggle_item_sp", "option_item_sp"):
       continue
-    param = next(keyword.value.value for keyword in node.value.keywords
-                 if keyword.arg == "param" and isinstance(keyword.value, ast.Constant))
+    param = next((keyword.value.value for keyword in node.value.keywords
+                  if keyword.arg == "param" and isinstance(keyword.value, ast.Constant)), None)
+    if node.targets[0].attr == "_live_learning_gas":
+      assert param is None  # Explicit callback enforces parked/restart semantics.
+      param = "HondaLiveLearningGas"
+    if param is None:
+      continue
     widgets_by_attribute[node.targets[0].attr] = (param, node.value.func.id.removesuffix("_item_sp"))
 
   returned = next(node for node in initialize.body if isinstance(node, ast.Return))
@@ -634,22 +638,8 @@ def test_e2e_cruise_path_ignores_personality_max_override():
   )
 
 
-def test_zero_overspeed_allowance_is_exact_noop():
-  assert apply_cruise_overspeed_allowance(20.0, 20.0, 20.0, 22.0, 0.2, 0.0) == 20.0
-
-
-def test_lower_selected_target_blocks_overspeed_allowance():
-  assert apply_cruise_overspeed_allowance(18.0, 18.0, 20.0, 22.0, 0.2, 2.0) == 18.0
-
-
-@pytest.mark.parametrize(("accel", "expected"), ((0.2, 22.0), (-0.2, 22.0)))
-def test_overspeed_allowance_follows_vehicle_without_braking_bias(accel, expected):
-  assert apply_cruise_overspeed_allowance(20.0, 20.0, 20.0, 22.0, accel, 5.0) == pytest.approx(expected)
-
-
-def test_overspeed_allowance_is_capped_from_raw_set_speed():
-  assert apply_cruise_overspeed_allowance(20.0, 20.0, 20.0, 24.0, 0.2, 1.0) == 21.0
-
-
-def test_overspeed_allowance_never_reduces_existing_target():
-  assert apply_cruise_overspeed_allowance(22.0, 20.0, 20.0, 23.0, 0.2, 1.0) == 22.0
+def test_retired_overspeed_allowance_has_no_callable_or_snapshot_reader():
+  assert not hasattr(longitudinal_planner_module, "apply_cruise_overspeed_allowance")
+  source = Path(longitudinal_planner_module.__file__).read_text(encoding="utf-8")
+  assert "NRDR_CRUISE_OVERSPEED_ALLOWANCE" not in source
+  assert "cruise_overspeed_allowance" not in source

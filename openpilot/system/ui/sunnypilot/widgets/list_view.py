@@ -41,6 +41,10 @@ class ToggleActionSP(ToggleAction):
     ToggleAction.__init__(self, initial_state, width, enabled, callback)
     self.toggle = ToggleSP(initial_state=initial_state, callback=callback, param=param)
 
+  @property
+  def enabled(self):
+    return super().enabled and tuning_write_allowed(self.toggle.params, self.toggle.param_key)
+
 
 class ButtonSP(Button):
   def _update_state(self):
@@ -140,6 +144,10 @@ class MultipleButtonActionSP(MultipleButtonAction):
   def set_enabled_buttons(self, indices: set[int] | None):
     self.enabled_buttons = indices
 
+  @property
+  def enabled(self):
+    return super().enabled and tuning_write_allowed(self.params, self.param_key)
+
   def _render(self, rect: rl.Rectangle):
 
     allowed = self.enabled and tuning_write_allowed(self.params, self.param_key)
@@ -203,6 +211,9 @@ class MultipleButtonActionSP(MultipleButtonAction):
           self.callback(i)
 
     if self.param_key:
+      if not tuning_write_allowed(self.params, self.param_key):
+        self.selected_button = int(self.params.get(self.param_key, return_default=True))
+        return
       self.params.put(self.param_key, self.selected_button)
 
 

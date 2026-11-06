@@ -1,6 +1,7 @@
 import time
 import pyray as rl
 from openpilot.common.params import Params
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
@@ -46,7 +47,7 @@ class ExpButton(Widget):
     center_x = int(self._rect.x + self._rect.width // 2)
     center_y = int(self._rect.y + self._rect.height // 2)
 
-    self._white_color.a = 180 if self.is_pressed or not self._engageable else 255
+    self._white_color.a = 100 if not self._is_toggle_allowed() else 180 if self.is_pressed or not self._engageable else 255
 
     texture = self._txt_exp if self._held_or_actual_mode() else self._txt_wheel
     rl.draw_circle(center_x, center_y, self._rect.width / 2, self._black_bg)
@@ -67,4 +68,4 @@ class ExpButton(Widget):
       return False
 
     # Mirror exp mode toggle using persistent car params
-    return ui_state.has_longitudinal_control
+    return ui_state.has_longitudinal_control and tuning_write_allowed(self._params, "ExperimentalMode", CP=ui_state.CP)

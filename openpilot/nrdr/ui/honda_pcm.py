@@ -3,6 +3,25 @@ from opendbc.car.honda.values import CAR, HONDA_BOSCH
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+
+
+def live_gas_available(CP, CP_SP, params) -> bool:
+  present, fingerprint, brand = get_selected_car_identity(params)
+  identity = confirmed_vehicle_identity(CP, fingerprint, brand, selection_present=present)
+  return bool(identity is not None and identity[1] == "honda" and identity[0] in CAR
+              and getattr(CP, "openpilotLongitudinalControl", False)
+              and CP_SP is not None
+              and not (getattr(CP_SP, "flags", 0) & HondaFlagsSP.STOCK_LONGITUDINAL))
+
+
+def save_live_gas_choice(state, value) -> bool:
+  if (type(value) is not bool or not state.is_offroad()
+      or not live_gas_available(state.CP, state.CP_SP, state.params)):
+    return False
+  state.params.put_bool("HondaLiveLearningGas", value, block=True)
+  state.params.put_bool("OnroadCycleRequested", True)
+  return True
 
 
 def pcm_tuning_available(CP, CP_SP, params) -> bool:
@@ -27,14 +46,8 @@ def saved_wind_brake(params) -> bool:
 
 
 def save_pcm_choice(state, key: str, value) -> bool:
-  if not pcm_tuning_available(state.CP, state.CP_SP, state.params):
-    return False
-  if key == "NrdrExperimentalEngineBraking":
-    if type(value) is not bool or state.CP.carFingerprint != CAR.HONDA_CIVIC:
-      return False
-    state.params.put_bool(key, value, block=True)
-    return True  # Consumed by the live controlsd snapshot, not a startup latch.
-  if not state.is_offroad():
+  if (not pcm_tuning_available(state.CP, state.CP_SP, state.params) or not state.is_offroad()
+      or not tuning_write_allowed(state.params, key, CP=state.CP)):
     return False
   if key == "NrdrHondaPcmMode" and type(value) is int and value in (0, 1, 2):
     state.params.put(key, value, block=True)

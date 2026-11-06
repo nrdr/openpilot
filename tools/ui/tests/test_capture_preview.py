@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 
 from tools.ui import capture_preview as preview
 from tools.ui.preview_scenarios import (
-  MICI_LONGITUDINAL_INDEX, READ_ONLY_KEYS, TELEMETRY_SERVICES, build_preview_script, focus_item, open_read_only_selector,
+  MICI_LONGITUDINAL_INDEX, READ_ONLY_KEYS, TELEMETRY_SERVICES, build_preview_script, focus_item,
   send_developer_telemetry, setup_vehicle_fixture,
 )
 
@@ -38,12 +38,16 @@ class TestPreview(unittest.TestCase):
     structs_module.car = Mock()
     cereal_module = ModuleType("openpilot.cereal")
     cereal_module.custom = Mock()
+    honda_module = ModuleType("opendbc.car.honda.values")
+    honda_module.HondaFlags = SimpleNamespace(MVL_LONGITUDINAL=131072, NIDEC=32)
     with patch.dict(sys.modules, {"openpilot.common.params": params_module, "opendbc.car.structs": structs_module,
-                                 "openpilot.cereal": cereal_module}):
+                                 "openpilot.cereal": cereal_module, "opendbc.car.honda.values": honda_module}):
       setup_vehicle_fixture()
     params.put_bool.assert_any_call("NrdrFirstRunSetupDone", True, block=True)
     params.put_bool.assert_any_call("NrdrSuggestedSettings", False, block=True)
     params.put_bool.assert_any_call("AccelBoostSP", False, block=True)
+    params.put_bool.assert_any_call("HondaLiveLearningGas", True, block=True)
+    self.assertEqual(structs_module.car.CarParams.call_args.kwargs["flags"], 131072 | 32)
     params.put.assert_any_call("DevUIInfo", 0, block=True)
     self.assertFalse(any(call.args[0].startswith("Osm") for call in params.method_calls))
 
@@ -202,31 +206,17 @@ class TestPreview(unittest.TestCase):
     for device, names in preview.SCENARIOS.items():
       self.assertEqual(len(names), len(set(names)))
       self.assertLessEqual(len(names), 20)
-      self.assertTrue({"engine-braking", "overshoot"} <= set(names))
+      self.assertTrue({"longitudinal-pcm", "longitudinal-learning"} <= set(names))
+      self.assertFalse({"engine-braking", "overshoot", "overshoot-selector"} & set(names))
       self.assertTrue({"onroad-personality", "onroad-lane-centering", "onroad-dm"} <= set(names))
       self.assertTrue({"accel-boost", "onroad-accel-boost", "onroad-developer"} <= set(names))
       self.assertIn("advanced-dm", preview.UNSUPPORTED[device])
 
-  def test_new_compact_controls_follow_unchanged_first_five(self):
+  def test_compact_controls_retain_native_indices(self):
     self.assertEqual(MICI_LONGITUDINAL_INDEX["longitudinal-pcm"], 2)
     self.assertEqual(MICI_LONGITUDINAL_INDEX["longitudinal-learning"], 0)
-    self.assertEqual(MICI_LONGITUDINAL_INDEX["engine-braking"], 5)
-    self.assertEqual(MICI_LONGITUDINAL_INDEX["overshoot"], 6)
-    self.assertEqual(MICI_LONGITUDINAL_INDEX["overshoot-selector"], 6)
-    self.assertIn("overshoot-selector", preview.SCENARIOS["mici"])
-
-  def test_selector_opens_without_selecting_or_changing_params(self):
-    values = dict(zip(READ_ONLY_KEYS, (False, 0, False), strict=True))
-    params = SimpleNamespace(get=values.get)
-    selector = SimpleNamespace(select=Mock())
-    gui = SimpleNamespace(_nav_stack=[object()])
-    control = SimpleNamespace(enabled=True, _click_callback=lambda: gui._nav_stack.append(selector))
-    self.assertIs(open_read_only_selector(control, gui, params), selector)
-    selector.select.assert_not_called()
-    self.assertEqual(values, dict(zip(READ_ONLY_KEYS, (False, 0, False), strict=True)))
-    control._click_callback = lambda: values.update(NrdrCruiseOverspeedAllowance=1)
-    with self.assertRaisesRegex(AssertionError, "changed tuning params"):
-      open_read_only_selector(control, gui, params)
+    self.assertEqual(set(MICI_LONGITUDINAL_INDEX), {"longitudinal-pcm", "longitudinal-learning"})
+    self.assertEqual(READ_ONLY_KEYS, ("HondaLiveLearningGas", "NrdrHondaPcmMode", "NrdrHondaWindBrake", "AccelBoostSP"))
 
   def test_focus_scrolls_actual_container_and_rejects_hidden_controls(self):
     item = SimpleNamespace(is_visible=True, rect=SimpleNamespace(x=800, y=600, width=200))
@@ -281,7 +271,7 @@ class TestPreview(unittest.TestCase):
       names = [event.setup.__defaults__[0] for _, event in entries
                if event.setup is not None and "checkpoint" in getattr(event.setup, "__code__", SimpleNamespace(co_freevars=())).co_freevars]
       self.assertEqual(names, list(preview.SCENARIOS[device]))
-      self.assertEqual(markers["end_frame"], 1581 if device == "tici" else 1459)
+      self.assertEqual(markers["end_frame"], 1520 if device == "tici" else 1276)
       self.assertLessEqual(entries[-1][0], 30 * 60)
       self.assertEqual([frame for frame, _ in entries], sorted(frame for frame, _ in entries))
       self.assertEqual(markers["unsupported"], preview.UNSUPPORTED[device])

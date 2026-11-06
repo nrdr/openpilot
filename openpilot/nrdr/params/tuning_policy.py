@@ -1,4 +1,13 @@
-"""Shared native/remote tuning admission rules. No vehicle actuation or I/O."""
+"""Shared native/remote tuning admission rules. Never an actuation authority."""
+
+from functools import lru_cache
+
+MVL_DESCRIPTION = (
+  "Selects full MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. " +
+  "MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. " +
+  "Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Conflicting tuning is locked, not erased. " +
+  "Change while parked; restart required."
+)
 
 SUGGESTED_DESCRIPTION = (
   "Use the November 5 lateral setup: Sunny and matched Firmware Controller/steer ratio where supported. " +
@@ -11,11 +20,20 @@ PIF_KEYS = frozenset(
                "NrdrLatStiction", "NrdrDeviceYawCorrection", "NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate"))
 LONG_SCALE_KEYS = frozenset(("LongPidTuneScale", "LongPidTuneScaleAggressive", "LongPidTuneScaleStandard",
                             "LongPidTuneScaleRelaxed", "LongPidTuneScaleEcon"))
+MVL_LOCK_KEYS = LONG_SCALE_KEYS | frozenset((
+  "NrdrHondaPcmMode", "NrdrHondaWindBrake", "StaticFeedforwardLong", "NrdrRoenAccelerationLimits",
+  "NrdrHondaFullBrakeAuthority", "HondaStoppingDecelRate", "HondaStopAccel", "HondaStoppingDecelRateLong",
+  "HondaVEgoStarting", "HondaVEgoStopping", "NrdrStandstillGapExtra", "NrdrCruiseMismatchCorrection",
+  "AccelBoostSP", "SmartCruiseControlVision", "SmartCruiseControlMap", "SpeedLimitMode",
+  "SpeedLimitPolicy", "SpeedLimitOffsetType", "SpeedLimitValueOffset", "ExperimentalMode", "DynamicExperimentalControl",
+  "CustomAccIncrementsEnabled", "CustomAccShortPressIncrement", "CustomAccLongPressIncrement",
+))
 YAW_FIXED_KEYS = PIF_KEYS | frozenset((
   "HondaTorqueLowPassFilter",
   "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",
 ))
 RETIRED_TUNING_KEYS = frozenset((
+  "NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance",
   "NrdrYawDelaySchedule",
   "NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed",
   "NrdrStarPilotPid", "NrdrIncreaseOverrideTolerance", "NeuralNetworkLateralControl",
@@ -39,12 +57,48 @@ def _enabled(params, key: str) -> bool:
   return str(value).strip().lower() in ("true", "1", "b'1'", "b'true'")
 
 
-def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedule: bool = False) -> bool:
+@lru_cache(maxsize=4)
+def _stored_mvl_context(raw: bytes) -> tuple[bool, bool]:
+  from opendbc.car.structs import car
+  from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
+
+  with car.CarParams.from_bytes(raw) as cp:
+    return mvl_longitudinal_enabled(cp), mvl_tuning_exempt(cp)
+
+
+def mvl_tuning_exempt(CP) -> bool:
+  """A known other vehicle/stock ACC must not inherit a saved Honda-mode lock."""
+  brand = str(getattr(CP, "brand", "")).lower()
+  return bool(brand and (brand != "honda" or not getattr(CP, "openpilotLongitudinalControl", False)))
+
+
+def mvl_tuning_locked(params, CP=None) -> bool:
+  """Saved ON or the boot-latched running mode keeps conflicting writes locked.
+
+  Param-only widget callers use current CarParams, then its offroad persistent
+  copy. A corrupt existing CP fails closed; no CP yet does not invent a mode.
+  """
+  from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
+
+  saved = _enabled(params, "HondaLiveLearningGas")
+  if CP is not None and getattr(CP, "brand", ""):
+    return mvl_longitudinal_enabled(CP) or (saved and not mvl_tuning_exempt(CP))
+  try:
+    raw = params.get("CarParams") or params.get("CarParamsPersistent")
+    if raw:
+      active, exempt = _stored_mvl_context(raw)
+      return active or (saved and not exempt)
+    return saved
+  except Exception:
+    return True
+
+
+def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedule: bool = False, CP=None) -> bool:
   if not key:
     return True
   if key in RETIRED_TUNING_KEYS or key.startswith("NrdrNnlc"):
     return False
-  if key in LONG_SCALE_KEYS and _enabled(params, "HondaLiveLearningGas"):
+  if key in MVL_LOCK_KEYS and mvl_tuning_locked(params, CP):
     return False
   if _enabled(params, "NrdrSuggestedSettings") or _enabled(params, "NrdrHandcraftedLateralTune"):
     if key in SUGGESTED_LOCK_KEYS or key.startswith(("NrdrSteerRatio", "LaneCenter", "NrdrLatRateDamping")):
@@ -58,7 +112,9 @@ def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedul
 
 
 def reset_learning_scales(params) -> None:
-  """Called by both settings writers; runtime independently forces unity too."""
-  if _enabled(params, "HondaLiveLearningGas"):
-    for key in sorted(LONG_SCALE_KEYS):
-      params.put(key, 100, block=True)
+  """Compatibility hook: full MVL ignores custom scales without erasing them.
+
+  Older generic UI/defaults callers still invoke this hook. Runtime ownership
+  replaces the old learner-only unity reset; returning to custom mode restores
+  the user's existing saved tune after restart.
+  """

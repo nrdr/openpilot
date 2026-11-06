@@ -435,10 +435,12 @@ sections:
       - key: HondaLiveLearningGas
         widget: toggle
         title: Live Learning Gas
-        description: Learns gas and wind compensation. Frozen in ECU-Matched and Civic Experimental. When ON, longitudinal PID scales stay at 100%.
-        details: Learns gas demand and estimated drag while driving. ECU-Matched and Civic Experimental freeze learning. Saved values appear here when the device supplies its settings. Training time is not recorded. Reset Live Learning Gas clears saved gas and wind learning, not speed or brake learning.
+        description: Selects full MVL longitudinal control; applies after restart.
+        details: ON selects full MVL gas, braking and Aggressive/Standard/Relaxed personalities, including following distances, on Honda Nidec PCM, Bosch and gas-interceptor openpilot longitudinal paths. Only Econ keeps nrdr's fixed longer-following and gentler acceleration/jerk defaults; a custom tune file does not change these MVL profiles. Saved ON is not proof that MVL is active yet. Conflicting settings stay locked while ON is saved or the running controller is MVL, including after saving OFF until restart. Their saved custom values are kept. Reset clears gas/wind learning only. Existing OFF choices are preserved; new Honda setups default ON.
+        needs_onroad_cycle: true
         enablement:
         - $ref: '#/macros/offroad'
+        - {type: capability, field: nrdr_honda_mvl_selection_available, equals: true}
       - key: NrdrResetLiveGas
         widget: toggle
         title: Reset Live Learning Gas
@@ -489,12 +491,12 @@ sections:
         widget: toggle
         title: Full Nidec Brake Authority
         description: Allows the full brake-command range on supported cars with a gas interceptor.
-        details: Enabled by default. Disable to retain the upstream brake-command headroom. This setting operates independently of Live Learning Gas.
+        details: Enabled by default. Disable to retain the upstream brake-command headroom. Unavailable while MVL longitudinal is selected or active.
       - key: NrdrRoenAccelerationLimits
         widget: toggle
         title: Roen Nidec Acceleration Limits
         description: Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.
-        details: Disabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. This operates independently of Live Learning Gas.
+        details: Disabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. Unavailable while MVL longitudinal is selected or active.
       - key: HondaBoschARadar
         widget: toggle
         title: Honda Bosch-A Radar (experimental)
@@ -541,26 +543,6 @@ sections:
         max: 500
         step: 5
         unit: '%'
-      - key: NrdrExperimentalEngineBraking
-        widget: toggle
-        title: Experimental Engine Braking
-        description: Fades into engine braking during free-cruise overshoot, then restores throttle over 3 seconds. Civic PCM only.
-        details: Off by default. Applies live; switching off clears the fade. Lead-car braking and pedal overrides take priority immediately. The fade shapes commands; actual engine braking depends on the car. Requires a nonzero Set-Speed Overshoot Allowance.
-        visibility:
-        - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
-        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}
-        enablement:
-        - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
-        - {type: capability, field: car_fingerprint, equals: HONDA_CIVIC}
-      - key: NrdrCruiseOverspeedAllowance
-        widget: option
-        title: Set-Speed Overshoot Allowance
-        description: Lets cruise match your current speed within this allowance above set speed unless a lower target applies.
-        details: 0 mph preserves stock behavior.
-        min: 0
-        max: 10
-        step: 1
-        unit: mph
       - key: NrdrCruiseMismatchCorrection
         widget: option
         title: Cruise Mismatch Correction

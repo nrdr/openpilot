@@ -22,8 +22,8 @@ route downloads, deployment, or publishing are involved.
 
 | Device | UI identity / layout | Native render size | Captures |
 | --- | --- | --- | --- |
-| C3X | `tici` / big `MainLayout` | 2160 × 1080 | 20 views, listed below |
-| C4 | `mici` / `MiciMainLayout` | 536 × 240 | 18 views, listed below |
+| C3X | `tici` / big `MainLayout` | 2160 × 1080 | 19 views, listed below |
+| C4 | `mici` / `MiciMainLayout` | 536 × 240 | 15 views, listed below |
 
 These are **real rendered UI pixels with synthetic replay messages**, not device
 screenshots or driving validation. Onroad has no camera feed or model output;
@@ -40,7 +40,7 @@ scrolled to the requested control. No widget is reparented, rescaled, or invente
 | Offroad home and settings | Home + nrdr hub | Home + settings carousel |
 | nrdr lateral | `LateralTuningLayout` hub | **Unsupported:** no wired mici lateral hub |
 | nrdr longitudinal | `LongitudinalTuningLayout`, plus PCM row | Device's existing `PcmModeControl` and `LiveGasControl`; **not** the full panel |
-| Engine braking / overshoot | Existing engine-braking toggle and overshoot row | Sixth/seventh Device controls; also opens the real overshoot selector without selecting a value |
+| MVL baseline | Live Learning Gas and locked custom PCM tuning | Existing LiveGas and PCM controls, with the same MVL lock |
 | Steer ratio (SR) | `SteerRatioTuningLayout` | **Unsupported:** no native mici SR menu |
 | Override | `OverrideTuningLayout` | **Unsupported:** no native mici override menu |
 | Lane centering | Existing lateral subpanel | Existing Toggles lane-centering panel |
@@ -57,7 +57,7 @@ EPS firmware capability and physical displays are not captured or validated.
 The gallery and manifest repeat these gaps even when a capture job fails.
 
 The isolated fixture identifies a synthetic Honda Civic/Nidec, enables the
-openpilot-longitudinal capability, and reports no gas interceptor or EPS firmware.
+openpilot-longitudinal capability and startup MVL mode, and reports no gas interceptor or EPS firmware.
 This exposes the existing Honda-gated menus without bypassing their gates; options
 requiring firmware or actual vehicle data remain unavailable. It seeds Star lane
 centering and unlocks suggested/handcrafted tuning only in temporary preview Params.
@@ -71,8 +71,8 @@ engaged display messages: 3.5-degree actual steering, 4-degree desired steering,
 centering active. These are display fixtures, not computed control outputs.
 No special floating tuning menu
 exists in this checkout: the onroad settings views use the same real settings tree.
-Engine-braking, overshoot and acceleration-boost values are checked unchanged at every checkpoint;
-the compact selector is opened through the existing control's registered callback.
+MVL selection, PCM shaping, wind-brake and acceleration-boost values are checked unchanged at every checkpoint.
+The retired engine-braking and overshoot controls are not captured.
 The first five compact longitudinal-control indices are unchanged.
 
 ## Local capture (Linux PC / WSL2 Ubuntu 24.04)
@@ -108,7 +108,7 @@ Prime account polling is disabled for the test dongle; no real account is used.
 
 The short script opens real settings widgets, checks ignition/nav-stack/viewport
 state, and gives C4's actual delayed onroad transition time to finish. It records
-under 30 seconds at 60 FPS per device (26.4s tici / about 24.4s mici). The default
+under 30 seconds at 60 FPS per device (25.4s tici / about 21.3s mici). The default
 replay wall-time limit is 180 seconds per device (`--timeout 1..600`); probing is
 capped at 60 seconds and a single batched extraction at 120 seconds. Adding menus
 does not add repeated full video decodes. Timeout terminates the worker and its

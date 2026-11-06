@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.common.time_helpers import system_time_valid
 from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigToggle, BigParamControl, BigCircleParamControl, GreyBigButton
@@ -180,7 +181,8 @@ class DeveloperLayoutMici(NavScroller):
 
   def _on_lat_maneuver_mode(self, state: bool):
     ui_state.params.put_bool("LateralManeuverMode", state, block=True)
-    ui_state.params.put_bool("ExperimentalMode", False, block=True)
+    if tuning_write_allowed(ui_state.params, "ExperimentalMode", CP=ui_state.CP):
+      ui_state.params.put_bool("ExperimentalMode", False, block=True)
     ui_state.params.put_bool("JoystickDebugMode", False, block=True)
     self._joystick_toggle.set_checked(False)
     ui_state.params.put_bool("LongitudinalManeuverMode", False, block=True)

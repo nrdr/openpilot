@@ -39,7 +39,8 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
         return inner_self.offroad
 
       def get(inner_self, key):
-        assert key in ("ParamsVersion", "NrdrSuggestedSettings", "NrdrHandcraftedLateralTune", "NrdrLateralController")
+        assert key in ("ParamsVersion", "NrdrSuggestedSettings", "NrdrHandcraftedLateralTune", "NrdrLateralController",
+                       "HondaLiveLearningGas", "CarParams", "CarParamsPersistent")
         return None
 
       def put(inner_self, key, value, block=False):
@@ -172,7 +173,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     assert self.saved_params == [(key, value, False) for key, value in values.items()]
 
-  def test_saveParams_allows_complete_interpolated_torque_snapshot_onroad(self):
+  def test_saveParams_rejects_retired_interpolated_torque_snapshot_onroad(self):
     self.fake_params.offroad = False
 
     values = {
@@ -186,9 +187,9 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
     }
     sunnylinkd.saveParams(values)
 
-    assert self.saved_params == [(key, value, False) for key, value in values.items()]
+    assert self.saved_params == [("SpeedLimitOffset", "10", False)]
 
-  def test_saveParams_allows_complete_interpolated_torque_snapshot_offroad(self):
+  def test_saveParams_rejects_retired_interpolated_torque_snapshot_offroad(self):
     values = {
       "NrdrInterpolatedTorquePifBlend": "1",
       "NrdrInterpolatedTorqueShare": "60",
@@ -200,7 +201,7 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
 
     sunnylinkd.saveParams(values)
 
-    assert self.saved_params == [(key, value, False) for key, value in values.items()]
+    assert self.saved_params == []
 
   def test_live_lateral_write_policy_allows_onroad_saves(self):
     for key in (
@@ -218,14 +219,16 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       assert allow_param_write(key, onroad=False, honda_tuning_available=True)
 
   def test_honda_tuning_cohort_is_fail_closed_for_every_remote_write(self):
-    assert len(HONDA_TUNING_WRITE_KEYS) == 58
-    assert {
+    assert len(HONDA_TUNING_WRITE_KEYS) == 45
+    assert {"NrdrLateralController", "NrdrDeviceYawCorrection", "NrdrOptimizedLaneChanges"} <= HONDA_TUNING_WRITE_KEYS
+    assert not {
       "NrdrLaneChangeEntrySrReduction", "NrdrLaneChangeEntryReturnTime",
       "NrdrLaneChangeTorqueFactor", "NrdrLaneChangeFrictionPercent",
-    } <= HONDA_TUNING_WRITE_KEYS
+    } & HONDA_TUNING_WRITE_KEYS
     for key in HONDA_TUNING_WRITE_KEYS:
-      assert allow_param_write(key, onroad=False, honda_tuning_available=True)
-      assert allow_param_write(key, onroad=True, honda_tuning_available=True)
+      assert allow_param_write(key, onroad=False, honda_tuning_available=True, device_yaw_correction_available=True)
+      assert allow_param_write(key, onroad=True, honda_tuning_available=True, device_yaw_correction_available=True) == (
+        key not in ONROAD_WRITE_BLOCKLIST)
       assert not allow_param_write(key, onroad=False, honda_tuning_available=False)
       assert not allow_param_write(key, onroad=False, honda_tuning_available=None)
 
@@ -234,9 +237,15 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "has_handcrafted_lateral_profile": False,
       "nrdr_honda_tuning_available": False,
     }
-    values = dict.fromkeys(HONDA_TUNING_WRITE_KEYS, "unchanged")
+    values = dict.fromkeys(HONDA_TUNING_WRITE_KEYS, remote_value("0"))
     values["SpeedLimitOffset"] = "10"
 
+    # Explicit controller selection rejects the whole batch before any write,
+    # even for a valid encoded choice on the wrong vehicle.
+    with self.assertRaises(ValueError):
+      sunnylinkd.saveParams(values)
+    assert not self.saved_params
+    values.pop("NrdrLateralController")
     sunnylinkd.saveParams(values)
 
     assert self.saved_params == [("SpeedLimitOffset", "10", False)]
@@ -251,12 +260,12 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
       "NrdrDriverMonitoringReminderPercent",
     ))
 
-  def test_saveParams_allows_live_engine_braking_without_requesting_restart(self):
+  def test_saveParams_rejects_removed_longitudinal_settings(self):
     self.fake_params.offroad = False
-    for value in ("1", "0"):
-      encoded = remote_value(value)
-      sunnylinkd.saveParams({"NrdrExperimentalEngineBraking": encoded})
-      assert self.saved_params[-1] == ("NrdrExperimentalEngineBraking", encoded, False)
+    for key in ("NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance"):
+      with self.assertRaises(ValueError):
+        sunnylinkd.saveParams({key: remote_value("1")})
+    assert not self.saved_params
     assert all(key != "OnroadCycleRequested" for key, _, _ in self.params_writes)
 
   def test_stopped_gap_requires_offroad_write(self):

@@ -18,6 +18,8 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP
 from openpilot.nrdr.features.longitudinal.longitudinal_planner import NrdrLongitudinalPlanner
 from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
+from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
+from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.mvl_planner import MvlLongitudinalPlanner
 from openpilot.nrdr.features.radar.radar import is_honda_bosch_a_radar
 
 A_CRUISE_MAX_VALS = [1.6, 1.2, 0.8, 0.6]
@@ -81,6 +83,10 @@ def get_cruise_accel(e2e, v_cruise, v_ego, a_cruise_prev, angle_steers, CP, dt, 
 
 class LongitudinalPlanner(LongitudinalPlannerSP):
   def __init__(self, CP, CP_SP, init_v=0.0, init_a=0.0, dt=DT_MDL):
+    self.mvl_enabled = mvl_longitudinal_enabled(CP)
+    if self.mvl_enabled:
+      MvlLongitudinalPlanner.__init__(self, CP, CP_SP, init_v, init_a, dt)
+      return
     self.CP = CP
     self.honda_bosch_a_radar = is_honda_bosch_a_radar(CP)
     nrdr_enabled = nrdr_longitudinal_enabled(CP)
@@ -102,6 +108,8 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.j_desired_trajectory = np.zeros(CONTROL_N)
 
   def update(self, sm):
+    if self.mvl_enabled:
+      return MvlLongitudinalPlanner.update(self, sm)
     LongitudinalPlannerSP.update(self, sm)
     if self.nrdr is not None:
       self.nrdr.refresh()
@@ -114,7 +122,6 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     v_ego = sm['carState'].vEgo
     v_cruise_kph = min(sm['carState'].vCruise, V_CRUISE_MAX)
     v_cruise = v_cruise_kph * CV.KPH_TO_MS
-    v_cruise_set = v_cruise
     v_cruise_initialized = sm['carState'].vCruise != V_CRUISE_UNSET
     force_slow_decel = sm['controlsState'].forceDecel
     if self.nrdr is None and force_slow_decel:
@@ -161,7 +168,7 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     if self.nrdr is not None:
       if force_slow_decel:
         v_cruise = 0.0
-      v_cruise = self.nrdr.cruise_target(v_cruise, v_cruise_set, v_ego, sm['carControl'].actuators.accel)
+      v_cruise = self.nrdr.cruise_target(v_cruise)
 
     personality = longitudinal_personality(sm['selfdriveState'].personality, self.nrdr is not None)
     self.mpc.set_weights(prev_accel_constraint, personality=personality)
@@ -227,6 +234,8 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.v_desired_filter.x = self.v_desired_filter.x + self.dt * (self.output_a_target + a_prev) / 2.0
 
   def publish(self, sm, pm):
+    if self.mvl_enabled:
+      return MvlLongitudinalPlanner.publish(self, sm, pm)
     plan_send = messaging.new_message('longitudinalPlan')
 
     plan_send.valid = sm.all_checks()

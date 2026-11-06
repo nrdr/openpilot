@@ -1,5 +1,7 @@
 from openpilot.cereal import log
 from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
+from openpilot.nrdr.features.longitudinal.personality import write_personality
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.common.params import Params, UnknownKeyName
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.list_view import multiple_button_item, toggle_item
@@ -146,6 +148,7 @@ class TogglesLayout(Widget):
     ui_state.add_engaged_transition_callback(self._update_toggles)
 
   def _update_state(self):
+    self._toggles["ExperimentalMode"].action_item.set_enabled(self._experimental_mode_editable())
     if ui_state.sm.updated["selfdriveState"]:
       personality = PERSONALITY_TO_INT[ui_state.sm["selfdriveState"].personality]
       if personality != ui_state.personality and ui_state.started:
@@ -187,7 +190,7 @@ class TogglesLayout(Widget):
         self._toggles["ExperimentalMode"].action_item.set_enabled(False)
         self._toggles["ExperimentalMode"].action_item.set_state(False)
         self._long_personality_setting.action_item.set_enabled(False)
-        if self._params.get("ExperimentalMode") is not False:
+        if self._params.get("ExperimentalMode") is not False and tuning_write_allowed(self._params, "ExperimentalMode", CP=ui_state.CP):
           self._params.put_bool("ExperimentalMode", False, block=True)
 
         unavailable = tr("Experimental mode is currently unavailable on this car since the car's stock ACC is used for longitudinal control.")
@@ -215,6 +218,7 @@ class TogglesLayout(Widget):
     for toggle_def in self._toggle_defs:
       if self._toggle_defs[toggle_def][3] and toggle_def not in self._locked_toggles:
         self._toggles[toggle_def].action_item.set_enabled(not ui_state.engaged)
+    self._toggles["ExperimentalMode"].action_item.set_enabled(self._experimental_mode_editable())
 
   def _render(self, rect):
     self._scroller.render(rect)
@@ -223,15 +227,22 @@ class TogglesLayout(Widget):
     icon = "experimental.png" if self._toggles["ExperimentalMode"].action_item.get_state() else "experimental_white.png"
     self._toggles["ExperimentalMode"].set_icon(icon)
 
+  def _experimental_mode_editable(self):
+    return ("ExperimentalMode" not in self._locked_toggles and (ui_state.CP is None or ui_state.has_longitudinal_control)
+            and tuning_write_allowed(self._params, "ExperimentalMode", CP=ui_state.CP))
+
   def _handle_experimental_mode_toggle(self, state: bool):
+    if not self._experimental_mode_editable():
+      self._toggles["ExperimentalMode"].action_item.set_state(self._params.get_bool("ExperimentalMode"))
+      return
     confirmed = self._params.get_bool("ExperimentalModeConfirmed")
     if state and not confirmed:
       def confirm_callback(result: DialogResult):
-        if result == DialogResult.CONFIRM:
+        if result == DialogResult.CONFIRM and self._experimental_mode_editable():
           self._params.put_bool("ExperimentalMode", True, block=True)
           self._params.put_bool("ExperimentalModeConfirmed", True, block=True)
         else:
-          self._toggles["ExperimentalMode"].action_item.set_state(False)
+          self._toggles["ExperimentalMode"].action_item.set_state(self._params.get_bool("ExperimentalMode"))
         self._update_experimental_mode_icon()
 
       # show confirmation dialog
@@ -253,5 +264,7 @@ class TogglesLayout(Widget):
       self._params.put_bool("OnroadCycleRequested", True, block=True)
 
   def _set_longitudinal_personality(self, button_index: int):
+    if isinstance(button_index, str):
+      button_index = int(button_index)
     personality = longitudinal_personality(button_index, nrdr_longitudinal_enabled(ui_state.CP))
-    self._params.put("LongitudinalPersonality", personality, block=True)
+    write_personality(self._params, personality)

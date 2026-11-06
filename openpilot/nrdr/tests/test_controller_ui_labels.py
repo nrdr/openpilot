@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import unittest
 
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
-from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, tuning_write_allowed
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_schema, DEFAULT_SRC
 
 
@@ -40,6 +40,7 @@ def _native_class(filename, name, *, saved_bools=None):
     "Widget": object, "Callable": Callable, "tr": lambda text: text,
     "ui_state": SimpleNamespace(params=SimpleNamespace(get_bool=lambda key: saved_bools.get(key, False))),
     "get_native_option_spec": get_native_option_spec,
+    "MVL_DESCRIPTION": MVL_DESCRIPTION,
     "large_reset_button": lambda: object(),
     "NavButton": lambda *_: SimpleNamespace(set_click_callback=lambda *_: None),
     "Scroller": lambda items, **_: items, "LineSeparatorSP": lambda *_: None,
@@ -98,31 +99,19 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertEqual(local["label_callback"](125), "+1.25 m")
     self.assertEqual(tuple(web[k] for k in ("min", "max", "step", "unit")), (0.0, 5.0, 0.25, "m"))
 
-  def test_engine_braking_uses_saved_state_without_automatic_param_binding(self):
-    for saved in (False, True):
-      with self.subTest(saved=saved):
-        cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout",
-                            saved_bools={"NrdrExperimentalEngineBraking": saved})
-        layout = cls.__new__(cls)
-        layout._initialize_items()
-        engine = layout._engine_braking
-        self.assertIs(engine["initial_state"], saved)
-        # ToggleSP writes bound params after callbacks, bypassing a rejected save.
-        self.assertNotIn("param", engine)
-        self.assertEqual(engine["callback"], layout._set_engine_braking)
-        self.assertTrue(callable(engine["enabled"]))
-
-  def test_engine_braking_metadata_is_live_but_still_civic_pcm_only(self):
+  def test_retired_longitudinal_controls_are_absent(self):
     items = _panel(self.schema, "steering", "nrdr_longitudinal")["items"]
-    engine = next(item for item in items if item.get("key") == "NrdrExperimentalEngineBraking")
-    self.assertFalse(engine.get("needs_onroad_cycle", False))
-    self.assertNotIn("Restart required", engine["details"])
-    self.assertIn("Applies live", engine["details"])
-    self.assertEqual(engine["visibility"], engine["enablement"])
-    self.assertEqual(engine["enablement"], [
-      {"type": "capability", "field": "nrdr_honda_pcm_tuning_available", "equals": True},
-      {"type": "capability", "field": "car_fingerprint", "equals": "HONDA_CIVIC"},
-    ])
+    self.assertFalse({"NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance"} & {item["key"] for item in items})
+
+  def test_live_gas_uses_guarded_callback_without_automatic_param_binding(self):
+    for saved in (False, True):
+      cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout", saved_bools={"HondaLiveLearningGas": saved})
+      layout = cls.__new__(cls)
+      layout._initialize_items()
+      control = layout._live_learning_gas
+      self.assertIs(control["initial_state"], saved)
+      self.assertNotIn("param", control)
+      self.assertEqual(control["callback"], layout._set_live_gas)
 
   def test_honda_pcm_mode_and_wind_order_copy_and_parked_restart_rules(self):
     cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout")
@@ -146,14 +135,16 @@ class TestControllerUiLabels(unittest.TestCase):
       self.assertIn("Restart required.", local["description"]())
       self.assertEqual(local["description"](), web["description"])
       self.assertTrue(web["needs_onroad_cycle"])
-      self.assertEqual(web["enablement"], [{"type": "offroad_only"}, {
+      self.assertEqual(web["enablement"][:2], [{"type": "offroad_only"}, {
         "type": "capability", "field": "nrdr_honda_pcm_tuning_available", "equals": True,
       }])
-      self.assertEqual(web["visibility"], web["enablement"][1:])
+      self.assertEqual(web["visibility"], web["enablement"][1:2])
+      self.assertIn("nrdr_mvl_longitudinal_active", json.dumps(web["enablement"][-1]))
     self.assertIn("mmmorks", layout._pcm_mode["description"]())
     self.assertIn("keeps MVL mapping", mode["details"])
     self.assertIn("ramp, coast and brake-release rules", layout._pcm_mode["description"]())
-    self.assertIn("Frozen in ECU-Matched and Civic Experimental", layout._live_learning_gas["description"]())
+    self.assertIn("full MVL longitudinal", layout._live_learning_gas["description"]())
+    self.assertIn("Only Econ", layout._live_learning_gas["description"]())
     self.assertEqual(layout._live_learning_gas["description"](), remote[0]["description"])
     self.assertIn("Turning it off changes friction-brake demand", wind["details"])
     self.assertNotIn("NrdrHondaEcuMatchedLong", [item["key"] for item in remote])

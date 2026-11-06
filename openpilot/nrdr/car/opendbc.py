@@ -207,7 +207,9 @@ class HondaParamsProvider:
       self._write_thread.join(timeout=2.0)
 
   def initialize_live_learning_gas(self, enable_gas_interceptor: bool) -> None:
-    self._live_learning_default = not enable_gas_interceptor
+    # New Honda installations select the complete MVL path on every supported
+    # longitudinal hardware variant. A stored Off choice remains untouched.
+    self._live_learning_default = True
     value = _read_param(self._params, OpendbcParamKey.HONDA_LIVE_LEARNING_GAS)
     if value is None:
       self._params.put_bool(
@@ -514,6 +516,7 @@ class NrdrHondaConfig:
   provider: HondaParamsProvider
   nidec_pcm_mode: int = 0
   nidec_wind_brake: bool = True
+  mvl_longitudinal: bool = False
 
 
 def build_nrdr_honda_config(params, *, start_worker: bool = True,
@@ -536,6 +539,7 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
     provider=provider,
     nidec_pcm_mode=mode,
     nidec_wind_brake=_bool_value(_read_param(params, OpendbcParamKey.NRDR_HONDA_WIND_BRAKE), True),
+    mvl_longitudinal=_bool_value(_read_param(params, OpendbcParamKey.HONDA_LIVE_LEARNING_GAS), True),
   )
 
 

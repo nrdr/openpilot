@@ -59,6 +59,8 @@ class TestLiveGasReport(unittest.TestCase):
     self.assertIn("may be from another car", text)
     self.assertIn("not PID feedforward", text)
     self.assertIn("Saved values lag driving", text)
+    self.assertIn("Full MVL mode ignores custom PCM shaping", text)
+    self.assertNotIn("freeze learning", text)
     self.assertIn("Reset clears gas/wind only", text)
 
   def test_corrupt_values_are_not_echoed_or_presented_as_learned(self):

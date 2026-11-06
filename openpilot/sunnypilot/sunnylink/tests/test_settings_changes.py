@@ -322,33 +322,34 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
   @parameterized.expand([
     ("NrdrHondaFullBrakeAuthority", "toggle"),
     ("NrdrRoenAccelerationLimits", "toggle"),
-    ("NrdrCruiseOverspeedAllowance", "option"),
   ], names=["key", "widget"])
-  def test_options_are_independent_of_live_learning_gas(self, schema, key, widget):
+  def test_options_are_locked_by_saved_or_active_mvl(self, schema, key, widget):
     item = _find_item(schema, key)
     assert item is not None
     assert item.get("widget") == widget
     rules = json.dumps((item.get("visibility") or []) + (item.get("enablement") or []))
-    assert "HondaLiveLearningGas" not in rules
+    assert "HondaLiveLearningGas" in rules
+    assert "nrdr_mvl_longitudinal_active" in rules
 
-  def test_overspeed_allowance_range(self, schema):
-    item = _find_item(schema, "NrdrCruiseOverspeedAllowance")
-    assert item is not None
-    assert (item.get("min"), item.get("max"), item.get("step"), item.get("unit")) == (0, 10, 1, "mph")
+  def test_retired_settings_are_not_exposed(self, schema):
+    assert _find_item(schema, "NrdrCruiseOverspeedAllowance") is None
+    assert _find_item(schema, "NrdrExperimentalEngineBraking") is None
 
   def test_longitudinal_default_descriptions(self, schema):
     roen = _find_item(schema, "NrdrRoenAccelerationLimits")
     live_gas = _find_item(schema, "HondaLiveLearningGas")
     assert "Disabled by default" in roen.get("details", "")
     assert _find_item(schema, "NrdrPersonalityAccelProfiles") is None
-    assert "default OFF when a gas pedal interceptor is detected" in live_gas.get("details", "")
-    assert "selection is preserved" in live_gas.get("details", "")
+    assert "new Honda setups default ON" in live_gas.get("details", "")
+    assert "Existing OFF choices are preserved" in live_gas.get("details", "")
+    assert "Only Econ" in live_gas["description"]
+    assert live_gas["needs_onroad_cycle"]
 
   def test_honda_bosch_a_radar_scope_is_explicit(self, schema):
     radar = _find_item(schema, "HondaBoschARadar")
     assert radar is not None
     copy = f"{radar.get('description', '')} {radar.get('details', '')}".lower()
-    assert "stock longitudinal or openpilot alpha long" in copy
+    assert "stock cruise or alpha long" in copy
     assert "feed openpilot's lead tracking" in copy
     assert "factory honda aeb/cmbs remains unavailable" in copy
 
@@ -371,7 +372,7 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     scale_indices = [keys.index(key) for key in self.PERSONALITY_SCALE_KEYS]
 
     assert keys[0] == "HondaLiveLearningGas"
-    assert set(widgets) == {"toggle", "option"}
+    assert set(widgets) == {"toggle", "option", "info", "multiple_button"}
     assert max(toggle_indices) < min(option_indices)
     assert scale_indices == list(range(scale_indices[0], scale_indices[0] + len(self.PERSONALITY_SCALE_KEYS)))
     assert [keys[index] for index in scale_indices] == list(self.PERSONALITY_SCALE_KEYS)
@@ -407,8 +408,9 @@ class TestControllerCleanup(OpenpilotTestCase):
     ]
     controller = panel["items"][0]
     assert [(o["value"], o["label"]) for o in controller["options"]] == [(0, "PIF Control"), (1, "Firmware Controller")]
-    assert "matching modified EPS build" in controller["description"]
-    assert "TEG-A010 uses its own provisional corrected-PTM calibration, not the Bosch placeholder" in controller["description"]
+    assert "exact modified steering firmware revision" in controller["description"]
+    assert "TEG-A010 requires the corrected PTM firmware" in controller["details"]
+    assert "its calibration has been driven on that build" in controller["details"]
     assert "RWD SHA256 starts 04147917" in controller["details"]
     assert "Older builds report the same version strings but are not compatible" in controller["details"]
     assert "PIF and Device Yaw Correction remain separate" in controller["details"]
@@ -419,7 +421,7 @@ class TestControllerCleanup(OpenpilotTestCase):
     assert _references_capability_field(correction["enablement"], "nrdr_interpolated_torque_pif_blend_available")
     optimized = panel["items"][3]
     assert optimized["widget"] == "toggle"
-    assert "either controller" in optimized["description"]
+    assert "turns off torque blending, feedforward, and rate damping" in optimized["description"]
 
   @parameterized.expand(["LowSpeed", "Standard", "Highway"], names=["band"])
   def test_each_speed_band_is_ordered_pidf(self, schema, band):
@@ -498,7 +500,7 @@ class TestNrdrSteerRatioMode(OpenpilotTestCase):
     item = _find_item(schema, "NrdrSteerRatioMode")
     assert item["widget"] == "multiple_button"
     assert [(option["value"], option["label"]) for option in item["options"]] == [
-      (0, "Manual"), (1, "Comma Learner"), (2, "NRDR Measured Curve"), (3, "Firmware"),
+      (0, "Manual"), (1, "Comma Learner"), (2, "nrdr Measured Curve"), (3, "Firmware"),
     ]
     assert "offroad_only" not in json.dumps(item.get("enablement") or [])
     assert "one live snapshot" in item["details"]
@@ -542,13 +544,13 @@ class TestLiveLaneCentering(OpenpilotTestCase):
       assert "LaneGuidanceMode" in json.dumps(rules)
       assert '"equals": 1' in json.dumps(rules)
 
-  def test_lane_guidance_selector_is_mutually_exclusive_and_gates_blendful(self, schema):
+  def test_lane_guidance_selector_is_mutually_exclusive_and_gates_sunny(self, schema):
     item = _find_item(schema, "LaneGuidanceMode")
     assert item["widget"] == "multiple_button"
     assert [(option["value"], option["label"]) for option in item["options"]] == [
-      (0, "Model Only"), (1, "NRDR"), (2, "Blendful"),
+      (0, "Off"), (2, "Sunny"), (1, "Star"),
     ]
-    assert "custom_model_active" in json.dumps(item["options"][2]["enablement"])
+    assert "custom_model_active" in json.dumps(item["options"][1]["enablement"])
 
 
 class TestNotEngagedReplacement(OpenpilotTestCase):

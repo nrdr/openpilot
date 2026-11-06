@@ -43,8 +43,6 @@ class NrdrParamKey(StrEnum):
   LANE_CENTERING_STRENGTH = "LaneCenteringStrength"
   NRDR_PERSONALITY_ACCEL_PROFILES = "NrdrPersonalityAccelProfiles"
   NRDR_CRUISE_MISMATCH_CORRECTION = "NrdrCruiseMismatchCorrection"
-  NRDR_CRUISE_OVERSPEED_ALLOWANCE = "NrdrCruiseOverspeedAllowance"
-  NRDR_EXPERIMENTAL_ENGINE_BRAKING = "NrdrExperimentalEngineBraking"
   NRDR_STANDSTILL_GAP_EXTRA = "NrdrStandstillGapExtra"
   HONDA_CENTER_SCALE = "HondaCenterScale"
   HONDA_PID_FRICTION = "HondaPidFriction"
@@ -206,8 +204,6 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.LANE_CENTERING_STRENGTH,
   NrdrParamKey.NRDR_PERSONALITY_ACCEL_PROFILES,
   NrdrParamKey.NRDR_CRUISE_MISMATCH_CORRECTION,
-  NrdrParamKey.NRDR_CRUISE_OVERSPEED_ALLOWANCE,
-  NrdrParamKey.NRDR_EXPERIMENTAL_ENGINE_BRAKING,
   NrdrParamKey.NRDR_STANDSTILL_GAP_EXTRA,
   NrdrParamKey.HONDA_CENTER_SCALE,
   NrdrParamKey.HONDA_PID_FRICTION,

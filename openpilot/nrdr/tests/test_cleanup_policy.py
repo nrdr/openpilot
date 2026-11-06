@@ -1,6 +1,5 @@
 """Cleanup contracts, independent of native Params, messaging and actuators."""
 import ast
-import math
 from pathlib import Path
 from types import SimpleNamespace as NS
 
@@ -81,12 +80,12 @@ def test_only_measured_firmware_schedule_locks_live_manual_delay(key):
   assert params[key] == .31
 
 
-def test_learning_forces_all_scales_to_unity_and_keeps_them_locked():
+def test_mvl_locks_scales_without_erasing_custom_saved_values():
   params = MemoryParams(HondaLiveLearningGas=True, **dict.fromkeys(LONG_SCALE_KEYS, 175))
   reset_learning_scales(params)
-  assert all(params[k] == 100 and not tuning_write_allowed(params, k) for k in LONG_SCALE_KEYS)
+  assert all(params[k] == 175 and not tuning_write_allowed(params, k) for k in LONG_SCALE_KEYS)
   params["HondaLiveLearningGas"] = False
-  assert all(params[k] == 100 and tuning_write_allowed(params, k) for k in LONG_SCALE_KEYS)
+  assert all(params[k] == 175 and tuning_write_allowed(params, k) for k in LONG_SCALE_KEYS)
 
 
 @pytest.mark.parametrize("state,active", [(0, False), (1, False), (2, True), (3, True)])
@@ -183,16 +182,8 @@ def test_bad_model_does_not_reenable_vision_in_same_frame():
   assert controller.output_v_target == 255.
 
 
-def test_overshoot_has_no_brake_speed_bias_inside_band_and_respects_lower_targets():
-  path = ROOT / "openpilot/nrdr/features/longitudinal/longitudinal_planner.py"
-  tree = ast.parse(path.read_text(encoding="utf-8"))
-  tree.body = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "apply_cruise_overspeed_allowance"]
-  env = {"np": np}
-  exec(compile(tree, str(path), "exec"), env)
-  apply = env["apply_cruise_overspeed_allowance"]
-  for accel in [-1, 0, 1]:
-    assert apply(20, 20, 20, 20.5, accel, 1) == 20.5
-    assert apply(20, 20, 20, 24, accel, 1) == 21
-    assert apply(18, 18, 20, 20.5, accel, 1) == 18
-    assert apply(20, 20, 20, 20.5, accel, 0) == 20
-  assert apply(20, 20, 20, math.nan, 0, 1) == 20
+def test_retired_overshoot_and_engine_braking_settings_cannot_be_written():
+  from openpilot.nrdr.params.generated import ALL_KEYS
+  for key in ("NrdrCruiseOverspeedAllowance", "NrdrExperimentalEngineBraking"):
+    assert key not in ALL_KEYS
+    assert not tuning_write_allowed(MemoryParams(), key)

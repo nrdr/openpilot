@@ -1,5 +1,46 @@
 # NRDR longitudinal vehicle isolation
 
+## Honda MVL priority (November 6, 2026)
+
+With **Live Learning Gas** selected, Honda openpilot longitudinal uses the
+pinned MVL controller and planner, not the custom controller with default
+slider values. Selection is latched at startup; change it while parked and
+restart. It applies to Nidec PCM, Bosch, and gas-interceptor control.
+
+- Source: MVL root `376c44b5731b2655e5c2f301b73c9729eb499e91` and its
+  opendbc pin `3fec9a418a659de31d7b1f494193161697a35071`.
+- Aggressive, Standard, and Relaxed copy MVL's complete profiles, including
+  following distances. Only Econ retains the fixed nrdr longer-following,
+  gentler acceleration/jerk profile.
+- Conflicting custom longitudinal settings are locked and ignored, not erased.
+  Custom tune files, PCM shaping, wind-brake overrides, PID scaling, brake-authority
+  overrides, and optional Sunny acceleration/target shaping cannot change this mode.
+- Saved learning remains intact. The mode includes MVL's gas, wind, PCM response,
+  brake feedback and platform-specific command paths; it is not just a gas learner.
+- Experimental Engine Braking and Set-Speed Overshoot Allowance are retired in
+  both modes, including their parameter registrations and active controller code.
+- MVL cruise defaults also apply: the software ceiling is 145 km/h and initial
+  software SET has the donor's 40 km/h floor. Hardware-owned PCM cruise targets
+  and engagement guards remain hardware-owned; this is not the custom 0-mph SET
+  experiment.
+- The donor's model/e2e candidate participates in longitudinal planning regardless
+  of the saved Experimental Mode toggle. That toggle is locked in MVL mode;
+  retaining the same driving model does not disable its longitudinal candidate.
+- Lateral tuning, selected driving model, vehicle safety and driver overrides are
+  unchanged. Qualified Clarity interceptor hardware retains its existing calibrated
+  brake/hold protection; that is an explicit hardware exception, not donor parity.
+
+See `opendbc_repo/opendbc/car/honda/MVL_LONGITUDINAL.md` and
+`openpilot/selfdrive/controls/lib/longitudinal_mpc_lib/mvl_manifest.json` for
+source hashes, exact scope, integration differences and test contracts.
+Parity tests establish software behavior against those pins, not road safety,
+successful convergence of a particular car's learning, or the author's private
+settings. The unchanged driving model and retained learned values still affect
+the result. Do not infer that the reported braking issue is resolved from these
+tests alone.
+
+## Non-Honda isolation
+
 Non-Honda cars use the existing Sunnypilot/MVL longitudinal baseline, not the
 NRDR controller with nominal/default slider values. This does not force factory
 ACC, change platform safety limits, or change lateral control.

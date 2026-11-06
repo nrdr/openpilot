@@ -13,6 +13,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.nrdr.tests.test_experimental_button_regressions import RecordingParams, load_definitions
 from openpilot.nrdr.tests import test_handcrafted_request_routing as routing_tests
 from openpilot.nrdr.tests.test_param_defaults import _apply, _load_defaults
@@ -39,8 +40,8 @@ def execute(nodes, namespace):
   exec(compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), "production_preference_writer", "exec"), namespace)
 
 
-@pytest.mark.parametrize("key", (VISION, EXPERIMENTAL))
-def test_existing_off_survives_repeated_boot_but_fresh_default_is_unchanged(key):
+@pytest.mark.parametrize("key,default", ((VISION, True), (EXPERIMENTAL, False)))
+def test_existing_off_survives_repeated_boot_but_fresh_default_is_unchanged(key, default):
   params = RecordingParams({key: False})
   for _ in range(3):
     boot(params)
@@ -48,7 +49,7 @@ def test_existing_off_survives_repeated_boot_but_fresh_default_is_unchanged(key)
   assert not any(action[1] == key for action in params.actions)
   fresh = RecordingParams()
   boot(fresh)
-  assert fresh.get(key) is True
+  assert fresh.get(key) is default
 
 
 def cleanup_vision(params, has_long):
@@ -97,7 +98,8 @@ def test_supported_cleanup_leaves_explicit_choice_alone(key, cleanup, initial):
 @pytest.mark.parametrize("initial", (False, True))
 def test_cruise_refresh_cannot_replay_stale_vision_choice(has_cp, has_long, has_icbm, offroad, when, initial):
   params = RecordingParams({VISION: initial, "SmartCruiseControlMap": False, "CustomAccIncrementsEnabled": False})
-  namespace = {"tr": lambda text: text, "CRUISE_PARAMS": ("CustomAccIncrementsEnabled", VISION, "SmartCruiseControlMap")}
+  namespace = {"tr": lambda text: text, "CRUISE_PARAMS": ("CustomAccIncrementsEnabled", VISION, "SmartCruiseControlMap"),
+               "tuning_write_allowed": tuning_write_allowed}
   load_definitions("openpilot/nrdr/ui/settings_policy.py", {"snapshot_params", "_restore_params", "apply_cruise_preferences"}, namespace)
   original = namespace["apply_cruise_preferences"]
 
@@ -140,7 +142,7 @@ def test_native_experimental_cleanup_preserves_off_through_next_boot(relative, i
   layout = NS(_params=params, _toggles={EXPERIMENTAL: Mock()}, _long_personality_setting=Mock(), _is_release=False,
               _experimental_btn=Mock(), _personality_toggle=Mock())
   execute([branch], {"self": layout, "ui_state": NS(params=params, has_longitudinal_control=False, CP=NS(alphaLongitudinalAvailable=True)),
-                     "tr": lambda text: text, "e2e_description": ""})
+                     "tr": lambda text: text, "e2e_description": "", "tuning_write_allowed": tuning_write_allowed})
   assert params.get(EXPERIMENTAL) is False
   assert ("remove", EXPERIMENTAL) not in params.actions
   boot(params)

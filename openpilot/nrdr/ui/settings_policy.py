@@ -1,4 +1,5 @@
 from openpilot.system.ui.lib.multilang import tr
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 
 
 CRUISE_PARAMS = (
@@ -19,9 +20,10 @@ def snapshot_params(params, keys):
   return {key: value for key in keys if (value := params.get(key)) is not None}
 
 
-def _restore_params(params, values):
+def _restore_params(params, values, CP=None):
   for key, value in values.items():
-    params.put(key, value)
+    if tuning_write_allowed(params, key, CP=CP):
+      params.put(key, value)
 
 
 def restore_params(params, values):
@@ -31,7 +33,7 @@ def restore_params(params, values):
 def apply_cruise_preferences(layout, state, values, has_long, has_icbm):
   # Vision SCC is never deleted by the layout. Replaying its snapshot here
   # could queue an old True after a newer explicit Off from the user/Sunnylink.
-  _restore_params(state.params, {key: value for key, value in values.items() if key != "SmartCruiseControlVision"})
+  _restore_params(state.params, {key: value for key, value in values.items() if key != "SmartCruiseControlVision"}, state.CP)
 
   if state.is_offroad():
     layout.custom_acc_toggle.set_description(tr("You can set this now. It activates once your car is detected and supports custom cruise increments."))
@@ -48,7 +50,7 @@ def apply_cruise_preferences(layout, state, values, has_long, has_icbm):
 
 
 def apply_speed_limit_preferences(control, state, value, available):
-  if value is not None:
+  if value is not None and tuning_write_allowed(state.params, "SpeedLimitMode", CP=state.CP):
     state.params.put("SpeedLimitMode", value)
 
   if available:

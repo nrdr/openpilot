@@ -88,7 +88,6 @@ LEGACY_FEATURE_EXPORTS = {
       "ROEN_PLANNER_ACCEL",
       "ROEN_TURN_ACCEL_THRESHOLD",
       "NrdrLongitudinalPlanner",
-      "apply_cruise_overspeed_allowance",
     ),
   ),
   "longitudinal_stopping": (

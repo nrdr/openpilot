@@ -66,8 +66,28 @@ def _load_definition() -> dict:
     schema = json.load(f)
   _inject_dynamic_options(schema)
   inject_car_tune_details(schema, _walk_all_items)
-  inject_live_gas_details(schema, _walk_all_items)
+  _inject_live_gas_help(schema)
   return schema
+
+
+def _inject_live_gas_help(schema: dict) -> None:
+  # Saved learner diagnostics supplement, never replace, the restart/mode
+  # contract. In particular the saved switch must not be presented as active.
+  help_by_id = {}
+
+  def remember(item):
+    if item.get("key") == "HondaLiveLearningGas":
+      help_by_id[id(item)] = item.get("details", "")
+
+  def restore(item):
+    if id(item) in help_by_id:
+      help_text = help_by_id[id(item)]
+      report = item.get("details", "")
+      item["details"] = f"{help_text}<br><br>{report}" if report and report != help_text else help_text
+
+  _walk_all_items(schema, remember)
+  inject_live_gas_details(schema, _walk_all_items)
+  _walk_all_items(schema, restore)
 
 
 # Public API

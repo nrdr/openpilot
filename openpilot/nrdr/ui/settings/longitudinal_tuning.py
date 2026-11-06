@@ -5,9 +5,11 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.list_view import ListItem
-from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
+from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled, nrdr_longitudinal_enabled
 from openpilot.nrdr.ui.settings.live_gas_reset import available as gas_reset_available, large_reset_button
-from openpilot.nrdr.ui.honda_pcm import pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice
+from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, mvl_tuning_locked, tuning_write_allowed
+from openpilot.nrdr.ui.honda_pcm import (pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice,
+                                       live_gas_available, save_live_gas_choice)
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, multiple_button_item_sp, LineSeparatorSP
@@ -21,9 +23,13 @@ class LongitudinalTuningLayout(Widget):
 
     self._tuning_items = self._initialize_items()
     status = ListItem(
-      title=lambda: tr("nrdr longitudinal active") if nrdr_longitudinal_enabled(ui_state.CP) else tr("Baseline longitudinal - nrdr tuning inactive"),
-      description=lambda: tr("nrdr tuning is enabled for Honda only unless an exact non-Honda vehicle profile is explicitly approved in the software. " +
-                             "Saved nrdr settings do not enable it on another car. Baseline Sunnypilot features remain available."),
+      title=lambda: (tr("Full MVL longitudinal active") if mvl_longitudinal_enabled(ui_state.CP)
+                     else tr("Custom longitudinal active") if nrdr_longitudinal_enabled(ui_state.CP)
+                     and getattr(ui_state.CP, "openpilotLongitudinalControl", False)
+                     else tr("Baseline longitudinal - nrdr tuning inactive")),
+      description=lambda: tr("The running mode is fixed at startup. Saving Live Learning Gas changes the next startup, not this drive. " +
+                             "MVL uses complete Aggressive, Standard and Relaxed profiles; " +
+                             "only Econ retains nrdr's following, acceleration and jerk defaults."),
     )
     self._scroller = Scroller([status, *self._tuning_items], line_separator=False, spacing=0)
 
@@ -130,30 +136,8 @@ class LongitudinalTuningLayout(Widget):
       title=lambda: tr("Roen Nidec Acceleration Limits (Default: OFF)"),
       description=lambda: tr(
         "Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling. " +
-        "This operates independently of Live Learning Gas."
+        "Unavailable while MVL longitudinal is selected or active."
       ),
-    )
-
-    self._engine_braking = toggle_item_sp(
-      title=lambda: tr("Experimental Engine Braking"),
-      initial_state=ui_state.params.get_bool("NrdrExperimentalEngineBraking"),
-      enabled=lambda: pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
-                      and str(getattr(ui_state.CP, "carFingerprint", "")) == "HONDA_CIVIC",
-      description=lambda: tr("Civic PCM only. Fades into free-cruise engine braking and back over 3 seconds. " +
-                             "Lead braking and pedal overrides take priority. Off by default; applies live."),
-      callback=self._set_engine_braking,
-    )
-    self._cruise_overspeed_allowance = option_item_sp(
-      param="NrdrCruiseOverspeedAllowance",
-      title=lambda: tr("Set-Speed Overshoot Allowance (Default: 0 mph)"),
-      min_value=0,
-      max_value=10,
-      value_change_step=1,
-      description=lambda: tr(
-        "Allows the cruise target to follow vehicle speed by up to this amount above the set speed when no other speed target is lower. " +
-        "0 mph preserves stock behavior."
-      ),
-      label_callback=lambda value: f"{value} mph",
     )
 
     self._cruise_mismatch_correction = option_item_sp(
@@ -172,12 +156,10 @@ class LongitudinalTuningLayout(Widget):
     )
 
     self._live_learning_gas = toggle_item_sp(
-      param="HondaLiveLearningGas",
-      title=lambda: tr("Live Learning Gas (Default: OFF with Gas Interceptor)"),
-      description=lambda: tr(
-        "Learns gas and wind compensation. Frozen in ECU-Matched and Civic Experimental. " +
-        "When ON, longitudinal PID scales stay at 100%."
-      ),
+      title=lambda: tr("Live Learning Gas - Full MVL Longitudinal"),
+      initial_state=ui_state.params.get_bool("HondaLiveLearningGas"),
+      description=lambda: tr(MVL_DESCRIPTION),
+      callback=self._set_live_gas,
     )
 
     self._stopping_decel_rate = option_item_sp(
@@ -272,8 +254,6 @@ class LongitudinalTuningLayout(Widget):
       self._long_pid_tune_scale_standard,
       self._long_pid_tune_scale_relaxed,
       self._long_pid_tune_scale_econ,
-      self._engine_braking,
-      self._cruise_overspeed_allowance,
       self._cruise_mismatch_correction,
       self._standstill_gap,
       self._stopping_decel_rate,
@@ -283,35 +263,35 @@ class LongitudinalTuningLayout(Widget):
       self._v_ego_starting,
     ]
 
-  def _set_engine_braking(self, value):
+  def _set_live_gas(self, value):
     # No param binding: ToggleSP otherwise writes after the guarded callback,
     # even when the vehicle became ineligible since the last display update.
-    save_pcm_choice(ui_state, "NrdrExperimentalEngineBraking", value)
-    self._engine_braking.action_item.set_state(ui_state.params.get_bool("NrdrExperimentalEngineBraking"))
+    save_live_gas_choice(ui_state, value)
+    self._live_learning_gas.action_item.set_state(ui_state.params.get_bool("HondaLiveLearningGas"))
 
   def _update_state(self):
     super()._update_state()
     enabled = nrdr_longitudinal_enabled(ui_state.CP)
     for item in self._tuning_items:
       if action := getattr(item, "action_item", None):
-        action.set_enabled(enabled)
-    learning = ui_state.params.get_bool("HondaLiveLearningGas")
+        action.set_enabled(enabled and tuning_write_allowed(ui_state.params, getattr(action, "param_key", None), CP=ui_state.CP))
+    learning = mvl_tuning_locked(ui_state.params, ui_state.CP)
     for item in (self._long_pid_tune_scale_aggressive, self._long_pid_tune_scale_standard,
                  self._long_pid_tune_scale_relaxed, self._long_pid_tune_scale_econ):
       item.set_visible(not learning)
       item.action_item.set_enabled(enabled and not learning)
-    self._live_learning_gas.action_item.set_enabled(enabled and ui_state.is_offroad())
+    self._live_learning_gas.action_item.set_enabled(
+      ui_state.is_offroad() and live_gas_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
+    self._live_learning_gas.action_item.set_state(ui_state.params.get_bool("HondaLiveLearningGas"))
     self._reset_live_gas.action_item.set_enabled(gas_reset_available())
     pcm_available = pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
-    pcm_enabled = ui_state.is_offroad() and pcm_available
+    pcm_enabled = ui_state.is_offroad() and pcm_available and not learning
     self._pcm_mode.action_item.set_enabled(pcm_enabled)
     self._wind_brake.action_item.set_enabled(pcm_enabled)
-    self._engine_braking.action_item.set_enabled(pcm_available and str(getattr(ui_state.CP, "carFingerprint", "")) == "HONDA_CIVIC")
     self._pcm_mode.action_item.set_selected_button(saved_pcm_mode(ui_state.params))
     self._wind_brake.action_item.set_state(saved_wind_brake(ui_state.params))
-    self._engine_braking.action_item.set_state(ui_state.params.get_bool("NrdrExperimentalEngineBraking"))
     self._standstill_gap.action_item.set_enabled(
-      enabled and ui_state.is_offroad() and bool(ui_state.CP and ui_state.CP.openpilotLongitudinalControl)
+      enabled and not learning and ui_state.is_offroad() and bool(ui_state.CP and ui_state.CP.openpilotLongitudinalControl)
     )
 
   def _render(self, rect):

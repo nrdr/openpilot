@@ -111,7 +111,10 @@ class TestUiSettingsContract(unittest.TestCase):
 
     copy = "\n".join(strings(self.pages["steering"]))
     self.assertNotIn("NRDR", copy)
-    self.assertNotIn("Blendful", copy)
+    # The implementation name can appear in explanatory prose; the selector
+    # presents user-facing names while retaining the stored numeric IDs.
+    guidance = self.panels["nrdr_lane_centering_stack"]["items"][0]
+    self.assertEqual([(o["value"], o["label"]) for o in guidance["options"]], [(0, "Off"), (2, "Sunny"), (1, "Star")])
     self.assertNotIn("Lane Centering Stack", copy)
     self.assertIn("nrdr_lane_centering_stack", self.panels)
     self.assertIn("nrdr_special", {section["id"] for section in self.pages["steering"]["sections"]})

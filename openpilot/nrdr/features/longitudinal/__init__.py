@@ -11,7 +11,7 @@ if TYPE_CHECKING:
   from openpilot.nrdr.features.longitudinal.long_tune import LongTune, write_tune
   from openpilot.nrdr.features.longitudinal.longcontrol import NrdrLongControl
   from openpilot.nrdr.features.longitudinal.longitudinal_mpc import MpcPolicyResult, NrdrLongitudinalMpc
-  from openpilot.nrdr.features.longitudinal.longitudinal_planner import NrdrLongitudinalPlanner, apply_cruise_overspeed_allowance
+  from openpilot.nrdr.features.longitudinal.longitudinal_planner import NrdrLongitudinalPlanner
   from openpilot.nrdr.features.longitudinal.longitudinal_stopping import compute_stopping_accel
 
 
@@ -21,7 +21,6 @@ __all__ = (
   "NrdrLongControl",
   "NrdrLongitudinalMpc",
   "NrdrLongitudinalPlanner",
-  "apply_cruise_overspeed_allowance",
   "compute_stopping_accel",
   "write_tune",
 )
@@ -32,7 +31,6 @@ _EXPORT_MODULES = {
   "MpcPolicyResult": "openpilot.nrdr.features.longitudinal.longitudinal_mpc",
   "NrdrLongitudinalMpc": "openpilot.nrdr.features.longitudinal.longitudinal_mpc",
   "NrdrLongitudinalPlanner": "openpilot.nrdr.features.longitudinal.longitudinal_planner",
-  "apply_cruise_overspeed_allowance": "openpilot.nrdr.features.longitudinal.longitudinal_planner",
   "compute_stopping_accel": "openpilot.nrdr.features.longitudinal.longitudinal_stopping",
 }
 

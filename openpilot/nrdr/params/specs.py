@@ -139,8 +139,6 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   # backed-up stale values remain harmless instead of becoming unknown.
   _added("NrdrPersonalityAccelProfiles", ParamType.BOOL, PB, "0", ParamLifecycle.TOMBSTONE, ParamOwner.LONGITUDINAL),
   _added("NrdrCruiseMismatchCorrection", ParamType.FLOAT, PB, "100", owner=ParamOwner.LONGITUDINAL),
-  _added("NrdrCruiseOverspeedAllowance", ParamType.INT, PB, "0", owner=ParamOwner.LONGITUDINAL),
-  _added("NrdrExperimentalEngineBraking", ParamType.BOOL, PB, "0", owner=ParamOwner.LONGITUDINAL),
   _added("NrdrStandstillGapExtra", ParamType.FLOAT, PB, "0.0", owner=ParamOwner.LONGITUDINAL),
   _added("HondaCenterScale", ParamType.FLOAT, PB, "0.0", owner=ParamOwner.HONDA),
   _added("HondaPidFriction", ParamType.FLOAT, PB, "0.0", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),

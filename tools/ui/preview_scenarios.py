@@ -1,10 +1,10 @@
 """Bounded routes through existing widgets; absent native menus are not synthesized."""
 
 SCENARIOS = {
-  "tici": ("offroad", "settings", "lateral", "longitudinal", "longitudinal-pcm", "engine-braking", "overshoot", "steer-ratio", "override",
+  "tici": ("offroad", "settings", "lateral", "longitudinal", "longitudinal-pcm", "longitudinal-learning", "steer-ratio", "override",
            "lane-centering", "dm", "accel-boost", "onroad", "onroad-sidebar", "onroad-personality", "onroad-longitudinal",
            "onroad-lane-centering", "onroad-dm", "onroad-accel-boost", "onroad-developer"),
-  "mici": ("offroad", "settings", "longitudinal-pcm", "longitudinal-learning", "engine-braking", "overshoot", "overshoot-selector",
+  "mici": ("offroad", "settings", "longitudinal-pcm", "longitudinal-learning",
            "lane-centering", "dm", "accel-boost", "onroad",
            "onroad-settings", "onroad-personality", "onroad-longitudinal-pcm", "onroad-lane-centering", "onroad-dm",
            "onroad-accel-boost", "onroad-developer"),
@@ -24,35 +24,28 @@ UNSUPPORTED = {
   },
 }
 FIXTURE = "Synthetic Honda Civic/Nidec identity, openpilot longitudinal, no gas interceptor or EPS firmware; not a vehicle recording."
-READ_ONLY_KEYS = ("NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance", "AccelBoostSP")
+READ_ONLY_KEYS = ("HondaLiveLearningGas", "NrdrHondaPcmMode", "NrdrHondaWindBrake", "AccelBoostSP")
 TELEMETRY_SERVICES = ("carState", "carControl", "controlsState", "radarState", "laneCenteringStateSP")
-MICI_LONGITUDINAL_INDEX = {"longitudinal-pcm": 2, "longitudinal-learning": 0, "engine-braking": 5, "overshoot": 6, "overshoot-selector": 6}
-
-
-def open_read_only_selector(control, gui, params):
-  saved = tuple(params.get(key) for key in READ_ONLY_KEYS)
-  previous = gui._nav_stack[-1]
-  assert control.enabled and control._click_callback is not None, "Overshoot control cannot open its selector"
-  control._click_callback()  # Open only; never invoke an option's selection callback.
-  assert tuple(params.get(key) for key in READ_ONLY_KEYS) == saved, "Opening the selector changed tuning params"
-  assert gui._nav_stack[-1] is not previous, "Native overshoot selector did not open"
-  return gui._nav_stack[-1]
+MICI_LONGITUDINAL_INDEX = {"longitudinal-pcm": 2, "longitudinal-learning": 0}
 
 
 def setup_vehicle_fixture():
+  from opendbc.car.honda.values import HondaFlags
   from opendbc.car.structs import car
   from openpilot.cereal import custom
   from openpilot.common.params import Params
 
   params = Params()  # Only called inside the worker's fresh OpenpilotPrefix.
   cp = car.CarParams(brand="honda", carFingerprint="HONDA_CIVIC", wheelbase=2.7, steerRatio=15.38,
-                     openpilotLongitudinalControl=True, pcmCruise=True)
+                     openpilotLongitudinalControl=True, pcmCruise=True,
+                     flags=int(HondaFlags.MVL_LONGITUDINAL | HondaFlags.NIDEC))
   cp_sp = custom.CarParamsSP.new_message(enableGasInterceptor=False)
   for key in ("CarParams", "CarParamsPersistent"):
     params.put(key, cp.to_bytes(), block=True)
   params.put("CarParamsSPPersistent", cp_sp.to_bytes(), block=True)
   for key, value in {"NrdrSuggestedSettings": False, "NrdrHandcraftedLateralTune": False,
-                     "NrdrFirstRunSetupDone": True, "AlwaysOnDM": True, "AccelBoostSP": False}.items():
+                     "NrdrFirstRunSetupDone": True, "AlwaysOnDM": True, "AccelBoostSP": False,
+                     "HondaLiveLearningGas": True}.items():
     params.put_bool(key, value, block=True)
   params.put("LaneGuidanceMode", 1, block=True)  # Star, solely to expose its tuning controls.
   params.put("DevUIInfo", 0, block=True)
@@ -167,7 +160,7 @@ def build_preview_script(pm, main_layout, variant, device, markers):
         main_layout.open_settings(PanelType.NRDR)
         checks.extend(((main_layout, "_current_mode", MainState.SETTINGS), (settings, "_current_panel", PanelType.NRDR)))
         panel = NrdrPanel.NRDR if route == "settings" else (
-          NrdrPanel.LONGITUDINAL if route.startswith("longitudinal") or route in ("engine-braking", "overshoot") else NrdrPanel.LATERAL)
+          NrdrPanel.LONGITUDINAL if route.startswith("longitudinal") else NrdrPanel.LATERAL)
         nrdr._set_current_panel(panel)
         checks.append((nrdr, "_current_panel", panel))
         widget = nrdr if route == "settings" else nrdr._panel_widget(panel)
@@ -177,7 +170,7 @@ def build_preview_script(pm, main_layout, variant, device, markers):
           lateral._set_panel(subpanel)
           checks.append((lateral, "_current_panel", subpanel))
           widget = lateral if route == "lateral" else lateral._panel_widget(subpanel)
-        focused_controls = {"longitudinal-pcm": "_pcm_mode", "engine-braking": "_engine_braking", "overshoot": "_cruise_overspeed_allowance"}
+        focused_controls = {"longitudinal-pcm": "_pcm_mode", "longitudinal-learning": "_live_learning_gas"}
         if route in focused_controls:
           widget, scroller = getattr(longitudinal, focused_controls[route]), longitudinal._scroller
     else:
@@ -198,9 +191,6 @@ def build_preview_script(pm, main_layout, variant, device, markers):
           gui_app.push_widget(top)
           widget = top._longitudinal_controls[MICI_LONGITUDINAL_INDEX[route]]
           scroller = top._scroller
-          if route == "overshoot-selector":
-            top = widget = open_read_only_selector(widget, gui_app, ui_state.params)
-            scroller = None
         elif route in ("dm", "personality", "lane-centering", "accel-boost"):
           top = settings_mici._toggles_panel
           gui_app.push_widget(top)

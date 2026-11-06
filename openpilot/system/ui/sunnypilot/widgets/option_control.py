@@ -53,6 +53,10 @@ class OptionControlSP(ItemAction):
     """Get the current value of the control"""
     return self.current_value
 
+  @property
+  def enabled(self):
+    return super().enabled and tuning_write_allowed(self.params, self.param_key)
+
   def _refresh_from_params(self, *, force=False):
     now = time.monotonic()
     if not force and now < getattr(self, "_next_param_refresh", 0.0):

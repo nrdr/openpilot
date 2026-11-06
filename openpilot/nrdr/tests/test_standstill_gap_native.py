@@ -39,7 +39,6 @@ def simulate_stop(monkeypatch, extra, e2e, lead_slot):
   params = Params()
   params.put("NrdrStandstillGapExtra", float(extra), block=True)
   params.put("NrdrCruiseMismatchCorrection", 100.0, block=True)
-  params.put("NrdrCruiseOverspeedAllowance", 0, block=True)
   live = get_live_params("plannerd")
   live.refresh_all()
   # Isolate the tested planner from optional map/remote services, not from its

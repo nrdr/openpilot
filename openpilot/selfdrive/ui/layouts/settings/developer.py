@@ -1,4 +1,5 @@
 from openpilot.common.params import Params
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.selfdrive.ui.widgets.ssh_key import ssh_key_item
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets import Widget
@@ -181,7 +182,8 @@ class DeveloperLayout(Widget):
 
   def _on_lat_maneuver_mode(self, state: bool):
     self._params.put_bool("LateralManeuverMode", state, block=True)
-    self._params.put_bool("ExperimentalMode", False, block=True)
+    if tuning_write_allowed(self._params, "ExperimentalMode", CP=ui_state.CP):
+      self._params.put_bool("ExperimentalMode", False, block=True)
     self._params.put_bool("JoystickDebugMode", False, block=True)
     self._joystick_toggle.action_item.set_state(False)
     self._params.put_bool("LongitudinalManeuverMode", False, block=True)

@@ -13,7 +13,7 @@ from openpilot.sunnypilot.selfdrive.controls.lib.accel_boost import AccelBoostSP
 from openpilot.sunnypilot.selfdrive.controls.lib.e2e_alerts_helper import E2EAlertsHelper
 from openpilot.sunnypilot.selfdrive.controls.lib.smart_cruise_control.smart_cruise_control import SmartCruiseControl
 from openpilot.nrdr.features.driver_policy.speed_limit_assist import NrdrSpeedLimitAssist
-from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
+from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled, nrdr_custom_longitudinal_enabled
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.speed_limit_assist import SpeedLimitAssist
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.speed_limit_resolver import SpeedLimitResolver
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
@@ -24,21 +24,33 @@ LongitudinalPlanSource = custom.LongitudinalPlanSP.LongitudinalPlanSource
 
 class LongitudinalPlannerSP:
   def __init__(self, CP: structs.CarParams, CP_SP: structs.CarParamsSP, mpc):
-    nrdr_enabled = nrdr_longitudinal_enabled(CP)
+    self.mvl_enabled = mvl_longitudinal_enabled(CP)
+    nrdr_enabled = nrdr_custom_longitudinal_enabled(CP)
     self.events_sp = EventsSP()
+    self.source = LongitudinalPlanSource.cruise
+    self.e2e_alerts_helper = E2EAlertsHelper()
+    self.openpilot_longitudinal = CP.openpilotLongitudinalControl
+    self.output_v_target = 0.
+    self.output_a_target = 0.
+    if self.mvl_enabled:
+      # Pinned donor defaults: SCC Vision/Map off, SpeedLimitMode=information.
+      # Do not construct settings readers: persisted custom values must not
+      # change targets while these controls are locked. Speed-limit telemetry
+      # remains neutral; model/lead arbitration lives in the donor planner.
+      self.scc = self.resolver = self.sla = self.accel_boost_sp = None
+      self.generation = None
+      return
     self.scc = SmartCruiseControl()
     self.resolver = SpeedLimitResolver(nrdr_enabled=nrdr_enabled)
     self.sla = (NrdrSpeedLimitAssist if nrdr_enabled else SpeedLimitAssist)(CP, CP_SP)
     self.generation = int(model_bundle.generation) if (model_bundle := get_active_bundle()) else None
-    self.source = LongitudinalPlanSource.cruise
-    self.e2e_alerts_helper = E2EAlertsHelper()
     self.accel_boost_sp = AccelBoostSP()
-    self.openpilot_longitudinal = CP.openpilotLongitudinalControl
-
-    self.output_v_target = 0.
-    self.output_a_target = 0.
 
   def update_targets(self, sm: messaging.SubMaster, v_ego: float, a_ego: float, v_cruise: float) -> tuple[float, float]:
+    if self.mvl_enabled:
+      self.source = LongitudinalPlanSource.cruise
+      self.output_v_target, self.output_a_target = v_cruise, a_ego
+      return self.output_v_target, self.output_a_target
     CS = sm['carState']
     v_cruise_cluster_kph = min(CS.vCruiseCluster, V_CRUISE_MAX)
     v_cruise_cluster = v_cruise_cluster_kph * CV.KPH_TO_MS
@@ -72,12 +84,13 @@ class LongitudinalPlannerSP:
     return self.output_v_target, self.output_a_target
 
   def update(self, sm: messaging.SubMaster) -> None:
-    self.accel_boost_sp.update_params()
+    if self.accel_boost_sp is not None:
+      self.accel_boost_sp.update_params()
     self.events_sp.clear()
     self.e2e_alerts_helper.update(sm, self.events_sp)
 
   def apply_accel_boost(self, sm, e2e_accel, mpc_accel, cruise_accel):
-    if self.accel_boost_sp.enabled and self.openpilot_longitudinal:
+    if self.accel_boost_sp is not None and self.accel_boost_sp.enabled and self.openpilot_longitudinal:
       return self.accel_boost_sp.update(sm, e2e_accel, mpc_accel, cruise_accel)
     # This NRDR base has no comma gas-override boost. Off must remain identity.
     return e2e_accel
@@ -92,6 +105,14 @@ class LongitudinalPlannerSP:
     longitudinalPlanSP.vTarget = float(self.output_v_target)
     longitudinalPlanSP.aTarget = float(self.output_a_target)
     longitudinalPlanSP.events = self.events_sp.to_msg()
+
+    if self.mvl_enabled:
+      # No retired/custom speed-control publication in pinned-default mode.
+      e2eAlerts = longitudinalPlanSP.e2eAlerts
+      e2eAlerts.greenLightAlert = self.e2e_alerts_helper.green_light_alert
+      e2eAlerts.leadDepartAlert = self.e2e_alerts_helper.lead_depart_alert
+      pm.send('longitudinalPlanSP', plan_sp_send)
+      return
 
     # Smart Cruise Control
     smartCruiseControl = longitudinalPlanSP.smartCruiseControl

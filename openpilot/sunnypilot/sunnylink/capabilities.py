@@ -15,10 +15,11 @@ from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported
+from openpilot.nrdr.params.tuning_policy import mvl_tuning_exempt
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
-from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
+from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled, mvl_longitudinal_enabled
 from openpilot.nrdr.hooks.driver_monitoring import monitoring_customization_available
-from openpilot.nrdr.ui.honda_pcm import pcm_tuning_available
+from openpilot.nrdr.ui.honda_pcm import pcm_tuning_available, live_gas_available
 from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   RAW_STEER_RATIO_PROFILES, get_raw_steer_ratio_profile, get_steer_ratio_metadata,
@@ -59,6 +60,9 @@ CAPABILITY_FIELDS = (
   "nrdr_firmware_controller_provisional",
   "nrdr_longitudinal_tuning_available",
   "nrdr_honda_pcm_tuning_available",
+  "nrdr_honda_mvl_selection_available",
+  "nrdr_mvl_longitudinal_active",
+  "nrdr_mvl_tuning_exempt",
   "nrdr_manual_steer_ratio_available",
   "nrdr_raw_steer_ratio_available",
   "nrdr_firmware_steer_ratio_available",
@@ -95,6 +99,9 @@ CAPABILITY_LABELS: dict[str, str] = {
   "nrdr_honda_tuning_available": "Confirmed Honda-specific nrdr tuning available",
   "nrdr_longitudinal_tuning_available": "Vehicle explicitly supported by nrdr longitudinal tuning",
   "nrdr_honda_pcm_tuning_available": "Confirmed non-interceptor Honda Nidec with openpilot longitudinal control",
+  "nrdr_honda_mvl_selection_available": "Confirmed Honda with openpilot longitudinal control",
+  "nrdr_mvl_longitudinal_active": "Boot-latched full MVL longitudinal control; changes require restart",
+  "nrdr_mvl_tuning_exempt": "Current vehicle is outside Honda openpilot longitudinal; saved Honda mode does not lock its tuning",
   "nrdr_manual_steer_ratio_available": "nrdr manual steer-ratio geometry available",
   "nrdr_raw_steer_ratio_available": "Matching nrdr measured steer-ratio curve available (may be provisional)",
   "nrdr_firmware_steer_ratio_available": "Exact nrdr firmware steer-ratio geometry available",
@@ -183,7 +190,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
 
   # CarParams-derived capabilities
   CP = None
-  CP_bytes = params.get("CarParamsPersistent")
+  CP_bytes = params.get("CarParams") or params.get("CarParamsPersistent")
   if CP_bytes is not None:
     try:
       CP = messaging.log_from_bytes(CP_bytes, car.CarParams)
@@ -232,6 +239,9 @@ def generate_capabilities(params: Params | None = None) -> dict:
   caps["nrdr_honda_tuning_available"] = confirmed_identity is not None and confirmed_identity[1] == "honda"
   caps["nrdr_longitudinal_tuning_available"] = confirmed_identity is not None and nrdr_longitudinal_enabled(CP)
   caps["nrdr_honda_pcm_tuning_available"] = pcm_tuning_available(CP, CP_SP, params)
+  caps["nrdr_honda_mvl_selection_available"] = live_gas_available(CP, CP_SP, params)
+  caps["nrdr_mvl_longitudinal_active"] = mvl_longitudinal_enabled(CP)
+  caps["nrdr_mvl_tuning_exempt"] = mvl_tuning_exempt(CP)
   # A selected platform and deserialized CP must agree before exposing a
   # vehicle-scoped apply command. A stale CP from the previous car cannot make
   # the command appear for a newly selected unsupported vehicle.

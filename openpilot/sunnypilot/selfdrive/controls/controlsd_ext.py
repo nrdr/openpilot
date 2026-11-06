@@ -19,7 +19,6 @@ from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.nrdr.hooks import initialize_live_parameter_settings
 from openpilot.nrdr.params import read_bool, read_float
 from openpilot.nrdr.features.longitudinal.civic_pcm import pcm_reference
-from openpilot.nrdr.features.longitudinal.engine_braking import engine_brake_context
 from openpilot.nrdr.features.lateral.lane_guidance import (
   LaneGuidanceMode,
   model_action_lane_guidance_mode,
@@ -148,11 +147,6 @@ class ControlsExt(ModelStateBase):
     (CC_SP.civicPcmEnabled, CC_SP.civicPcmReferenceSpeed, CC_SP.civicPcmReferenceMonoTime) = pcm_reference(
       self.CP, self.CP_SP, sm['longitudinalPlan'].speeds, sm.logMonoTime['longitudinalPlan'],
       sm.all_checks(['longitudinalPlan']),
-    )
-    snapshot = self.nrdr_live_params.snapshot
-    (CC_SP.pcmEngineBrakeAllowed, CC_SP.pcmEngineBrakeRequest, CC_SP.pcmEngineBrakeMonoTime) = engine_brake_context(
-      self.CP, self.CP_SP, sm, read_bool(snapshot, 'NrdrExperimentalEngineBraking', False),
-      read_float(snapshot, 'NrdrCruiseOverspeedAllowance', 0.0, 0.0, 10.0),
     )
 
     return CC_SP

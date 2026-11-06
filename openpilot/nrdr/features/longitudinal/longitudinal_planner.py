@@ -63,20 +63,6 @@ def c3_personality_accel_max(v_ego: float, personality) -> float | None:
   return float(np.interp(max(0.0, speed), C3_ACCEL_PROFILE_BP, profile))
 
 
-def apply_cruise_overspeed_allowance(target: float, selected_target: float, set_speed: float,
-                                     v_ego: float, accel: float, allowance: float) -> float:
-  # A lower selected target may represent a speed limit or curve target; never
-  # raise it. Lead/obstacle braking remains independently enforced by the MPC.
-  if not all(np.isfinite(v) for v in (target, selected_target, set_speed, v_ego, allowance)):
-    return target
-  if allowance <= 0.0 or selected_target < set_speed or v_ego <= target:
-    return target
-  # Previously an unconditional 0.1/0.5 m/s negative speed error asked for
-  # braking even inside the allowance. Coast at current speed within the band,
-  # without moving the driver's set speed or permitting unbounded overspeed.
-  return max(target, min(v_ego, set_speed + allowance))
-
-
 class NrdrLongitudinalPlanner:
   def __init__(self, CP, CP_SP, tune):
     self.CP = CP
@@ -86,7 +72,6 @@ class NrdrLongitudinalPlanner:
     self.settings_generation = -1
     self.v_ego_stopping = CP.deprecated.vEgoStopping
     self.cruise_scale = 1.0
-    self.cruise_overspeed_allowance = 0.0
     self.standstill_gap_extra = 0.0
     self.roen_acceleration_limits = False
     self.launch_armed = False
@@ -100,9 +85,6 @@ class NrdrLongitudinalPlanner:
     snapshot = self.params.snapshot
     self.v_ego_stopping = read_float(snapshot, NrdrParamKey.HONDA_V_EGO_STOPPING, self.CP.deprecated.vEgoStopping, 0.0, 5.0)
     self.cruise_scale = read_float(snapshot, NrdrParamKey.NRDR_CRUISE_MISMATCH_CORRECTION, 100.0, 95.0, 105.0) / 100.0
-    self.cruise_overspeed_allowance = read_float(
-      snapshot, NrdrParamKey.NRDR_CRUISE_OVERSPEED_ALLOWANCE, 0.0, 0.0, 10.0,
-    ) * CV.MPH_TO_MS
     self.roen_acceleration_limits = read_bool(snapshot, NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS, False)
     self.standstill_gap_requested = read_float(snapshot, NrdrParamKey.NRDR_STANDSTILL_GAP_EXTRA, 0.0, 0.0, 5.0)
     self.settings_generation = snapshot.generation
@@ -131,13 +113,10 @@ class NrdrLongitudinalPlanner:
   def turn_accel_threshold(self) -> float:
     return ROEN_TURN_ACCEL_THRESHOLD if self.roen_enabled else 0.0
 
-  def cruise_target(self, target: float, set_speed: float, v_ego: float, accel: float) -> float:
+  def cruise_target(self, target: float) -> float:
     if target <= 0.0:
       return target
-    scaled_target = min(target * self.cruise_scale, V_CRUISE_MAX * CV.KPH_TO_MS)
-    return apply_cruise_overspeed_allowance(
-      scaled_target, target, set_speed, v_ego, accel, self.cruise_overspeed_allowance,
-    )
+    return min(target * self.cruise_scale, V_CRUISE_MAX * CV.KPH_TO_MS)
 
   def launch_accel(self, sm, mpc_time_indices, action_time: float, v_ego: float,
                    should_stop: bool, output_accel: float, e2e_active: bool) -> float:

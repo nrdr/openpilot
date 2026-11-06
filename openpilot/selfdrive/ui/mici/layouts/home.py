@@ -14,6 +14,7 @@ from openpilot.system.ui.widgets.label import UnifiedLabel, gui_label
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos, TextAlignment, TextAlignmentVertical
 from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState
 from openpilot.common.version import RELEASE_BRANCHES
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 
 HEAD_BUTTON_FONT_SIZE = 40
 HOME_PADDING = 8
@@ -173,7 +174,8 @@ class MiciHomeLayout(Widget):
     if self._mouse_down_t is not None:
       if time.monotonic() - self._mouse_down_t > 0.5:
         # long gating for experimental mode - only allow toggle if longitudinal control is available
-        if ui_state.has_longitudinal_control and ui_state.experimental_mode_confirmed:
+        if (ui_state.has_longitudinal_control and ui_state.experimental_mode_confirmed
+            and tuning_write_allowed(ui_state.params, "ExperimentalMode", CP=ui_state.CP)):
           ui_state.experimental_mode = not ui_state.experimental_mode
           ui_state.params.put("ExperimentalMode", ui_state.experimental_mode, block=True)
         self._mouse_down_t = None

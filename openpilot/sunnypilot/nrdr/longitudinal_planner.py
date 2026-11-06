@@ -10,7 +10,6 @@ from openpilot.nrdr.features.longitudinal.longitudinal_planner import (
   ROEN_PLANNER_ACCEL,
   ROEN_TURN_ACCEL_THRESHOLD,
   NrdrLongitudinalPlanner,
-  apply_cruise_overspeed_allowance,
 )
 
 
@@ -24,5 +23,4 @@ __all__ = (
   "ROEN_PLANNER_ACCEL",
   "ROEN_TURN_ACCEL_THRESHOLD",
   "NrdrLongitudinalPlanner",
-  "apply_cruise_overspeed_allowance",
 )

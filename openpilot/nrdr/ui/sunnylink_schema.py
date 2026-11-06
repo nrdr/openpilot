@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 
-from openpilot.nrdr.params.tuning_policy import LONG_SCALE_KEYS, SUGGESTED_LOCK_KEYS, YAW_FIXED_KEYS
+from openpilot.nrdr.params.tuning_policy import LONG_SCALE_KEYS, MVL_DESCRIPTION, MVL_LOCK_KEYS, SUGGESTED_LOCK_KEYS, YAW_FIXED_KEYS
 
 from openpilot.nrdr.params import NRDR_UI_METADATA_BY_KEY, get_ui_metadata
 
@@ -36,6 +36,8 @@ def apply_sunnylink_metadata(item: dict) -> dict:
   expected = sunnylink_fields_for_key(key) if key in NRDR_UI_METADATA_BY_KEY else {}
 
   merged = dict(item)
+  if key == "HondaLiveLearningGas":
+    merged["description"] = MVL_DESCRIPTION
   for field, expected_value in expected.items():
     if field in merged and merged[field] != expected_value:
       raise SunnylinkMetadataConflict(
@@ -58,10 +60,17 @@ def apply_sunnylink_metadata(item: dict) -> dict:
         {"type": "param", "key": "NrdrLateralController", "equals": 1},
         {"type": "capability", "field": "nrdr_firmware_prediction_schedule", "equals": True},
       ]}})
-    if key in LONG_SCALE_KEYS:
-      condition = {"type": "not", "condition": {"type": "param", "key": "HondaLiveLearningGas", "equals": True}}
+    if key in MVL_LOCK_KEYS:
+      condition = {"type": "not", "condition": {"type": "any", "conditions": [
+        {"type": "all", "conditions": [
+          {"type": "param", "key": "HondaLiveLearningGas", "equals": True},
+          {"type": "not", "condition": {"type": "capability", "field": "nrdr_mvl_tuning_exempt", "equals": True}},
+        ]},
+        {"type": "capability", "field": "nrdr_mvl_longitudinal_active", "equals": True},
+      ]}}
       enablement.append(condition)
-      merged["visibility"] = [*copy.deepcopy(merged.get("visibility", [])), condition]
+      if key in LONG_SCALE_KEYS:
+        merged["visibility"] = [*copy.deepcopy(merged.get("visibility", [])), condition]
     if enablement:
       merged["enablement"] = enablement
   return merged

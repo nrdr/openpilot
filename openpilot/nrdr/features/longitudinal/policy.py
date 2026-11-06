@@ -8,6 +8,24 @@ and regression tests before adding its exact (brand, fingerprint) pair below.
 TUNED_NON_HONDA_CARS: frozenset[tuple[str, str]] = frozenset()
 
 
+def mvl_longitudinal_enabled(CP) -> bool:
+  """Use the logged startup choice, never a live saved-setting read.
+
+  The Honda interface qualifies this flag against the active longitudinal
+  hardware. One immutable CarParams choice is shared by planner and controller.
+  """
+  from opendbc.car.honda.values import HondaFlags
+
+  return bool(str(getattr(CP, "brand", "")).lower() == "honda" and
+              getattr(CP, "openpilotLongitudinalControl", False) and
+              int(getattr(CP, "flags", 0)) & HondaFlags.MVL_LONGITUDINAL)
+
+
+def nrdr_custom_longitudinal_enabled(CP) -> bool:
+  """Whether custom NRDR control laws, not just Honda UI support, are active."""
+  return nrdr_longitudinal_enabled(CP) and not mvl_longitudinal_enabled(CP)
+
+
 def nrdr_longitudinal_enabled(CP) -> bool:
   brand = str(getattr(CP, "brand", "")).lower()
   fingerprint = str(getattr(CP, "carFingerprint", ""))

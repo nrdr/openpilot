@@ -11,6 +11,7 @@ from openpilot.selfdrive.modeld.constants import index_function
 from openpilot.selfdrive.controls.radard import _LEAD_ACCEL_TAU
 from openpilot.nrdr.features.longitudinal.longitudinal_mpc import NrdrLongitudinalMpc, apply_standstill_gap
 from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality
+from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.mvl_econ import ECON_T_FOLLOW, ECON_JERK_FACTOR
 
 if __name__ == '__main__':  # generating code
   from acados.acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver
@@ -67,7 +68,7 @@ def get_jerk_factor(personality=log.LongitudinalPersonality.standard):
   elif personality==log.LongitudinalPersonality.aggressive:
     return 0.5
   elif personality==log.LongitudinalPersonality.econ:
-    return 1.5
+    return ECON_JERK_FACTOR
   else:
     raise NotImplementedError("Longitudinal personality not supported")
 
@@ -80,7 +81,7 @@ def get_T_FOLLOW(personality=log.LongitudinalPersonality.standard):
   elif personality==log.LongitudinalPersonality.aggressive:
     return 1.25
   elif personality==log.LongitudinalPersonality.econ:
-    return 2.25
+    return ECON_T_FOLLOW
   else:
     raise NotImplementedError("Longitudinal personality not supported")
 
@@ -218,12 +219,14 @@ def gen_long_ocp():
 
 
 class LongitudinalMpc:
-  def __init__(self, dt=DT_MDL, honda_bosch_a_radar: bool = False, *, nrdr_enabled: bool = False):
+  def __init__(self, dt=DT_MDL, honda_bosch_a_radar: bool = False, *, nrdr_enabled: bool = False,
+               mvl_enabled: bool = False):
     self.dt = dt
+    self.mvl_enabled = mvl_enabled
     self.nrdr = NrdrLongitudinalMpc(
       dt, T_IDXS, T_DIFFS, ACCEL_MIN, ACCEL_MAX, MIN_X_LEAD_FACTOR, ACCEL_MIN, cloudlog.warning,
       honda_bosch_a_radar=honda_bosch_a_radar,
-    ) if nrdr_enabled else None
+    ) if nrdr_enabled and not mvl_enabled else None
     self.tune = self.nrdr.tune if self.nrdr is not None else None
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
     self.reset()
@@ -277,7 +280,7 @@ class LongitudinalMpc:
       self.solver.cost_set(i, 'Zl', Zl)
 
   def set_weights(self, prev_accel_constraint=True, personality=log.LongitudinalPersonality.standard):
-    personality = longitudinal_personality(personality, self.nrdr is not None)
+    personality = longitudinal_personality(personality, self.mvl_enabled or self.nrdr is not None)
     if self.nrdr is not None:
       jerk_factor = self.nrdr.base_jerk(personality, get_jerk_factor)
       a_change_factor, jerk_factor = self.nrdr.jerk_factors(personality, jerk_factor, self.x0[1])
@@ -329,7 +332,7 @@ class LongitudinalMpc:
 
   def update(self, radarstate, personality=log.LongitudinalPersonality.standard, *, model=None, v_cruise=None,
              extra_stop_distance=0.0):
-    personality = longitudinal_personality(personality, self.nrdr is not None)
+    personality = longitudinal_personality(personality, self.mvl_enabled or self.nrdr is not None)
     t_follow = get_T_FOLLOW(personality)
     v_ego = self.x0[1]
 

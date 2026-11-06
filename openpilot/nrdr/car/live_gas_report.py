@@ -49,7 +49,8 @@ def live_gas_details(params, *, now: datetime | None = None) -> str:
     "",
     "Gas values shape demand, not pedal position. Drag is an estimate, not measured wind. "
     + "Response models PCM smoothing, not PID feedforward.",
-    "Saved values lag driving. ECU-Matched/Civic Experimental freeze learning. Reset clears gas/wind only.",
+    "Saved values lag driving. Full MVL mode ignores custom PCM shaping and wind-brake choices. "
+    + "This PCM table does not describe Bosch/interceptor learning. Reset clears gas/wind only.",
   ]
   # Sunnylink's info modal preserves <br>, not plain newlines or Markdown.
   return "<br>".join(lines)

@@ -133,6 +133,7 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertFalse(config.honda.enforce_stock_longitudinal)
     self.assertEqual(config.honda.nidec_pcm_mode, 0)
     self.assertTrue(config.honda.nidec_wind_brake)
+    self.assertTrue(config.honda.mvl_longitudinal)
     self.assertEqual(config.hyundai.longitudinal_tuning, 0)
     self.assertFalse(config.subaru.stop_and_go)
     self.assertFalse(config.subaru.stop_and_go_manual_parking_brake)
@@ -144,6 +145,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       str(NrdrHondaParamKey.HONDA_BOSCH_A_RADAR),
       str(NrdrHondaParamKey.NRDR_HONDA_PCM_MODE),
       str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE),
+      str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS),
       *(str(key) for key in HOST_STARTUP_DEFAULTS),
     ])
 
@@ -172,7 +174,10 @@ class TestOpendbcBoundary(unittest.TestCase):
     try:
       self.assertFalse(honda.bosch_a_radar)
       self.assertFalse(provider._workers_started)
-      self.assertFalse({key for key, _ in params.reads} & {str(key) for group in SLOW_PARAM_GROUPS for key in group})
+      # The full longitudinal mode is captured once at startup. Background
+      # refresh and all other live-setting reads remain dormant here.
+      self.assertEqual({key for key, _ in params.reads} & {str(key) for group in SLOW_PARAM_GROUPS for key in group},
+                       {str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS)})
       provider.initialize_live_learning_gas(False)
       self.assertTrue(provider._workers_started)
     finally:
@@ -293,7 +298,7 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertEqual(tuning.alt_dashboard_distance, 2)
 
   def test_live_learning_default_is_initialized_by_openpilot(self):
-    for gas_interceptor, expected in ((True, False), (False, True)):
+    for gas_interceptor, expected in ((True, True), (False, True)):
       with self.subTest(gas_interceptor=gas_interceptor, expected=expected):
         params = FakeParams()
         provider = HondaParamsProvider(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
@@ -301,6 +306,18 @@ class TestOpendbcBoundary(unittest.TestCase):
 
         self.assertIs(params.values[str(OpendbcParamKey.HONDA_LIVE_LEARNING_GAS)], expected)
         self.assertIs(provider.get_live_tuning().live_learning_gas, expected)
+
+  def test_mvl_mode_is_one_startup_choice_not_a_live_control_law_switch(self):
+    for initial in (True, False):
+      with self.subTest(initial=initial):
+        params = FakeParams({"HondaLiveLearningGas": initial})
+        config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+        self.assertIs(config.honda.mvl_longitudinal, initial)
+        params.values["HondaLiveLearningGas"] = not initial
+        config.honda.provider.refresh_all()
+        self.assertIs(config.honda.mvl_longitudinal, initial)
+        restarted = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+        self.assertIs(restarted.honda.mvl_longitudinal, not initial)
 
   def test_live_learning_user_override_is_preserved(self):
     for existing in (True, False):

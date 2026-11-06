@@ -37,6 +37,7 @@ from openpilot.sunnypilot.sunnylink.tools.generate_settings_schema import genera
 from openpilot.nrdr.features.services.sunnylink import (
   HONDA_TUNING_WRITE_KEYS, allow_param_write, request_stored_handcrafted_lateral_profile,
 )
+from openpilot.nrdr.features.longitudinal.personality import write_personality
 
 SUNNYLINK_ATHENA_HOST = os.getenv('SUNNYLINK_ATHENA_HOST', 'wss://athena.sunnylink.ai')
 HANDLER_THREADS = int(os.getenv('HANDLER_THREADS', "4"))
@@ -279,8 +280,19 @@ def _remote_int_value(value: str, compression: bool) -> int | None:
 @dispatcher.add_method
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
   from openpilot.nrdr.car.live_gas_reset import REQUEST, request_reset, stored_cp
-  from openpilot.nrdr.params.tuning_policy import reset_learning_scales, tuning_write_allowed
+  from openpilot.nrdr.params.tuning_policy import MVL_LOCK_KEYS, mvl_tuning_locked, tuning_write_allowed
   onroad = not params.get_bool("IsOffroad")
+  retired = {"NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance"}.intersection(params_to_update)
+  if retired:
+    raise ValueError(f"Retired settings cannot be written: {', '.join(sorted(retired))}")
+  live_gas_selection = None
+  if "HondaLiveLearningGas" in params_to_update:
+    live_gas_selection = _remote_bool_value(params_to_update["HondaLiveLearningGas"], compression)
+    if live_gas_selection is None or onroad:
+      raise ValueError("Live Learning Gas requires a boolean and can only be changed while parked. Restart required.")
+  conflicts = MVL_LOCK_KEYS.intersection(params_to_update)
+  if conflicts and (live_gas_selection is True or mvl_tuning_locked(params)):
+    raise ValueError("Full MVL longitudinal owns these settings. Save OFF separately and restart before changing custom tuning.")
   if REQUEST in params_to_update:
     selected = _remote_bool_value(params_to_update[REQUEST], compression)
     if selected is None or (selected and len(params_to_update) != 1):
@@ -305,10 +317,20 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       raise ValueError("Monitoring reminder timing must be 50–250% in 5% steps.")
   vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {
     "NrdrHandcraftedLateralTune", "NrdrSuggestedSettings", "LagdToggle", "LagdToggleDelay", "LaneGuidanceMode",
+    "HondaLiveLearningGas", "NrdrHondaPcmMode", "NrdrHondaWindBrake",
   }
   capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
   handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
   honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
+  if live_gas_selection is not None and capabilities.get("nrdr_honda_mvl_selection_available") is not True:
+    raise ValueError("Live Learning Gas requires a confirmed Honda with openpilot longitudinal control.")
+  pcm_selections = {}
+  for key in ("NrdrHondaPcmMode", "NrdrHondaWindBrake"):
+    if key in params_to_update:
+      selected = (_remote_int_value if key == "NrdrHondaPcmMode" else _remote_bool_value)(params_to_update[key], compression)
+      if onroad or selected is None or capabilities.get("nrdr_honda_pcm_tuning_available") is not True:
+        raise ValueError("PCM settings require a valid choice on a parked non-interceptor Nidec. Restart required.")
+      pcm_selections[key] = selected
   controller_selection = None
   lane_guidance_selection = None
   if "NrdrLateralController" in params_to_update:
@@ -334,6 +356,8 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     if lane_guidance_selection == 2 and capabilities.get("custom_model_active") is not True:
       raise ValueError("Sunny requires a non-Default custom model. The selection was not saved.")
   for key, value in params_to_update.items():
+    if key in MVL_LOCK_KEYS and mvl_tuning_locked(params):
+      raise ValueError("Setting is locked by saved or active MVL longitudinal control.")
     if not tuning_write_allowed(params, key, firmware_prediction_schedule=capabilities.get("nrdr_firmware_prediction_schedule") is True):
       cloudlog.warning(f"sunnylinkd.saveParams.locked: '{key}'")
       continue
@@ -354,7 +378,24 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       continue
 
     try:
-      if key == "NrdrDriverMonitoringReminderPercent":
+      if key == "HondaLiveLearningGas" or key in pcm_selections:
+        capability = "nrdr_honda_mvl_selection_available" if key == "HondaLiveLearningGas" else "nrdr_honda_pcm_tuning_available"
+        if not params.get_bool("IsOffroad") or _vehicle_tuning_capabilities().get(capability) is not True:
+          raise ValueError("Longitudinal mode can only be changed while parked with the matching vehicle.")
+        if key in pcm_selections and mvl_tuning_locked(params):
+          raise ValueError("PCM settings are locked by MVL longitudinal control.")
+        selected = live_gas_selection if key == "HondaLiveLearningGas" else pcm_selections[key]
+        writer = params.put if key == "NrdrHondaPcmMode" else params.put_bool
+        writer(key, selected, block=True)
+        params.put_bool("OnroadCycleRequested", True, block=True)
+      elif key == "LongitudinalPersonality":
+        decoded = base64.b64decode(value, validate=True)
+        if compression:
+          decoded = gzip.decompress(decoded)
+        if decoded not in (b"0", b"1", b"2", b"3"):
+          raise ValueError("Invalid longitudinal personality")
+        write_personality(params, int(decoded))
+      elif key == "NrdrDriverMonitoringReminderPercent":
         if not params.get_bool("IsOffroad"):
           raise ValueError("Monitoring reminder timing cannot be changed after the car starts.")
         params.put(key, monitoring_selection, block=True)
@@ -378,11 +419,9 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
           cloudlog.warning("sunnylinkd.saveParams.handcrafted: Fresh request rejected for current vehicle or state")
       else:
         save_param_from_base64_encoded_string(key, value, compression)
-      if key == "HondaLiveLearningGas":
-        reset_learning_scales(params)
     except Exception as e:
       cloudlog.error(f"sunnylinkd.saveParams.exception {e}")
-      if key in ("NrdrLateralController", "NrdrDriverMonitoringReminderPercent"):
+      if key in ("NrdrLateralController", "NrdrDriverMonitoringReminderPercent", "HondaLiveLearningGas", "LongitudinalPersonality", *pcm_selections):
         raise ValueError("Setting could not be saved. Refresh settings to read the device's selection.") from e
 
   # Increment version counter for frontend change detection

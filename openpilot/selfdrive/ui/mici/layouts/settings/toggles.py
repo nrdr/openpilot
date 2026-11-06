@@ -1,6 +1,7 @@
 from collections.abc import Callable
 
 from openpilot.cereal import log
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 
 from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.selfdrive.ui.mici.layouts.settings.lane_centering import LaneCenteringLayoutMici
@@ -48,6 +49,7 @@ class TogglesLayoutMici(NavScroller):
     self._experimental_btn = BigToggle("experimental mode", initial_state=ui_state.params.get_bool("ExperimentalMode"),
                                        toggle_callback=self._on_experimental_mode,
                                        description="Let the driving model control gas and brakes. These are alpha features. Expect mistakes.")
+    self._experimental_btn.set_enabled(self._experimental_mode_editable)
     self._accel_boost_toggle = BigParamControl(
       "acceleration boost", "AccelBoostSP",
       description="Sunny's boost in Experimental Mode. Off by default; inactive in Econ.",
@@ -130,19 +132,29 @@ class TogglesLayoutMici(NavScroller):
         self._experimental_btn.set_visible(False)
         self._experimental_btn.set_checked(False)
         self._personality_toggle.set_visible(False)
-        if ui_state.params.get("ExperimentalMode") is not False:
+        if ui_state.params.get("ExperimentalMode") is not False and tuning_write_allowed(ui_state.params, "ExperimentalMode", CP=ui_state.CP):
           ui_state.params.put_bool("ExperimentalMode", False, block=True)
 
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
 
+  def _experimental_mode_editable(self):
+    return ((ui_state.CP is None or ui_state.has_longitudinal_control)
+            and tuning_write_allowed(ui_state.params, "ExperimentalMode", CP=ui_state.CP))
+
   def _on_experimental_mode(self, state: bool):
+    if not self._experimental_mode_editable():
+      self._experimental_btn.set_checked(ui_state.params.get_bool("ExperimentalMode"))
+      return
     if state and not ui_state.params.get_bool("ExperimentalModeConfirmed"):
       # Don't show enabled state until confirm
       self._experimental_btn.set_checked(False)
 
       def on_confirm():
+        if not self._experimental_mode_editable():
+          self._experimental_btn.set_checked(ui_state.params.get_bool("ExperimentalMode"))
+          return
         ui_state.params.put_bool("ExperimentalModeConfirmed", True)
         ui_state.params.put_bool("ExperimentalMode", True)
         self._experimental_btn.set_checked(True)

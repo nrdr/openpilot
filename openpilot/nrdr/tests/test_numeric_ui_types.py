@@ -55,6 +55,6 @@ def test_float_settings_write_decimals_without_crashing(key, filename):
 
 def test_blend_display_and_one_degree_step_are_preserved():
   settings = option("NrdrSteerRatioBlendStart", "steer_ratio_tuning.py")
-  assert settings["label_callback"](2500) == "25–30°"
-  assert settings["label_callback"](18000) == "180–185°"
+  assert settings["label_callback"](2500) == "25-30°"
+  assert settings["label_callback"](18000) == "180-185°"
   assert settings["value_change_step"] / 100 == 1

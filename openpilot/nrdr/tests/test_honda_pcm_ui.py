@@ -12,6 +12,8 @@ from opendbc.car import structs
 from opendbc.car.honda.values import CAR, HONDA_BOSCH
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.nrdr.ui.honda_pcm import pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice
+from openpilot.nrdr.ui.honda_pcm import live_gas_available, save_live_gas_choice
+from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, mvl_tuning_locked, tuning_write_allowed
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -145,7 +147,7 @@ def test_mici_saved_selection_refresh_and_click_time_recheck():
   ui = state()
   env = {"BigMultiToggle": Widget, "BigToggle": Widget, "ui_state": ui, "tr": lambda s: s,
          "pcm_tuning_available": pcm_tuning_available, "saved_pcm_mode": saved_pcm_mode,
-         "saved_wind_brake": saved_wind_brake, "save_pcm_choice": save_pcm_choice}
+         "saved_wind_brake": saved_wind_brake, "save_pcm_choice": save_pcm_choice, "mvl_tuning_locked": mvl_tuning_locked}
   exec(compile(tree, str(path), "exec"), env)
   mode, wind = env["PcmModeControl"](), env["WindBrakeControl"]()
   assert mode.text == "PCM Command Shaping"
@@ -241,6 +243,7 @@ def native_layout(ui, toggle_factory=None):
     def __init__(self, **kwargs):
       self.kwargs = kwargs
       self.action_item = self
+      self.param_key = kwargs.get("param")
 
     def set_enabled(self, enabled):
       self.enabled = enabled
@@ -261,6 +264,8 @@ def native_layout(ui, toggle_factory=None):
          "saved_pcm_mode": saved_pcm_mode, "saved_wind_brake": saved_wind_brake, "save_pcm_choice": save_pcm_choice,
          "gas_reset_available": lambda: False, "large_reset_button": Item, "LineSeparatorSP": lambda _: NS(),
          "toggle_item_sp": toggle_factory or Item, "option_item_sp": Item, "multiple_button_item_sp": Item}
+  env.update(MVL_DESCRIPTION=MVL_DESCRIPTION, mvl_tuning_locked=mvl_tuning_locked, tuning_write_allowed=tuning_write_allowed,
+             live_gas_available=live_gas_available, save_live_gas_choice=save_live_gas_choice)
   exec(compile(tree, str(path), "exec"), env)
   layout = object.__new__(env["LongitudinalTuningLayout"])
   layout._tuning_items = layout._initialize_items()
@@ -321,220 +326,6 @@ def native_layout_with_real_toggle_handlers(ui):
   return native_layout(ui, Item)
 
 
-@pytest.mark.parametrize("saved", [False, True])
-@pytest.mark.parametrize("offroad", [False, True])
-def test_native_engine_saved_initial_state_refresh_and_live_save(saved, offroad):
-  ui = state()
-  ui.is_offroad = lambda: offroad
-  ui.params.values["NrdrExperimentalEngineBraking"] = saved
-  layout = native_layout_with_real_toggle_handlers(ui)
-  engine = layout._engine_braking
-  assert engine.kwargs.get("param") is None
-  assert engine.kwargs["initial_state"] is saved
-  assert engine.toggle.get_state() is saved
-  assert engine.enabled()
-  assert not ui.params.writes
-  layout._update_state()
-  assert engine.enabled is True
-  ui.params.values["NrdrExperimentalEngineBraking"] = not saved
-  layout._update_state()
-  assert engine.toggle.get_state() is not saved
-  assert not ui.params.writes
-  engine.toggle._handle_mouse_release(None)
-  assert engine.toggle.get_state() is saved
-  assert ui.params.writes == [("NrdrExperimentalEngineBraking", saved)]
-
-
-@pytest.mark.parametrize("saved", [False, True])
-@pytest.mark.parametrize("change", ["interceptor", "stock", "missing_cp", "missing_cp_sp", "stale_identity",
-                                   "openlong_off", "clarity", "pilot", "bosch", "non_honda"])
-def test_native_engine_rejected_release_cannot_write_bound_param(change, saved):
-  ui = state()
-  ui.params.values["NrdrExperimentalEngineBraking"] = saved
-  layout = native_layout_with_real_toggle_handlers(ui)
-  layout._update_state()
-  engine = layout._engine_braking
-  assert engine.enabled
-  if change == "interceptor":
-    ui.CP_SP.enableGasInterceptor = True
-  elif change == "stock":
-    ui.CP_SP.flags |= HondaFlagsSP.STOCK_LONGITUDINAL
-  elif change == "missing_cp":
-    ui.CP = None
-  elif change == "missing_cp_sp":
-    ui.CP_SP = None
-  elif change == "stale_identity":
-    ui.params.values["CarPlatformBundle"] = {"brand": "honda", "platform": "HONDA_CLARITY"}
-  elif change == "openlong_off":
-    ui.CP.openpilotLongitudinalControl = False
-  elif change == "non_honda":
-    ui.CP.brand = "toyota"
-  else:
-    ui.CP.carFingerprint = {"clarity": "HONDA_CLARITY", "pilot": "HONDA_PILOT", "bosch": "HONDA_CIVIC_BOSCH"}[change]
-  # Deliberately click with a stale enabled widget, before any display refresh.
-  engine.toggle._handle_mouse_release(None)
-  assert not ui.params.writes
-  assert ui.params.get_bool("NrdrExperimentalEngineBraking") is saved
-  assert engine.toggle.get_state() is saved
-  layout._update_state()
-  assert engine.enabled is False
-  assert engine.toggle.get_state() is saved
-  # Direct callback invocations must be guarded as well.
-  engine.kwargs["callback"](not saved)
-  assert not ui.params.writes
-  assert engine.toggle.get_state() is saved
-
-
-def test_native_engine_missing_vehicle_is_safe_at_initialization_and_refresh():
-  ui = state()
-  ui.CP = ui.CP_SP = None
-  layout = native_layout_with_real_toggle_handlers(ui)
-  assert not layout._engine_braking.enabled()
-  assert layout._engine_braking.toggle.get_state() is False
-  layout._update_state()
-  assert layout._engine_braking.enabled is False
-  layout._engine_braking.kwargs["callback"](True)
-  assert not ui.params.writes
-
-
-def test_mici_controls_are_in_requested_order_and_wired_into_device_menu():
-  path = ROOT / "openpilot/nrdr/ui/settings/pcm_modes_mici.py"
-  tree = ast.parse(path.read_text(encoding="utf-8"))
-  tree.body = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "longitudinal_controls"]
-  env = {"tr": lambda s: s, "BigParamControl": Widget, "LiveGasControl": lambda: "live",
-         "mici_reset_button": lambda: "reset", "PcmModeControl": lambda: "mode", "WindBrakeControl": lambda: "wind",
-         "EngineBrakeControl": lambda: "engine", "OverspeedAllowanceControl": lambda: "overspeed"}
-  exec(compile(tree, str(path), "exec"), env)
-  controls = env["longitudinal_controls"]()
-  assert controls[:4] == ["live", "reset", "mode", "wind"]
-  assert controls[4].text == "Keep Feedforward Static"
-  assert controls[5:] == ["engine", "overspeed"]
-  device = (ROOT / "openpilot/selfdrive/ui/sunnypilot/mici/layouts/device.py").read_text(encoding="utf-8")
-  assert "self._longitudinal_controls = longitudinal_controls()" in device
-  assert "self._scroller.add_widgets(self._longitudinal_controls)" in device
-
-
-def compact_controls(ui):
-  from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
-
-  class Selector:
-    def __init__(self):
-      self.buttons = []
-      self._scroller = NS(add_widgets=self.buttons.extend)
-
-  pushed, popped = [], []
-  path = ROOT / "openpilot/nrdr/ui/settings/pcm_modes_mici.py"
-  tree = ast.parse(path.read_text(encoding="utf-8"))
-  tree.body = [n for n in tree.body if isinstance(n, ast.ClassDef) and n.name in ("EngineBrakeControl", "OverspeedAllowanceControl")]
-  env = {"BigToggle": Widget, "BigButton": Widget, "NavScroller": Selector,
-         "ui_state": ui, "tr": lambda s: s, "pcm_tuning_available": pcm_tuning_available,
-         "save_pcm_choice": save_pcm_choice, "nrdr_longitudinal_enabled": nrdr_longitudinal_enabled,
-         "gui_app": NS(push_widget=pushed.append, pop_widget=lambda: popped.append(True))}
-  exec(compile(tree, str(path), "exec"), env)
-  return env["EngineBrakeControl"](), env["OverspeedAllowanceControl"](), pushed, popped
-
-
-def test_mici_engine_refreshes_saved_choice_and_saves_live_without_restart():
-  ui = state()
-  engine, _, _, _ = compact_controls(ui)
-  assert engine.enabled()
-  assert engine.kwargs["initial_state"] is False
-  engine._select(True)
-  assert ui.params.writes == [("NrdrExperimentalEngineBraking", True)]
-  assert engine.value is True
-  ui.params.values["NrdrExperimentalEngineBraking"] = False
-  engine._update_state()
-  assert engine.value is False
-  ui.params.writes.clear()
-  ui.is_offroad = lambda: False
-  assert engine.enabled()
-  engine._select(True)
-  assert engine.value is True
-  assert ui.params.writes == [("NrdrExperimentalEngineBraking", True)]
-  engine._select(False)
-  assert engine.value is False
-  assert ui.params.writes[-1] == ("NrdrExperimentalEngineBraking", False)
-
-
-@pytest.mark.parametrize("car", list(CAR))
-def test_mici_engine_control_is_civic_pcm_only(car):
-  ui = state(carFingerprint=str(car))
-  engine, _, _, _ = compact_controls(ui)
-  assert engine.enabled() == (car == CAR.HONDA_CIVIC)
-  engine._select(True)
-  assert bool(ui.params.writes) == (car == CAR.HONDA_CIVIC)
-
-
-@pytest.mark.parametrize("change", ["interceptor", "stock", "missing_cp", "missing_cp_sp", "stale_identity", "openlong_off"])
-def test_mici_engine_selection_rechecks_vehicle_after_menu_opens(change):
-  ui = state()
-  engine, _, _, _ = compact_controls(ui)
-  assert engine.enabled()
-  if change == "interceptor":
-    ui.CP_SP.enableGasInterceptor = True
-  elif change == "stock":
-    ui.CP_SP.flags |= HondaFlagsSP.STOCK_LONGITUDINAL
-  elif change == "missing_cp":
-    ui.CP = None
-  elif change == "missing_cp_sp":
-    ui.CP_SP = None
-  elif change == "stale_identity":
-    ui.params.values["CarPlatformBundle"] = {"brand": "honda", "platform": "HONDA_CLARITY"}
-  else:
-    ui.CP.openpilotLongitudinalControl = False
-  assert not engine.enabled()
-  engine._select(True)
-  assert engine.value is False and not ui.params.writes
-
-
-@pytest.mark.parametrize("value", range(11))
-def test_mici_overspeed_uses_separate_nav_choices_and_saves_each_value(value):
-  ui = state()
-  ui.params.values["NrdrCruiseOverspeedAllowance"] = 5
-  _, allowance, pushed, popped = compact_controls(ui)
-  assert allowance.value == "5 mph"
-  allowance.click_callback()
-  assert len(pushed) == 1
-  choices = pushed[0].buttons
-  assert [button.text for button in choices] == [f"{i} mph" for i in range(11)]
-  assert [button.kwargs["value"] for button in choices] == ["selected" if i == 5 else "" for i in range(11)]
-  choices[value].click_callback()
-  assert ui.params.writes == [("NrdrCruiseOverspeedAllowance", value)]
-  assert allowance.value == f"{value} mph"
-  assert popped == [True]
-  ui.params.values["NrdrCruiseOverspeedAllowance"] = 10 - value
-  allowance._update_state()
-  assert allowance.value == f"{10 - value} mph"
-
-
-@pytest.mark.parametrize("value", [None, True, False, -1, 11, 1.0, "5", b"5", {}])
-def test_mici_overspeed_invalid_values_do_not_write_or_navigate(value):
-  ui = state()
-  ui.params.values["NrdrCruiseOverspeedAllowance"] = value
-  _, allowance, pushed, popped = compact_controls(ui)
-  assert allowance.value == "0 mph"
-  allowance._select(value)
-  assert not ui.params.writes and not pushed and not popped
-
-
-@pytest.mark.parametrize("change", ["onroad", "non_honda", "missing_cp"])
-def test_mici_overspeed_rechecks_before_opening_and_saving(change):
-  ui = state()
-  _, allowance, pushed, popped = compact_controls(ui)
-  allowance.click_callback()
-  choice = pushed[0].buttons[8]
-  if change == "onroad":
-    ui.is_offroad = lambda: False
-  elif change == "non_honda":
-    ui.CP.brand = "toyota"
-  else:
-    ui.CP = None
-  assert not allowance.enabled() and not choice.enabled()
-  choice.click_callback()
-  allowance.click_callback()
-  assert not ui.params.writes and not popped and len(pushed) == 1
-
-
 def test_mici_device_show_refresh_is_not_position_dependent():
   calls = []
 
@@ -550,22 +341,6 @@ def test_mici_device_show_refresh_is_not_position_dependent():
   device = object.__new__(env["DeviceLayoutMiciSP"])
   device._disable_power_down = NS(refresh=lambda: calls.append("power"))
   device._longitudinal_controls = [NS(), NS(refresh=lambda: calls.append("static")),
-                                   NS(refresh=lambda: calls.append("engine")), NS(refresh=lambda: calls.append("overspeed")), NS()]
+                                   NS(refresh=lambda: calls.append("mode")), NS(refresh=lambda: calls.append("wind")), NS()]
   device.show_event()
-  assert calls == ["base", "power", "static", "engine", "overspeed"]
-
-
-def test_mici_new_control_labels_fit_the_compact_cards():
-  engine, allowance, _, _ = compact_controls(state())
-  for control, width, has_value in ((engine, engine._title_width_hint(), False), (allowance, 322, True)):
-    size = control.kwargs["font_size"]
-    lines = []
-    for word in control.text.split():
-      joined = f"{lines[-1]} {word}" if lines else word
-      if lines and _font_advance_upper_bound("Inter-Bold.ttf", joined, size) <= width:
-        lines[-1] = joined
-      else:
-        lines.append(word)
-    assert all(_font_advance_upper_bound("Inter-Bold.ttf", line, size) <= width for line in lines)
-    title_height = size * 1.16 * (1 + .9 * (len(lines) - 1))
-    assert title_height + (36 * 1.16 if has_value else 0) <= 180 - 2 * 23
+  assert calls == ["base", "power", "static", "mode", "wind"]

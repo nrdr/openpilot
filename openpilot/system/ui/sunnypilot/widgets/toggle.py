@@ -8,7 +8,7 @@ from collections.abc import Callable
 
 import pyray as rl
 from openpilot.common.params import Params
-from openpilot.nrdr.params.tuning_policy import reset_learning_scales, tuning_write_allowed
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.system.ui.lib.application import MousePos
 from openpilot.system.ui.widgets.toggle import Toggle
 from openpilot.system.ui.sunnypilot.lib.styles import style
@@ -33,11 +33,10 @@ class ToggleSP(Toggle):
       return
     super()._handle_mouse_release(mouse_pos)
     if self._enabled and self.param_key:
+      if not tuning_write_allowed(self.params, self.param_key):
+        self.set_state(self.params.get_bool(self.param_key))
+        return
       self.params.put_bool(self.param_key, self._state)
-      if self.param_key == "HondaLiveLearningGas" and self._state:
-        # Blocking enable/readback ordering prevents keeping custom scale values.
-        self.params.put_bool(self.param_key, True, block=True)
-        reset_learning_scales(self.params)
 
   def _render(self, rect: rl.Rectangle):
     self.update()
