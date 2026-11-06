@@ -34,6 +34,16 @@ def test_conflicting_writes_use_saved_or_boot_latched_mode(saved, active, key):
   assert params.get(key) == 123 and not params.writes
 
 
+@pytest.mark.parametrize("saved,active", [(False, False), (True, False), (False, True), (True, True)])
+def test_manual_experimental_is_not_an_mvl_conflict_but_dec_is(saved, active):
+  params = Params(HondaLiveLearningGas=saved, CarParamsPersistent=cp_bytes(active))
+  assert "ExperimentalMode" not in MVL_LOCK_KEYS
+  assert "DynamicExperimentalControl" in MVL_LOCK_KEYS
+  assert tuning_write_allowed(params, "ExperimentalMode")
+  assert tuning_write_allowed(params, "DynamicExperimentalControl") is not (saved or active)
+  assert not params.writes
+
+
 @pytest.mark.parametrize("key", ["LongitudinalPersonality", "HondaLiveLearningGas", "HondaBoschARadar",
   "AlphaLongitudinalEnabled", "HondaNidecStockLongitudinal", "EnableGasInterceptor", "DisengageOnAccelerator",
   "NrdrResetLiveGas", "NrdrLiveGasResetStatus", "NrdrCarTuneInfo", "NrdrLateralController", "LatPScaleStandard",
@@ -174,11 +184,24 @@ def rpc():
     node.decorator_list = []
   params = Params(IsOffroad=True, HondaLiveLearningGas=False)
   caps = {"nrdr_honda_mvl_selection_available": True, "nrdr_honda_pcm_tuning_available": True}
-  env = {"params": params, "base64": base64, "gzip": gzip, "HONDA_TUNING_WRITE_KEYS": set(), "BLOCKED_PARAMS": set(),
-         "_vehicle_tuning_capabilities": lambda: caps, "allow_param_write": lambda *a, **k: True,
-         "save_param_from_base64_encoded_string": lambda k, v, c: params.put(k, v),
+  env = {"params": params, "base64": base64, "gzip": gzip, "BLOCKED_PARAMS": set(),
+         "_vehicle_tuning_capabilities": lambda: caps,
          "cloudlog": NS(warning=lambda *a: None, error=lambda *a: None)}
   exec(compile(ast.Module(nodes, []), str(path), "exec"), env)
+  # Exercise the actual remote road-state policy and boolean decoder without
+  # importing Linux hardware or native Params on the portable test host.
+  policy = ast.parse((ROOT / "openpilot/nrdr/features/services/sunnylink.py").read_text(encoding="utf-8"))
+  policy.body = [n for n in policy.body if isinstance(n, ast.FunctionDef) and n.name == "allow_param_write"
+                 or isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id in
+                    ("ONROAD_WRITE_BLOCKLIST", "HONDA_TUNING_WRITE_KEYS") for t in n.targets)]
+  exec(compile(policy, "sunnylink.py", "exec"), env)
+  param_types = NS(BYTES=0, STRING=1, BOOL=2, INT=3, FLOAT=4, TIME=5, JSON=6)
+  params.get_type = lambda key: param_types.INT if key in ("CustomAccShortPressIncrement", "CustomAccLongPressIncrement") else param_types.BOOL
+  env.update(Params=lambda: params, ParamKeyType=param_types, json=json)
+  helpers = ast.parse((ROOT / "openpilot/sunnypilot/sunnylink/utils.py").read_text(encoding="utf-8"))
+  helpers.body = [n for n in helpers.body if isinstance(n, ast.FunctionDef) and n.name in
+                  ("save_param_from_base64_encoded_string", "_convert_param_to_type")]
+  exec(compile(helpers, "utils.py", "exec"), env)
   return env["saveParams"], params, caps
 
 
@@ -198,6 +221,44 @@ def test_remote_live_gas_is_typed_offroad_and_requests_restart(rpc, selected, co
   params.writes.clear()
   with pytest.raises(ValueError):
     save({"HondaLiveLearningGas": encoded(selected, compressed)}, compressed)
+  assert not params.writes
+
+
+@pytest.mark.parametrize("saved,active", [(False, False), (True, False), (False, True), (True, True)])
+@pytest.mark.parametrize("selected", [False, True])
+@pytest.mark.parametrize("offroad", [False, True])
+@pytest.mark.parametrize("compressed", [False, True])
+def test_remote_manual_experimental_on_off_during_mvl_restart_states(rpc, saved, active, selected, offroad, compressed):
+  save, params, _ = rpc
+  params.values.update(HondaLiveLearningGas=saved, CarParamsPersistent=cp_bytes(active), IsOffroad=offroad,
+                       ExperimentalMode=not selected, ExperimentalModeConfirmed=True)
+  save({"ExperimentalMode": encoded(int(selected), compressed)}, compressed)
+  assert params.get_bool("ExperimentalMode") is selected
+  assert params.writes == [("ExperimentalMode", selected), ("ParamsVersion", "1")]
+  assert params.get("HondaLiveLearningGas") is saved
+
+
+@pytest.mark.parametrize("active", [False, True])
+@pytest.mark.parametrize("mvl_selected", [False, True])
+@pytest.mark.parametrize("selected", [False, True])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_remote_manual_experimental_can_share_mvl_restart_batch(rpc, active, mvl_selected, selected, reverse):
+  save, params, _ = rpc
+  params.values.update(HondaLiveLearningGas=not mvl_selected, CarParamsPersistent=cp_bytes(active), ExperimentalMode=not selected)
+  entries = [("HondaLiveLearningGas", encoded(int(mvl_selected))), ("ExperimentalMode", encoded(int(selected)))]
+  save(dict(reversed(entries) if reverse else entries))
+  assert params.get_bool("ExperimentalMode") is selected
+  assert params.get_bool("HondaLiveLearningGas") is mvl_selected
+  assert params.get_bool("OnroadCycleRequested")
+  assert len(params.writes) == 4
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_remote_manual_experimental_does_not_unlock_dec_in_same_batch(rpc, selected):
+  save, params, _ = rpc
+  params.values.update(HondaLiveLearningGas=True, CarParamsPersistent=cp_bytes(True), ExperimentalMode=not selected)
+  with pytest.raises(ValueError):
+    save({"ExperimentalMode": encoded(int(selected)), "DynamicExperimentalControl": encoded(1)})
   assert not params.writes
 
 
@@ -268,7 +329,7 @@ def test_remote_non_honda_ignores_saved_honda_mode_for_global_sunny_controls(rpc
                        CarParams=car.CarParams.new_message(brand="toyota", openpilotLongitudinalControl=True).to_bytes())
   caps.update(nrdr_honda_mvl_selection_available=False, nrdr_honda_pcm_tuning_available=False)
   save({key: encoded(1)})
-  assert params.get(key) == encoded(1)
+  assert params.get(key) == 1
   params.writes.clear()
   with pytest.raises(ValueError):
     save({"HondaLiveLearningGas": encoded(0)})
@@ -309,7 +370,12 @@ def test_compiled_schema_locks_every_conflicting_control_and_preserves_econ_sele
   assert "HondaLiveLearningGas" not in json.dumps(personality.get("enablement"))
   assert "Only Econ" in items["HondaLiveLearningGas"]["description"]
   assert "including following distances" in items["HondaLiveLearningGas"]["description"]
+  assert "Experimental Mode remains manually selectable" in items["HondaLiveLearningGas"]["description"]
   assert items["HondaLiveLearningGas"]["needs_onroad_cycle"]
+  assert items["ExperimentalMode"]["enablement"] == [
+    {"type": "capability", "field": "has_longitudinal_control", "equals": True},
+  ]
+  assert schema == json.loads((ROOT / "openpilot/sunnypilot/sunnylink/settings_ui.json").read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize("saved,active,exempt,allowed", [(True, False, True, True), (True, False, False, False),

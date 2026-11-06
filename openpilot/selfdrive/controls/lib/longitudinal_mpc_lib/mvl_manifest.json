@@ -37,6 +37,7 @@
   },
   "exceptions": [
     "Econ only, as enumerated above. No Params/LongTune or live personality setting inputs to dynamics in MVL mode.",
+    "Manual Experimental Mode is an explicit exception to the donor's unconditional model candidate. Off excludes model acceleration/shouldStop and model-override boost; radar MPC, cruise, FCW and forced deceleration remain. On uses the donor candidate/boost. Turning Off clears only model boost state, retaining planner/PID continuity.",
     "Host schema: allowThrottle=True, matching donor's absence of throttle suppression.",
     "Donor accelBoost publication omitted: host schema currently has no corresponding field; computation unchanged.",
     "Host MPC stores raw donor lead trajectories for existing diagnostics; no lead filtering/shaping.",
@@ -53,15 +54,15 @@
     "not_validated": "Physical actuator response, on-road behavior, future learned-state convergence, or the donor author's private settings. Source parity and native software tests are not road validation."
   },
   "configuration_contract": {
-    "effective_selections": "Driver cruise set speed and four personality selector remain effective. Honda mode is startup-latched; no live setting toggles it.",
+    "effective_selections": "Driver cruise set speed, four personality selector and manual Experimental Mode remain effective. Honda MVL-controller ownership is startup-latched; Experimental Mode is live.",
     "first_three": "Pinned donor code and checked-in defaults, not a claim about the donor author's private runtime preferences.",
     "SmartCruiseControlVision": false,
     "SmartCruiseControlMap": false,
     "SpeedLimitMode": 1,
     "SpeedLimitMode_meaning": "information (not assist); no acceleration target",
     "optional_speed_controls": "Fixed-disabled target adapter: does not construct SCC, resolver, or SLA. Saved settings and stale targets cannot affect speed/acceleration. SP SCC/SLA/resolver telemetry is neutral (information display is not reproduced).",
-    "ExperimentalMode": "Ignored by donor planner candidate arbitration: e2e/model candidate always participates. No model-selection or lateral setting changed here.",
-    "AccelBoostSP": "Ignored, not constructed. Donor gas-override AccelBoost is always present; max 0.2, rate 0.025, per override 0.05, min speed 10 mph.",
+    "ExperimentalMode": "Live manual selection via settings or distance-button hold. Off: cruise/radar candidates only, no model stop request or model boost update. On: donor model candidate and boost. DynamicExperimentalControl remains disabled; saved preference is never forced by this mode.",
+    "AccelBoostSP": "Ignored, not constructed. Donor gas-override AccelBoost participates only with Experimental Mode On; max 0.2, rate 0.025, per override 0.05, min speed 10 mph. Switching Off clears accumulated model boost.",
     "GreenLightAlert_and_LeadDepartAlert": "Existing SP alert preferences remain read-only advisory events, not acceleration/trajectory inputs.",
     "not_changed": "Model selection, lateral control, stock safety, hardware/gear safety guard.",
     "V_CRUISE_MAX": "145 km/h pinned locally in MVL planner; host cruise selector's 169 km/h is unchanged outside mode. Above 145 km/h, target arbitration still uses the donor ceiling."
@@ -123,7 +124,7 @@
     "resume": "Exact donor last-speed/initialized guard. PCM initialization remains hardware-owned; no new resume or engagement guard bypass.",
     "pcm_ownership": "PCM-controlled targets and 0/-1 sentinels are mirrored exactly as donor, without rewriting hardware-owned cruise. Initialization returns immediately for CP.pcmCruise. Software button targets use 145 kph. No CAN/gear/safety changes.",
     "settings": "Donor-default custom increments disabled: one unit short, five units long, standard 1.6 kph imperial increment and donor rounding. No NrdrCruise construction or live Params in MVL VCruiseHelperSP. Ignore custom increments/HUD submode/Honda imperial remap/SLA sidecar targets, even stale in-memory values.",
-    "wheel_hold": "CruiseHelper latches CP mode at construction; MVL holds never write ExperimentalMode or emit switched alerts. Saved HondaLiveLearningGas changes cannot change this active runtime gate.",
+    "wheel_hold": "Distance-button hold toggles manual Experimental Mode once per hold and announces the chosen On/Off state. Releasing that hold must not also cycle personality. Short presses retain the four-personality selector. Saved HondaLiveLearningGas changes cannot change the active controller gate.",
     "parent_contract": "Parent-owned NrdrSelfdrive hooks own bypass of HUD submode personality-consumption and stale SLA reservations in MVL; cruise helper does not edit those hooks.",
     "legacy": "Non-MVL cruise helper behavior, global 0/169 limits, and boolean initialization API retained.",
     "initialization": "Exact donor-default non-PCM SET: round(clamp(max(current speed kph, 40), 40, 145)). Initial SET at standstill is 40 km/h (~25 mph), intentionally restored per explicit user direction. No custom 0-mph target. Host bool argument and saved InitialCruiseSpeedKph do not affect MVL."

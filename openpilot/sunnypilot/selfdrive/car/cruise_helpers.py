@@ -57,10 +57,6 @@ class CruiseHelper:
         self.button_frame_counts[button] = int(button_event.pressed)
 
   def update_experimental_mode(self, events, experimental_mode) -> None:
-    if self.mvl_enabled:
-      # MVL always arbitrates the model candidate. A wheel hold must neither
-      # change the saved ExperimentalMode preference nor announce a fake mode.
-      return
     if self.button_frame_counts[ButtonType.gapAdjustCruise] >= DISTANCE_LONG_PRESS and not self.experimental_mode_switched:
       self._experimental_mode = not experimental_mode
       self.params.put_bool("ExperimentalMode", self._experimental_mode)

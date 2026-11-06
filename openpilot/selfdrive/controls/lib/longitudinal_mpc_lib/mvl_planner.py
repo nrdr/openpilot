@@ -41,6 +41,7 @@ class MvlLongitudinalPlanner(LongitudinalPlannerSP):
     self.fcw = False
     self.dt = dt
     self.accel_boost = AccelBoost()
+    self.experimental_mode = False
 
     self.v_desired_filter = FirstOrderFilter(init_v, 2.0, self.dt)
     self.a_cruise = init_a
@@ -113,11 +114,17 @@ class MvlLongitudinalPlanner(LongitudinalPlannerSP):
                      get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt))
     cruise_should_stop = should_stop(v_ego, self.a_cruise)
 
-    output_a_target_e2e = self.accel_boost.update(sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)
-
     candidates = [(output_a_target_mpc, self.mpc.source, output_should_stop_mpc),
-                  (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop),
-                  (output_a_target_e2e, LongitudinalPlanSource.e2e, output_should_stop_e2e)]
+                  (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop)]
+    experimental_mode = sm['selfdriveState'].experimentalMode
+    if experimental_mode:
+      output_a_target_e2e = self.accel_boost.update(sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)
+      candidates.append((output_a_target_e2e, LongitudinalPlanSource.e2e, output_should_stop_e2e))
+    elif self.experimental_mode:
+      # Manual ACC-only selection must also stop learning model-override boost.
+      # Retain planner/PID continuity, but discard boost from the previous mode.
+      self.accel_boost = AccelBoost()
+    self.experimental_mode = experimental_mode
 
     output_a_target, self.mpc.source, _ = min(candidates, key=lambda c: c[0])
     self.output_should_stop = any(should_stop for _, _, should_stop in candidates)

@@ -5,6 +5,7 @@ from functools import lru_cache
 MVL_DESCRIPTION = (
   "Selects full MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. " +
   "MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. " +
+  "Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. " +
   "Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Conflicting tuning is locked, not erased. " +
   "Change while parked; restart required."
 )
@@ -20,12 +21,13 @@ PIF_KEYS = frozenset(
                "NrdrLatStiction", "NrdrDeviceYawCorrection", "NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate"))
 LONG_SCALE_KEYS = frozenset(("LongPidTuneScale", "LongPidTuneScaleAggressive", "LongPidTuneScaleStandard",
                             "LongPidTuneScaleRelaxed", "LongPidTuneScaleEcon"))
+# Manual ExperimentalMode remains authoritative; automatic DEC is a conflict.
 MVL_LOCK_KEYS = LONG_SCALE_KEYS | frozenset((
   "NrdrHondaPcmMode", "NrdrHondaWindBrake", "StaticFeedforwardLong", "NrdrRoenAccelerationLimits",
   "NrdrHondaFullBrakeAuthority", "HondaStoppingDecelRate", "HondaStopAccel", "HondaStoppingDecelRateLong",
   "HondaVEgoStarting", "HondaVEgoStopping", "NrdrStandstillGapExtra", "NrdrCruiseMismatchCorrection",
   "AccelBoostSP", "SmartCruiseControlVision", "SmartCruiseControlMap", "SpeedLimitMode",
-  "SpeedLimitPolicy", "SpeedLimitOffsetType", "SpeedLimitValueOffset", "ExperimentalMode", "DynamicExperimentalControl",
+  "SpeedLimitPolicy", "SpeedLimitOffsetType", "SpeedLimitValueOffset", "DynamicExperimentalControl",
   "CustomAccIncrementsEnabled", "CustomAccShortPressIncrement", "CustomAccLongPressIncrement",
 ))
 YAW_FIXED_KEYS = PIF_KEYS | frozenset((

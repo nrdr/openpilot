@@ -23,9 +23,14 @@ restart. It applies to Nidec PCM, Bosch, and gas-interceptor control.
   software SET has the donor's 40 km/h floor. Hardware-owned PCM cruise targets
   and engagement guards remain hardware-owned; this is not the custom 0-mph SET
   experiment.
-- The donor's model/e2e candidate participates in longitudinal planning regardless
-  of the saved Experimental Mode toggle. That toggle is locked in MVL mode;
-  retaining the same driving model does not disable its longitudinal candidate.
+- Manual Experimental Mode remains available in the native/remote UI and through
+  a distance-button hold. Off excludes the model's end-to-end acceleration and
+  stop requests; radar following, cruise, FCW and forced deceleration remain.
+  On enables the donor's model candidate and override boost. Switching Off clears
+  model boost without resetting the planner/PID. This is an explicit exception
+  to the pinned donor's always-on model arbitration, correcting the initial port.
+  Short distance-button presses still cycle personalities; releasing a mode-switch
+  hold does not also cycle personality. Automatic DEC remains locked out.
 - Lateral tuning, selected driving model, vehicle safety and driver overrides are
   unchanged. Qualified Clarity interceptor hardware retains its existing calibrated
   brake/hold protection; that is an explicit hardware exception, not donor parity.
@@ -35,8 +40,8 @@ See `opendbc_repo/opendbc/car/honda/MVL_LONGITUDINAL.md` and
 source hashes, exact scope, integration differences and test contracts.
 Parity tests establish software behavior against those pins, not road safety,
 successful convergence of a particular car's learning, or the author's private
-settings. The unchanged driving model and retained learned values still affect
-the result. Do not infer that the reported braking issue is resolved from these
+settings. The unchanged driving model (including lead perception) and retained
+learned values still affect the result. Do not infer that the reported braking issue is resolved from these
 tests alone.
 
 ## Non-Honda isolation

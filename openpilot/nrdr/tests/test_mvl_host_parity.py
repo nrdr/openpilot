@@ -187,11 +187,27 @@ def test_planner_only_documented_donor_edits():
                               "from openpilot.selfdrive.car.cruise import V_CRUISE_UNSET")
   expected = expected.replace("A_CRUISE_MIN = -0.5", "A_CRUISE_MIN = -0.5\nV_CRUISE_MAX = 145")
   expected = expected.replace("LongitudinalMpc(dt=dt)", "LongitudinalMpc(dt=dt, mvl_enabled=True)")
+  expected = expected.replace("self.accel_boost = AccelBoost()", "self.accel_boost = AccelBoost()\n    self.experimental_mode = False")
   expected = expected.replace("self.a_cruise = get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt)",
                               "self.a_cruise = (econ_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt)\n" +
                               "                     if sm['selfdriveState'].personality == 3 else\n" +
                               "                     get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt))")
   expected = expected.replace("    longitudinalPlan.accelBoost = float(self.accel_boost.total_boost)\n", "")
+  expected = expected.replace(
+    "    output_a_target_e2e = self.accel_boost.update(sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)\n\n" +
+    "    candidates = [(output_a_target_mpc, self.mpc.source, output_should_stop_mpc),\n" +
+    "                  (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop),\n" +
+    "                  (output_a_target_e2e, LongitudinalPlanSource.e2e, output_should_stop_e2e)]",
+    "    candidates = [(output_a_target_mpc, self.mpc.source, output_should_stop_mpc),\n" +
+    "                  (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop)]\n" +
+    "    experimental_mode = sm['selfdriveState'].experimentalMode\n" +
+    "    if experimental_mode:\n" +
+    "      output_a_target_e2e = self.accel_boost.update(sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)\n" +
+    "      candidates.append((output_a_target_e2e, LongitudinalPlanSource.e2e, output_should_stop_e2e))\n" +
+    "    elif self.experimental_mode:\n" +
+    "      self.accel_boost = AccelBoost()\n" +
+    "    self.experimental_mode = experimental_mode",
+  )
   expected = expected.replace("longitudinalPlan.allowBrake = True",
                               "longitudinalPlan.allowBrake = True\n    longitudinalPlan.allowThrottle = True")
   assert parsed(source(MPC + "mvl_planner.py")) == parsed(expected)
@@ -228,11 +244,11 @@ def test_pinned_optional_feature_defaults():
   mode = node(git_source(SP + "speed_limit/common.py"), "Mode")
   values = {n.targets[0].id: ast.literal_eval(n.value) for n in mode.body if isinstance(n, ast.Assign)}
   assert values["information"] == 1 and values["assist"] == 3
-  # The donor boost is unconditional. Neither this Sunny toggle nor
-  # ExperimentalMode gates the model acceleration candidate.
+  # Sunny's optional boost remains excluded. Unlike the always-E2E donor,
+  # manual ExperimentalMode now owns whether the model participates at all.
   names = {n.id for n in ast.walk(ast.parse(source(MPC + "mvl_planner.py"))) if isinstance(n, ast.Name)}
   assert "AccelBoostSP" not in names
-  assert "experimentalMode" not in source(MPC + "mvl_planner.py")
+  assert "sm['selfdriveState'].experimentalMode" in source(MPC + "mvl_planner.py")
 
 
 def test_generated_solver_contract_and_constants_are_unchanged():
@@ -478,6 +494,7 @@ def test_planner_exact_donor_first_three_with_polluted_custom_inputs(profile, in
   rng = np.random.default_rng(376)
   for frame in range(250):
     sm = planner_messages(frame, rng, profile)
+    sm['selfdriveState'].experimentalMode = True  # Exact donor parity when explicitly selected.
     actual.update(sm)
     expected.update(copy.deepcopy(sm))
     for attr in ("output_a_target", "output_should_stop", "a_cruise", "fcw", "seen_cruise_target"):

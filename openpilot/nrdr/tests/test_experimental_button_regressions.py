@@ -7,6 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
+from threading import Lock
 from types import SimpleNamespace as NS
 
 import pytest
@@ -124,15 +125,23 @@ def button_stack(*, long_enabled=True, brand="honda", initial_mode=True, mvl=Fal
   namespace = {"ButtonType": Button, "Params": lambda: params, "structs": NS(CarParams=object),
                "DISTANCE_LONG_PRESS": 50, "EventNameSP": NS(experimentalModeSwitched="switched"),
                "consume_button_press": lambda _: True,
+                "StockCmbsAlerts": lambda: object(), "time": NS(monotonic=lambda: 100.),
                "nrdr_longitudinal_enabled": lambda cp: cp.brand == "honda",
                "longitudinal_personality": lambda value, _: value,
                "log": NS(LongitudinalPersonality=NS(schema=NS(enumerants=dict.fromkeys(range(4)))))}
   load_policy(namespace)
   load_definitions("openpilot/sunnypilot/selfdrive/car/cruise_helpers.py", {"CruiseHelper"}, namespace)
-  load_definitions("openpilot/nrdr/hooks/selfdrived.py", {"NrdrSelfdrive"}, namespace)
+  load_definitions("openpilot/nrdr/hooks/selfdrived.py", {"NrdrSelfdrive", "MvlPersonalitySync"}, namespace)
   helper = namespace["CruiseHelper"](NS(openpilotLongitudinalControl=long_enabled, brand=brand,
                                        flags=MVL_FLAG if mvl else 0))
   helper.personality = 1
+  helper.nrdr = namespace["NrdrSelfdrive"](helper.CP)
+  if namespace["mvl_longitudinal_enabled"](helper.CP):
+    # Exercise the real MVL cycle/latches without disk-backed initialization.
+    # Atomic persistence is covered by test_mvl_personality_sync.py.
+    sync = namespace["MvlPersonalitySync"].__new__(namespace["MvlPersonalitySync"])
+    sync._lock, sync._version, sync._pending = Lock(), 0, None
+    helper.nrdr.personality_sync = sync
   events = []
 
   def tick(pressed=None, *, reserved=False, available=True, flush_writes=True):
@@ -152,8 +161,9 @@ def hold(tick, **kwargs):
     tick(**kwargs)
 
 
-def test_repeated_holds_toggle_once_each_without_personality_change():
-  helper, params, events, tick = button_stack()
+@pytest.mark.parametrize("mvl", (False, True))
+def test_repeated_holds_toggle_once_each_without_personality_change(mvl):
+  helper, params, events, tick = button_stack(mvl=mvl)
   for expected in (False, True, False):
     hold(tick)
     assert params.get_bool("ExperimentalMode") is expected
@@ -193,8 +203,9 @@ def test_sla_confirmation_cannot_turn_into_a_delayed_toggle_or_personality_chang
   assert events == ["switched"]
 
 
-def test_release_while_cruise_unavailable_does_not_stick():
-  helper, params, events, tick = button_stack()
+@pytest.mark.parametrize("mvl", (False, True))
+def test_release_while_cruise_unavailable_does_not_stick(mvl):
+  helper, params, events, tick = button_stack(mvl=mvl)
   hold(tick)
   tick(False, available=False)
   for _ in range(100):
@@ -206,8 +217,9 @@ def test_release_while_cruise_unavailable_does_not_stick():
   assert events == ["switched", "switched"]
 
 
-def test_unavailable_press_requires_fresh_press_after_cruise_returns():
-  _, _, events, tick = button_stack()
+@pytest.mark.parametrize("mvl", (False, True))
+def test_unavailable_press_requires_fresh_press_after_cruise_returns(mvl):
+  _, _, events, tick = button_stack(mvl=mvl)
   hold(tick, available=False)
   for _ in range(100):
     tick()
@@ -218,8 +230,9 @@ def test_unavailable_press_requires_fresh_press_after_cruise_returns():
 
 
 @pytest.mark.parametrize("brand,expected", (("honda", 3), ("toyota", 2)))
-def test_short_press_keeps_existing_personality_count(brand, expected):
-  helper, _, events, tick = button_stack(brand=brand)
+@pytest.mark.parametrize("mvl", (False, True))
+def test_short_press_keeps_existing_personality_count(brand, expected, mvl):
+  helper, _, events, tick = button_stack(brand=brand, mvl=mvl)
   helper.personality = 0
   tick(True)
   for _ in range(10):
@@ -239,19 +252,53 @@ def test_stock_longitudinal_cannot_toggle_experimental_mode():
 
 @pytest.mark.parametrize("saved_mvl", (False, True))
 @pytest.mark.parametrize("initial_mode", (False, True))
-def test_mvl_hold_never_writes_or_announces_experimental_mode(saved_mvl, initial_mode):
+def test_mvl_hold_toggles_once_without_personality_change_regardless_of_saved_choice(saved_mvl, initial_mode):
   helper, params, events, tick = button_stack(mvl=True, saved_mvl=saved_mvl, initial_mode=initial_mode)
-  for _ in range(3):
+  for expected in (not initial_mode, initial_mode, not initial_mode):
     hold(tick)
     for _ in range(80):
       tick()
-    tick(False)
+    assert params.get_bool("ExperimentalMode") is expected
+    assert helper.experimental_mode_switched
+    assert not tick(False)
+    assert not helper.experimental_mode_switched
     params.values["HondaLiveLearningGas"] = not params.values["HondaLiveLearningGas"]
   assert helper.mvl_enabled is True
-  assert params.get_bool("ExperimentalMode") is initial_mode
-  assert not helper.experimental_mode_switched
-  assert not events
-  assert not any(action[1] == "ExperimentalMode" for action in params.actions)
+  assert helper.personality == 1 and helper.nrdr.personality_sync._pending is None
+  assert events == ["switched"] * 3
+  assert params.actions == [("put", "ExperimentalMode", value) for value in (not initial_mode, initial_mode, not initial_mode)]
+
+
+def test_mvl_stale_sla_cannot_block_hold_or_four_personality_short_presses():
+  helper, params, events, tick = button_stack(mvl=True)
+  helper.nrdr.sla_button_reserved_until = 1000.
+  reserved = helper.nrdr.reserve_distance_button(object())
+  assert not reserved and helper.nrdr.sla_button_reserved_until == 0.
+  hold(tick, reserved=reserved)
+  assert not tick(False)
+  assert events == ["switched"] and not params.get_bool("ExperimentalMode")
+  for generation, expected in enumerate((0, 3, 2, 1), 1):
+    tick(True)
+    assert tick(False)
+    assert helper.personality == expected
+    assert helper.nrdr.personality_sync._pending == (generation, expected)
+  assert params.actions == [("put", "ExperimentalMode", False)]
+
+
+@pytest.mark.parametrize("mvl", (False, True))
+def test_cruise_loss_mid_hold_blocks_both_actions_until_fresh_press(mvl):
+  helper, params, events, tick = button_stack(mvl=mvl)
+  tick(True)
+  for _ in range(10):
+    tick()
+  tick(available=False)
+  for _ in range(100):
+    tick()
+  assert not tick(False)
+  assert not events and not params.actions and helper.personality == 1
+  hold(tick)
+  assert not tick(False)
+  assert events == ["switched"] and not params.get_bool("ExperimentalMode")
 
 
 @pytest.mark.parametrize("saved_mvl", (False, True))
@@ -323,8 +370,9 @@ def alert_stack(helper):
 
 @pytest.mark.parametrize("initial_mode", (False, True))
 @pytest.mark.parametrize("write_flushed", (False, True))
-def test_experimental_alert_uses_button_result_before_param_poller_catches_up(initial_mode, write_flushed):
-  helper, params, events, tick = button_stack(initial_mode=initial_mode)
+@pytest.mark.parametrize("mvl", (False, True))
+def test_experimental_alert_uses_button_result_before_param_poller_catches_up(initial_mode, write_flushed, mvl):
+  helper, params, events, tick = button_stack(initial_mode=initial_mode, mvl=mvl)
   runtime = alert_stack(helper)
   helper.experimental_mode = initial_mode  # params_thread has not observed the toggle yet.
   hold(tick, flush_writes=False)
@@ -358,8 +406,9 @@ def test_experimental_alert_uses_button_result_before_param_poller_catches_up(in
   assert helper.AM.current_alert is alert
 
 
-def test_repeated_toggles_get_independent_alert_snapshots():
-  helper, _, events, tick = button_stack()
+@pytest.mark.parametrize("mvl", (False, True))
+def test_repeated_toggles_get_independent_alert_snapshots(mvl):
+  helper, _, events, tick = button_stack(mvl=mvl)
   runtime = alert_stack(helper)
   snapshots = []
   for expected in ("Experimental Mode Off", "Experimental Mode On", "Experimental Mode Off"):

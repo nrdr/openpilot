@@ -3,6 +3,7 @@
 Run in the parent's isolated Linux/C4 staging checkout, never as a live process.
 Uses the same pinned references as test_mvl_host_parity.py.
 """
+import copy
 import sys
 from types import SimpleNamespace as NS
 
@@ -83,7 +84,7 @@ def test_native_planner_and_longcontrol_match_pinned_donor(monkeypatch, profile)
     cs = NS(vEgo=speed, aEgo=-.3, standstill=False, vCruise=100., gasPressed=15 < frame < 35,
             brakePressed=False, cruiseState=NS(standstill=False))
     sm = {"carState": cs, "controlsState": NS(forceDecel=frame > 100, longControlState=0 if frame == 0 else 1),
-          "selfdriveState": NS(enabled=frame > 0, personality=profile, experimentalMode=frame % 2 == 0),
+          "selfdriveState": NS(enabled=frame > 0, personality=profile, experimentalMode=True),
           "modelV2": NS(action=NS(desiredAcceleration=.5, shouldStop=False)),
           "radarState": NS(leadOne=lead(distance=40., speed=10.), leadTwo=lead(present=False))}
     for planner in (actual, expected):
@@ -132,3 +133,31 @@ def test_native_cruise_standstill_initialization_and_minimums(metric, pcm_speed,
     helper.update_v_cruise(cs, True, metric)
     assert helper.v_cruise_kph <= 145.
   assert helper.v_cruise_kph == (8 if pcm_speed else 30 if metric else 20)
+
+
+@pytest.mark.parametrize("profile", range(4))
+@pytest.mark.parametrize("lead_present", [False, True])
+def test_native_experimental_off_excludes_model_after_live_switch(monkeypatch, profile, lead_present):
+  monkeypatch.setattr(sp_planner, "E2EAlertsHelper", lambda: NS(update=lambda *_: None))
+  planners = [LongitudinalPlanner(cp(), custom.CarParamsSP.new_message(), init_v=20.) for _ in range(2)]
+  for frame in range(60):
+    experimental = frame < 20
+    sm = {"carState": NS(vEgo=20., aEgo=0., standstill=False, vCruise=100., gasPressed=False),
+          "controlsState": NS(forceDecel=False, longControlState=1),
+          "selfdriveState": NS(enabled=True, personality=profile, experimentalMode=experimental),
+          "modelV2": NS(action=NS(desiredAcceleration=-3.5, shouldStop=True)),
+          "radarState": NS(leadOne=lead(present=lead_present, distance=40., speed=10.), leadTwo=lead(present=False))}
+    neutral = copy.deepcopy(sm)
+    if not experimental:
+      neutral["modelV2"].action.desiredAcceleration = 2.
+      neutral["modelV2"].action.shouldStop = False
+    for planner, msg in zip(planners, (sm, neutral), strict=True):
+      planner.update(msg)
+      assert planner.mpc.solution_status == 0
+      if not experimental:
+        assert planner.mpc.source != long_mpc.LongitudinalPlanSource.e2e
+        assert not planner.output_should_stop
+        assert planner.accel_boost.total_boost == 0.
+    assert planners[0].output_a_target == pytest.approx(planners[1].output_a_target, abs=1e-10)
+    assert planners[0].output_should_stop == planners[1].output_should_stop
+    assert planners[0].fcw == planners[1].fcw

@@ -255,7 +255,7 @@ def test_pinned_caller_and_defaults_explain_boolean_adapter():
 
 @pytest.mark.parametrize("mvl", [False, True])
 @pytest.mark.parametrize("saved_mvl", [False, True])
-def test_experimental_wheel_hold_obeys_startup_flag_not_saved_choice(mvl, saved_mvl):
+def test_experimental_wheel_hold_toggles_once_in_both_modes_regardless_of_saved_choice(mvl, saved_mvl):
   env, params = namespace(POLLUTED | {"HondaLiveLearningGas": saved_mvl, "ExperimentalMode": False})
   cls = definitions(source(HELPERS), env)["CruiseHelper"]
   helper = cls(cp(mvl=mvl))
@@ -263,6 +263,7 @@ def test_experimental_wheel_hold_obeys_startup_flag_not_saved_choice(mvl, saved_
   for frame in range(150):
     helper.update(state(button=Button.gapAdjustCruise if frame == 0 else None, pressed=True),
                   NS(add=events.append), False)
-  assert params.values["ExperimentalMode"] is (not mvl)
-  assert helper.experimental_mode_switched is (not mvl)
-  assert events == ([] if mvl else [1])
+  assert params.values["ExperimentalMode"] is True
+  assert helper.experimental_mode_switched is True
+  assert events == [1]
+  assert [call for call in params.calls if call[0] == "put"] == [("put", "ExperimentalMode")]

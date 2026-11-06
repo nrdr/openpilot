@@ -2290,7 +2290,7 @@
                   "widget": "toggle",
                   "needs_onroad_cycle": true,
                   "title": "Live Learning Gas",
-                  "description": "Selects full MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Conflicting tuning is locked, not erased. Change while parked; restart required.",
+                  "description": "Selects full MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Conflicting tuning is locked, not erased. Change while parked; restart required.",
                   "details": "ON selects full MVL gas, braking and Aggressive/Standard/Relaxed personalities, including following distances, on Honda Nidec PCM, Bosch and gas-interceptor openpilot longitudinal paths. Only Econ keeps nrdr's fixed longer-following and gentler acceleration/jerk defaults; a custom tune file does not change these MVL profiles. Saved ON is not proof that MVL is active yet. Conflicting settings stay locked while ON is saved or the running controller is MVL, including after saving OFF until restart. Their saved custom values are kept. Reset clears gas/wind learning only. Existing OFF choices are preserved; new Honda setups default ON.",
                   "enablement": [
                     {
@@ -3380,37 +3380,6 @@
                   "type": "capability",
                   "field": "has_longitudinal_control",
                   "equals": true
-                },
-                {
-                  "type": "not",
-                  "condition": {
-                    "type": "any",
-                    "conditions": [
-                      {
-                        "type": "all",
-                        "conditions": [
-                          {
-                            "type": "param",
-                            "key": "HondaLiveLearningGas",
-                            "equals": true
-                          },
-                          {
-                            "type": "not",
-                            "condition": {
-                              "type": "capability",
-                              "field": "nrdr_mvl_tuning_exempt",
-                              "equals": true
-                            }
-                          }
-                        ]
-                      },
-                      {
-                        "type": "capability",
-                        "field": "nrdr_mvl_longitudinal_active",
-                        "equals": true
-                      }
-                    ]
-                  }
                 }
               ]
             },

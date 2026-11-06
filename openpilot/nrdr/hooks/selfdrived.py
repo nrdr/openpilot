@@ -162,9 +162,10 @@ class NrdrSelfdrive:
 
     blocked = button_reserved or getattr(selfdrive, "distance_button_consumed", False)
     if sync is not None:
-      # The old latch conflates disabled SLA/experimental actions with a press
-      # made while cruise was unavailable. Ignore stale legacy latches, but
-      # retain the latter guard independently until a fresh available press.
+      # Ignore stale disabled-SLA consumption for personality selection, but
+      # retain cruise-unavailable protection until a fresh available press.
+      # Experimental holds share the normal latch: keep it through the hold
+      # and suppress personality cycling on that hold's release.
       available = getattr(getattr(CS, "cruiseState", None), "available", True)
       if any(event.pressed and event.type == ButtonType.gapAdjustCruise for event in CS.buttonEvents):
         if not nrdr.personality_button_held:
@@ -173,10 +174,10 @@ class NrdrSelfdrive:
       if nrdr.personality_button_held and not available:
         nrdr.personality_safety_consumed = True
       blocked = not available or nrdr.personality_safety_consumed
-      experimental_mode_switched = False
-      selfdrive.experimental_mode_switched = False
-      selfdrive.distance_button_consumed = False
       if distance_released:
+        # CruiseHelper also needs this latch while held: availability returning
+        # must not turn the tail of an unavailable press into a mode toggle.
+        selfdrive.distance_button_consumed = False
         nrdr.personality_button_held = False
         nrdr.personality_safety_consumed = False
 

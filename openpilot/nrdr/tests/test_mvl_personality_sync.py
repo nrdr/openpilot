@@ -354,14 +354,15 @@ def test_invalid_disk_profile_does_not_replace_active_econ(runtime, tmp_path, in
 
 @pytest.mark.parametrize("mvl", [True, False])
 @pytest.mark.parametrize("blocked", ["reserved", "consumed", "experimental"])
-def test_legacy_button_latches_are_bypassed_only_in_mvl(runtime, tmp_path, blocked, mvl):
+def test_mvl_bypasses_stale_sla_latches_but_not_experimental_hold(runtime, tmp_path, blocked, mvl):
   selfdrive = state(runtime, tmp_path, flags=MVL_FLAG if mvl else 0)
   selfdrive.distance_button_consumed = blocked == "consumed"
   selfdrive.experimental_mode_switched = blocked == "experimental"
-  assert runtime["NrdrSelfdrive"].update_personality(selfdrive, RELEASE, blocked == "reserved") is mvl
-  assert selfdrive.personality == (0 if mvl else 1)
+  changed = mvl and blocked != "experimental"
+  assert runtime["NrdrSelfdrive"].update_personality(selfdrive, RELEASE, blocked == "reserved") is changed
+  assert selfdrive.personality == (0 if changed else 1)
   if mvl:
-    assert selfdrive.nrdr.personality_sync._pending == (1, 0)
+    assert selfdrive.nrdr.personality_sync._pending == ((1, 0) if changed else None)
     assert not selfdrive.distance_button_consumed and not selfdrive.experimental_mode_switched
   assert not selfdrive.params.writes
 

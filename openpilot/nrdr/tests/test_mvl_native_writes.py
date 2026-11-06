@@ -239,13 +239,34 @@ def experimental_layout(ui, mici):
   layout._params, layout._locked_toggles = ui.params, set()
   layout._toggles = {"ExperimentalMode": NS(action_item=action, title="Experimental", description="")}
   layout._experimental_btn = action
+  action.set_enabled(layout._experimental_mode_editable)
   layout._update_experimental_mode_icon = lambda: None
   return layout, dialogs, action
 
 
 @pytest.mark.parametrize("mici", [False, True])
-@pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
-def test_experimental_callback_and_confirmation_recheck_mode(mici, saved, active):
+@pytest.mark.parametrize("saved,active", [(False, False), (True, False), (False, True), (True, True)])
+@pytest.mark.parametrize("selected", [False, True])
+@pytest.mark.parametrize("offroad", [False, True])
+def test_experimental_manual_on_off_remains_live_during_mvl_restart_states(mici, saved, active, selected, offroad):
+  ui = state(saved, active)
+  ui.is_offroad = lambda: offroad
+  ui.started = ui.engaged = not offroad
+  ui.params["ExperimentalMode"] = not selected
+  layout, dialogs, action = experimental_layout(ui, mici)
+  select = layout._on_experimental_mode if mici else layout._handle_experimental_mode_toggle
+  layout._update_state()
+  assert action.enabled and layout._experimental_mode_editable()
+  assert not ui.params.writes  # Refresh must never change the saved preference.
+  select(selected)
+  assert not dialogs
+  assert ui.params.writes == [("ExperimentalMode", selected)]
+  assert ui.params["ExperimentalMode"] is selected
+
+
+@pytest.mark.parametrize("mici", [False, True])
+@pytest.mark.parametrize("saved,active", [(True, False), (False, True), (True, True)])
+def test_experimental_confirmation_allows_mvl_selection_or_restart_race(mici, saved, active):
   ui = state()
   ui.params["ExperimentalModeConfirmed"] = False
   layout, dialogs, action = experimental_layout(ui, mici)
@@ -254,13 +275,39 @@ def test_experimental_callback_and_confirmation_recheck_mode(mici, saved, active
   assert len(dialogs) == 1 and not ui.params.writes
   ui.params["HondaLiveLearningGas"] = saved
   ui.CP.flags = 131072 if active else 0
-  assert not layout._experimental_mode_editable()
+  assert layout._experimental_mode_editable()
+  dialogs[0]() if mici else dialogs[0](1)
+  assert ui.params["ExperimentalMode"] is True
+  assert ui.params["ExperimentalModeConfirmed"] is True
+  assert sorted(ui.params.writes) == [("ExperimentalMode", True), ("ExperimentalModeConfirmed", True)]
+  ui.params.writes.clear()
+  select(False)
+  assert ui.params.writes == [("ExperimentalMode", False)]
+
+
+@pytest.mark.parametrize("mici", [False, True])
+def test_experimental_confirmation_rechecks_hardware_availability(mici):
+  ui = state(True, True)
+  ui.params["ExperimentalModeConfirmed"] = False
+  layout, dialogs, action = experimental_layout(ui, mici)
+  select = layout._on_experimental_mode if mici else layout._handle_experimental_mode_toggle
+  select(True)
+  assert len(dialogs) == 1 and not ui.params.writes
+  ui.CP.openpilotLongitudinalControl = ui.has_longitudinal_control = False
   dialogs[0]() if mici else dialogs[0](1)
   select(True)
+  layout._update_state()
+  assert not layout._experimental_mode_editable() and not action.enabled
   assert not ui.params.writes and not action._checked
-  if not mici:
-    layout._update_state()
-    assert not action.enabled
+
+
+def test_tici_experimental_confirmation_cancel_does_not_write():
+  ui = state(True, True)
+  ui.params["ExperimentalModeConfirmed"] = False
+  layout, dialogs, action = experimental_layout(ui, False)
+  layout._handle_experimental_mode_toggle(True)
+  dialogs[0](0)
+  assert not ui.params.writes and not action._checked
 
 
 @pytest.mark.parametrize("mici", [False, True])
@@ -273,21 +320,32 @@ def test_experimental_settings_remain_available_on_non_honda(mici):
   assert ui.params.writes == [("ExperimentalMode", True)]
 
 
-@pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
-def test_home_and_onroad_shortcuts_cannot_bypass_mvl_lock(saved, active):
+@pytest.mark.parametrize("saved,active", [(False, False), (True, False), (False, True), (True, True)])
+@pytest.mark.parametrize("selected", [False, True])
+@pytest.mark.parametrize("openlong,confirmed", [(True, True), (False, True), (True, False)])
+def test_home_and_onroad_shortcuts_keep_manual_mode_and_availability_guards(saved, active, selected, openlong, confirmed):
   ui = state(saved, active)
+  ui.CP.openpilotLongitudinalControl = ui.has_longitudinal_control = openlong
+  ui.params["ExperimentalModeConfirmed"] = ui.experimental_mode_confirmed = confirmed
+  ui.params["ExperimentalMode"] = ui.experimental_mode = not selected
+  expected = [("ExperimentalMode", selected)] if openlong and confirmed else []
   env = {"Widget": Widget, "ui_state": ui, "tuning_write_allowed": tuning_write_allowed, "time": NS(monotonic=lambda: 1.)}
   definitions("openpilot/selfdrive/ui/mici/layouts/home.py", {"MiciHomeLayout"}, env, {"_update_state"})
   home = env["MiciHomeLayout"]()
   home.is_pressed = home._is_pressed_prev = True
   home._mouse_down_t = 0.
   home._update_state()
-  assert not ui.params.writes and ui.experimental_mode is False
+  assert ui.params.writes == expected
+  assert ui.experimental_mode is (selected if expected else not selected)
+  ui.params.writes.clear()
+  ui.params["ExperimentalMode"] = not selected
   definitions("openpilot/selfdrive/ui/onroad/exp_button.py", {"ExpButton"}, env, {"_is_toggle_allowed", "_handle_mouse_release"})
   button = env["ExpButton"]()
-  button._params, button._experimental_mode = ui.params, False
+  button._params, button._experimental_mode = ui.params, not selected
+  button._hold_duration = 2.
   button._handle_mouse_release(None)
-  assert not button._is_toggle_allowed() and not ui.params.writes
+  assert button._is_toggle_allowed() is (openlong and confirmed)
+  assert ui.params.writes == expected
 
 
 @pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
@@ -331,7 +389,7 @@ def test_mici_live_mode_status_fits_below_the_title_and_left_of_the_toggle():
 
 @pytest.mark.parametrize("mici", [False, True])
 @pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
-def test_lateral_diagnostic_callback_keeps_working_without_mutating_locked_longitudinal(mici, saved, active):
+def test_lateral_diagnostic_callback_can_clear_manual_experimental_without_unlocking_dec(mici, saved, active):
   ui = state(saved, active)
   ui.params["ExperimentalMode"] = True
   env = {"Widget": Widget, "NavScroller": Widget, "ui_state": ui, "tuning_write_allowed": tuning_write_allowed,
@@ -345,8 +403,10 @@ def test_lateral_diagnostic_callback_keeps_working_without_mutating_locked_longi
   action.action_item = action
   layout._joystick_toggle = layout._long_maneuver_toggle = action
   layout._on_lat_maneuver_mode(True)
-  assert ui.params["ExperimentalMode"] is True
-  assert ui.params.writes == [("LateralManeuverMode", True), ("JoystickDebugMode", False), ("LongitudinalManeuverMode", False)]
+  assert ui.params["ExperimentalMode"] is False
+  assert ui.params.writes == [("LateralManeuverMode", True), ("ExperimentalMode", False),
+                             ("JoystickDebugMode", False), ("LongitudinalManeuverMode", False)]
+  assert not tuning_write_allowed(ui.params, "DynamicExperimentalControl", CP=ui.CP)
 
 
 @pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
