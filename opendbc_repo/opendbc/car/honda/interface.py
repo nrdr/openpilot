@@ -508,7 +508,7 @@ class CarInterface(CarInterfaceBase):
           stock_cp.safetyConfigs[0].safetyParam == 0 and stock_cp.openpilotLongitudinalControl and
           not (docs or stock_cp.passive or stock_cp.dashcamOnly or ret.flags & HondaFlagsSP.STOCK_LONGITUDINAL)):
         # Detect the hardware here; detection alone must not select the development calibration.
-        ret.flags |= HondaFlagsSP.CLARITY_INTERCEPTOR_BRAKE_CAPABLE
+        ret.flags |= HondaFlagsSP.CLARITY_INTERCEPTOR_BRAKE_CAPABLE.value
 
     stock_cp.autoResumeSng = stock_cp.autoResumeSng or ret.enableGasInterceptor
     if ret.flags & HondaFlagsSP.STOCK_LONGITUDINAL or not stock_cp.openpilotLongitudinalControl:
