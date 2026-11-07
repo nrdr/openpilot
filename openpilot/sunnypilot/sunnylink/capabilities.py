@@ -20,6 +20,7 @@ from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
 from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled, mvl_longitudinal_enabled
 from openpilot.nrdr.hooks.driver_monitoring import monitoring_customization_available
 from openpilot.nrdr.ui.honda_pcm import pcm_tuning_available, live_gas_available, mvl_pcm_deadzone_available, pcm_experiments_available, pcm_experiment_active
+from openpilot.nrdr.ui.icbm import icbm_available
 from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
   RAW_STEER_RATIO_PROFILES, get_raw_steer_ratio_profile, get_steer_ratio_metadata,
@@ -231,8 +232,9 @@ def generate_capabilities(params: Params | None = None) -> dict:
   if CP_SP_bytes is not None:
     try:
       CP_SP = messaging.log_from_bytes(CP_SP_bytes, custom.CarParamsSP)
-      caps["icbm_available"] = bool(CP_SP.intelligentCruiseButtonManagementAvailable)
-      caps["has_icbm"] = bool(CP_SP.intelligentCruiseButtonManagementAvailable) and params.get_bool("IntelligentCruiseButtonManagement")
+      caps["icbm_available"] = icbm_available(CP, CP_SP)
+      caps["has_icbm"] = bool(CP is not None and CP_SP.intelligentCruiseButtonManagementAvailable
+                              and not CP.openpilotLongitudinalControl and not CP_SP.pcmCruiseSpeed)
       caps["tesla_has_vehicle_bus"] = bool(CP_SP.flags & TeslaFlagsSP.HAS_VEHICLE_BUS)
     except Exception:
       cloudlog.exception("capabilities: failed to deserialize CarParamsSPPersistent")

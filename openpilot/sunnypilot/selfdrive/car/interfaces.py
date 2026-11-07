@@ -51,9 +51,8 @@ def _cleanup_unsupported_params(CP: structs.CarParams, CP_SP: structs.CarParamsS
     params.remove("EnforceTorqueControl")
     params.remove("LateralJerkTorqueController")
 
-  if not CP_SP.intelligentCruiseButtonManagementAvailable or CP.openpilotLongitudinalControl:
-    cloudlog.warning("ICBM not available or openpilot Longitudinal Control enabled, cleaning up params")
-    params.remove("IntelligentCruiseButtonManagement")
+  # Keep the saved ICBM choice for a future eligible stock-ACC configuration.
+  # Admission and the runtime controller, not deleting preferences, own activation.
 
   if not CP.openpilotLongitudinalControl and CP_SP.pcmCruiseSpeed:
     cloudlog.warning("openpilot Longitudinal Control and ICBM not available, cleaning up params")
@@ -71,7 +70,7 @@ def setup_interfaces(CI: CarInterfaceBase, params: Params | None = None) -> None
   enforce_torque = _enforce_torque_lateral_control(CI.CP, params)
   _initialize_intelligent_cruise_button_management(CI.CP, CI.CP_SP, params)
   _initialize_torque_lateral_control(CI, CI.CP, enforce_torque)
-  _cleanup_unsupported_params(CI.CP, CI.CP_SP)
+  _cleanup_unsupported_params(CI.CP, CI.CP_SP, params)
 
   try:
     STATSLOGSP.raw('sunnypilot.car_params', CI.CP.to_dict())

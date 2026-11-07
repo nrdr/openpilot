@@ -14,6 +14,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.ui.icbm import icbm_available
 from openpilot.nrdr.tests.test_experimental_button_regressions import RecordingParams, load_definitions
 from openpilot.nrdr.tests import test_handcrafted_request_routing as routing_tests
 from openpilot.nrdr.tests.test_param_defaults import _apply, _load_defaults
@@ -97,9 +98,9 @@ def test_supported_cleanup_leaves_explicit_choice_alone(key, cleanup, initial):
 @pytest.mark.parametrize("when", ("committed_during", "committed_after", "queued_before"))
 @pytest.mark.parametrize("initial", (False, True))
 def test_cruise_refresh_cannot_replay_stale_vision_choice(has_cp, has_long, has_icbm, offroad, when, initial):
-  params = RecordingParams({VISION: initial, "SmartCruiseControlMap": False, "CustomAccIncrementsEnabled": False})
+  params = RecordingParams({VISION: initial, "SmartCruiseControlMap": False, "CustomAccIncrementsEnabled": False, "IsOffroad": offroad})
   namespace = {"tr": lambda text: text, "CRUISE_PARAMS": ("CustomAccIncrementsEnabled", VISION, "SmartCruiseControlMap"),
-               "tuning_write_allowed": tuning_write_allowed}
+               "tuning_write_allowed": tuning_write_allowed, "icbm_available": icbm_available}
   load_definitions("openpilot/nrdr/ui/settings_policy.py", {"snapshot_params", "_restore_params", "apply_cruise_preferences"}, namespace)
   original = namespace["apply_cruise_preferences"]
 
@@ -111,8 +112,10 @@ def test_cruise_refresh_cannot_replay_stale_vision_choice(has_cp, has_long, has_
   namespace["apply_cruise_preferences"] = apply
   namespace["Widget"] = type("Widget", (), {"_update_state": lambda self: None})
   namespace["ui_state"] = NS(params=params, has_longitudinal_control=has_long, has_icbm=has_icbm, is_offroad=lambda: offroad,
-                             CP=NS(alphaLongitudinalAvailable=True, pcmCruise=False) if has_cp else None,
-                             CP_SP=NS(intelligentCruiseButtonManagementAvailable=has_icbm) if has_cp else None)
+                             CP=NS(brand="honda", carFingerprint="unsupported", flags=0, openpilotLongitudinalControl=has_long,
+                                   alphaLongitudinalAvailable=True, pcmCruise=False) if has_cp else None,
+                             CP_SP=NS(intelligentCruiseButtonManagementAvailable=has_icbm, pcmCruiseSpeed=True,
+                                      enableGasInterceptor=False) if has_cp else None)
   for name in ("ICBM_DESC", "ICMB_UNAVAILABLE", "ICMB_UNAVAILABLE_LONG_AVAILABLE", "ICMB_UNAVAILABLE_LONG_UNAVAILABLE",
                "ONROAD_ONLY_DESCRIPTION", "ACC_PCMCRUISE_DISABLED_DESCRIPTION", "ACC_ENABLED_DESCRIPTION", "ACC_NOLONG_DESCRIPTION"):
     namespace[name] = name
@@ -155,11 +158,12 @@ def test_sunnylink_explicit_off_routes_and_survives_boot(key, compressed):
   routing = routing_tests.TestHandcraftedRequestRouting()
   routing.setUp()
   params = RecordingParams({key: True, "IsOffroad": True})
-  params.get_type = lambda _: 1  # Native BOOL type.
   namespace = {"Params": lambda: params, "IntEnum": IntEnum, "base64": base64, "gzip": gzip, "json": json}
   load_definitions("openpilot/common/params.py", {"ParamKeyType"}, namespace)
+  params.get_type = lambda _: namespace["ParamKeyType"].BOOL
   load_definitions("openpilot/sunnypilot/sunnylink/utils.py", {"_convert_param_to_type", "save_param_from_base64_encoded_string"}, namespace)
   routing.namespace["params"] = params
+  routing.namespace["ParamKeyType"] = namespace["ParamKeyType"]
   routing.namespace["save_param_from_base64_encoded_string"] = namespace["save_param_from_base64_encoded_string"]
   raw = b"False"
   routing.save_params({key: base64.b64encode(gzip.compress(raw) if compressed else raw).decode()}, compressed)

@@ -181,7 +181,10 @@ def test_compiled_cruise_has_no_blanket_preset_lock_and_preserves_icbm_action_gu
               "SpeedLimitPolicy", "SmartCruiseControlVision", "SmartCruiseControlMap", "AccelBoostSP"):
     assert allowed(items[key], values), key
   assert allowed(items["CustomAccIncrementsEnabled"], values)
-  assert not allowed(items["IntelligentCruiseButtonManagement"], values)
+  # ICBM can be prepared before switching to factory ACC, without claiming it
+  # is active under the current OP-long CP. Hardware and offroad still apply.
+  assert allowed(items["IntelligentCruiseButtonManagement"], values | {"icbm_available": True})
+  assert not allowed(items["IntelligentCruiseButtonManagement"], values | {"icbm_available": True, "IsOffroad": False})
 
 
 @pytest.mark.parametrize("offroad", [False, True, None])

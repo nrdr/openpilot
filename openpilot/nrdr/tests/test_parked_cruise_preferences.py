@@ -5,6 +5,7 @@ import pytest
 
 from opendbc.car.honda.values import HondaFlags
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.ui.icbm import icbm_available
 from openpilot.nrdr.tests.test_experimental_button_regressions import RecordingParams
 from openpilot.nrdr.tests.test_mvl_native_writes import definitions, tici_control
 from openpilot.nrdr.tests.test_nidec_pcm_experiments import cp_bytes
@@ -58,11 +59,13 @@ def cruise_layout(offroad, vehicle, mode, initial=True):
                    "CarParamsPersistent": cp_bytes(flags), **dict.fromkeys(TOGGLES.values(), initial),
                    "CustomAccShortPressIncrement": 3, "CustomAccLongPressIncrement": 5})
   has_long, has_icbm = vehicle in ("long", "fixed"), vehicle == "icbm"
-  cp = None if vehicle == "missing" else NS(brand="honda", openpilotLongitudinalControl=has_long,
+  cp = None if vehicle == "missing" else NS(brand="honda", carFingerprint="unsupported", flags=0, openpilotLongitudinalControl=has_long,
                                            pcmCruise=vehicle in ("stock", "fixed"), alphaLongitudinalAvailable=False)
-  cp_sp = None if vehicle == "missing" else NS(intelligentCruiseButtonManagementAvailable=has_icbm, pcmCruiseSpeed=vehicle != "fixed")
+  cp_sp = None if vehicle == "missing" else NS(intelligentCruiseButtonManagementAvailable=has_icbm, pcmCruiseSpeed=vehicle != "fixed",
+                                              enableGasInterceptor=False)
   ui = NS(params=params, CP=cp, CP_SP=cp_sp, has_longitudinal_control=has_long, has_icbm=has_icbm, is_offroad=lambda: offroad)
   env = {"ui_state": ui, "tr": lambda text: text, "tuning_write_allowed": tuning_write_allowed,
+         "icbm_available": icbm_available,
          "Widget": type("Widget", (), {"_update_state": lambda self: None})}
   for name in ("ICBM_DESC", "ICMB_UNAVAILABLE", "ICMB_UNAVAILABLE_LONG_AVAILABLE", "ICMB_UNAVAILABLE_LONG_UNAVAILABLE",
                "ONROAD_ONLY_DESCRIPTION", "ACC_PCMCRUISE_DISABLED_DESCRIPTION", "ACC_ENABLED_DESCRIPTION", "ACC_NOLONG_DESCRIPTION"):

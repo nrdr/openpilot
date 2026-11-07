@@ -11,6 +11,7 @@ from opendbc.car.structs import car
 from opendbc.car import structs
 from opendbc.car.honda.values import HondaFlags
 from opendbc.car.honda.pcm_test_modes import qualified as pcm_mode_qualified
+from opendbc.sunnypilot.car.honda.icbm_eligibility import civic_icbm_available
 from openpilot.common.constants import CV
 from openpilot.common.params import Params
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import get_minimum_set_speed
@@ -109,6 +110,11 @@ class VCruiseHelperSP:
       return
     if self.CP_SP.pcmCruiseSpeed:
       self.v_cruise_min = V_CRUISE_MIN
+      return
+
+    if (not self.CP.openpilotLongitudinalControl and self.CP_SP.intelligentCruiseButtonManagementAvailable and
+        civic_icbm_available(self.CP, self.CP_SP)):
+      self.v_cruise_min = 40 if is_metric else 25 * CV.MPH_TO_KPH
       return
 
     self.v_cruise_min = get_minimum_set_speed(is_metric)

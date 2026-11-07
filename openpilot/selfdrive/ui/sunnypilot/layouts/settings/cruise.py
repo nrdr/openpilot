@@ -9,6 +9,7 @@ from enum import IntEnum
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.cruise_sub_layouts.speed_limit_settings import SpeedLimitSettingsLayout
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.ui import apply_cruise_preferences
+from openpilot.nrdr.ui.icbm import ICBM_DESCRIPTION, icbm_available, save_icbm_choice
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, simple_button_item_sp
 from openpilot.system.ui.widgets import Widget
@@ -20,8 +21,7 @@ class PanelType(IntEnum):
   SLA = 1
 
 
-ICBM_DESC = tr_noop("When enabled, sunnypilot will attempt to manage the built-in cruise control buttons " +
-                    "by emulating button presses for limited longitudinal control.")
+ICBM_DESC = tr_noop(ICBM_DESCRIPTION)
 ICMB_UNAVAILABLE = tr_noop("Intelligent Cruise Button Management is currently unavailable on this platform.")
 ICMB_UNAVAILABLE_LONG_AVAILABLE = tr_noop("Disable the sunnypilot Longitudinal Control (alpha) toggle to allow Intelligent Cruise Button Management.")
 ICMB_UNAVAILABLE_LONG_UNAVAILABLE = tr_noop("sunnypilot Longitudinal Control is the default longitudinal control for this platform.")
@@ -46,7 +46,8 @@ class CruiseLayout(Widget):
     self.icbm_toggle = toggle_item_sp(
       title=tr("Intelligent Cruise Button Management (ICBM) (Alpha)"),
       description="",
-      param="IntelligentCruiseButtonManagement")
+      initial_state=ui_state.params.get_bool("IntelligentCruiseButtonManagement"),
+      callback=self._on_icbm_toggle)
 
     self.scc_v_toggle = toggle_item_sp(
       title=tr("Smart Cruise Control - Vision"),
@@ -122,18 +123,18 @@ class CruiseLayout(Widget):
     super()._update_state()
     # Reflect external/Sunnylink changes without replaying a saved preference.
     for item, key in ((self.accel_boost_toggle, "AccelBoostSP"), (self.custom_acc_toggle, "CustomAccIncrementsEnabled"),
-                      (self.scc_v_toggle, "SmartCruiseControlVision"), (self.scc_m_toggle, "SmartCruiseControlMap")):
+                      (self.scc_v_toggle, "SmartCruiseControlVision"), (self.scc_m_toggle, "SmartCruiseControlMap"),
+                      (self.icbm_toggle, "IntelligentCruiseButtonManagement")):
       item.action_item.set_state(ui_state.params.get_bool(key))
 
     if ui_state.CP is not None and ui_state.CP_SP is not None:
       has_icbm = ui_state.has_icbm
       has_long = ui_state.has_longitudinal_control
 
-      if ui_state.CP_SP.intelligentCruiseButtonManagementAvailable and not has_long:
+      if icbm_available(ui_state.CP, ui_state.CP_SP):
         self.icbm_toggle.action_item.set_enabled(ui_state.is_offroad())
         self.icbm_toggle.set_description(tr(ICBM_DESC))
       else:
-        ui_state.params.remove("IntelligentCruiseButtonManagement")
         self.icbm_toggle.action_item.set_enabled(False)
 
         long_desc = ICMB_UNAVAILABLE
@@ -176,6 +177,10 @@ class CruiseLayout(Widget):
         self.custom_acc_toggle.show_description(True)
 
     apply_cruise_preferences(self, ui_state, {}, has_long, has_icbm)
+
+  def _on_icbm_toggle(self, state):
+    save_icbm_choice(ui_state, state)
+    self.icbm_toggle.action_item.set_state(ui_state.params.get_bool("IntelligentCruiseButtonManagement"))
 
   def _on_custom_acc_toggle(self, state):
     self.custom_acc_short_increment.set_visible(state)

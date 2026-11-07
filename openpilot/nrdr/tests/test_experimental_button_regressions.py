@@ -16,7 +16,7 @@ from openpilot.nrdr.tests.test_mvl_cruise import MVL_FLAG, load_policy
 
 ROOT = Path(__file__).resolve().parents[3]
 PREFERENCES = ("ExperimentalMode", "DynamicExperimentalControl", "CustomAccIncrementsEnabled",
-               "SmartCruiseControlVision", "SmartCruiseControlMap")
+               "SmartCruiseControlVision", "SmartCruiseControlMap", "IntelligentCruiseButtonManagement")
 
 
 def load_definitions(relative, names, namespace):
@@ -69,7 +69,8 @@ def constraints(params, *, has_long=True, cp=True, steer_control_type=1, has_bsm
   namespace["car"] = NS(CarParams=NS(SteerControlType=NS(angle=2)))
   exec(compile(ast.Module(body=[method], type_ignores=[]), str(source), "exec"), namespace)
   state = NS(params=params, has_longitudinal_control=has_long, has_icbm=False,
-             CP=NS(steerControlType=steer_control_type, alphaLongitudinalAvailable=False, enableBsm=has_bsm) if cp else None,
+             CP=NS(steerControlType=steer_control_type, alphaLongitudinalAvailable=False, enableBsm=has_bsm,
+                   openpilotLongitudinalControl=has_long) if cp else None,
              CP_SP=NS(intelligentCruiseButtonManagementAvailable=False))
   namespace["_enforce_constraints"](state)
   return state
@@ -98,12 +99,12 @@ def test_ui_preserves_preferences_without_delete_restore_cycle(has_long, cp):
   assert all(params.values[key] is True for key in PREFERENCES)
   assert not any(action[1] in PREFERENCES for action in params.actions)
   assert ("remove", "AlphaLongitudinalEnabled") in params.actions
-  assert ("remove", "IntelligentCruiseButtonManagement") in params.actions
+  assert not any(action[1] == "IntelligentCruiseButtonManagement" for action in params.actions)
 
 
 def test_unrelated_vehicle_constraints_are_still_enforced():
   forbidden = ("EnforceTorqueControl", "LateralJerkTorqueController",
-               "AlphaLongitudinalEnabled", "AutoLaneChangeBsmDelay", "IntelligentCruiseButtonManagement")
+               "AlphaLongitudinalEnabled", "AutoLaneChangeBsmDelay")
   params = RecordingParams(dict.fromkeys((*PREFERENCES, *forbidden), True))
   constraints(params, steer_control_type=2, has_bsm=False)
   params.flush()

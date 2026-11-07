@@ -147,9 +147,7 @@ class UIStateSP:
 
   def update_params(self) -> None:
     CP_SP_bytes = self.params.get("CarParamsSPPersistent")
-    if CP_SP_bytes is not None:
-      self.CP_SP = messaging.log_from_bytes(CP_SP_bytes, custom.CarParamsSP)
-      self.has_icbm = self.CP_SP.intelligentCruiseButtonManagementAvailable and self.params.get_bool("IntelligentCruiseButtonManagement")
+    self.CP_SP = messaging.log_from_bytes(CP_SP_bytes, custom.CarParamsSP) if CP_SP_bytes is not None else None
 
     self._enforce_constraints()
     source = get_active_source(chestnut=self.chestnut_present, chestnut_active=self.chestnut_active,
@@ -216,14 +214,12 @@ class UIStateSP:
     # Consumers still gate these preferences on vehicle capabilities (e.g.
     # selfdrived requires CP.openpilotLongitudinalControl for ExperimentalMode).
 
-    # ICBM: clear if not available or if full longitudinal control is active
-    if self.CP_SP is not None:
-      if not self.CP_SP.intelligentCruiseButtonManagementAvailable or has_long:
-        self.params.remove("IntelligentCruiseButtonManagement")
-        self.has_icbm = False
-    else:
-      self.params.remove("IntelligentCruiseButtonManagement")
-      self.has_icbm = False
+    # Saved choice survives unsupported/missing CP and OP-long; only the active
+    # capability changes. Never delete/replay a user's parked preference.
+    self.has_icbm = bool(CP is not None and self.CP_SP is not None and
+                         self.CP_SP.intelligentCruiseButtonManagementAvailable and
+                         not has_long and not CP.openpilotLongitudinalControl and
+                         not self.CP_SP.pcmCruiseSpeed)
 
 
 class DeviceSP:
