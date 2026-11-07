@@ -1,0 +1,37 @@
+{
+  "abi": "generic-onnx-warp-v1",
+  "tinygrad_ref": "fe5d3169ba4f41d0947ad174925f413cbea9d056",
+  "upstream_ref": "27c132984df60e9ef42ebd1a805738b8c851356f",
+  "tinygrad_files": {
+    "tinygrad/engine/jit.py": "725bf4a0fdbaaaecfaa1af160cc0656708e17e08fe8d457bd82d0af5347a7e17",
+    "tinygrad/uop/ops.py": "186ddac516b55ca0e117a5b00f137e8e26cbb47781561c86eb19a89f41d21c6e",
+    "tinygrad/nn/onnx.py": "4ff1b2096d44c1dd3638193153664b5d0d8ac4fa1f8c9195e90c2f81ac61d7ca",
+    "tinygrad/runtime/ops_qcom.py": "ac9039af57358b5d685ff2968b7974f844f69eb2d2e8bfc8c64cfbcfb625bcf6",
+    "examples/openpilot/compile_onnx.py": "a70a0c15e03f4be537f8480f729414883e21ef3c9820dc6578753f0a0000b351",
+    "examples/openpilot/compile_warp.py": "2f7cf2f16a3febc35a91d420814130147e12bbbd12c6fb82d7cd7a69ead7fdb5"
+  },
+  "precompiled": {
+    "big_driving_tinygrad.pkl": "76cc0a9bc3af7a318889483dcbe126337f8d338f5abcbe664a8988c9b18b6639",
+    "driving_warp_1344x760_tinygrad.pkl": "c48c9150afd01bd7071641415a248308c9a7b3cb47e7095862ef66c9f0429e43",
+    "driving_warp_1928x1208_tinygrad.pkl": "59564a7d214fe13dbb30cdd068437c4bf35ec071789c922288046636f711cdfa",
+    "big_driving_warp_1344x760_tinygrad.pkl": "ebac006f5e35ddb9c7da8ab38f9af87d6d0a87a3299b07cd118f88581f0f561f",
+    "big_driving_warp_1928x1208_tinygrad.pkl": "d8eab79e53ebe1bbc3c633acc2a6bee80612cfe7fb5246afff6e0b7259c3a0d3"
+  },
+  "source_models": {
+    "driving_supercombo.onnx": {"sha256": "65a08adc31d5c456219687d99b7bf5e44d61dae2d49ea67850e76105c7248cce", "size": 60918562},
+    "dmonitoring_model.onnx": {"sha256": "dd299afabe7a3e0d04cbe2bd97fdb0c93bba8ad6d3cc3663a0e0ededaf243ac2", "size": 7497335}
+  },
+  "legacy_rebuilds": {
+    "6dcaddf515ec60b860d20cab5b0892cb855082e5db56e7992d27833aa485227b": {
+      "model_ref": "62bf6fb072880905a4c490f0f4f4a6b3c23346ec",
+      "model_name": "PMV2",
+      "model_type": "vision_policy",
+      "model_size": [512, 256],
+      "frame_skip": null,
+      "source_models": {
+        "driving_vision.onnx": {"sha256": "940e9006a25f27f0b6e85da798e6a8fd1f6dd492dd7d0b9ff1a9436460f46129", "size": 46887794},
+        "driving_policy.onnx": {"sha256": "853c6634746ff439a848349d00e4d5581cd941f13f7c1862c31b72a31cc24858", "size": 14061595}
+      }
+    }
+  }
+}
