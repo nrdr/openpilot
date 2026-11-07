@@ -1,0 +1,690 @@
+# Canonical NRDR sections merged into the Sunnylink host page.
+page_id: steering
+after_section: lane_change
+sections:
+  - id: nrdr
+    title: nrdr
+    description: nrdr settings for steering, cruise, device, and driver monitoring. Longitudinal tuning is Honda-only unless an exact non-Honda profile is explicitly approved in the software. Other cars use the baseline Sunnypilot longitudinal path and ignore saved nrdr tuning values.
+    items:
+    - key: NrdrSuggestedSettings
+      widget: toggle
+      title: Apply Suggested Settings
+      description: "Last Road Tested: October 1, 2026, with PopV2 Model. Your mileage may vary. Turning back to OFF will preserve these settings and unlock tuning menus."
+      visibility:
+      - {type: capability, field: has_handcrafted_lateral_profile, equals: true}
+      enablement:
+      - $ref: '#/macros/handcrafted_apply_offroad'
+    - key: NrdrRemoteForceUpdate
+      widget: toggle
+      title: Force Update
+      description: Flip ON to run the full updater chain (check, download, install, reboot). Only works while the car is off.
+      details: Flip ON to run the full updater chain on the device (check, download, install, reboot). The device flips this back OFF when it picks up the request - that is your acknowledgment. Only works while the car is off. Watch Remote Action Status for progress.
+    - key: DisablePowerDown
+      widget: toggle
+      title: Prevent Automatic Shutdown
+      description: Prevents openpilot's automatic offroad shutdowns after the vehicle is turned off.
+      details: When enabled, this bypasses the Max Time Offroad timer and its low-voltage and estimated-battery safeguards, and can drain the vehicle battery. When disabled, those safeguards resume after a 60-second grace period. Manual Power Off still works.
+      enablement:
+      - $ref: '#/macros/offroad'
+    sub_panels:
+    - id: nrdr_pidf_ground
+      label: Lateral Tuning
+      trigger_key: null
+      trigger_condition: {type: capability, field: nrdr_honda_tuning_available, equals: true}
+      items:
+      - key: NrdrLateralController
+        widget: multiple_button
+        title: Controller Type
+        description: Choose PIF or Firmware Controller while parked. Firmware Controller needs the exact modified steering firmware revision its tune was built for.
+        details: TEG-A010 requires the corrected PTM firmware (RWD SHA256 starts 04147917); its calibration has been driven on that build. Insight TXM-A040 requires the corrected PTM firmware (7ba37432). Starting calibrations, not yet road-validated, cover the corrected builds of Civic Bosch TBA-C120 (9261b8db), Civic TGG-A120 (6640806d), Civic TBA-A030 (55c37266), CR-V TLA-A040 (2e6a8802) and CR-V TLA-A220 (2c992997). Older builds report the same version strings but are not compatible with these calibrations. Confirm the actual flashed build before selecting Firmware Controller. PIF and Device Yaw Correction remain separate.
+        options:
+        - value: 0
+          label: PIF Control
+        - value: 1
+          label: Firmware Controller
+          enablement:
+          - {type: capability, field: nrdr_yaw_controller_available, equals: true}
+        enablement:
+        - {type: offroad_only}
+      - key: NrdrLatStiction
+        widget: toggle
+        title: Predictive Lateral Stiction
+        description: Tapers torque before a stable steering target, then holds it until another correction is needed.
+        details: PID remains the normal throw. A predictive capture stage can only reduce torque as the wheel closes on a stable target, then freezes the captured output until error, relative motion, drift, or a decisive corrective torque reversal requires reacquisition. It operates at every speed and immediately bypasses for driver input, lane changes, steering faults, or control limits. Default is OFF.
+      - key: NrdrDeviceYawCorrection
+        widget: toggle
+        title: Use Device Yaw Correction
+        description: Mix 1% device-yaw torque feedback with 99% PIF output. This is the legacy option; use Firmware Controller for a matching rack. Optimized lane changes temporarily disable the blend.
+        details: Defaults ON. The blend strength, acceleration factor, and friction remain fixed. Below 4.5 mph the torque leg uses steering-angle feedback, transitioning to the device's calibrated yaw estimate by 11.2 mph. Missing, stale, or invalid yaw falls back to PIF when yaw is required. Available only for supported modified-EPS Honda PIF setups. Firmware Controller never uses this blend. Turn Suggested Settings OFF to unlock this switch.
+        visibility:
+        - {type: not, condition: {type: param, key: NrdrLateralController, equals: 1}}
+        enablement:
+        - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
+      - key: NrdrOptimizedLaneChanges
+        widget: toggle
+        title: Optimized Lane Changes
+        description: Temporarily lowers the effective steer ratio on entry and turns off torque blending, feedforward, and rate damping during a lane change. This can smooth out aggressive lane changes on older models.
+      - key: LatPScaleLowSpeed
+        widget: option
+      - key: LatIScaleLowSpeed
+        widget: option
+      - key: NrdrLatRateDampingLowSpeed
+        widget: option
+        title: "[0-25MPH] Derivative"
+        description: Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). Defaults to 0% (off). Optimized lane changes bypass it.
+        min: 0
+        max: 300
+        step: 5
+        unit: '%'
+      - key: LatFScaleLowSpeed
+        widget: option
+        title: "[0-25MPH] Feedforward"
+        description: Supplies anticipated steering torque before an error occurs.
+        min: 0
+        max: 500
+        step: 5
+        unit: '%'
+      - key: LatPScaleStandard
+        widget: option
+      - key: LatIScaleStandard
+        widget: option
+      - key: NrdrLatRateDampingStandard
+        widget: option
+        title: "[25-50MPH] Derivative"
+        description: Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). Defaults to 0% (off). Optimized lane changes bypass it.
+        min: 0
+        max: 300
+        step: 5
+        unit: '%'
+      - key: LatFScaleStandard
+        widget: option
+        title: "[25-50MPH] Feedforward"
+        description: Supplies anticipated steering torque before an error occurs.
+        min: 0
+        max: 500
+        step: 5
+        unit: '%'
+      - key: LatPScaleHighway
+        widget: option
+      - key: LatIScaleHighway
+        widget: option
+      - key: NrdrLatRateDampingHighway
+        widget: option
+        title: "[50+MPH] Derivative"
+        description: Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). Defaults to 0% (off). Optimized lane changes bypass it.
+        min: 0
+        max: 300
+        step: 5
+        unit: '%'
+      - key: LatFScaleHighway
+        widget: option
+        title: "[50+MPH] Feedforward"
+        description: Supplies anticipated steering torque before an error occurs.
+        min: 0
+        max: 500
+        step: 5
+        unit: '%'
+      - key: HondaCenterScale
+        widget: option
+        title: Center Boost
+        description: Adds steering correction near center on straights. This can help a lazy model or a slightly undertuned PIF setup stay centered. Firmware Controller doesn't use it.
+        details: Multiplies only the proportional term near center. Integral, feedforward, and damping keep their normal values. Available at every speed above the minimum, including the highway.
+        min: 0.0
+        max: 5.0
+        step: 0.01
+      - key: HondaCenterBoostThreshold
+        widget: option
+        title: Center Boost Threshold (deg)
+        description: How centered should the steering wheel be when center boost is actually active?
+        min: 0.0
+        max: 10.0
+        step: 0.1
+        unit: deg
+      - key: HondaCenterBoostMinSpeed
+        widget: option
+        title: Center Boost Minimum Speed
+        description: Below this speed center boost is disabled; there is no upper-speed cutoff.
+        details: Below this speed center boost is disabled. Above the short ramp it remains fully available, including on the highway.
+        min: 0
+        max: 80
+        step: 1
+        unit: mph
+    - id: nrdr_lane_centering_stack
+      label: Lane Centering Method
+      trigger_key: null
+      items:
+      - key: LaneGuidanceMode
+        widget: multiple_button
+        title: Lane Centering Method
+        description: Off follows the model without lane-centering corrections. Sunny uses sunnypilot's Blendful inside the model runner. Star adds a lane-centering correction to the final steering request instead.
+        details: Star builds a lane-center path from two confident boundaries and compares it with the model after the steering action takes effect. Sunny adds a confidence-weighted correction before model smoothing and yields when the model appears to be going around an obstacle. The two correction paths are mutually exclusive. Sunny requires a non-Default custom model.
+        options:
+        - value: 0
+          label: 'Off'
+        - value: 2
+          label: Sunny
+          enablement:
+          - {type: capability, field: custom_model_active, equals: true}
+        - value: 1
+          label: Star
+      - key: LaneCenteringMinSpeed
+        widget: option
+        title: Minimum Lane Centering Speed
+        description: Arms at this speed and releases smoothly 3 mph below it, bounded by the 5 m/s controller floor.
+        details: Suggested Settings uses 12 mph. Outside that profile, existing saved minimum speeds are preserved.
+        min: 12
+        max: 100
+        step: 1
+        unit: mph
+        enablement:
+        - {type: param, key: LaneGuidanceMode, equals: 1}
+      - key: LaneCenteringPauseOnSignal
+        widget: toggle
+        title: Fade on Turn Signal
+        description: Fade out the correction while a turn signal is active. Lane-change maneuvers always suspend the correction immediately, regardless of this setting.
+        enablement:
+        - {type: param, key: LaneGuidanceMode, equals: 1}
+      - key: LaneCenterOffset
+        widget: option
+        title: Center Offset
+        description: Shift the target left or right of the detected lane center. The controller reduces the offset in a narrow lane.
+        min: -0.3
+        max: 0.3
+        step: 0.01
+        unit: meters
+        enablement:
+        - {type: param, key: LaneGuidanceMode, equals: 1}
+      - key: LaneCenteringStrength
+        widget: option
+        title: Lane-Centering Strength
+        description: Blend the model path toward the lane-center path. 0.0 uses the model path; 1.0 requests the lane-center path, without raising the existing maximum correction ceiling. 0.95 is the suggested setting.
+        details: Confidence and steering limits always apply. Model Break-In can reduce the lane contribution during a large, confident path disagreement; set Model Break-In to 0.0 if you want no such reduction. This is a path weight, not a promise of exact physical lane position.
+        min: 0.0
+        max: 1.0
+        step: 0.05
+        enablement:
+        - {type: param, key: LaneGuidanceMode, equals: 1}
+      - key: LaneCenteringE2EAuthority
+        widget: option
+        title: Model Break-In
+        description: When a confident model path disagrees with lane center by more than 0.15 m across the preview, allow it to reduce the correction. At 1.0, the correction can reach zero by 0.50 m of disagreement; 0.0 never reduces it.
+        details: Uses weighted disagreement over the full preview rather than one distant point. This conditional model break-in is separate from lane-center strength.
+        min: 0.0
+        max: 1.0
+        step: 0.05
+        enablement:
+        - {type: param, key: LaneGuidanceMode, equals: 1}
+    - id: nrdr_steer_ratio_tuning
+      label: Steer Ratio Tuning
+      trigger_key: null
+      trigger_condition: {type: capability, field: nrdr_honda_tuning_available, equals: true}
+      items:
+      - key: NrdrSteerRatioHybrid
+        widget: toggle
+        title: Enable Hybrid Steer Ratio
+        description: Use source A near center, then blend into source B across 5 degrees. OFF preserves single-source operation and your existing selection.
+        details: Experimental geometry, not road-validated. Configure while parked. The slider is the start of the transition, measured from straight ahead in either direction. Both sources must match this vehicle. A blend that reverses the angle-to-curvature mapping is rejected; runtime holds the last accepted geometry while active, or uses stock fallback at startup. Inspect the current steer-ratio result on the device. No PID gains or original curve data are changed.
+      - key: NrdrSteerRatioMode
+        widget: multiple_button
+        title: Ratio A — Near Center / Single Source
+        description: The only source with Hybrid OFF; the near-center source with Hybrid ON.
+        details: Comma uses its last valid learned ratio as one number and holds it through brief message dropouts. nrdr Measured Curve uses fixed logged data; it does not learn while you drive. Clarity retains its audited 435.7-degree near-lock anchor. Civic TEG-A010 uses provisional v0, with data-derived anchors at 3.3-58.7 degrees and linear interpolation between them. Outside that range the nearest anchor is held as an unmeasured estimate. This Civic draft is not road-validated and has no fitted speed correction. A disabled nrdr option means no matching car/EPS data profile. Firmware uses a recognized EPS shape and a matching rack map. Clarity, Civic C020, TEG-A010, TGG-A120 and Insight have yaw-measured maps; Civic A030 inherits the TEG map provisionally. Civic C120 and CR-V A040/A220 use provisional maps based on published specs. Other recognized profiles use their stock center ratio. Settings are captured from one live snapshot. Background polling has a 0.5-second cycle, but this does not prove Sunnylink delivery or active-controller consumption. Configure experimental settings while parked. Existing settings are not changed automatically.
+        options:
+        - value: 0
+          label: Manual
+          enablement:
+          - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
+        - value: 1
+          label: Comma Learner
+        - value: 2
+          label: nrdr Measured Curve
+          enablement:
+          - {type: capability, field: nrdr_raw_steer_ratio_available, equals: true}
+        - value: 3
+          label: Firmware
+          enablement:
+          - {type: capability, field: nrdr_firmware_steer_ratio_available, equals: true}
+      - key: NrdrSteerRatioBlendStart
+        widget: option
+        title: Blend Starts At
+        description: Steering-wheel angle in either direction. Source B takes over fully 5 degrees later; for example, 25 degrees blends from 25 to 30 degrees. This is not a recommended tuning point.
+        min: 0.0
+        max: 180.0
+        step: 1.0
+        unit: °
+        enablement:
+        - {type: param, key: NrdrSteerRatioHybrid, equals: true}
+      - key: NrdrSteerRatioSourceB
+        widget: multiple_button
+        title: Ratio B — Beyond the Blend
+        description: Used after the 5-degree transition. The same transition is followed in reverse when unwinding. No speed-based switch.
+        enablement:
+        - {type: param, key: NrdrSteerRatioHybrid, equals: true}
+        options:
+        - value: 0
+          label: Manual
+          enablement:
+          - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
+        - value: 1
+          label: Comma Learner
+        - value: 2
+          label: nrdr Measured Curve
+          enablement:
+          - {type: capability, field: nrdr_raw_steer_ratio_available, equals: true}
+        - value: 3
+          label: Firmware
+          enablement:
+          - {type: capability, field: nrdr_firmware_steer_ratio_available, equals: true}
+      - key: NrdrSteerRatioManualCenter
+        widget: option
+        title: Manual Override On-Center Ratio
+        description: Ratio used with the wheel straight ahead. A bigger number asks for more steering-wheel movement for the same planned curve; a smaller number asks for less. Default 15.38.
+        min: 8.0
+        max: 25.0
+        step: 0.01
+        enablement:
+        - type: any
+          conditions:
+          - {type: param, key: NrdrSteerRatioMode, equals: 0}
+          - type: all
+            conditions:
+            - {type: param, key: NrdrSteerRatioHybrid, equals: true}
+            - {type: param, key: NrdrSteerRatioSourceB, equals: 0}
+        - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
+      - key: NrdrSteerRatioManualFinal
+        widget: option
+        title: Manual Override Final Ratio
+        description: Ratio used near the end of wheel travel. Default 10.93.
+        details: nrdr blends smoothly from the on-center number to this final number using hidden car-specific outer-angle metadata. Cars without exact metadata keep their stock ratio instead.
+        min: 8.0
+        max: 25.0
+        step: 0.01
+        enablement:
+        - type: any
+          conditions:
+          - {type: param, key: NrdrSteerRatioMode, equals: 0}
+          - type: all
+            conditions:
+            - {type: param, key: NrdrSteerRatioHybrid, equals: true}
+            - {type: param, key: NrdrSteerRatioSourceB, equals: 0}
+        - {type: capability, field: nrdr_manual_steer_ratio_available, equals: true}
+    - id: nrdr_override
+      label: Override Tuning
+      trigger_key: null
+      trigger_condition: {type: capability, field: nrdr_honda_tuning_available, equals: true}
+      items:
+      - key: NrdrOverrideThresholdCenterBoost
+        widget: option
+        title: Driver Override Threshold (During Straights)
+        description: 'Override threshold within the straight-ahead steering-angle band configured by Center Boost Degrees. This uses wheel angle, not detected road curvature. Default: 1200. Set equal to the curves threshold to use the same threshold at all angles.'
+        details: The existing straight-ahead threshold and saved value are unchanged. A higher value requires more driver torque to register an override. This threshold only applies when Center Boost Degrees is greater than zero and the absolute steering angle is within that band.
+        min: 100
+        max: 5000
+        step: 100
+      - key: NrdrDriverOverrideThreshold
+        widget: option
+        title: Driver Override Threshold (During Curves)
+        description: 'Override threshold outside the straight-ahead steering-angle band, or at all angles when that band is disabled. Default: 1400. 1200 represents the stock threshold, scaled proportionally on cars with a different stock threshold.'
+        details: The existing general override threshold and saved value are unchanged. A higher value requires more driver torque to register an override. The separate straights threshold applies inside the configured steering-angle band; this does not classify the road as straight or curved.
+        min: 100
+        max: 5000
+        step: 100
+      - key: HondaDriverAssistDuringOverride
+        widget: toggle
+        title: Assist Pass-Through
+        description: Stops requesting lane assist when you take over, so you're not steering against it. This can make manual steering feel smoother without switching assist off.
+      - key: HondaOverrideFadeDownSecs
+        widget: option
+        title: Override Torque Fade Down
+        description: Controls how quickly steering torque fades out when driver override begins.
+        min: 0.0
+        max: 10.0
+        step: 0.01
+        unit: second
+      - key: HondaOverrideFadeUpSecs
+        widget: option
+        title: Override Torque Fade Up
+        description: Controls how quickly steering torque fades back in after driver override ends.
+        min: 0.0
+        max: 10.0
+        step: 0.01
+        unit: second
+      - key: HondaOverrideTorqueScale
+        widget: option
+        title: Override Torque Retain
+        description: Controls how much openpilot steering torque remains when the override has gone past Override Torque Fade Down.
+        min: 0
+        max: 100
+        step: 1
+        unit: '%'
+    - id: nrdr_steer_filters
+      label: Steer Filters
+      trigger_key: null
+      trigger_condition: {type: capability, field: nrdr_honda_tuning_available, equals: true}
+      items:
+      - key: HondaTorqueLowPassFilter
+        widget: toggle
+        title: Low Pass Filter (tau)
+        description: Master switch. OFF bypasses all three speed bands, regardless of saved tau values.
+        details: Changing tau does not turn the filter on. With the master switch ON, 0 bypasses only that speed band; higher tau adds smoothing and delay. Too much delay can cause oscillations. After a remote edit, refresh and verify the device-reported switch and values; editable sliders alone do not prove filtering is active.
+      - key: HondaLpfTauLowSpeed
+        widget: option
+        title: Low Pass Filter Tau (Below 25mph)
+        description: Time constant below 25 mph, in seconds. Requires the master switch ON. 0 bypasses only this speed band.
+        min: 0.0
+        max: 5.0
+        step: 0.01
+        enablement:
+        - type: param
+          key: HondaTorqueLowPassFilter
+          equals: true
+      - key: HondaLpfTauStandard
+        widget: option
+        title: Standard Tau (25-50mph)
+        description: Time constant from 25 to below 50 mph, in seconds. Requires the master switch ON. 0 bypasses only this speed band.
+        min: 0.0
+        max: 5.0
+        step: 0.01
+        enablement:
+        - type: param
+          key: HondaTorqueLowPassFilter
+          equals: true
+      - key: HondaLpfTauHighway
+        widget: option
+        title: Highway Tau (50mph+)
+        description: Time constant at or above 50 mph, in seconds. Requires the master switch ON. 0 bypasses only this speed band.
+        min: 0.0
+        max: 5.0
+        step: 0.01
+        enablement:
+        - type: param
+          key: HondaTorqueLowPassFilter
+          equals: true
+      - key: HondaSteerDeltaLimiter
+        widget: toggle
+        title: Legacy Steer Delta Rate Limiter
+        description: Limits how quickly requested steering torque can rise or fall.
+        details: Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful compared to the low pass filter.
+      - key: HondaSteerDeltaUp
+        widget: option
+        title: Steer Delta Up
+        description: Maximum upward steering torque rate when the rate limiter is enabled (too low will add lag).
+        min: 0.0
+        max: 100.0
+        step: 0.1
+        enablement:
+        - type: param
+          key: HondaSteerDeltaLimiter
+          equals: true
+      - key: HondaSteerDeltaDown
+        widget: option
+        title: Steer Delta Down
+        description: Maximum downward steering torque rate when the rate limiter is enabled (too low will add lag).
+        min: 0.0
+        max: 100.0
+        step: 0.1
+        enablement:
+        - type: param
+          key: HondaSteerDeltaLimiter
+          equals: true
+    - id: nrdr_longitudinal
+      label: Longitudinal Tuning
+      trigger_key: null
+      trigger_condition: {type: capability, field: nrdr_longitudinal_tuning_available, equals: true}
+      items:
+      - key: HondaLiveLearningGas
+        widget: toggle
+        title: Live Learning Gas
+        description: Selects full MVL longitudinal control; applies after restart.
+        details: ON selects full MVL gas, braking and Aggressive/Standard/Relaxed personalities, including following distances, on Honda Nidec PCM, Bosch and gas-interceptor openpilot longitudinal paths. Only Econ keeps nrdr's fixed longer-following and gentler acceleration/jerk defaults; a custom tune file does not change these MVL profiles. Saved ON is not proof that MVL is active yet. Conflicting settings stay locked while ON is saved or the running controller is MVL, including after saving OFF until restart. Their saved custom values are kept. Reset clears gas/wind learning only. Existing OFF choices are preserved; new Honda setups default ON.
+        needs_onroad_cycle: true
+        enablement:
+        - $ref: '#/macros/offroad'
+        - {type: capability, field: nrdr_honda_mvl_selection_available, equals: true}
+      - key: NrdrResetLiveGas
+        widget: toggle
+        title: Reset Live Learning Gas
+        description: Clear gas and wind learning shared across Hondas on this device.
+        details: Wind returns to baseline, which may change when braking starts on the next drive. Brake tuning, PID scales, and the learning switch are kept. Park and turn the ignition off, then turn this ON once. When it turns back OFF, check Live Gas Reset Status for the outcome.
+        requires_attestation: true
+        visibility:
+        - {type: capability, field: nrdr_honda_tuning_available, equals: true}
+        enablement:
+        - $ref: '#/macros/offroad'
+      - key: NrdrLiveGasResetStatus
+        widget: info
+        title: Live Gas Reset Status
+        visibility:
+        - {type: capability, field: nrdr_honda_tuning_available, equals: true}
+      - key: NrdrHondaPcmMode
+        widget: multiple_button
+        title: 'Honda Nidec: ECU-Matched PCM Command Shaping'
+        description: "Off uses upstream PCM control. ECU-Matched adds mmmorks' ramp, coast and brake-release rules. Experimental uses the Civic trial. No gas interceptor. Restart required."
+        details: ECU-Matched keeps MVL mapping on all non-interceptor Nidecs. Experimental falls back to upstream on unsupported Nidecs. Requires openpilot longitudinal control; configure while parked. Default Off.
+        needs_onroad_cycle: true
+        options:
+        - {label: 'Off', value: 0}
+        - {label: ECU-Matched, value: 1}
+        - {label: Experimental, value: 2}
+        visibility:
+        - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
+        enablement:
+        - $ref: '#/macros/offroad'
+        - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
+      - key: NrdrHondaWindBrake
+        widget: toggle
+        title: Wind Brake
+        description: Subtracts estimated wind drag from brake demand. PCM only; gas compensation is unchanged. Restart required.
+        details: Default ON. Turning it off changes friction-brake demand. Non-interceptor Nidec openpilot longitudinal only; excludes Bosch. Configure while parked.
+        needs_onroad_cycle: true
+        visibility:
+        - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
+        enablement:
+        - $ref: '#/macros/offroad'
+        - {type: capability, field: nrdr_honda_pcm_tuning_available, equals: true}
+      - key: StaticFeedforwardLong
+        widget: toggle
+        title: Keep Feedforward Static
+        description: 'On: feedforward stays the same. Off: feedforward scales with the rest of the PID tune.'
+        details: When ON, the active personality PID scale multiplies only the feedback (P+I) terms; the feedforward (kf) keeps its tuned value instead of being scaled along with it. The lateral PID scales have their own toggle.
+      - key: NrdrHondaFullBrakeAuthority
+        widget: toggle
+        title: Full Nidec Brake Authority
+        description: Allows the full brake-command range on supported cars with a gas interceptor.
+        details: Enabled by default. Disable to retain the upstream brake-command headroom. Unavailable while MVL longitudinal is selected or active.
+      - key: NrdrRoenAccelerationLimits
+        widget: toggle
+        title: Roen Nidec Acceleration Limits
+        description: Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.
+        details: Disabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. Unavailable while MVL longitudinal is selected or active.
+      - key: HondaBoschARadar
+        widget: toggle
+        title: Honda Bosch-A Radar (experimental)
+        description: Reads factory radar with stock cruise or Alpha Long on supported cars.
+        details: EXPERIMENTAL — The reverse-engineered object format has not been road-validated on every supported model. Disable this setting if radar tracks look incorrect. With Alpha Long, these tracks feed openpilot's lead tracking and longitudinal commands; factory Honda AEB/CMBS remains unavailable.
+      - key: NrdrHondaDashVariantB
+        widget: toggle
+        title: Honda Dashboard Variant B
+        description: Turn ON if your cluster is Variant B (4 dashed lane lines). Placeholder for now - has no effect yet.
+        details: Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is Variant B. Placeholder for now - has no effect until the rounding correction is built.
+      - key: LongPidTuneScaleAggressive
+        widget: option
+        title: Distance 1 / Aggressive PID Scale
+        description: Scales the longitudinal PID controller for the Aggressive personality (distance setting 1).
+        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        min: 0
+        max: 500
+        step: 5
+        unit: '%'
+      - key: LongPidTuneScaleStandard
+        widget: option
+        title: Distance 2 / Standard PID Scale
+        description: Scales the longitudinal PID controller for the Standard personality (distance setting 2).
+        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        min: 0
+        max: 500
+        step: 5
+        unit: '%'
+      - key: LongPidTuneScaleRelaxed
+        widget: option
+        title: Distance 3 / Relaxed PID Scale
+        description: Scales the longitudinal PID controller for the Relaxed personality (distance setting 3).
+        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        min: 0
+        max: 500
+        step: 5
+        unit: '%'
+      - key: LongPidTuneScaleEcon
+        widget: option
+        title: Distance 4 / Econ PID Scale
+        description: Scales the longitudinal PID controller for the Econ personality (distance setting 4).
+        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        min: 0
+        max: 500
+        step: 5
+        unit: '%'
+      - key: NrdrCruiseMismatchCorrection
+        widget: option
+        title: Cruise Mismatch Correction
+        description: Adjusts the cruise target if your car consistently runs above or below set speed.
+        details: Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, lower this until correct on a flat road, or vice versa for the opposite problem.
+        min: 95.0
+        max: 105.0
+        step: 0.1
+        unit: '%'
+      - key: NrdrStandstillGapExtra
+        widget: option
+        title: Extra Stopped Lead Gap
+        description: Targets extra space behind a stopped vehicle; 0 m keeps the usual gap.
+        details: Adds to the planner's distance floor, not the distance-bar time gap. Measured bumper clearance can vary with lead sensing and braking. Configure offroad; applies on the next engagement. Requires nrdr-supported openpilot longitudinal control; stock ACC and unapproved non-Honda vehicles are unchanged.
+        min: 0.0
+        max: 5.0
+        step: 0.25
+        unit: m
+        enablement:
+        - $ref: '#/macros/offroad'
+        - type: capability
+          field: has_longitudinal_control
+          equals: true
+      - key: HondaStoppingDecelRate
+        widget: option
+        title: Stopping Decel Rate
+        description: Brake-rate limiter used while coming to a stop (carcontroller).
+        min: 0
+        max: 100
+        step: 1
+      - key: HondaStopAccel
+        widget: option
+        title: Stop Accel
+        description: Target acceleration once stopped (holds the brake).
+        min: -4.0
+        max: 0.0
+        step: 0.01
+      - key: HondaStoppingDecelRateLong
+        widget: option
+        title: Planner Stopping Rate
+        description: How quickly commanded deceleration ramps down while coming to a stop.
+        min: 0.0
+        max: 5.0
+        step: 0.01
+      - key: HondaVEgoStopping
+        widget: option
+        title: vEgo Stopping
+        description: Speed (m/s) below which the planner treats the car as stopping.
+        min: 0.0
+        max: 3.0
+        step: 0.01
+      - key: HondaVEgoStarting
+        widget: option
+        title: vEgo Starting
+        description: Speed (m/s) above which the car is considered moving again.
+        min: 0.0
+        max: 3.0
+        step: 0.01
+    - id: nrdr_driver_monitoring
+      label: Driver Monitoring
+      trigger_key: null
+      trigger_condition: {type: capability, field: nrdr_driver_monitoring_tuning_available, equals: true}
+      items:
+      - key: NrdrDriverMonitoringReminderPercent
+        widget: option
+        needs_onroad_cycle: true
+        title: First Reminder Timing
+        description: 100% uses upstream timing. Higher values wait longer before the first reminder; lower values warn sooner. The gaps between later warnings stay unchanged, so later warnings shift with the first reminder. Camera-failure protections, lockouts, and the no-response interval are unchanged.
+        details: No disable option. At 250%, vision reminders occur at 12.5, 15.5, and 20.5 seconds; wheel reminders occur at 12.5, 22.5, and 32.5 seconds. Each sequence then keeps the unchanged 5-second no-response interval. Changes apply after reboot. Monitoring does not guarantee an emergency stop.
+        min: 50
+        max: 250
+        step: 5
+        unit: '%'
+        enablement:
+        - $ref: '#/macros/offroad'
+  - id: nrdr_special
+    title: nrdr Special
+    description: Dashboard, diagnostics, and special features.
+    visibility:
+    - {type: capability, field: nrdr_honda_tuning_available, equals: true}
+    items: []
+    sub_panels:
+    - id: nrdr_party_tricks
+      label: Special
+      trigger_key: null
+      items:
+      - key: HondaInjectionTest
+        widget: toggle
+        title: Injection Test (Caution!)
+        description: Multiplies the lateral PID output scale by 999% as a diagnostic stress test. Use with extreme caution.
+        details: When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a massive steering command. Use with extreme caution on a safe, empty road.
+      - key: HondaAltDashboardSpeed
+        widget: multiple_button
+        title: Alternative Dashboard Speed Design
+        description: Repurposes the cluster's set-speed slot to show lead, GPS, or true cluster speed (needs openpilot longitudinal).
+        details: Lead Speed shows the lead's speed in whole mph ("Stopped" below 1 mph, "--" with no lead). GPS Speed shows the comma's own true speed. Cluster Speed shows exactly what the dash cluster reads.
+        options:
+        - value: 0
+          label: Stock
+        - value: 1
+          label: Lead Speed
+        - value: 2
+          label: GPS Speed
+        - value: 3
+          label: Cluster Speed
+      - key: HondaAltDashboardDistance
+        widget: option
+        title: Alternative Dashboard Distance Design
+        description: Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal).
+        details: Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). Radar closes the bars in as the lead approaches. Velocity pushes the bars out under acceleration and pulls them in under braking. Non-stock designs stay on the cluster permanently, even when not engaged.
+        options:
+        - value: 0
+          label: Stock
+        - value: 1
+          label: Radar
+        - value: 2
+          label: Velocity
+      - key: NrdrClearDashFaults
+        widget: toggle
+        title: Clear Dashboard Fault Codes
+        description: Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime.
+        details: Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active).
+      - key: HondaSpoofCameraMessages
+        widget: toggle
+        title: Spoof Camera Messages
+        description: Dead camera only - keeps the CAMERA_MESSAGES broadcast alive so the cluster never raises a high-beam fault.
+        details: Dead camera only - keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises "Auto High Beam System Problem" (that fault is a message timeout, not a code). Leave OFF if your stock camera works.
+      - key: NrdrCruiseButtonSubMode
+        widget: toggle
+        title: Cruise Button Sub-Mode
+        description: Dynamic HUD - the distance or set/resume button first wakes a blinking preview on the cluster.
+        details: Dynamic HUD - pressing the distance button or set/resume first wakes a preview on the cluster (current personality on the bars, set speed if engaged, all blinking). Only presses made during the preview actually change the personality or set speed. The blink starts lazy and accelerates continuously until it cuts off.
+      - key: NrdrCruiseButtonSubModeSecs
+        widget: option
+        title: Sub-Mode Visibility Time
+        description: How long the preview stays on the cluster after a button press.
+        details: How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and rapid right before it falls off.
+        min: 5
+        max: 60
+        step: 1
+        unit: second
+        enablement:
+        - type: param
+          key: NrdrCruiseButtonSubMode
+          equals: true

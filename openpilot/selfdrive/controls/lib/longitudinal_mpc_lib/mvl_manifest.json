@@ -1,0 +1,132 @@
+{
+  "donor_commit": "376c44b5731b2655e5c2f301b73c9729eb499e91",
+  "donor_ref": "mvl/sp-honda-dev-202608",
+  "legacy_commit": "bf7ae630c9dd26f2175704b38c7213078c0ef7fb",
+  "gate": "policy.mvl_longitudinal_enabled(CP): Honda + openpilot longitudinal + startup-latched HondaFlags.MVL_LONGITUDINAL (131072)",
+  "donor_blobs": {
+    "openpilot/selfdrive/controls/lib/accel_boost.py": "17920c6daa6a2aaf47f91504a2a81ceb0d66835e",
+    "openpilot/selfdrive/controls/lib/longcontrol.py": "3a20601c48388adf65dd4fe7689c5797e0c933d6",
+    "openpilot/selfdrive/controls/lib/longitudinal_mpc_lib/long_mpc.py": "0a0722fbc6e1299a992ca4f3b195204dc89c4036",
+    "openpilot/selfdrive/controls/lib/longitudinal_planner.py": "87f62fbe9580c6e234ed7f1bd1656b2de947619c",
+    "openpilot/sunnypilot/selfdrive/controls/lib/longitudinal_planner.py": "a579e61c599f6b51cfa8594a92ae323ba79ce613",
+    "openpilot/selfdrive/car/cruise.py": "ab2eaba020cf01ca012f9742b760be61ca1e81a7"
+  },
+  "personality_contract": {
+    "aggressive": {
+      "t_follow": 1.25,
+      "jerk_factor": 0.5,
+      "dynamics": "exact donor"
+    },
+    "standard": {
+      "t_follow": 1.45,
+      "jerk_factor": 1,
+      "dynamics": "exact donor"
+    },
+    "relaxed": {
+      "t_follow": 1.75,
+      "jerk_factor": 1,
+      "dynamics": "exact donor"
+    },
+    "econ": {
+      "t_follow": 2.25,
+      "jerk_factor": 1.5,
+      "accel": "fixed pre-mode C3 Eco ceiling and fixed pre-mode cruise ceiling; positive cruise acceleration only",
+      "cruise_jerk": "fixed pre-mode [1.6, 1.2, 0.8, 0.6] at [0, 10, 25, 40] m/s",
+      "other_behavior": "donor lead trajectories, obstacles, stopping, PID, FCW, acceleration boost"
+    }
+  },
+  "exceptions": [
+    "Econ only, as enumerated above. No Params/LongTune or live personality setting inputs to dynamics in MVL mode.",
+    "Manual Experimental Mode is an explicit exception to the donor's unconditional model candidate. Off excludes model acceleration/shouldStop and model-override boost; radar MPC, cruise, FCW and forced deceleration remain. On uses the donor candidate/boost. Turning Off clears only model boost state, retaining planner/PID continuity.",
+    "Host schema: allowThrottle=True, matching donor's absence of throttle suppression.",
+    "Donor accelBoost publication omitted: host schema currently has no corresponding field; computation unchanged.",
+    "Host MPC stores raw donor lead trajectories for existing diagnostics; no lead filtering/shaping.",
+    "Fixed donor-default SP target adapter bypasses optional SCC/SLA/resolver and AccelBoostSP construction. Information-only speed-limit telemetry stays neutral. This prevents saved custom settings leaking through locked controls."
+  ],
+  "retired": [
+    "Host cruise overspeed allowance runtime, helper, exports.",
+    "Host engine braking helper, SP publication, and dedicated tests. Cereal ordinal deprecation and DBC cleanup owned by parent/DBC agent."
+  ],
+  "validation": {
+    "command": "python -m pytest openpilot/nrdr/tests/test_mvl_host_parity.py openpilot/nrdr/tests/test_mvl_plannerd_lifecycle.py openpilot/nrdr/tests/test_mvl_host_native.py openpilot/nrdr/tests/test_mvl_cruise.py openpilot/nrdr/tests/test_experimental_button_regressions.py",
+    "scope": "Pinned git blob verification; exact AST comparison of copied algorithms and optimizer definition; differential controller/planner/solver-input/FCW/boost tests; polluted custom-settings isolation; legacy non-Honda equivalence.",
+    "native_release_gate": "Run test_mvl_host_native against the native acados solver, capnp imports, startup policy, settings and controller parity on the C4, then repeat acceptance checks after building the exact installed revision.",
+    "not_validated": "Physical actuator response, on-road behavior, future learned-state convergence, or the donor author's private settings. Source parity and native software tests are not road validation."
+  },
+  "configuration_contract": {
+    "effective_selections": "Driver cruise set speed, four personality selector and manual Experimental Mode remain effective. Honda MVL-controller ownership is startup-latched; Experimental Mode is live.",
+    "first_three": "Pinned donor code and checked-in defaults, not a claim about the donor author's private runtime preferences.",
+    "SmartCruiseControlVision": false,
+    "SmartCruiseControlMap": false,
+    "SpeedLimitMode": 1,
+    "SpeedLimitMode_meaning": "information (not assist); no acceleration target",
+    "optional_speed_controls": "Fixed-disabled target adapter: does not construct SCC, resolver, or SLA. Saved settings and stale targets cannot affect speed/acceleration. SP SCC/SLA/resolver telemetry is neutral (information display is not reproduced).",
+    "ExperimentalMode": "Live manual selection via settings or distance-button hold. Off: cruise/radar candidates only, no model stop request or model boost update. On: donor model candidate and boost. DynamicExperimentalControl remains disabled; saved preference is never forced by this mode.",
+    "AccelBoostSP": "Ignored, not constructed. Donor gas-override AccelBoost participates only with Experimental Mode On; max 0.2, rate 0.025, per override 0.05, min speed 10 mph. Switching Off clears accumulated model boost.",
+    "GreenLightAlert_and_LeadDepartAlert": "Existing SP alert preferences remain read-only advisory events, not acceleration/trajectory inputs.",
+    "not_changed": "Model selection, lateral control, stock safety, hardware/gear safety guard.",
+    "V_CRUISE_MAX": "145 km/h pinned locally in MVL planner; host cruise selector's 169 km/h is unchanged outside mode. Above 145 km/h, target arbitration still uses the donor ceiling."
+  },
+  "offline_references": {
+    "environment": "MVL_PARITY_REFERENCE_ROOT",
+    "layout": "<reference root>/<full commit>/<repository-relative path>; preserve exact git blob bytes",
+    "376c44b5731b2655e5c2f301b73c9729eb499e91": [
+      "openpilot/selfdrive/controls/lib/accel_boost.py",
+      "openpilot/selfdrive/controls/lib/longcontrol.py",
+      "openpilot/selfdrive/controls/lib/longitudinal_mpc_lib/long_mpc.py",
+      "openpilot/selfdrive/controls/lib/longitudinal_planner.py",
+      "openpilot/sunnypilot/selfdrive/controls/lib/longitudinal_planner.py",
+      "openpilot/common/pid.py",
+      "openpilot/common/params_keys.h",
+      "openpilot/sunnypilot/selfdrive/controls/lib/speed_limit/common.py",
+      "openpilot/selfdrive/car/cruise.py",
+      "openpilot/sunnypilot/selfdrive/car/cruise_ext.py",
+      "openpilot/selfdrive/car/card.py",
+      "openpilot/sunnypilot/selfdrive/car/intelligent_cruise_button_management/helpers.py"
+    ],
+    "bf7ae630c9dd26f2175704b38c7213078c0ef7fb": [
+      "openpilot/selfdrive/controls/lib/longitudinal_planner.py",
+      "openpilot/nrdr/features/longitudinal/longitudinal_planner.py",
+      "openpilot/selfdrive/car/cruise.py",
+      "openpilot/sunnypilot/selfdrive/car/cruise_ext.py"
+    ],
+    "fixture_fallback": "openpilot/nrdr/tests/fixtures/mvl_baseline/<full commit>/<repository path>.txt",
+    "verification": "Normalize CRLF to LF, verify every reference against reference_blobs before execution. Explicit MVL_PARITY_REFERENCE_ROOT is authoritative and hash-checked; otherwise bundled fixtures are preferred over Git. No skips for missing references."
+  },
+  "solver_contract": "No formulation regeneration required by this mode: pinned donor and existing generated formulation share N=12, X=3, U=1, P=6, cost=6/terminal=5, constraints=4, same horizon/dynamics/constraints/cost equations/default parameters and solver options. Runtime costs/headway are parameters. SCons can rebuild on source mtime; offline staging may reuse unchanged native solver libraries. Native tests required to validate loaded artifacts.",
+  "reference_blobs": {
+    "376c44b5731b2655e5c2f301b73c9729eb499e91": {
+      "openpilot/selfdrive/controls/lib/accel_boost.py": "17920c6daa6a2aaf47f91504a2a81ceb0d66835e",
+      "openpilot/selfdrive/controls/lib/longcontrol.py": "3a20601c48388adf65dd4fe7689c5797e0c933d6",
+      "openpilot/selfdrive/controls/lib/longitudinal_mpc_lib/long_mpc.py": "0a0722fbc6e1299a992ca4f3b195204dc89c4036",
+      "openpilot/selfdrive/controls/lib/longitudinal_planner.py": "87f62fbe9580c6e234ed7f1bd1656b2de947619c",
+      "openpilot/sunnypilot/selfdrive/controls/lib/longitudinal_planner.py": "a579e61c599f6b51cfa8594a92ae323ba79ce613",
+      "openpilot/common/pid.py": "f541baf05c96503d4a8c4daa980e935c058005e9",
+      "openpilot/common/params_keys.h": "45aa48eb534e7a864051dbf4cd5a8f5107b682ac",
+      "openpilot/sunnypilot/selfdrive/controls/lib/speed_limit/common.py": "c46768464e61ae2929fe3fd199b5a33bec700738",
+      "openpilot/selfdrive/car/cruise.py": "ab2eaba020cf01ca012f9742b760be61ca1e81a7",
+      "openpilot/sunnypilot/selfdrive/car/cruise_ext.py": "61bec477f2e3ce9a3c8b3b5261d7a1b5995b034f",
+      "openpilot/selfdrive/car/card.py": "e2e888d9e75b73c610c64c105b4b010cfa07d568",
+      "openpilot/sunnypilot/selfdrive/car/intelligent_cruise_button_management/helpers.py": "eb4bbdecb5fc4fcb2af94eedf3dfaacf8f5612f0"
+    },
+    "bf7ae630c9dd26f2175704b38c7213078c0ef7fb": {
+      "openpilot/selfdrive/controls/lib/longitudinal_planner.py": "98d2b7d4f14a06716f481896ec59e99fe0ae6b71",
+      "openpilot/nrdr/features/longitudinal/longitudinal_planner.py": "f4521945947f42e692ff1f3f805b49d6a489a069",
+      "openpilot/selfdrive/car/cruise.py": "e3c0756e442afdde17e0f0289692b47b962a7c90",
+      "openpilot/sunnypilot/selfdrive/car/cruise_ext.py": "7debd54179f15b888b07c24ec8deddd68cecb858"
+    }
+  },
+  "cruise_contract": {
+    "pinned_donor": "376c44b5731b2655e5c2f301b73c9729eb499e91",
+    "software_ceiling_kph": 145,
+    "minimums": "Pinned donor SP: pcmCruiseSpeed=True -> 8 kph; False -> 30 kph metric or 20 kph imperial (both values are kph).",
+    "initial_caller": "Donor card.py passes InitialCruiseSpeedKph (checked-in default 40). Host card.py passes experimental_mode: bool; preserve its signature, ignore that argument in MVL.",
+    "resume": "Exact donor last-speed/initialized guard. PCM initialization remains hardware-owned; no new resume or engagement guard bypass.",
+    "pcm_ownership": "PCM-controlled targets and 0/-1 sentinels are mirrored exactly as donor, without rewriting hardware-owned cruise. Initialization returns immediately for CP.pcmCruise. Software button targets use 145 kph. No CAN/gear/safety changes.",
+    "settings": "Donor-default custom increments disabled: one unit short, five units long, standard 1.6 kph imperial increment and donor rounding. No NrdrCruise construction or live Params in MVL VCruiseHelperSP. Ignore custom increments/HUD submode/Honda imperial remap/SLA sidecar targets, even stale in-memory values.",
+    "wheel_hold": "Distance-button hold toggles manual Experimental Mode once per hold and announces the chosen On/Off state. Releasing that hold must not also cycle personality. Short presses retain the four-personality selector. Saved HondaLiveLearningGas changes cannot change the active controller gate.",
+    "parent_contract": "Parent-owned NrdrSelfdrive hooks own bypass of HUD submode personality-consumption and stale SLA reservations in MVL; cruise helper does not edit those hooks.",
+    "legacy": "Non-MVL cruise helper behavior, global 0/169 limits, and boolean initialization API retained.",
+    "initialization": "Exact donor-default non-PCM SET: round(clamp(max(current speed kph, 40), 40, 145)). Initial SET at standstill is 40 km/h (~25 mph), intentionally restored per explicit user direction. No custom 0-mph target. Host bool argument and saved InitialCruiseSpeedKph do not affect MVL."
+  }
+}

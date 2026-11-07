@@ -1,0 +1,276 @@
+"""
+Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
+
+This file is part of sunnypilot and is licensed under the MIT License.
+See the LICENSE.md file in the root directory for more details.
+
+Sentinel tests for the capabilities payload contract. PROTOCOL_VERSION is the
+wire-protocol version observable by the dashboard; bumping it is a breaking
+change and must be intentional. KNOWN_PROTOCOL_VERSIONS pins the set we
+explicitly support — when the constant is bumped, this list must be edited in
+the same commit so the bump shows up in code review.
+"""
+from __future__ import annotations
+
+
+from opendbc.car.structs import car
+from openpilot.cereal import custom
+from openpilot.common.params import Params
+from openpilot.sunnypilot.sunnylink.capabilities import (
+  CAPABILITY_DEFAULTS,
+  CAPABILITY_FIELDS,
+  CAPABILITY_LABELS,
+  PROTOCOL_VERSION,
+  generate_capabilities,
+)
+from openpilot.common.test import OpenpilotTestCase
+
+
+KNOWN_PROTOCOL_VERSIONS = (1, 2)
+LATEST_KNOWN = max(KNOWN_PROTOCOL_VERSIONS)
+
+
+def caps():
+  return generate_capabilities()
+
+
+def params():
+  return Params()
+
+
+def put_car_params(params, fingerprint: str, brand: str, firmware: bytes | None = None) -> None:
+  CP = car.CarParams.new_message()
+  CP.carFingerprint = fingerprint
+  CP.brand = brand
+  if firmware is not None:
+    CP.carFw = [{"ecu": "eps", "fwVersion": firmware}]
+  params.put("CarParamsPersistent", CP.to_bytes(), block=True)
+
+
+class TestProtocolVersion(OpenpilotTestCase):
+  def test_protocol_version_in_capability_fields(self):
+    assert "protocol_version" in CAPABILITY_FIELDS
+
+  def test_protocol_version_has_label(self):
+    assert "protocol_version" in CAPABILITY_LABELS
+
+  def test_protocol_version_default_is_set(self):
+    assert CAPABILITY_DEFAULTS.get("protocol_version") == PROTOCOL_VERSION
+
+  def test_protocol_version_emitted(self, caps):
+    assert "protocol_version" in caps
+    assert isinstance(caps["protocol_version"], int)
+    assert caps["protocol_version"] >= 1
+
+  def test_protocol_version_matches_constant(self, caps):
+    assert caps["protocol_version"] == PROTOCOL_VERSION
+
+  def test_protocol_version_is_known(self):
+    """Sentinel against accidental bumps. Edit KNOWN_PROTOCOL_VERSIONS if intentional."""
+    assert PROTOCOL_VERSION in KNOWN_PROTOCOL_VERSIONS, (
+      f"PROTOCOL_VERSION={PROTOCOL_VERSION} is not in KNOWN_PROTOCOL_VERSIONS={KNOWN_PROTOCOL_VERSIONS}. " +
+      "If this bump is intentional, add it to KNOWN_PROTOCOL_VERSIONS."
+    )
+
+  def test_protocol_version_matches_latest_known(self):
+    assert PROTOCOL_VERSION == LATEST_KNOWN, (
+      "Test invariant: PROTOCOL_VERSION must equal max(KNOWN_PROTOCOL_VERSIONS)."
+    )
+
+
+class TestOpaquePerBrandFlags(OpenpilotTestCase):
+  def test_pcm_tuning_requires_confirmed_non_interceptor_nidec_openlong(self, params):
+    assert "nrdr_honda_pcm_tuning_available" in CAPABILITY_FIELDS
+    assert generate_capabilities(params)["nrdr_honda_pcm_tuning_available"] is False
+    for fingerprint, interceptor, openlong, expected in (
+      ("HONDA_CIVIC", False, True, True),
+      ("HONDA_CLARITY", False, True, True),
+      ("HONDA_CIVIC", True, True, False),
+      ("HONDA_CIVIC", False, False, False),
+      ("HONDA_CIVIC_BOSCH", False, True, False),
+    ):
+      CP = car.CarParams.new_message()
+      CP.brand, CP.carFingerprint = "honda", fingerprint
+      CP.openpilotLongitudinalControl = openlong
+      CP_SP = custom.CarParamsSP.new_message()
+      CP_SP.enableGasInterceptor = interceptor
+      params.put("CarParamsPersistent", CP.to_bytes(), block=True)
+      params.put("CarParamsSPPersistent", CP_SP.to_bytes(), block=True)
+      assert generate_capabilities(params)["nrdr_honda_pcm_tuning_available"] is expected
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CIVIC_BOSCH"}, block=True)
+    CP.carFingerprint = "HONDA_CIVIC"
+    params.put("CarParamsPersistent", CP.to_bytes(), block=True)
+    assert generate_capabilities(params)["nrdr_honda_pcm_tuning_available"] is False
+
+  def test_provisional_firmware_label_does_not_describe_the_retired_bosch_fallback(self):
+    label = CAPABILITY_LABELS["nrdr_firmware_controller_provisional"]
+    assert "firmware-specific" in label
+    assert "required EPS build" in label
+    assert "Bosch" not in label
+
+  def test_handcrafted_lateral_profile_field_present(self):
+    assert "has_handcrafted_lateral_profile" in CAPABILITY_FIELDS
+
+  def test_handcrafted_lateral_profile_default_false(self, caps):
+    assert caps["has_handcrafted_lateral_profile"] is False
+
+  def test_handcrafted_profile_requires_confirmed_matching_car_params(self, params):
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CIVIC"}, block=True)
+    assert generate_capabilities(params)["has_handcrafted_lateral_profile"] is False
+    assert generate_capabilities(params)["nrdr_honda_tuning_available"] is False
+
+    put_car_params(params, "HONDA_CIVIC", "honda")
+    caps = generate_capabilities(params)
+    assert caps["has_handcrafted_lateral_profile"] is True
+    assert caps["nrdr_honda_tuning_available"] is True
+
+  def test_handcrafted_profile_rejects_stale_or_cross_brand_identity(self, params):
+    put_car_params(params, "HONDA_CIVIC", "honda")
+    params.put("CarPlatformBundle", {"brand": "toyota", "platform": "LEXUS_ES_TSS2"}, block=True)
+    caps = generate_capabilities(params)
+    assert caps["has_handcrafted_lateral_profile"] is False
+    assert caps["nrdr_honda_tuning_available"] is False
+
+  def test_present_partial_or_non_mapping_selection_never_falls_back_to_stale_honda_cp(self, params):
+    put_car_params(params, "HONDA_CIVIC", "honda")
+    for bundle in ({}, {"brand": "honda"}, {"platform": "HONDA_CIVIC"}, ["honda", "HONDA_CIVIC"]):
+      params.put("CarPlatformBundle", bundle, block=True)
+      caps = generate_capabilities(params)
+      assert caps["has_handcrafted_lateral_profile"] is False
+      assert caps["nrdr_honda_tuning_available"] is False
+
+    params.put("CarPlatformBundle", {"brand": "toyota", "platform": "HONDA_CIVIC"}, block=True)
+    caps = generate_capabilities(params)
+    assert caps["has_handcrafted_lateral_profile"] is False
+    assert caps["nrdr_honda_tuning_available"] is False
+
+  def test_confirmed_toyota_only_exposes_compatible_non_honda_profile(self, params):
+    put_car_params(params, "LEXUS_ES_TSS2", "toyota")
+    params.put("CarPlatformBundle", {"brand": "toyota", "platform": "LEXUS_ES_TSS2"}, block=True)
+    caps = generate_capabilities(params)
+    assert caps["has_handcrafted_lateral_profile"] is True
+    assert caps["nrdr_honda_tuning_available"] is False
+    assert caps["nrdr_yaw_controller_available"] is False
+    assert caps["nrdr_interpolated_torque_pif_blend_available"] is False
+    from openpilot.nrdr.params.profiles import get_handcrafted_lateral_profile
+    with car.CarParams.from_bytes(params.get("CarParamsPersistent")) as cp:
+      profile = get_handcrafted_lateral_profile("LEXUS_ES_TSS2", cp, None)
+    assert profile is not None
+    assert not any(key.startswith(("Honda", "LatP", "LatI", "LatF", "NrdrLat", "LongPid", "NrdrSteerRatio"))
+                   for key, _ in profile.values)
+
+  def test_nrdr_steer_ratio_availability_fields_present(self):
+    assert "nrdr_manual_steer_ratio_available" in CAPABILITY_FIELDS
+    assert "nrdr_raw_steer_ratio_available" in CAPABILITY_FIELDS
+    assert "nrdr_firmware_steer_ratio_available" in CAPABILITY_FIELDS
+
+  def test_interpolated_torque_pif_blend_availability_field_present(self):
+    assert "nrdr_interpolated_torque_pif_blend_available" in CAPABILITY_FIELDS
+
+  def test_nrdr_steer_ratio_availability_defaults_are_conservative(self, caps):
+    assert caps["nrdr_manual_steer_ratio_available"] is False
+    assert caps["nrdr_raw_steer_ratio_available"] is False
+    assert caps["nrdr_firmware_steer_ratio_available"] is False
+    assert caps["nrdr_interpolated_torque_pif_blend_available"] is False
+    assert caps["nrdr_firmware_prediction_schedule"] is False
+    assert caps["nrdr_firmware_controller_provisional"] is False
+
+  def test_firmware_profiles_are_exact_and_carry_their_schedule(self, params):
+    from openpilot.cereal import custom
+    from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
+    sp = custom.CarParamsSP.new_message(flags=HondaFlagsSP.EPS_MODIFIED.value)
+    params.put("CarParamsSPPersistent", sp.to_bytes(), block=True)
+    for fingerprint, firmware, available, scheduled, provisional in (
+      ("HONDA_CLARITY", b"39990-TRW-A020", True, True, False),
+      ("HONDA_CIVIC_BOSCH", b"39990-TBA-C020", True, True, False),
+      ("HONDA_CIVIC", b"39990-TEG-A010", True, True, False),
+      ("HONDA_INSIGHT", b"39990-TXM-A040", True, True, False),
+      ("HONDA_CIVIC", b"39990-TBA-A030", True, True, True),
+      ("HONDA_CIVIC_BOSCH", b"39990-TBA-C120", True, True, True),
+      ("HONDA_CIVIC_BOSCH", b"39990-TGG-A120", True, True, True),
+      ("HONDA_CRV_5G", b"39990-TLA-A040", True, False, True),
+      ("HONDA_CRV_5G", b"39990-TLA-A220", True, False, True),
+      ("HONDA_CIVIC", b"39990-TBA-C120", False, False, False),
+    ):
+      params.put("CarPlatformBundle", {"brand": "honda", "platform": fingerprint}, block=True)
+      put_car_params(params, fingerprint, "honda", firmware)
+      result = generate_capabilities(params)
+      assert result["nrdr_yaw_controller_available"] is available
+      assert result["nrdr_firmware_prediction_schedule"] is scheduled
+      assert result["nrdr_firmware_controller_provisional"] is provisional
+    # A stale Clarity CP cannot lock another selected vehicle's delay settings.
+    put_car_params(params, "HONDA_CLARITY", "honda", b"39990-TRW-A020")
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CIVIC"}, block=True)
+    result = generate_capabilities(params)
+    assert not result["nrdr_yaw_controller_available"]
+    assert not result["nrdr_firmware_prediction_schedule"]
+
+  def test_exact_honda_bundle_enables_manual_and_clarity_raw(self, params):
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CLARITY"}, block=True)
+    model_caps = generate_capabilities(params)
+    assert model_caps["nrdr_manual_steer_ratio_available"] is True
+    assert model_caps["nrdr_raw_steer_ratio_available"] is True
+    assert model_caps["nrdr_firmware_steer_ratio_available"] is False
+
+  def test_honda_looking_fingerprint_on_other_brand_is_unavailable(self, params):
+    params.put("CarPlatformBundle", {"brand": "toyota", "platform": "HONDA_CLARITY"}, block=True)
+    model_caps = generate_capabilities(params)
+    assert model_caps["nrdr_manual_steer_ratio_available"] is False
+    assert model_caps["nrdr_raw_steer_ratio_available"] is False
+
+  def test_civic_measured_curve_requires_matching_cp_and_eps(self, params):
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CIVIC"}, block=True)
+    assert generate_capabilities(params)["nrdr_raw_steer_ratio_available"] is False
+    for version, available in ((b"39990-TBA-A030", False), (b"39990-TEG-A010", True)):
+      put_car_params(params, "HONDA_CIVIC", "honda", version)
+      assert generate_capabilities(params)["nrdr_raw_steer_ratio_available"] is available
+    for bundle in ({"brand": "honda", "platform": "HONDA_CIVIC_BOSCH"}, {}, {"brand": "honda"},
+                   {"brand": "toyota", "platform": "HONDA_CIVIC"}):
+      params.put("CarPlatformBundle", bundle, block=True)
+      assert generate_capabilities(params)["nrdr_raw_steer_ratio_available"] is False
+
+  def test_civic_measured_curve_rejects_stale_cp_without_requiring_manual_selection(self, params):
+    put_car_params(params, "HONDA_CIVIC", "honda", b"39990-TEG-A010")
+    assert generate_capabilities(params)["nrdr_raw_steer_ratio_available"] is True
+    put_car_params(params, "HONDA_CIVIC_BOSCH", "honda", b"39990-TEG-A010")
+    params.put("CarPlatformBundle", {"brand": "honda", "platform": "HONDA_CIVIC"}, block=True)
+    assert generate_capabilities(params)["nrdr_raw_steer_ratio_available"] is False
+
+  def test_subaru_has_sng_field_present(self):
+    assert "subaru_has_sng" in CAPABILITY_FIELDS
+
+  def test_hyundai_alpha_long_available_field_present(self):
+    assert "hyundai_alpha_long_available" in CAPABILITY_FIELDS
+
+  def test_subaru_has_sng_default_false(self, caps):
+    assert caps["subaru_has_sng"] is False
+
+  def test_hyundai_alpha_long_available_default_false(self, caps):
+    assert caps["hyundai_alpha_long_available"] is False
+
+
+class TestCapabilitiesShape(OpenpilotTestCase):
+  def test_all_fields_present(self, caps):
+    for field in CAPABILITY_FIELDS:
+      assert field in caps, f"capabilities missing {field}"
+
+  def test_all_fields_have_labels(self):
+    for field in CAPABILITY_FIELDS:
+      assert field in CAPABILITY_LABELS, f"CAPABILITY_LABELS missing {field}"
+
+  def test_string_defaults_are_strings(self, caps):
+    assert isinstance(caps["brand"], str)
+    assert isinstance(caps["steer_control_type"], str)
+    assert isinstance(caps["device_type"], str)
+
+  def test_custom_model_capability_tracks_the_active_runner(self, params):
+    from openpilot.cereal import custom
+
+    assert "custom_model_active" in CAPABILITY_FIELDS
+    assert generate_capabilities(params)["custom_model_active"] is False
+
+    params.put("ModelRunnerTypeCache", int(custom.ModelManagerSP.Runner.tinygrad), block=True)
+    assert generate_capabilities(params)["custom_model_active"] is True
+
+    params.put("ModelRunnerTypeCache", int(custom.ModelManagerSP.Runner.stock), block=True)
+    assert generate_capabilities(params)["custom_model_active"] is False

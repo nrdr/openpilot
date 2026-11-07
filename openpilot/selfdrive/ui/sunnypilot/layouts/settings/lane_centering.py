@@ -1,0 +1,204 @@
+"""Live controls for confidence-gated lane centering."""
+
+from collections.abc import Callable
+
+from openpilot.cereal import custom
+from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.nrdr.features.lateral.lane_guidance import (
+  LaneGuidanceMode,
+  lane_guidance_mode_from_params,
+  set_lane_guidance_mode,
+)
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.ui.lane_guidance import LANE_GUIDANCE_MODES
+from openpilot.selfdrive.controls.lib.lane_centering import (
+  LANE_CENTERING_MIN_SPEED_MAX_MPH,
+  LANE_CENTERING_MIN_SPEED_MIN_MPH,
+  lane_centering_min_speed_mph,
+  lane_centering_strength,
+)
+from openpilot.system.ui.lib.multilang import tr
+from openpilot.system.ui.sunnypilot.lib.styles import style
+from openpilot.system.ui.sunnypilot.widgets.list_view import ListItemSP, multiple_button_item_sp, toggle_item_sp
+from openpilot.system.ui.sunnypilot.widgets.option_control import OptionControlSP
+from openpilot.system.ui.widgets import Widget
+from openpilot.system.ui.widgets.scroller_tici import Scroller
+
+
+class _GuardedOptionControlSP(OptionControlSP):
+  """Option control that rechecks its write gate at the mutation boundary."""
+
+  def __init__(self, *args, write_allowed: Callable[[], bool], value_normalizer: Callable[[object], float] | None = None, **kwargs):
+    self._write_allowed = write_allowed
+    self._value_normalizer = value_normalizer
+    super().__init__(*args, **kwargs)
+
+  def set_value(self, value: int):
+    if self._write_allowed():
+      super().set_value(value)
+
+  def refresh_from_param(self) -> None:
+    try:
+      value = self.params.get(self.param_key, return_default=True)
+      if self._value_normalizer is not None:
+        value = self._value_normalizer(value)
+      candidate = int(float(value) * 100.0) if self.use_float_scaling else int(value)
+    except (TypeError, ValueError):
+      return
+    self.current_value = min(self.max_value, max(self.min_value, candidate))
+
+
+class LaneCenteringLayout(Widget):
+  def __init__(self):
+    super().__init__()
+
+    self._lane_guidance_mode = multiple_button_item_sp(
+      title=tr("Lane Centering Method"),
+      description=tr("Choose exactly one method. Off uses the model unchanged. Sunny adds SunnyPilot's confidence-weighted alpha correction " +
+                     "inside the custom model runner and yields when the model appears to be going around an obstacle. " +
+                     "Sunny requires a non-Default custom model. Star uses nrdr's delay-aware lane-centering controller and the tuning below. " +
+                     "Sunny and Star are mutually exclusive."),
+      buttons=[tr("Off"), tr("Sunny"), tr("Star")],
+      selected_index=LANE_GUIDANCE_MODES.index(lane_guidance_mode_from_params(ui_state.params)),
+      button_width=260,
+      callback=self._on_lane_guidance_mode,
+      inline=False,
+    )
+    self._lane_guidance_mode.action_item.set_enabled(self._write_allowed)
+    self._pause_on_signal_toggle = toggle_item_sp(
+      title=tr("Fade on Turn Signal"),
+      description=tr("Fade out the correction while a turn signal is active. Lane-change maneuvers always suspend the correction immediately, " +
+                     "regardless of this setting."),
+      initial_state=bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)),
+      enabled=self._settings_writable,
+      callback=self._on_pause_on_signal,
+    )
+    self._minimum_speed_control = self._option_item(
+      title=tr("Minimum Lane Centering Speed"),
+      description=tr("Arm lane centering at this speed. Once active, it releases smoothly 3 mph below the selected speed, bounded by the " +
+                     "5 m/s controller floor."),
+      param="LaneCenteringMinSpeed",
+      min_value=LANE_CENTERING_MIN_SPEED_MIN_MPH,
+      max_value=LANE_CENTERING_MIN_SPEED_MAX_MPH,
+      label_callback=lambda value: f"{value} mph",
+      value_normalizer=lane_centering_min_speed_mph,
+    )
+    self._center_offset_control = self._option_item(
+      title=tr("Center Offset"),
+      description=tr("Shift the target left or right of the detected lane center. The controller reduces the offset in a narrow lane."),
+      param="LaneCenterOffset",
+      min_value=-30,
+      max_value=30,
+      use_float_scaling=True,
+      label_callback=lambda value: f"{value / 100:.2f} m",
+    )
+    self._strength_control = self._option_item(
+      title=tr("Lane-Centering Strength"),
+      description=tr("Blend the model path toward the lane-center path. 0% uses the model path; 100% requests the lane-center path. " +
+                     "Confidence, Model Break-In, and the existing correction and steering limits still apply. 30% is the default."),
+      param="LaneCenteringStrength",
+      min_value=0,
+      max_value=100,
+      value_change_step=5,
+      use_float_scaling=True,
+      label_callback=lambda value: f"{value}%",
+      value_normalizer=lane_centering_strength,
+    )
+    self._model_authority_control = self._option_item(
+      title=tr("Model Break-In"),
+      description=tr("When a confident model path disagrees with lane center by more than 0.15 m, allow it to reduce the correction. At 100%, " +
+                     "the correction can reach zero by 0.50 m of disagreement; 0% never reduces it."),
+      param="LaneCenteringE2EAuthority",
+      min_value=0,
+      max_value=100,
+      value_change_step=5,
+      use_float_scaling=True,
+      label_callback=lambda value: f"{value}%",
+    )
+
+    self._scroller = Scroller([
+      self._lane_guidance_mode,
+      self._minimum_speed_control,
+      self._pause_on_signal_toggle,
+      self._center_offset_control,
+      self._strength_control,
+      self._model_authority_control,
+    ], line_separator=True, spacing=0)
+
+  @staticmethod
+  def _write_allowed() -> bool:
+    return tuning_write_allowed(ui_state.params, "LaneGuidanceMode")  # Unlocked settings still apply live.
+
+  @staticmethod
+  def _custom_model_active() -> bool | None:
+    runner = ui_state.params.get("ModelRunnerTypeCache")
+    if runner is None:
+      # CLEAR_ON_ONROAD_TRANSITION makes this briefly unknown while the model
+      # manager rebuilds its derived cache.
+      return None
+    return runner == custom.ModelManagerSP.Runner.tinygrad
+
+  def _settings_writable(self) -> bool:
+    return self._write_allowed() and lane_guidance_mode_from_params(ui_state.params) == LaneGuidanceMode.NRDR
+
+  def _option_item(self, title: str, description: str, param: str, min_value: int, max_value: int,
+                   value_change_step: int = 1, use_float_scaling: bool = False,
+                   label_callback: Callable[[int], str] | None = None,
+                   value_normalizer: Callable[[object], float] | None = None) -> ListItemSP:
+    action = _GuardedOptionControlSP(
+      param,
+      min_value,
+      max_value,
+      value_change_step=value_change_step,
+      enabled=self._settings_writable,
+      use_float_scaling=use_float_scaling,
+      label_width=style.BUTTON_ACTION_WIDTH,
+      label_callback=label_callback,
+      write_allowed=self._settings_writable,
+      value_normalizer=value_normalizer,
+    )
+    return ListItemSP(title=title, description=description, action_item=action)
+
+  def _on_lane_guidance_mode(self, value: int) -> None:
+    if not self._write_allowed():
+      self._refresh()
+      return
+    mode = LANE_GUIDANCE_MODES[value]
+    if mode == LaneGuidanceMode.BLENDFUL and self._custom_model_active() is not True:
+      self._refresh()
+      return
+    set_lane_guidance_mode(ui_state.params, mode)
+    self._refresh()
+
+  def _on_pause_on_signal(self, state: bool) -> None:
+    if not self._settings_writable():
+      current = bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True))
+      self._pause_on_signal_toggle.action_item.set_state(current)
+      return
+    ui_state.params.put_bool("LaneCenteringPauseOnSignal", state, block=True)
+
+  def _refresh(self) -> None:
+    mode = lane_guidance_mode_from_params(ui_state.params)
+    custom_model_active = self._custom_model_active()
+    if mode == LaneGuidanceMode.BLENDFUL and custom_model_active is False:
+      set_lane_guidance_mode(ui_state.params, LaneGuidanceMode.MODEL_ONLY)
+      mode = LaneGuidanceMode.MODEL_ONLY
+    self._lane_guidance_mode.action_item.set_selected_button(LANE_GUIDANCE_MODES.index(mode))
+    self._lane_guidance_mode.action_item.set_enabled_buttons(
+      {0, 1, 2} if custom_model_active is True or (custom_model_active is None and mode == LaneGuidanceMode.BLENDFUL) else {0, 2})
+    self._pause_on_signal_toggle.action_item.set_state(
+      bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)))
+    self._minimum_speed_control.action_item.refresh_from_param()
+    self._center_offset_control.action_item.refresh_from_param()
+    self._strength_control.action_item.refresh_from_param()
+    self._model_authority_control.action_item.refresh_from_param()
+
+  def _render(self, rect):
+    self._scroller.render(rect)
+
+  def show_event(self):
+    self._refresh()
+    self._scroller.show_event()
+
+  def hide_event(self):
+    self._scroller.hide_event()

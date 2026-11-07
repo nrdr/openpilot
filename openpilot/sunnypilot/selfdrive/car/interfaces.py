@@ -1,0 +1,85 @@
+"""
+Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
+
+This file is part of sunnypilot and is licensed under the MIT License.
+See the LICENSE.md file in the root directory for more details.
+"""
+from opendbc.car import structs
+from opendbc.car.interfaces import CarInterfaceBase
+from openpilot.common.params import Params
+from openpilot.common.swaglog import cloudlog
+from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
+from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import set_speed_limit_assist_availability
+
+from openpilot.sunnypilot.sunnylink.statsd import STATSLOGSP
+
+
+def log_fingerprint(CP: structs.CarParams) -> None:
+  cloudlog.info("car fingerprint: %s (%s)", CP.carFingerprint, CP.brand)
+
+
+def _enforce_torque_lateral_control(CP: structs.CarParams, params: Params | None = None, enabled: bool = False) -> bool:
+  if params is None:
+    params = Params()
+
+  if CP.steerControlType != structs.CarParams.SteerControlType.angle:
+    enabled = params.get_bool("EnforceTorqueControl")
+
+  return enabled
+
+
+def _initialize_intelligent_cruise_button_management(CP: structs.CarParams, CP_SP: structs.CarParamsSP, params: Params | None = None) -> None:
+  if params is None:
+    params = Params()
+
+  icbm_enabled = params.get_bool("IntelligentCruiseButtonManagement")
+  if icbm_enabled and CP_SP.intelligentCruiseButtonManagementAvailable and not CP.openpilotLongitudinalControl:
+    CP_SP.pcmCruiseSpeed = False
+
+
+def _initialize_torque_lateral_control(CI: CarInterfaceBase, CP: structs.CarParams, enforce_torque: bool) -> None:
+  if enforce_torque:
+    CI.configure_torque_tune(CP.carFingerprint, CP.lateralTuning)
+
+
+def _cleanup_unsupported_params(CP: structs.CarParams, CP_SP: structs.CarParamsSP, params: Params | None = None) -> None:
+  if params is None:
+    params = Params()
+
+  if CP.steerControlType == structs.CarParams.SteerControlType.angle:
+    cloudlog.warning("SteerControlType is angle, cleaning up params")
+    params.remove("EnforceTorqueControl")
+    params.remove("LateralJerkTorqueController")
+
+  if not CP_SP.intelligentCruiseButtonManagementAvailable or CP.openpilotLongitudinalControl:
+    cloudlog.warning("ICBM not available or openpilot Longitudinal Control enabled, cleaning up params")
+    params.remove("IntelligentCruiseButtonManagement")
+
+  if not CP.openpilotLongitudinalControl and CP_SP.pcmCruiseSpeed:
+    cloudlog.warning("openpilot Longitudinal Control and ICBM not available, cleaning up params")
+    params.remove("CustomAccIncrementsEnabled")
+    # Keep unsupported SCC disabled without turning a saved Off into an unset
+    # preference that nrdr's next boot would seed True again.
+    if params.get("SmartCruiseControlVision") is not False:
+      params.put_bool("SmartCruiseControlVision", False, block=True)
+    params.remove("SmartCruiseControlMap")
+
+  set_speed_limit_assist_availability(CP, CP_SP, params)
+
+
+def setup_interfaces(CI: CarInterfaceBase, params: Params | None = None) -> None:
+  enforce_torque = _enforce_torque_lateral_control(CI.CP, params)
+  _initialize_intelligent_cruise_button_management(CI.CP, CI.CP_SP, params)
+  _initialize_torque_lateral_control(CI, CI.CP, enforce_torque)
+  _cleanup_unsupported_params(CI.CP, CI.CP_SP)
+
+  try:
+    STATSLOGSP.raw('sunnypilot.car_params', CI.CP.to_dict())
+  except RuntimeError:
+    pass  # to_dict fails on macOS due to library issues.
+  # STATSLOGSP.raw('sunnypilot_params.car_params_sp', CP_SP.to_dict()) # https://github.com/sunnypilot/opendbc/pull/361
+
+
+def initialize_params(params):
+  """Compatibility name for SunnyPilot's typed host configuration builder."""
+  return build_sunnypilot_car_config(params)

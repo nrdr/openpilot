@@ -1,0 +1,66 @@
+# Page: models
+# Edit this file. Run compile_settings_ui.py to emit settings_ui.json.
+id: models
+label: Models
+icon: models
+order: 10
+remote_configurable: false
+description: Driving model behavior and camera calibration
+sections:
+- id: model_behavior
+  title: Model Behavior
+  description: Lane desire and lead-vehicle awareness tuning
+  items:
+  - key: LaneTurnDesire
+    widget: toggle
+    title: Use Lane Turn Desires
+    description: At 20 mph (32 km/h) or below with your blinker on, the car plans a turn that way at the nearest drivable path.
+    details: If you are driving at 20 mph (32 km/h) or below and have your blinker on, the car will plan a turn in that direction at the nearest drivable path. This prevents situations (like at red lights) where the car might plan the wrong turn direction.
+  - key: LaneTurnValue
+    widget: option
+    title: Adjust Lane Turn Speed
+    description: Set the maximum speed for lane turn desires.
+    min: 0
+    max: 20
+    step: 1
+    unit:
+      metric: km/h
+      imperial: mph
+    enablement:
+    - type: param
+      key: LaneTurnDesire
+      equals: true
+    - $ref: '#/macros/advanced_only'
+  - key: LagdToggle
+    widget: toggle
+    title: Live Learning Steer Delay
+    description: Learn steering delay. The Firmware Controller uses its measured speed schedule instead.
+  - key: LagdToggleDelay
+    widget: option
+    title: Adjust Software Delay
+    description: Additional software delay when live learning is off. The Firmware Controller uses a measured speed schedule instead.
+    details: Software delay is added to the vehicle's actuator delay. Clarity Firmware Controller instead uses 0.15/0.08/0.10/0.20/0.30 seconds at 3.5/7/12/20/30 m/s, smoothly interpolated. The Civics use their own (TEG-A010 0.20 seconds; C020 0.28 seconds, 0.26 on the highway). Saved settings are preserved for other controllers. Firmware command delay and model-specific smoothing are separate. Default additional software delay is 0.2 seconds.
+    min: 0.05
+    max: 1.0
+    step: 0.01
+    enablement:
+    - type: not
+      condition:
+        type: param
+        key: LagdToggle
+        equals: true
+    - $ref: '#/macros/advanced_only'
+- id: camera
+  title: Camera
+  description: Camera position and calibration
+  items:
+  - key: CameraOffset
+    widget: option
+    title: Adjust Camera Offset
+    description: Virtually shift camera's perspective to move model's center to Left(+ values) or Right (- values)
+    min: -0.35
+    max: 0.35
+    step: 0.01
+    unit: meters
+    enablement:
+    - $ref: '#/macros/advanced_only'
