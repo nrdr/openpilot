@@ -64,14 +64,18 @@ def pcm_experiment_active(CP, key: str) -> bool:
               and getattr(CP, "openpilotLongitudinalControl", False) and getattr(CP, "flags", 0) & flag)
 
 
-def pcm_experiment_status(CP, CP_SP, params, key: str, *, compact: bool = False) -> str:
+def pcm_experiment_status(CP, CP_SP, params, key: str, *, compact: bool = False, is_offroad: bool | None = None) -> str:
   if not pcm_experiments_available(CP, CP_SP, params):
     return "Unavailable"
   active, saved = pcm_experiment_active(CP, key), saved_pcm_experiment(params, key)
   running, selected = ("On" if active else "Off"), ("On" if saved else "Off")
+  # Persistent CP may describe the last drive. Missing road state cannot prove a running mode.
+  parked = is_offroad if is_offroad is not None else params.get("IsOffroad") is not False
+  if parked:
+    return f"Next: {selected}" if compact else f"Saved: {selected}. Applies next drive."
   if compact:
     return running if active == saved else f"{running} → {selected}"
-  return f"Running: {running}." if active == saved else f"Running: {running}. Saved: {selected}; restart required."
+  return f"Running: {running}." if active == saved else f"Running: {running}. Saved: {selected}; applies next drive."
 
 
 def save_pcm_experiment(state, key: str, value) -> bool:
@@ -84,21 +88,26 @@ def save_pcm_experiment(state, key: str, value) -> bool:
   return True
 
 
-def live_gas_status(CP, params, CP_SP=None) -> str:
+def live_gas_status(CP, params, CP_SP=None, *, is_offroad: bool | None = None) -> str:
   selected = params.get_bool("HondaLiveLearningGas")
   legacy_locked = legacy_pcm_tuning_locked(params, CP, CP_SP)
   legacy_selected = saved_pcm_experiment(params, "NrdrHondaLegacyPcm") and legacy_locked
+  parked = is_offroad if is_offroad is not None else params.get("IsOffroad") is not False
+  if parked:
+    if legacy_selected:
+      return "Legacy next drive\nMVL saved" if selected else "Legacy next drive\nMVL Off"
+    return "MVL next drive" if selected else "MVL Off next drive"
   if legacy_pcm_active(CP) and legacy_locked:
     if not legacy_selected:
-      return "Legacy active\nMVL pending" if selected else "Legacy active\nOFF after restart"
+      return "Legacy active\nMVL next drive" if selected else "Legacy active\nOff next drive"
     return "Legacy active\nMVL saved" if selected else "Legacy active"
   if mvl_longitudinal_enabled(CP):
     if legacy_selected:
-      return "MVL active\nLegacy pending"
-    return "MVL active" if selected else "MVL active\nOFF after restart"
+      return "MVL active\nLegacy next drive"
+    return "MVL active" if selected else "MVL active\nOff next drive"
   if selected and legacy_selected:
-    return "MVL saved\nLegacy pending"
-  return "MVL selected\nRestart required" if selected else "MVL inactive"
+    return "MVL saved\nLegacy next drive"
+  return "MVL next drive" if selected else "MVL inactive"
 
 
 def mvl_pcm_deadzone_available(CP, CP_SP, params) -> bool:

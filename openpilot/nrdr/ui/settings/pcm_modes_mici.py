@@ -24,7 +24,8 @@ class PcmModeControl(BigMultiToggle):
                      select_callback=self._select, font_size=34,
                      description=tr("Honda Nidec: ECU-Matched PCM Command Shaping. " +
                                     "Off uses upstream PCM control. ECU-Matched adds mmmorks' ramp, coast and brake-release rules. " +
-                                    "Experimental uses the Civic trial. No gas interceptor. Restart required."))
+                                    "Experimental uses the Civic trial. No gas interceptor. " +
+                                    "Change while parked. Applies next drive; no device reboot."))
     self.set_enabled(lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
                      and tuning_write_allowed(ui_state.params, "NrdrHondaPcmMode", CP=ui_state.CP, CP_SP=ui_state.CP_SP))
     self.set_value(self._labels[saved_pcm_mode(ui_state.params)])
@@ -79,7 +80,8 @@ class WindBrakeControl(BigToggle):
   def __init__(self):
     super().__init__(tr("Wind Brake"), initial_state=saved_wind_brake(ui_state.params),
                      toggle_callback=self._select,
-                     description=tr("Subtracts estimated wind drag from brake demand. PCM only; gas compensation is unchanged. Restart required."))
+                     description=tr("Subtracts estimated wind drag from brake demand. PCM only; gas compensation is unchanged. " +
+                                    "Change while parked. Applies next drive; no device reboot."))
     self.set_enabled(lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
                      and tuning_write_allowed(ui_state.params, "NrdrHondaWindBrake", CP=ui_state.CP, CP_SP=ui_state.CP_SP))
 
@@ -118,7 +120,7 @@ class StaticFeedforwardControl(BigToggle):
 
 
 class PcmExperimentControl(BigToggle):
-  """C4/MICI card: saved switch plus running → pending state in the subtitle."""
+  """C4/MICI card: next-drive choice while parked, running → saved while onroad."""
 
   def __init__(self, key):
     self._key = key
@@ -126,7 +128,7 @@ class PcmExperimentControl(BigToggle):
     super().__init__(tr(title), initial_state=saved_pcm_experiment(ui_state.params, key), font_size=24,
                      toggle_callback=self._select,
                      description=tr(description) + " " + tr(PCM_EXPERIMENT_DETAILS[key])
-                                 + " " + tr("The subtitle shows running → saved when a restart is pending."))
+                                 + " " + tr("The subtitle shows the next-drive choice while parked, or running → saved while onroad."))
     self.set_enabled(lambda: ui_state.is_offroad() and pcm_experiments_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
     self.refresh()
 
@@ -142,7 +144,8 @@ class PcmExperimentControl(BigToggle):
 
   def refresh(self):
     self.set_checked(saved_pcm_experiment(ui_state.params, self._key))
-    self.set_value(tr(pcm_experiment_status(ui_state.CP, ui_state.CP_SP, ui_state.params, self._key, compact=True)))
+    self.set_value(tr(pcm_experiment_status(ui_state.CP, ui_state.CP_SP, ui_state.params, self._key,
+                                             compact=True, is_offroad=ui_state.is_offroad())))
 
   def _update_state(self):
     super()._update_state()
@@ -162,7 +165,7 @@ class LiveGasControl(BigToggle):
 
   @staticmethod
   def _mode_status():
-    return tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP))
+    return tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP, is_offroad=ui_state.is_offroad()))
 
   def _refresh(self):
     self.set_checked(ui_state.params.get_bool("HondaLiveLearningGas"))

@@ -171,14 +171,25 @@ def test_native_segment_indices_are_strict(key, value):
 
 @pytest.mark.parametrize("key,flag", list(zip(KEYS, FLAGS, strict=True)))
 @pytest.mark.parametrize("saved,active", list(itertools.product((False, True), repeat=2)))
-def test_saved_switch_never_claims_running_mode_and_pending_off_is_retained(key, flag, saved, active):
+@pytest.mark.parametrize("offroad", [False, True])
+def test_saved_switch_never_claims_running_mode_and_pending_off_is_retained(key, flag, saved, active, offroad):
   ui = state(flags=int(HondaFlags.NIDEC | (flag if active else 0)))
+  ui.is_offroad = lambda: offroad
+  ui.params.values["IsOffroad"] = offroad
   ui.params.values[key] = saved
   status = honda_pcm.pcm_experiment_status(ui.CP, ui.CP_SP, ui.params, key)
-  assert status.startswith("Running: On." if active else "Running: Off.")
-  assert ("restart required" in status) is (saved != active)
+  selected = "On" if saved else "Off"
+  if offroad:
+    assert status == f"Saved: {selected}. Applies next drive."
+  else:
+    assert status.startswith("Running: On." if active else "Running: Off.")
+    assert ("applies next drive" in status) is (saved != active)
+  # Native UI road state wins even while the stored road-state value is stale.
+  ui.params.values["IsOffroad"] = not offroad
   compact = mici_control(ui, key)
-  assert ("→" in compact.value) is (saved != active)
+  assert ("→" in compact.value) is (not offroad and saved != active)
+  if offroad:
+    assert compact.value == f"Next: {selected}"
   large = native_layout(ui)
   large._update_state()
   assert large._pcm_experiments[key].value == int(saved)
@@ -217,7 +228,8 @@ def test_current_latch_wins_over_persistent_and_bad_cp_fails_closed():
 def test_legacy_supersedes_saved_mvl_status_without_forcing_off():
   ui = state(flags=int(HondaFlags.NIDEC | HondaFlags.NIDEC_PCM_LEGACY | HondaFlags.MVL_LONGITUDINAL))
   ui.params.values.update(NrdrHondaLegacyPcm=True, HondaLiveLearningGas=True, NrdrHondaPcmMode=2, NrdrHondaWindBrake=True, NrdrMvlPcmDeadzone=5)
-  assert honda_pcm.live_gas_status(ui.CP, ui.params) == "Legacy active\nMVL saved"
+  assert honda_pcm.live_gas_status(ui.CP, ui.params, is_offroad=False) == "Legacy active\nMVL saved"
+  assert honda_pcm.live_gas_status(ui.CP, ui.params, is_offroad=True) == "Legacy next drive\nMVL saved"
   large = native_layout(ui)
   large._update_state()
   for item in (large._live_learning_gas, large._mvl_pcm_deadzone, large._pcm_mode, large._wind_brake, large._static_feedforward_long):
@@ -227,7 +239,8 @@ def test_legacy_supersedes_saved_mvl_status_without_forcing_off():
   assert not honda_pcm.save_mvl_pcm_deadzone(ui, 0)
   assert not ui.params.writes
   ui.params.values[LEGACY] = False
-  assert honda_pcm.live_gas_status(ui.CP, ui.params) == "Legacy active\nMVL pending"
+  assert honda_pcm.live_gas_status(ui.CP, ui.params, is_offroad=False) == "Legacy active\nMVL next drive"
+  assert honda_pcm.live_gas_status(ui.CP, ui.params, is_offroad=True) == "MVL next drive"
 
 
 @pytest.mark.parametrize("key", KEYS)
@@ -314,7 +327,7 @@ def test_shared_copy_native_geometry_and_compiled_schema(key):
   title, description = PCM_EXPERIMENTS[key]
   assert compact.text == local["title"]() == web["title"] == title
   assert description in compact.kwargs["description"] and description in local["description"]()
-  assert web["description"] == description and web["needs_onroad_cycle"]
+  assert web["description"] == description and "needs_onroad_cycle" not in web
   assert web["details"] == PCM_EXPERIMENT_DETAILS[key]
   assert len(description) < 170
   gate = {"type": "capability", "field": CAP, "equals": True}
@@ -331,7 +344,7 @@ def test_shared_copy_native_geometry_and_compiled_schema(key):
       lines.append(word)
   title_height = size * 1.16 * (1 + .9 * (len(lines) - 1))
   assert compact._rect.height - 2 * compact.LABEL_VERTICAL_PADDING - title_height - 36 * 1.16 > 10
-  for label in ("Off", "On", "Off → On", "On → Off", "Unavailable"):
+  for label in ("Off", "On", "Off → On", "On → Off", "Next: On", "Next: Off", "Unavailable"):
     assert _font_advance_upper_bound("Inter-Regular.ttf", label, 36) < compact._subtitle_width_hint()
 
 
@@ -361,9 +374,12 @@ def test_actual_capability_assignment_matches_native_availability(case):
     assert all(env["caps"].values())
 
 
-def test_remote_status_injection_keeps_help_and_saved_choices():
+@pytest.mark.parametrize("offroad", [None, True, False])
+def test_remote_status_injection_keeps_help_and_saved_choices(offroad):
   params = Params(NrdrHondaPcmFixedCruise=True, NrdrHondaLegacyPcm=False, HondaLiveLearningGas=True,
                   CarParamsPersistent=cp_bytes(HondaFlags.NIDEC_PCM_LEGACY), CarParamsSPPersistent=custom.CarParamsSP.new_message().to_bytes())
+  if offroad is not None:
+    params.values["IsOffroad"] = offroad
   path = ROOT / "openpilot/nrdr/features/services/sunnylink.py"
   tree = ast.parse(path.read_text(encoding="utf-8"))
   tree.body = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "inject_pcm_experiment_status"]
@@ -371,8 +387,14 @@ def test_remote_status_injection_keeps_help_and_saved_choices():
   exec(compile(tree, str(path), "exec"), env)
   items = [{"key": key, "details": "Keep help"} for key in (*KEYS, "HondaLiveLearningGas", "Other")]
   env["inject_pcm_experiment_status"](items, lambda schema, visitor: [visitor(item) for item in schema])
-  assert items[0]["details"].startswith("Running: Off. Saved: On; restart required.")
-  assert items[1]["details"].startswith("Running: On. Saved: Off; restart required.")
-  assert items[2]["details"].startswith("Legacy active; MVL pending")
+  if offroad is False:
+    assert items[0]["details"].startswith("Running: Off. Saved: On; applies next drive.")
+    assert items[1]["details"].startswith("Running: On. Saved: Off; applies next drive.")
+    assert items[2]["details"].startswith("Legacy active; MVL next drive")
+  else:
+    assert items[0]["details"].startswith("Saved: On. Applies next drive.")
+    assert items[1]["details"].startswith("Saved: Off. Applies next drive.")
+    assert items[2]["details"].startswith("MVL next drive")
+    assert all("active" not in item["details"] and "Running:" not in item["details"] for item in items)
   assert all(item["details"].endswith("Keep help") for item in items)
   assert not params.writes

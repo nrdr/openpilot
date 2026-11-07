@@ -359,19 +359,24 @@ def test_preference_refresh_cannot_replay_conflicting_values(saved, active):
   assert ui.params.writes == [("AlwaysOnDM", True), ("LongitudinalPersonality", 3)]
 
 
-@pytest.mark.parametrize("saved,active,text", [(False, False, "MVL inactive"), (True, False, "MVL selected\nRestart required"),
-                                             (False, True, "MVL active\nOFF after restart"), (True, True, "MVL active")])
-def test_mici_mode_status_uses_the_boot_flag_not_just_the_saved_preference(saved, active, text):
+@pytest.mark.parametrize("saved,active,text", [(False, False, "MVL inactive"), (True, False, "MVL next drive"),
+                                             (False, True, "MVL active\nOff next drive"), (True, True, "MVL active")])
+@pytest.mark.parametrize("offroad", [False, True])
+def test_mici_mode_status_uses_road_state_and_latched_mode(saved, active, text, offroad):
   from openpilot.nrdr.ui.honda_pcm import live_gas_status
   ui = state(saved, active)
+  ui.is_offroad = lambda: offroad
   env = {"BigToggle": Widget, "ui_state": ui, "tr": lambda s: s, "live_gas_status": live_gas_status}
   definitions("openpilot/nrdr/ui/settings/pcm_modes_mici.py", {"LiveGasControl"}, env, {"_mode_status", "_refresh", "_update_state"})
   control = env["LiveGasControl"]()
   control._update_state()
-  assert control.value == text and control._checked is saved
+  assert control.value == (("MVL next drive" if saved else "MVL Off next drive") if offroad else text)
+  assert control._checked is saved
   ui.params["HondaLiveLearningGas"] = not saved
   control._update_state()
-  assert control._checked is not saved and ("active" in control.value and "inactive" not in control.value) is active
+  assert control._checked is not saved and ("active" in control.value and "inactive" not in control.value) is (active and not offroad)
+  if offroad:
+    assert control.value == ("MVL Off next drive" if saved else "MVL next drive")
   assert not ui.params.writes
 
 
@@ -382,7 +387,7 @@ def test_mici_live_mode_status_fits_below_the_title_and_left_of_the_toggle():
   init = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "__init__")
   size = next(k.value.value for n in ast.walk(init) if isinstance(n, ast.Call) for k in n.keywords if k.arg == "font_size")
   assert _font_advance_upper_bound("Inter-Bold.ttf", "Live Learning Gas", size) < 266
-  for line in ("MVL active", "MVL selected", "MVL inactive", "OFF after restart", "Restart required"):
+  for line in ("MVL active", "MVL inactive", "Off next drive", "MVL next drive", "MVL Off next drive", "Legacy next drive", "MVL saved", "MVL Off"):
     assert _font_advance_upper_bound("Inter-Regular.ttf", line, 36) < 322
   assert size * 1.16 + 2 * 36 * 1.16 < 180 - 2 * 23
 

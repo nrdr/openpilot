@@ -295,7 +295,7 @@ def test_copy_schema_native_options_and_compact_geometry_match():
   assert local["description"]() == mici.kwargs["description"] == web["description"] + " " + web["details"]
   assert web["options"] == [{"label": label, "value": value} for label, value in zip(choices.MVL_PCM_DEADZONE_LABELS, VALUES, strict=True)]
   assert [label() for label in local["buttons"]] == mici.options == list(choices.MVL_PCM_DEADZONE_LABELS)
-  assert web["needs_onroad_cycle"]
+  assert "needs_onroad_cycle" not in web
   gate = {"type": "capability", "field": CAP, "equals": True}
   assert web["visibility"] == [gate]
   assert web["enablement"] == [{"type": "offroad_only"}, gate,  # no blanket MVL lock

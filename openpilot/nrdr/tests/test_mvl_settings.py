@@ -383,7 +383,7 @@ def test_compiled_schema_locks_every_conflicting_control_and_preserves_econ_sele
   assert "Only Econ" in items["HondaLiveLearningGas"]["description"]
   assert "including following distances" in items["HondaLiveLearningGas"]["description"]
   assert "Experimental Mode remains manually selectable" in items["HondaLiveLearningGas"]["description"]
-  assert items["HondaLiveLearningGas"]["needs_onroad_cycle"]
+  assert "needs_onroad_cycle" not in items["HondaLiveLearningGas"]
   assert items["ExperimentalMode"]["enablement"] == [
     {"type": "capability", "field": "has_longitudinal_control", "equals": True},
   ]
@@ -419,7 +419,7 @@ def test_increment_schema_lock_preserves_existing_availability_rules(key):
   assert "nrdr_honda_legacy_pcm_locked" in json.dumps(result["enablement"][-1])
 
 
-def test_saved_learner_diagnostics_do_not_replace_restart_help():
+def test_saved_learner_diagnostics_do_not_replace_next_drive_help():
   path = ROOT / "openpilot/sunnypilot/sunnylink/tools/generate_settings_schema.py"
   tree = ast.parse(path.read_text(encoding="utf-8"))
   tree.body = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in ("_inject_live_gas_help", "_walk_all_items")]
@@ -430,10 +430,10 @@ def test_saved_learner_diagnostics_do_not_replace_restart_help():
   from collections.abc import Callable
   env["Callable"] = Callable
   exec(compile(tree, str(path), "exec"), env)
-  item = {"key": "HondaLiveLearningGas", "details": "Saved ON is not active. Restart required."}
+  item = {"key": "HondaLiveLearningGas", "details": "Saved ON is not active. Applies next drive; no device reboot."}
   schema = {"panels": [{"items": [item]}]}
   env["_inject_live_gas_help"](schema)
-  assert item["details"] == "Saved ON is not active. Restart required.<br><br>Saved snapshot only"
+  assert item["details"] == "Saved ON is not active. Applies next drive; no device reboot.<br><br>Saved snapshot only"
 
 
 def test_full_compiled_schema_integrity_without_hardware_imports():

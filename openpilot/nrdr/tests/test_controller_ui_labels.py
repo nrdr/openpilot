@@ -41,7 +41,7 @@ def _native_class(filename, name, *, saved_bools=None):
   saved_bools = dict(saved_bools or {})
   env = {
     "Widget": object, "Callable": Callable, "tr": lambda text: text,
-    "ui_state": SimpleNamespace(CP=None, CP_SP=None, params=SimpleNamespace(
+    "ui_state": SimpleNamespace(CP=None, CP_SP=None, is_offroad=lambda: True, params=SimpleNamespace(
       get_bool=lambda key: saved_bools.get(key, False), get=lambda key: saved_bools.get(key),
     )),
     "get_native_option_spec": get_native_option_spec,
@@ -121,7 +121,7 @@ class TestControllerUiLabels(unittest.TestCase):
       self.assertNotIn("param", control)
       self.assertEqual(control["callback"], layout._set_live_gas)
 
-  def test_honda_pcm_mode_and_wind_order_copy_and_parked_restart_rules(self):
+  def test_honda_pcm_mode_and_wind_order_copy_and_parked_apply_rules(self):
     cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout")
     layout = cls.__new__(cls)
     local_items = layout._initialize_items()
@@ -143,9 +143,9 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertEqual([label() for label in layout._pcm_mode["buttons"]], [o["label"] for o in mode["options"]])
     for local, web in ((layout._pcm_mode, mode), (layout._wind_brake, wind)):
       self.assertEqual(local["title"](), web["title"])
-      self.assertIn("Restart required.", local["description"]())
+      self.assertIn("Change while parked. Applies next drive; no device reboot.", local["description"]())
       self.assertEqual(local["description"](), web["description"])
-      self.assertTrue(web["needs_onroad_cycle"])
+      self.assertNotIn("needs_onroad_cycle", web)
       self.assertEqual(web["enablement"][:2], [{"type": "offroad_only"}, {
         "type": "capability", "field": "nrdr_honda_pcm_tuning_available", "equals": True,
       }])
@@ -159,7 +159,7 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertIn("ramp, coast and brake-release rules", layout._pcm_mode["description"]())
     self.assertIn("full MVL longitudinal", layout._live_learning_gas["description"]())
     self.assertIn("Only Econ", layout._live_learning_gas["description"]())
-    self.assertEqual(layout._live_learning_gas["description"](), "MVL inactive. " + remote[0]["description"])
+    self.assertEqual(layout._live_learning_gas["description"](), "MVL Off next drive. " + remote[0]["description"])
     self.assertIn("Turning it off changes friction-brake demand", wind["details"])
     self.assertNotIn("NrdrHondaEcuMatchedLong", [item["key"] for item in remote])
 

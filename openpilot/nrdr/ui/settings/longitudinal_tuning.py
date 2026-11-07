@@ -29,13 +29,15 @@ class LongitudinalTuningLayout(Widget):
 
     self._tuning_items = self._initialize_items()
     status = ListItem(
-      title=lambda: (tr("Legacy Kegman PCM active") if legacy_pcm_active(ui_state.CP)
+      title=lambda: (tr("Parked - saved settings apply next drive") if ui_state.is_offroad()
+                     else tr("Legacy Kegman PCM active") if legacy_pcm_active(ui_state.CP)
                      else tr("Full MVL longitudinal active") if mvl_longitudinal_enabled(ui_state.CP)
                      else tr("Custom longitudinal active") if nrdr_longitudinal_enabled(ui_state.CP)
                      and getattr(ui_state.CP, "openpilotLongitudinalControl", False)
                      else tr("Baseline longitudinal - nrdr tuning inactive")),
-      description=lambda: tr("The running mode is fixed at startup. Saved changes require restart. ")
-                          + tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP).replace("\n", "; ")),
+      description=lambda: tr("Change while parked. Applies next drive; no device reboot. ")
+                          + tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP,
+                                               is_offroad=ui_state.is_offroad()).replace("\n", "; ")),
     )
     self._scroller = Scroller([status, *self._tuning_items], line_separator=False, spacing=0)
 
@@ -116,7 +118,7 @@ class LongitudinalTuningLayout(Widget):
       button_width=300, callback=lambda value: save_pcm_choice(ui_state, "NrdrHondaPcmMode", value),
       description=lambda: tr(
         "Off uses upstream PCM control. ECU-Matched adds mmmorks' ramp, coast and brake-release rules. " +
-        "Experimental uses the Civic trial. No gas interceptor. Restart required."
+        "Experimental uses the Civic trial. No gas interceptor. Change while parked. Applies next drive; no device reboot."
       ),
     )
 
@@ -133,7 +135,8 @@ class LongitudinalTuningLayout(Widget):
         title=lambda title=title: tr(title),
         buttons=[lambda: tr("Off"), lambda: tr("On")], button_width=180,
         callback=lambda index, key=key: self._set_pcm_experiment(key, index),
-        description=lambda key=key, description=description: tr(pcm_experiment_status(ui_state.CP, ui_state.CP_SP, ui_state.params, key))
+        description=lambda key=key, description=description: tr(pcm_experiment_status(
+          ui_state.CP, ui_state.CP_SP, ui_state.params, key, is_offroad=ui_state.is_offroad()))
                     + " " + tr(description) + " " + tr(PCM_EXPERIMENT_DETAILS[key]),
       )
 
@@ -141,7 +144,8 @@ class LongitudinalTuningLayout(Widget):
       title=lambda: tr("Wind Brake"), initial_state=True,
       callback=lambda value: save_pcm_choice(ui_state, "NrdrHondaWindBrake", value),
       description=lambda: tr(
-        "Subtracts estimated wind drag from brake demand. PCM only; gas compensation is unchanged. Restart required."
+        "Subtracts estimated wind drag from brake demand. PCM only; gas compensation is unchanged. " +
+        "Change while parked. Applies next drive; no device reboot."
       ),
     )
 
@@ -181,7 +185,8 @@ class LongitudinalTuningLayout(Widget):
     self._live_learning_gas = toggle_item_sp(
       title=lambda: tr("Live Learning Gas - Full MVL Longitudinal"),
       initial_state=ui_state.params.get_bool("HondaLiveLearningGas"),
-      description=lambda: tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP).replace("\n", "; ")) + ". " + tr(MVL_DESCRIPTION),
+      description=lambda: tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP,
+                                             is_offroad=ui_state.is_offroad()).replace("\n", "; ")) + ". " + tr(MVL_DESCRIPTION),
       callback=self._set_live_gas,
     )
 

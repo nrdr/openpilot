@@ -343,7 +343,7 @@ class TestNrdrLongitudinalOptions(OpenpilotTestCase):
     assert "new Honda setups default ON" in live_gas.get("details", "")
     assert "Existing OFF choices are preserved" in live_gas.get("details", "")
     assert "Only Econ" in live_gas["description"]
-    assert live_gas["needs_onroad_cycle"]
+    assert "needs_onroad_cycle" not in live_gas
 
   def test_honda_bosch_a_radar_scope_is_explicit(self, schema):
     radar = _find_item(schema, "HondaBoschARadar")

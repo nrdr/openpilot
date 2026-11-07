@@ -8,7 +8,7 @@ MVL_DESCRIPTION = (
   "Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. " +
   "Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Conflicting tuning is locked, not erased. " +
   "Legacy Kegman PCM takes precedence on supported Civics; the saved learning choice is kept. " +
-  "Change while parked; restart required."
+  "Change while parked. Applies next drive; no device reboot."
 )
 
 SUGGESTED_DESCRIPTION = (
