@@ -12,6 +12,7 @@ from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot.models.helpers import is_bundle_version_compatible
 from openpilot.cereal import custom
+from openpilot.nrdr.features.services import TINYGRAD_RUNTIME_REF
 
 
 class ModelParser:
@@ -143,6 +144,7 @@ class ModelFetcher:
       for source, (_, suffix) in self.MODEL_SOURCES.items()
     }
     self._refetched: set[str] = set()
+    self._runtime_refresh_at: dict[str, float] = {}
     self.params.put("ModelManager_ActiveJson", {
       "qcom": self.MODEL_URL,
       "chestnut": self.MODEL_URL_CHESTNUT,
@@ -209,12 +211,18 @@ class ModelFetcher:
         except Exception:
           cloudlog.warning(f"Failed to parse cached models for {source}; refetching", exc_info=True)
         else:
-          if parsed:
+          current_runtime = source != "qcom" or all(str(bundle.runner) != "tinygrad" or bundle.tinygradRef == TINYGRAD_RUNTIME_REF
+                                                    for bundle in parsed)
+          if parsed and (current_runtime or time.monotonic() < self._runtime_refresh_at.get(source, 0)):
             cloudlog.debug(f"Using valid cached models data for source {source}")
             return parsed
+          if parsed:
+            # An unavailable catalog must not cause a 1 Hz download loop. An
+            # old fallback is still shown, but cannot authorize an ABI upgrade.
+            self._runtime_refresh_at[source] = time.monotonic() + 60
           # a source-matching cache that yields no valid bundles is stale (e.g. an old
           # manifest version) - do not trust it, refetch so the source is repopulated
-          cloudlog.warning(f"Cached models for {source} have no valid bundles; refetching")
+          cloudlog.warning(f"Cached models for {source} need current selector/compiler metadata; refetching")
       else:
         self._refetched.add(source)
         cloudlog.warning(f"Cached models for {source} not valid; refetching once")
