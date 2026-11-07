@@ -279,10 +279,13 @@ def _remote_int_value(value: str, compression: bool, choices: tuple[int, ...] = 
 
 @dispatcher.add_method
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
+  import math
+
   from openpilot.nrdr.car.live_gas_reset import REQUEST, request_reset, stored_cp
   from openpilot.nrdr.params.tuning_policy import MVL_LOCK_KEYS, LEGACY_PCM_LOCK_KEYS, mvl_tuning_locked, legacy_pcm_tuning_locked, tuning_write_allowed
   from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS
   from openpilot.nrdr.params.mvl_pcm_deadzone import MVL_PCM_DEADZONE_VALUES
+  mode_lock_keys = MVL_LOCK_KEYS | LEGACY_PCM_LOCK_KEYS
   onroad = not params.get_bool("IsOffroad")
   retired = {"NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance"}.intersection(params_to_update)
   if retired:
@@ -291,20 +294,20 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
   for key in PCM_EXPERIMENTS.keys() & params_to_update.keys():
     selected = _remote_bool_value(params_to_update[key], compression)
     if onroad or selected is None:
-      raise ValueError("Civic PCM experiments require a boolean and can only be changed while parked. Restart required.")
+      raise ValueError("Civic PCM experiments require a boolean and can only be changed while parked. Applies next drive.")
     experiment_selections[key] = selected
-  if LEGACY_PCM_LOCK_KEYS.intersection(params_to_update) and (
+  if onroad and LEGACY_PCM_LOCK_KEYS.intersection(params_to_update) and (
     experiment_selections.get("NrdrHondaLegacyPcm") is True or legacy_pcm_tuning_locked(params)
   ):
-    raise ValueError("Legacy PCM owns these settings. Save Legacy OFF separately and restart before changing conflicting tuning.")
+    raise ValueError("Legacy PCM owns these settings while driving. Change saved tuning while parked.")
   live_gas_selection = None
   if "HondaLiveLearningGas" in params_to_update:
     live_gas_selection = _remote_bool_value(params_to_update["HondaLiveLearningGas"], compression)
     if live_gas_selection is None or onroad:
-      raise ValueError("Live Learning Gas requires a boolean and can only be changed while parked. Restart required.")
+      raise ValueError("Live Learning Gas requires a boolean and can only be changed while parked. Applies next drive.")
   conflicts = MVL_LOCK_KEYS.intersection(params_to_update)
-  if conflicts and (live_gas_selection is True or mvl_tuning_locked(params)):
-    raise ValueError("Full MVL longitudinal owns these settings. Save OFF separately and restart before changing custom tuning.")
+  if onroad and conflicts and (live_gas_selection is True or mvl_tuning_locked(params)):
+    raise ValueError("Full MVL longitudinal owns these settings while driving. Change saved tuning while parked.")
   if REQUEST in params_to_update:
     selected = _remote_bool_value(params_to_update[REQUEST], compression)
     if selected is None or (selected and len(params_to_update) != 1):
@@ -341,16 +344,40 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
   deadzone_selection = None
   if "NrdrMvlPcmDeadzone" in params_to_update:
     deadzone_selection = _remote_int_value(params_to_update["NrdrMvlPcmDeadzone"], compression, MVL_PCM_DEADZONE_VALUES)
-    if (onroad or deadzone_selection is None or capabilities.get("nrdr_mvl_pcm_deadzone_available") is not True
-        or (live_gas_selection is False and capabilities.get("nrdr_mvl_longitudinal_active") is not True)):
-      raise ValueError("PCM feedback deadzone requires 0, 2, 5 or 10 on a parked Civic PCM with MVL selected or active. Restart required.")
+    if onroad or deadzone_selection is None or capabilities.get("nrdr_mvl_pcm_deadzone_available") is not True:
+      raise ValueError("PCM feedback deadzone requires 0, 2, 5 or 10 on a parked, supported Civic PCM. Applies next drive.")
   pcm_selections = {}
   for key in ("NrdrHondaPcmMode", "NrdrHondaWindBrake"):
     if key in params_to_update:
       selected = (_remote_int_value if key == "NrdrHondaPcmMode" else _remote_bool_value)(params_to_update[key], compression)
       if onroad or selected is None or capabilities.get("nrdr_honda_pcm_tuning_available") is not True:
-        raise ValueError("PCM settings require a valid choice on a parked non-interceptor Nidec. Restart required.")
+        raise ValueError("PCM settings require a valid choice on a parked non-interceptor Nidec. Applies next drive.")
       pcm_selections[key] = selected
+  # Preconfiguration changes saved values only. Validate the whole mode-tuning
+  # batch before writing, including when a mode selection shares the batch.
+  tuning_selections = {}
+  for key in mode_lock_keys.intersection(params_to_update) - {"HondaLiveLearningGas", "NrdrMvlPcmDeadzone", *pcm_selections}:
+    try:
+      raw = base64.b64decode(params_to_update[key], validate=True)
+      if compression:
+        raw = gzip.decompress(raw)
+      decoded = raw.decode("utf-8")
+      param_type = params.get_type(key)
+      if param_type == ParamKeyType.BOOL:
+        selected = _remote_bool_value(params_to_update[key], compression)
+        if selected is None:
+          raise ValueError("Expected a boolean")
+      elif param_type == ParamKeyType.INT:
+        selected = int(decoded)
+      elif param_type == ParamKeyType.FLOAT:
+        selected = float(decoded)
+        if not math.isfinite(selected):
+          raise ValueError("Expected a finite number")
+      else:
+        raise ValueError("Unsupported tuning parameter type")
+      tuning_selections[key] = selected
+    except Exception as error:
+      raise ValueError(f"Invalid saved tuning value for {key}. Nothing was saved.") from error
   controller_selection = None
   lane_guidance_selection = None
   if "NrdrLateralController" in params_to_update:
@@ -376,9 +403,14 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     if lane_guidance_selection == 2 and capabilities.get("custom_model_active") is not True:
       raise ValueError("Sunny requires a non-Default custom model. The selection was not saved.")
   for key, value in params_to_update.items():
-    if key in LEGACY_PCM_LOCK_KEYS and legacy_pcm_tuning_locked(params):
+    write_onroad = not params.get_bool("IsOffroad")
+    if write_onroad and key in ("HondaLiveLearningGas", "NrdrMvlPcmDeadzone", *pcm_selections, *experiment_selections):
+      raise ValueError("Longitudinal modes can only be changed while parked. Applies next drive.")
+    if key in mode_lock_keys and not onroad and write_onroad:
+      raise ValueError("Saved tuning cannot be changed after the car starts. Change while parked.")
+    if write_onroad and key in LEGACY_PCM_LOCK_KEYS and legacy_pcm_tuning_locked(params):
       raise ValueError("Setting is locked by saved or active Legacy PCM control.")
-    if key in MVL_LOCK_KEYS and mvl_tuning_locked(params):
+    if write_onroad and key in MVL_LOCK_KEYS and mvl_tuning_locked(params):
       raise ValueError("Setting is locked by saved or active MVL longitudinal control.")
     if not tuning_write_allowed(params, key, firmware_prediction_schedule=capabilities.get("nrdr_firmware_prediction_schedule") is True):
       cloudlog.warning(f"sunnylinkd.saveParams.locked: '{key}'")
@@ -390,7 +422,7 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     requested_bool = _remote_bool_value(value, compression) \
       if key in ("NrdrHandcraftedLateralTune", "NrdrSuggestedSettings") else None
     if not allow_param_write(
-      key, onroad,
+      key, write_onroad,
       handcrafted_profile_available=handcrafted_available,
       honda_tuning_available=honda_tuning_available,
       device_yaw_correction_available=capabilities.get("nrdr_interpolated_torque_pif_blend_available") is True,
@@ -401,25 +433,29 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
 
     try:
       if key in experiment_selections:
-        if not params.get_bool("IsOffroad") or _vehicle_tuning_capabilities().get("nrdr_honda_pcm_experiments_available") is not True:
+        if _vehicle_tuning_capabilities().get("nrdr_honda_pcm_experiments_available") is not True or not params.get_bool("IsOffroad"):
           raise ValueError("Civic PCM experiment is no longer available. Nothing was saved for this setting.")
         params.put_bool(key, experiment_selections[key], block=True)
         params.put_bool("OnroadCycleRequested", True, block=True)
       elif key == "NrdrMvlPcmDeadzone":
-        if not params.get_bool("IsOffroad") or _vehicle_tuning_capabilities().get("nrdr_mvl_pcm_deadzone_available") is not True:
+        if _vehicle_tuning_capabilities().get("nrdr_mvl_pcm_deadzone_available") is not True or not params.get_bool("IsOffroad"):
           raise ValueError("PCM feedback deadzone is no longer available. Nothing was saved for this setting.")
         params.put(key, deadzone_selection, block=True)
         params.put_bool("OnroadCycleRequested", True, block=True)
       elif key == "HondaLiveLearningGas" or key in pcm_selections:
         capability = "nrdr_honda_mvl_selection_available" if key == "HondaLiveLearningGas" else "nrdr_honda_pcm_tuning_available"
-        if not params.get_bool("IsOffroad") or _vehicle_tuning_capabilities().get(capability) is not True:
+        if _vehicle_tuning_capabilities().get(capability) is not True or not params.get_bool("IsOffroad"):
           raise ValueError("Longitudinal mode can only be changed while parked with the matching vehicle.")
-        if key in pcm_selections and mvl_tuning_locked(params):
-          raise ValueError("PCM settings are locked by MVL longitudinal control.")
         selected = live_gas_selection if key == "HondaLiveLearningGas" else pcm_selections[key]
         writer = params.put if key == "NrdrHondaPcmMode" else params.put_bool
         writer(key, selected, block=True)
         params.put_bool("OnroadCycleRequested", True, block=True)
+      elif key in tuning_selections:
+        if not tuning_write_allowed(params, key):
+          raise ValueError("Setting is no longer available. Nothing was saved for this setting.")
+        if not onroad and not params.get_bool("IsOffroad"):
+          raise ValueError("Saved tuning cannot be changed after the car starts. Change while parked.")
+        params.put(key, tuning_selections[key], block=True)
       elif key == "LongitudinalPersonality":
         decoded = base64.b64decode(value, validate=True)
         if compression:
@@ -454,7 +490,7 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     except Exception as e:
       cloudlog.error(f"sunnylinkd.saveParams.exception {e}")
       if key in ("NrdrLateralController", "NrdrDriverMonitoringReminderPercent", "HondaLiveLearningGas", "LongitudinalPersonality",
-                 "NrdrMvlPcmDeadzone", *pcm_selections, *experiment_selections):
+                 "NrdrMvlPcmDeadzone", *pcm_selections, *experiment_selections, *tuning_selections):
         raise ValueError("Setting could not be saved. Refresh settings to read the device's selection.") from e
 
   # Increment version counter for frontend change detection

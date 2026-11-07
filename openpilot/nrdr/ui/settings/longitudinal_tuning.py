@@ -163,7 +163,7 @@ class LongitudinalTuningLayout(Widget):
       title=lambda: tr("Roen Nidec Acceleration Limits (Default: OFF)"),
       description=lambda: tr(
         "Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling. " +
-        "Unavailable while MVL longitudinal is selected or active."
+        "Saved while parked; ignored when MVL longitudinal is active."
       ),
     )
 
@@ -314,8 +314,10 @@ class LongitudinalTuningLayout(Widget):
     enabled = nrdr_longitudinal_enabled(ui_state.CP)
     for item in self._tuning_items:
       if action := getattr(item, "action_item", None):
-        action.set_enabled(enabled and tuning_write_allowed(ui_state.params, getattr(action, "param_key", None), CP=ui_state.CP, CP_SP=ui_state.CP_SP))
-    learning = mvl_tuning_locked(ui_state.params, ui_state.CP) or legacy_pcm_tuning_locked(ui_state.params, ui_state.CP, ui_state.CP_SP)
+        action.set_enabled(enabled and tuning_write_allowed(ui_state.params, getattr(action, "param_key", None),
+                                                           CP=ui_state.CP, CP_SP=ui_state.CP_SP, is_offroad=ui_state.is_offroad()))
+    learning = not ui_state.is_offroad() and (mvl_tuning_locked(ui_state.params, ui_state.CP)
+                                            or legacy_pcm_tuning_locked(ui_state.params, ui_state.CP, ui_state.CP_SP))
     for item in (self._long_pid_tune_scale_aggressive, self._long_pid_tune_scale_standard,
                  self._long_pid_tune_scale_relaxed, self._long_pid_tune_scale_econ):
       item.set_visible(not learning)

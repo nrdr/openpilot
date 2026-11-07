@@ -142,7 +142,8 @@ class SpeedLimitSettingsLayout(Widget):
       sla_available = (has_long or has_icbm) and not sla_disallow_in_release and not sla_always_disallow
 
       if (not sla_available and speed_limit_mode_param == int(SpeedLimitMode.assist)
-          and tuning_write_allowed(ui_state.params, "SpeedLimitMode", CP=ui_state.CP)):
+          # An editable saved choice is not permission to downgrade it on refresh.
+          and tuning_write_allowed(ui_state.params, "SpeedLimitMode", CP=ui_state.CP, is_offroad=False)):
         ui_state.params.put("SpeedLimitMode", int(SpeedLimitMode.warning))
 
     else:

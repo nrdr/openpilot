@@ -31,11 +31,13 @@ class Params(dict):
   put_bool = put
 
 
-def state(saved=False, active=False, brand="honda"):
+def state(saved=False, active=False, brand="honda", offroad=True):
   cp = car.CarParams.new_message(brand=brand, openpilotLongitudinalControl=True, flags=131072 if active else 0)
-  params = Params(HondaLiveLearningGas=saved, CarParams=cp.to_bytes(), ExperimentalMode=False, ExperimentalModeConfirmed=True)
+  params = Params(IsOffroad=offroad, HondaLiveLearningGas=saved, CarParams=cp.to_bytes(),
+                  ExperimentalMode=False, ExperimentalModeConfirmed=True)
   return NS(CP=cp, CP_SP=NS(), params=params, has_longitudinal_control=True, experimental_mode=False,
-            experimental_mode_confirmed=True, sm=NS(updated={"selfdriveState": False}))
+            experimental_mode_confirmed=True, is_offroad=lambda: params.get("IsOffroad") is True,
+            sm=NS(updated={"selfdriveState": False}))
 
 
 class Widget:
@@ -104,21 +106,23 @@ def mici_control(kind, params, key):
 @pytest.mark.parametrize("kind", ["BigParamControl", "BigCircleParamControl", "BigMultiParamToggle"])
 @pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
 @pytest.mark.parametrize("key", sorted(MVL_LOCK_KEYS))
-def test_mici_every_conflicting_key_is_visibly_locked_and_cannot_write(kind, saved, active, key):
-  ui = state(saved, active)
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_mici_mode_conflicts_are_editable_only_while_parked(kind, saved, active, key, offroad):
+  ui = state(saved, active, offroad=offroad)
   ui.params[key] = 0
   control = mici_control(kind, ui.params, key)
   control.set_enabled(True)  # A layout refresh must not override the policy.
-  assert not control.enabled
+  assert control.enabled is (offroad is True)
   control._handle_mouse_release(None)  # Deliberately bypass normal hit testing.
-  assert not ui.params.writes and ui.params[key] == 0
+  assert ui.params.writes == ([(key, 1)] if offroad is True else [])
+  assert ui.params[key] == (1 if offroad is True else 0)
 
 
 @pytest.mark.parametrize("kind", ["BigParamControl", "BigCircleParamControl", "BigMultiParamToggle"])
 @pytest.mark.parametrize("key", ["LongitudinalPersonality", "DisengageOnAccelerator", "AlwaysOnDM",
                                 "AlphaLongitudinalEnabled", "HondaEnforceStockLongitudinal", "LaneGuidanceMode", "NrdrResetLiveGas"])
 def test_mici_mvl_does_not_disable_personalities_safeguards_hardware_lateral_or_reset(kind, key):
-  ui = state(True, True)
+  ui = state(True, True, offroad=False)
   ui.params[key] = 0
   control = mici_control(kind, ui.params, key)
   assert control.enabled
@@ -128,7 +132,7 @@ def test_mici_mvl_does_not_disable_personalities_safeguards_hardware_lateral_or_
 
 @pytest.mark.parametrize("kind", ["BigParamControl", "BigCircleParamControl", "BigMultiParamToggle"])
 def test_mici_rechecks_after_callbacks_and_keeps_caller_disable_gates(kind):
-  ui = state()
+  ui = state(offroad=False)
   ui.params["AccelBoostSP"] = 0
   control = mici_control(kind, ui.params, "AccelBoostSP")
   control.set_enabled(lambda: False)
@@ -143,7 +147,7 @@ def test_mici_rechecks_after_callbacks_and_keeps_caller_disable_gates(kind):
 
 @pytest.mark.parametrize("kind", ["BigParamControl", "BigCircleParamControl", "BigMultiParamToggle"])
 def test_mici_non_honda_does_not_inherit_saved_honda_lock(kind):
-  ui = state(True, brand="toyota")
+  ui = state(True, brand="toyota", offroad=False)
   ui.params["AccelBoostSP"] = 0
   control = mici_control(kind, ui.params, "AccelBoostSP")
   assert control.enabled
@@ -176,24 +180,26 @@ def tici_control(kind, params, key):
 @pytest.mark.parametrize("kind", ["ToggleActionSP", "MultipleButtonActionSP", "OptionControlSP"])
 @pytest.mark.parametrize("key", sorted(MVL_LOCK_KEYS))
 @pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
-def test_tici_bound_widgets_show_policy_disabled_and_block_stale_direct_writes(kind, key, saved, active):
-  ui = state(saved, active)
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_tici_bound_widgets_recheck_parked_mode_conflict_policy(kind, key, saved, active, offroad):
+  ui = state(saved, active, offroad=offroad)
   ui.params[key] = 0
   control = tici_control(kind, ui.params, key)
   control.set_enabled(True)
-  assert not control.enabled
+  assert control.enabled is (offroad is True)
   if kind == "ToggleActionSP":
     control.toggle._handle_mouse_release(None)
   elif kind == "OptionControlSP":
     control.set_value(1)
   else:
     control._handle_mouse_release(None)
-  assert not ui.params.writes and ui.params[key] == 0
+  assert ui.params.writes == ([(key, 1)] if offroad is True else [])
+  assert ui.params[key] == (1 if offroad is True else 0)
 
 
 @pytest.mark.parametrize("kind,key", [("ToggleActionSP", "AccelBoostSP"), ("MultipleButtonActionSP", "SpeedLimitMode")])
 def test_tici_post_callback_cannot_write_after_mvl_becomes_selected(kind, key):
-  ui = state()
+  ui = state(offroad=False)
   ui.params[key] = 0
   control = tici_control(kind, ui.params, key)
   def callback(*_):
@@ -211,7 +217,7 @@ def test_tici_post_callback_cannot_write_after_mvl_becomes_selected(kind, key):
 @pytest.mark.parametrize("key", ["AccelBoostSP", "ExperimentalMode", "SmartCruiseControlVision", "CustomAccIncrementsEnabled",
                                 "CustomAccShortPressIncrement", "CustomAccLongPressIncrement"])
 def test_tici_global_sunny_preferences_remain_editable_after_vehicle_swap(kind, key):
-  ui = state(True, brand="toyota")
+  ui = state(True, brand="toyota", offroad=False)
   ui.params[key] = 0
   control = tici_control(kind, ui.params, key)
   assert control.enabled
@@ -248,8 +254,7 @@ def experimental_layout(ui, mici):
 @pytest.mark.parametrize("selected", [False, True])
 @pytest.mark.parametrize("offroad", [False, True])
 def test_experimental_manual_on_off_remains_live_during_mvl_restart_states(mici, saved, active, selected, offroad):
-  ui = state(saved, active)
-  ui.is_offroad = lambda: offroad
+  ui = state(saved, active, offroad=offroad)
   ui.started = ui.engaged = not offroad
   ui.params["ExperimentalMode"] = not selected
   layout, dialogs, action = experimental_layout(ui, mici)
@@ -323,7 +328,7 @@ def test_experimental_settings_remain_available_on_non_honda(mici):
 @pytest.mark.parametrize("selected", [False, True])
 @pytest.mark.parametrize("openlong,confirmed", [(True, True), (False, True), (True, False)])
 def test_home_and_onroad_shortcuts_keep_manual_mode_and_availability_guards(saved, active, selected, openlong, confirmed):
-  ui = state(saved, active)
+  ui = state(saved, active, offroad=False)
   ui.CP.openpilotLongitudinalControl = ui.has_longitudinal_control = openlong
   ui.params["ExperimentalModeConfirmed"] = ui.experimental_mode_confirmed = confirmed
   ui.params["ExperimentalMode"] = ui.experimental_mode = not selected
@@ -348,8 +353,9 @@ def test_home_and_onroad_shortcuts_keep_manual_mode_and_availability_guards(save
 
 
 @pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
-def test_preference_refresh_cannot_replay_conflicting_values(saved, active):
-  ui = state(saved, active)
+@pytest.mark.parametrize("offroad", [False, True])
+def test_preference_refresh_cannot_replay_conflicting_values(saved, active, offroad):
+  ui = state(saved, active, offroad=offroad)
   env = {"tuning_write_allowed": tuning_write_allowed, "tr": lambda s: s}
   definitions("openpilot/nrdr/ui/settings_policy.py", {"_restore_params", "restore_params", "apply_speed_limit_preferences"}, env)
   env["restore_params"](ui.params, dict.fromkeys(MVL_LOCK_KEYS, 1))
@@ -364,8 +370,7 @@ def test_preference_refresh_cannot_replay_conflicting_values(saved, active):
 @pytest.mark.parametrize("offroad", [False, True])
 def test_mici_mode_status_uses_road_state_and_latched_mode(saved, active, text, offroad):
   from openpilot.nrdr.ui.honda_pcm import live_gas_status
-  ui = state(saved, active)
-  ui.is_offroad = lambda: offroad
+  ui = state(saved, active, offroad=offroad)
   env = {"BigToggle": Widget, "ui_state": ui, "tr": lambda s: s, "live_gas_status": live_gas_status}
   definitions("openpilot/nrdr/ui/settings/pcm_modes_mici.py", {"LiveGasControl"}, env, {"_mode_status", "_refresh", "_update_state"})
   control = env["LiveGasControl"]()
@@ -395,7 +400,7 @@ def test_mici_live_mode_status_fits_below_the_title_and_left_of_the_toggle():
 @pytest.mark.parametrize("mici", [False, True])
 @pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
 def test_lateral_diagnostic_callback_can_clear_manual_experimental_without_unlocking_dec(mici, saved, active):
-  ui = state(saved, active)
+  ui = state(saved, active, offroad=False)
   ui.params["ExperimentalMode"] = True
   env = {"Widget": Widget, "NavScroller": Widget, "ui_state": ui, "tuning_write_allowed": tuning_write_allowed,
          "restart_needed_callback": lambda: None}
@@ -415,12 +420,12 @@ def test_lateral_diagnostic_callback_can_clear_manual_experimental_without_unloc
 
 
 @pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
-def test_speed_limit_automatic_downgrade_and_refresh_never_write_while_locked(saved, active):
-  ui = state(saved, active)
+@pytest.mark.parametrize("offroad", [False, True])
+def test_speed_limit_automatic_downgrade_and_refresh_never_write_while_locked(saved, active, offroad):
+  ui = state(saved, active, offroad=offroad)
   ui.params["SpeedLimitMode"] = 3
   # Simulate a stale UI availability snapshot; the boot-latched CP remains authoritative.
   ui.has_longitudinal_control = ui.has_icbm = ui.is_sp_release = False
-  ui.is_offroad = lambda: True
   env = {"Widget": Widget, "ui_state": ui, "tuning_write_allowed": tuning_write_allowed, "tr": lambda s: s,
          "SpeedLimitMode": NS(off=0, information=1, warning=2, assist=3), "SpeedLimitOffsetType": NS(off=0)}
   definitions("openpilot/nrdr/ui/settings_policy.py", {"apply_speed_limit_preferences"}, env)

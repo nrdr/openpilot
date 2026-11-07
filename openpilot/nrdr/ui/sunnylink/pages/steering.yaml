@@ -9,7 +9,6 @@ sections:
     - key: NrdrSuggestedSettings
       widget: toggle
       title: Apply Suggested Settings
-      description: "Last Road Tested: October 1, 2026, with PopV2 Model. Your mileage may vary. Turning back to OFF will preserve these settings and unlock tuning menus."
       visibility:
       - {type: capability, field: has_handcrafted_lateral_profile, equals: true}
       enablement:
@@ -55,7 +54,7 @@ sections:
         widget: toggle
         title: Use Device Yaw Correction
         description: Mix 1% device-yaw torque feedback with 99% PIF output. This is the legacy option; use Firmware Controller for a matching rack. Optimized lane changes temporarily disable the blend.
-        details: Defaults ON. The blend strength, acceleration factor, and friction remain fixed. Below 4.5 mph the torque leg uses steering-angle feedback, transitioning to the device's calibrated yaw estimate by 11.2 mph. Missing, stale, or invalid yaw falls back to PIF when yaw is required. Available only for supported modified-EPS Honda PIF setups. Firmware Controller never uses this blend. Turn Suggested Settings OFF to unlock this switch.
+        details: Defaults ON. The blend strength, acceleration factor, and friction remain fixed. Below 4.5 mph the torque leg uses steering-angle feedback, transitioning to the device's calibrated yaw estimate by 11.2 mph. Missing, stale, or invalid yaw falls back to PIF when yaw is required. Available only for supported modified-EPS Honda PIF setups. Firmware Controller never uses this blend. Suggested Settings does not prevent parked edits once its apply transaction finishes.
         visibility:
         - {type: not, condition: {type: param, key: NrdrLateralController, equals: 1}}
         enablement:
@@ -436,7 +435,7 @@ sections:
         widget: toggle
         title: Live Learning Gas
         description: Selects full MVL longitudinal control. Change while parked. Applies next drive; no device reboot.
-        details: ON selects full MVL gas, braking and Aggressive/Standard/Relaxed personalities, including following distances, on Honda Nidec PCM, Bosch and gas-interceptor openpilot longitudinal paths. Only Econ keeps nrdr's fixed longer-following and gentler acceleration/jerk defaults; a custom tune file does not change these MVL profiles. Saved ON is not proof that MVL is active yet. Conflicting settings stay locked while ON is saved or the last controller was MVL, including after saving OFF until the next drive. Their saved custom values are kept. Reset clears gas/wind learning only. Existing OFF choices are preserved; new Honda setups default ON.
+        details: ON selects full MVL gas, braking and Aggressive/Standard/Relaxed personalities, including following distances, on Honda Nidec PCM, Bosch and gas-interceptor openpilot longitudinal paths. Only Econ keeps nrdr's fixed longer-following and gentler acceleration/jerk defaults; a custom tune file does not change these MVL profiles. Saved ON is not proof that MVL is active yet. Custom tuning stays editable while parked; use depends on the selected controller. Saved custom values are kept. Reset clears gas/wind learning only. Existing OFF choices are preserved; new Honda setups default ON.
         enablement:
         - $ref: '#/macros/offroad'
         - {type: capability, field: nrdr_honda_mvl_selection_available, equals: true}
@@ -467,7 +466,7 @@ sections:
       - key: NrdrMvlPcmDeadzone
         widget: multiple_button
         title: PCM Feedback Deadzone (Experimental)
-        description: Ignores small acceleration errors while accelerating. Civic PCM with Live Learning Gas only. Off keeps MVL unchanged. Change while parked. Applies next drive; no device reboot.
+        description: Filters small acceleration errors only while MVL controls Civic PCM. Editable while parked even with MVL off. Off keeps MVL unchanged. Applies next drive; no device reboot.
         details: Width (m/s²) ramps from 0 at 2.3 m/s to the selected maximum at 9 m/s. Bypasses requested deceleration, stopping, overrides and AEB. This filters acceleration error, not a throttle ramp or delay model. It may hold existing integral correction longer. Learning can change; Off does not undo saved learning.
         options:
         - {label: 'Off', value: 0}
@@ -517,12 +516,12 @@ sections:
         widget: toggle
         title: Full Nidec Brake Authority
         description: Allows the full brake-command range on supported cars with a gas interceptor.
-        details: Enabled by default. Disable to retain the upstream brake-command headroom. Unavailable while MVL longitudinal is selected or active.
+        details: Enabled by default. Disable to retain the upstream brake-command headroom. Editable while parked; use depends on the selected controller.
       - key: NrdrRoenAccelerationLimits
         widget: toggle
         title: Roen Nidec Acceleration Limits
         description: Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling.
-        details: Disabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. Unavailable while MVL longitudinal is selected or active.
+        details: Disabled by default. Applies only to Honda Nidec cars with a gas interceptor. The planner allows 4.0 m/s² through 5 m/s, fading to 2.0 m/s² at 20 m/s; the controller fades from 4.0 to 3.0 m/s², while ordinary low-lateral-acceleration driving retains the full envelope. Editable while parked; use depends on the selected controller.
       - key: HondaBoschARadar
         widget: toggle
         title: Honda Bosch-A Radar (experimental)
@@ -537,7 +536,7 @@ sections:
         widget: option
         title: Distance 1 / Aggressive PID Scale
         description: Scales the longitudinal PID controller for the Aggressive personality (distance setting 1).
-        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        details: Defaults to 100%. Editable while parked; use depends on the selected controller and hardware.
         min: 0
         max: 500
         step: 5
@@ -546,7 +545,7 @@ sections:
         widget: option
         title: Distance 2 / Standard PID Scale
         description: Scales the longitudinal PID controller for the Standard personality (distance setting 2).
-        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        details: Defaults to 100%. Editable while parked; use depends on the selected controller and hardware.
         min: 0
         max: 500
         step: 5
@@ -555,7 +554,7 @@ sections:
         widget: option
         title: Distance 3 / Relaxed PID Scale
         description: Scales the longitudinal PID controller for the Relaxed personality (distance setting 3).
-        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        details: Defaults to 100%. Editable while parked; use depends on the selected controller and hardware.
         min: 0
         max: 500
         step: 5
@@ -564,7 +563,7 @@ sections:
         widget: option
         title: Distance 4 / Econ PID Scale
         description: Scales the longitudinal PID controller for the Econ personality (distance setting 4).
-        details: Defaults to 100%. Effective only with a gas pedal interceptor and Live Learning Gas OFF; otherwise longitudinal PID scaling is fixed at 100%.
+        details: Defaults to 100%. Editable while parked; use depends on the selected controller and hardware.
         min: 0
         max: 500
         step: 5

@@ -57,8 +57,13 @@ def test_shared_geometry_is_not_locked_by_controller_selection(key):
   params = MemoryParams(NrdrLateralController=1, NrdrSuggestedSettings=False)
   assert tuning_write_allowed(params, key)
   item = apply_sunnylink_metadata({"key": key})
-  conditions = {condition["condition"]["key"] for condition in item["enablement"]}
-  assert conditions == {"NrdrSuggestedSettings", "NrdrHandcraftedLateralTune"}
+  assert item["enablement"] == [
+    {"type": "any", "conditions": [
+      {"type": "offroad_only"},
+      {"type": "not", "condition": {"type": "param", "key": "NrdrSuggestedSettings", "equals": True}},
+    ]},
+    {"type": "not", "condition": {"type": "param", "key": "NrdrHandcraftedLateralTune", "equals": True}},
+  ]
   params["NrdrSuggestedSettings"] = True
   assert not tuning_write_allowed(params, key)
 

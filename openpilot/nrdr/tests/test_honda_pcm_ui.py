@@ -46,7 +46,8 @@ def state(**overrides):
   CP_SP = structs.CarParamsSP(enableGasInterceptor=overrides.pop("enableGasInterceptor", False))
   for key, value in overrides.items():
     setattr(CP, key, value)
-  return NS(CP=CP, CP_SP=CP_SP, params=Params(), is_offroad=lambda: True)
+  params = Params(IsOffroad=True)
+  return NS(CP=CP, CP_SP=CP_SP, params=params, is_offroad=lambda: params.get_bool("IsOffroad"))
 
 
 @pytest.mark.parametrize("car", list(CAR))

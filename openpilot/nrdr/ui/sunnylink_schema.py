@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import copy
 
-from openpilot.nrdr.params.tuning_policy import LONG_SCALE_KEYS, MVL_DESCRIPTION, MVL_LOCK_KEYS, SUGGESTED_LOCK_KEYS, YAW_FIXED_KEYS, LEGACY_PCM_LOCK_KEYS
+from openpilot.nrdr.params.tuning_policy import (
+  LONG_SCALE_KEYS, MVL_DESCRIPTION, MVL_LOCK_KEYS, SUGGESTED_DESCRIPTION, SUGGESTED_LOCK_KEYS, YAW_FIXED_KEYS, LEGACY_PCM_LOCK_KEYS,
+)
 from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS, PCM_EXPERIMENT_DETAILS
 
 from openpilot.nrdr.params import NRDR_UI_METADATA_BY_KEY, get_ui_metadata
@@ -39,6 +41,8 @@ def apply_sunnylink_metadata(item: dict) -> dict:
   merged = dict(item)
   if key == "HondaLiveLearningGas":
     merged["description"] = MVL_DESCRIPTION
+  if key == "NrdrSuggestedSettings":
+    merged["description"] = SUGGESTED_DESCRIPTION
   if key in PCM_EXPERIMENTS:
     merged["title"], merged["description"] = PCM_EXPERIMENTS[key]
     merged["details"] = PCM_EXPERIMENT_DETAILS[key]
@@ -55,8 +59,12 @@ def apply_sunnylink_metadata(item: dict) -> dict:
       # lives under Steering. Keep the cross-page exclusion at the UI boundary.
       enablement.append({"type": "param", "key": "DisablePowerDown", "equals": False})
     if key in SUGGESTED_LOCK_KEYS or key.startswith(("NrdrSteerRatio", "LaneCenter", "NrdrLatRateDamping")):
-      for switch in ("NrdrSuggestedSettings", "NrdrHandcraftedLateralTune"):
-        enablement.append({"type": "not", "condition": {"type": "param", "key": switch, "equals": True}})
+      enablement.append({"type": "any", "conditions": [
+        {"type": "offroad_only"},
+        {"type": "not", "condition": {"type": "param", "key": "NrdrSuggestedSettings", "equals": True}},
+      ]})
+      # A pending preset write remains exclusive even while parked.
+      enablement.append({"type": "not", "condition": {"type": "param", "key": "NrdrHandcraftedLateralTune", "equals": True}})
     if key in YAW_FIXED_KEYS or key.startswith("NrdrLatRateDamping"):
       enablement.append({"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 1}})
     if key in ("LagdToggle", "LagdToggleDelay"):
@@ -65,18 +73,24 @@ def apply_sunnylink_metadata(item: dict) -> dict:
         {"type": "capability", "field": "nrdr_firmware_prediction_schedule", "equals": True},
       ]}})
     if key in MVL_LOCK_KEYS:
-      condition = {"type": "not", "condition": {"type": "any", "conditions": [
-        {"type": "all", "conditions": [
-          {"type": "param", "key": "HondaLiveLearningGas", "equals": True},
-          {"type": "not", "condition": {"type": "capability", "field": "nrdr_mvl_tuning_exempt", "equals": True}},
-        ]},
-        {"type": "capability", "field": "nrdr_mvl_longitudinal_active", "equals": True},
-      ]}}
+      condition = {"type": "any", "conditions": [
+        {"type": "offroad_only"},
+        {"type": "not", "condition": {"type": "any", "conditions": [
+          {"type": "all", "conditions": [
+            {"type": "param", "key": "HondaLiveLearningGas", "equals": True},
+            {"type": "not", "condition": {"type": "capability", "field": "nrdr_mvl_tuning_exempt", "equals": True}},
+          ]},
+          {"type": "capability", "field": "nrdr_mvl_longitudinal_active", "equals": True},
+        ]}},
+      ]}
       enablement.append(condition)
       if key in LONG_SCALE_KEYS:
         merged["visibility"] = [*copy.deepcopy(merged.get("visibility", [])), condition]
     if key in LEGACY_PCM_LOCK_KEYS:
-      enablement.append({"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}})
+      enablement.append({"type": "any", "conditions": [
+        {"type": "offroad_only"},
+        {"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}},
+      ]})
     if enablement:
       merged["enablement"] = enablement
   return merged

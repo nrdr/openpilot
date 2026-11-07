@@ -83,7 +83,7 @@ class LaneCenteringLayoutMici(NavScroller):
 
   @staticmethod
   def _write_allowed() -> bool:
-    return tuning_write_allowed(ui_state.params, "LaneGuidanceMode")  # Unlocked settings still apply live.
+    return tuning_write_allowed(ui_state.params, "LaneGuidanceMode", is_offroad=ui_state.is_offroad())
 
   @staticmethod
   def _custom_model_active() -> bool | None:

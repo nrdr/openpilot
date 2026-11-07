@@ -83,10 +83,10 @@ def test_native_values_are_typed_not_storage_encodings(value):
 
 @pytest.mark.parametrize("car", list(CAR))
 @pytest.mark.parametrize("saved,active", [(False, False), (True, False), (False, True), (True, True)])
-def test_exact_car_and_selected_or_active_gate_native_and_capability(car, saved, active):
+def test_exact_hardware_gates_native_and_capability_independent_of_mvl(car, saved, active):
   ui = state(carFingerprint=str(car), flags=int(HondaFlags.MVL_LONGITUDINAL) if active else 0)
   ui.params.values["HondaLiveLearningGas"] = saved
-  expected = car == CAR.HONDA_CIVIC and (saved or active)
+  expected = car == CAR.HONDA_CIVIC
   assert mvl_pcm_deadzone_available(ui.CP, ui.CP_SP, ui.params) is expected
   assert emitted_capability(ui) is expected
   assert save_mvl_pcm_deadzone(ui, 5) is expected
@@ -110,7 +110,7 @@ def test_both_native_callbacks_recheck_stale_vehicle_and_road_state(case, native
     def select():
       layout._select("0.05")
   if case == "onroad":
-    ui.is_offroad = lambda: False
+    ui.params.values["IsOffroad"] = False
   elif case == "stock":
     ui.CP.openpilotLongitudinalControl = False
   elif case == "interceptor":
@@ -133,29 +133,33 @@ def test_both_native_callbacks_recheck_stale_vehicle_and_road_state(case, native
     ui.params.values["HondaLiveLearningGas"] = False
   select()
   layout._update_state()
-  assert not ui.params.writes
+  accepted = case == "mvl_off"
+  assert ui.params.writes == ([(KEY, 5), ("OnroadCycleRequested", True)] if accepted else [])
   assert ui.params.get_bool("ExperimentalMode")
   if native == "large":
-    assert not layout._mvl_pcm_deadzone.enabled and layout._mvl_pcm_deadzone.value == 1
+    assert layout._mvl_pcm_deadzone.enabled is accepted
+    assert layout._mvl_pcm_deadzone.value == (2 if accepted else 1)
   else:
-    assert not layout.enabled() and layout.value == "0.02"
+    assert layout.enabled() is accepted
+    assert layout.value == ("0.05" if accepted else "0.02")
 
 
 @pytest.mark.parametrize("saved,active", [(True, False), (False, True), (True, True)])
 @pytest.mark.parametrize("value", VALUES)
-def test_native_controls_save_enum_not_button_index_and_leave_other_locks(saved, active, value):
+def test_native_controls_save_enum_not_button_index_with_parked_tuning_editable(saved, active, value):
   ui = state(flags=int(HondaFlags.MVL_LONGITUDINAL) if active else 0)
   ui.params.values.update(HondaLiveLearningGas=saved, ExperimentalMode=False)
   large, mici = native_layout(ui), mici_control(ui)
   assert KEY not in MVL_LOCK_KEYS
   assert tuning_write_allowed(ui.params, KEY, CP=ui.CP)
-  assert all(not tuning_write_allowed(ui.params, key, CP=ui.CP) for key in MVL_LOCK_KEYS)
+  assert all(tuning_write_allowed(ui.params, key, CP=ui.CP) for key in MVL_LOCK_KEYS)
+  assert all(not tuning_write_allowed(ui.params, key, CP=ui.CP, is_offroad=False) for key in MVL_LOCK_KEYS)
   assert large._mvl_pcm_deadzone.param_key is None  # no automatic post-callback write
   large._mvl_pcm_deadzone.kwargs["callback"](VALUES.index(value))
   large._update_state()
   assert large._mvl_pcm_deadzone.value == VALUES.index(value)
   assert large._mvl_pcm_deadzone.enabled
-  assert not large._pcm_mode.enabled and not large._wind_brake.enabled and not large._static_feedforward_long.enabled
+  assert large._pcm_mode.enabled and large._wind_brake.enabled and large._static_feedforward_long.enabled
   assert ui.params.writes == [(KEY, value), ("OnroadCycleRequested", True)]
   ui.params.writes.clear()
   mici._update_state()
@@ -238,24 +242,30 @@ def test_remote_rechecks_just_before_write(rpc, change):
 
 
 @pytest.mark.parametrize("key", sorted(MVL_LOCK_KEYS))
-def test_remote_deadzone_does_not_unlock_custom_tuning_in_same_batch(rpc, key):
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_remote_deadzone_and_custom_tuning_batch_requires_parked(rpc, key, offroad):
   save, params, caps = rpc
-  params.values["HondaLiveLearningGas"] = True
+  params.values.update(IsOffroad=offroad, HondaLiveLearningGas=True)
   caps[CAP] = True
-  with pytest.raises(ValueError):
+  if offroad is True:
     save({KEY: encoded(5), key: encoded(1)})
-  assert not params.writes
+    assert params.get(KEY) == 5 and params.get(key) == 1
+    assert {name for name, _ in params.writes} == {KEY, key, "OnroadCycleRequested", "ParamsVersion"}
+  else:
+    with pytest.raises(ValueError):
+      save({KEY: encoded(5), key: encoded(1)})
+    assert not params.writes
 
 
 @pytest.mark.parametrize("reverse", [False, True])
-def test_remote_batch_cannot_disable_its_own_mvl_eligibility(rpc, reverse):
+def test_remote_parked_batch_can_prepare_deadzone_with_mvl_off(rpc, reverse):
   save, params, caps = rpc
   params.values["HondaLiveLearningGas"] = True
   caps[CAP] = True
   entries = [(KEY, encoded(5)), ("HondaLiveLearningGas", encoded(0))]
-  with pytest.raises(ValueError):
-    save(dict(reversed(entries) if reverse else entries))
-  assert not params.writes
+  save(dict(reversed(entries) if reverse else entries))
+  assert params.get(KEY) == 5 and params.get("HondaLiveLearningGas") is False
+  assert {name for name, _ in params.writes} == {KEY, "HondaLiveLearningGas", "OnroadCycleRequested", "ParamsVersion"}
 
 
 @pytest.mark.parametrize("car,interceptor,openlong,mvl,stock", [
@@ -299,7 +309,10 @@ def test_copy_schema_native_options_and_compact_geometry_match():
   gate = {"type": "capability", "field": CAP, "equals": True}
   assert web["visibility"] == [gate]
   assert web["enablement"] == [{"type": "offroad_only"}, gate,  # no blanket MVL lock
-                               {"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}}]
+                               {"type": "any", "conditions": [
+                                 {"type": "offroad_only"},
+                                 {"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}},
+                               ]}]
   assert json.loads((ROOT / "openpilot/sunnypilot/sunnylink/settings_ui.json").read_text(encoding="utf-8")) == schema
   fields = ast.parse((ROOT / "openpilot/sunnypilot/sunnylink/capabilities.py").read_text(encoding="utf-8"))
   field_list = next(node.value for node in fields.body if isinstance(node, ast.Assign)

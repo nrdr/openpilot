@@ -6,7 +6,7 @@ MVL_DESCRIPTION = (
   "Selects full MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. " +
   "MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. " +
   "Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. " +
-  "Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Conflicting tuning is locked, not erased. " +
+  "Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Custom tuning can be saved while parked; MVL ignores it. " +
   "Legacy Kegman PCM takes precedence on supported Civics; the saved learning choice is kept. " +
   "Change while parked. Applies next drive; no device reboot."
 )
@@ -14,7 +14,7 @@ MVL_DESCRIPTION = (
 SUGGESTED_DESCRIPTION = (
   "Use the November 5 lateral setup: Sunny and matched Firmware Controller/steer ratio where supported. " +
   "Tested with PopV2; your model stays unchanged. Confirm the exact modified EPS build before using firmware control. " +
-  "Turning this off keeps the settings and unlocks tuning."
+  "You can adjust the applied settings while parked. Turning this off keeps your saved tuning."
 )
 PIF_KEYS = frozenset(
   f"Lat{term}Scale{band}" for term in "PIF" for band in ("LowSpeed", "Standard", "Highway")
@@ -77,10 +77,11 @@ def mvl_tuning_exempt(CP) -> bool:
 
 
 def mvl_tuning_locked(params, CP=None) -> bool:
-  """Saved ON or the boot-latched running mode keeps conflicting writes locked.
+  """Saved ON or the startup mode owns custom tuning while driving.
 
   Param-only widget callers use current CarParams, then its offroad persistent
   copy. A corrupt existing CP fails closed; no CP yet does not invent a mode.
+  This reports mode ownership, not whether parked preconfiguration is allowed.
   """
   from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
 
@@ -97,16 +98,24 @@ def mvl_tuning_locked(params, CP=None) -> bool:
     return True
 
 
-def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedule: bool = False, CP=None, CP_SP=None) -> bool:
+def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedule: bool = False,
+                         CP=None, CP_SP=None, is_offroad: bool | None = None) -> bool:
   if not key:
     return True
   if key in RETIRED_TUNING_KEYS or key.startswith("NrdrNnlc"):
     return False
-  if key in LEGACY_PCM_LOCK_KEYS and legacy_pcm_tuning_locked(params, CP, CP_SP):
-    return False
-  if key in MVL_LOCK_KEYS and mvl_tuning_locked(params, CP):
-    return False
-  if _enabled(params, "NrdrSuggestedSettings") or _enabled(params, "NrdrHandcraftedLateralTune"):
+  # A controller's ownership of its running tune does not prevent preparing
+  # another tune while parked. Persistent CP describes the previous drive.
+  # Unknown road state retains the onroad guards; no saved choice is rewritten.
+  parked = _enabled(params, "IsOffroad") if is_offroad is None else is_offroad is True
+  if not parked:
+    if key in LEGACY_PCM_LOCK_KEYS and legacy_pcm_tuning_locked(params, CP, CP_SP):
+      return False
+    if key in MVL_LOCK_KEYS and mvl_tuning_locked(params, CP):
+      return False
+  # A completed preset is a starting point, not a permanent edit lock. Keep
+  # the short pending-application guard so edits cannot race the preset write.
+  if (not parked and _enabled(params, "NrdrSuggestedSettings")) or _enabled(params, "NrdrHandcraftedLateralTune"):
     if key in SUGGESTED_LOCK_KEYS or key.startswith(("NrdrSteerRatio", "LaneCenter", "NrdrLatRateDamping")):
       return False
   if str(params.get("NrdrLateralController")) in ("1", "b'1'"):
@@ -161,7 +170,7 @@ def _stored_legacy_sp_exempt(raw: bytes) -> bool:
 
 
 def legacy_pcm_tuning_locked(params, CP=None, CP_SP=None) -> bool:
-  """Saved or startup-latched Legacy locks conflicts without modifying them."""
+  """Saved or startup-latched Legacy ownership, separate from parked editing."""
   from openpilot.nrdr.params.nidec_pcm import decode_pcm_experiment
 
   saved = decode_pcm_experiment(params.get("NrdrHondaLegacyPcm")) is True

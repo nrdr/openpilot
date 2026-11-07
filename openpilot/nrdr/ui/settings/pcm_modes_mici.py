@@ -27,7 +27,8 @@ class PcmModeControl(BigMultiToggle):
                                     "Experimental uses the Civic trial. No gas interceptor. " +
                                     "Change while parked. Applies next drive; no device reboot."))
     self.set_enabled(lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
-                     and tuning_write_allowed(ui_state.params, "NrdrHondaPcmMode", CP=ui_state.CP, CP_SP=ui_state.CP_SP))
+                     and tuning_write_allowed(ui_state.params, "NrdrHondaPcmMode", CP=ui_state.CP, CP_SP=ui_state.CP_SP,
+                                              is_offroad=ui_state.is_offroad()))
     self.set_value(self._labels[saved_pcm_mode(ui_state.params)])
 
   def _title_width_hint(self) -> int:
@@ -83,7 +84,8 @@ class WindBrakeControl(BigToggle):
                      description=tr("Subtracts estimated wind drag from brake demand. PCM only; gas compensation is unchanged. " +
                                     "Change while parked. Applies next drive; no device reboot."))
     self.set_enabled(lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
-                     and tuning_write_allowed(ui_state.params, "NrdrHondaWindBrake", CP=ui_state.CP, CP_SP=ui_state.CP_SP))
+                     and tuning_write_allowed(ui_state.params, "NrdrHondaWindBrake", CP=ui_state.CP, CP_SP=ui_state.CP_SP,
+                                              is_offroad=ui_state.is_offroad()))
 
   def _select(self, value):
     save_pcm_choice(ui_state, "NrdrHondaWindBrake", value)
@@ -104,7 +106,8 @@ class StaticFeedforwardControl(BigToggle):
   @staticmethod
   def _available():
     return (nrdr_longitudinal_enabled(ui_state.CP)
-            and tuning_write_allowed(ui_state.params, "StaticFeedforwardLong", CP=ui_state.CP, CP_SP=ui_state.CP_SP))
+            and tuning_write_allowed(ui_state.params, "StaticFeedforwardLong", CP=ui_state.CP, CP_SP=ui_state.CP_SP,
+                                     is_offroad=ui_state.is_offroad()))
 
   def _select(self, value):
     if type(value) is bool and self._available():

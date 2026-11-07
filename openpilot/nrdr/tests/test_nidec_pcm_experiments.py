@@ -115,7 +115,7 @@ def test_both_controls_remain_independent_and_available_under_mvl_or_legacy(save
 
 def make_ineligible(ui, case):
   if case == "onroad":
-    ui.is_offroad = lambda: False
+    ui.params.values["IsOffroad"] = False
   elif case == "missing_cp":
     ui.CP = None
   elif case == "missing_sp":
@@ -198,10 +198,12 @@ def test_saved_switch_never_claims_running_mode_and_pending_off_is_retained(key,
 
 @pytest.mark.parametrize("saved,active", list(itertools.product((False, True), repeat=2)))
 @pytest.mark.parametrize("key", sorted(LEGACY_PCM_LOCK_KEYS))
-def test_legacy_locks_conflicts_until_restart_without_erasing_saved_values(saved, active, key):
-  params = Params(NrdrHondaLegacyPcm=saved, CarParamsPersistent=cp_bytes(HondaFlags.NIDEC_PCM_LEGACY if active else 0), **{key: 123})
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_legacy_locks_conflicts_only_onroad_or_unknown_without_erasing_saved_values(saved, active, key, offroad):
+  params = Params(IsOffroad=offroad, NrdrHondaLegacyPcm=saved,
+                  CarParamsPersistent=cp_bytes(HondaFlags.NIDEC_PCM_LEGACY if active else 0), **{key: 123})
   assert legacy_pcm_tuning_locked(params) is (saved or active)
-  assert tuning_write_allowed(params, key) is not (saved or active)
+  assert tuning_write_allowed(params, key) is (offroad is True or not (saved or active))
   assert params.get(key) == 123 and not params.writes
 
 
@@ -233,12 +235,25 @@ def test_legacy_supersedes_saved_mvl_status_without_forcing_off():
   large = native_layout(ui)
   large._update_state()
   for item in (large._live_learning_gas, large._mvl_pcm_deadzone, large._pcm_mode, large._wind_brake, large._static_feedforward_long):
-    assert not item.enabled
-  assert not honda_pcm.save_live_gas_choice(ui, False)
-  assert not honda_pcm.save_pcm_choice(ui, "NrdrHondaPcmMode", 0)
-  assert not honda_pcm.save_mvl_pcm_deadzone(ui, 0)
+    assert item.enabled
   assert not ui.params.writes
-  ui.params.values[LEGACY] = False
+  assert honda_pcm.save_live_gas_choice(ui, False)
+  assert honda_pcm.save_pcm_choice(ui, "NrdrHondaPcmMode", 0)
+  assert honda_pcm.save_mvl_pcm_deadzone(ui, 0)
+  assert ui.params.writes == [("HondaLiveLearningGas", False), ("OnroadCycleRequested", True),
+                              ("NrdrHondaPcmMode", 0), ("OnroadCycleRequested", True),
+                              ("NrdrMvlPcmDeadzone", 0), ("OnroadCycleRequested", True)]
+  assert legacy_pcm_tuning_locked(ui.params, ui.CP, ui.CP_SP)
+  ui.params.values["IsOffroad"] = False
+  ui.params.writes.clear()
+  large._update_state()
+  for item in (large._live_learning_gas, large._mvl_pcm_deadzone, large._pcm_mode, large._wind_brake, large._static_feedforward_long):
+    assert not item.enabled
+  assert not honda_pcm.save_live_gas_choice(ui, True)
+  assert not honda_pcm.save_pcm_choice(ui, "NrdrHondaPcmMode", 2)
+  assert not honda_pcm.save_mvl_pcm_deadzone(ui, 5)
+  assert not ui.params.writes
+  ui.params.values.update(NrdrHondaLegacyPcm=False, HondaLiveLearningGas=True)
   assert honda_pcm.live_gas_status(ui.CP, ui.params, is_offroad=False) == "Legacy active\nMVL next drive"
   assert honda_pcm.live_gas_status(ui.CP, ui.params, is_offroad=True) == "MVL next drive"
 
@@ -296,23 +311,39 @@ def test_remote_rechecks_at_write_time(rpc, key, change):
 
 @pytest.mark.parametrize("key", sorted(LEGACY_PCM_LOCK_KEYS))
 @pytest.mark.parametrize("reverse", [False, True])
-def test_remote_cannot_enable_legacy_and_write_conflicts_in_either_order(rpc, key, reverse):
-  save, params, _ = rpc
-  entries = [(LEGACY, encoded(1)), (key, encoded(1))]
-  with pytest.raises(ValueError):
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_remote_legacy_and_tuning_batch_is_parked_only_in_either_order(rpc, key, reverse, offroad):
+  save, params, caps = rpc
+  params.values["IsOffroad"] = offroad
+  caps["nrdr_mvl_pcm_deadzone_available"] = True
+  value = 2 if key == "NrdrMvlPcmDeadzone" else 1
+  entries = [(LEGACY, encoded(1)), (key, encoded(value))]
+  if offroad is True:
     save(dict(reversed(entries) if reverse else entries))
-  assert not params.writes
+    assert params.get(LEGACY) is True and params.get(key) == value
+    assert {name for name, _ in params.writes} == {LEGACY, key, "OnroadCycleRequested", "ParamsVersion"}
+  else:
+    with pytest.raises(ValueError):
+      save(dict(reversed(entries) if reverse else entries))
+    assert not params.writes
 
 
 @pytest.mark.parametrize("saved,active", [(False, True), (True, False), (True, True)])
-def test_remote_cannot_disable_legacy_and_unlock_conflict_in_same_batch(rpc, saved, active):
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_remote_legacy_off_and_tuning_batch_requires_parked_not_an_inactive_latch(rpc, saved, active, offroad):
   save, params, _ = rpc
-  params.values.update(NrdrHondaLegacyPcm=saved, CarParamsPersistent=cp_bytes(HondaFlags.NIDEC_PCM_LEGACY if active else 0))
-  with pytest.raises(ValueError):
+  params.values.update(IsOffroad=offroad, NrdrHondaLegacyPcm=saved,
+                       CarParamsPersistent=cp_bytes(HondaFlags.NIDEC_PCM_LEGACY if active else 0))
+  if offroad is True:
     save({LEGACY: encoded(0), "NrdrHondaWindBrake": encoded(1)})
-  assert not params.writes
-  save({LEGACY: encoded(0), FIXED: encoded(1)})
-  assert params.get(LEGACY) is False and params.get(FIXED) is True
+    assert params.get(LEGACY) is False and params.get("NrdrHondaWindBrake") is True
+    assert legacy_pcm_tuning_locked(params) is active
+    save({LEGACY: encoded(0), FIXED: encoded(1)})
+    assert params.get(LEGACY) is False and params.get(FIXED) is True
+  else:
+    with pytest.raises(ValueError):
+      save({LEGACY: encoded(0), "NrdrHondaWindBrake": encoded(1)})
+    assert not params.writes
 
 
 @pytest.mark.parametrize("key", KEYS)
@@ -349,9 +380,12 @@ def test_shared_copy_native_geometry_and_compiled_schema(key):
 
 
 @pytest.mark.parametrize("key", sorted(LEGACY_PCM_LOCK_KEYS))
-def test_remote_visual_lock_covers_every_legacy_conflict(key):
+def test_remote_visual_lock_covers_every_legacy_conflict_with_parked_bypass(key):
   item = apply_sunnylink_metadata({"key": key})
-  assert {"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}} in item["enablement"]
+  assert {"type": "any", "conditions": [
+    {"type": "offroad_only"},
+    {"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}},
+  ]} in item["enablement"]
 
 
 @pytest.mark.parametrize("case", [None, "missing_cp", "missing_sp", "interceptor", "stock_flag", "stock", "other_brand", "other_civic",

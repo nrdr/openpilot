@@ -21,7 +21,7 @@ PCM_EXPERIMENT_DETAILS = {
   ),
   "NrdrHondaLegacyPcm": (
     "Default Off. Speed-based Kegman PCM control. Exact Civic Nidec, no gas interceptor, openpilot longitudinal; excludes stock ACC. "
-    + "Saved learning and tuning choices are kept, but conflicts stay locked until the next drive with Legacy off. "
+    + "Saved learning and tuning choices are kept and editable while parked; use depends on the selected controller. "
     + "Independent of Fixed PCM Cruise Speed; neither experiment guarantees equivalent hardware behavior."
   ),
 }

@@ -3,6 +3,7 @@ import ast
 import base64
 import gzip
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace as NS
 
@@ -12,6 +13,7 @@ from opendbc.car.honda.values import HondaFlags
 from opendbc.car.structs import car
 from openpilot.nrdr.params.generated import ALL_KEYS
 from openpilot.nrdr.params.snapshots import CONTROL_GROUPS, PLANNER_GROUPS
+from openpilot.nrdr.params.specs import PARAM_SPECS_BY_KEY
 from openpilot.nrdr.params.tuning_policy import LONG_SCALE_KEYS, MVL_DESCRIPTION, MVL_LOCK_KEYS, mvl_tuning_locked, tuning_write_allowed
 from openpilot.nrdr.tests.test_honda_pcm_ui import Params, Widget, native_layout, native_layout_with_real_toggle_handlers, state
 from openpilot.nrdr.ui.honda_pcm import live_gas_available, save_live_gas_choice
@@ -23,6 +25,9 @@ from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_sch
 
 ROOT = Path(__file__).resolve().parents[3]
 RETIRED = {"NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance"}
+PARAM_TYPES = dict(re.findall(r'\{"([^"]+)",\s*\{[^,\n]+,\s*(BYTES|STRING|BOOL|INT|FLOAT|TIME|JSON)\b',
+                             (ROOT / "openpilot/common/params_keys.h").read_text(encoding="utf-8")))
+PARAM_TYPES.update({key: spec.param_type.value for key, spec in PARAM_SPECS_BY_KEY.items()})
 
 
 def cp_bytes(active, **kwargs):
@@ -32,9 +37,11 @@ def cp_bytes(active, **kwargs):
 
 @pytest.mark.parametrize("saved,active", [(False, False), (True, False), (False, True), (True, True)])
 @pytest.mark.parametrize("key", sorted(MVL_LOCK_KEYS))
-def test_conflicting_writes_use_saved_or_boot_latched_mode(saved, active, key):
-  params = Params(HondaLiveLearningGas=saved, CarParamsPersistent=cp_bytes(active), **{key: 123})
-  assert tuning_write_allowed(params, key) is not (saved or active)
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_conflicting_writes_bypass_mode_only_while_parked(saved, active, key, offroad):
+  params = Params(IsOffroad=offroad, HondaLiveLearningGas=saved, CarParamsPersistent=cp_bytes(active), **{key: 123})
+  assert mvl_tuning_locked(params) is (saved or active)
+  assert tuning_write_allowed(params, key) is (offroad is True or not (saved or active))
   assert params.get(key) == 123 and not params.writes
 
 
@@ -131,19 +138,24 @@ def test_tici_live_toggle_never_writes_after_a_rejected_callback():
   assert ui.params.get_bool("OnroadCycleRequested")
 
 
-def test_tici_saved_off_stays_locked_until_boot_latch_changes():
+def test_tici_parked_saved_off_unlocks_tuning_without_changing_boot_latch():
   ui = state(flags=int(HondaFlags.MVL_LONGITUDINAL))
   ui.params.values["HondaLiveLearningGas"] = True
   layout = native_layout(ui)
   layout._set_live_gas(False)
   layout._update_state()
-  for name in ("_pcm_mode", "_wind_brake", "_static_feedforward_long", "_full_brake_authority",
-               "_roen_acceleration_limits", "_standstill_gap", "_cruise_mismatch_correction", "_stop_accel"):
-    assert not getattr(layout, name).enabled
+  controls = ("_pcm_mode", "_wind_brake", "_static_feedforward_long", "_full_brake_authority",
+              "_roen_acceleration_limits", "_standstill_gap", "_cruise_mismatch_correction", "_stop_accel")
+  assert all(getattr(layout, name).enabled for name in controls)
   assert layout._radar_tryout.enabled and layout._dashboard_variant.enabled
-  assert not layout._long_pid_tune_scale_standard.visible
+  assert layout._long_pid_tune_scale_standard.visible
   assert layout._live_learning_gas.value is False
-  ui.CP.flags = 0
+  assert mvl_tuning_locked(ui.params, ui.CP)
+  ui.params.values["IsOffroad"] = False
+  layout._update_state()
+  assert all(not getattr(layout, name).enabled for name in controls)
+  assert not layout._long_pid_tune_scale_standard.visible
+  ui.params.values["IsOffroad"] = True
   layout._update_state()
   assert layout._pcm_mode.enabled and layout._standstill_gap.enabled
 
@@ -178,13 +190,19 @@ def test_mici_order_and_write_guards_survive_stale_display():
   mode._select("Experimental")
   wind._select(False)
   static._select(True)
-  assert not ui.params.writes
-  assert not mode.enabled() and not wind.enabled() and not static.enabled()
+  assert ui.params.writes == [("NrdrHondaPcmMode", 2), ("OnroadCycleRequested", True),
+                              ("NrdrHondaWindBrake", False), ("OnroadCycleRequested", True), ("StaticFeedforwardLong", True)]
+  assert mode.enabled() and wind.enabled() and static.enabled()
   assert deadzone.enabled()
-  ui.is_offroad = lambda: False
+  ui.params.values["IsOffroad"] = False
+  ui.params.writes.clear()
+  mode._select("Off")
+  wind._select(True)
+  static._select(False)
   live._select(True)
   deadzone._select("0.05")
   assert not ui.params.writes
+  assert not mode.enabled() and not wind.enabled() and not static.enabled() and not deadzone.enabled()
 
 
 @pytest.fixture
@@ -208,7 +226,7 @@ def rpc():
                     ("ONROAD_WRITE_BLOCKLIST", "HONDA_TUNING_WRITE_KEYS") for t in n.targets)]
   exec(compile(policy, "sunnylink.py", "exec"), env)
   param_types = NS(BYTES=0, STRING=1, BOOL=2, INT=3, FLOAT=4, TIME=5, JSON=6)
-  params.get_type = lambda key: param_types.INT if key in ("CustomAccShortPressIncrement", "CustomAccLongPressIncrement") else param_types.BOOL
+  params.get_type = lambda key: getattr(param_types, PARAM_TYPES[key])
   env.update(Params=lambda: params, ParamKeyType=param_types, json=json)
   helpers = ast.parse((ROOT / "openpilot/sunnypilot/sunnylink/utils.py").read_text(encoding="utf-8"))
   helpers.body = [n for n in helpers.body if isinstance(n, ast.FunctionDef) and n.name in
@@ -266,44 +284,62 @@ def test_remote_manual_experimental_can_share_mvl_restart_batch(rpc, active, mvl
 
 
 @pytest.mark.parametrize("selected", [False, True])
-def test_remote_manual_experimental_does_not_unlock_dec_in_same_batch(rpc, selected):
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_remote_manual_experimental_and_dec_batch_respects_road_state(rpc, selected, offroad):
   save, params, _ = rpc
-  params.values.update(HondaLiveLearningGas=True, CarParamsPersistent=cp_bytes(True), ExperimentalMode=not selected)
-  with pytest.raises(ValueError):
-    save({"ExperimentalMode": encoded(int(selected)), "DynamicExperimentalControl": encoded(1)})
-  assert not params.writes
+  params.values.update(IsOffroad=offroad, HondaLiveLearningGas=True, CarParamsPersistent=cp_bytes(True), ExperimentalMode=not selected)
+  batch = {"ExperimentalMode": encoded(int(selected)), "DynamicExperimentalControl": encoded(1)}
+  if offroad is True:
+    save(batch)
+    assert params.writes == [("ExperimentalMode", selected), ("DynamicExperimentalControl", True), ("ParamsVersion", "1")]
+  else:
+    with pytest.raises(ValueError):
+      save(batch)
+    assert not params.writes
 
 
 @pytest.mark.parametrize("active", [False, True])
 @pytest.mark.parametrize("key", sorted(MVL_LOCK_KEYS))
-def test_remote_rejects_saved_or_active_conflicts_even_when_switch_is_off(rpc, active, key):
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_remote_saved_or_active_conflicts_are_editable_only_while_parked(rpc, active, key, offroad):
   save, params, _ = rpc
-  params.values.update(HondaLiveLearningGas=not active, CarParamsPersistent=cp_bytes(active))
-  with pytest.raises(ValueError):
+  params.values.update(IsOffroad=offroad, HondaLiveLearningGas=not active, CarParamsPersistent=cp_bytes(active))
+  if offroad is True:
     save({key: encoded(0)})
-  assert not params.writes
+    assert params.get(key) == 0
+    assert {name for name, _ in params.writes} == ({key, "OnroadCycleRequested", "ParamsVersion"}
+                                                 if key in ("NrdrHondaPcmMode", "NrdrHondaWindBrake") else {key, "ParamsVersion"})
+  else:
+    with pytest.raises(ValueError):
+      save({key: encoded(0)})
+    assert not params.writes
 
 
 @pytest.mark.parametrize("reverse", [False, True])
-def test_remote_mixed_enable_batch_is_order_independent_and_atomic(rpc, reverse):
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_remote_mixed_enable_batch_is_parked_only_and_order_independent(rpc, reverse, offroad):
   save, params, _ = rpc
+  params.values["IsOffroad"] = offroad
   entries = [("HondaLiveLearningGas", encoded(1)), ("StaticFeedforwardLong", encoded(1))]
-  with pytest.raises(ValueError):
+  if offroad is True:
     save(dict(reversed(entries) if reverse else entries))
-  assert not params.writes
+    assert params.get("HondaLiveLearningGas") is True and params.get("StaticFeedforwardLong") is True
+    assert {key for key, _ in params.writes} == {"HondaLiveLearningGas", "StaticFeedforwardLong", "OnroadCycleRequested", "ParamsVersion"}
+  else:
+    with pytest.raises(ValueError):
+      save(dict(reversed(entries) if reverse else entries))
+    assert not params.writes
 
 
-def test_remote_saved_off_cannot_unlock_active_mode_in_same_or_later_batch(rpc):
+def test_remote_parked_saved_off_can_prepare_tuning_in_same_or_later_batch(rpc):
   save, params, _ = rpc
   params.values.update(HondaLiveLearningGas=True, CarParamsPersistent=cp_bytes(True))
-  with pytest.raises(ValueError):
-    save({"HondaLiveLearningGas": encoded(0), "NrdrHondaPcmMode": encoded(2)})
-  assert not params.writes
-  save({"HondaLiveLearningGas": encoded(0)})
+  save({"HondaLiveLearningGas": encoded(0), "NrdrHondaPcmMode": encoded(2)})
+  assert params.get("HondaLiveLearningGas") is False and params.get("NrdrHondaPcmMode") == 2
+  assert mvl_tuning_locked(params)  # Preparing the next tune does not alter the running latch.
   params.writes.clear()
-  with pytest.raises(ValueError):
-    save({"NrdrHondaPcmMode": encoded(2)})
-  assert not params.writes
+  save({"NrdrHondaPcmMode": encoded(1)})
+  assert params.writes == [("NrdrHondaPcmMode", 1), ("OnroadCycleRequested", True), ("ParamsVersion", "2")]
 
 
 @pytest.mark.parametrize("value", ["2", "", "not a bool"])
@@ -361,7 +397,7 @@ def test_retired_keys_are_absent_and_remote_writes_rejected(rpc):
   assert not params.writes
 
 
-def test_compiled_schema_locks_every_conflicting_control_and_preserves_econ_selection():
+def test_compiled_schema_keeps_onroad_mode_guards_and_preserves_econ_selection():
   schema = compile_schema(DEFAULT_SRC)
   def walk(node):
     if isinstance(node, dict):
@@ -377,6 +413,7 @@ def test_compiled_schema_locks_every_conflicting_control_and_preserves_econ_sele
     rules = json.dumps(items[key]["enablement"])
     assert "HondaLiveLearningGas" in rules and "nrdr_mvl_longitudinal_active" in rules
     assert "nrdr_mvl_tuning_exempt" in rules
+    assert "offroad_only" in rules
   personality = items["LongitudinalPersonality"]
   assert [option["label"] for option in personality["options"]] == ["Aggressive", "Standard", "Relaxed", "Econ"]
   assert "HondaLiveLearningGas" not in json.dumps(personality.get("enablement"))
@@ -392,19 +429,22 @@ def test_compiled_schema_locks_every_conflicting_control_and_preserves_econ_sele
 
 @pytest.mark.parametrize("saved,active,exempt,allowed", [(True, False, True, True), (True, False, False, False),
                                                        (False, True, False, False), (False, False, False, True)])
-def test_sunnylink_visual_lock_matches_vehicle_scope_and_restart_latch(saved, active, exempt, allowed):
+@pytest.mark.parametrize("offroad", [None, False, True])
+def test_sunnylink_visual_lock_matches_road_state_vehicle_scope_and_latch(saved, active, exempt, allowed, offroad):
   from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
   values = {"HondaLiveLearningGas": saved, "nrdr_mvl_longitudinal_active": active, "nrdr_mvl_tuning_exempt": exempt,
             "nrdr_honda_legacy_pcm_locked": False}
   def evaluate(rule):
     kind = rule["type"]
+    if kind == "offroad_only":
+      return offroad is True
     if kind in ("param", "capability"):
       return values[rule.get("key", rule.get("field"))] == rule["equals"]
     if kind == "not":
       return not evaluate(rule["condition"])
     return (any if kind == "any" else all)(evaluate(c) for c in rule["conditions"])
   item = apply_sunnylink_metadata({"key": "AccelBoostSP"})
-  assert all(evaluate(rule) for rule in item["enablement"]) is allowed
+  assert all(evaluate(rule) for rule in item["enablement"]) is (offroad is True or allowed)
 
 
 @pytest.mark.parametrize("key", ["CustomAccIncrementsEnabled", "CustomAccShortPressIncrement", "CustomAccLongPressIncrement"])

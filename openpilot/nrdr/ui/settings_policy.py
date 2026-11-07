@@ -22,7 +22,9 @@ def snapshot_params(params, keys):
 
 def _restore_params(params, values, CP=None):
   for key, value in values.items():
-    if tuning_write_allowed(params, key, CP=CP):
+    # Parked preconfiguration permits explicit edits, not automatic replay of
+    # an old UI snapshot while a saved/previous controller owns these choices.
+    if tuning_write_allowed(params, key, CP=CP, is_offroad=False):
       params.put(key, value)
 
 
@@ -31,26 +33,24 @@ def restore_params(params, values):
 
 
 def apply_cruise_preferences(layout, state, values, has_long, has_icbm):
-  # Vision SCC is never deleted by the layout. Replaying its snapshot here
-  # could queue an old True after a newer explicit Off from the user/Sunnylink.
-  _restore_params(state.params, {key: value for key, value in values.items() if key != "SmartCruiseControlVision"}, state.CP)
-
-  if state.is_offroad():
+  # The legacy snapshot argument is intentionally ignored: refresh must never
+  # replay a saved value over a newer explicit user/Sunnylink choice.
+  editable = state.is_offroad()
+  if editable:
     layout.custom_acc_toggle.set_description(tr("You can set this now. It activates once your car is detected and supports custom cruise increments."))
     layout.custom_acc_toggle.show_description(True)
 
-  if has_long or has_icbm:
-    return
-
-  editable = state.is_offroad()
+  # Only presentation changes while parked. Runtime capabilities and ICBM's
+  # separate hardware admission remain unchanged.
+  layout.accel_boost_toggle.action_item.set_enabled(editable or has_long)
   layout.custom_acc_toggle.action_item.set_enabled(editable)
-  layout.scc_v_toggle.action_item.set_enabled(editable)
-  layout.scc_m_toggle.action_item.set_enabled(editable)
+  layout.scc_v_toggle.action_item.set_enabled(editable or has_long or has_icbm)
+  layout.scc_m_toggle.action_item.set_enabled(editable or has_long or has_icbm)
   layout._on_custom_acc_toggle(layout.custom_acc_toggle.action_item.get_state())
 
 
 def apply_speed_limit_preferences(control, state, value, available):
-  if value is not None and tuning_write_allowed(state.params, "SpeedLimitMode", CP=state.CP):
+  if value is not None and tuning_write_allowed(state.params, "SpeedLimitMode", CP=state.CP, is_offroad=False):
     state.params.put("SpeedLimitMode", value)
 
   if available:

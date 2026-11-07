@@ -152,7 +152,10 @@ class TestControllerUiLabels(unittest.TestCase):
       self.assertEqual(web["visibility"], web["enablement"][1:2])
       self.assertIn("nrdr_mvl_longitudinal_active", json.dumps(web["enablement"][-2]))
       self.assertEqual(web["enablement"][-1], {
-        "type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True},
+        "type": "any", "conditions": [
+          {"type": "offroad_only"},
+          {"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}},
+        ],
       })
     self.assertIn("mmmorks", layout._pcm_mode["description"]())
     self.assertIn("keeps MVL mapping", mode["details"])
@@ -200,10 +203,35 @@ class TestControllerUiLabels(unittest.TestCase):
       "type": "capability", "field": "nrdr_interpolated_torque_pif_blend_available", "equals": True,
     })
     locks = {rule["condition"]["key"] for rule in web["enablement"] if rule["type"] == "not"}
-    self.assertEqual(locks, {"NrdrSuggestedSettings", "NrdrHandcraftedLateralTune", "NrdrLateralController"})
+    self.assertEqual(locks, {"NrdrHandcraftedLateralTune", "NrdrLateralController"})
+    self.assertIn({"type": "any", "conditions": [
+      {"type": "offroad_only"},
+      {"type": "not", "condition": {"type": "param", "key": "NrdrSuggestedSettings", "equals": True}},
+    ]}, web["enablement"])
     self.assertTrue(tuning_write_allowed({}, key))
-    for settings in ({"NrdrSuggestedSettings": True}, {"NrdrHandcraftedLateralTune": True}, {"NrdrLateralController": 1}):
-      self.assertFalse(tuning_write_allowed(settings, key))
+    for offroad in (False, True):
+      for available in (False, True):
+        for settings in ({}, {"NrdrSuggestedSettings": True}, {"NrdrHandcraftedLateralTune": True}, {"NrdrLateralController": 1}):
+          with self.subTest(offroad=offroad, capability=available, settings=settings):
+            values = {"NrdrSuggestedSettings": False, "NrdrHandcraftedLateralTune": False, "NrdrLateralController": 0, **settings}
+            allowed = not values["NrdrHandcraftedLateralTune"] and values["NrdrLateralController"] != 1 \
+              and (offroad or not values["NrdrSuggestedSettings"])
+            self.assertIs(tuning_write_allowed({"IsOffroad": offroad, **values}, key), allowed)
+
+            def evaluate(rule, offroad=offroad, values=values, available=available):
+              if rule["type"] == "offroad_only":
+                return offroad
+              if rule["type"] == "param":
+                return values[rule["key"]] == rule["equals"]
+              if rule["type"] == "capability":
+                self.assertEqual(rule["field"], "nrdr_interpolated_torque_pif_blend_available")
+                return available == rule["equals"]
+              if rule["type"] == "not":
+                return not evaluate(rule["condition"])
+              self.assertEqual(rule["type"], "any")
+              return any(evaluate(condition) for condition in rule["conditions"])
+
+            self.assertIs(all(evaluate(rule) for rule in web["enablement"]), available and allowed)
 
   def test_committed_sunnylink_output_matches_source(self):
     path = ROOT / "openpilot/sunnypilot/sunnylink/settings_ui.json"

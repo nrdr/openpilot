@@ -15,8 +15,7 @@ def live_gas_available(CP, CP_SP, params) -> bool:
   return bool(identity is not None and identity[1] == "honda" and identity[0] in CAR
               and getattr(CP, "openpilotLongitudinalControl", False)
               and CP_SP is not None
-              and not (getattr(CP_SP, "flags", 0) & HondaFlagsSP.STOCK_LONGITUDINAL)
-              and not legacy_pcm_tuning_locked(params, CP, CP_SP))
+              and not (getattr(CP_SP, "flags", 0) & HondaFlagsSP.STOCK_LONGITUDINAL))
 
 
 def save_live_gas_choice(state, value) -> bool:
@@ -111,9 +110,8 @@ def live_gas_status(CP, params, CP_SP=None, *, is_offroad: bool | None = None) -
 
 
 def mvl_pcm_deadzone_available(CP, CP_SP, params) -> bool:
-  return (pcm_tuning_available(CP, CP_SP, params) and CP.carFingerprint == CAR.HONDA_CIVIC
-          and not legacy_pcm_tuning_locked(params, CP, CP_SP)
-          and (mvl_longitudinal_enabled(CP) or params.get_bool("HondaLiveLearningGas")))
+  # Hardware eligibility, not whether the saved choice is currently consumed.
+  return pcm_tuning_available(CP, CP_SP, params) and CP.carFingerprint == CAR.HONDA_CIVIC
 
 
 def saved_mvl_pcm_deadzone(params) -> int:
@@ -122,7 +120,7 @@ def saved_mvl_pcm_deadzone(params) -> int:
 
 
 def save_mvl_pcm_deadzone(state, value) -> bool:
-  # Deliberate MVL-only exception; custom PCM/wind/other tuning stays locked.
+  # May be prepared while parked; only the MVL PCM path consumes this choice.
   if (type(value) is not int or value not in MVL_PCM_DEADZONE_VALUES or not state.is_offroad()
       or not mvl_pcm_deadzone_available(state.CP, state.CP_SP, state.params)):
     return False
@@ -138,7 +136,7 @@ def saved_wind_brake(params) -> bool:
 
 def save_pcm_choice(state, key: str, value) -> bool:
   if (not pcm_tuning_available(state.CP, state.CP_SP, state.params) or not state.is_offroad()
-      or not tuning_write_allowed(state.params, key, CP=state.CP, CP_SP=state.CP_SP)):
+      or not tuning_write_allowed(state.params, key, CP=state.CP, CP_SP=state.CP_SP, is_offroad=state.is_offroad())):
     return False
   if key == "NrdrHondaPcmMode" and type(value) is int and value in (0, 1, 2):
     state.params.put(key, value, block=True)

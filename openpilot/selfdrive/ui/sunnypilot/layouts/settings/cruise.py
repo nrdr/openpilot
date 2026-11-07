@@ -8,7 +8,7 @@ from enum import IntEnum
 
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.cruise_sub_layouts.speed_limit_settings import SpeedLimitSettingsLayout
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.nrdr.ui import CRUISE_PARAMS, apply_cruise_preferences, snapshot_params
+from openpilot.nrdr.ui import apply_cruise_preferences
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, simple_button_item_sp
 from openpilot.system.ui.widgets import Widget
@@ -121,13 +121,13 @@ class CruiseLayout(Widget):
   def _update_state(self):
     super()._update_state()
     # Reflect external/Sunnylink changes without replaying a saved preference.
-    self.accel_boost_toggle.action_item.set_state(ui_state.params.get_bool("AccelBoostSP"))
-    pending_preferences = snapshot_params(ui_state.params, CRUISE_PARAMS)
+    for item, key in ((self.accel_boost_toggle, "AccelBoostSP"), (self.custom_acc_toggle, "CustomAccIncrementsEnabled"),
+                      (self.scc_v_toggle, "SmartCruiseControlVision"), (self.scc_m_toggle, "SmartCruiseControlMap")):
+      item.action_item.set_state(ui_state.params.get_bool(key))
 
     if ui_state.CP is not None and ui_state.CP_SP is not None:
       has_icbm = ui_state.has_icbm
       has_long = ui_state.has_longitudinal_control
-      self.accel_boost_toggle.action_item.set_enabled(has_long)
 
       if ui_state.CP_SP.intelligentCruiseButtonManagementAvailable and not has_long:
         self.icbm_toggle.action_item.set_enabled(ui_state.is_offroad())
@@ -148,23 +148,9 @@ class CruiseLayout(Widget):
           self.icbm_toggle.set_description(new_desc)
           self.icbm_toggle.show_description(True)
 
-      if has_long or has_icbm:
-        self.custom_acc_toggle.action_item.set_enabled(((has_long and not ui_state.CP.pcmCruise) or has_icbm) and ui_state.is_offroad())
-        self.scc_v_toggle.action_item.set_enabled(True)
-        self.scc_m_toggle.action_item.set_enabled(True)
-      else:
-        ui_state.params.remove("CustomAccIncrementsEnabled")
-        # Preserve Vision SCC's saved choice; capability gating is UI state,
-        # not a reason to delete and later replay a stale preference snapshot.
-        ui_state.params.remove("SmartCruiseControlMap")
-        self.custom_acc_toggle.action_item.set_enabled(False)
-        self.scc_v_toggle.action_item.set_enabled(False)
-        self.scc_m_toggle.action_item.set_enabled(False)
-
     else:
       has_icbm = has_long = False
       self.icbm_toggle.action_item.set_enabled(False)
-      self.accel_boost_toggle.action_item.set_enabled(False)
       self.icbm_toggle.set_description(tr(ONROAD_ONLY_DESCRIPTION))
 
     show_custom_acc_desc = False
@@ -189,8 +175,7 @@ class CruiseLayout(Widget):
       if show_custom_acc_desc:
         self.custom_acc_toggle.show_description(True)
 
-    self._on_custom_acc_toggle(self.custom_acc_toggle.action_item.get_state())
-    apply_cruise_preferences(self, ui_state, pending_preferences, has_long, has_icbm)
+    apply_cruise_preferences(self, ui_state, {}, has_long, has_icbm)
 
   def _on_custom_acc_toggle(self, state):
     self.custom_acc_short_increment.set_visible(state)

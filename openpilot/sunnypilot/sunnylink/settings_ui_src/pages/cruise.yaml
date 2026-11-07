@@ -15,7 +15,10 @@ sections:
     widget: toggle
     title: Experimental Mode
     enablement:
-    - $ref: '#/macros/longitudinal'
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - {type: capability, field: has_longitudinal_control, equals: true}
   - key: DisengageOnAccelerator
     widget: toggle
     title: Disengage Cruise on Accelerator Pedal
@@ -38,7 +41,10 @@ sections:
       enablement:
       - {type: capability, field: nrdr_longitudinal_tuning_available, equals: true}
     enablement:
-    - $ref: '#/macros/longitudinal'
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - {type: capability, field: has_longitudinal_control, equals: true}
   - key: IntelligentCruiseButtonManagement
     widget: toggle
     title: Intelligent Cruise Button Management (ICBM) (Alpha)
@@ -60,6 +66,7 @@ sections:
   - $ref: '#/macros/offroad'
   - type: any
     conditions:
+    - {type: offroad_only}
     - type: all
       conditions:
       - type: capability
@@ -81,6 +88,7 @@ sections:
     - $ref: '#/macros/offroad'
     - type: any
       conditions:
+      - {type: offroad_only}
       - type: all
         conditions:
         - type: capability
@@ -212,6 +220,7 @@ sections:
   enablement:
   - type: any
     conditions:
+    - {type: offroad_only}
     - type: capability
       field: has_longitudinal_control
       equals: true
@@ -226,6 +235,7 @@ sections:
     visibility:
     - type: any
       conditions:
+      - {type: offroad_only}
       - type: capability
         field: has_longitudinal_control
         equals: true
@@ -235,6 +245,7 @@ sections:
     enablement:
     - type: any
       conditions:
+      - {type: offroad_only}
       - type: capability
         field: has_longitudinal_control
         equals: true
@@ -246,7 +257,10 @@ sections:
     title: Acceleration Boost
     description: Sunny's boost in Experimental Mode. Off by default; inactive in Econ.
     enablement:
-    - $ref: '#/macros/longitudinal'
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - {type: capability, field: has_longitudinal_control, equals: true}
   - key: SmartCruiseControlMap
     widget: toggle
     title: Map
@@ -254,6 +268,7 @@ sections:
     visibility:
     - type: any
       conditions:
+      - {type: offroad_only}
       - type: capability
         field: has_longitudinal_control
         equals: true
@@ -263,6 +278,7 @@ sections:
     enablement:
     - type: any
       conditions:
+      - {type: offroad_only}
       - type: capability
         field: has_longitudinal_control
         equals: true

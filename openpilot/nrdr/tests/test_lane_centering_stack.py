@@ -100,11 +100,11 @@ class TestLaneCenteringStack(unittest.TestCase):
     tici = TICI_PANEL.read_text(encoding="utf-8")
     mici = MICI_PANEL.read_text(encoding="utf-8")
     self.assertIn("if self._write_allowed():", tici)
-    self.assertIn('return tuning_write_allowed(ui_state.params, "LaneGuidanceMode")', tici)
+    self.assertIn('return tuning_write_allowed(ui_state.params, "LaneGuidanceMode", is_offroad=ui_state.is_offroad())', tici)
     self.assertNotIn("return ui_state.is_offroad() and not ui_state.engaged", tici)
     self.assertEqual(tici.count("if not self._write_allowed():"), 1)
     self.assertEqual(tici.count("if not self._settings_writable():"), 1)
-    self.assertIn('return tuning_write_allowed(ui_state.params, "LaneGuidanceMode")', mici)
+    self.assertIn('return tuning_write_allowed(ui_state.params, "LaneGuidanceMode", is_offroad=ui_state.is_offroad())', mici)
     self.assertNotIn("return ui_state.is_offroad() and not ui_state.engaged", mici)
     self.assertEqual(mici.count("if not self._write_allowed():"), 1)
     self.assertEqual(mici.count("if not self._settings_writable():"), 5)
@@ -113,7 +113,7 @@ class TestLaneCenteringStack(unittest.TestCase):
   def test_native_callbacks_save_while_onroad_and_engaged(self) -> None:
     class MemoryParams:
       def __init__(self):
-        self.values = {"LaneGuidanceMode": 0, "LaneCentering": False, "ModelRunnerTypeCache": 1}
+        self.values = {"IsOffroad": False, "LaneGuidanceMode": 0, "LaneCentering": False, "ModelRunnerTypeCache": 1}
 
       def get(self, key, return_default=False):
         return self.values.get(key)
@@ -189,10 +189,84 @@ class TestLaneCenteringStack(unittest.TestCase):
             self.assertEqual(memory.values["LaneCentering"], expected == 1)
             self.assertEqual(panel._settings_writable(), expected == 1)
 
+  def test_native_completed_preset_edits_respect_live_road_state_pending_transaction_and_model(self) -> None:
+    class MemoryParams(dict):
+      def __init__(self, **values):
+        super().__init__(values)
+        self.writes = []
+
+      def get(self, key, return_default=False):
+        return super().get(key)
+
+      def get_raw(self, key):
+        value = self.get(key)
+        return None if value is None else str(int(value)).encode()
+
+      def put(self, key, value, block=False):
+        self[key] = value
+        self.writes.append((key, value))
+
+      put_bool = put
+
+    for path, class_name in ((TICI_PANEL, "LaneCenteringLayout"), (MICI_PANEL, "LaneCenteringLayoutMici")):
+      source_class = next(node for node in ast.parse(path.read_text(encoding="utf-8")).body
+                          if isinstance(node, ast.ClassDef) and node.name == class_name)
+      methods = [node for node in source_class.body if isinstance(node, ast.FunctionDef)
+                 and node.name in ("_write_allowed", "_settings_writable", "_custom_model_active",
+                                   "_on_lane_guidance_mode", "_on_pause_on_signal")]
+      isolated_class = ast.ClassDef(name=class_name, bases=[], keywords=[], body=methods, decorator_list=[])
+      module = ast.fix_missing_locations(ast.Module(body=[isolated_class], type_ignores=[]))
+      for offroad in (False, True):
+        for stored_offroad in (None, False, True):
+          for completed, pending in ((False, False), (True, False), (False, True), (True, True)):
+            for runner in (None, 0, 1):
+              with self.subTest(panel=class_name, offroad=offroad, stored_offroad=stored_offroad,
+                                completed=completed, pending=pending, runner=runner):
+                params = MemoryParams(IsOffroad=stored_offroad, NrdrSuggestedSettings=completed,
+                                      NrdrHandcraftedLateralTune=pending, ModelRunnerTypeCache=runner,
+                                      LaneGuidanceMode=1, LaneCentering=True, LaneCenteringPauseOnSignal=True)
+                namespace = {
+                  "ui_state": SimpleNamespace(params=params, is_offroad=lambda offroad=offroad: offroad),
+                  "tuning_write_allowed": tuning_write_allowed, "LaneGuidanceMode": LaneGuidanceMode,
+                  "LANE_GUIDANCE_LABELS": LANE_GUIDANCE_LABELS, "LANE_GUIDANCE_MODES": LANE_GUIDANCE_MODES,
+                  "lane_guidance_mode_from_params": lane_guidance_mode_from_params,
+                  "set_lane_guidance_mode": set_lane_guidance_mode,
+                  "custom": SimpleNamespace(ModelManagerSP=SimpleNamespace(Runner=SimpleNamespace(tinygrad=1))),
+                }
+                exec(compile(module, str(path), "exec"), namespace)
+                panel = namespace[class_name]()
+                panel._refresh = lambda: None
+                panel._pause_on_signal_toggle = SimpleNamespace(action_item=SimpleNamespace(set_state=lambda _: None))
+                allowed = not pending and (offroad or not completed)
+                self.assertIs(panel._write_allowed(), allowed)
+                self.assertIs(panel._settings_writable(), allowed)
+                panel._on_lane_guidance_mode(1 if class_name == "LaneCenteringLayout" else "Sunny")
+                self.assertEqual(params["LaneGuidanceMode"], 2 if allowed and runner == 1 else 1)
+                self.assertEqual(params["LaneCentering"], not (allowed and runner == 1))
+                if not allowed or (runner != 1 and class_name == "LaneCenteringLayout"):
+                  self.assertEqual(params.writes, [])
+                panel._on_lane_guidance_mode(2 if class_name == "LaneCenteringLayout" else "Star")
+                panel._on_pause_on_signal(False)
+                self.assertEqual(params["LaneGuidanceMode"], 1)
+                self.assertIs(params["LaneCenteringPauseOnSignal"], not allowed)
+                self.assertIs(params["NrdrSuggestedSettings"], completed)
+                self.assertIs(params["NrdrHandcraftedLateralTune"], pending)
+                self.assertEqual(params["ModelRunnerTypeCache"], runner)
+                if not allowed:
+                  self.assertEqual(params.writes, [])
+                # A newly pending transaction must reject a stale enabled callback.
+                params["NrdrHandcraftedLateralTune"] = True
+                before = dict(params)
+                params.writes.clear()
+                panel._on_lane_guidance_mode(0 if class_name == "LaneCenteringLayout" else "Off")
+                panel._on_pause_on_signal(True)
+                self.assertEqual(dict(params), before)
+                self.assertEqual(params.writes, [])
+
   def test_unavailable_blendful_resets_saved_and_visible_native_mode(self) -> None:
     class MemoryParams:
       def __init__(self):
-        self.values = {"LaneGuidanceMode": 2, "LaneCentering": False, "ModelRunnerTypeCache": 0}
+        self.values = {"IsOffroad": False, "LaneGuidanceMode": 2, "LaneCentering": False, "ModelRunnerTypeCache": 0}
 
       def get(self, key, return_default=False):
         return self.values.get(key)
@@ -242,7 +316,7 @@ class TestLaneCenteringStack(unittest.TestCase):
         isolated_class = ast.ClassDef(name=class_name, bases=[], keywords=[], body=methods, decorator_list=[])
         memory = MemoryParams()
         namespace = {
-          "ui_state": SimpleNamespace(params=memory),
+          "ui_state": SimpleNamespace(params=memory, is_offroad=lambda: False),
           "tuning_write_allowed": tuning_write_allowed,
           "LaneGuidanceMode": LaneGuidanceMode,
           "LANE_GUIDANCE_LABELS": LANE_GUIDANCE_LABELS, "LANE_GUIDANCE_MODES": LANE_GUIDANCE_MODES,
