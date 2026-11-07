@@ -29,6 +29,7 @@ from openpilot.sunnypilot.models import helpers
 from openpilot.sunnypilot.models.helpers import (get_active_bundle, get_active_source, get_selected_bundle,
                                                   resolve_bundle_by_ref, validate_active_bundles)
 from openpilot.sunnypilot.models.manager import ModelManagerSP
+from openpilot.nrdr.features.services import TINYGRAD_RUNTIME_REF
 
 CHUNK_BODIES = [b'A' * 5000, b'B' * 5000, b'C' * 3000]
 WHOLE_BODY = b'Z' * 9000
@@ -112,6 +113,18 @@ class ManagerDownloadTestBase(OpenpilotTestCase):
     self.manager.chestnut_present = False
     self.manager._chunk_size = 1024
     self.manager._download_start_times = {}
+    # Download tests use in-memory Params. Native locking/atomicity is covered
+    # separately by TestConditionalModelParams in test_model_migration.py.
+    self.manager._conditional_param_update = self._conditional_param_update
+
+  def _conditional_param_update(self, key, value, expected):
+    if any(self.manager.params.get(guard) != wanted for guard, wanted in expected.items()):
+      return False
+    if value is None:
+      self.manager.params.remove(key)
+    else:
+      self.manager.params.put(key, value, block=True)
+    return True
 
   def _record_progress(self, *args) -> None:
     """Runs on every real _report_status send."""
@@ -476,6 +489,7 @@ def manifest_bundle(short_name: str, ref: str, index: int = 0, is_big: bool = Fa
     "generation": 1,
     "environment": "release",
     "runner": "tinygrad",
+    "tinygrad_ref": TINYGRAD_RUNTIME_REF,
     "is_big": is_big,
     "minimum_selector_version": str(helpers.REQUIRED_JSON_VERSION),
     "ref": ref,
