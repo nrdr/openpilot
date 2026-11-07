@@ -104,6 +104,7 @@ class NrdrParamKey(StrEnum):
   STATIC_FEEDFORWARD_LONG = "StaticFeedforwardLong"
   NRDR_HONDA_ECU_MATCHED_LONG = "NrdrHondaEcuMatchedLong"
   NRDR_HONDA_PCM_MODE = "NrdrHondaPcmMode"
+  NRDR_MVL_PCM_DEADZONE = "NrdrMvlPcmDeadzone"
   NRDR_HONDA_WIND_BRAKE = "NrdrHondaWindBrake"
   NRDR_HONDA_FULL_BRAKE_AUTHORITY = "NrdrHondaFullBrakeAuthority"
   NRDR_ROEN_ACCELERATION_LIMITS = "NrdrRoenAccelerationLimits"
@@ -265,6 +266,7 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.STATIC_FEEDFORWARD_LONG,
   NrdrParamKey.NRDR_HONDA_ECU_MATCHED_LONG,
   NrdrParamKey.NRDR_HONDA_PCM_MODE,
+  NrdrParamKey.NRDR_MVL_PCM_DEADZONE,
   NrdrParamKey.NRDR_HONDA_WIND_BRAKE,
   NrdrParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY,
   NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS,

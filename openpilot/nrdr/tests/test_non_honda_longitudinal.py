@@ -387,6 +387,8 @@ def test_native_tuning_controls_follow_vehicle_policy(brand, enabled, monkeypatc
                        "ui_state": state, "nrdr_longitudinal_enabled": policy.nrdr_longitudinal_enabled,
                        "gas_reset_available": lambda: enabled, "pcm_tuning_available": lambda *_: False,
                        "live_gas_available": lambda *_: enabled,
+                       "mvl_pcm_deadzone_available": lambda *_: False, "saved_mvl_pcm_deadzone": lambda _: 0,
+                       "MVL_PCM_DEADZONE_VALUES": (0, 2, 5, 10),
                        "tuning_write_allowed": admission["tuning_write_allowed"], "mvl_tuning_locked": admission["mvl_tuning_locked"],
                        "saved_pcm_mode": lambda _: 0, "saved_wind_brake": lambda _: True})
   layout = object.__new__(module['LongitudinalTuningLayout'])
@@ -399,6 +401,7 @@ def test_native_tuning_controls_follow_vehicle_policy(brand, enabled, monkeypatc
   layout._reset_live_gas = NS(action_item=NS(set_enabled=lambda value: values.append(('reset', value))))
   layout._standstill_gap = NS(action_item=NS(set_enabled=lambda value: values.append(('gap', value))))
   layout._pcm_mode = NS(action_item=NS(set_enabled=lambda _: None, set_selected_button=lambda _: None))
+  layout._mvl_pcm_deadzone = NS(action_item=NS(set_enabled=lambda _: None, set_selected_button=lambda _: None))
   layout._wind_brake = NS(action_item=NS(set_enabled=lambda _: None, set_state=lambda _: None))
   layout._tuning_items = [layout._live_learning_gas, NS(), NS(action_item=NS(set_enabled=lambda value: values.append(('tune', value))))]
   layout._update_state()

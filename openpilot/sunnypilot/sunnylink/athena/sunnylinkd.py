@@ -266,13 +266,13 @@ def _remote_bool_value(value: str, compression: bool) -> bool | None:
     return None
 
 
-def _remote_int_value(value: str, compression: bool) -> int | None:
+def _remote_int_value(value: str, compression: bool, choices: tuple[int, ...] = (0, 1, 2)) -> int | None:
   try:
     raw = base64.b64decode(value, validate=True)
     if compression:
       raw = gzip.decompress(raw)
     decoded = raw.decode("utf-8")
-    return int(decoded) if decoded in ("0", "1", "2") else None
+    return int(decoded) if decoded in tuple(str(choice) for choice in choices) else None
   except Exception:
     return None
 
@@ -281,6 +281,7 @@ def _remote_int_value(value: str, compression: bool) -> int | None:
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
   from openpilot.nrdr.car.live_gas_reset import REQUEST, request_reset, stored_cp
   from openpilot.nrdr.params.tuning_policy import MVL_LOCK_KEYS, mvl_tuning_locked, tuning_write_allowed
+  from openpilot.nrdr.params.mvl_pcm_deadzone import MVL_PCM_DEADZONE_VALUES
   onroad = not params.get_bool("IsOffroad")
   retired = {"NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance"}.intersection(params_to_update)
   if retired:
@@ -317,13 +318,19 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       raise ValueError("Monitoring reminder timing must be 50–250% in 5% steps.")
   vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {
     "NrdrHandcraftedLateralTune", "NrdrSuggestedSettings", "LagdToggle", "LagdToggleDelay", "LaneGuidanceMode",
-    "HondaLiveLearningGas", "NrdrHondaPcmMode", "NrdrHondaWindBrake",
+    "HondaLiveLearningGas", "NrdrHondaPcmMode", "NrdrHondaWindBrake", "NrdrMvlPcmDeadzone",
   }
   capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
   handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
   honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
   if live_gas_selection is not None and capabilities.get("nrdr_honda_mvl_selection_available") is not True:
     raise ValueError("Live Learning Gas requires a confirmed Honda with openpilot longitudinal control.")
+  deadzone_selection = None
+  if "NrdrMvlPcmDeadzone" in params_to_update:
+    deadzone_selection = _remote_int_value(params_to_update["NrdrMvlPcmDeadzone"], compression, MVL_PCM_DEADZONE_VALUES)
+    if (onroad or deadzone_selection is None or capabilities.get("nrdr_mvl_pcm_deadzone_available") is not True
+        or (live_gas_selection is False and capabilities.get("nrdr_mvl_longitudinal_active") is not True)):
+      raise ValueError("PCM feedback deadzone requires 0, 2, 5 or 10 on a parked Civic PCM with MVL selected or active. Restart required.")
   pcm_selections = {}
   for key in ("NrdrHondaPcmMode", "NrdrHondaWindBrake"):
     if key in params_to_update:
@@ -378,7 +385,12 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       continue
 
     try:
-      if key == "HondaLiveLearningGas" or key in pcm_selections:
+      if key == "NrdrMvlPcmDeadzone":
+        if not params.get_bool("IsOffroad") or _vehicle_tuning_capabilities().get("nrdr_mvl_pcm_deadzone_available") is not True:
+          raise ValueError("PCM feedback deadzone is no longer available. Nothing was saved for this setting.")
+        params.put(key, deadzone_selection, block=True)
+        params.put_bool("OnroadCycleRequested", True, block=True)
+      elif key == "HondaLiveLearningGas" or key in pcm_selections:
         capability = "nrdr_honda_mvl_selection_available" if key == "HondaLiveLearningGas" else "nrdr_honda_pcm_tuning_available"
         if not params.get_bool("IsOffroad") or _vehicle_tuning_capabilities().get(capability) is not True:
           raise ValueError("Longitudinal mode can only be changed while parked with the matching vehicle.")
@@ -421,7 +433,8 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
         save_param_from_base64_encoded_string(key, value, compression)
     except Exception as e:
       cloudlog.error(f"sunnylinkd.saveParams.exception {e}")
-      if key in ("NrdrLateralController", "NrdrDriverMonitoringReminderPercent", "HondaLiveLearningGas", "LongitudinalPersonality", *pcm_selections):
+      if key in ("NrdrLateralController", "NrdrDriverMonitoringReminderPercent", "HondaLiveLearningGas", "LongitudinalPersonality",
+                 "NrdrMvlPcmDeadzone", *pcm_selections):
         raise ValueError("Setting could not be saved. Refresh settings to read the device's selection.") from e
 
   # Increment version counter for frontend change detection

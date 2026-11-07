@@ -78,6 +78,7 @@ def build_sunnypilot_car_config(params, *, start_worker: bool = True,
       nidec_pcm_mode=nrdr_honda.nidec_pcm_mode,
       nidec_wind_brake=nrdr_honda.nidec_wind_brake,
       mvl_longitudinal=nrdr_honda.mvl_longitudinal,
+      mvl_pcm_deadzone=nrdr_honda.mvl_pcm_deadzone,
     ),
     hyundai=HyundaiCarConfig(
       longitudinal_tuning=int(_float_value(

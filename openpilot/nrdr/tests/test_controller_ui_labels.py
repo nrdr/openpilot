@@ -8,6 +8,7 @@ import unittest
 
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
 from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, tuning_write_allowed
+from openpilot.nrdr.params import mvl_pcm_deadzone
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_schema, DEFAULT_SRC
 
 
@@ -48,6 +49,7 @@ def _native_class(filename, name, *, saved_bools=None):
       "button_item_sp", "toggle_item_sp", "option_item_sp", "simple_button_item_sp", "multiple_button_item_sp",
     )},
   }
+  env.update({key: value for key, value in vars(mvl_pcm_deadzone).items() if key.startswith("MVL_PCM_DEADZONE_")})
   exec(compile(tree, str(path), "exec"), env)
   return env[name]
 
@@ -117,14 +119,14 @@ class TestControllerUiLabels(unittest.TestCase):
     cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout")
     layout = cls.__new__(cls)
     local_items = layout._initialize_items()
-    self.assertEqual(local_items[:6], [layout._live_learning_gas, layout._reset_live_gas, None,
+    self.assertEqual(local_items[:7], [layout._live_learning_gas, layout._reset_live_gas, layout._mvl_pcm_deadzone, None,
                                       layout._pcm_mode, layout._wind_brake, layout._static_feedforward_long])
     remote = _panel(self.schema, "steering", "nrdr_longitudinal")["items"]
-    self.assertEqual([item["key"] for item in remote[:6]], [
-      "HondaLiveLearningGas", "NrdrResetLiveGas", "NrdrLiveGasResetStatus",
+    self.assertEqual([item["key"] for item in remote[:7]], [
+      "HondaLiveLearningGas", "NrdrResetLiveGas", "NrdrMvlPcmDeadzone", "NrdrLiveGasResetStatus",
       "NrdrHondaPcmMode", "NrdrHondaWindBrake", "StaticFeedforwardLong",
     ])
-    mode, wind = remote[3:5]
+    mode, wind = remote[4:6]
     self.assertEqual(mode["widget"], "multiple_button")
     self.assertEqual(mode["options"], [
       {"label": "Off", "value": 0}, {"label": "ECU-Matched", "value": 1}, {"label": "Experimental", "value": 2},

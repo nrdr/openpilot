@@ -451,6 +451,22 @@ sections:
         - {type: capability, field: nrdr_honda_tuning_available, equals: true}
         enablement:
         - $ref: '#/macros/offroad'
+      - key: NrdrMvlPcmDeadzone
+        widget: multiple_button
+        title: PCM Feedback Deadzone (Experimental)
+        description: Ignores small acceleration errors while accelerating. Civic PCM with Live Learning Gas only. Off keeps MVL unchanged. Restart required.
+        details: Width (m/s²) ramps from 0 at 2.3 m/s to the selected maximum at 9 m/s. Bypasses requested deceleration, stopping, overrides and AEB. This filters acceleration error, not a throttle ramp or delay model. It may hold existing integral correction longer. Learning can change; Off does not undo saved learning. Configure while parked; applies only after restart.
+        needs_onroad_cycle: true
+        options:
+        - {label: 'Off', value: 0}
+        - {label: '0.02', value: 2}
+        - {label: '0.05', value: 5}
+        - {label: '0.10', value: 10}
+        visibility:
+        - {type: capability, field: nrdr_mvl_pcm_deadzone_available, equals: true}
+        enablement:
+        - $ref: '#/macros/offroad'
+        - {type: capability, field: nrdr_mvl_pcm_deadzone_available, equals: true}
       - key: NrdrLiveGasResetStatus
         widget: info
         title: Live Gas Reset Status

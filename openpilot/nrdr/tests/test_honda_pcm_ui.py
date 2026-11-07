@@ -14,6 +14,8 @@ from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.nrdr.ui.honda_pcm import pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice
 from openpilot.nrdr.ui.honda_pcm import live_gas_available, save_live_gas_choice
 from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, mvl_tuning_locked, tuning_write_allowed
+from openpilot.nrdr.params import mvl_pcm_deadzone
+from openpilot.nrdr.ui.honda_pcm import mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone, save_mvl_pcm_deadzone
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -266,6 +268,9 @@ def native_layout(ui, toggle_factory=None):
          "toggle_item_sp": toggle_factory or Item, "option_item_sp": Item, "multiple_button_item_sp": Item}
   env.update(MVL_DESCRIPTION=MVL_DESCRIPTION, mvl_tuning_locked=mvl_tuning_locked, tuning_write_allowed=tuning_write_allowed,
              live_gas_available=live_gas_available, save_live_gas_choice=save_live_gas_choice)
+  env.update({key: value for key, value in vars(mvl_pcm_deadzone).items() if key.startswith("MVL_PCM_DEADZONE_")})
+  env.update(mvl_pcm_deadzone_available=mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone=saved_mvl_pcm_deadzone,
+             save_mvl_pcm_deadzone=save_mvl_pcm_deadzone)
   exec(compile(tree, str(path), "exec"), env)
   layout = object.__new__(env["LongitudinalTuningLayout"])
   layout._tuning_items = layout._initialize_items()

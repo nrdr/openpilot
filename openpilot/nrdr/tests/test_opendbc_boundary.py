@@ -124,6 +124,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       OpendbcParamKey.NRDR_HONDA_ECU_MATCHED_LONG,
       OpendbcParamKey.NRDR_HONDA_PCM_MODE,
       OpendbcParamKey.NRDR_HONDA_WIND_BRAKE,
+      OpendbcParamKey.NRDR_MVL_PCM_DEADZONE,
     })
 
   def test_missing_startup_values_preserve_previous_interface_behavior(self):
@@ -134,6 +135,7 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertEqual(config.honda.nidec_pcm_mode, 0)
     self.assertTrue(config.honda.nidec_wind_brake)
     self.assertTrue(config.honda.mvl_longitudinal)
+    self.assertEqual(config.honda.mvl_pcm_deadzone, 0.0)
     self.assertEqual(config.hyundai.longitudinal_tuning, 0)
     self.assertFalse(config.subaru.stop_and_go)
     self.assertFalse(config.subaru.stop_and_go_manual_parking_brake)
@@ -146,6 +148,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       str(NrdrHondaParamKey.NRDR_HONDA_PCM_MODE),
       str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE),
       str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS),
+      str(NrdrHondaParamKey.NRDR_MVL_PCM_DEADZONE),
       *(str(key) for key in HOST_STARTUP_DEFAULTS),
     ])
 
@@ -162,6 +165,23 @@ class TestOpendbcBoundary(unittest.TestCase):
         self.assertEqual(config.honda.nidec_pcm_mode, expected)
         self.assertFalse(config.honda.nidec_wind_brake)
         self.assertFalse(config.honda.provider.get_live_tuning().ecu_matched_long)
+
+  def test_mvl_pcm_deadzone_enum_scaling_fallback_and_startup_latch(self):
+    for value, expected in ((None, 0), (True, 0), (False, 0), (-1, 0), (1, 0), (3, 0), (100, 0), (2.0, 0),
+                            ("02", 0), (b" 5", 0), ("5.0", 0), (b"\xff", 0), ({}, 0),
+                            (0, 0), (2, .02), (5, .05), (10, .1), (b"2", .02), ("5", .05), (b"10", .1)):
+      with self.subTest(value=value):
+        params = FakeParams({"NrdrMvlPcmDeadzone": value})
+        config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+        self.assertEqual(config.honda.mvl_pcm_deadzone, expected)
+        params.values["NrdrMvlPcmDeadzone"] = 10
+        config.honda.provider.refresh_all()
+        self.assertEqual(config.honda.mvl_pcm_deadzone, expected)
+        restarted = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+        self.assertEqual(restarted.honda.mvl_pcm_deadzone, .1)
+        self.assertFalse(params.writes)
+    grouped = {key for group in (*SLOW_PARAM_GROUPS, FAST_PARAM_GROUP) for key in group}
+    self.assertNotIn(OpendbcParamKey.NRDR_MVL_PCM_DEADZONE, grouped)
 
   def test_honda_workers_stay_dormant_until_honda_interface_activation(self):
     params = FakeParams()

@@ -4,6 +4,8 @@ from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
+from openpilot.nrdr.params.mvl_pcm_deadzone import MVL_PCM_DEADZONE_VALUES
 
 
 def live_gas_available(CP, CP_SP, params) -> bool:
@@ -38,6 +40,26 @@ def saved_pcm_mode(params) -> int:
   value = params.get("NrdrHondaPcmMode")
   # Typed Params returns an int. Reject bool and malformed/stale values as Off.
   return value if type(value) is int and value in (0, 1, 2) else 0
+
+
+def mvl_pcm_deadzone_available(CP, CP_SP, params) -> bool:
+  return (pcm_tuning_available(CP, CP_SP, params) and CP.carFingerprint == CAR.HONDA_CIVIC
+          and (mvl_longitudinal_enabled(CP) or params.get_bool("HondaLiveLearningGas")))
+
+
+def saved_mvl_pcm_deadzone(params) -> int:
+  value = params.get("NrdrMvlPcmDeadzone")
+  return value if type(value) is int and value in MVL_PCM_DEADZONE_VALUES else 0
+
+
+def save_mvl_pcm_deadzone(state, value) -> bool:
+  # Deliberate MVL-only exception; custom PCM/wind/other tuning stays locked.
+  if (type(value) is not int or value not in MVL_PCM_DEADZONE_VALUES or not state.is_offroad()
+      or not mvl_pcm_deadzone_available(state.CP, state.CP_SP, state.params)):
+    return False
+  state.params.put("NrdrMvlPcmDeadzone", value, block=True)
+  state.params.put_bool("OnroadCycleRequested", True, block=True)
+  return True
 
 
 def saved_wind_brake(params) -> bool:

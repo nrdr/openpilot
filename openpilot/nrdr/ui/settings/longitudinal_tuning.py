@@ -8,8 +8,12 @@ from openpilot.system.ui.widgets.list_view import ListItem
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled, nrdr_longitudinal_enabled
 from openpilot.nrdr.ui.settings.live_gas_reset import available as gas_reset_available, large_reset_button
 from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, mvl_tuning_locked, tuning_write_allowed
+from openpilot.nrdr.params.mvl_pcm_deadzone import (
+  MVL_PCM_DEADZONE_VALUES, MVL_PCM_DEADZONE_LABELS, MVL_PCM_DEADZONE_TITLE, MVL_PCM_DEADZONE_DESCRIPTION, MVL_PCM_DEADZONE_DETAILS,
+)
 from openpilot.nrdr.ui.honda_pcm import (pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice,
-                                       live_gas_available, save_live_gas_choice)
+                                       live_gas_available, save_live_gas_choice,
+                                       mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone, save_mvl_pcm_deadzone)
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, multiple_button_item_sp, LineSeparatorSP
@@ -112,6 +116,13 @@ class LongitudinalTuningLayout(Widget):
         "Off uses upstream PCM control. ECU-Matched adds mmmorks' ramp, coast and brake-release rules. " +
         "Experimental uses the Civic trial. No gas interceptor. Restart required."
       ),
+    )
+
+    self._mvl_pcm_deadzone = multiple_button_item_sp(
+      title=lambda: tr(MVL_PCM_DEADZONE_TITLE),
+      buttons=[lambda label=label: tr(label) for label in MVL_PCM_DEADZONE_LABELS],
+      button_width=160, callback=self._set_mvl_pcm_deadzone,
+      description=lambda: tr(MVL_PCM_DEADZONE_DESCRIPTION) + " " + tr(MVL_PCM_DEADZONE_DETAILS),
     )
 
     self._wind_brake = toggle_item_sp(
@@ -241,6 +252,7 @@ class LongitudinalTuningLayout(Widget):
     return [
       self._live_learning_gas,
       self._reset_live_gas,
+      self._mvl_pcm_deadzone,
       LineSeparatorSP(40),
       self._pcm_mode,
       self._wind_brake,
@@ -269,6 +281,11 @@ class LongitudinalTuningLayout(Widget):
     save_live_gas_choice(ui_state, value)
     self._live_learning_gas.action_item.set_state(ui_state.params.get_bool("HondaLiveLearningGas"))
 
+  def _set_mvl_pcm_deadzone(self, index):
+    if type(index) is int and 0 <= index < len(MVL_PCM_DEADZONE_VALUES):
+      save_mvl_pcm_deadzone(ui_state, MVL_PCM_DEADZONE_VALUES[index])
+    self._mvl_pcm_deadzone.action_item.set_selected_button(MVL_PCM_DEADZONE_VALUES.index(saved_mvl_pcm_deadzone(ui_state.params)))
+
   def _update_state(self):
     super()._update_state()
     enabled = nrdr_longitudinal_enabled(ui_state.CP)
@@ -284,6 +301,9 @@ class LongitudinalTuningLayout(Widget):
       ui_state.is_offroad() and live_gas_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
     self._live_learning_gas.action_item.set_state(ui_state.params.get_bool("HondaLiveLearningGas"))
     self._reset_live_gas.action_item.set_enabled(gas_reset_available())
+    self._mvl_pcm_deadzone.action_item.set_enabled(
+      ui_state.is_offroad() and mvl_pcm_deadzone_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
+    self._mvl_pcm_deadzone.action_item.set_selected_button(MVL_PCM_DEADZONE_VALUES.index(saved_mvl_pcm_deadzone(ui_state.params)))
     pcm_available = pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
     pcm_enabled = ui_state.is_offroad() and pcm_available and not learning
     self._pcm_mode.action_item.set_enabled(pcm_enabled)
