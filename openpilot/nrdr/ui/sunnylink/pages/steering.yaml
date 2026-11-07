@@ -441,6 +441,22 @@ sections:
         enablement:
         - $ref: '#/macros/offroad'
         - {type: capability, field: nrdr_honda_mvl_selection_available, equals: true}
+      - key: NrdrHondaPcmFixedCruise
+        widget: toggle
+        needs_onroad_cycle: true
+        visibility:
+        - {type: capability, field: nrdr_honda_pcm_experiments_available, equals: true}
+        enablement:
+        - $ref: '#/macros/offroad'
+        - {type: capability, field: nrdr_honda_pcm_experiments_available, equals: true}
+      - key: NrdrHondaLegacyPcm
+        widget: toggle
+        needs_onroad_cycle: true
+        visibility:
+        - {type: capability, field: nrdr_honda_pcm_experiments_available, equals: true}
+        enablement:
+        - $ref: '#/macros/offroad'
+        - {type: capability, field: nrdr_honda_pcm_experiments_available, equals: true}
       - key: NrdrResetLiveGas
         widget: toggle
         title: Reset Live Learning Gas

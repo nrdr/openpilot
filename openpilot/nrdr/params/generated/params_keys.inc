@@ -98,6 +98,8 @@
     {"StaticFeedforwardLong", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrHondaEcuMatchedLong", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrHondaPcmMode", {PERSISTENT | BACKUP, INT, "0"}},
+    {"NrdrHondaPcmFixedCruise", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrHondaLegacyPcm", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrMvlPcmDeadzone", {PERSISTENT | BACKUP, INT, "0"}},
     {"NrdrHondaWindBrake", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrHondaFullBrakeAuthority", {PERSISTENT | BACKUP, BOOL, "1"}},

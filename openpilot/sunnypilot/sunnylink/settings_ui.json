@@ -2290,7 +2290,7 @@
                   "widget": "toggle",
                   "needs_onroad_cycle": true,
                   "title": "Live Learning Gas",
-                  "description": "Selects full MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Conflicting tuning is locked, not erased. Change while parked; restart required.",
+                  "description": "Selects full MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Conflicting tuning is locked, not erased. Legacy Kegman PCM takes precedence on supported Civics; the saved learning choice is kept. Change while parked; restart required.",
                   "details": "ON selects full MVL gas, braking and Aggressive/Standard/Relaxed personalities, including following distances, on Honda Nidec PCM, Bosch and gas-interceptor openpilot longitudinal paths. Only Econ keeps nrdr's fixed longer-following and gentler acceleration/jerk defaults; a custom tune file does not change these MVL profiles. Saved ON is not proof that MVL is active yet. Conflicting settings stay locked while ON is saved or the running controller is MVL, including after saving OFF until restart. Their saved custom values are kept. Reset clears gas/wind learning only. Existing OFF choices are preserved; new Honda setups default ON.",
                   "enablement": [
                     {
@@ -2299,6 +2299,64 @@
                     {
                       "type": "capability",
                       "field": "nrdr_honda_mvl_selection_available",
+                      "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrHondaPcmFixedCruise",
+                  "widget": "toggle",
+                  "needs_onroad_cycle": true,
+                  "title": "Fixed PCM Cruise Speed",
+                  "description": "Keeps the car\u2019s cruise ceiling at 90 mph while openpilot controls the selected speed, including a 0 mph attempt. Civic PCM only. Restart required.",
+                  "details": "Default Off. Change while parked. Exact Civic Nidec, no gas interceptor, openpilot longitudinal; excludes stock ACC. 90 mph is the PCM cruise-speed field, not the driving target. Zero is an attempt, not a guarantee the PCM accepts it. Independent of Legacy; neither experiment guarantees equivalent hardware behavior.",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_honda_pcm_experiments_available",
+                      "equals": true
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_honda_pcm_experiments_available",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrHondaLegacyPcm",
+                  "widget": "toggle",
+                  "needs_onroad_cycle": true,
+                  "title": "Legacy Kegman PCM Control",
+                  "description": "Uses Kegman\u2019s speed-based PCM control. Bypasses MVL learning, saved gas tuning, wind brake and custom PCM shaping. Civic PCM only. Restart required.",
+                  "details": "Default Off. Change while parked. Exact Civic Nidec, no gas interceptor, openpilot longitudinal; excludes stock ACC. Saved learning and tuning choices are kept, but conflicts stay locked until Legacy is off and the device restarts. Independent of Fixed PCM Cruise Speed; neither experiment guarantees equivalent hardware behavior.",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_honda_pcm_experiments_available",
+                      "equals": true
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_honda_pcm_experiments_available",
                       "equals": true
                     }
                   ]
@@ -2363,6 +2421,14 @@
                       "type": "capability",
                       "field": "nrdr_mvl_pcm_deadzone_available",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -2445,6 +2511,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -2501,6 +2575,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -2540,6 +2622,14 @@
                             "equals": true
                           }
                         ]
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
                       }
                     }
                   ]
@@ -2581,6 +2671,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -2620,6 +2718,14 @@
                             "equals": true
                           }
                         ]
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
                       }
                     }
                   ]
@@ -2712,6 +2818,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -2788,6 +2902,14 @@
                             "equals": true
                           }
                         ]
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
                       }
                     }
                   ]
@@ -2866,6 +2988,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -2943,6 +3073,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -2986,6 +3124,14 @@
                             "equals": true
                           }
                         ]
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
                       }
                     }
                   ]
@@ -3039,6 +3185,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -3080,6 +3234,14 @@
                             "equals": true
                           }
                         ]
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
                       }
                     }
                   ]
@@ -3123,6 +3285,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -3164,6 +3334,14 @@
                             "equals": true
                           }
                         ]
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
                       }
                     }
                   ]
@@ -3207,6 +3385,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -3248,6 +3434,14 @@
                             "equals": true
                           }
                         ]
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
                       }
                     }
                   ]
@@ -3601,6 +3795,14 @@
                       }
                     ]
                   }
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "capability",
+                    "field": "nrdr_honda_legacy_pcm_locked",
+                    "equals": true
+                  }
                 }
               ]
             }
@@ -3659,6 +3861,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -3704,6 +3914,14 @@
                             "equals": true
                           }
                         ]
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
                       }
                     }
                   ]
@@ -3819,6 +4037,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -3879,6 +4105,14 @@
                           }
                         ]
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
+                      }
                     }
                   ]
                 },
@@ -3930,6 +4164,14 @@
                             "equals": true
                           }
                         ]
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
                       }
                     }
                   ]
@@ -3983,6 +4225,14 @@
                             "equals": true
                           }
                         ]
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "nrdr_honda_legacy_pcm_locked",
+                        "equals": true
                       }
                     }
                   ]
@@ -4081,6 +4331,14 @@
                       }
                     ]
                   }
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "capability",
+                    "field": "nrdr_honda_legacy_pcm_locked",
+                    "equals": true
+                  }
                 }
               ]
             },
@@ -4124,6 +4382,14 @@
                         "equals": true
                       }
                     ]
+                  }
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "capability",
+                    "field": "nrdr_honda_legacy_pcm_locked",
+                    "equals": true
                   }
                 }
               ]
@@ -4195,6 +4461,14 @@
                         "equals": true
                       }
                     ]
+                  }
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "capability",
+                    "field": "nrdr_honda_legacy_pcm_locked",
+                    "equals": true
                   }
                 }
               ]

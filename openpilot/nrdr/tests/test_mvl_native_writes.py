@@ -8,7 +8,6 @@ from typing import Union
 import pytest
 
 from opendbc.car.structs import car
-from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
 from openpilot.nrdr.params.tuning_policy import MVL_LOCK_KEYS, tuning_write_allowed
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -363,8 +362,9 @@ def test_preference_refresh_cannot_replay_conflicting_values(saved, active):
 @pytest.mark.parametrize("saved,active,text", [(False, False, "MVL inactive"), (True, False, "MVL selected\nRestart required"),
                                              (False, True, "MVL active\nOFF after restart"), (True, True, "MVL active")])
 def test_mici_mode_status_uses_the_boot_flag_not_just_the_saved_preference(saved, active, text):
+  from openpilot.nrdr.ui.honda_pcm import live_gas_status
   ui = state(saved, active)
-  env = {"BigToggle": Widget, "ui_state": ui, "tr": lambda s: s, "mvl_longitudinal_enabled": mvl_longitudinal_enabled}
+  env = {"BigToggle": Widget, "ui_state": ui, "tr": lambda s: s, "live_gas_status": live_gas_status}
   definitions("openpilot/nrdr/ui/settings/pcm_modes_mici.py", {"LiveGasControl"}, env, {"_mode_status", "_refresh", "_update_state"})
   control = env["LiveGasControl"]()
   control._update_state()

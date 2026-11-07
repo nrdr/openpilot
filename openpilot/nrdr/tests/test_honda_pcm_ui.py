@@ -16,6 +16,8 @@ from openpilot.nrdr.ui.honda_pcm import live_gas_available, save_live_gas_choice
 from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, mvl_tuning_locked, tuning_write_allowed
 from openpilot.nrdr.params import mvl_pcm_deadzone
 from openpilot.nrdr.ui.honda_pcm import mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone, save_mvl_pcm_deadzone
+from openpilot.nrdr.ui import honda_pcm
+from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS, PCM_EXPERIMENT_DETAILS
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -149,7 +151,7 @@ def test_mici_saved_selection_refresh_and_click_time_recheck():
   ui = state()
   env = {"BigMultiToggle": Widget, "BigToggle": Widget, "ui_state": ui, "tr": lambda s: s,
          "pcm_tuning_available": pcm_tuning_available, "saved_pcm_mode": saved_pcm_mode,
-         "saved_wind_brake": saved_wind_brake, "save_pcm_choice": save_pcm_choice, "mvl_tuning_locked": mvl_tuning_locked}
+         "saved_wind_brake": saved_wind_brake, "save_pcm_choice": save_pcm_choice, "tuning_write_allowed": tuning_write_allowed}
   exec(compile(tree, str(path), "exec"), env)
   mode, wind = env["PcmModeControl"](), env["WindBrakeControl"]()
   assert mode.text == "PCM Command Shaping"
@@ -271,6 +273,9 @@ def native_layout(ui, toggle_factory=None):
   env.update({key: value for key, value in vars(mvl_pcm_deadzone).items() if key.startswith("MVL_PCM_DEADZONE_")})
   env.update(mvl_pcm_deadzone_available=mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone=saved_mvl_pcm_deadzone,
              save_mvl_pcm_deadzone=save_mvl_pcm_deadzone)
+  env.update(vars(honda_pcm))
+  env["PCM_EXPERIMENTS"] = PCM_EXPERIMENTS
+  env["PCM_EXPERIMENT_DETAILS"] = PCM_EXPERIMENT_DETAILS
   exec(compile(tree, str(path), "exec"), env)
   layout = object.__new__(env["LongitudinalTuningLayout"])
   layout._tuning_items = layout._initialize_items()

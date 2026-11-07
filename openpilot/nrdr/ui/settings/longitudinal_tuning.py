@@ -7,12 +7,14 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.list_view import ListItem
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled, nrdr_longitudinal_enabled
 from openpilot.nrdr.ui.settings.live_gas_reset import available as gas_reset_available, large_reset_button
-from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, mvl_tuning_locked, tuning_write_allowed
+from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, mvl_tuning_locked, tuning_write_allowed, legacy_pcm_active, legacy_pcm_tuning_locked
+from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS, PCM_EXPERIMENT_DETAILS
 from openpilot.nrdr.params.mvl_pcm_deadzone import (
   MVL_PCM_DEADZONE_VALUES, MVL_PCM_DEADZONE_LABELS, MVL_PCM_DEADZONE_TITLE, MVL_PCM_DEADZONE_DESCRIPTION, MVL_PCM_DEADZONE_DETAILS,
 )
 from openpilot.nrdr.ui.honda_pcm import (pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice,
                                        live_gas_available, save_live_gas_choice,
+                                       pcm_experiments_available, saved_pcm_experiment, save_pcm_experiment, pcm_experiment_status, live_gas_status,
                                        mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone, save_mvl_pcm_deadzone)
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
@@ -27,13 +29,13 @@ class LongitudinalTuningLayout(Widget):
 
     self._tuning_items = self._initialize_items()
     status = ListItem(
-      title=lambda: (tr("Full MVL longitudinal active") if mvl_longitudinal_enabled(ui_state.CP)
+      title=lambda: (tr("Legacy Kegman PCM active") if legacy_pcm_active(ui_state.CP)
+                     else tr("Full MVL longitudinal active") if mvl_longitudinal_enabled(ui_state.CP)
                      else tr("Custom longitudinal active") if nrdr_longitudinal_enabled(ui_state.CP)
                      and getattr(ui_state.CP, "openpilotLongitudinalControl", False)
                      else tr("Baseline longitudinal - nrdr tuning inactive")),
-      description=lambda: tr("The running mode is fixed at startup. Saving Live Learning Gas changes the next startup, not this drive. " +
-                             "MVL uses complete Aggressive, Standard and Relaxed profiles; " +
-                             "only Econ retains nrdr's following, acceleration and jerk defaults."),
+      description=lambda: tr("The running mode is fixed at startup. Saved changes require restart. ")
+                          + tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP).replace("\n", "; ")),
     )
     self._scroller = Scroller([status, *self._tuning_items], line_separator=False, spacing=0)
 
@@ -125,6 +127,16 @@ class LongitudinalTuningLayout(Widget):
       description=lambda: tr(MVL_PCM_DEADZONE_DESCRIPTION) + " " + tr(MVL_PCM_DEADZONE_DETAILS),
     )
 
+    self._pcm_experiments = {}
+    for key, (title, description) in PCM_EXPERIMENTS.items():
+      self._pcm_experiments[key] = multiple_button_item_sp(
+        title=lambda title=title: tr(title),
+        buttons=[lambda: tr("Off"), lambda: tr("On")], button_width=180,
+        callback=lambda index, key=key: self._set_pcm_experiment(key, index),
+        description=lambda key=key, description=description: tr(pcm_experiment_status(ui_state.CP, ui_state.CP_SP, ui_state.params, key))
+                    + " " + tr(description) + " " + tr(PCM_EXPERIMENT_DETAILS[key]),
+      )
+
     self._wind_brake = toggle_item_sp(
       title=lambda: tr("Wind Brake"), initial_state=True,
       callback=lambda value: save_pcm_choice(ui_state, "NrdrHondaWindBrake", value),
@@ -169,7 +181,7 @@ class LongitudinalTuningLayout(Widget):
     self._live_learning_gas = toggle_item_sp(
       title=lambda: tr("Live Learning Gas - Full MVL Longitudinal"),
       initial_state=ui_state.params.get_bool("HondaLiveLearningGas"),
-      description=lambda: tr(MVL_DESCRIPTION),
+      description=lambda: tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP).replace("\n", "; ")) + ". " + tr(MVL_DESCRIPTION),
       callback=self._set_live_gas,
     )
 
@@ -251,6 +263,7 @@ class LongitudinalTuningLayout(Widget):
     self._reset_live_gas = large_reset_button()
     return [
       self._live_learning_gas,
+      *self._pcm_experiments.values(),
       self._reset_live_gas,
       self._mvl_pcm_deadzone,
       LineSeparatorSP(40),
@@ -286,13 +299,18 @@ class LongitudinalTuningLayout(Widget):
       save_mvl_pcm_deadzone(ui_state, MVL_PCM_DEADZONE_VALUES[index])
     self._mvl_pcm_deadzone.action_item.set_selected_button(MVL_PCM_DEADZONE_VALUES.index(saved_mvl_pcm_deadzone(ui_state.params)))
 
+  def _set_pcm_experiment(self, key, index):
+    if type(index) is int and index in (0, 1):
+      save_pcm_experiment(ui_state, key, bool(index))
+    self._pcm_experiments[key].action_item.set_selected_button(int(saved_pcm_experiment(ui_state.params, key)))
+
   def _update_state(self):
     super()._update_state()
     enabled = nrdr_longitudinal_enabled(ui_state.CP)
     for item in self._tuning_items:
       if action := getattr(item, "action_item", None):
-        action.set_enabled(enabled and tuning_write_allowed(ui_state.params, getattr(action, "param_key", None), CP=ui_state.CP))
-    learning = mvl_tuning_locked(ui_state.params, ui_state.CP)
+        action.set_enabled(enabled and tuning_write_allowed(ui_state.params, getattr(action, "param_key", None), CP=ui_state.CP, CP_SP=ui_state.CP_SP))
+    learning = mvl_tuning_locked(ui_state.params, ui_state.CP) or legacy_pcm_tuning_locked(ui_state.params, ui_state.CP, ui_state.CP_SP)
     for item in (self._long_pid_tune_scale_aggressive, self._long_pid_tune_scale_standard,
                  self._long_pid_tune_scale_relaxed, self._long_pid_tune_scale_econ):
       item.set_visible(not learning)
@@ -300,6 +318,9 @@ class LongitudinalTuningLayout(Widget):
     self._live_learning_gas.action_item.set_enabled(
       ui_state.is_offroad() and live_gas_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
     self._live_learning_gas.action_item.set_state(ui_state.params.get_bool("HondaLiveLearningGas"))
+    for key, item in self._pcm_experiments.items():
+      item.action_item.set_enabled(ui_state.is_offroad() and pcm_experiments_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
+      item.action_item.set_selected_button(int(saved_pcm_experiment(ui_state.params, key)))
     self._reset_live_gas.action_item.set_enabled(gas_reset_available())
     self._mvl_pcm_deadzone.action_item.set_enabled(
       ui_state.is_offroad() and mvl_pcm_deadzone_available(ui_state.CP, ui_state.CP_SP, ui_state.params))

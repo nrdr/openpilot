@@ -7,6 +7,7 @@ MVL_DESCRIPTION = (
   "MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. " +
   "Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. " +
   "Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Conflicting tuning is locked, not erased. " +
+  "Legacy Kegman PCM takes precedence on supported Civics; the saved learning choice is kept. " +
   "Change while parked; restart required."
 )
 
@@ -34,6 +35,7 @@ YAW_FIXED_KEYS = PIF_KEYS | frozenset((
   "HondaTorqueLowPassFilter",
   "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",
 ))
+LEGACY_PCM_LOCK_KEYS = MVL_LOCK_KEYS | frozenset(("HondaLiveLearningGas", "NrdrMvlPcmDeadzone"))
 RETIRED_TUNING_KEYS = frozenset((
   "NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance",
   "NrdrYawDelaySchedule",
@@ -95,10 +97,12 @@ def mvl_tuning_locked(params, CP=None) -> bool:
     return True
 
 
-def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedule: bool = False, CP=None) -> bool:
+def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedule: bool = False, CP=None, CP_SP=None) -> bool:
   if not key:
     return True
   if key in RETIRED_TUNING_KEYS or key.startswith("NrdrNnlc"):
+    return False
+  if key in LEGACY_PCM_LOCK_KEYS and legacy_pcm_tuning_locked(params, CP, CP_SP):
     return False
   if key in MVL_LOCK_KEYS and mvl_tuning_locked(params, CP):
     return False
@@ -111,6 +115,71 @@ def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedul
     if key in YAW_FIXED_KEYS or key.startswith("NrdrLatRateDamping"):
       return False
   return True
+
+
+def legacy_pcm_active(CP) -> bool:
+  from opendbc.car.honda.values import CAR, HondaFlags
+
+  return bool(CP is not None and getattr(CP, "brand", "") == "honda"
+              and getattr(CP, "carFingerprint", "") == CAR.HONDA_CIVIC
+              and getattr(CP, "flags", 0) & HondaFlags.NIDEC and not (getattr(CP, "flags", 0) & HondaFlags.BOSCH)
+              and getattr(CP, "openpilotLongitudinalControl", False)
+              and not (getattr(CP, "passive", False) or getattr(CP, "dashcamOnly", False))
+              and getattr(CP, "flags", 0) & HondaFlags.NIDEC_PCM_LEGACY)
+
+
+@lru_cache(maxsize=4)
+def _stored_legacy_context(raw: bytes) -> tuple[bool, bool]:
+  from opendbc.car.structs import car
+
+  with car.CarParams.from_bytes(raw) as cp:
+    return legacy_pcm_active(cp), _legacy_pcm_exempt(cp)
+
+
+def _legacy_pcm_exempt(CP) -> bool:
+  from opendbc.car.honda.values import CAR, HondaFlags
+
+  return bool(getattr(CP, "brand", "") and (
+    CP.brand != "honda" or getattr(CP, "carFingerprint", "") != CAR.HONDA_CIVIC
+    or not (getattr(CP, "flags", 0) & HondaFlags.NIDEC) or getattr(CP, "flags", 0) & HondaFlags.BOSCH
+    or not getattr(CP, "openpilotLongitudinalControl", False)
+    or getattr(CP, "passive", False) or getattr(CP, "dashcamOnly", False)))
+
+
+def _legacy_sp_exempt(CP_SP) -> bool:
+  from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
+
+  return bool(getattr(CP_SP, "enableGasInterceptor", False) or getattr(CP_SP, "flags", 0) & HondaFlagsSP.STOCK_LONGITUDINAL)
+
+
+@lru_cache(maxsize=4)
+def _stored_legacy_sp_exempt(raw: bytes) -> bool:
+  from openpilot.cereal import custom
+
+  with custom.CarParamsSP.from_bytes(raw) as cp_sp:
+    return _legacy_sp_exempt(cp_sp)
+
+
+def legacy_pcm_tuning_locked(params, CP=None, CP_SP=None) -> bool:
+  """Saved or startup-latched Legacy locks conflicts without modifying them."""
+  from openpilot.nrdr.params.nidec_pcm import decode_pcm_experiment
+
+  saved = decode_pcm_experiment(params.get("NrdrHondaLegacyPcm")) is True
+  try:
+    if CP_SP is not None:
+      if _legacy_sp_exempt(CP_SP):
+        return False
+    elif (raw_sp := params.get("CarParamsSPPersistent")) and _stored_legacy_sp_exempt(raw_sp):
+      return False
+    if CP is not None and getattr(CP, "brand", ""):
+      return legacy_pcm_active(CP) or (saved and not _legacy_pcm_exempt(CP))
+    raw = params.get("CarParams") or params.get("CarParamsPersistent")
+    if raw:
+      active, exempt = _stored_legacy_context(raw)
+      return active or (saved and not exempt)
+    return saved
+  except Exception:
+    return True
 
 
 def reset_learning_scales(params) -> None:

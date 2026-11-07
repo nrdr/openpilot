@@ -29,7 +29,10 @@ def load_policy(namespace):
       return None
 
   tree = NoEnumImport().visit(ast.parse(source("openpilot/nrdr/features/longitudinal/policy.py")))
-  namespace["HondaFlags"] = NS(MVL_LONGITUDINAL=MVL_FLAG)
+  namespace["HondaFlags"] = NS(MVL_LONGITUDINAL=MVL_FLAG, NIDEC_PCM_FIXED_CRUISE=262144, NIDEC_PCM_LEGACY=524288,
+                               NIDEC=16, BOSCH=4)
+  namespace["HondaFlagsSP"] = NS(STOCK_LONGITUDINAL=16)
+  namespace["CAR"] = NS(HONDA_CIVIC="HONDA_CIVIC")
   exec(compile(ast.fix_missing_locations(tree), "<real MVL gate, injected enum>", "exec"), namespace)
   return namespace
 
@@ -90,6 +93,10 @@ def namespace(values=None):
     "consume_button_press": lambda _: True,
   }
   load_policy(env)
+  pcm = "opendbc_repo/opendbc/car/honda/"
+  env["uses_nidec_pcm"] = definitions(source(pcm + "nidec_pcm_constraints.py"), env)["uses_nidec_pcm"]
+  modes = definitions(source(pcm + "pcm_test_modes.py"), env)
+  env.update(pcm_mode_qualified=modes["qualified"], FIXED_CRUISE_MPS=modes["FIXED_CRUISE_MPS"])
   return env, params
 
 

@@ -31,8 +31,8 @@ REGISTRY_METADATA_SHA256 = "c4433c55bdfe7c6216a6db1f14d5f447d8645d981ef098f8d834
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 160)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 159)
+    self.assertEqual(len(PARAM_SPECS), 162)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 161)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
     from openpilot.nrdr.params.generated import ALL_KEYS, ADDED_KEYS, OVERRIDDEN_KEYS
@@ -43,7 +43,7 @@ class TestParamCatalog(unittest.TestCase):
 
     # Adding the optional deadzone must not change any existing registry/default.
     metadata = "\n".join(f"{spec.action.value}|{spec.key}|{spec.cpp_attributes}" for spec in PARAM_SPECS
-                         if spec.key != "NrdrMvlPcmDeadzone") + "\n"
+                         if spec.key not in ("NrdrMvlPcmDeadzone", "NrdrHondaPcmFixedCruise", "NrdrHondaLegacyPcm")) + "\n"
     self.assertEqual(sha256(metadata.encode()).hexdigest(), REGISTRY_METADATA_SHA256)
     receipt = PARAM_SPECS_BY_KEY["NrdrRdxRouteAConfirmation"]
     self.assertEqual(receipt.flags, (ParamFlag.PERSISTENT, ParamFlag.DONT_LOG))
@@ -60,7 +60,8 @@ class TestParamCatalog(unittest.TestCase):
 
   def test_pcm_mode_defaults_off_and_wind_on_without_migrating_legacy_bool(self) -> None:
     for key, kind, default in (("NrdrHondaPcmMode", ParamType.INT, "0"), ("NrdrHondaWindBrake", ParamType.BOOL, "1"),
-                               ("NrdrMvlPcmDeadzone", ParamType.INT, "0")):
+                               ("NrdrMvlPcmDeadzone", ParamType.INT, "0"), ("NrdrHondaPcmFixedCruise", ParamType.BOOL, "0"),
+                               ("NrdrHondaLegacyPcm", ParamType.BOOL, "0")):
       spec = PARAM_SPECS_BY_KEY[key]
       self.assertEqual((spec.param_type, spec.default), (kind, default))
       self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))

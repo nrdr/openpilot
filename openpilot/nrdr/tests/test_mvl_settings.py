@@ -17,6 +17,8 @@ from openpilot.nrdr.tests.test_honda_pcm_ui import Params, Widget, native_layout
 from openpilot.nrdr.ui.honda_pcm import live_gas_available, save_live_gas_choice
 from openpilot.nrdr.params import mvl_pcm_deadzone
 from openpilot.nrdr.ui.honda_pcm import mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone, save_mvl_pcm_deadzone
+from openpilot.nrdr.ui import honda_pcm
+from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENT_DETAILS
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_schema, DEFAULT_SRC
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -162,8 +164,11 @@ def test_mici_order_and_write_guards_survive_stale_display():
   env.update({key: value for key, value in vars(mvl_pcm_deadzone).items() if key.startswith("MVL_PCM_DEADZONE_")})
   env.update(mvl_pcm_deadzone_available=mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone=saved_mvl_pcm_deadzone,
              save_mvl_pcm_deadzone=save_mvl_pcm_deadzone)
+  env.update(vars(honda_pcm))
+  env["PCM_EXPERIMENT_DETAILS"] = PCM_EXPERIMENT_DETAILS
   exec(compile(tree, str(path), "exec"), env)
-  live, reset, mode, wind, static, deadzone = env["longitudinal_controls"]()
+  live, reset, mode, wind, static, deadzone, *experiments = env["longitudinal_controls"]()
+  assert len(experiments) == 2
   assert reset == "reset" and static.text == "Keep Feedforward Static"
   live._select(True)
   assert ui.params.get_bool("OnroadCycleRequested")
@@ -389,7 +394,8 @@ def test_compiled_schema_locks_every_conflicting_control_and_preserves_econ_sele
                                                        (False, True, False, False), (False, False, False, True)])
 def test_sunnylink_visual_lock_matches_vehicle_scope_and_restart_latch(saved, active, exempt, allowed):
   from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
-  values = {"HondaLiveLearningGas": saved, "nrdr_mvl_longitudinal_active": active, "nrdr_mvl_tuning_exempt": exempt}
+  values = {"HondaLiveLearningGas": saved, "nrdr_mvl_longitudinal_active": active, "nrdr_mvl_tuning_exempt": exempt,
+            "nrdr_honda_legacy_pcm_locked": False}
   def evaluate(rule):
     kind = rule["type"]
     if kind in ("param", "capability"):
@@ -407,9 +413,10 @@ def test_increment_schema_lock_preserves_existing_availability_rules(key):
   original = {"key": key, "enablement": [{"type": "capability", "field": "has_longitudinal_control", "equals": True}],
               "visibility": [{"type": "param", "key": "CustomAccIncrementsEnabled", "equals": True}]}
   result = apply_sunnylink_metadata(original)
-  assert result["enablement"][:-1] == original["enablement"]
+  assert result["enablement"][:-2] == original["enablement"]
   assert result["visibility"] == original["visibility"]
-  assert "nrdr_mvl_longitudinal_active" in json.dumps(result["enablement"][-1])
+  assert "nrdr_mvl_longitudinal_active" in json.dumps(result["enablement"][-2])
+  assert "nrdr_honda_legacy_pcm_locked" in json.dumps(result["enablement"][-1])
 
 
 def test_saved_learner_diagnostics_do_not_replace_restart_help():

@@ -125,6 +125,8 @@ class TestOpendbcBoundary(unittest.TestCase):
       OpendbcParamKey.NRDR_HONDA_PCM_MODE,
       OpendbcParamKey.NRDR_HONDA_WIND_BRAKE,
       OpendbcParamKey.NRDR_MVL_PCM_DEADZONE,
+      OpendbcParamKey.NRDR_HONDA_PCM_FIXED_CRUISE,
+      OpendbcParamKey.NRDR_HONDA_LEGACY_PCM,
     })
 
   def test_missing_startup_values_preserve_previous_interface_behavior(self):
@@ -134,6 +136,8 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertFalse(config.honda.enforce_stock_longitudinal)
     self.assertEqual(config.honda.nidec_pcm_mode, 0)
     self.assertTrue(config.honda.nidec_wind_brake)
+    self.assertFalse(config.honda.nidec_fixed_cruise)
+    self.assertFalse(config.honda.nidec_legacy_pcm)
     self.assertTrue(config.honda.mvl_longitudinal)
     self.assertEqual(config.honda.mvl_pcm_deadzone, 0.0)
     self.assertEqual(config.hyundai.longitudinal_tuning, 0)
@@ -147,6 +151,8 @@ class TestOpendbcBoundary(unittest.TestCase):
       str(NrdrHondaParamKey.HONDA_BOSCH_A_RADAR),
       str(NrdrHondaParamKey.NRDR_HONDA_PCM_MODE),
       str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE),
+      str(NrdrHondaParamKey.NRDR_HONDA_PCM_FIXED_CRUISE),
+      str(NrdrHondaParamKey.NRDR_HONDA_LEGACY_PCM),
       str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS),
       str(NrdrHondaParamKey.NRDR_MVL_PCM_DEADZONE),
       *(str(key) for key in HOST_STARTUP_DEFAULTS),

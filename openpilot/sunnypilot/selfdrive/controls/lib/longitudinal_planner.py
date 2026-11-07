@@ -14,6 +14,7 @@ from openpilot.sunnypilot.selfdrive.controls.lib.e2e_alerts_helper import E2EAle
 from openpilot.sunnypilot.selfdrive.controls.lib.smart_cruise_control.smart_cruise_control import SmartCruiseControl
 from openpilot.nrdr.features.driver_policy.speed_limit_assist import NrdrSpeedLimitAssist
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled, nrdr_custom_longitudinal_enabled
+from openpilot.nrdr.features.longitudinal.legacy_pcm import legacy_pcm_enabled
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.speed_limit_assist import SpeedLimitAssist
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.speed_limit_resolver import SpeedLimitResolver
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
@@ -24,19 +25,21 @@ LongitudinalPlanSource = custom.LongitudinalPlanSP.LongitudinalPlanSource
 
 class LongitudinalPlannerSP:
   def __init__(self, CP: structs.CarParams, CP_SP: structs.CarParamsSP, mpc):
-    self.mvl_enabled = mvl_longitudinal_enabled(CP)
-    nrdr_enabled = nrdr_custom_longitudinal_enabled(CP)
+    self.legacy_pcm = legacy_pcm_enabled(CP, CP_SP)
+    self.mvl_enabled = not self.legacy_pcm and mvl_longitudinal_enabled(CP)
+    nrdr_enabled = not self.legacy_pcm and nrdr_custom_longitudinal_enabled(CP)
     self.events_sp = EventsSP()
     self.source = LongitudinalPlanSource.cruise
     self.e2e_alerts_helper = E2EAlertsHelper()
     self.openpilot_longitudinal = CP.openpilotLongitudinalControl
     self.output_v_target = 0.
     self.output_a_target = 0.
-    if self.mvl_enabled:
+    if self.mvl_enabled or self.legacy_pcm:
       # Pinned donor defaults: SCC Vision/Map off, SpeedLimitMode=information.
       # Do not construct settings readers: persisted custom values must not
       # change targets while these controls are locked. Speed-limit telemetry
-      # remains neutral; model/lead arbitration lives in the donor planner.
+      # remains neutral. Legacy uses the current base model/lead planner,
+      # with no saved acceleration boost or NRDR custom target injection.
       self.scc = self.resolver = self.sla = self.accel_boost_sp = None
       self.generation = None
       return
@@ -47,7 +50,7 @@ class LongitudinalPlannerSP:
     self.accel_boost_sp = AccelBoostSP()
 
   def update_targets(self, sm: messaging.SubMaster, v_ego: float, a_ego: float, v_cruise: float) -> tuple[float, float]:
-    if self.mvl_enabled:
+    if self.mvl_enabled or self.legacy_pcm:
       self.source = LongitudinalPlanSource.cruise
       self.output_v_target, self.output_a_target = v_cruise, a_ego
       return self.output_v_target, self.output_a_target
@@ -106,7 +109,7 @@ class LongitudinalPlannerSP:
     longitudinalPlanSP.aTarget = float(self.output_a_target)
     longitudinalPlanSP.events = self.events_sp.to_msg()
 
-    if self.mvl_enabled:
+    if self.mvl_enabled or self.legacy_pcm:
       # No retired/custom speed-control publication in pinned-default mode.
       e2eAlerts = longitudinalPlanSP.e2eAlerts
       e2eAlerts.greenLightAlert = self.e2e_alerts_helper.green_light_alert

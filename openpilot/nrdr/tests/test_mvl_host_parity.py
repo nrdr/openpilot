@@ -108,6 +108,8 @@ def environment(**extra):
     "time": NS(monotonic=lambda: 100.), "cloudlog": NS(info=lambda *_: None, warning=lambda *_: None),
     "messaging": NS(SubMaster=object, PubMaster=object), "structs": NS(CarParams=object, CarParamsSP=object),
     "mvl_longitudinal_enabled": mvl_enabled, "nrdr_longitudinal_enabled": lambda cp: cp.brand == "honda",
+    "legacy_pcm_enabled": lambda *_: False,
+    "fixed_pcm_cruise_enabled": lambda *_: False,
     "nrdr_custom_longitudinal_enabled": lambda cp: cp.brand == "honda" and not mvl_enabled(cp),
     "longitudinal_personality": personality, "is_honda_bosch_a_radar": lambda _: True,
     "NrdrLongControl": forbidden, "NrdrLongitudinalPlanner": forbidden, "NrdrLongitudinalMpc": forbidden,

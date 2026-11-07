@@ -13,6 +13,8 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
   "NrdrLateralController",
   "NrdrDriverMonitoringReminderPercent",
   "NrdrMvlPcmDeadzone",
+  "NrdrHondaPcmFixedCruise",
+  "NrdrHondaLegacyPcm",
 ))
 
 # These controls are surfaced only for an exact, confirmed Honda CP. Keeping
@@ -167,6 +169,39 @@ def inject_live_gas_details(schema: dict, walk) -> None:
   walk(schema, visitor)
 
 
+def inject_pcm_experiment_status(schema: dict, walk) -> None:
+  from opendbc.car.structs import car
+  from openpilot.cereal import custom
+  from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS
+  from openpilot.nrdr.ui.honda_pcm import live_gas_status, pcm_experiment_status
+
+  params = Params()
+  CP = CP_SP = None
+  try:
+    raw = params.get("CarParams") or params.get("CarParamsPersistent")
+    raw_sp = params.get("CarParamsSPPersistent")
+    if raw:
+      with car.CarParams.from_bytes(raw) as reader:
+        CP = reader.as_builder()
+    if raw_sp:
+      with custom.CarParamsSP.from_bytes(raw_sp) as reader:
+        CP_SP = reader.as_builder()
+  except Exception:
+    CP = CP_SP = None
+
+  def visitor(item: dict) -> None:
+    key = item.get("key")
+    if key in PCM_EXPERIMENTS:
+      status = pcm_experiment_status(CP, CP_SP, params, key)
+    elif key == "HondaLiveLearningGas":
+      status = live_gas_status(CP, params, CP_SP).replace("\n", "; ")
+    else:
+      return
+    item["details"] = status + "<br><br>" + item.get("details", "")
+
+  walk(schema, visitor)
+
+
 __all__ = (
   "HONDA_TUNING_WRITE_KEYS",
   "ONROAD_WRITE_BLOCKLIST",
@@ -175,6 +210,7 @@ __all__ = (
   "allow_param_write",
   "inject_car_tune_details",
   "inject_live_gas_details",
+  "inject_pcm_experiment_status",
   "persist_dongle_id",
   "request_stored_handcrafted_lateral_profile",
   "restore_dongle_id",

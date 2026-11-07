@@ -95,7 +95,7 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
 
     canonical_keys = set(canonical_references) & catalog_keys
     generated_nrdr_keys = set(generated_references) & catalog_keys
-    self.assertEqual(len(canonical_keys), 74)
+    self.assertEqual(len(canonical_keys), 76)
     # The adapter adds the pending-apply lock to each suggested-profile control.
     self.assertEqual(canonical_keys | {"NrdrHandcraftedLateralTune"}, generated_nrdr_keys)
     self.assertEqual(set(canonical_references) - catalog_keys, INHERITED_LANE_CENTERING_KEYS)

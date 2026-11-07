@@ -21,6 +21,7 @@ def initialize(helper, cs, experimental):
                any(isinstance(t, ast.Name) and t.id.startswith("V_CRUISE_") for t in n.targets)]
   env = {"np": np, "CV": CV, "ButtonType": BUTTONS}
   exec(compile(ast.Module(body=[*constants, method], type_ignores=[]), str(source), "exec"), env)
+  helper.fixed_cruise_enabled = False
   env["initialize_v_cruise"](helper, cs, experimental)
 
 

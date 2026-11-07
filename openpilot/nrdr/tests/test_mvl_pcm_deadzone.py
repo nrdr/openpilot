@@ -298,7 +298,8 @@ def test_copy_schema_native_options_and_compact_geometry_match():
   assert web["needs_onroad_cycle"]
   gate = {"type": "capability", "field": CAP, "equals": True}
   assert web["visibility"] == [gate]
-  assert web["enablement"] == [{"type": "offroad_only"}, gate]  # no blanket MVL lock
+  assert web["enablement"] == [{"type": "offroad_only"}, gate,  # no blanket MVL lock
+                               {"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}}]
   assert json.loads((ROOT / "openpilot/sunnypilot/sunnylink/settings_ui.json").read_text(encoding="utf-8")) == schema
   fields = ast.parse((ROOT / "openpilot/sunnypilot/sunnylink/capabilities.py").read_text(encoding="utf-8"))
   field_list = next(node.value for node in fields.body if isinstance(node, ast.Assign)

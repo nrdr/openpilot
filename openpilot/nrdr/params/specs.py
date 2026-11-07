@@ -206,6 +206,8 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("NrdrHondaEcuMatchedLong", ParamType.BOOL, PB, "0", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),
   # Startup-latched: 0=Off, 1=ECU-Matched, 2=Experimental.
   _added("NrdrHondaPcmMode", ParamType.INT, PB, "0", owner=ParamOwner.HONDA),
+  _added("NrdrHondaPcmFixedCruise", ParamType.BOOL, PB, "0", owner=ParamOwner.HONDA),
+  _added("NrdrHondaLegacyPcm", ParamType.BOOL, PB, "0", owner=ParamOwner.HONDA),
   _added("NrdrMvlPcmDeadzone", ParamType.INT, PB, "0", owner=ParamOwner.HONDA),
   _added("NrdrHondaWindBrake", ParamType.BOOL, PB, "1", owner=ParamOwner.HONDA),
   _added("NrdrHondaFullBrakeAuthority", ParamType.BOOL, PB, "1", owner=ParamOwner.HONDA),

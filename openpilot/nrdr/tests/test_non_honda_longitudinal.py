@@ -67,6 +67,8 @@ def environment(**overrides):
     "time": NS(monotonic=lambda: 100.0), "Literal": Literal, "interp": np.interp,
     "enforce_mode_dwell": enforce_mode_dwell, "slow_down_threshold": slow_down_threshold,
     "nrdr_longitudinal_enabled": policy.nrdr_longitudinal_enabled,
+    "legacy_pcm_enabled": lambda *_: False,
+    "fixed_pcm_cruise_enabled": lambda *_: False,
     "mvl_longitudinal_enabled": gate["mvl_longitudinal_enabled"],
     "nrdr_custom_longitudinal_enabled": gate["nrdr_custom_longitudinal_enabled"],
     "longitudinal_personality": policy.longitudinal_personality,
@@ -390,6 +392,7 @@ def test_native_tuning_controls_follow_vehicle_policy(brand, enabled, monkeypatc
                        "mvl_pcm_deadzone_available": lambda *_: False, "saved_mvl_pcm_deadzone": lambda _: 0,
                        "MVL_PCM_DEADZONE_VALUES": (0, 2, 5, 10),
                        "tuning_write_allowed": admission["tuning_write_allowed"], "mvl_tuning_locked": admission["mvl_tuning_locked"],
+                       "legacy_pcm_tuning_locked": admission["legacy_pcm_tuning_locked"],
                        "saved_pcm_mode": lambda _: 0, "saved_wind_brake": lambda _: True})
   layout = object.__new__(module['LongitudinalTuningLayout'])
   for band in ('aggressive', 'standard', 'relaxed', 'econ'):
@@ -403,6 +406,7 @@ def test_native_tuning_controls_follow_vehicle_policy(brand, enabled, monkeypatc
   layout._pcm_mode = NS(action_item=NS(set_enabled=lambda _: None, set_selected_button=lambda _: None))
   layout._mvl_pcm_deadzone = NS(action_item=NS(set_enabled=lambda _: None, set_selected_button=lambda _: None))
   layout._wind_brake = NS(action_item=NS(set_enabled=lambda _: None, set_state=lambda _: None))
+  layout._pcm_experiments = {}
   layout._tuning_items = [layout._live_learning_gas, NS(), NS(action_item=NS(set_enabled=lambda value: values.append(('tune', value))))]
   layout._update_state()
   assert values == [('gas', enabled), ('tune', enabled), ('gas', enabled), ('reset', enabled), ('gap', enabled)]
