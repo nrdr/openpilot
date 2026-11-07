@@ -104,7 +104,10 @@ def _bundle_needs_reset(active_bundle: custom.ModelManagerSP.ModelBundle, availa
       return True
     if active_bundle.runner != matching_bundle.runner:
       return True
-    if set(_bundle_artifacts(active_bundle)) != set(_bundle_artifacts(matching_bundle)):
+    # Automatic repairs use private content-addressed names, but exactly the
+    # catalog's bytes. Filename equality is not model/compiler identity.
+    from openpilot.nrdr.features.services.model_manager import _artifact_identity
+    if active_bundle.tinygradRef != matching_bundle.tinygradRef or _artifact_identity(active_bundle) != _artifact_identity(matching_bundle):
       return True
 
   return not _bundle_is_valid_locally(active_bundle)

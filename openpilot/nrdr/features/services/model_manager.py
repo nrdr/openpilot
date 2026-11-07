@@ -1,3 +1,6 @@
+from pathlib import PurePosixPath
+from urllib.parse import urlparse
+
 from openpilot.nrdr.features.services import TINYGRAD_RUNTIME_REF
 
 
@@ -33,4 +36,36 @@ def select_default_model(params, available_models) -> None:
     params.put_bool("NrdrAutoSelectModel", False)
 
 
-__all__ = ("select_default_model",)
+def _artifact_identity(bundle) -> tuple:
+  # Local content-addressed filenames differ from catalog names after repair.
+  return tuple((str(model.type), model.artifact.downloadUri.sha256.lower(),
+                tuple(chunk.sha256.lower() for chunk in model.artifact.chunks)) for model in bundle.models)
+
+
+def get_model_repair_candidate(saved, available_models):
+  """Upgrade a saved selection's compiler artifacts, never its model identity."""
+  if not saved or not saved.ref or not saved.internalName or str(saved.runner) != "tinygrad":
+    return None
+  matches = [model for model in available_models if model.ref == saved.ref and model.internalName == saved.internalName and
+             model.generation == saved.generation and str(model.runner) == "tinygrad"]
+  if len(matches) != 1:
+    return None
+  target = matches[0]
+  if not _compatible_automatic_download(target):
+    return None
+  for model in target.models:
+    artifact = model.artifact
+    name = artifact.fileName
+    uri = urlparse(artifact.downloadUri.uri)
+    if (not name or PurePosixPath(name).name != name or "\\" in name or not name.endswith(".pkl") or
+        uri.scheme != "https" or not uri.hostname):
+      return None
+    hashes = [artifact.downloadUri.sha256, *(chunk.sha256 for chunk in artifact.chunks)]
+    if any(len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest.lower()) for digest in hashes):
+      return None
+  if saved.tinygradRef == TINYGRAD_RUNTIME_REF and _artifact_identity(saved) == _artifact_identity(target):
+    return None
+  return target
+
+
+__all__ = ("get_model_repair_candidate", "select_default_model")

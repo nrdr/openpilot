@@ -7,7 +7,10 @@ See the LICENSE.md file in the root directory for more details.
 
 import asyncio
 import os
+import tempfile
 import time
+from pathlib import Path
+from uuid import uuid4
 
 import requests
 from openpilot.common.params import Params
@@ -19,10 +22,12 @@ from openpilot.cereal import messaging, custom
 from openpilot.sunnypilot.models.fetcher import ModelFetcher
 from openpilot.sunnypilot.models.helpers import (ACTIVE_BUNDLE_KEYS, get_active_bundle, get_selected_bundle,
                                                   resolve_bundle_by_ref, validate_active_bundles, verify_file)
-from openpilot.nrdr.features.services.model_manager import select_default_model
+from openpilot.nrdr.features.services.model_manager import get_model_repair_candidate, select_default_model
 
 # (connect, read) seconds. read is per-request inactivity, not a total cap
 DOWNLOAD_TIMEOUT = (30, 30)
+MODEL_REPAIR_RETRY_SECONDS = 60
+MODEL_REPAIR_REQUEST_PREFIX = "nrdr-repair:"
 
 
 class DownloadCancelled(Exception):
@@ -45,16 +50,71 @@ class ModelManagerSP:
     self._chunk_size = 128 * 1000  # 128 KB chunks
     self._download_start_times: dict[str, float] = {}  # Track start time per model
     self._download_ref: bytes | str | None = None
+    self._repair_context: tuple[str, dict] | None = None
+    self._repair_retry_at: dict[str, float] = {}
 
   def _download_interrupted(self) -> bool:
+    if context := getattr(self, "_repair_context", None):
+      key, saved = context
+      if (not self.params.get_bool("IsOffroad") or self.params.get(key) != saved or
+          self.params.get("ModelManager_DownloadRef") != self._download_ref):
+        return True
     # only removal cancels: a different ref is a queued selection that
     # _release_download_ref leaves in place for the next tick
     return self.params.get("ModelManager_DownloadRef") is None
 
   def _release_download_ref(self) -> None:
-    if self.params.get("ModelManager_DownloadRef") == self._download_ref:
-      self.params.remove("ModelManager_DownloadRef")
-    self._download_ref = None
+    try:
+      if self._download_ref is not None:
+        self._conditional_param_update("ModelManager_DownloadRef", None, {"ModelManager_DownloadRef": self._download_ref})
+    finally:
+      self._download_ref = None
+
+  def _conditional_param_update(self, key: str, value, expected: dict) -> bool:
+    """Commit a model update only if its offroad/user-selection guards still hold.
+
+    Use the native Params lock, including for UI/remote writers. Calling put()
+    inside this lock would deadlock; use its encoding and atomic-file protocol.
+    Keep the lexical store path: resolving its symlink changes the lock root.
+    """
+    import fcntl
+
+    allowed = {*ACTIVE_BUNDLE_KEYS.values(), "ModelManager_DownloadRef"}
+    if key not in allowed or not set(expected) <= allowed | {"IsOffroad"}:
+      raise ValueError("Unsupported conditional model parameter update")
+    checked_key = self.params.check_key(key)
+    store = Path(self.params.get_param_path())
+    temporary = None
+    try:
+      if value is not None:
+        with tempfile.NamedTemporaryFile(prefix=".tmp_model_upgrade_", dir=store.parent, delete=False) as stream:
+          temporary = Path(stream.name)
+          stream.write(self.params._put_cast(checked_key, value))
+          stream.flush()
+          os.fsync(stream.fileno())
+      with os.fdopen(os.open(store.parent / ".lock", os.O_RDONLY | os.O_CREAT, 0o775), "rb") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        for guard, wanted in expected.items():
+          raw = self.params.get_raw(guard)
+          if wanted is None:
+            if raw is not None:
+              return False
+          elif raw is None or self.params.cpp2python(guard, raw) != wanted:
+            return False
+        destination = Path(self.params.get_param_path(checked_key))
+        if value is None:
+          destination.unlink(missing_ok=True)
+        else:
+          os.replace(temporary, destination)
+        directory = os.open(store, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+          os.fsync(directory)
+        finally:
+          os.close(directory)
+        return True
+    finally:
+      if temporary is not None:
+        temporary.unlink(missing_ok=True)
 
   def _sync_artifact_progress(self, source_artifact) -> None:
     """Mirror download progress to all artifacts sharing the same filename in the selected bundle."""
@@ -237,7 +297,11 @@ class ModelManagerSP:
 
     except Exception as e:
       cloudlog.error(f"Error downloading {filename}: {str(e)}")
-      for f in [full_path] + [p for p in (os.path.join(destination_path, f) for f in os.listdir(destination_path)) if filename in p]:
+      from openpilot.common.file_chunker import get_chunk_name, get_manifest_path
+      manifest = get_manifest_path(full_path)
+      owned_paths = [full_path, manifest, manifest + '.tmp']
+      owned_paths.extend(get_chunk_name(full_path, i, len(artifact.chunks)) for i in range(len(artifact.chunks)))
+      for f in owned_paths:
         if os.path.isfile(f):  # noqa: ASYNC240
           os.remove(f)
       artifact.downloadProgress.status = custom.ModelManagerSP.DownloadStatus.failed
@@ -311,6 +375,11 @@ class ModelManagerSP:
     # the bar dropping to idle for a tick between the two transfers
     last_ref = None
     while (ref_to_download := self.params.get("ModelManager_DownloadRef")) is not None:
+      if isinstance(ref_to_download, str) and ref_to_download.startswith(MODEL_REPAIR_REQUEST_PREFIX):
+        # A crash or storage error may leave an automatic claim behind. Never
+        # reinterpret it as a manual canonical-file download on the next tick.
+        self._conditional_param_update("ModelManager_DownloadRef", None, {"ModelManager_DownloadRef": ref_to_download})
+        return
       if ref_to_download == last_ref:  # a repeating ref falls back to the next tick instead of spinning
         return
       last_ref = ref_to_download
@@ -326,6 +395,77 @@ class ModelManagerSP:
       finally:
         self._release_download_ref()
         self.selected_bundle = None
+
+  def _repair_saved_bundles(self) -> None:
+    """Offroad same-model upgrades; the old files/selection survive every failure."""
+    if not self.params.get_bool("IsOffroad") or self.params.get("ModelManager_DownloadRef") is not None:
+      return
+    if not hasattr(self, "_repair_retry_at"):
+      self._repair_retry_at = {}
+    for source, key in ACTIVE_BUNDLE_KEYS.items():
+      if not self.params.get_bool("IsOffroad") or self.params.get("ModelManager_DownloadRef") is not None:
+        return
+      if time.monotonic() < self._repair_retry_at.get(source, 0):
+        continue
+      saved = self.params.get(key)
+      target = get_model_repair_candidate(get_selected_bundle(self.params, source), self.source_models.get(source, []))
+      if target is None:
+        continue
+      # Progress still reports the actual selected bundle. The cancel channel
+      # owns a distinct token, so reselecting even the same model wins over us.
+      self._repair_context = (key, saved)
+      self._download_ref = f"{MODEL_REPAIR_REQUEST_PREFIX}{source}:{target.ref}:{uuid4().hex}"
+      try:
+        if not self._conditional_param_update("ModelManager_DownloadRef", self._download_ref,
+                                              {"IsOffroad": True, "ModelManager_DownloadRef": None, key: saved}):
+          return
+        asyncio.run(self._repair_bundle(target, source, key))
+      except Exception:
+        cloudlog.exception(f"Model upgrade for {source} incomplete; saved selection retained, retrying offroad")
+      finally:
+        # Back off from completion, including long failed/cancelled downloads.
+        self._repair_retry_at[source] = time.monotonic() + MODEL_REPAIR_RETRY_SECONDS
+        try:
+          self._release_download_ref()
+        finally:
+          self._repair_context = None
+          self.selected_bundle = None
+
+  async def _repair_bundle(self, target, source: str, key: str) -> None:
+    from openpilot.common.file_chunker import get_chunk_name
+    bundle = custom.ModelManagerSP.ModelBundle(**target.to_dict())
+    for model in bundle.models:
+      artifact = model.artifact
+      # Flat private names work with the existing reader/cache cleaner and keep
+      # both hardware slots isolated, even if their catalog basenames coincide.
+      artifact.fileName = f"nrdr-{source}-{artifact.downloadUri.sha256.lower()}-{artifact.fileName}"
+      for i, chunk in enumerate(artifact.chunks):
+        chunk.fileName = get_chunk_name(artifact.fileName, i, len(artifact.chunks))
+    self.selected_bundle = bundle
+    bundle.status = custom.ModelManagerSP.DownloadStatus.downloading
+    self._report_status()
+    destination = Paths.model_root()
+    os.makedirs(destination, exist_ok=True)
+    seen = set()
+    for model in bundle.models:
+      artifact = model.artifact
+      if artifact.fileName not in seen:
+        seen.add(artifact.fileName)
+        await self._process_artifact(artifact, destination)
+      # The whole artifact hash, not just individual chunk hashes, is what the
+      # model runner admits. This also validates a resumed/cached repair.
+      if not await verify_file(os.path.join(destination, artifact.fileName), artifact.downloadUri.sha256):
+        raise ValueError("Model upgrade's complete artifact hash does not match the catalog")
+    if self._download_interrupted():
+      raise DownloadCancelled("Model upgrade interrupted before activation")
+    bundle.status = custom.ModelManagerSP.DownloadStatus.downloaded
+    _, saved = self._repair_context
+    if not self._conditional_param_update(key, bundle.to_dict(),
+                                          {"IsOffroad": True, "ModelManager_DownloadRef": self._download_ref, key: saved}):
+      raise DownloadCancelled("Model upgrade superseded before activation")
+    self.active_bundle = get_active_bundle(self.params, chestnut=self.chestnut_present)
+    cloudlog.info(f"Upgraded saved {source} model {bundle.internalName} for its current runtime")
+    self._report_status()
 
   def main_thread(self) -> None:
     """Main thread for model management"""
@@ -347,6 +487,8 @@ class ModelManagerSP:
             self.params.put("ModelManager_DownloadRef", DEFAULT_MODEL_REF)
 
         self._process_download_requests()
+
+        self._repair_saved_bundles()
 
         if self.params.get("ModelManager_ClearCache"):
           self.clear_model_cache()

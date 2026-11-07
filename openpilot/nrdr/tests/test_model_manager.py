@@ -141,6 +141,7 @@ class TestSelectDefaultModel(unittest.TestCase):
       params=params, sm=SimpleNamespace(update=lambda timeout: None),
       model_fetcher=SimpleNamespace(get_bundles_for_source=lambda source: available),
       _process_download_requests=lambda: processed.append(params.get("ModelManager_DownloadRef")),
+      _repair_saved_bundles=lambda: None,
       _report_status=lambda: None,
     )
     class FakeSubMaster:
