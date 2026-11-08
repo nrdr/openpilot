@@ -148,7 +148,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       str(NrdrHondaParamKey.NRDR_HONDA_PCM_MODE),
       str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE),
       str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS),
-      str(NrdrHondaParamKey.NRDR_MVL_PCM_DEADZONE),
+      "NrdrPcmSpeedDeadzone",
       *(str(key) for key in HOST_STARTUP_DEFAULTS),
     ])
 
@@ -166,19 +166,17 @@ class TestOpendbcBoundary(unittest.TestCase):
         self.assertFalse(config.honda.nidec_wind_brake)
         self.assertFalse(config.honda.provider.get_live_tuning().ecu_matched_long)
 
-  def test_mvl_pcm_deadzone_enum_scaling_fallback_and_startup_latch(self):
-    for value, expected in ((None, 0), (True, 0), (False, 0), (-1, 0), (1, 0), (3, 0), (100, 0), (2.0, 0),
-                            ("02", 0), (b" 5", 0), ("5.0", 0), (b"\xff", 0), ({}, 0),
-                            (0, 0), (2, .02), (5, .05), (10, .1), (b"2", .02), ("5", .05), (b"10", .1)):
+  def test_retired_acceleration_deadzone_is_never_selected(self):
+    for value in (None, True, False, -1, 1, 3, 100, 2.0, "02", b" 5", "5.0", b"\xff", {}, 0, 2, 5, 10, b"2", "5", b"10"):
       with self.subTest(value=value):
         params = FakeParams({"NrdrMvlPcmDeadzone": value})
         config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
-        self.assertEqual(config.honda.mvl_pcm_deadzone, expected)
+        self.assertEqual(config.honda.mvl_pcm_deadzone, 0.0)  # Retired, never reinterpreted as speed.
         params.values["NrdrMvlPcmDeadzone"] = 10
         config.honda.provider.refresh_all()
-        self.assertEqual(config.honda.mvl_pcm_deadzone, expected)
+        self.assertEqual(config.honda.mvl_pcm_deadzone, 0.0)
         restarted = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
-        self.assertEqual(restarted.honda.mvl_pcm_deadzone, .1)
+        self.assertEqual(restarted.honda.mvl_pcm_deadzone, 0.0)
         self.assertFalse(params.writes)
     grouped = {key for group in (*SLOW_PARAM_GROUPS, FAST_PARAM_GROUP) for key in group}
     self.assertNotIn(OpendbcParamKey.NRDR_MVL_PCM_DEADZONE, grouped)

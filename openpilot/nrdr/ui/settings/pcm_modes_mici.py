@@ -1,13 +1,10 @@
 """Compact longitudinal controls with the same saved-choice guards as tici."""
 from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
 from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, tuning_write_allowed
-from openpilot.nrdr.params.mvl_pcm_deadzone import (
-  MVL_PCM_DEADZONE_VALUES, MVL_PCM_DEADZONE_LABELS, MVL_PCM_DEADZONE_TITLE, MVL_PCM_DEADZONE_DESCRIPTION, MVL_PCM_DEADZONE_DETAILS,
-)
+from openpilot.nrdr.ui.settings.pcm_speed_deadzone import PcmSpeedDeadzoneSlider
 from openpilot.nrdr.ui.honda_pcm import (pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice,
                                        live_gas_available, save_live_gas_choice,
-                                       live_gas_status,
-                                       mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone, save_mvl_pcm_deadzone)
+                                       live_gas_status)
 from openpilot.nrdr.ui.settings.live_gas_reset import mici_reset_button
 from openpilot.selfdrive.ui.mici.widgets.button import BigMultiToggle, BigToggle
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -50,31 +47,9 @@ class PcmModeControl(BigMultiToggle):
       self.set_value(label)
 
 
-class MvlPcmDeadzoneControl(BigMultiToggle):
+class MvlPcmDeadzoneControl(PcmSpeedDeadzoneSlider):
   def __init__(self):
-    self._labels = [tr(label) for label in MVL_PCM_DEADZONE_LABELS]
-    super().__init__(tr(MVL_PCM_DEADZONE_TITLE), self._labels, select_callback=self._select, font_size=24,
-                     description=tr(MVL_PCM_DEADZONE_DESCRIPTION) + " " + tr(MVL_PCM_DEADZONE_DETAILS))
-    self.set_enabled(lambda: ui_state.is_offroad() and mvl_pcm_deadzone_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
-    self.refresh()
-
-  def _title_width_hint(self) -> int:
-    return max(1, int(self._rect.width - self.LABEL_HORIZONTAL_PADDING - self._txt_enabled_toggle.width - 12))
-
-  def _subtitle_width_hint(self) -> int:
-    return self._title_width_hint()
-
-  def _select(self, label):
-    if label in self._labels:
-      save_mvl_pcm_deadzone(ui_state, MVL_PCM_DEADZONE_VALUES[self._labels.index(label)])
-    self.refresh()
-
-  def refresh(self):
-    self.set_value(self._labels[MVL_PCM_DEADZONE_VALUES.index(saved_mvl_pcm_deadzone(ui_state.params))])
-
-  def _update_state(self):
-    super()._update_state()
-    self.refresh()
+    super().__init__(compact=True)
 
 
 class WindBrakeControl(BigToggle):

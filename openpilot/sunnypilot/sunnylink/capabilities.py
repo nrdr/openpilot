@@ -101,7 +101,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "nrdr_honda_tuning_available": "Confirmed Honda-specific nrdr tuning available",
   "nrdr_longitudinal_tuning_available": "Vehicle explicitly supported by nrdr longitudinal tuning",
   "nrdr_honda_pcm_tuning_available": "Confirmed non-interceptor Honda Nidec; saved tuning applies when openpilot controls longitudinal",
-  "nrdr_mvl_pcm_deadzone_available": "Confirmed non-interceptor Civic Nidec PCM; configure while parked, applies only under MVL",
+  "nrdr_mvl_pcm_deadzone_available": "Confirmed non-interceptor Civic Nidec PCM; configure while parked, applies only during Experimental PCM shaping",
   "nrdr_honda_mvl_selection_available": "Confirmed Honda; saved MVL selection applies when openpilot controls longitudinal",
   "nrdr_mvl_longitudinal_active": "Drive-latched MVL longitudinal control; saved tuning choices remain editable",
   "nrdr_mvl_tuning_exempt": "Current vehicle is outside Honda openpilot longitudinal; saved Honda modes do not restrict its tuning",

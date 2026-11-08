@@ -9,7 +9,7 @@ from openpilot.nrdr.params.tuning_policy import (
 )
 from openpilot.nrdr.tests.test_honda_pcm_ui import Params, native_layout, state
 from openpilot.nrdr.tests.test_nidec_pcm_experiments import cp_bytes
-from openpilot.nrdr.ui.honda_pcm import save_live_gas_choice, save_mvl_pcm_deadzone, save_pcm_choice
+from openpilot.nrdr.ui.honda_pcm import save_live_gas_choice, save_pcm_speed_deadzone, save_pcm_choice
 
 
 @pytest.mark.parametrize("key", sorted(MVL_LOCK_KEYS))
@@ -86,13 +86,13 @@ def test_parked_native_configuration_keeps_old_cp_but_saves_choices(flags):
     assert getattr(layout, name).enabled, name
   assert layout._long_pid_tune_scale_standard.visible
   assert save_live_gas_choice(ui, True)
-  assert save_mvl_pcm_deadzone(ui, 5)
+  assert save_pcm_speed_deadzone(ui, .05)
   assert save_pcm_choice(ui, "NrdrHondaWindBrake", False)
   assert ui.params.get("NrdrHondaLegacyPcm") is False
   assert ui.CP.flags == before_flags
   ui.params.writes.clear()
   ui.is_offroad = lambda: False
   assert not save_live_gas_choice(ui, False)
-  assert not save_mvl_pcm_deadzone(ui, 0)
+  assert not save_pcm_speed_deadzone(ui, 0)
   assert not save_pcm_choice(ui, "NrdrHondaWindBrake", True)
   assert not ui.params.writes

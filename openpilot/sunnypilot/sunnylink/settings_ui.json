@@ -2675,29 +2675,15 @@
                   ]
                 },
                 {
-                  "key": "NrdrMvlPcmDeadzone",
-                  "widget": "multiple_button",
-                  "title": "PCM Feedback Deadzone (Experimental)",
-                  "description": "Filters small acceleration errors only while MVL controls Civic PCM. Ignored during Civic Experimental shaping. Editable while parked even with MVL off. Off keeps MVL unchanged. Applies next drive; no device reboot.",
-                  "details": "Width (m/s\u00b2) ramps from 0 at 2.3 m/s to the selected maximum at 9 m/s. Bypasses requested deceleration, stopping, overrides and AEB. This filters acceleration error, not a throttle ramp or delay model. It may hold existing integral correction longer. Learning can change; Off does not undo saved learning.",
-                  "options": [
-                    {
-                      "label": "Off",
-                      "value": 0
-                    },
-                    {
-                      "label": "0.02",
-                      "value": 2
-                    },
-                    {
-                      "label": "0.05",
-                      "value": 5
-                    },
-                    {
-                      "label": "0.10",
-                      "value": 10
-                    }
-                  ],
+                  "key": "NrdrPcmSpeedDeadzone",
+                  "widget": "option",
+                  "title": "PCM Speed-Error Deadzone",
+                  "description": "Deadbands the Experimental Civic PCM speed-target error, not acceleration feedback. 0 = Off; default 0.15 m/s. Editable while parked, even with Experimental off. Applies next drive; no device reboot.",
+                  "details": "Width ramps from zero at 0 m/s to the selected maximum at 9 m/s (about 20 mph). Inside the band, PCM requests current speed, not zero. Outside it, the width is subtracted from the error. Launch, friction-brake requests, stopping and override/AEB releases are not delayed. Speed-gain and ceiling learning pause while the deadband changes the target. This is not the old speed-error PID or an overspeed allowance.",
+                  "min": 0.0,
+                  "max": 0.2,
+                  "step": 0.01,
+                  "unit": "m/s",
                   "visibility": [
                     {
                       "type": "capability",

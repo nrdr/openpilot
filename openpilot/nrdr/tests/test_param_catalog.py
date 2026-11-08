@@ -31,8 +31,8 @@ REGISTRY_METADATA_SHA256 = "c4433c55bdfe7c6216a6db1f14d5f447d8645d981ef098f8d834
 class TestParamCatalog(unittest.TestCase):
   def test_catalog_is_complete_and_unique(self) -> None:
     self.assertEqual(validate_catalog(), ())
-    self.assertEqual(len(PARAM_SPECS), 165)
-    self.assertEqual(len(ADDED_PARAM_SPECS), 164)
+    self.assertEqual(len(PARAM_SPECS), 166)
+    self.assertEqual(len(ADDED_PARAM_SPECS), 165)
     self.assertEqual(len(OVERRIDDEN_PARAM_SPECS), 1)
     self.assertEqual(len(PARAM_SPECS_BY_KEY), len(PARAM_SPECS))
     from openpilot.nrdr.params.generated import ALL_KEYS, ADDED_KEYS, OVERRIDDEN_KEYS
@@ -43,7 +43,7 @@ class TestParamCatalog(unittest.TestCase):
 
     # Adding the optional deadzone must not change any existing registry/default.
     metadata = "\n".join(f"{spec.action.value}|{spec.key}|{spec.cpp_attributes}" for spec in PARAM_SPECS
-                         if spec.key not in ("NrdrMvlPcmDeadzone", "NrdrHondaPcmFixedCruise", "NrdrHondaLegacyPcm",
+                         if spec.key not in ("NrdrMvlPcmDeadzone", "NrdrPcmSpeedDeadzone", "NrdrHondaPcmFixedCruise", "NrdrHondaLegacyPcm",
                                                "NrdrConfidenceBall", "NrdrDeveloperSidebar", "NrdrEngagementSoundPack")) + "\n"
     self.assertEqual(sha256(metadata.encode()).hexdigest(), REGISTRY_METADATA_SHA256)
     receipt = PARAM_SPECS_BY_KEY["NrdrRdxRouteAConfirmation"]
@@ -61,13 +61,14 @@ class TestParamCatalog(unittest.TestCase):
 
   def test_pcm_mode_defaults_off_and_wind_on_without_migrating_legacy_bool(self) -> None:
     for key, kind, default in (("NrdrHondaPcmMode", ParamType.INT, "0"), ("NrdrHondaWindBrake", ParamType.BOOL, "1"),
-                               ("NrdrMvlPcmDeadzone", ParamType.INT, "0")):
+                               ("NrdrPcmSpeedDeadzone", ParamType.FLOAT, "0.15")):
       spec = PARAM_SPECS_BY_KEY[key]
       self.assertEqual((spec.param_type, spec.default), (kind, default))
       self.assertEqual(spec.flags, (ParamFlag.PERSISTENT, ParamFlag.BACKUP))
       self.assertIs(spec.lifecycle, ParamLifecycle.SETTING)
       self.assertIs(spec.owner, ParamOwner.HONDA)
     self.assertIs(PARAM_SPECS_BY_KEY["NrdrHondaEcuMatchedLong"].lifecycle, ParamLifecycle.TOMBSTONE)
+    self.assertIs(PARAM_SPECS_BY_KEY["NrdrMvlPcmDeadzone"].lifecycle, ParamLifecycle.TOMBSTONE)
 
   def test_handcrafted_request_context_is_typed_and_not_restored_from_backups(self) -> None:
     spec = PARAM_SPECS_BY_KEY["NrdrHandcraftedLateralRequest"]
@@ -122,7 +123,7 @@ class TestParamCatalog(unittest.TestCase):
 
     tombstones = {spec.key for spec in PARAM_SPECS if spec.lifecycle is ParamLifecycle.TOMBSTONE}
     self.assertEqual(tombstones, {
-      "NrdrHondaEcuMatchedLong", "NrdrHondaPcmFixedCruise", "NrdrHondaLegacyPcm",
+      "NrdrHondaEcuMatchedLong", "NrdrHondaPcmFixedCruise", "NrdrHondaLegacyPcm", "NrdrMvlPcmDeadzone",
       "NrdrYawDelaySchedule",
       "NrdrInterpolatedTorquePifBlend", "NrdrInterpolatedTorqueShare", "NrdrInterpolatedTorqueLatAccelFactor",
       "NrdrInterpolatedTorqueFriction", "NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway",

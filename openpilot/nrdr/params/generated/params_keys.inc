@@ -104,6 +104,7 @@
     {"NrdrHondaPcmFixedCruise", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrHondaLegacyPcm", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrMvlPcmDeadzone", {PERSISTENT | BACKUP, INT, "0"}},
+    {"NrdrPcmSpeedDeadzone", {PERSISTENT | BACKUP, FLOAT, "0.15"}},
     {"NrdrHondaWindBrake", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrHondaFullBrakeAuthority", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrRoenAccelerationLimits", {PERSISTENT | BACKUP, BOOL, "0"}},

@@ -1,27 +1,23 @@
-"""ROOT startup/UI contract for the opt-in Civic PCM acceleration-error deadzone."""
-import ast
+"""Speed-deadzone replacement: real units, saved-state isolation and UI/RPC contract."""
 from dataclasses import replace
-import json
 
 import pytest
 
-from opendbc.car.honda.values import CAR, HondaFlags
-from opendbc.car.honda.mvl_longitudinal import pcm_deadzone_config
-from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
-from openpilot.nrdr.params import mvl_pcm_deadzone as choices
-from openpilot.nrdr.params.tuning_policy import MVL_LOCK_KEYS, tuning_write_allowed
-from openpilot.nrdr.tests.test_honda_pcm_ui import ROOT, Params, Widget, _font_advance_upper_bound, native_layout, state
+from openpilot.nrdr.params.pcm_speed_deadzone import (
+  PCM_SPEED_DEADZONE_KEY as KEY, PCM_SPEED_DEADZONE_DEFAULT, PCM_SPEED_DEADZONE_DESCRIPTION,
+  PCM_SPEED_DEADZONE_DETAILS, decode_speed_deadzone, read_speed_deadzone,
+)
+from openpilot.nrdr.tests.test_honda_pcm_ui import Params, state, native_layout
 from openpilot.nrdr.tests.test_mvl_settings import encoded, rpc as rpc_fixture
 from openpilot.nrdr.tests.test_opendbc_boundary import FakeParams
-from openpilot.nrdr.ui.honda_pcm import mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone, save_mvl_pcm_deadzone
+from openpilot.nrdr.tests.test_parked_tuning_schema import items_in
+from openpilot.nrdr.ui.honda_pcm import saved_pcm_speed_deadzone, save_pcm_speed_deadzone
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_schema, DEFAULT_SRC
 
-
-KEY = "NrdrMvlPcmDeadzone"
 CAP = "nrdr_mvl_pcm_deadzone_available"
-VALUES = choices.MVL_PCM_DEADZONE_VALUES
-INVALID = (None, True, False, -1, 1, 3, 100, 2.0, .02, "", "02", "2.0", " 2", "2\n", "+2", "0.02", "nan", b"\xff", {}, [])
+VALUES = tuple(tick / 100 for tick in range(21))
+INVALID = (True, False, -1, .21, 2, 5, 10, .155, float("nan"), float("inf"), "", "true", b"\xff", {}, [])
 
 
 @pytest.fixture
@@ -29,303 +25,102 @@ def rpc():
   return rpc_fixture.__wrapped__()
 
 
-def mici_control(ui):
-  path = ROOT / "openpilot/nrdr/ui/settings/pcm_modes_mici.py"
-  tree = ast.parse(path.read_text(encoding="utf-8"))
-  tree.body = [node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "MvlPcmDeadzoneControl"]
-  env = {"BigMultiToggle": Widget, "ui_state": ui, "tr": lambda s: s,
-         "mvl_pcm_deadzone_available": mvl_pcm_deadzone_available, "saved_mvl_pcm_deadzone": saved_mvl_pcm_deadzone,
-         "save_mvl_pcm_deadzone": save_mvl_pcm_deadzone}
-  env.update({key: value for key, value in vars(choices).items() if key.startswith("MVL_PCM_DEADZONE_")})
-  exec(compile(tree, str(path), "exec"), env)
-  return env["MvlPcmDeadzoneControl"]()
-
-
-def emitted_capability(ui):
-  """Execute the production capability assignment with current vehicle objects."""
-  path = ROOT / "openpilot/sunnypilot/sunnylink/capabilities.py"
-  tree = ast.parse(path.read_text(encoding="utf-8"))
-  method = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "generate_capabilities")
-  assignment = next(node for node in method.body if isinstance(node, ast.Assign)
-                    and isinstance(node.targets[0], ast.Subscript) and isinstance(node.targets[0].slice, ast.Constant)
-                    and node.targets[0].slice.value == CAP)
-  env = {"caps": {}, "CP": ui.CP, "CP_SP": ui.CP_SP, "params": ui.params,
-         "mvl_pcm_deadzone_available": mvl_pcm_deadzone_available}
-  exec(compile(ast.Module([assignment], []), str(path), "exec"), env)
-  return env["caps"][CAP]
-
-
 @pytest.mark.parametrize("value", VALUES)
-def test_strict_host_and_wire_enum(value):
+def test_real_speed_units_and_existing_selections(value):
   for raw in (value, str(value), str(value).encode()):
-    assert choices.decode_mvl_pcm_deadzone(raw) == value
-  assert saved_mvl_pcm_deadzone(Params(**{KEY: value})) == value
+    assert decode_speed_deadzone(raw) == value
+  assert saved_pcm_speed_deadzone(Params(**{KEY: value})) == value
 
 
 @pytest.mark.parametrize("value", INVALID)
-def test_invalid_values_fall_back_without_repair_or_native_write(value):
-  assert choices.decode_mvl_pcm_deadzone(value) is None
+def test_invalid_values_are_not_repaired_or_written(value):
+  assert decode_speed_deadzone(value) is None
+  assert read_speed_deadzone(value) == 0
   ui = state()
-  ui.params.values.update(HondaLiveLearningGas=True, **{KEY: value})
-  assert saved_mvl_pcm_deadzone(ui.params) == 0
-  assert not save_mvl_pcm_deadzone(ui, value)
+  assert not save_pcm_speed_deadzone(ui, value)
   assert not ui.params.writes
 
 
-@pytest.mark.parametrize("value", ["0", "2", "5", "10", b"2", b"10"])
-def test_native_values_are_typed_not_storage_encodings(value):
-  ui = state()
-  ui.params.values.update(HondaLiveLearningGas=True, **{KEY: value})
-  assert saved_mvl_pcm_deadzone(ui.params) == 0
-  assert not save_mvl_pcm_deadzone(ui, value)
-  assert not ui.params.writes
+def test_missing_is_default_and_old_acceleration_units_are_not_migrated(tmp_path):
+  params = FakeParams({"NrdrMvlPcmDeadzone": 10})
+  cfg = build_sunnypilot_car_config(params, start_worker=False, metadata_path=tmp_path / "meta.json")
+  assert cfg.honda.civic_pcm_speed_deadzone == PCM_SPEED_DEADZONE_DEFAULT == .15
+  assert cfg.honda.mvl_pcm_deadzone == 0
+  assert not params.writes
+  params.values[KEY] = 0.
+  disabled = build_sunnypilot_car_config(params, start_worker=False, metadata_path=tmp_path / "off.json")
+  assert disabled.honda.civic_pcm_speed_deadzone == 0.
+  assert cfg == replace(disabled, honda=replace(disabled.honda, provider=cfg.honda.provider, civic_pcm_speed_deadzone=.15))
 
 
-@pytest.mark.parametrize("car", list(CAR))
-@pytest.mark.parametrize("saved,active", [(False, False), (True, False), (False, True), (True, True)])
-def test_exact_hardware_gates_native_and_capability_independent_of_mvl(car, saved, active):
-  ui = state(carFingerprint=str(car), flags=int(HondaFlags.MVL_LONGITUDINAL) if active else 0)
-  ui.params.values["HondaLiveLearningGas"] = saved
-  expected = car == CAR.HONDA_CIVIC
-  assert mvl_pcm_deadzone_available(ui.CP, ui.CP_SP, ui.params) is expected
-  assert emitted_capability(ui) is expected
-  assert save_mvl_pcm_deadzone(ui, 5) is expected
-  assert ui.params.writes == ([(KEY, 5), ("OnroadCycleRequested", True)] if expected else [])
-
-
-@pytest.mark.parametrize("case", ["onroad", "stock", "interceptor", "stock_flag", "missing_cp", "missing_sp",
-                                 "unknown", "other_brand", "stale_bundle", "bad_bundle", "mvl_off"])
-@pytest.mark.parametrize("native", ["large", "mici"])
-def test_both_native_callbacks_recheck_stale_vehicle_and_road_state(case, native):
-  ui = state()
-  ui.params.values.update(HondaLiveLearningGas=True, ExperimentalMode=True, **{KEY: 2})
-  layout = native_layout(ui) if native == "large" else mici_control(ui)
-  if native == "large":
-    layout._update_state()
-    assert layout._mvl_pcm_deadzone.enabled
-    def select():
-      layout._mvl_pcm_deadzone.kwargs["callback"](2)
-  else:
-    assert layout.enabled()
-    def select():
-      layout._select("0.05")
-  if case == "onroad":
-    ui.params.values["IsOffroad"] = False
-  elif case == "stock":
-    ui.CP.openpilotLongitudinalControl = False
-  elif case == "interceptor":
-    ui.CP_SP.enableGasInterceptor = True
-  elif case == "stock_flag":
-    ui.CP_SP.flags |= HondaFlagsSP.STOCK_LONGITUDINAL
-  elif case == "missing_cp":
-    ui.CP = None
-  elif case == "missing_sp":
-    ui.CP_SP = None
-  elif case == "unknown":
-    ui.CP.carFingerprint = "UNKNOWN_HONDA"
-  elif case == "other_brand":
-    ui.CP.brand = "toyota"
-  elif case == "stale_bundle":
-    ui.params.values["CarPlatformBundle"] = {"brand": "honda", "platform": "HONDA_CLARITY"}
-  elif case == "bad_bundle":
-    ui.params.values["CarPlatformBundle"] = True
-  elif case == "mvl_off":
-    ui.params.values["HondaLiveLearningGas"] = False
-  select()
-  layout._update_state()
-  accepted = case in ("mvl_off", "stock", "stock_flag")
-  assert ui.params.writes == ([(KEY, 5), ("OnroadCycleRequested", True)] if accepted else [])
-  assert ui.params.get_bool("ExperimentalMode")
-  if native == "large":
-    assert layout._mvl_pcm_deadzone.enabled is accepted
-    assert layout._mvl_pcm_deadzone.value == (2 if accepted else 1)
-  else:
-    assert layout.enabled() is accepted
-    assert layout.value == ("0.05" if accepted else "0.02")
-
-
-@pytest.mark.parametrize("saved,active", [(True, False), (False, True), (True, True)])
-@pytest.mark.parametrize("value", VALUES)
-def test_native_controls_save_enum_not_button_index_with_parked_tuning_editable(saved, active, value):
-  ui = state(flags=int(HondaFlags.MVL_LONGITUDINAL) if active else 0)
-  ui.params.values.update(HondaLiveLearningGas=saved, ExperimentalMode=False)
-  large, mici = native_layout(ui), mici_control(ui)
-  assert KEY not in MVL_LOCK_KEYS
-  assert tuning_write_allowed(ui.params, KEY, CP=ui.CP)
-  assert all(tuning_write_allowed(ui.params, key, CP=ui.CP) for key in MVL_LOCK_KEYS)
-  assert all(tuning_write_allowed(ui.params, key, CP=ui.CP, is_offroad=False) for key in MVL_LOCK_KEYS)
-  assert large._mvl_pcm_deadzone.param_key is None  # no automatic post-callback write
-  large._mvl_pcm_deadzone.kwargs["callback"](VALUES.index(value))
-  large._update_state()
-  assert large._mvl_pcm_deadzone.value == VALUES.index(value)
-  assert large._mvl_pcm_deadzone.enabled
-  assert large._pcm_mode.enabled and large._wind_brake.enabled and large._static_feedforward_long.enabled
-  assert ui.params.writes == [(KEY, value), ("OnroadCycleRequested", True)]
-  ui.params.writes.clear()
-  mici._update_state()
-  assert mici.value == choices.MVL_PCM_DEADZONE_LABELS[VALUES.index(value)]
-  mici._select(mici.value)
-  assert ui.params.writes == [(KEY, value), ("OnroadCycleRequested", True)]
-  assert not ui.params.get_bool("ExperimentalMode")
-
-
-@pytest.mark.parametrize("index", [-1, 4, True, None, "2", 2.0])
-def test_native_invalid_button_indices_do_not_write(index):
-  ui = state()
-  ui.params.values["HondaLiveLearningGas"] = True
-  layout = native_layout(ui)
-  layout._mvl_pcm_deadzone.kwargs["callback"](index)
-  assert not ui.params.writes
-
-
-@pytest.mark.parametrize("value", VALUES)
-@pytest.mark.parametrize("compressed", [False, True])
-def test_remote_valid_enum_parked_restart_and_no_experimental_write(rpc, value, compressed):
-  save, params, caps = rpc
-  params.values.update(HondaLiveLearningGas=True, ExperimentalMode=True)
-  caps[CAP] = True
-  save({KEY: encoded(value, compressed)}, compressed)
-  assert params.get(KEY) == value and type(params.get(KEY)) is int
-  assert params.get_bool("OnroadCycleRequested")
-  assert params.get_bool("ExperimentalMode")
-  assert {key for key, _ in params.writes} == {KEY, "OnroadCycleRequested", "ParamsVersion"}
-
-
-@pytest.mark.parametrize("value", INVALID)
-@pytest.mark.parametrize("compressed", [False, True])
-def test_remote_malformed_values_rejected_before_any_write(rpc, value, compressed):
-  save, params, caps = rpc
-  caps[CAP] = True
-  with pytest.raises(ValueError):
-    save({"ExperimentalMode": encoded(1, compressed), KEY: encoded(value, compressed)}, compressed)
+def test_speed_choice_is_latched_for_the_drive(tmp_path):
+  params = FakeParams({KEY: .05})
+  cfg = build_sunnypilot_car_config(params, start_worker=False, metadata_path=tmp_path / "meta.json")
+  params.values[KEY] = .2
+  cfg.honda.provider.refresh_all()
+  assert cfg.honda.civic_pcm_speed_deadzone == .05
+  next_drive = build_sunnypilot_car_config(params, start_worker=False, metadata_path=tmp_path / "next.json")
+  assert next_drive.honda.civic_pcm_speed_deadzone == .2
   assert not params.writes
 
 
-@pytest.mark.parametrize("payload,compressed", [("!bad-base64", False), ("!bad-base64", True), (encoded(5), True)])
-def test_remote_bad_transport_rejected(rpc, payload, compressed):
+@pytest.mark.parametrize("value", VALUES)
+@pytest.mark.parametrize("offroad", [True, False])
+def test_native_slider_saves_real_value_without_changing_other_settings(value, offroad):
+  ui = state()
+  ui.params.values.update(IsOffroad=offroad, HondaLiveLearningGas=True, NrdrHondaPcmMode=0, NrdrHondaWindBrake=True)
+  assert save_pcm_speed_deadzone(ui, value) is offroad
+  assert ui.params.writes == ([(KEY, value), ("OnroadCycleRequested", True)] if offroad else [])
+  assert ui.params.get("NrdrHondaPcmMode") == 0 and ui.params.get_bool("NrdrHondaWindBrake")
+
+
+@pytest.mark.parametrize("value", VALUES)
+@pytest.mark.parametrize("compressed", [False, True])
+def test_remote_slider_saves_real_value(rpc, value, compressed):
+  save, params, caps = rpc
+  caps[CAP] = True
+  save({KEY: encoded(value, compressed)}, compressed)
+  assert params.get(KEY) == value and type(params.get(KEY)) is float
+  assert params.get_bool("OnroadCycleRequested")
+
+
+@pytest.mark.parametrize("value", INVALID)
+def test_remote_malformed_values_rejected_before_any_batch_write(rpc, value):
   save, params, caps = rpc
   caps[CAP] = True
   with pytest.raises(ValueError):
-    save({KEY: payload}, compressed)
+    save({"ExperimentalMode": encoded(1), KEY: encoded(value)})
+  assert not params.writes
+
+
+def test_retired_acceleration_setting_cannot_be_written(rpc):
+  save, params, _ = rpc
+  with pytest.raises(ValueError, match="Retired"):
+    save({"NrdrMvlPcmDeadzone": encoded(10)})
   assert not params.writes
 
 
 @pytest.mark.parametrize("offroad,capability", [(False, True), (True, False), (True, None)])
-def test_remote_road_and_capability_fail_closed(rpc, offroad, capability):
+def test_remote_road_and_hardware_guards(rpc, offroad, capability):
   save, params, caps = rpc
   params.values["IsOffroad"] = offroad
   caps[CAP] = capability
   with pytest.raises(ValueError):
-    save({KEY: encoded(5)})
+    save({KEY: encoded(.15)})
   assert not params.writes
 
 
-@pytest.mark.parametrize("change", ["road", "vehicle"])
-def test_remote_rechecks_just_before_write(rpc, change):
-  save, params, caps = rpc
-  caps[CAP] = True
-  calls = 0
-
-  def capabilities():
-    nonlocal calls
-    calls += 1
-    if calls == 1:
-      if change == "road":
-        params.values["IsOffroad"] = False
-      return dict(caps)
-    return {**caps, CAP: False}
-
-  save.__globals__["_vehicle_tuning_capabilities"] = capabilities
-  with pytest.raises(ValueError):
-    save({KEY: encoded(10)})
-  assert not params.writes
-
-
-@pytest.mark.parametrize("key", sorted(MVL_LOCK_KEYS))
-@pytest.mark.parametrize("offroad", [None, False, True])
-def test_remote_deadzone_and_custom_tuning_batch_requires_parked(rpc, key, offroad):
-  save, params, caps = rpc
-  params.values.update(IsOffroad=offroad, HondaLiveLearningGas=True)
-  caps[CAP] = True
-  if offroad is True:
-    save({KEY: encoded(5), key: encoded(1)})
-    assert params.get(KEY) == 5 and params.get(key) == 1
-    assert {name for name, _ in params.writes} == {KEY, key, "OnroadCycleRequested", "ParamsVersion"}
-  else:
-    with pytest.raises(ValueError):
-      save({KEY: encoded(5), key: encoded(1)})
-    assert not params.writes
-
-
-@pytest.mark.parametrize("reverse", [False, True])
-def test_remote_parked_batch_can_prepare_deadzone_with_mvl_off(rpc, reverse):
-  save, params, caps = rpc
-  params.values["HondaLiveLearningGas"] = True
-  caps[CAP] = True
-  entries = [(KEY, encoded(5)), ("HondaLiveLearningGas", encoded(0))]
-  save(dict(reversed(entries) if reverse else entries))
-  assert params.get(KEY) == 5 and params.get("HondaLiveLearningGas") is False
-  assert {name for name, _ in params.writes} == {KEY, "HondaLiveLearningGas", "OnroadCycleRequested", "ParamsVersion"}
-
-
-@pytest.mark.parametrize("car,interceptor,openlong,mvl,stock", [
-  (CAR.HONDA_CIVIC, False, True, True, False), (CAR.HONDA_CIVIC, False, True, False, False),
-  (CAR.HONDA_CLARITY, False, True, True, False), (CAR.HONDA_CIVIC_BOSCH, False, True, True, False),
-  (CAR.HONDA_CIVIC, True, True, True, False), (CAR.HONDA_CIVIC, False, False, True, False),
-  (CAR.HONDA_CIVIC, False, True, True, True),
-])
-def test_host_value_passes_scaled_to_core_but_cannot_apply_to_unsupported_path(tmp_path, car, interceptor, openlong, mvl, stock):
-  params = FakeParams({KEY: 5, "HondaLiveLearningGas": mvl})
-  config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=tmp_path / "meta.json")
-  ui = state(carFingerprint=str(car), enableGasInterceptor=interceptor, openpilotLongitudinalControl=openlong,
-             flags=int(HondaFlags.BOSCH if car == CAR.HONDA_CIVIC_BOSCH else HondaFlags.NIDEC))
-  if stock:
-    ui.CP_SP.flags |= HondaFlagsSP.STOCK_LONGITUDINAL
-  expected = .05 if car == CAR.HONDA_CIVIC and not interceptor and openlong and mvl and not stock else 0.0
-  assert config.honda.mvl_pcm_deadzone == .05
-  assert pcm_deadzone_config(ui.CP, ui.CP_SP, config.honda.mvl_longitudinal, config.honda.mvl_pcm_deadzone) == expected
-  # Aside from this explicit startup option, every other host setting stays identical.
-  baseline = build_sunnypilot_car_config(FakeParams({"HondaLiveLearningGas": mvl}), start_worker=False, metadata_path=tmp_path / "off.json")
-  assert config == replace(baseline, honda=replace(baseline.honda, provider=config.honda.provider, mvl_pcm_deadzone=.05))
-  assert not params.writes
-
-
-def test_copy_schema_native_options_and_compact_geometry_match():
-  ui = state()
-  large, mici = native_layout(ui), mici_control(ui)
-  schema = compile_schema(DEFAULT_SRC)
-  section = next(page for page in schema["panels"] if page["id"] == "steering")["sections"]
-  panel = next(panel for group in section for panel in group.get("sub_panels", []) if panel["id"] == "nrdr_longitudinal")
-  web = next(item for item in panel["items"] if item.get("key") == KEY)
-  local = large._mvl_pcm_deadzone.kwargs
-  assert web["title"] == local["title"]() == mici.text == choices.MVL_PCM_DEADZONE_TITLE
-  assert web["description"] == choices.MVL_PCM_DEADZONE_DESCRIPTION
-  assert web["details"] == choices.MVL_PCM_DEADZONE_DETAILS
-  assert "m/s²" in web["details"]
-  assert local["description"]() == mici.kwargs["description"] == web["description"] + " " + web["details"]
-  assert web["options"] == [{"label": label, "value": value} for label, value in zip(choices.MVL_PCM_DEADZONE_LABELS, VALUES, strict=True)]
-  assert [label() for label in local["buttons"]] == mici.options == list(choices.MVL_PCM_DEADZONE_LABELS)
-  assert "needs_onroad_cycle" not in web
-  gate = {"type": "capability", "field": CAP, "equals": True}
-  assert web["visibility"] == [gate]
-  assert web["enablement"] == [{"type": "offroad_only"}, gate]
-  assert json.loads((ROOT / "openpilot/sunnypilot/sunnylink/settings_ui.json").read_text(encoding="utf-8")) == schema
-  fields = ast.parse((ROOT / "openpilot/sunnypilot/sunnylink/capabilities.py").read_text(encoding="utf-8"))
-  field_list = next(node.value for node in fields.body if isinstance(node, ast.Assign)
-                    and any(isinstance(target, ast.Name) and target.id == "CAPABILITY_FIELDS" for target in node.targets))
-  assert CAP in ast.literal_eval(field_list)
-  # MICI's 536px screen uses a 402px settings card; reserve the right pill column.
-  assert mici._rect.width == 402
-  size, width = mici.kwargs["font_size"], mici._title_width_hint()
-  lines = []
-  for word in mici.text.split():
-    joined = f"{lines[-1]} {word}" if lines else word
-    if lines and _font_advance_upper_bound("Inter-Bold.ttf", joined, size) <= width:
-      lines[-1] = joined
-    else:
-      lines.append(word)
-  assert all(_font_advance_upper_bound("Inter-Bold.ttf", line, size) <= width for line in lines)
-  title_height = size * 1.16 * (1 + .9 * (len(lines) - 1))
-  assert mici._rect.height - 2 * mici.LABEL_VERTICAL_PADDING - title_height - 36 * 1.16 > 10
-  assert all(_font_advance_upper_bound("Inter-Regular.ttf", label, 36) < mici._subtitle_width_hint() for label in mici.options)
-  assert mici._txt_enabled_toggle.height + 3 * 35 <= mici._rect.height
+def test_web_slider_and_native_admission_do_not_depend_on_selected_mode():
+  items = {item["key"]: item for item in items_in(compile_schema(DEFAULT_SRC))}
+  assert "NrdrMvlPcmDeadzone" not in items
+  web = items[KEY]
+  assert web["widget"] == "option"
+  assert (web["min"], web["max"], web["step"], web["unit"]) == (0, .2, .01, "m/s")
+  assert web["description"] == PCM_SPEED_DEADZONE_DESCRIPTION
+  assert web["details"] == PCM_SPEED_DEADZONE_DETAILS
+  ui = state(openpilotLongitudinalControl=False)
+  ui.params.values.update(NrdrHondaPcmMode=0, HondaLiveLearningGas=False)
+  layout = native_layout(ui)
+  layout._update_state()
+  assert layout._mvl_pcm_deadzone.enabled
+  assert save_pcm_speed_deadzone(ui, .15)

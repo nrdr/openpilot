@@ -19,8 +19,6 @@ from openpilot.nrdr.params.tuning_policy import (
 )
 from openpilot.nrdr.tests.test_honda_pcm_ui import Params, Widget, native_layout, native_layout_with_real_toggle_handlers, state
 from openpilot.nrdr.ui.honda_pcm import live_gas_available, save_live_gas_choice
-from openpilot.nrdr.params import mvl_pcm_deadzone
-from openpilot.nrdr.ui.honda_pcm import mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone, save_mvl_pcm_deadzone
 from openpilot.nrdr.ui import honda_pcm
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_schema, DEFAULT_SRC
 
@@ -184,10 +182,8 @@ def test_mici_order_and_write_guards_survive_stale_display():
          "save_live_gas_choice": save_live_gas_choice, "mvl_tuning_locked": mvl_tuning_locked, "tuning_write_allowed": tuning_write_allowed,
          "pcm_tuning_available": pcm_tuning_available, "save_pcm_choice": save_pcm_choice, "saved_pcm_mode": saved_pcm_mode,
          "saved_wind_brake": saved_wind_brake, "mici_reset_button": lambda: "reset"}
-  env.update({key: value for key, value in vars(mvl_pcm_deadzone).items() if key.startswith("MVL_PCM_DEADZONE_")})
-  env.update(mvl_pcm_deadzone_available=mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone=saved_mvl_pcm_deadzone,
-             save_mvl_pcm_deadzone=save_mvl_pcm_deadzone)
   env.update(vars(honda_pcm))
+  env["PcmSpeedDeadzoneSlider"] = type("Slider", (Widget,), {"__init__": lambda self, **kwargs: Widget.__init__(self, "PCM Speed-Error Deadzone")})
   exec(compile(tree, str(path), "exec"), env)
   live, reset, mode, wind, static, deadzone = env["longitudinal_controls"]()
   assert reset == "reset" and static.text == "Keep Feedforward Static"
@@ -202,16 +198,15 @@ def test_mici_order_and_write_guards_survive_stale_display():
   assert ui.params.writes == [("NrdrHondaPcmMode", 2), ("OnroadCycleRequested", True),
                               ("NrdrHondaWindBrake", False), ("OnroadCycleRequested", True), ("StaticFeedforwardLong", True)]
   assert mode.enabled() and wind.enabled() and static.enabled()
-  assert deadzone.enabled()
+  assert type(deadzone).__name__ == "MvlPcmDeadzoneControl"
   ui.params.values["IsOffroad"] = False
   ui.params.writes.clear()
   mode._select("Off")
   wind._select(True)
   static._select(False)
   live._select(True)
-  deadzone._select("0.05")
   assert ui.params.writes == [("StaticFeedforwardLong", False)]
-  assert not mode.enabled() and not wind.enabled() and static.enabled() and not deadzone.enabled()
+  assert not mode.enabled() and not wind.enabled() and static.enabled()
 
 
 @pytest.fixture

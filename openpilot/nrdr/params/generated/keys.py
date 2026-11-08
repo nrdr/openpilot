@@ -110,6 +110,7 @@ class NrdrParamKey(StrEnum):
   NRDR_HONDA_PCM_FIXED_CRUISE = "NrdrHondaPcmFixedCruise"
   NRDR_HONDA_LEGACY_PCM = "NrdrHondaLegacyPcm"
   NRDR_MVL_PCM_DEADZONE = "NrdrMvlPcmDeadzone"
+  NRDR_PCM_SPEED_DEADZONE = "NrdrPcmSpeedDeadzone"
   NRDR_HONDA_WIND_BRAKE = "NrdrHondaWindBrake"
   NRDR_HONDA_FULL_BRAKE_AUTHORITY = "NrdrHondaFullBrakeAuthority"
   NRDR_ROEN_ACCELERATION_LIMITS = "NrdrRoenAccelerationLimits"
@@ -277,6 +278,7 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.NRDR_HONDA_PCM_FIXED_CRUISE,
   NrdrParamKey.NRDR_HONDA_LEGACY_PCM,
   NrdrParamKey.NRDR_MVL_PCM_DEADZONE,
+  NrdrParamKey.NRDR_PCM_SPEED_DEADZONE,
   NrdrParamKey.NRDR_HONDA_WIND_BRAKE,
   NrdrParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY,
   NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS,

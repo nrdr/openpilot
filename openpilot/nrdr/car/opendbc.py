@@ -18,7 +18,7 @@ from opendbc.sunnypilot.car.honda.longitudinal import LEARN_VERSION
 from opendbc.sunnypilot.car.runtime_config import HondaLiveTuning
 
 from openpilot.nrdr.params.generated.keys import NrdrParamKey
-from openpilot.nrdr.params.mvl_pcm_deadzone import decode_mvl_pcm_deadzone
+from openpilot.nrdr.params.pcm_speed_deadzone import read_speed_deadzone
 from openpilot.nrdr.car.mvl_state import LEARNER_META_PATH, MvlStateStore
 
 
@@ -520,6 +520,7 @@ class NrdrHondaConfig:
   nidec_wind_brake: bool = True
   mvl_longitudinal: bool = False
   mvl_pcm_deadzone: float = 0.0
+  civic_pcm_speed_deadzone: float = 0.15
 
 
 def build_nrdr_honda_config(params, *, start_worker: bool = True,
@@ -543,7 +544,9 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
     nidec_pcm_mode=mode,
     nidec_wind_brake=_bool_value(_read_param(params, OpendbcParamKey.NRDR_HONDA_WIND_BRAKE), True),
     mvl_longitudinal=_bool_value(_read_param(params, OpendbcParamKey.HONDA_LIVE_LEARNING_GAS), True),
-    mvl_pcm_deadzone=(decode_mvl_pcm_deadzone(_read_param(params, OpendbcParamKey.NRDR_MVL_PCM_DEADZONE)) or 0) / 100,
+    # Old acceleration-error settings are retained on disk, never reinterpreted as speed.
+    mvl_pcm_deadzone=0.0,
+    civic_pcm_speed_deadzone=read_speed_deadzone(_read_param(params, "NrdrPcmSpeedDeadzone")),
   )
 
 

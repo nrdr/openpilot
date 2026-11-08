@@ -13,7 +13,7 @@ from openpilot.nrdr.tests.test_nidec_pcm_experiments import cp_bytes
 
 LOCK_KEYS = MVL_LOCK_KEYS
 MODE_KEYS = {"HondaLiveLearningGas",
-             "NrdrHondaPcmMode", "NrdrHondaWindBrake", "NrdrMvlPcmDeadzone"}
+             "NrdrHondaPcmMode", "NrdrHondaWindBrake", "NrdrPcmSpeedDeadzone"}
 REGISTRY = {}
 for relative in ("openpilot/common/params_keys.h", "openpilot/nrdr/params/generated/params_keys.inc"):
   REGISTRY.update(re.findall(r'\{"([^"]+)", \{[^{}\n]*,\s*(BOOL|INT|FLOAT)\s*[,}]',
@@ -40,8 +40,8 @@ def rpc():
 def choice(key):
   if key == "NrdrHondaPcmMode":
     return 2
-  if key == "NrdrMvlPcmDeadzone":
-    return 5
+  if key == "NrdrPcmSpeedDeadzone":
+    return 0.05
   return {"BOOL": True, "INT": 37, "FLOAT": 1.25}[REGISTRY[key]]
 
 
@@ -132,7 +132,7 @@ def test_existing_unlocked_onroad_tuning_behavior_is_preserved(rpc, key):
 
 @pytest.mark.parametrize("key,bad", [
   ("NrdrHondaPcmFixedCruise", "invalid"), ("NrdrHondaLegacyPcm", "invalid"), ("HondaLiveLearningGas", "invalid"),
-  ("NrdrHondaPcmMode", 3), ("NrdrHondaWindBrake", "invalid"), ("NrdrMvlPcmDeadzone", 3),
+  ("NrdrHondaPcmMode", 3), ("NrdrHondaWindBrake", "invalid"), ("NrdrPcmSpeedDeadzone", 3),
   ("StaticFeedforwardLong", "invalid"), ("SpeedLimitPolicy", "1.5"), ("LongPidTuneScaleStandard", "invalid"),
   ("HondaStopAccel", "invalid"), ("NrdrStandstillGapExtra", "nan"), ("NrdrCruiseMismatchCorrection", "inf"),
 ])
@@ -159,7 +159,7 @@ def test_bad_tuning_transport_rejects_batch_before_writes(rpc, key, payload, com
 @pytest.mark.parametrize("key,cap", [
   ("HondaLiveLearningGas", "nrdr_honda_mvl_selection_available"),
   ("NrdrHondaPcmMode", "nrdr_honda_pcm_tuning_available"), ("NrdrHondaWindBrake", "nrdr_honda_pcm_tuning_available"),
-  ("NrdrMvlPcmDeadzone", "nrdr_mvl_pcm_deadzone_available"),
+  ("NrdrPcmSpeedDeadzone", "nrdr_mvl_pcm_deadzone_available"),
 ])
 @pytest.mark.parametrize("change", ["unavailable", "missing", "lost_before_write", "started_during_capability_check", "started_before_loop"])
 def test_mode_hardware_and_fresh_road_checks_remain_fail_closed(rpc, key, cap, change):

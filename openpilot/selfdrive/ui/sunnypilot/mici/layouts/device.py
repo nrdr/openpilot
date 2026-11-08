@@ -15,6 +15,9 @@ class DeviceLayoutMiciSP(DeviceLayoutMici):
     self._disable_power_down = attach_mici_automatic_shutdown_control(self._scroller)
     self._longitudinal_controls = longitudinal_controls()
     self._scroller.add_widgets(self._longitudinal_controls)
+    self._scroller.set_scrolling_enabled(lambda: not any(
+      getattr(control, "captures_horizontal_scroll", lambda: False)() for control in self._longitudinal_controls
+    ))
 
   def show_event(self):
     super().show_event()

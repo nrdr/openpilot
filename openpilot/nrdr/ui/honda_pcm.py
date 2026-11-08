@@ -4,7 +4,7 @@ from opendbc.car.honda.values import CAR, HONDA_BOSCH
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
-from openpilot.nrdr.params.mvl_pcm_deadzone import MVL_PCM_DEADZONE_VALUES
+from openpilot.nrdr.params.pcm_speed_deadzone import PCM_SPEED_DEADZONE_KEY, decode_speed_deadzone, read_speed_deadzone
 
 
 def live_gas_available(CP, CP_SP, params) -> bool:
@@ -54,17 +54,15 @@ def mvl_pcm_deadzone_available(CP, CP_SP, params) -> bool:
   return pcm_tuning_available(CP, CP_SP, params) and CP.carFingerprint == CAR.HONDA_CIVIC
 
 
-def saved_mvl_pcm_deadzone(params) -> int:
-  value = params.get("NrdrMvlPcmDeadzone")
-  return value if type(value) is int and value in MVL_PCM_DEADZONE_VALUES else 0
+def saved_pcm_speed_deadzone(params) -> float:
+  return read_speed_deadzone(params.get(PCM_SPEED_DEADZONE_KEY))
 
 
-def save_mvl_pcm_deadzone(state, value) -> bool:
-  # May be prepared while parked; only the MVL PCM path consumes this choice.
-  if (type(value) is not int or value not in MVL_PCM_DEADZONE_VALUES or not state.is_offroad()
-      or not mvl_pcm_deadzone_available(state.CP, state.CP_SP, state.params)):
+def save_pcm_speed_deadzone(state, value) -> bool:
+  selected = decode_speed_deadzone(value) if type(value) in (int, float) else None
+  if selected is None or not state.is_offroad() or not mvl_pcm_deadzone_available(state.CP, state.CP_SP, state.params):
     return False
-  state.params.put("NrdrMvlPcmDeadzone", value, block=True)
+  state.params.put(PCM_SPEED_DEADZONE_KEY, selected, block=True)
   state.params.put_bool("OnroadCycleRequested", True, block=True)
   return True
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from openpilot.nrdr.params.tuning_policy import LONG_SCALE_KEYS, MVL_LOCK_KEYS, RETIRED_TUNING_KEYS, SUGGESTED_DESCRIPTION
-from openpilot.nrdr.params.mvl_pcm_deadzone import MVL_PCM_DEADZONE_DESCRIPTION
+from openpilot.nrdr.params.pcm_speed_deadzone import PCM_SPEED_DEADZONE_DESCRIPTION
 from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import DEFAULT_OUT, DEFAULT_SRC, compile_schema
 
@@ -66,7 +66,7 @@ def test_parked_editing_accepts_saved_and_cached_modes_without_clearing_capabili
   assert not item.get("enablement")
 
 
-@pytest.mark.parametrize("key", ["LongPidTuneScaleStandard", "AccelBoostSP", "HondaLiveLearningGas", "NrdrMvlPcmDeadzone"])
+@pytest.mark.parametrize("key", ["LongPidTuneScaleStandard", "AccelBoostSP", "HondaLiveLearningGas", "NrdrPcmSpeedDeadzone"])
 @pytest.mark.parametrize("offroad", [False, True, None])
 @pytest.mark.parametrize("saved,active,exempt,legacy", [
   (False, False, False, False),
@@ -238,7 +238,7 @@ def test_suggested_copy_uses_parent_owned_shared_description(items):
   ("NrdrHondaPcmMode", "nrdr_honda_pcm_tuning_available"),
   ("NrdrHondaWindBrake", "nrdr_honda_pcm_tuning_available"),
   ("HondaLiveLearningGas", "nrdr_honda_mvl_selection_available"),
-  ("NrdrMvlPcmDeadzone", "nrdr_mvl_pcm_deadzone_available"),
+  ("NrdrPcmSpeedDeadzone", "nrdr_mvl_pcm_deadzone_available"),
 ])
 def test_compiled_parked_controls_preserve_hardware_gates(items, key, capability):
   values = {**mode_values(), capability: True}
@@ -249,12 +249,13 @@ def test_compiled_parked_controls_preserve_hardware_gates(items, key, capability
 
 
 def test_compiled_deadzone_can_be_saved_with_mvl_off_but_still_requires_confirmed_pcm(items):
-  item = items["NrdrMvlPcmDeadzone"]
+  item = items["NrdrPcmSpeedDeadzone"]
   values = {**mode_values(saved=False, active=False, legacy=False), "nrdr_mvl_pcm_deadzone_available": True}
   assert allowed(item, values) and allowed(item, values, "visibility")
   values["nrdr_mvl_pcm_deadzone_available"] = False
   assert not allowed(item, values) and not allowed(item, values, "visibility")
-  assert [option["value"] for option in item["options"]] == [0, 2, 5, 10]
+  assert item["widget"] == "option"
+  assert (item["min"], item["max"], item["step"], item["unit"]) == (0.0, 0.2, 0.01, "m/s")
 
 
 def test_compiled_schema_keeps_pid_controls_and_omits_retired_tuning(items):
@@ -275,8 +276,8 @@ def test_compiled_copy_explains_saved_choices_instead_of_parked_lockout(items):
   mvl_details = items["HondaLiveLearningGas"]["details"]
   assert "Speed-limit assistance, curve-speed control and cruise-button increments remain independent" in mvl_details
   assert "Custom controller tuning stays editable but is ignored by MVL" in mvl_details
-  assert items["NrdrMvlPcmDeadzone"]["description"] == MVL_PCM_DEADZONE_DESCRIPTION
-  assert "even with MVL off" in items["NrdrMvlPcmDeadzone"]["description"]
+  assert items["NrdrPcmSpeedDeadzone"]["description"] == PCM_SPEED_DEADZONE_DESCRIPTION
+  assert "Editable while parked, even with Experimental off" in items["NrdrPcmSpeedDeadzone"]["description"]
   assert "gas interceptor" in items["NrdrRoenAccelerationLimits"]["details"]
 
 

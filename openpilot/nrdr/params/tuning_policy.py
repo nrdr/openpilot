@@ -43,6 +43,7 @@ YAW_FIXED_KEYS = PIF_KEYS | frozenset((
   "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",
 ))
 RETIRED_TUNING_KEYS = frozenset((
+  "NrdrMvlPcmDeadzone",
   "NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance", "NrdrHondaPcmFixedCruise", "NrdrHondaLegacyPcm",
   "NrdrYawDelaySchedule",
   "NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed",

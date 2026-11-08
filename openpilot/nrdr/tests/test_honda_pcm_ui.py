@@ -14,8 +14,7 @@ from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.nrdr.ui.honda_pcm import pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice
 from openpilot.nrdr.ui.honda_pcm import live_gas_available, save_live_gas_choice
 from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, mvl_tuning_locked, tuning_write_allowed
-from openpilot.nrdr.params import mvl_pcm_deadzone
-from openpilot.nrdr.ui.honda_pcm import mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone, save_mvl_pcm_deadzone
+from openpilot.nrdr.ui.honda_pcm import save_pcm_speed_deadzone
 from openpilot.nrdr.ui import honda_pcm
 
 
@@ -103,7 +102,7 @@ def test_cached_factory_acc_allows_parked_preconfiguration_without_changing_runt
   assert save_pcm_choice(ui, "NrdrHondaPcmMode", 2)
   assert save_pcm_choice(ui, "NrdrHondaWindBrake", True)
   assert save_live_gas_choice(ui, True)
-  assert save_mvl_pcm_deadzone(ui, 5)
+  assert save_pcm_speed_deadzone(ui, .05)
   assert ui.params.get("HondaEnforceStockLongitudinal") is saved_stock
   assert not ui.CP.openpilotLongitudinalControl
   assert ui.CP_SP.flags & HondaFlagsSP.STOCK_LONGITUDINAL
@@ -131,7 +130,7 @@ def test_sunnylink_cached_stock_snapshot_exposes_configuration_not_active_contro
     assert caps[key]
   assert not caps["has_longitudinal_control"] and not caps["nrdr_mvl_longitudinal_active"]
   items = {item["key"]: item for item in items_in(compile_schema(DEFAULT_SRC))}
-  for key in ("NrdrHondaPcmMode", "NrdrHondaWindBrake", "HondaLiveLearningGas", "NrdrMvlPcmDeadzone"):
+  for key in ("NrdrHondaPcmMode", "NrdrHondaWindBrake", "HondaLiveLearningGas", "NrdrPcmSpeedDeadzone"):
     assert allowed(items[key], caps | {"IsOffroad": True})
     assert not allowed(items[key], caps | {"IsOffroad": False})
   assert not params.writes
@@ -317,12 +316,10 @@ def native_layout(ui, toggle_factory=None):
          "nrdr_longitudinal_enabled": nrdr_longitudinal_enabled, "pcm_tuning_available": pcm_tuning_available,
          "saved_pcm_mode": saved_pcm_mode, "saved_wind_brake": saved_wind_brake, "save_pcm_choice": save_pcm_choice,
          "gas_reset_available": lambda: False, "large_reset_button": Item, "LineSeparatorSP": lambda _: NS(),
-         "toggle_item_sp": toggle_factory or Item, "option_item_sp": Item, "multiple_button_item_sp": Item}
+         "toggle_item_sp": toggle_factory or Item, "option_item_sp": Item, "multiple_button_item_sp": Item,
+         "speed_deadzone_item": Item}
   env.update(MVL_DESCRIPTION=MVL_DESCRIPTION, mvl_tuning_locked=mvl_tuning_locked, tuning_write_allowed=tuning_write_allowed,
              live_gas_available=live_gas_available, save_live_gas_choice=save_live_gas_choice)
-  env.update({key: value for key, value in vars(mvl_pcm_deadzone).items() if key.startswith("MVL_PCM_DEADZONE_")})
-  env.update(mvl_pcm_deadzone_available=mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone=saved_mvl_pcm_deadzone,
-             save_mvl_pcm_deadzone=save_mvl_pcm_deadzone)
   env.update(vars(honda_pcm))
   exec(compile(tree, str(path), "exec"), env)
   layout = object.__new__(env["LongitudinalTuningLayout"])

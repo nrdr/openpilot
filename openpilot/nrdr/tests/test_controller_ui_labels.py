@@ -9,7 +9,6 @@ import unittest
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
 from openpilot.nrdr.ui.honda_pcm import live_gas_status
 from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, tuning_write_allowed
-from openpilot.nrdr.params import mvl_pcm_deadzone
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_schema, DEFAULT_SRC
 
 
@@ -46,14 +45,13 @@ def _native_class(filename, name, *, saved_bools=None):
     "get_native_option_spec": get_native_option_spec,
     "MVL_DESCRIPTION": MVL_DESCRIPTION,
     "live_gas_status": live_gas_status,
-    "large_reset_button": lambda: object(),
+    "large_reset_button": lambda: object(), "speed_deadzone_item": lambda: object(),
     "NavButton": lambda *_: SimpleNamespace(set_click_callback=lambda *_: None),
     "Scroller": lambda items, **_: items, "LineSeparatorSP": lambda *_: None,
     **{factory: lambda **kwargs: kwargs for factory in (
       "button_item_sp", "toggle_item_sp", "option_item_sp", "simple_button_item_sp", "multiple_button_item_sp",
     )},
   }
-  env.update({key: value for key, value in vars(mvl_pcm_deadzone).items() if key.startswith("MVL_PCM_DEADZONE_")})
   exec(compile(tree, str(path), "exec"), env)
   return env[name]
 
@@ -130,7 +128,7 @@ class TestControllerUiLabels(unittest.TestCase):
     remote = _panel(self.schema, "steering", "nrdr_longitudinal")["items"]
     self.assertEqual([item["key"] for item in remote[:7]], [
       "HondaLiveLearningGas",
-      "NrdrResetLiveGas", "NrdrMvlPcmDeadzone", "NrdrLiveGasResetStatus",
+      "NrdrResetLiveGas", "NrdrPcmSpeedDeadzone", "NrdrLiveGasResetStatus",
       "NrdrHondaPcmMode", "NrdrHondaWindBrake", "StaticFeedforwardLong",
     ])
     mode, wind = remote[4:6]

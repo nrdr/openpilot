@@ -16,7 +16,7 @@ from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import DEFAULT_SRC
 
 CHOICES = (
   ("HondaLiveLearningGas", True),
-  ("NrdrHondaPcmMode", 2), ("NrdrHondaWindBrake", False), ("NrdrMvlPcmDeadzone", 5),
+  ("NrdrHondaPcmMode", 2), ("NrdrHondaWindBrake", False), ("NrdrPcmSpeedDeadzone", 0.05),
 )
 COPY = "Change while parked. Applies next drive; no device reboot."
 
@@ -70,14 +70,14 @@ def test_compiled_and_runtime_overlays_keep_four_controls_parked_without_reboot_
 def test_four_remote_choices_keep_server_parked_gate_and_explicit_cycle(rpc, key, value, offroad):
   save, params, _ = rpc
   params.values.update(IsOffroad=offroad, CarParamsPersistent=cp_bytes())
-  if key == "NrdrMvlPcmDeadzone":
+  if key == "NrdrPcmSpeedDeadzone":
     params.values["HondaLiveLearningGas"] = True
   if not offroad:
     with pytest.raises(ValueError):
-      save({key: encoded(int(value))})
+      save({key: encoded(int(value) if type(value) is bool else value)})
     assert not params.writes
     return
-  save({key: encoded(int(value))})
+  save({key: encoded(int(value) if type(value) is bool else value)})
   assert params.get(key) == value and type(params.get(key)) is type(value)
   assert params.get_bool("OnroadCycleRequested")
   assert {name for name, _ in params.writes} == {key, "OnroadCycleRequested", "ParamsVersion"}
@@ -88,9 +88,9 @@ def test_four_remote_choices_keep_server_parked_gate_and_explicit_cycle(rpc, key
 def test_four_native_choices_keep_parked_gate_and_explicit_cycle(key, value, offroad):
   ui = state()
   ui.is_offroad = lambda: offroad
-  if key == "NrdrMvlPcmDeadzone":
+  if key == "NrdrPcmSpeedDeadzone":
     ui.params.values["HondaLiveLearningGas"] = True
-    saved = honda_pcm.save_mvl_pcm_deadzone(ui, value)
+    saved = honda_pcm.save_pcm_speed_deadzone(ui, value)
   elif key == "HondaLiveLearningGas":
     saved = honda_pcm.save_live_gas_choice(ui, value)
   else:
