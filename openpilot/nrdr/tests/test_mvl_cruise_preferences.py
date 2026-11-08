@@ -10,10 +10,8 @@ from types import SimpleNamespace as NS
 import numpy as np
 import pytest
 
-from opendbc.car.honda.pcm_test_modes import FIXED_CRUISE_MPS, qualified
 from opendbc.car.honda.values import CAR, HondaFlags
 from opendbc.car.structs import car
-from opendbc.sunnypilot.car.honda.icbm_eligibility import civic_icbm_available
 from openpilot.cereal import custom
 from openpilot.common.constants import CV
 from openpilot.nrdr.features.driver_policy.speed_limit import compare_cluster_target, quantize_set_speed
@@ -52,8 +50,8 @@ def helper(*, mvl=True, fixed=False, legacy=False, pcm=False, pcm_speed=False, s
   params = Params(PREFERENCES | (values or {}))
   env = {
     "np": np, "math": math, "CV": CV, "car": car, "custom": custom, "HondaFlags": HondaFlags,
-    "Params": lambda: params, "pcm_mode_qualified": qualified, "FIXED_CRUISE_MPS": FIXED_CRUISE_MPS,
-    "mvl_longitudinal_enabled": mvl_longitudinal_enabled, "civic_icbm_available": civic_icbm_available,
+    "Params": lambda: params,
+    "mvl_longitudinal_enabled": mvl_longitudinal_enabled,
     "compare_cluster_target": compare_cluster_target, "quantize_set_speed": quantize_set_speed,
     "SLA_ACTIVE_STATES": (SLA.active, SLA.adapting), "consume_button_press": lambda _: True,
   }
@@ -64,12 +62,12 @@ def helper(*, mvl=True, fixed=False, legacy=False, pcm=False, pcm_speed=False, s
   env["NrdrCruise"] = definitions("openpilot/nrdr/features/driver_policy/cruise.py", env)["NrdrCruise"]
   core = definitions("openpilot/selfdrive/car/cruise.py", env)
   flags = (HondaFlags.NIDEC | (HondaFlags.MVL_LONGITUDINAL if mvl else 0) |
-           (HondaFlags.NIDEC_PCM_FIXED_CRUISE if fixed else 0) | (HondaFlags.NIDEC_PCM_LEGACY if legacy else 0))
+           (262144 if fixed else 0) | (524288 if legacy else 0))
   cp = NS(flags=flags, brand="honda", carFingerprint=CAR.HONDA_CIVIC, pcmCruise=pcm,
           openpilotLongitudinalControl=not stock, passive=False, dashcamOnly=False)
   sp = NS(pcmCruiseSpeed=pcm_speed, flags=0, enableGasInterceptor=False, intelligentCruiseButtonManagementAvailable=stock)
   result = core["VCruiseHelper"](cp, sp)
-  result.v_cruise_kph = result.v_cruise_cluster_kph = result.fixed_cruise_kph = 80.
+  result.v_cruise_kph = result.v_cruise_cluster_kph = 80.
   result.enabled_prev = True
   return result, params
 
@@ -176,8 +174,8 @@ def test_mvl_sla_current_or_previous_preactive_keeps_manual_increment(previous, 
 @pytest.mark.parametrize("target,button,direction", [(60., BUTTON.decelCruise, -1), (100., BUTTON.accelCruise, 1)])
 def test_preactive_core_button_presses_remain_manual_with_distance_only_confirmation(mvl, fixed, metric, long, increment,
                                                                                   target, button, direction):
-  cruise, _ = helper(mvl=mvl, fixed=fixed, pcm=fixed, pcm_speed=fixed)
-  baseline, _ = helper(mvl=mvl, fixed=fixed, pcm=fixed, pcm_speed=fixed)
+  cruise, _ = helper(mvl=mvl, fixed=fixed)
+  baseline, _ = helper(mvl=mvl, fixed=fixed)
   cruise.update_speed_limit_assist(metric, plan(target, SLA.preActive))
   for item in (cruise, baseline):
     press(item, button, long=long, metric=metric)
@@ -186,8 +184,6 @@ def test_preactive_core_button_presses_remain_manual_with_distance_only_confirma
   assert cruise.sla_state == SLA.preActive  # +/- is not an SLA confirmation.
   if mvl or metric:
     assert cruise.v_cruise_kph == round(80. + direction * increment * (1. if metric else 1.6), 1)
-  if fixed:
-    assert cruise.fixed_cruise_kph == cruise.v_cruise_kph
 
 
 @pytest.mark.parametrize("guard", ["disabled", "enabled_since_press", "standstill_at_press", "standstill_at_release"])
@@ -229,12 +225,10 @@ def test_sla_keeps_mvl_minimum_and_fixed_pcm_ceiling(metric, pcm_speed, fixed, t
   cruise, _ = helper(fixed=fixed, pcm_speed=pcm_speed)
   cruise.update_speed_limit_assist(metric, plan(target))
   cruise.update_v_cruise(state(), True, metric)
-  minimum = 0 if fixed else 8 if pcm_speed else 30 if metric else 20
-  maximum = FIXED_CRUISE_MPS * CV.MS_TO_KPH if fixed else 145
+  minimum = 8 if pcm_speed else 30 if metric else 20
+  maximum = 145
   assert cruise.v_cruise_min == minimum
   assert cruise.v_cruise_kph == (minimum if target == 0 else maximum)
-  if fixed:
-    assert cruise.fixed_cruise_kph == cruise.v_cruise_kph
 
 
 @pytest.mark.parametrize("mvl,legacy,stock", [(True, False, False), (False, True, False), (False, False, True)])
@@ -244,15 +238,15 @@ def test_sla_and_custom_preferences_do_not_take_native_pcm_speed_authority(mvl, 
   cruise.update_speed_limit_assist(True, plan(60.))
   cs = state(pcm_speed=reported)
   cruise.update_v_cruise(cs, True, True)
-  assert not cruise.fixed_cruise_enabled
+  assert not hasattr(cruise, "fixed_cruise_enabled")
   assert cruise.v_cruise_kph == (255 if reported == 0 else -1 if reported == -1 else reported * CV.MS_TO_KPH)
   assert cruise.v_cruise_cluster_kph == (cruise.v_cruise_kph if reported <= 0 else cs.cruiseState.speedCluster * CV.MS_TO_KPH)
 
 
-@pytest.mark.parametrize("metric,minimum", [(True, 40.), (False, 25 * CV.MPH_TO_KPH)])
+@pytest.mark.parametrize("metric,minimum", [(True, 30.), (False, 20.)])
 def test_factory_acc_icbm_minimum_is_unchanged(metric, minimum):
   cruise, _ = helper(mvl=False, stock=True, pcm=True)
   cruise.update_speed_limit_assist(metric, plan(0.))
   cruise.update_v_cruise(state(), True, metric)
-  assert not cruise.mvl_enabled and not cruise.fixed_cruise_enabled
+  assert not cruise.mvl_enabled and not hasattr(cruise, "fixed_cruise_enabled")
   assert cruise.v_cruise_min == cruise.v_cruise_kph == minimum

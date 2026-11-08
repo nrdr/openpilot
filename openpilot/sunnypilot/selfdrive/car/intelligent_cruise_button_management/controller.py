@@ -7,7 +7,6 @@ See the LICENSE.md file in the root directory for more details.
 from openpilot.cereal import custom
 from opendbc.car.structs import car
 from opendbc.car import structs, apply_hysteresis
-from opendbc.sunnypilot.car.honda.icbm_eligibility import civic_icbm_available
 from openpilot.common.constants import CV
 from openpilot.common.realtime import DT_CTRL
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import get_minimum_set_speed
@@ -66,7 +65,7 @@ class IntelligentCruiseButtonManagement:
 
     self.v_target_ms_last = apply_hysteresis(LP_SP.vTarget, self.v_target_ms_last, HYST_GAP * ms_conv)
 
-    self.v_cruise_min = (40 if self.is_metric else 25) if civic_icbm_available(self.CP, self.CP_SP) else get_minimum_set_speed(self.is_metric)
+    self.v_cruise_min = get_minimum_set_speed(self.is_metric)
     self.v_target = max(self.v_cruise_min, round(self.v_target_ms_last * speed_conv))
     self.v_cruise_cluster = round(CS.cruiseState.speedCluster * speed_conv)
 

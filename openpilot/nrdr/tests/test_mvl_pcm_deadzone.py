@@ -153,7 +153,7 @@ def test_native_controls_save_enum_not_button_index_with_parked_tuning_editable(
   assert KEY not in MVL_LOCK_KEYS
   assert tuning_write_allowed(ui.params, KEY, CP=ui.CP)
   assert all(tuning_write_allowed(ui.params, key, CP=ui.CP) for key in MVL_LOCK_KEYS)
-  assert all(not tuning_write_allowed(ui.params, key, CP=ui.CP, is_offroad=False) for key in MVL_LOCK_KEYS)
+  assert all(tuning_write_allowed(ui.params, key, CP=ui.CP, is_offroad=False) for key in MVL_LOCK_KEYS)
   assert large._mvl_pcm_deadzone.param_key is None  # no automatic post-callback write
   large._mvl_pcm_deadzone.kwargs["callback"](VALUES.index(value))
   large._update_state()
@@ -308,11 +308,7 @@ def test_copy_schema_native_options_and_compact_geometry_match():
   assert "needs_onroad_cycle" not in web
   gate = {"type": "capability", "field": CAP, "equals": True}
   assert web["visibility"] == [gate]
-  assert web["enablement"] == [{"type": "offroad_only"}, gate,  # no blanket MVL lock
-                               {"type": "any", "conditions": [
-                                 {"type": "offroad_only"},
-                                 {"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}},
-                               ]}]
+  assert web["enablement"] == [{"type": "offroad_only"}, gate]
   assert json.loads((ROOT / "openpilot/sunnypilot/sunnylink/settings_ui.json").read_text(encoding="utf-8")) == schema
   fields = ast.parse((ROOT / "openpilot/sunnypilot/sunnylink/capabilities.py").read_text(encoding="utf-8"))
   field_list = next(node.value for node in fields.body if isinstance(node, ast.Assign)

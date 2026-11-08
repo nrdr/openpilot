@@ -5,7 +5,6 @@ from openpilot.selfdrive.controls.lib.drive_helpers import CONTROL_N
 from openpilot.common.pid import PIDController
 from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.nrdr.features.longitudinal.longcontrol import NrdrLongControl
-from openpilot.nrdr.features.longitudinal.legacy_pcm import LegacyLongControl, legacy_pcm_enabled
 from openpilot.nrdr.features.longitudinal.policy import nrdr_custom_longitudinal_enabled
 
 CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
@@ -50,30 +49,19 @@ class LongControl:
     self.pid = PIDController(0.0, (CP.longitudinalTuning.kiBP, CP.longitudinalTuning.kiV),
                              rate=1 / DT_CTRL)
     self.last_output_accel = 0.0
-    self.legacy_controller = LegacyLongControl() if legacy_pcm_enabled(CP, CP_SP) else None
     # The startup MVL flag selects the donor state machine/PID below. Never
     # instantiate NRDR's live tuning, hill or custom stopping in that mode.
-    self.nrdr_controller = NrdrLongControl(CP, CP_SP) if self.legacy_controller is None and nrdr_custom_longitudinal_enabled(CP) else None
+    self.nrdr_controller = NrdrLongControl(CP, CP_SP) if nrdr_custom_longitudinal_enabled(CP) else None
     if self.nrdr_controller is not None:
       self.pid = self.nrdr_controller.pid
-    elif self.legacy_controller is not None:
-      self.pid = self.legacy_controller.pid
 
   def reset(self):
-    if self.legacy_controller is not None:
-      self.legacy_controller.reset()
-      self.long_control_state = self.legacy_controller.long_control_state
-    elif self.nrdr_controller is not None:
+    if self.nrdr_controller is not None:
       self.nrdr_controller.reset()
     else:
       self.pid.reset()
 
-  def update(self, active, CS, a_target, should_stop, accel_limits, pitch=None, drel=None, personality=None, reference_valid=True):
-    if self.legacy_controller is not None:
-      output_accel = self.legacy_controller.update(active, CS, a_target, should_stop, accel_limits, reference_valid)
-      self.long_control_state = self.legacy_controller.long_control_state
-      self.last_output_accel = output_accel
-      return output_accel
+  def update(self, active, CS, a_target, should_stop, accel_limits, pitch=None, drel=None, personality=None):
     if self.nrdr_controller is not None:
       output_accel = self.nrdr_controller.update(active, CS, a_target, should_stop, accel_limits, pitch, drel, personality)
       self.long_control_state = self.nrdr_controller.long_control_state

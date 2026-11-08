@@ -26,7 +26,10 @@ class _Params:
     self.writes = []
 
   def get(self, key, return_default=False):
-    return self.values.get(key, 0 if return_default and key == KEY else None)
+    return self.values.get(key, (0 if key == KEY else True) if return_default else None)
+
+  def put_bool(self, key, value, **kwargs):
+    self.put(key, value, **kwargs)
 
   def put(self, key, value, **kwargs):
     self.values[key] = value
@@ -66,6 +69,9 @@ class _Choice:
     self.config = kwargs
     self.value = self.selected = None
 
+  def set_checked(self, value):
+    self.checked = value
+
   def set_value(self, value):
     self.value = value
 
@@ -85,7 +91,7 @@ def _load_class(path, class_name, params, methods=None):
   env = {
     "Widget": _Widget, "NavScroller": _NavScroller, "Scroller": _Scroller, "NavButton": _Choice,
     "Callable": Callable, "Params": lambda: params, "tr": lambda text: text,
-    "ui_state": SimpleNamespace(params=params), "BigMultiToggle": _Choice,
+    "ui_state": SimpleNamespace(params=params), "BigMultiToggle": _Choice, "BigToggle": _Choice,
     "multiple_button_item_sp": lambda **kwargs: SimpleNamespace(config=kwargs, action_item=_Choice()),
   }
   exec(compile(tree, str(path), "exec"), env)
@@ -122,7 +128,7 @@ class TestCustomAudioVisualsUi(unittest.TestCase):
     self.assertEqual(control.options, ["Current", "June 2026"])
     self.assertEqual(control.config["font_size"], 40)
     self.assertEqual(control.config["description"], DESCRIPTION)
-    self.assertEqual(layout._scroller._items, [control])
+    self.assertEqual(layout._scroller._items, [control, layout._confidence_ball, layout._developer_sidebar])
     layout.show_event()
     self.assertEqual(control.value, "Current")
     for label, value in (("June 2026", 1), ("Current", 0)):
@@ -135,6 +141,18 @@ class TestCustomAudioVisualsUi(unittest.TestCase):
     layout.show_event()
     self.assertEqual(control.value, "Current")
     self.assertEqual(len(self.params.writes), 2)
+
+  def test_c4_visual_toggles_default_on_and_write_live(self):
+    layout = _load_class(MICI, "CustomAudioVisualsLayoutMici", self.params)()
+    for name, key in (("_confidence_ball", "NrdrConfidenceBall"), ("_developer_sidebar", "NrdrDeveloperSidebar")):
+      control = getattr(layout, name)
+      self.assertTrue(control.config["initial_state"])
+      for value in (False, True):
+        control.config["toggle_callback"](value)
+        self.assertEqual(self.params.writes[-1], (key, value, {"block": True}))
+        layout.show_event()
+        self.assertEqual(control.checked, value)
+    self.assertEqual({key for key, _, _ in self.params.writes}, {"NrdrConfidenceBall", "NrdrDeveloperSidebar"})
 
   def test_c4_device_entry_stays_last_after_derived_layout_additions(self):
     cls = _load_class(DEVICE, "DeviceLayoutMici", self.params, methods={"show_event"})

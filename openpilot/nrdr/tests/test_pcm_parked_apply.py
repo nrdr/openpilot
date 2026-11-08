@@ -1,4 +1,4 @@
-"""Six longitudinal choices apply next drive without a device-reboot badge."""
+"""Four longitudinal choices apply next drive without a device-reboot badge."""
 import ast
 from collections.abc import Callable
 import datetime
@@ -15,7 +15,7 @@ from openpilot.nrdr.ui import honda_pcm
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import DEFAULT_SRC, compile_schema
 
 CHOICES = (
-  ("NrdrHondaPcmFixedCruise", True), ("NrdrHondaLegacyPcm", True), ("HondaLiveLearningGas", True),
+  ("HondaLiveLearningGas", True),
   ("NrdrHondaPcmMode", 2), ("NrdrHondaWindBrake", False), ("NrdrMvlPcmDeadzone", 5),
 )
 COPY = "Change while parked. Applies next drive; no device reboot."
@@ -35,9 +35,9 @@ def _functions(path, names=None):
 
 
 @pytest.mark.parametrize("offroad", [None, True, False])
-def test_compiled_and_runtime_overlays_keep_six_controls_parked_without_reboot_badges(offroad):
+def test_compiled_and_runtime_overlays_keep_four_controls_parked_without_reboot_badges(offroad):
   params = Params(HondaLiveLearningGas=True, NrdrHondaLegacyPcm=False, NrdrHondaPcmFixedCruise=True,
-                  CarParamsPersistent=cp_bytes(HondaFlags.NIDEC_PCM_LEGACY | HondaFlags.MVL_LONGITUDINAL),
+                  CarParamsPersistent=cp_bytes(524288 | HondaFlags.MVL_LONGITUDINAL),
                   CarParamsSPPersistent=custom.CarParamsSP.new_message().to_bytes())
   if offroad is not None:
     params.values["IsOffroad"] = offroad
@@ -56,22 +56,18 @@ def test_compiled_and_runtime_overlays_keep_six_controls_parked_without_reboot_b
     for key, _ in CHOICES:
       item = items[key]
       assert "needs_onroad_cycle" not in item
-      assert COPY in item["description"]
+      assert "Applies next drive; no device reboot." in item["description"]
+      assert "parked" in item["description"]
       assert "restart" not in (item["description"] + item.get("details", "")).lower()
       assert {"type": "offroad_only"} in item["enablement"]
-  if offroad is not False:
-    assert items["NrdrHondaPcmFixedCruise"]["details"].startswith("Saved: On. Applies next drive.")
-    assert items["NrdrHondaLegacyPcm"]["details"].startswith("Saved: Off. Applies next drive.")
-    assert items["HondaLiveLearningGas"]["details"].startswith("MVL next drive<br>")
-  else:
-    assert items["NrdrHondaLegacyPcm"]["details"].startswith("Running: On. Saved: Off; applies next drive.")
-    assert items["HondaLiveLearningGas"]["details"].startswith("Legacy active; MVL next drive<br>")
+  assert items["HondaLiveLearningGas"]["details"].startswith("MVL active<br>" if offroad is False else "MVL next drive<br>")
+  assert "NrdrHondaPcmFixedCruise" not in items and "NrdrHondaLegacyPcm" not in items
   assert not params.writes
 
 
 @pytest.mark.parametrize("key,value", CHOICES)
 @pytest.mark.parametrize("offroad", [False, True])
-def test_six_remote_choices_keep_server_parked_gate_and_explicit_cycle(rpc, key, value, offroad):
+def test_four_remote_choices_keep_server_parked_gate_and_explicit_cycle(rpc, key, value, offroad):
   save, params, _ = rpc
   params.values.update(IsOffroad=offroad, CarParamsPersistent=cp_bytes())
   if key == "NrdrMvlPcmDeadzone":
@@ -89,7 +85,7 @@ def test_six_remote_choices_keep_server_parked_gate_and_explicit_cycle(rpc, key,
 
 @pytest.mark.parametrize("key,value", CHOICES)
 @pytest.mark.parametrize("offroad", [False, True])
-def test_six_native_choices_keep_parked_gate_and_explicit_cycle(key, value, offroad):
+def test_four_native_choices_keep_parked_gate_and_explicit_cycle(key, value, offroad):
   ui = state()
   ui.is_offroad = lambda: offroad
   if key == "NrdrMvlPcmDeadzone":
@@ -97,15 +93,13 @@ def test_six_native_choices_keep_parked_gate_and_explicit_cycle(key, value, offr
     saved = honda_pcm.save_mvl_pcm_deadzone(ui, value)
   elif key == "HondaLiveLearningGas":
     saved = honda_pcm.save_live_gas_choice(ui, value)
-  elif key in honda_pcm.PCM_EXPERIMENTS:
-    saved = honda_pcm.save_pcm_experiment(ui, key, value)
   else:
     saved = honda_pcm.save_pcm_choice(ui, key, value)
   assert saved is offroad
   assert ui.params.writes == ([(key, value), ("OnroadCycleRequested", True)] if offroad else [])
 
 
-@pytest.mark.parametrize("flag", [HondaFlags.NIDEC_PCM_LEGACY, HondaFlags.MVL_LONGITUDINAL])
+@pytest.mark.parametrize("flag", [524288, HondaFlags.MVL_LONGITUDINAL])
 def test_native_parked_banner_does_not_call_cached_mode_active(flag):
   ui = state(flags=int(HondaFlags.NIDEC | flag))
   path = ROOT / "openpilot/nrdr/ui/settings/longitudinal_tuning.py"

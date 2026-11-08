@@ -5,9 +5,8 @@ from __future__ import annotations
 import copy
 
 from openpilot.nrdr.params.tuning_policy import (
-  LONG_SCALE_KEYS, MVL_DESCRIPTION, MVL_LOCK_KEYS, SUGGESTED_DESCRIPTION, SUGGESTED_LOCK_KEYS, YAW_FIXED_KEYS, LEGACY_PCM_LOCK_KEYS,
+  MVL_DESCRIPTION, SUGGESTED_DESCRIPTION, SUGGESTED_LOCK_KEYS, YAW_FIXED_KEYS,
 )
-from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS, PCM_EXPERIMENT_DETAILS
 
 from openpilot.nrdr.params import NRDR_UI_METADATA_BY_KEY, get_ui_metadata
 
@@ -43,9 +42,6 @@ def apply_sunnylink_metadata(item: dict) -> dict:
     merged["description"] = MVL_DESCRIPTION
   if key == "NrdrSuggestedSettings":
     merged["description"] = SUGGESTED_DESCRIPTION
-  if key in PCM_EXPERIMENTS:
-    merged["title"], merged["description"] = PCM_EXPERIMENTS[key]
-    merged["details"] = PCM_EXPERIMENT_DETAILS[key]
   for field, expected_value in expected.items():
     if field in merged and merged[field] != expected_value:
       raise SunnylinkMetadataConflict(
@@ -72,25 +68,6 @@ def apply_sunnylink_metadata(item: dict) -> dict:
         {"type": "param", "key": "NrdrLateralController", "equals": 1},
         {"type": "capability", "field": "nrdr_firmware_prediction_schedule", "equals": True},
       ]}})
-    if key in MVL_LOCK_KEYS:
-      condition = {"type": "any", "conditions": [
-        {"type": "offroad_only"},
-        {"type": "not", "condition": {"type": "any", "conditions": [
-          {"type": "all", "conditions": [
-            {"type": "param", "key": "HondaLiveLearningGas", "equals": True},
-            {"type": "not", "condition": {"type": "capability", "field": "nrdr_mvl_tuning_exempt", "equals": True}},
-          ]},
-          {"type": "capability", "field": "nrdr_mvl_longitudinal_active", "equals": True},
-        ]}},
-      ]}
-      enablement.append(condition)
-      if key in LONG_SCALE_KEYS:
-        merged["visibility"] = [*copy.deepcopy(merged.get("visibility", [])), condition]
-    if key in LEGACY_PCM_LOCK_KEYS:
-      enablement.append({"type": "any", "conditions": [
-        {"type": "offroad_only"},
-        {"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}},
-      ]})
     if enablement:
       merged["enablement"] = enablement
   return merged

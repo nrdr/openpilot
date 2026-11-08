@@ -6,13 +6,13 @@ import re
 import pytest
 
 from opendbc.car.honda.values import HondaFlags
-from openpilot.nrdr.params.tuning_policy import CRUISE_PREFERENCE_KEYS, LEGACY_PCM_LOCK_KEYS, MVL_LOCK_KEYS
+from openpilot.nrdr.params.tuning_policy import MVL_LOCK_KEYS
 from openpilot.nrdr.tests.test_honda_pcm_ui import ROOT
 from openpilot.nrdr.tests.test_mvl_settings import encoded, rpc as base_rpc
 from openpilot.nrdr.tests.test_nidec_pcm_experiments import cp_bytes
 
-LOCK_KEYS = MVL_LOCK_KEYS | LEGACY_PCM_LOCK_KEYS
-MODE_KEYS = {"HondaLiveLearningGas", "NrdrHondaPcmFixedCruise", "NrdrHondaLegacyPcm",
+LOCK_KEYS = MVL_LOCK_KEYS
+MODE_KEYS = {"HondaLiveLearningGas",
              "NrdrHondaPcmMode", "NrdrHondaWindBrake", "NrdrMvlPcmDeadzone"}
 REGISTRY = {}
 for relative in ("openpilot/common/params_keys.h", "openpilot/nrdr/params/generated/params_keys.inc"):
@@ -52,7 +52,7 @@ def wire(value, compressed=False):
 def context(params, mode):
   saved = mode.endswith("saved")
   mvl, legacy = mode.startswith(("mvl", "both")), mode.startswith(("legacy", "both"))
-  flags = (HondaFlags.MVL_LONGITUDINAL if mvl and not saved else 0) | (HondaFlags.NIDEC_PCM_LEGACY if legacy and not saved else 0)
+  flags = (HondaFlags.MVL_LONGITUDINAL if mvl and not saved else 0) | (524288 if legacy and not saved else 0)
   params.values.update(HondaLiveLearningGas=mvl and saved, NrdrHondaLegacyPcm=legacy and saved, CarParamsPersistent=cp_bytes(flags))
 
 
@@ -88,7 +88,7 @@ def test_modes_and_all_saved_tunes_can_share_either_batch_order(rpc, mvl, legacy
   save, params, _ = rpc
   context(params, "both_active" if active else "both_saved")
   before = dict(params.values)
-  requested = {"HondaLiveLearningGas": mvl, "NrdrHondaLegacyPcm": legacy, "NrdrHondaPcmFixedCruise": True}
+  requested = {"HondaLiveLearningGas": mvl, "NrdrHondaPcmMode": 2 if legacy else 0}
   requested.update({key: choice(key) for key in sorted(LOCK_KEYS) if key != "HondaLiveLearningGas"})
   entries = [(key, wire(value, compressed)) for key, value in requested.items()]
   save(dict(reversed(entries) if reverse else entries), compressed)
@@ -98,20 +98,17 @@ def test_modes_and_all_saved_tunes_can_share_either_batch_order(rpc, mvl, legacy
 
 @pytest.mark.parametrize("key", sorted(LOCK_KEYS))
 @pytest.mark.parametrize("mode", CONTEXTS)
-def test_onroad_saved_and_active_mode_conflicts_still_reject_before_writes(rpc, key, mode):
+def test_saved_and_active_modes_do_not_lock_ordinary_tuning(rpc, key, mode):
   save, params, _ = rpc
   context(params, mode)
   params.values["IsOffroad"] = False
-  if mode in ("mvl_saved", "mvl_active") and key in CRUISE_PREFERENCE_KEYS:
-    before = dict(params.values)
-    requested = {"ExperimentalMode": True, key: choice(key)}
-    save({name: wire(value) for name, value in requested.items()})
-    assert_only_requested_values_changed(params, before, requested)
-    return
-  # Deadzone and LiveGas also have their own parked-only guards under MVL.
-  with pytest.raises(ValueError):
-    save({"ExperimentalMode": wire(True), key: wire(choice(key))})
-  assert not params.writes
+  before = dict(params.values)
+  requested = {"ExperimentalMode": True, key: choice(key)}
+  save({name: wire(value) for name, value in requested.items()})
+  if key == "NrdrStandstillGapExtra":
+    assert params.get(key) is None
+    requested.pop(key)  # Existing explicit offroad-only gap setting, not an MVL lock.
+  assert_only_requested_values_changed(params, before, requested)
 
 
 @pytest.mark.parametrize("key", sorted(MODE_KEYS))
@@ -143,7 +140,7 @@ def test_existing_unlocked_onroad_tuning_behavior_is_preserved(rpc, key):
 def test_invalid_tuning_or_mode_rejects_entire_batch_before_writes(rpc, key, bad, reverse, compressed):
   save, params, _ = rpc
   context(params, "both_active")
-  entries = [("NrdrHondaPcmFixedCruise" if key != "NrdrHondaPcmFixedCruise" else "NrdrHondaLegacyPcm", wire(True, compressed)),
+  entries = [("ExperimentalMode", wire(True, compressed)),
              (key, encoded(bad, compressed))]
   with pytest.raises(ValueError):
     save(dict(reversed(entries) if reverse else entries), compressed)
@@ -155,13 +152,11 @@ def test_invalid_tuning_or_mode_rejects_entire_batch_before_writes(rpc, key, bad
 def test_bad_tuning_transport_rejects_batch_before_writes(rpc, key, payload, compressed):
   save, params, _ = rpc
   with pytest.raises(ValueError):
-    save({"NrdrHondaLegacyPcm": wire(True, compressed), key: payload}, compressed)
+    save({"ExperimentalMode": wire(True, compressed), key: payload}, compressed)
   assert not params.writes
 
 
 @pytest.mark.parametrize("key,cap", [
-  ("NrdrHondaPcmFixedCruise", "nrdr_honda_pcm_experiments_available"),
-  ("NrdrHondaLegacyPcm", "nrdr_honda_pcm_experiments_available"),
   ("HondaLiveLearningGas", "nrdr_honda_mvl_selection_available"),
   ("NrdrHondaPcmMode", "nrdr_honda_pcm_tuning_available"), ("NrdrHondaWindBrake", "nrdr_honda_pcm_tuning_available"),
   ("NrdrMvlPcmDeadzone", "nrdr_mvl_pcm_deadzone_available"),
@@ -202,9 +197,11 @@ def test_parked_generic_tuning_rechecks_road_after_validation(rpc, key):
     return get_type(name)
 
   params.get_type = starts_during_validation
-  with pytest.raises(ValueError):
-    save({key: wire(choice(key))})
-  assert not params.writes
+  before = dict(params.values)
+  save({key: wire(choice(key))})
+  before["IsOffroad"] = False
+  requested = {} if key == "NrdrStandstillGapExtra" else {key: choice(key)}
+  assert_only_requested_values_changed(params, before, requested)
 
 
 def test_each_generic_write_rechecks_road_after_preceding_saved_value(rpc):
@@ -218,19 +215,18 @@ def test_each_generic_write_rechecks_road_after_preceding_saved_value(rpc):
       params.values["IsOffroad"] = False
 
   params.put = starts_after_first
-  with pytest.raises(ValueError):
-    save({"StaticFeedforwardLong": wire(True), "LongPidTuneScaleStandard": wire(125)})
-  assert params.writes == [("StaticFeedforwardLong", True)]
-  assert params.get("LongPidTuneScaleStandard") is None
+  save({"StaticFeedforwardLong": wire(True), "LongPidTuneScaleStandard": wire(125)})
+  assert params.writes == [("StaticFeedforwardLong", True), ("LongPidTuneScaleStandard", 125), ("ParamsVersion", "1")]
+  assert params.get("LongPidTuneScaleStandard") == 125
 
 
 def test_client_cannot_forge_offroad_to_bypass_mode_conflicts(rpc):
   save, params, _ = rpc
   context(params, "both_active")
   params.values["IsOffroad"] = False
-  with pytest.raises(ValueError):
-    save({"IsOffroad": wire(True), "StaticFeedforwardLong": wire(True)})
-  assert not params.writes
+  save({"IsOffroad": wire(True), "StaticFeedforwardLong": wire(True)})
+  assert params.get("IsOffroad") is False
+  assert params.writes == [("StaticFeedforwardLong", True), ("ParamsVersion", "1")]
 
 
 @pytest.mark.parametrize("offroad", [True, False, None])

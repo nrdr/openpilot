@@ -9,6 +9,8 @@ class NrdrParamKey(StrEnum):
   OFFROAD_NEOS_UPDATE = "Offroad_NeosUpdate"
   RECORD_AUDIO_FEEDBACK = "RecordAudioFeedback"
   NRDR_ENGAGEMENT_SOUND_PACK = "NrdrEngagementSoundPack"
+  NRDR_CONFIDENCE_BALL = "NrdrConfidenceBall"
+  NRDR_DEVELOPER_SIDEBAR = "NrdrDeveloperSidebar"
   NRDR_DRIVER_MONITORING_REMINDER_PERCENT = "NrdrDriverMonitoringReminderPercent"
   REMOTE_ACCESS_PIN_ENABLED = "RemoteAccessPinEnabled"
   REMOTE_ACCESS_PIN_SALT = "RemoteAccessPinSalt"
@@ -174,6 +176,8 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.OFFROAD_NEOS_UPDATE,
   NrdrParamKey.RECORD_AUDIO_FEEDBACK,
   NrdrParamKey.NRDR_ENGAGEMENT_SOUND_PACK,
+  NrdrParamKey.NRDR_CONFIDENCE_BALL,
+  NrdrParamKey.NRDR_DEVELOPER_SIDEBAR,
   NrdrParamKey.NRDR_DRIVER_MONITORING_REMINDER_PERCENT,
   NrdrParamKey.REMOTE_ACCESS_PIN_ENABLED,
   NrdrParamKey.REMOTE_ACCESS_PIN_SALT,

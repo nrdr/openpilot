@@ -48,7 +48,7 @@ sections:
   - key: IntelligentCruiseButtonManagement
     widget: toggle
     title: Intelligent Cruise Button Management (ICBM) (Alpha)
-    description: Adjusts factory ACC set speed using cruise-button commands. Factory ACC controls gas, brakes and following distance. Civic requires Honda Nidec Factory Longitudinal Control. Applies next drive; no device reboot.
+    description: Adjusts factory ACC set speed using cruise-button commands. Factory ACC controls gas, brakes and following distance. Applies next drive; no device reboot.
     needs_onroad_cycle: true
     visibility:
     - type: capability

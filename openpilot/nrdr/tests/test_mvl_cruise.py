@@ -95,8 +95,6 @@ def namespace(values=None):
   load_policy(env)
   pcm = "opendbc_repo/opendbc/car/honda/"
   env["uses_nidec_pcm"] = definitions(source(pcm + "nidec_pcm_constraints.py"), env)["uses_nidec_pcm"]
-  modes = definitions(source(pcm + "pcm_test_modes.py"), env)
-  env.update(pcm_mode_qualified=modes["qualified"], FIXED_CRUISE_MPS=modes["FIXED_CRUISE_MPS"])
   return env, params
 
 

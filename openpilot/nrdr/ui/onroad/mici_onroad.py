@@ -32,7 +32,15 @@ def _confidence_ball_visible(alert_type: str) -> bool:
 
 
 class NrdrConfidenceBall(ConfidenceBall):
-  def _render(self, _):
+  def _update_state(self):
+    # Widget updates even when hidden. Stop the animation/filter entirely when disabled.
+    if ui_state.nrdr_confidence_ball:
+      super()._update_state()
+
+  def _render(self, rect):
+    if not ui_state.nrdr_developer_sidebar:
+      return super()._render(rect)
+
     radius = 24
     x = self._rect.x + self._rect.width - SIDE_PANEL_WIDTH - radius - 16
     y = self._rect.y + radius + 36
@@ -88,7 +96,7 @@ class StripDevUiRenderer(Widget):
     return UiElement("--", "DESIRED STEER", "", rl.WHITE)
 
   def _render(self, _):
-    if ui_state.developer_ui not in (DeveloperUiState.RIGHT, DeveloperUiState.BOTH):
+    if not ui_state.nrdr_developer_sidebar or ui_state.developer_ui not in (DeveloperUiState.RIGHT, DeveloperUiState.BOTH):
       return
     sm = ui_state.sm
     if sm.recv_frame["carState"] < ui_state.started_frame:
@@ -144,6 +152,6 @@ class NrdrAugmentedRoadView(AugmentedRoadView):
   def _render(self, rect):
     alert_to_render, _ = self._alert_renderer.will_render() if ui_state.started else (None, True)
     alert_type = alert_to_render.alert_type if alert_to_render is not None else ''
-    self._confidence_ball.set_visible(_confidence_ball_visible(alert_type))
+    self._confidence_ball.set_visible(ui_state.nrdr_confidence_ball and _confidence_ball_visible(alert_type))
     super()._render(rect)
     self._strip_dev_ui.render(self.rect)

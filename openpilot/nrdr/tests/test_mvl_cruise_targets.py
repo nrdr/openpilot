@@ -13,7 +13,6 @@ from opendbc.car.honda.values import CAR, HondaFlags
 from opendbc.car.structs import car
 from openpilot.cereal import custom
 from openpilot.common.constants import CV
-from openpilot.nrdr.features.longitudinal.legacy_pcm import legacy_pcm_enabled
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled, nrdr_longitudinal_enabled
 from openpilot.nrdr.tests.test_mvl_host_parity import (
   CORE, MPC, SP, Messages, PlannerMpcDouble, car_params, constant, definitions, environment, forbidden, planner_messages, source,
@@ -135,21 +134,20 @@ def new_message(service):
 
 
 def planner_environment(mode):
-  legacy = mode.startswith("legacy")
   return environment(
     custom=custom, V_CRUISE_MAX=CRUISE_MAX,
-    legacy_pcm_enabled=legacy_pcm_enabled, mvl_longitudinal_enabled=mvl_longitudinal_enabled,
+    mvl_longitudinal_enabled=mvl_longitudinal_enabled,
     nrdr_longitudinal_enabled=nrdr_longitudinal_enabled,
     # Do not use controller-tune eligibility to select the speed-target policy.
     nrdr_custom_longitudinal_enabled=forbidden,
     EventsSP=lambda: NS(clear=lambda: None, to_msg=list),
     E2EAlertsHelper=lambda: NS(update=lambda *_: None, green_light_alert=True, lead_depart_alert=False),
-    SmartCruiseControl=forbidden if legacy else SCCBoundary,
-    SpeedLimitResolver=forbidden if legacy else ResolverBoundary,
-    NrdrSpeedLimitAssist=forbidden if legacy else NrdrAssistBoundary,
-    SpeedLimitAssist=forbidden if legacy else AssistBoundary,
-    AccelBoostSP=BoostBoundary if mode == "normal" else forbidden,
-    get_active_bundle=(lambda: NS(generation=8)) if mode == "normal" else forbidden,
+    SmartCruiseControl=SCCBoundary,
+    SpeedLimitResolver=ResolverBoundary,
+    NrdrSpeedLimitAssist=NrdrAssistBoundary,
+    SpeedLimitAssist=AssistBoundary,
+    AccelBoostSP=BoostBoundary if mode in ("normal", "legacy") else forbidden,
+    get_active_bundle=(lambda: NS(generation=8)) if mode in ("normal", "legacy") else forbidden,
     messaging=NS(SubMaster=object, PubMaster=object, new_message=new_message),
   )
 
@@ -161,7 +159,7 @@ def params(mode):
   if mode in ("mvl", "legacy_mvl"):
     cp.flags |= HondaFlags.MVL_LONGITUDINAL
   if mode.startswith("legacy"):
-    cp.flags |= HondaFlags.NIDEC_PCM_LEGACY
+    cp.flags |= 524288  # retired cached bit must be inert
   cp.passive = cp.dashcamOnly = False
   cp.pcmCruise = True
   return cp, NS(enableGasInterceptor=False, flags=0)
@@ -194,19 +192,16 @@ def publish(planner, sm):
 @pytest.mark.parametrize("mode", ["normal", "mvl", "legacy", "legacy_mvl"])
 def test_target_policy_separate_from_tuning_ownership(mode):
   planner = make_planner(mode)
-  assert planner.legacy_pcm is mode.startswith("legacy")
-  assert planner.mvl_enabled is (mode == "mvl")
-  if planner.legacy_pcm:
-    assert planner.scc is planner.resolver is planner.sla is None
-  else:
-    assert isinstance(planner.scc, SCCBoundary)
-    assert planner.resolver.nrdr_enabled
-    assert type(planner.sla) is NrdrAssistBoundary
-    planner.sla.update_buttons(4)
-    assert planner.sla.buttons == [4]
+  assert not hasattr(planner, "legacy_pcm")
+  assert planner.mvl_enabled is ("mvl" in mode)
+  assert isinstance(planner.scc, SCCBoundary)
+  assert planner.resolver.nrdr_enabled
+  assert type(planner.sla) is NrdrAssistBoundary
+  planner.sla.update_buttons(4)
+  assert planner.sla.buttons == [4]
   planner.update(messages())
-  assert planner.apply_accel_boost({}, .2, .3, .4) == pytest.approx(.7 if mode == "normal" else .2)
-  if mode == "normal":
+  assert planner.apply_accel_boost({}, .2, .3, .4) == pytest.approx(.7 if mode in ("normal", "legacy") else .2)
+  if mode in ("normal", "legacy"):
     assert planner.accel_boost_sp.reads == 1 and planner.generation == 8
   else:
     assert planner.accel_boost_sp is planner.generation is None
@@ -319,14 +314,12 @@ def test_speed_limit_validity_and_telemetry_remain_live(mode, valid, last_valid)
 
 
 @pytest.mark.parametrize("mode", ["legacy", "legacy_mvl"])
-def test_legacy_bypass_retains_neutral_speed_control_telemetry(mode):
-  planner = make_planner(mode)
-  # No SCC/SLA construction or target input access is allowed, even when MVL is
-  # also flagged. Advisory E2E alerts still publish as before.
-  assert planner.update_targets({}, 20., .2, 30.) == (30., .2)
-  payload = publish(planner, Messages())
+def test_retired_legacy_bit_does_not_remove_speed_control_telemetry(mode):
+  planner, sm = make_planner(mode), messages()
+  assert planner.update_targets(sm, 20., .2, 30.) == (30., .2)
+  payload = publish(planner, sm)
   assert payload["longitudinalPlanSource"] == "cruise"
-  assert "smartCruiseControl" not in payload and "speedLimit" not in payload
+  assert "smartCruiseControl" in payload and "speedLimit" in payload
   assert payload["e2eAlerts"]["greenLightAlert"]
 
 

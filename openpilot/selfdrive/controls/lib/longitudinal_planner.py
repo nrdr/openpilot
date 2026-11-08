@@ -5,7 +5,6 @@ import numpy as np
 
 import openpilot.cereal.messaging as messaging
 from opendbc.car.interfaces import ACCEL_MIN, ACCEL_MAX
-from opendbc.car.honda.pcm_test_modes import FIXED_CRUISE_MPS
 from openpilot.common.constants import CV
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import DT_MDL
@@ -19,7 +18,6 @@ from openpilot.common.swaglog import cloudlog
 
 from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP
 from openpilot.nrdr.features.longitudinal.longitudinal_planner import NrdrLongitudinalPlanner
-from openpilot.nrdr.features.longitudinal.legacy_pcm import legacy_pcm_enabled, fixed_pcm_cruise_enabled
 from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.mvl_planner import MvlLongitudinalPlanner
@@ -118,21 +116,17 @@ def bosch_a_human_accel_base(nrdr, experimental: bool, v_ego: float, personality
 
 class LongitudinalPlanner(LongitudinalPlannerSP):
   def __init__(self, CP, CP_SP, init_v=0.0, init_a=0.0, dt=DT_MDL):
-    self.legacy_pcm = legacy_pcm_enabled(CP, CP_SP)
-    self.fixed_pcm_cruise = fixed_pcm_cruise_enabled(CP, CP_SP)
-    self.mvl_enabled = not self.legacy_pcm and mvl_longitudinal_enabled(CP)
+    self.mvl_enabled = mvl_longitudinal_enabled(CP)
     if self.mvl_enabled:
       MvlLongitudinalPlanner.__init__(self, CP, CP_SP, init_v, init_a, dt)
       return
     self.CP = CP
     self.honda_bosch_a_radar = is_honda_bosch_a_radar(CP)
-    # Legacy feedback uses today's base planner, not the MVL planner and not
-    # persisted NRDR acceleration, launch, stopping, gap, or jerk tuning.
-    nrdr_enabled = nrdr_longitudinal_enabled(CP) and not self.legacy_pcm
+    nrdr_enabled = nrdr_longitudinal_enabled(CP)
     # Bosch-A longitudinal tuning (HumanFollowing, HumanAcceleration and the post-MPC chain). Always on for a Bosch-A Honda
-    # with openpilot longitudinal; MVL has already returned above, and the legacy / fixed PCM experiments keep today's planner.
+    # with openpilot longitudinal; MVL has already returned above.
     from openpilot.nrdr.features.longitudinal.bosch_a import gate as bosch_a_gate
-    self.bosch_a_wired = bool(nrdr_enabled and not self.fixed_pcm_cruise and bosch_a_gate.human_following_enabled(CP))
+    self.bosch_a_wired = bool(nrdr_enabled and bosch_a_gate.human_following_enabled(CP))
     self.mpc = LongitudinalMpc(dt=dt, honda_bosch_a_radar=self.honda_bosch_a_radar, nrdr_enabled=nrdr_enabled,
                                human_following=self.bosch_a_wired)
     if self.bosch_a_wired:
@@ -217,19 +211,11 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
 
     # Get new v_cruise and a_target from Smart Cruise Control and Speed Limit Assist
     v_cruise, self.output_a_target = LongitudinalPlannerSP.update_targets(self, sm, self.v_desired_filter.x, self.output_a_target, v_cruise)
-    fixed_cruise_ceiling = (min(v_cruise, max(0.0, v_cruise_kph * CV.KPH_TO_MS), FIXED_CRUISE_MPS)
-                            if self.fixed_pcm_cruise else v_cruise)
 
     if self.nrdr is not None:
       if force_slow_decel:
         v_cruise = 0.0
       v_cruise = self.nrdr.cruise_target(v_cruise)
-
-    if self.fixed_pcm_cruise:
-      # Saved mismatch correction must not defeat the independent user target.
-      # Keep lower SCC/curve targets. This changes the cruise goal only: the
-      # normal cruise jerk limit/planner, not a speed-reference step, approaches it.
-      v_cruise = min(v_cruise, fixed_cruise_ceiling)
 
     personality = longitudinal_personality(sm['selfdriveState'].personality, self.nrdr is not None)
     self.mpc.set_weights(prev_accel_constraint, personality=personality)
@@ -303,10 +289,6 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
 
     output_a_target, self.mpc.source, _ = min(candidates, key=lambda c: c[0])
     self.output_should_stop = any(should_stop for _, _, should_stop in candidates)
-    if self.fixed_pcm_cruise and v_cruise_kph == 0.0 and v_ego < 0.5:
-      # A saved NRDR stopping threshold of exactly zero must not turn the
-      # explicit zero-speed experiment into indefinite creeping.
-      self.output_should_stop = True
     if self.bosch_a_wired:
       # Post-MPC Bosch-A chain, SOURCE order (starpilot longitudinal_planner.py): HumanAcceleration cap (throttle side
       # only; the cap is >= 0 so a braking target passes through), engage init, then bosch_a_long -> coast_first ->

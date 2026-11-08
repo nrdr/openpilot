@@ -161,15 +161,7 @@ class Controls(ControlsExt):
     long_pitch, long_drel = stopping_inputs(self.calibrated_pose, long_plan)
     actuators.accel = float(self.LoC.update(CC.longActive, CS, long_plan.aTarget, long_plan.shouldStop, pid_accel_limits,
                                             pitch=long_pitch, drel=long_drel,
-                                            personality=self.sm['selfdriveState'].personality,
-                                            reference_valid=bool(self.sm.all_checks(['longitudinalPlan']))))
-    if self.LoC.legacy_controller is not None:
-      # A distinct, startup-latched command contract; accel remains the FINAL
-      # selected plan's feedforward, never the legacy PI's converted output.
-      actuators.speed = float(self.LoC.legacy_controller.v_pid)
-      actuators.brake = float(self.LoC.legacy_controller.brake)
-      actuators.gas = 0.0
-      actuators.longControlState = self.LoC.long_control_state
+                                            personality=self.sm['selfdriveState'].personality))
 
     # Steering PID loop and lateral MPC
     # Reset desired curvature to current to avoid violating the limits on engage

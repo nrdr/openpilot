@@ -131,6 +131,7 @@ class CruiseLayout(Widget):
       has_icbm = ui_state.has_icbm
       has_long = ui_state.has_longitudinal_control
 
+      self.icbm_toggle.set_visible(icbm_available(ui_state.CP, ui_state.CP_SP))
       if icbm_available(ui_state.CP, ui_state.CP_SP):
         self.icbm_toggle.action_item.set_enabled(ui_state.is_offroad())
         self.icbm_toggle.set_description(tr(ICBM_DESC))

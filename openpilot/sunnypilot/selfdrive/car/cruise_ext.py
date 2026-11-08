@@ -9,9 +9,6 @@ import numpy as np
 from openpilot.cereal import custom
 from opendbc.car.structs import car
 from opendbc.car import structs
-from opendbc.car.honda.values import HondaFlags
-from opendbc.car.honda.pcm_test_modes import qualified as pcm_mode_qualified
-from opendbc.sunnypilot.car.honda.icbm_eligibility import civic_icbm_available
 from openpilot.common.constants import CV
 from openpilot.common.params import Params
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import get_minimum_set_speed
@@ -49,9 +46,6 @@ class VCruiseHelperSP:
     self.CP = CP
     self.CP_SP = CP_SP
     self.mvl_enabled = mvl_longitudinal_enabled(CP)
-    # Internal target ownership is independent of legacy PCM command law.
-    self.fixed_cruise_enabled = bool(CP.flags & HondaFlags.NIDEC_PCM_FIXED_CRUISE and
-                                   pcm_mode_qualified(CP, CP_SP, HondaFlags.NIDEC_PCM_FIXED_CRUISE))
     self.v_cruise_kph = V_CRUISE_UNSET
     self.v_cruise_cluster_kph = V_CRUISE_UNSET
     self.params = Params()
@@ -98,9 +92,6 @@ class VCruiseHelperSP:
     return round_to_nearest, v_cruise_delta
 
   def get_minimum_set_speed(self, is_metric: bool) -> None:
-    if self.fixed_cruise_enabled:
-      self.v_cruise_min = 0
-      return
     if self.mvl_enabled:
       # Donor SP's non-pcmCruiseSpeed minimum is 30 metric / 20 imperial
       # (both kph); native pcmCruiseSpeed uses the donor's 8 kph constant.
@@ -108,11 +99,6 @@ class VCruiseHelperSP:
       return
     if self.CP_SP.pcmCruiseSpeed:
       self.v_cruise_min = V_CRUISE_MIN
-      return
-
-    if (not self.CP.openpilotLongitudinalControl and self.CP_SP.intelligentCruiseButtonManagementAvailable and
-        civic_icbm_available(self.CP, self.CP_SP)):
-      self.v_cruise_min = 40 if is_metric else 25 * CV.MPH_TO_KPH
       return
 
     self.v_cruise_min = get_minimum_set_speed(is_metric)
@@ -166,7 +152,7 @@ class VCruiseHelperSP:
     if self.sla_state in SLA_ACTIVE_STATES and (self.prev_sla_state not in SLA_ACTIVE_STATES or
                                                 self.update_speed_limit_final_last_changed):
       target_kph = quantize_set_speed(self.speed_limit_final_last_kph, self.is_metric, self.CP)
-      maximum = self.v_cruise_max if self.fixed_cruise_enabled or self.mvl_enabled else V_CRUISE_MAX
+      maximum = self.v_cruise_max if self.mvl_enabled else V_CRUISE_MAX
       self.v_cruise_kph = np.clip(target_kph, self.v_cruise_min, maximum)
 
     self.prev_sla_state = self.sla_state

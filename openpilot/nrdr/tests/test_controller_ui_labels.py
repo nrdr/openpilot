@@ -7,8 +7,7 @@ from types import SimpleNamespace
 import unittest
 
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
-from openpilot.nrdr.ui.honda_pcm import live_gas_status, pcm_experiment_status
-from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS, PCM_EXPERIMENT_DETAILS
+from openpilot.nrdr.ui.honda_pcm import live_gas_status
 from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, tuning_write_allowed
 from openpilot.nrdr.params import mvl_pcm_deadzone
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_schema, DEFAULT_SRC
@@ -46,8 +45,7 @@ def _native_class(filename, name, *, saved_bools=None):
     )),
     "get_native_option_spec": get_native_option_spec,
     "MVL_DESCRIPTION": MVL_DESCRIPTION,
-    "PCM_EXPERIMENTS": PCM_EXPERIMENTS, "PCM_EXPERIMENT_DETAILS": PCM_EXPERIMENT_DETAILS,
-    "live_gas_status": live_gas_status, "pcm_experiment_status": pcm_experiment_status,
+    "live_gas_status": live_gas_status,
     "large_reset_button": lambda: object(),
     "NavButton": lambda *_: SimpleNamespace(set_click_callback=lambda *_: None),
     "Scroller": lambda items, **_: items, "LineSeparatorSP": lambda *_: None,
@@ -125,17 +123,17 @@ class TestControllerUiLabels(unittest.TestCase):
     cls = _native_class("longitudinal_tuning.py", "LongitudinalTuningLayout")
     layout = cls.__new__(cls)
     local_items = layout._initialize_items()
-    self.assertEqual(local_items[:9], [
-      layout._live_learning_gas, layout._pcm_experiments["NrdrHondaPcmFixedCruise"], layout._pcm_experiments["NrdrHondaLegacyPcm"],
+    self.assertEqual(local_items[:7], [
+      layout._live_learning_gas,
       layout._reset_live_gas, layout._mvl_pcm_deadzone, None, layout._pcm_mode, layout._wind_brake, layout._static_feedforward_long,
     ])
     remote = _panel(self.schema, "steering", "nrdr_longitudinal")["items"]
-    self.assertEqual([item["key"] for item in remote[:9]], [
-      "HondaLiveLearningGas", "NrdrHondaPcmFixedCruise", "NrdrHondaLegacyPcm",
+    self.assertEqual([item["key"] for item in remote[:7]], [
+      "HondaLiveLearningGas",
       "NrdrResetLiveGas", "NrdrMvlPcmDeadzone", "NrdrLiveGasResetStatus",
       "NrdrHondaPcmMode", "NrdrHondaWindBrake", "StaticFeedforwardLong",
     ])
-    mode, wind = remote[6:8]
+    mode, wind = remote[4:6]
     self.assertEqual(mode["widget"], "multiple_button")
     self.assertEqual(mode["options"], [
       {"label": "Off", "value": 0}, {"label": "ECU-Matched", "value": 1}, {"label": "Experimental", "value": 2},
@@ -150,20 +148,14 @@ class TestControllerUiLabels(unittest.TestCase):
         "type": "capability", "field": "nrdr_honda_pcm_tuning_available", "equals": True,
       }])
       self.assertEqual(web["visibility"], web["enablement"][1:2])
-      self.assertIn("nrdr_mvl_longitudinal_active", json.dumps(web["enablement"][-2]))
-      self.assertEqual(web["enablement"][-1], {
-        "type": "any", "conditions": [
-          {"type": "offroad_only"},
-          {"type": "not", "condition": {"type": "capability", "field": "nrdr_honda_legacy_pcm_locked", "equals": True}},
-        ],
-      })
-    self.assertIn("mmmorks", layout._pcm_mode["description"]())
-    self.assertIn("keeps MVL mapping", mode["details"])
-    self.assertIn("ramp, coast and brake-release rules", layout._pcm_mode["description"]())
-    self.assertIn("full MVL longitudinal", layout._live_learning_gas["description"]())
+      self.assertEqual(len(web["enablement"]), 2)
+    self.assertIn("ECU-Matched", layout._pcm_mode["description"]())
+    self.assertIn("MVL's eligible speed and launch learning", mode["details"])
+    self.assertIn("Experimental", layout._pcm_mode["description"]())
+    self.assertIn("MVL longitudinal", layout._live_learning_gas["description"]())
     self.assertIn("Only Econ", layout._live_learning_gas["description"]())
     self.assertEqual(layout._live_learning_gas["description"](), "MVL Off next drive. " + remote[0]["description"])
-    self.assertIn("Turning it off changes friction-brake demand", wind["details"])
+    self.assertIn("saved choice", wind["details"])
     self.assertNotIn("NrdrHondaEcuMatchedLong", [item["key"] for item in remote])
 
   def test_override_threshold_labels_keep_keys_and_show_straights_before_curves(self):

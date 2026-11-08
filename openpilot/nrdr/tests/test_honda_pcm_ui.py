@@ -17,7 +17,6 @@ from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, mvl_tuning_lock
 from openpilot.nrdr.params import mvl_pcm_deadzone
 from openpilot.nrdr.ui.honda_pcm import mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone, save_mvl_pcm_deadzone
 from openpilot.nrdr.ui import honda_pcm
-from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS, PCM_EXPERIMENT_DETAILS
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -248,6 +247,7 @@ def native_layout(ui, toggle_factory=None):
     def __init__(self, **kwargs):
       self.kwargs = kwargs
       self.action_item = self
+      self.visible = True
       self.param_key = kwargs.get("param")
 
     def set_enabled(self, enabled):
@@ -275,8 +275,6 @@ def native_layout(ui, toggle_factory=None):
   env.update(mvl_pcm_deadzone_available=mvl_pcm_deadzone_available, saved_mvl_pcm_deadzone=saved_mvl_pcm_deadzone,
              save_mvl_pcm_deadzone=save_mvl_pcm_deadzone)
   env.update(vars(honda_pcm))
-  env["PCM_EXPERIMENTS"] = PCM_EXPERIMENTS
-  env["PCM_EXPERIMENT_DETAILS"] = PCM_EXPERIMENT_DETAILS
   exec(compile(tree, str(path), "exec"), env)
   layout = object.__new__(env["LongitudinalTuningLayout"])
   layout._tuning_items = layout._initialize_items()

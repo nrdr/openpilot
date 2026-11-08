@@ -19,7 +19,6 @@ from opendbc.sunnypilot.car.runtime_config import HondaLiveTuning
 
 from openpilot.nrdr.params.generated.keys import NrdrParamKey
 from openpilot.nrdr.params.mvl_pcm_deadzone import decode_mvl_pcm_deadzone
-from openpilot.nrdr.params.nidec_pcm import decode_pcm_experiment
 from openpilot.nrdr.car.mvl_state import LEARNER_META_PATH, MvlStateStore
 
 
@@ -68,8 +67,6 @@ class NrdrHondaParamKey(StrEnum):
   NRDR_HUD_SUB_MODE_UNTIL = NrdrParamKey.NRDR_HUD_SUB_MODE_UNTIL
   NRDR_HONDA_ECU_MATCHED_LONG = NrdrParamKey.NRDR_HONDA_ECU_MATCHED_LONG
   NRDR_HONDA_PCM_MODE = NrdrParamKey.NRDR_HONDA_PCM_MODE
-  NRDR_HONDA_PCM_FIXED_CRUISE = NrdrParamKey.NRDR_HONDA_PCM_FIXED_CRUISE
-  NRDR_HONDA_LEGACY_PCM = NrdrParamKey.NRDR_HONDA_LEGACY_PCM
   NRDR_MVL_PCM_DEADZONE = NrdrParamKey.NRDR_MVL_PCM_DEADZONE
   NRDR_HONDA_WIND_BRAKE = NrdrParamKey.NRDR_HONDA_WIND_BRAKE
   NRDR_HONDA_FULL_BRAKE_AUTHORITY = NrdrParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY
@@ -521,8 +518,6 @@ class NrdrHondaConfig:
   provider: HondaParamsProvider
   nidec_pcm_mode: int = 0
   nidec_wind_brake: bool = True
-  nidec_fixed_cruise: bool = False
-  nidec_legacy_pcm: bool = False
   mvl_longitudinal: bool = False
   mvl_pcm_deadzone: float = 0.0
 
@@ -547,8 +542,6 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
     provider=provider,
     nidec_pcm_mode=mode,
     nidec_wind_brake=_bool_value(_read_param(params, OpendbcParamKey.NRDR_HONDA_WIND_BRAKE), True),
-    nidec_fixed_cruise=decode_pcm_experiment(_read_param(params, OpendbcParamKey.NRDR_HONDA_PCM_FIXED_CRUISE)) is True,
-    nidec_legacy_pcm=decode_pcm_experiment(_read_param(params, OpendbcParamKey.NRDR_HONDA_LEGACY_PCM)) is True,
     mvl_longitudinal=_bool_value(_read_param(params, OpendbcParamKey.HONDA_LIVE_LEARNING_GAS), True),
     mvl_pcm_deadzone=(decode_mvl_pcm_deadzone(_read_param(params, OpendbcParamKey.NRDR_MVL_PCM_DEADZONE)) or 0) / 100,
   )

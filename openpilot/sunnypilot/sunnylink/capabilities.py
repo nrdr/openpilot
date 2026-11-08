@@ -15,11 +15,11 @@ from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware import HARDWARE
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported
-from openpilot.nrdr.params.tuning_policy import mvl_tuning_exempt, legacy_pcm_tuning_locked
+from openpilot.nrdr.params.tuning_policy import mvl_tuning_exempt
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
 from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled, mvl_longitudinal_enabled
 from openpilot.nrdr.hooks.driver_monitoring import monitoring_customization_available
-from openpilot.nrdr.ui.honda_pcm import pcm_tuning_available, live_gas_available, mvl_pcm_deadzone_available, pcm_experiments_available, pcm_experiment_active
+from openpilot.nrdr.ui.honda_pcm import pcm_tuning_available, live_gas_available, mvl_pcm_deadzone_available
 from openpilot.nrdr.ui.icbm import icbm_available
 from openpilot.nrdr.features.lateral.interpolated_torque_pif import supports_interpolated_torque_pif
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import (
@@ -61,10 +61,6 @@ CAPABILITY_FIELDS = (
   "nrdr_firmware_controller_provisional",
   "nrdr_longitudinal_tuning_available",
   "nrdr_honda_pcm_tuning_available",
-  "nrdr_honda_pcm_experiments_available",
-  "nrdr_honda_pcm_fixed_cruise_active",
-  "nrdr_honda_legacy_pcm_active",
-  "nrdr_honda_legacy_pcm_locked",
   "nrdr_mvl_pcm_deadzone_available",
   "nrdr_honda_mvl_selection_available",
   "nrdr_mvl_longitudinal_active",
@@ -105,10 +101,6 @@ CAPABILITY_LABELS: dict[str, str] = {
   "nrdr_honda_tuning_available": "Confirmed Honda-specific nrdr tuning available",
   "nrdr_longitudinal_tuning_available": "Vehicle explicitly supported by nrdr longitudinal tuning",
   "nrdr_honda_pcm_tuning_available": "Confirmed non-interceptor Honda Nidec with openpilot longitudinal control",
-  "nrdr_honda_pcm_experiments_available": "Confirmed non-interceptor Civic Nidec with openpilot longitudinal control",
-  "nrdr_honda_pcm_fixed_cruise_active": "Startup-latched Fixed PCM Cruise Speed experiment",
-  "nrdr_honda_legacy_pcm_active": "Startup-latched Legacy Kegman PCM control; overrides saved MVL",
-  "nrdr_honda_legacy_pcm_locked": "Legacy PCM is saved or active; conflicting tuning is restricted onroad, editable while parked",
   "nrdr_mvl_pcm_deadzone_available": "Confirmed non-interceptor Civic Nidec PCM; configure while parked, applies only under MVL",
   "nrdr_honda_mvl_selection_available": "Confirmed Honda with openpilot longitudinal control",
   "nrdr_mvl_longitudinal_active": "Drive-latched MVL longitudinal control; conflicting tuning is restricted onroad, editable while parked",
@@ -233,7 +225,7 @@ def generate_capabilities(params: Params | None = None) -> dict:
     try:
       CP_SP = messaging.log_from_bytes(CP_SP_bytes, custom.CarParamsSP)
       caps["icbm_available"] = icbm_available(CP, CP_SP)
-      caps["has_icbm"] = bool(CP is not None and CP_SP.intelligentCruiseButtonManagementAvailable
+      caps["has_icbm"] = bool(caps["icbm_available"]
                               and not CP.openpilotLongitudinalControl and not CP_SP.pcmCruiseSpeed)
       caps["tesla_has_vehicle_bus"] = bool(CP_SP.flags & TeslaFlagsSP.HAS_VEHICLE_BUS)
     except Exception:
@@ -251,10 +243,6 @@ def generate_capabilities(params: Params | None = None) -> dict:
   caps["nrdr_honda_tuning_available"] = confirmed_identity is not None and confirmed_identity[1] == "honda"
   caps["nrdr_longitudinal_tuning_available"] = confirmed_identity is not None and nrdr_longitudinal_enabled(CP)
   caps["nrdr_honda_pcm_tuning_available"] = pcm_tuning_available(CP, CP_SP, params)
-  caps["nrdr_honda_pcm_experiments_available"] = pcm_experiments_available(CP, CP_SP, params)
-  caps["nrdr_honda_pcm_fixed_cruise_active"] = pcm_experiment_active(CP, "NrdrHondaPcmFixedCruise")
-  caps["nrdr_honda_legacy_pcm_active"] = pcm_experiment_active(CP, "NrdrHondaLegacyPcm")
-  caps["nrdr_honda_legacy_pcm_locked"] = legacy_pcm_tuning_locked(params, CP, CP_SP)
   caps["nrdr_mvl_pcm_deadzone_available"] = mvl_pcm_deadzone_available(CP, CP_SP, params)
   caps["nrdr_honda_mvl_selection_available"] = live_gas_available(CP, CP_SP, params)
   caps["nrdr_mvl_longitudinal_active"] = mvl_longitudinal_enabled(CP)

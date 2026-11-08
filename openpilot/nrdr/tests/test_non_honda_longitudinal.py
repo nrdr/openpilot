@@ -392,7 +392,6 @@ def test_native_tuning_controls_follow_vehicle_policy(brand, enabled, monkeypatc
                        "mvl_pcm_deadzone_available": lambda *_: False, "saved_mvl_pcm_deadzone": lambda _: 0,
                        "MVL_PCM_DEADZONE_VALUES": (0, 2, 5, 10),
                        "tuning_write_allowed": admission["tuning_write_allowed"], "mvl_tuning_locked": admission["mvl_tuning_locked"],
-                       "legacy_pcm_tuning_locked": admission["legacy_pcm_tuning_locked"],
                        "saved_pcm_mode": lambda _: 0, "saved_wind_brake": lambda _: True})
   layout = object.__new__(module['LongitudinalTuningLayout'])
   for band in ('aggressive', 'standard', 'relaxed', 'econ'):

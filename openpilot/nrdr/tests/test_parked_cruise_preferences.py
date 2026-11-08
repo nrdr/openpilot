@@ -54,7 +54,7 @@ class Item:
 
 
 def cruise_layout(offroad, vehicle, mode, initial=True):
-  flags = {"custom": 0, "mvl": HondaFlags.MVL_LONGITUDINAL, "legacy": HondaFlags.NIDEC_PCM_LEGACY}[mode]
+  flags = {"custom": 0, "mvl": HondaFlags.MVL_LONGITUDINAL, "legacy": 524288}[mode]
   params = Params({"IsOffroad": offroad, "HondaLiveLearningGas": mode == "mvl", "NrdrHondaLegacyPcm": mode == "legacy",
                    "CarParamsPersistent": cp_bytes(flags), **dict.fromkeys(TOGGLES.values(), initial),
                    "CustomAccShortPressIncrement": 3, "CustomAccLongPressIncrement": 5})
@@ -97,8 +97,8 @@ def test_refresh_preserves_preferences_and_only_relaxes_parked_normal_controls(o
   assert layout.custom_acc_toggle.enabled is offroad
   assert layout.custom_acc_short_increment.enabled is offroad
   assert layout.custom_acc_long_increment.enabled is offroad
-  assert layout.accel_boost_toggle.enabled is (offroad or (mode == "custom" and vehicle in ("long", "fixed")))
-  assert layout.scc_v_toggle.enabled is (offroad or (mode != "legacy" and vehicle in ("long", "fixed", "icbm")))
+  assert layout.accel_boost_toggle.enabled is (offroad or vehicle in ("long", "fixed"))
+  assert layout.scc_v_toggle.enabled is (offroad or vehicle in ("long", "fixed", "icbm"))
   assert layout.scc_m_toggle.enabled is layout.scc_v_toggle.enabled
 
 
@@ -109,7 +109,7 @@ def test_explicit_generic_widget_writes_keep_onroad_mode_guard(offroad, mode, ke
   _, ui, _ = cruise_layout(offroad, "missing", mode)
   kind = "OptionControlSP" if key in INCREMENTS.values() else "ToggleActionSP"
   control = tici_control(kind, ui.params, key)
-  writable = offroad or (mode == "mvl" and key != "AccelBoostSP")
+  writable = True
   assert control.enabled is writable
   if kind == "OptionControlSP":
     control.set_value(4)

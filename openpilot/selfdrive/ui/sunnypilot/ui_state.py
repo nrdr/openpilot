@@ -49,6 +49,8 @@ class UIStateSP:
     self.chevron_metrics = None
     self.custom_interactive_timeout: int = 0
     self.developer_ui = None
+    self.nrdr_confidence_ball = True
+    self.nrdr_developer_sidebar = True
     self.hide_v_ego_ui: bool = False
     self.onroad_brightness: int = 0
     self.onroad_brightness_timer: int = 0
@@ -161,6 +163,8 @@ class UIStateSP:
     self.chevron_metrics = self.params.get("ChevronInfo")
     self.custom_interactive_timeout = self.params.get("InteractivityTimeout", return_default=True)
     self.developer_ui = self.params.get("DevUIInfo")
+    self.nrdr_confidence_ball = self.params.get("NrdrConfidenceBall", return_default=True)
+    self.nrdr_developer_sidebar = self.params.get("NrdrDeveloperSidebar", return_default=True)
     self.hide_v_ego_ui = self.params.get_bool("HideVEgoUI")
     self.onroad_brightness = int(float(self.params.get("OnroadScreenOffBrightness", return_default=True)))
     self.onroad_brightness_timer_param = self.params.get("OnroadScreenOffTimer", return_default=True)
@@ -216,7 +220,8 @@ class UIStateSP:
 
     # Saved choice survives unsupported/missing CP and OP-long; only the active
     # capability changes. Never delete/replay a user's parked preference.
-    self.has_icbm = bool(CP is not None and self.CP_SP is not None and
+    from openpilot.nrdr.ui.icbm import icbm_available
+    self.has_icbm = bool(icbm_available(CP, self.CP_SP) and
                          self.CP_SP.intelligentCruiseButtonManagementAvailable and
                          not has_long and not CP.openpilotLongitudinalControl and
                          not self.CP_SP.pcmCruiseSpeed)

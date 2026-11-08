@@ -5,9 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from openpilot.nrdr.params.tuning_policy import LEGACY_PCM_LOCK_KEYS, LONG_SCALE_KEYS, MVL_LOCK_KEYS, RETIRED_TUNING_KEYS, SUGGESTED_DESCRIPTION
+from openpilot.nrdr.params.tuning_policy import LONG_SCALE_KEYS, MVL_LOCK_KEYS, RETIRED_TUNING_KEYS, SUGGESTED_DESCRIPTION
 from openpilot.nrdr.params.mvl_pcm_deadzone import MVL_PCM_DEADZONE_DESCRIPTION
-from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENT_DETAILS
 from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
 from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import DEFAULT_OUT, DEFAULT_SRC, compile_schema
 
@@ -57,17 +56,14 @@ def items(schema):
   return {item["key"]: item for item in items_in(schema)}
 
 
-@pytest.mark.parametrize("key", sorted(MVL_LOCK_KEYS | LEGACY_PCM_LOCK_KEYS))
+@pytest.mark.parametrize("key", sorted(MVL_LOCK_KEYS))
 def test_parked_editing_accepts_saved_and_cached_modes_without_clearing_capabilities(key):
   values = mode_values()  # Both saved/latched modes deliberately remain true.
   snapshot = dict(values)
   item = apply_sunnylink_metadata({"key": key})
   assert allowed(item, values)
   assert values == snapshot
-  for rule in item["enablement"]:
-    assert rule["type"] == "any"
-    assert rule["conditions"][0] == {"type": "offroad_only"}
-    assert rule["conditions"][1]["type"] == "not"
+  assert not item.get("enablement")
 
 
 @pytest.mark.parametrize("key", ["LongPidTuneScaleStandard", "AccelBoostSP", "HondaLiveLearningGas", "NrdrMvlPcmDeadzone"])
@@ -83,9 +79,7 @@ def test_parked_editing_accepts_saved_and_cached_modes_without_clearing_capabili
 ])
 def test_mode_rule_keeps_onroad_semantics_and_requires_positive_offroad_evidence(key, offroad, saved, active, exempt, legacy):
   values = mode_values(offroad=offroad, saved=saved, active=active, exempt=exempt, legacy=legacy)
-  blocked = ((key in MVL_LOCK_KEYS and (active or saved and not exempt)) or
-             (key in LEGACY_PCM_LOCK_KEYS and legacy))
-  assert allowed(apply_sunnylink_metadata({"key": key}), values) is (offroad is True or not blocked)
+  assert allowed(apply_sunnylink_metadata({"key": key}), values)
 
 
 @pytest.mark.parametrize("key", sorted(LONG_SCALE_KEYS))
@@ -96,7 +90,7 @@ def test_pid_scales_stay_visible_while_parked_without_bypassing_existing_visibil
   assert allowed(item, values, "visibility") and allowed(item, values)
   values["has_longitudinal_control"] = False
   assert not allowed(item, values, "visibility")
-  assert item["visibility"][:-1] == original["visibility"]
+  assert item["visibility"] == original["visibility"]
 
 
 def test_existing_hardware_parked_and_engagement_rules_remain_independent():
@@ -109,7 +103,7 @@ def test_existing_hardware_parked_and_engagement_rules_remain_independent():
   snapshot = copy.deepcopy(original)
   item = apply_sunnylink_metadata(original)
   assert original == snapshot
-  assert item["enablement"][:-2] == original["enablement"]
+  assert item["enablement"] == original["enablement"]
   assert item["visibility"] == original["visibility"]
   values = {**mode_values(), "has_longitudinal_control": True, "show_tuning": True, "engaged": False}
   assert allowed(item, values)
@@ -272,8 +266,7 @@ def test_compiled_schema_keeps_pid_controls_and_omits_retired_tuning(items):
 
 
 def test_compiled_copy_explains_saved_choices_instead_of_parked_lockout(items):
-  for key in (LONG_SCALE_KEYS - {"LongPidTuneScale"}) | {"NrdrHondaLegacyPcm",
-                                                       "NrdrHondaFullBrakeAuthority", "NrdrRoenAccelerationLimits"}:
+  for key in (LONG_SCALE_KEYS - {"LongPidTuneScale"}) | {"NrdrHondaFullBrakeAuthority", "NrdrRoenAccelerationLimits"}:
     details = items[key]["details"]
     assert "editable while parked" in details.lower()
     assert "use depends on the selected controller" in details
@@ -281,11 +274,9 @@ def test_compiled_copy_explains_saved_choices_instead_of_parked_lockout(items):
     assert "locked" not in details
   mvl_details = items["HondaLiveLearningGas"]["details"]
   assert "Speed-limit assistance, curve-speed control and cruise-button increments remain independent" in mvl_details
-  assert "Custom controller tuning is saved but ignored by MVL" in mvl_details
-  assert items["NrdrHondaLegacyPcm"]["details"] == PCM_EXPERIMENT_DETAILS["NrdrHondaLegacyPcm"]
+  assert "Custom controller tuning stays editable but is ignored by MVL" in mvl_details
   assert items["NrdrMvlPcmDeadzone"]["description"] == MVL_PCM_DEADZONE_DESCRIPTION
   assert "even with MVL off" in items["NrdrMvlPcmDeadzone"]["description"]
-  assert "no gas interceptor" in items["NrdrHondaLegacyPcm"]["details"]
   assert "gas interceptor" in items["NrdrRoenAccelerationLimits"]["details"]
 
 

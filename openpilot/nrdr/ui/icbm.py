@@ -1,19 +1,18 @@
 """ICBM presentation and saved preferences; runtime retains controller ownership."""
-from opendbc.sunnypilot.car.honda.icbm_eligibility import civic_icbm_available
+from opendbc.car.honda.values import CAR
 
 
 ICBM_DESCRIPTION = (
   "Adjusts factory ACC set speed using cruise-button commands. Factory ACC controls gas, brakes and following distance. " +
-  "Civic: enable Honda Nidec Factory Longitudinal Control too. Applies next drive; no device reboot."
+  "Applies next drive; no device reboot."
 )
 
 
 def icbm_available(CP, CP_SP) -> bool:
   if CP is None or CP_SP is None:
     return False
-  # Old persistent CP_SP predates Civic admission. Refresh presentation without
-  # pretending the controller for the previous drive has changed ownership.
-  return bool(CP_SP.intelligentCruiseButtonManagementAvailable or civic_icbm_available(CP, CP_SP))
+  # Ignore stale availability cached by the retired Nidec Civic port.
+  return bool(CP.carFingerprint != CAR.HONDA_CIVIC and CP_SP.intelligentCruiseButtonManagementAvailable)
 
 
 def save_icbm_choice(state, value) -> bool:

@@ -631,12 +631,10 @@ def test_mici_actual_profile_handler_uses_shared_writer_and_exits_econ(runtime, 
 def remote_writer(params):
   # Execute saveParams and its real admission policy; omit only local imports
   # of native dependencies that are irrelevant to the personality branch.
-  from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS
-  from openpilot.nrdr.params.tuning_policy import LEGACY_PCM_LOCK_KEYS, MVL_LOCK_KEYS
+  from openpilot.nrdr.params.tuning_policy import CRUISE_PREFERENCE_KEYS, MVL_LOCK_KEYS
 
   env = {"params": params, "base64": base64, "gzip": gzip, "Path": Path,
-         "REQUEST": "NrdrResetLiveGas", "MVL_LOCK_KEYS": MVL_LOCK_KEYS, "mvl_tuning_locked": lambda _: False,
-         "LEGACY_PCM_LOCK_KEYS": LEGACY_PCM_LOCK_KEYS, "PCM_EXPERIMENTS": PCM_EXPERIMENTS,
+         "REQUEST": "NrdrResetLiveGas", "MVL_LOCK_KEYS": MVL_LOCK_KEYS, "CRUISE_PREFERENCE_KEYS": CRUISE_PREFERENCE_KEYS, "mvl_tuning_locked": lambda _: False,
          "tuning_write_allowed": lambda *_args, **_kw: True, "BLOCKED_PARAMS": frozenset(),
          "cloudlog": NS(warning=lambda *_: None, error=lambda *_: None), "write_personality": write_personality}
   definitions("openpilot/nrdr/features/services/sunnylink.py", env)

@@ -13,7 +13,7 @@ import pytest
 from opendbc.car import apply_hysteresis
 from opendbc.car.honda.values import CAR, HondaFlags
 from opendbc.car.structs import car
-from opendbc.sunnypilot.car.honda.icbm_eligibility import civic_icbm_available
+from openpilot.nrdr.ui.icbm import icbm_available
 from openpilot.common.constants import CV
 
 
@@ -60,7 +60,7 @@ def car_params(*, bosch=False, op_long=False, available=True, pcm_speed=False, i
 def controller(*, bosch=False, **kwargs):
   env = {"State": State, "SendButtonState": SendButtonState, "ButtonType": ButtonType,
          "CV": CV, "DT_CTRL": .01, "apply_hysteresis": apply_hysteresis,
-         "civic_icbm_available": civic_icbm_available}
+         "icbm_available": icbm_available}
   definitions(CRUISE, {"CRUISE_BUTTON_TIMER", "update_manual_button_timers"}, env)
   definitions("openpilot/sunnypilot/selfdrive/car/intelligent_cruise_button_management/helpers.py", {"get_minimum_set_speed"}, env)
   definitions(CONTROLLER, {"HYST_GAP", "INACTIVE_TIMER", "SEND_BUTTONS", "IntelligentCruiseButtonManagement"}, env)
@@ -111,8 +111,8 @@ def test_ineligible_state_clears_pending_button_and_fixed_pcm_cannot_bypass(bosc
   cp, sp = icbm.CP, icbm.CP_SP
   if blocked in ("op_long", "fixed_pcm", "legacy_pcm", "mvl"):
     cp.openpilotLongitudinalControl = True
-    cp.flags |= {"op_long": 0, "fixed_pcm": HondaFlags.NIDEC_PCM_FIXED_CRUISE,
-                 "legacy_pcm": HondaFlags.NIDEC_PCM_LEGACY, "mvl": HondaFlags.MVL_LONGITUDINAL}[blocked]
+    cp.flags |= {"op_long": 0, "fixed_pcm": 262144,
+                 "legacy_pcm": 524288, "mvl": HondaFlags.MVL_LONGITUDINAL}[blocked]
     # Explicitly preserve False: Fixed's target ownership is NOT ICBM admission.
     sp.pcmCruiseSpeed = False
   elif blocked == "unavailable":
@@ -194,7 +194,7 @@ def test_manual_pulse_and_ineligible_hold_are_not_lost_and_timers_are_private():
 def test_factory_minimum_clamps_target_and_reaches_terminal_holding(metric, bosch):
   icbm, _ = controller(bosch=bosch)
   cs, cc, plan = inputs()
-  floor = (30 if metric else 20) if bosch else (40 if metric else 25)
+  floor = 30 if metric else 20
   conversion = CV.KPH_TO_MS if metric else CV.MPH_TO_MS
   cs.cruiseState.speedCluster = (floor + 1) * conversion
   plan.vTarget = 0.
@@ -213,15 +213,15 @@ def test_cruise_helper_civic_minimum_is_kph_and_other_branches_unchanged(metric,
                       available=variant != "unavailable", pcm_speed=variant in ("stock_off", "mvl_stock"),
                       interceptor=variant == "interceptor")
   obj = NS(CP=cp, CP_SP=sp, fixed_cruise_enabled=variant == "fixed", mvl_enabled=variant in ("mvl", "mvl_stock"))
-  env = {"CV": CV, "civic_icbm_available": civic_icbm_available, "V_CRUISE_MIN": 0, "MVL_V_CRUISE_MIN": 8}
+  env = {"CV": CV, "icbm_available": icbm_available, "V_CRUISE_MIN": 0, "MVL_V_CRUISE_MIN": 8}
   definitions("openpilot/sunnypilot/selfdrive/car/intelligent_cruise_button_management/helpers.py", {"get_minimum_set_speed"}, env)
   definitions(CRUISE, {"get_minimum_set_speed"}, env, class_name="VCruiseHelperSP")
   # The class method has the same name as its module-level helper.
   method = env.pop("get_minimum_set_speed")
   definitions("openpilot/sunnypilot/selfdrive/car/intelligent_cruise_button_management/helpers.py", {"get_minimum_set_speed"}, env)
   method(obj, metric)
-  expected = (40 if metric else 25 * CV.MPH_TO_KPH) if variant == "stock_icbm" else 30 if metric else 20
-  if variant in ("stock_off", "fixed"):
+  expected = 30 if metric else 20
+  if variant == "stock_off":
     expected = 0
   elif variant == "mvl_stock":
     expected = 8
@@ -273,13 +273,13 @@ def test_ui_preserves_choice_and_uses_admitted_state_not_saved_preference(saved,
   cp, sp = car_params(available=mode != "unavailable", op_long=mode == "op_long", pcm_speed=mode == "pending_on")
   ui = NS(CP=None if mode == "missing_cp" else cp, CP_SP=None if mode == "missing_sp" else sp,
           params=Params({} if saved is None else {KEY: saved}), has_longitudinal_control=mode == "op_long", has_icbm=True)
-  env = {"car": car}
+  env = {"car": car, "icbm_available": icbm_available}
   definitions(UI, {"_enforce_constraints"}, env, class_name="UIStateSP")
   for _ in range(3):
     env["_enforce_constraints"](ui)
   assert ui.params.get(KEY) is saved and (KEY in ui.params) is (saved is not None)
   assert not any(action[1] == KEY for action in ui.params.actions)
-  assert ui.has_icbm is (mode == "active")
+  assert not ui.has_icbm  # Civic support is retired, including stale availability.
 
 
 def test_ui_missing_persistent_sp_does_not_keep_previous_active_capability():
@@ -288,7 +288,7 @@ def test_ui_missing_persistent_sp_does_not_keep_previous_active_capability():
 
   cp, sp = car_params()
   ui = NS(CP=cp, CP_SP=sp, params=Params({KEY: True}), has_icbm=True, has_longitudinal_control=False)
-  env = {"car": car, "messaging": Mock(), "custom": NS(CarParamsSP=object)}
+  env = {"car": car, "icbm_available": icbm_available, "messaging": Mock(), "custom": NS(CarParamsSP=object)}
   definitions(UI, {"update_params", "_enforce_constraints"}, env, class_name="UIStateSP")
 
   def enforce():

@@ -4,7 +4,7 @@ MVL_PCM_DEADZONE_VALUES = (0, 2, 5, 10)
 MVL_PCM_DEADZONE_LABELS = ("Off", "0.02", "0.05", "0.10")
 MVL_PCM_DEADZONE_TITLE = "PCM Feedback Deadzone (Experimental)"
 MVL_PCM_DEADZONE_DESCRIPTION = (
-  "Filters small acceleration errors only while MVL controls Civic PCM. " +
+  "Filters small acceleration errors only while MVL controls Civic PCM. Ignored during Civic Experimental shaping. " +
   "Editable while parked even with MVL off. Off keeps MVL unchanged. Applies next drive; no device reboot."
 )
 MVL_PCM_DEADZONE_DETAILS = (

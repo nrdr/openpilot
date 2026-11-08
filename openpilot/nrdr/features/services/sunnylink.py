@@ -13,8 +13,6 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
   "NrdrLateralController",
   "NrdrDriverMonitoringReminderPercent",
   "NrdrMvlPcmDeadzone",
-  "NrdrHondaPcmFixedCruise",
-  "NrdrHondaLegacyPcm",
 ))
 
 # These controls are surfaced only for an exact, confirmed Honda CP. Keeping
@@ -172,8 +170,7 @@ def inject_live_gas_details(schema: dict, walk) -> None:
 def inject_pcm_experiment_status(schema: dict, walk) -> None:
   from opendbc.car.structs import car
   from openpilot.cereal import custom
-  from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS
-  from openpilot.nrdr.ui.honda_pcm import live_gas_status, pcm_experiment_status
+  from openpilot.nrdr.ui.honda_pcm import live_gas_status
 
   params = Params()
   CP = CP_SP = None
@@ -191,9 +188,7 @@ def inject_pcm_experiment_status(schema: dict, walk) -> None:
 
   def visitor(item: dict) -> None:
     key = item.get("key")
-    if key in PCM_EXPERIMENTS:
-      status = pcm_experiment_status(CP, CP_SP, params, key)
-    elif key == "HondaLiveLearningGas":
+    if key == "HondaLiveLearningGas":
       status = live_gas_status(CP, params, CP_SP).replace("\n", "; ")
     else:
       return
