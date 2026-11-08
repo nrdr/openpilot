@@ -116,14 +116,12 @@ def test_live_gas_selects_all_honda_openlong_paths_parked_and_requests_restart(c
   assert not ui.params.writes
 
 
-@pytest.mark.parametrize("change", ["missing", "stock", "non_honda", "mismatch", "invalid"])
+@pytest.mark.parametrize("change", ["missing", "non_honda", "mismatch", "invalid"])
 def test_live_gas_stale_callback_rechecks_identity_and_value(change):
   ui = state()
   selected = True
   if change == "missing":
     ui.CP = None
-  elif change == "stock":
-    ui.CP.openpilotLongitudinalControl = False
   elif change == "non_honda":
     ui.CP.brand = "toyota"
   elif change == "mismatch":

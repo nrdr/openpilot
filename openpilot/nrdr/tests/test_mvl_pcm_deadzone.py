@@ -133,7 +133,7 @@ def test_both_native_callbacks_recheck_stale_vehicle_and_road_state(case, native
     ui.params.values["HondaLiveLearningGas"] = False
   select()
   layout._update_state()
-  accepted = case == "mvl_off"
+  accepted = case in ("mvl_off", "stock", "stock_flag")
   assert ui.params.writes == ([(KEY, 5), ("OnroadCycleRequested", True)] if accepted else [])
   assert ui.params.get_bool("ExperimentalMode")
   if native == "large":

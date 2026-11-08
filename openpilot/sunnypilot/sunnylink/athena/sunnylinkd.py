@@ -324,7 +324,7 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
   handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
   honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
   if live_gas_selection is not None and capabilities.get("nrdr_honda_mvl_selection_available") is not True:
-    raise ValueError("Live Learning Gas requires a confirmed Honda with openpilot longitudinal control.")
+    raise ValueError("Live Learning Gas requires a confirmed supported Honda; its saved choice applies with openpilot longitudinal control.")
   deadzone_selection = None
   if "NrdrMvlPcmDeadzone" in params_to_update:
     deadzone_selection = _remote_int_value(params_to_update["NrdrMvlPcmDeadzone"], compression, MVL_PCM_DEADZONE_VALUES)

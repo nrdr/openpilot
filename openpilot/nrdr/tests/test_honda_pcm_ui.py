@@ -50,14 +50,14 @@ def state(**overrides):
 
 
 @pytest.mark.parametrize("car", list(CAR))
-def test_exact_nidec_catalog_and_openlong_eligibility(car):
+def test_exact_nidec_catalog_hardware_eligibility(car):
   ui = state(carFingerprint=str(car))
   assert pcm_tuning_available(ui.CP, ui.CP_SP, ui.params) == (car not in HONDA_BOSCH)
 
 
 @pytest.mark.parametrize("overrides", [
   {"brand": "toyota"}, {"carFingerprint": "UNKNOWN_HONDA"},
-  {"openpilotLongitudinalControl": False}, {"enableGasInterceptor": True},
+  {"enableGasInterceptor": True},
 ])
 def test_ineligible_control_cannot_save(overrides):
   ui = state(**overrides)
@@ -85,7 +85,56 @@ def test_matching_identity_and_missing_vehicle():
   assert not pcm_tuning_available(None, ui.CP_SP, ui.params)
   assert not pcm_tuning_available(ui.CP, None, ui.params)
   ui.CP_SP.flags |= HondaFlagsSP.STOCK_LONGITUDINAL
-  assert not pcm_tuning_available(ui.CP, ui.CP_SP, ui.params)
+  assert pcm_tuning_available(ui.CP, ui.CP_SP, ui.params)
+
+
+@pytest.mark.parametrize("saved_stock", [False, True])
+def test_cached_factory_acc_allows_parked_preconfiguration_without_changing_runtime(saved_stock):
+  from opendbc.car.honda.civic_pcm import uses_civic_pcm
+  from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
+
+  ui = state(openpilotLongitudinalControl=False)
+  ui.CP_SP.flags |= HondaFlagsSP.STOCK_LONGITUDINAL
+  ui.params.values.update(HondaEnforceStockLongitudinal=saved_stock,
+                         CarPlatformBundle={"brand": "honda", "platform": "HONDA_CIVIC"})
+  layout = native_layout(ui)
+  layout._update_state()
+  assert all(item.enabled for item in (layout._pcm_mode, layout._wind_brake, layout._live_learning_gas, layout._mvl_pcm_deadzone))
+  assert save_pcm_choice(ui, "NrdrHondaPcmMode", 2)
+  assert save_pcm_choice(ui, "NrdrHondaWindBrake", True)
+  assert save_live_gas_choice(ui, True)
+  assert save_mvl_pcm_deadzone(ui, 5)
+  assert ui.params.get("HondaEnforceStockLongitudinal") is saved_stock
+  assert not ui.CP.openpilotLongitudinalControl
+  assert ui.CP_SP.flags & HondaFlagsSP.STOCK_LONGITUDINAL
+  assert not uses_civic_pcm(ui.CP, ui.CP_SP) and not mvl_longitudinal_enabled(ui.CP)
+
+
+@pytest.mark.parametrize("saved_stock", [False, True])
+def test_sunnylink_cached_stock_snapshot_exposes_configuration_not_active_control(saved_stock):
+  from opendbc.car.structs import car
+  from openpilot.cereal import custom
+  from openpilot.sunnypilot.sunnylink.capabilities import generate_capabilities
+  from openpilot.nrdr.tests.test_parked_tuning_schema import allowed, items_in
+  from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import DEFAULT_SRC, compile_schema
+
+  params = Params(
+    IsOffroad=True, HondaEnforceStockLongitudinal=saved_stock,
+    CarPlatformBundle={"brand": "honda", "platform": "HONDA_CIVIC"},
+    CarParamsPersistent=car.CarParams.new_message(brand="honda", carFingerprint="HONDA_CIVIC",
+                                                openpilotLongitudinalControl=False).to_bytes(),
+    CarParamsSPPersistent=custom.CarParamsSP.new_message(flags=int(HondaFlagsSP.STOCK_LONGITUDINAL),
+                                                        enableGasInterceptor=False).to_bytes(),
+  )
+  caps = generate_capabilities(params)
+  for key in ("nrdr_honda_pcm_tuning_available", "nrdr_honda_mvl_selection_available", "nrdr_mvl_pcm_deadzone_available"):
+    assert caps[key]
+  assert not caps["has_longitudinal_control"] and not caps["nrdr_mvl_longitudinal_active"]
+  items = {item["key"]: item for item in items_in(compile_schema(DEFAULT_SRC))}
+  for key in ("NrdrHondaPcmMode", "NrdrHondaWindBrake", "HondaLiveLearningGas", "NrdrMvlPcmDeadzone"):
+    assert allowed(items[key], caps | {"IsOffroad": True})
+    assert not allowed(items[key], caps | {"IsOffroad": False})
+  assert not params.writes
 
 
 @pytest.mark.parametrize("value", [None, True, False, -1, 3, 1.0, "1", b"1", {}])

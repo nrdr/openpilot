@@ -1,6 +1,5 @@
 """Presentation eligibility and saved choices; never an actuation authority."""
 from opendbc.car.honda.values import CAR, HONDA_BOSCH
-from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
@@ -9,12 +8,12 @@ from openpilot.nrdr.params.mvl_pcm_deadzone import MVL_PCM_DEADZONE_VALUES
 
 
 def live_gas_available(CP, CP_SP, params) -> bool:
+  # This admits saved choices, not controller operation. Persistent CP can still
+  # describe the last factory-ACC drive after the user changes its saved mode.
   present, fingerprint, brand = get_selected_car_identity(params)
   identity = confirmed_vehicle_identity(CP, fingerprint, brand, selection_present=present)
   return bool(identity is not None and identity[1] == "honda" and identity[0] in CAR
-              and getattr(CP, "openpilotLongitudinalControl", False)
-              and CP_SP is not None
-              and not (getattr(CP_SP, "flags", 0) & HondaFlagsSP.STOCK_LONGITUDINAL))
+              and CP_SP is not None)
 
 
 def save_live_gas_choice(state, value) -> bool:
@@ -31,9 +30,7 @@ def pcm_tuning_available(CP, CP_SP, params) -> bool:
   identity = confirmed_vehicle_identity(CP, fingerprint, brand, selection_present=present)
   return bool(identity is not None and identity[1] == "honda" and identity[0] in CAR
               and identity[0] not in HONDA_BOSCH
-              and getattr(CP, "openpilotLongitudinalControl", False)
-              and not getattr(CP_SP, "enableGasInterceptor", True)
-              and not (getattr(CP_SP, "flags", 0) & HondaFlagsSP.STOCK_LONGITUDINAL))
+              and CP_SP is not None and not getattr(CP_SP, "enableGasInterceptor", True))
 
 
 def saved_pcm_mode(params) -> int:
