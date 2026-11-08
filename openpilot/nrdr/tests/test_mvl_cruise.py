@@ -1,4 +1,4 @@
-"""Pinned-donor cruise helper parity, button safety and isolated settings.
+"""Pinned-donor cruise limits/authority with saved button preferences and SLA.
 
 No device I/O. Source fixtures are blob-verified by test_mvl_host_parity.
 Low-speed SET (<40 kph), including standstill, restores donor's fixed floor40.
@@ -78,7 +78,7 @@ class Params:
 
 
 def forbidden(*_args, **_kwargs):
-  raise AssertionError("MVL touched custom cruise settings/HUD/SLA")
+  raise AssertionError("MVL touched the NRDR HUD/button submode")
 
 
 def namespace(values=None):
@@ -123,34 +123,42 @@ def state(speed=20., *, button=None, pressed=False, available=True, standstill=F
 @pytest.mark.parametrize("pcm_speed", [False, True])
 @pytest.mark.parametrize("pcm", [False, True])
 @pytest.mark.parametrize("metric", [False, True])
-def test_entire_button_update_matches_donor_defaults_with_polluted_settings(pcm_speed, pcm, metric):
-  current, params = module(values=POLLUTED, forbid_nrdr=True)
-  donor, _ = module(DONOR)
+def test_entire_button_update_matches_donor_with_saved_preferences_and_sla(pcm_speed, pcm, metric):
+  values = POLLUTED | {"CustomAccShortPressIncrement": 5, "CustomAccLongPressIncrement": 1}
+  current, params = module(values=values, forbid_nrdr=True)
+  donor, _ = module(DONOR, values=values)
   car_params, car_sp = cp(pcm=pcm), NS(pcmCruiseSpeed=pcm_speed)
   actual, expected = (m["VCruiseHelper"](car_params, car_sp) for m in (current, donor))
-  assert actual.nrdr is None and actual.params is None
+  assert actual.nrdr is None and actual.params is params
+  assert actual.v_cruise_max == 145
   for helper in (actual, expected):
     helper.v_cruise_kph = helper.v_cruise_cluster_kph = 70.
-  # Even old in-memory settings/SLA targets cannot leak into the mode.
-  actual.custom_acc_enabled, actual.short_increment, actual.long_increment = True, 10, 10
-  actual.sla_state, actual.prev_sla_state = SLA.active, SLA.preActive
-  actual.has_speed_limit, actual.speed_limit_final_last_kph = True, 169.
-  actual.req_plus = actual.req_minus = True
+  # Saved cruise preferences supersede stale cached values, while unrelated
+  # HUD/initial-speed settings still cannot acquire MVL target authority.
+  actual.custom_acc_enabled, actual.short_increment, actual.long_increment = False, 10, 10
   for frame in range(420):
     button = Button.accelCruise if frame < 210 else Button.decelCruise
     event = frame % 210 in (5, 8, 20, 75, 100, 160)
     pressed = frame % 210 in (5, 20, 100)
     cs = state(button=button if event else None, pressed=pressed, gas=frame % 31 == 0,
                standstill=110 < frame % 210 < 135, available=frame % 80 != 0)
-    actual.read_custom_set_speed_params()
-    actual.update_speed_limit_assist(metric, object())  # no access to sidecar fields
+    target = 169. if frame < 210 else 60.
+    assist = SLA.active if frame % 120 >= 90 else SLA.disabled
+    plan = NS(speedLimit=NS(resolver=NS(speedLimitValid=True, speedLimitLastValid=False,
+                                      speedLimitFinalLast=target * CV.KPH_TO_MS), assist=NS(state=assist)))
     for helper in (actual, expected):
+      helper.read_custom_set_speed_params()
+      helper.update_speed_limit_assist(metric, plan)
       helper.update_v_cruise(cs, frame % 200 > 2, metric)
+    assert actual.custom_acc_enabled and actual.short_increment == 5 and actual.long_increment == 1
+    assert actual.has_speed_limit and actual.sla_state == assist
+    assert actual.speed_limit_final_last_kph == pytest.approx(target)
     for key in ("v_cruise_kph", "v_cruise_cluster_kph", "v_cruise_kph_last", "v_cruise_min", "enabled_prev"):
       assert getattr(actual, key) == getattr(expected, key), (frame, key)
     assert actual.button_timers == expected.button_timers
     assert actual.button_change_states == expected.button_change_states
-  assert not params.calls
+  assert params.calls == [("get", key) for key in DEFAULTS] * 421
+  assert params.values == values  # No preference rewrites or unrelated setting reads.
 
 
 @pytest.mark.parametrize("metric", [False, True])

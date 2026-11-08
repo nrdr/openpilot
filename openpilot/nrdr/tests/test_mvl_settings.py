@@ -14,7 +14,9 @@ from opendbc.car.structs import car
 from openpilot.nrdr.params.generated import ALL_KEYS
 from openpilot.nrdr.params.snapshots import CONTROL_GROUPS, PLANNER_GROUPS
 from openpilot.nrdr.params.specs import PARAM_SPECS_BY_KEY
-from openpilot.nrdr.params.tuning_policy import LONG_SCALE_KEYS, MVL_DESCRIPTION, MVL_LOCK_KEYS, mvl_tuning_locked, tuning_write_allowed
+from openpilot.nrdr.params.tuning_policy import (
+  CRUISE_PREFERENCE_KEYS, LONG_SCALE_KEYS, MVL_DESCRIPTION, MVL_LOCK_KEYS, mvl_tuning_locked, tuning_write_allowed,
+)
 from openpilot.nrdr.tests.test_honda_pcm_ui import Params, Widget, native_layout, native_layout_with_real_toggle_handlers, state
 from openpilot.nrdr.ui.honda_pcm import live_gas_available, save_live_gas_choice
 from openpilot.nrdr.params import mvl_pcm_deadzone
@@ -61,6 +63,16 @@ def test_manual_experimental_is_not_an_mvl_conflict_but_dec_is(saved, active):
   "LaneGuidanceMode", "HondaSteerDeltaUp", "IntelligentCruiseButtonManagement"])
 def test_mvl_does_not_lock_personality_selection_lateral_hardware_safety_or_diagnostics(key):
   assert tuning_write_allowed(Params(HondaLiveLearningGas=True, CarParamsPersistent=cp_bytes(True)), key)
+
+
+@pytest.mark.parametrize("key", sorted(CRUISE_PREFERENCE_KEYS))
+@pytest.mark.parametrize("offroad", [False, True])
+@pytest.mark.parametrize("saved,active", [(True, False), (False, True), (True, True)])
+def test_cruise_preferences_are_independent_of_mvl_tune_ownership(key, offroad, saved, active):
+  params = Params(IsOffroad=offroad, HondaLiveLearningGas=saved, CarParamsPersistent=cp_bytes(active))
+  assert key not in MVL_LOCK_KEYS
+  assert tuning_write_allowed(params, key)
+  assert not params.writes
 
 
 def test_current_cp_supersedes_old_persistent_latch_but_corruption_fails_closed():
@@ -384,6 +396,16 @@ def test_remote_non_honda_ignores_saved_honda_mode_for_global_sunny_controls(rpc
   assert not params.writes
 
 
+@pytest.mark.parametrize("key", sorted(CRUISE_PREFERENCE_KEYS))
+@pytest.mark.parametrize("offroad", [False, True])
+def test_remote_cruise_preferences_save_while_mvl_is_active(rpc, key, offroad):
+  save, params, _ = rpc
+  params.values.update(IsOffroad=offroad, HondaLiveLearningGas=True, CarParams=cp_bytes(True))
+  save({key: encoded(1)})
+  assert params.get(key) == 1
+  assert [name for name, _ in params.writes] == [key, "ParamsVersion"]
+
+
 def test_retired_keys_are_absent_and_remote_writes_rejected(rpc):
   save, params, _ = rpc
   keys = set(ALL_KEYS) | {k for group in CONTROL_GROUPS + PLANNER_GROUPS for k in group.keys}
@@ -422,7 +444,10 @@ def test_compiled_schema_keeps_onroad_mode_guards_and_preserves_econ_selection()
   assert "Experimental Mode remains manually selectable" in items["HondaLiveLearningGas"]["description"]
   assert "needs_onroad_cycle" not in items["HondaLiveLearningGas"]
   assert items["ExperimentalMode"]["enablement"] == [
-    {"type": "capability", "field": "has_longitudinal_control", "equals": True},
+    {"type": "any", "conditions": [
+      {"type": "offroad_only"},
+      {"type": "capability", "field": "has_longitudinal_control", "equals": True},
+    ]},
   ]
   assert schema == json.loads((ROOT / "openpilot/sunnypilot/sunnylink/settings_ui.json").read_text(encoding="utf-8"))
 
@@ -448,14 +473,14 @@ def test_sunnylink_visual_lock_matches_road_state_vehicle_scope_and_latch(saved,
 
 
 @pytest.mark.parametrize("key", ["CustomAccIncrementsEnabled", "CustomAccShortPressIncrement", "CustomAccLongPressIncrement"])
-def test_increment_schema_lock_preserves_existing_availability_rules(key):
+def test_increment_schema_removes_mvl_lock_but_preserves_other_availability_rules(key):
   from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
   original = {"key": key, "enablement": [{"type": "capability", "field": "has_longitudinal_control", "equals": True}],
               "visibility": [{"type": "param", "key": "CustomAccIncrementsEnabled", "equals": True}]}
   result = apply_sunnylink_metadata(original)
-  assert result["enablement"][:-2] == original["enablement"]
+  assert result["enablement"][:-1] == original["enablement"]
   assert result["visibility"] == original["visibility"]
-  assert "nrdr_mvl_longitudinal_active" in json.dumps(result["enablement"][-2])
+  assert "nrdr_mvl_longitudinal_active" not in json.dumps(result["enablement"])
   assert "nrdr_honda_legacy_pcm_locked" in json.dumps(result["enablement"][-1])
 
 

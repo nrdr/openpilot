@@ -125,6 +125,7 @@ def button_stack(*, long_enabled=True, brand="honda", initial_mode=True, mvl=Fal
   params = RecordingParams({"ExperimentalMode": initial_mode, "HondaLiveLearningGas": saved_mvl})
   namespace = {"ButtonType": Button, "Params": lambda: params, "structs": NS(CarParams=object),
                "DISTANCE_LONG_PRESS": 50, "EventNameSP": NS(experimentalModeSwitched="switched"),
+               "custom": NS(LongitudinalPlanSP=NS(SpeedLimit=NS(AssistState=NS(preActive=1)))),
                "consume_button_press": lambda _: True,
                 "StockCmbsAlerts": lambda: object(), "time": NS(monotonic=lambda: 100.),
                "nrdr_longitudinal_enabled": lambda cp: cp.brand == "honda",
@@ -178,8 +179,9 @@ def test_repeated_holds_toggle_once_each_without_personality_change(mvl):
 
 
 @pytest.mark.parametrize("release_reserved", (False, True))
-def test_reserved_release_resets_latch_and_next_hold_works(release_reserved):
-  helper, params, events, tick = button_stack()
+@pytest.mark.parametrize("mvl", (False, True))
+def test_reserved_release_resets_latch_and_next_hold_works(release_reserved, mvl):
+  helper, params, events, tick = button_stack(mvl=mvl)
   hold(tick)
   tick(reserved=True)
   assert not tick(False, reserved=release_reserved)
@@ -191,8 +193,9 @@ def test_reserved_release_resets_latch_and_next_hold_works(release_reserved):
   assert helper.personality == 1
 
 
-def test_sla_confirmation_cannot_turn_into_a_delayed_toggle_or_personality_change():
-  helper, params, events, tick = button_stack()
+@pytest.mark.parametrize("mvl", (False, True))
+def test_sla_confirmation_cannot_turn_into_a_delayed_toggle_or_personality_change(mvl):
+  helper, params, events, tick = button_stack(mvl=mvl)
   hold(tick, reserved=True)
   for _ in range(100):
     tick()  # Planner reservation expires while the same physical press continues.
@@ -270,19 +273,29 @@ def test_mvl_hold_toggles_once_without_personality_change_regardless_of_saved_ch
   assert params.actions == [("put", "ExperimentalMode", value) for value in (not initial_mode, initial_mode, not initial_mode)]
 
 
-def test_mvl_stale_sla_cannot_block_hold_or_four_personality_short_presses():
-  helper, params, events, tick = button_stack(mvl=True)
-  helper.nrdr.sla_button_reserved_until = 1000.
-  reserved = helper.nrdr.reserve_distance_button(object())
-  assert not reserved and helper.nrdr.sla_button_reserved_until == 0.
-  hold(tick, reserved=reserved)
+@pytest.mark.parametrize("saved_mvl", (False, True))
+def test_mvl_sla_owns_press_through_expiry_then_fresh_buttons_work(saved_mvl):
+  helper, params, events, tick = button_stack(mvl=True, saved_mvl=saved_mvl)
+  assert helper.nrdr.reserve_distance_button(1)
+  hold(tick, reserved=True)
+  clock = helper.nrdr.reserve_distance_button.__func__.__globals__["time"]
+  clock.monotonic = lambda: 101.
+  assert not helper.nrdr.reserve_distance_button(0)
+  for _ in range(100):
+    tick()  # Reservation expired, but the same physical press is consumed.
   assert not tick(False)
-  assert events == ["switched"] and not params.get_bool("ExperimentalMode")
+  assert events == [] and params.get_bool("ExperimentalMode")
+  assert helper.personality == 1 and helper.nrdr.personality_sync._pending is None
+  assert not params.actions
   for generation, expected in enumerate((0, 3, 2, 1), 1):
     tick(True)
     assert tick(False)
     assert helper.personality == expected
     assert helper.nrdr.personality_sync._pending == (generation, expected)
+  hold(tick)
+  assert not tick(False)
+  assert events == ["switched"] and not params.get_bool("ExperimentalMode")
+  assert helper.personality == 1 and helper.nrdr.personality_sync._pending == (4, 1)
   assert params.actions == [("put", "ExperimentalMode", False)]
 
 

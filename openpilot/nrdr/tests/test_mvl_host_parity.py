@@ -549,38 +549,124 @@ def test_econ_acceleration_is_fixed_and_braking_stays_donor():
   assert "import Params" not in econ_source and "import LongTune" not in econ_source
 
 
-def test_sp_construction_isolates_donor_scc_sla_and_no_sunny_boost():
-  env = environment(EventsSP=lambda: object(), SmartCruiseControl=forbidden,
-                    NrdrSpeedLimitAssist=forbidden, SpeedLimitAssist=forbidden, AccelBoostSP=forbidden,
-                    SpeedLimitResolver=forbidden, get_active_bundle=forbidden,
-                    E2EAlertsHelper=lambda: object())
-  module = definitions(source(SP + "longitudinal_planner.py"), env)
-  planner = module["LongitudinalPlannerSP"](car_params(), NS(), object())
-  assert planner.scc is planner.sla is planner.resolver is None
-  assert planner.accel_boost_sp is None
+class TargetFeatureBoundary:
+  """Controlled leaf output; planner routing/arbitration/publication stay real."""
+  def __init__(self, *_):
+    self.enabled = self.is_enabled = self.is_active = False
+    self.state = 0
+    self.output_v_target, self.output_a_target = 255., 0.
+    self.requested_v_target, self.requested_a_target = 15., -.8
+    self.current_lat_acc, self.max_pred_lat_acc = 1.7, 2.1
+    self.calls = []
+
+  def update(self, *args):
+    self.calls.append(args)
+    self.is_enabled = self.is_active = self.enabled
+    self.state = int(self.enabled)
+    self.output_v_target = self.requested_v_target if self.enabled else 255.
+    self.output_a_target = self.requested_a_target if self.enabled else 0.
 
 
-def test_sp_target_arbitration_exact_donor_disabled_defaults():
-  env = environment()
-  current = definitions(source(SP + "longitudinal_planner.py"), env)["LongitudinalPlannerSP"]
-  donor = definitions(git_source(SP + "longitudinal_planner.py"), env)["LongitudinalPlannerSP"]
-  for stale_targets in ((20., 25., 30.), (30., 15., 25.), (30., 25., 10.), (255., 255., 255.)):
-    results = []
-    for cls in (current, donor):
-      planner = object.__new__(cls)
-      planner.mvl_enabled = True
-      # The fixed-default MVL path ignores even stale/custom target objects.
-      targets = stale_targets if cls is current else (255., 255., 255.)
-      planner.events_sp = object()
-      planner.scc = NS(update=lambda *_: None,
-                       vision=NS(output_v_target=targets[0], output_a_target=-.1),
-                       map=NS(output_v_target=targets[1], output_a_target=-.2))
-      planner.resolver = NS(update=lambda *_: None, speed_limit_valid=True, speed_limit_last_valid=True,
-                           speed_limit=10., speed_limit_final_last=10., distance=100.)
-      planner.sla = NS(update=lambda *_: None, output_v_target=targets[2], output_a_target=-.3)
-      sm = {"carState": NS(vCruiseCluster=100.), "carControl": NS(enabled=True, cruiseControl=NS(override=False))}
-      results.append((planner.update_targets(sm, 20., .5, 27.), planner.source))
-    assert results[0] == results[1]
+class SmartCruiseBoundary:
+  def __init__(self):
+    self.vision, self.map = TargetFeatureBoundary(), TargetFeatureBoundary()
+
+  def update(self, *args):
+    self.vision.update(*args)
+    self.map.update(*args)
+
+
+class ResolverBoundary:
+  def __init__(self, **kwargs):
+    self.kwargs, self.calls = kwargs, []
+    self.speed_limit = self.speed_limit_last = self.speed_limit_final = self.speed_limit_final_last = 15.
+    self.speed_limit_valid = self.speed_limit_last_valid = True
+    self.speed_limit_offset, self.distance, self.source = 0., 100., 1
+
+  def update(self, *args):
+    self.calls.append(args)
+
+
+def integrated_planner_classes():
+  """Actual routed MVL -> current SP versus pinned donor -> pinned donor SP.
+
+  Only the solver/feature/message boundaries are doubles. In particular, do
+  not substitute PlannerSPDouble: that would miss the MVL-wide target bypass.
+  Feature algorithms and cruise-button preferences have separate regressions.
+  """
+  def message(service):
+    payload = (NS(e2eAlerts=NS(), smartCruiseControl=NS(vision=NS(), map=NS()),
+                  speedLimit=NS(resolver=NS(), assist=NS())) if service == "longitudinalPlanSP" else NS())
+    return NS(logMonoTime=200, **{service: payload})
+
+  env = environment(
+    EventsSP=lambda: NS(clear=lambda: None, to_msg=list),
+    E2EAlertsHelper=lambda: NS(update=lambda *_: None, green_light_alert=False, lead_depart_alert=False),
+    SmartCruiseControl=SmartCruiseBoundary, SpeedLimitResolver=ResolverBoundary,
+    SpeedLimitAssist=TargetFeatureBoundary, NrdrSpeedLimitAssist=TargetFeatureBoundary,
+    AccelBoostSP=forbidden, get_active_bundle=lambda: None,
+    messaging=NS(SubMaster=object, PubMaster=object, new_message=message),
+    LongitudinalMpc=PlannerMpcDouble, T_IDXS_MPC=np.linspace(0., 10., 13),
+  )
+  helpers = definitions(source(CORE + "drive_helpers.py"), env)
+  env.update({key: helpers[key] for key in ("get_accel_from_plan", "should_stop")})
+  env["AccelBoost"] = definitions(source(MPC + "mvl_accel_boost.py"), env)["AccelBoost"]
+  current_env = env | {"V_CRUISE_MAX": constant(source("openpilot/selfdrive/car/cruise.py"), "V_CRUISE_MAX")}
+  current_env["LongitudinalPlannerSP"] = definitions(source(SP + "longitudinal_planner.py"), current_env)["LongitudinalPlannerSP"]
+  current_env["MvlLongitudinalPlanner"] = definitions(source(MPC + "mvl_planner.py"), current_env)["MvlLongitudinalPlanner"]
+  env["LongitudinalPlannerSP"] = definitions(git_source(SP + "longitudinal_planner.py"), env)["LongitudinalPlannerSP"]
+  return (definitions(source(CORE + "longitudinal_planner.py"), current_env)["LongitudinalPlanner"],
+          definitions(git_source(CORE + "longitudinal_planner.py"), env)["LongitudinalPlanner"])
+
+
+def integrated_planner_messages(frame, rng, profile):
+  sm = planner_messages(frame, rng, profile)
+  sm["carState"].vCruiseCluster = sm["carState"].vCruise
+  sm["carControl"].enabled = sm["selfdriveState"].enabled
+  sm["carControl"].cruiseControl = NS(override=False)
+  sm["radarState"].leadOne = NS(present=True)
+  return sm
+
+
+def test_mvl_constructs_sp_target_features_but_not_custom_accel_or_tune():
+  current, _ = integrated_planner_classes()
+  planner = current(car_params(), NS(enableGasInterceptor=False))
+  assert planner.mvl_enabled and planner.mpc.kwargs["mvl_enabled"]
+  assert isinstance(planner.scc, SmartCruiseBoundary)
+  assert isinstance(planner.resolver, ResolverBoundary)
+  assert isinstance(planner.sla, TargetFeatureBoundary)
+  assert planner.accel_boost_sp is planner.mpc.nrdr is planner.mpc.tune is None
+  assert not hasattr(planner, "nrdr")
+
+
+@pytest.mark.parametrize("profile", [0, 1, 2])
+@pytest.mark.parametrize("interceptor", [False, True])
+def test_integrated_sp_disabled_features_preserve_numerical_donor_parity(profile, interceptor):
+  actual, expected = (cls(car_params(), NS(enableGasInterceptor=interceptor)) for cls in integrated_planner_classes())
+  actual.saved_settings, actual.tune_file = POLLUTED.copy(), POLLUTED_TUNE.copy()
+  rng = np.random.default_rng(376)
+  for frame in range(80):
+    sm = integrated_planner_messages(frame, rng, profile)
+    sm["selfdriveState"].experimentalMode = True  # Donor always includes its model candidate.
+    actual.update(sm)
+    expected.update(copy.deepcopy(sm))
+    for attr in ("output_v_target", "output_a_target", "output_should_stop", "a_cruise", "fcw", "source"):
+      assert getattr(actual, attr) == getattr(expected, attr), (frame, attr)
+    assert actual.source == SOURCE.cruise
+    assert actual.v_desired_filter.x == expected.v_desired_filter.x
+    assert vars(actual.accel_boost) == vars(expected.accel_boost)
+    assert actual.mpc.weights == expected.mpc.weights
+    assert (actual.mpc.v, actual.mpc.a, actual.mpc.source) == (expected.mpc.v, expected.mpc.a, expected.mpc.source)
+    for attr in ("v_desired_trajectory", "a_desired_trajectory", "j_desired_trajectory"):
+      np.testing.assert_array_equal(getattr(actual, attr), getattr(expected, attr))
+    # Disabled feature outputs are neutral, not a skipped SP lifecycle.
+    for feature in (actual.scc.vision, actual.scc.map, actual.sla, actual.resolver):
+      assert len(feature.calls) == frame + 1
+
+  sent_actual, sent_expected = {}, {}
+  actual.publish(sm, NS(send=lambda key, value: sent_actual.update({key: value})))
+  expected.publish(sm, NS(send=lambda key, value: sent_expected.update({key: value})))
+  assert vars(sent_actual["longitudinalPlanSP"]) == vars(sent_expected["longitudinalPlanSP"])
 
 
 def test_retired_host_runtime_is_absent():
@@ -600,35 +686,32 @@ def test_mvl_mode_never_reads_tune_file_or_live_custom_params():
     assert not names.intersection({"LongTune", "Params", "get_live_params", "NrdrLongitudinalPlanner", "NrdrLongitudinalMpc"})
 
 
-def test_routed_planner_sp_lifecycle_and_publication_ignore_all_custom_inputs():
+@pytest.mark.parametrize("feature_name,expected_source", [
+  ("vision", SOURCE.sccVision), ("map", SOURCE.sccMap), ("sla", SOURCE.speedLimitAssist),
+])
+@pytest.mark.parametrize("experimental", [False, True])
+def test_routed_mvl_sp_target_features_reach_planner_and_publication(feature_name, expected_source, experimental):
   sent = {}
-
-  def message(service):
-    payload = NS(e2eAlerts=NS()) if service == "longitudinalPlanSP" else NS()
-    return NS(logMonoTime=200, **{service: payload})
-
-  env = environment(
-    EventsSP=lambda: NS(clear=lambda: None, to_msg=list),
-    E2EAlertsHelper=lambda: NS(update=lambda *_: None, green_light_alert=False, lead_depart_alert=False),
-    SmartCruiseControl=forbidden, SpeedLimitResolver=forbidden, SpeedLimitAssist=forbidden,
-    NrdrSpeedLimitAssist=forbidden, AccelBoostSP=forbidden, get_active_bundle=forbidden,
-    messaging=NS(SubMaster=object, PubMaster=object, new_message=message),
-    LongitudinalMpc=PlannerMpcDouble, T_IDXS_MPC=np.linspace(0., 10., 13),
-  )
-  env["LongitudinalPlannerSP"] = definitions(source(SP + "longitudinal_planner.py"), env)["LongitudinalPlannerSP"]
-  helpers = definitions(source(CORE + "drive_helpers.py"), env)
-  env.update({key: helpers[key] for key in ("get_accel_from_plan", "should_stop")})
-  env["AccelBoost"] = definitions(source(MPC + "mvl_accel_boost.py"), env)["AccelBoost"]
-  env["MvlLongitudinalPlanner"] = definitions(source(MPC + "mvl_planner.py"), env)["MvlLongitudinalPlanner"]
-  planner_cls = definitions(source(CORE + "longitudinal_planner.py"), env)["LongitudinalPlanner"]
-  planner = planner_cls(car_params(), NS(enableGasInterceptor=True))
-  assert planner.mvl_enabled and planner.scc is planner.resolver is planner.sla is None
-  sm = planner_messages(4, np.random.default_rng(123), 1)
-  sm["radarState"].leadOne = NS(present=True)
-  sm.target_limit = .01  # an old SCC/SLA target must not reach the fixed-default path
+  current, _ = integrated_planner_classes()
+  planner, neutral = (current(car_params(), NS(enableGasInterceptor=True), init_v=25.) for _ in range(2))
+  feature = planner.sla if feature_name == "sla" else getattr(planner.scc, feature_name)
+  feature.enabled = True
+  sm = integrated_planner_messages(1, np.random.default_rng(123), 1)
+  sm["carState"].vEgo, sm["carState"].vCruise, sm["carState"].vCruiseCluster = 25., 110., 110.
+  sm["carState"].standstill = sm["carState"].gasPressed = False
+  sm["selfdriveState"].experimentalMode = experimental
+  sm["modelV2"].action.desiredAcceleration, sm["modelV2"].action.shouldStop = 2., False
+  sm["radarState"].accel = 1.
   planner.saved_settings, planner.tune_file = POLLUTED.copy(), POLLUTED_TUNE.copy()
   planner.update(sm)
-  assert planner.output_v_target == sm["carState"].vCruise * CV.KPH_TO_MS
+  neutral.update(copy.deepcopy(sm))
+  assert planner.source == expected_source
+  assert feature.is_active and len(feature.calls) == 1
+  assert planner.output_v_target == feature.requested_v_target < neutral.output_v_target
+  assert planner.mpc.a == feature.requested_a_target
+  assert planner.a_cruise < neutral.a_cruise
+  assert planner.output_a_target < neutral.output_a_target
+  assert planner.accel_boost_sp is planner.mpc.tune is planner.mpc.nrdr is None
   planner.publish(sm, NS(send=lambda key, value: sent.update({key: value})))
   assert set(sent) == {"longitudinalPlan", "longitudinalPlanSP"}
   main = sent["longitudinalPlan"].longitudinalPlan
@@ -636,9 +719,22 @@ def test_routed_planner_sp_lifecycle_and_publication_ignore_all_custom_inputs():
   assert main.aTarget == planner.output_a_target and main.shouldStop == planner.output_should_stop
   assert main.hasLead is True
   sp = sent["longitudinalPlanSP"].longitudinalPlanSP
-  assert sp.longitudinalPlanSource == SOURCE.cruise
-  assert not hasattr(sp, "smartCruiseControl") and not hasattr(sp, "speedLimit")
+  assert sp.longitudinalPlanSource == expected_source
+  assert sp.vTarget == feature.requested_v_target and sp.aTarget == planner.output_a_target
+  published_feature = sp.speedLimit.assist if feature_name == "sla" else getattr(sp.smartCruiseControl, feature_name)
+  assert published_feature.enabled and published_feature.active
+  assert published_feature.vTarget == feature.requested_v_target
+  assert published_feature.aTarget == feature.requested_a_target
+  assert sp.speedLimit.resolver.speedLimitValid and sp.speedLimit.resolver.speedLimit == 15.
   assert sp.e2eAlerts.greenLightAlert is False and sp.e2eAlerts.leadDepartAlert is False
+
+  # Disabling the target source returns ownership to cruise on the next tick;
+  # it must not require re-instantiating or changing the MVL controller/tune.
+  feature.enabled = False
+  planner.update(sm)
+  assert not feature.is_active and len(feature.calls) == 2
+  assert planner.source == SOURCE.cruise
+  assert planner.output_v_target == sm["carState"].vCruise * CV.KPH_TO_MS
 
 
 @pytest.mark.parametrize("brand", ["toyota", "hyundai", "unknown"])

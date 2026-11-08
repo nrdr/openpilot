@@ -41,7 +41,7 @@
     "Host schema: allowThrottle=True, matching donor's absence of throttle suppression.",
     "Donor accelBoost publication omitted: host schema currently has no corresponding field; computation unchanged.",
     "Host MPC stores raw donor lead trajectories for existing diagnostics; no lead filtering/shaping.",
-    "Fixed donor-default SP target adapter bypasses optional SCC/SLA/resolver and AccelBoostSP construction. Information-only speed-limit telemetry stays neutral. This prevents saved custom settings leaking through locked controls."
+    "User-selected SCC Vision/Map, speed-limit resolver/assist and custom cruise increments remain independent of MVL tuning. These may change the requested speed, not the controller gains, maps, learning, acceleration/jerk profiles or donor boost. AccelBoostSP remains unconstructed. With optional target features inactive, the target adapter is identity."
   ],
   "retired": [
     "Host cruise overspeed allowance runtime, helper, exports.",
@@ -54,13 +54,12 @@
     "not_validated": "Physical actuator response, on-road behavior, future learned-state convergence, or the donor author's private settings. Source parity and native software tests are not road validation."
   },
   "configuration_contract": {
-    "effective_selections": "Driver cruise set speed, four personality selector and manual Experimental Mode remain effective. Honda MVL-controller ownership is startup-latched; Experimental Mode is live.",
+    "effective_selections": "Driver cruise set speed, custom button increments, SCC Vision/Map, speed-limit preferences, four personality selector and manual Experimental Mode remain effective. Honda MVL-controller ownership is startup-latched; Experimental Mode is live.",
     "first_three": "Pinned donor code and checked-in defaults, not a claim about the donor author's private runtime preferences.",
-    "SmartCruiseControlVision": false,
-    "SmartCruiseControlMap": false,
-    "SpeedLimitMode": 1,
-    "SpeedLimitMode_meaning": "information (not assist); no acceleration target",
-    "optional_speed_controls": "Fixed-disabled target adapter: does not construct SCC, resolver, or SLA. Saved settings and stale targets cannot affect speed/acceleration. SP SCC/SLA/resolver telemetry is neutral (information display is not reproduced).",
+    "SmartCruiseControlVision": "Driver preference; not overridden by MVL.",
+    "SmartCruiseControlMap": "Driver preference; not overridden by MVL.",
+    "SpeedLimitMode": "Driver preference, including Assist; not overridden by MVL.",
+    "optional_speed_controls": "Normal SP target arbitration and publication, using NRDR speed-limit confirmation semantics on supported cars. Inactive target features leave MVL output unchanged; enabled features request a lower target without changing the controller tune. Opening the settings UI never overwrites the saved speed-limit choice.",
     "ExperimentalMode": "Live manual selection via settings or distance-button hold. Off: cruise/radar candidates only, no model stop request or model boost update. On: donor model candidate and boost. DynamicExperimentalControl remains disabled; saved preference is never forced by this mode.",
     "AccelBoostSP": "Ignored, not constructed. Donor gas-override AccelBoost participates only with Experimental Mode On; max 0.2, rate 0.025, per override 0.05, min speed 10 mph. Switching Off clears accumulated model boost.",
     "GreenLightAlert_and_LeadDepartAlert": "Existing SP alert preferences remain read-only advisory events, not acceleration/trajectory inputs.",
@@ -123,9 +122,9 @@
     "initial_caller": "Donor card.py passes InitialCruiseSpeedKph (checked-in default 40). Host card.py passes experimental_mode: bool; preserve its signature, ignore that argument in MVL.",
     "resume": "Exact donor last-speed/initialized guard. PCM initialization remains hardware-owned; no new resume or engagement guard bypass.",
     "pcm_ownership": "PCM-controlled targets and 0/-1 sentinels are mirrored exactly as donor, without rewriting hardware-owned cruise. Initialization returns immediately for CP.pcmCruise. Software button targets use 145 kph. No CAN/gear/safety changes.",
-    "settings": "Donor-default custom increments disabled: one unit short, five units long, standard 1.6 kph imperial increment and donor rounding. No NrdrCruise construction or live Params in MVL VCruiseHelperSP. Ignore custom increments/HUD submode/Honda imperial remap/SLA sidecar targets, even stale in-memory values.",
+    "settings": "Custom short/long increments and SLA sidecar targets use saved preferences. With custom increments off, retain one unit short/five units long, standard 1.6 kph imperial increment and donor rounding. No NrdrCruise construction or Honda imperial remap; existing MVL minimum/maximum/initialization and hardware authority remain unchanged.",
     "wheel_hold": "Distance-button hold toggles manual Experimental Mode once per hold and announces the chosen On/Off state. Releasing that hold must not also cycle personality. Short presses retain the four-personality selector. Saved HondaLiveLearningGas changes cannot change the active controller gate.",
-    "parent_contract": "Parent-owned NrdrSelfdrive hooks own bypass of HUD submode personality-consumption and stale SLA reservations in MVL; cruise helper does not edit those hooks.",
+    "parent_contract": "NrdrSelfdrive preserves SLA confirmation-button reservations/consumed presses through release, so confirming a limit cannot also cycle personality or toggle Experimental. Existing cruise-availability protection remains.",
     "legacy": "Non-MVL cruise helper behavior, global 0/169 limits, and boolean initialization API retained.",
     "initialization": "Exact donor-default non-PCM SET: round(clamp(max(current speed kph, 40), 40, 145)). Initial SET at standstill is 40 km/h (~25 mph), intentionally restored per explicit user direction. No custom 0-mph target. Host bool argument and saved InitialCruiseSpeedKph do not affect MVL."
   }

@@ -43,6 +43,7 @@ def definitions(relative, env, *, cls=None, method=None):
 def runtime():
   env = {"os": os, "Lock": Lock, "time": NS(sleep=lambda _: None, monotonic=lambda: 100.),
          "car": NS(CarState=NS(ButtonEvent=NS(Type=BUTTON))),
+         "custom": NS(LongitudinalPlanSP=NS(SpeedLimit=NS(AssistState=NS(preActive=1)))),
          "log": NS(LongitudinalPersonality=NS(schema=NS(enumerants=dict.fromkeys(range(4))))),
          "StockCmbsAlerts": lambda: object(), "consume_button_press": lambda _: True,
          "personality_write_lock": personality_write_lock, "write_personality": write_personality}
@@ -354,25 +355,29 @@ def test_invalid_disk_profile_does_not_replace_active_econ(runtime, tmp_path, in
 
 @pytest.mark.parametrize("mvl", [True, False])
 @pytest.mark.parametrize("blocked", ["reserved", "consumed", "experimental"])
-def test_mvl_bypasses_stale_sla_latches_but_not_experimental_hold(runtime, tmp_path, blocked, mvl):
+def test_sla_and_experimental_consumption_block_personality_with_or_without_mvl(runtime, tmp_path, blocked, mvl):
   selfdrive = state(runtime, tmp_path, flags=MVL_FLAG if mvl else 0)
   selfdrive.distance_button_consumed = blocked == "consumed"
   selfdrive.experimental_mode_switched = blocked == "experimental"
-  changed = mvl and blocked != "experimental"
-  assert runtime["NrdrSelfdrive"].update_personality(selfdrive, RELEASE, blocked == "reserved") is changed
-  assert selfdrive.personality == (0 if changed else 1)
+  assert not runtime["NrdrSelfdrive"].update_personality(selfdrive, RELEASE, blocked == "reserved")
+  assert selfdrive.personality == 1
   if mvl:
-    assert selfdrive.nrdr.personality_sync._pending == ((1, 0) if changed else None)
+    assert selfdrive.nrdr.personality_sync._pending is None
     assert not selfdrive.distance_button_consumed and not selfdrive.experimental_mode_switched
   assert not selfdrive.params.writes
 
 
-def test_mvl_ignores_stale_sla_publication_and_reservation(runtime, tmp_path):
-  selfdrive = state(runtime, tmp_path)
-  selfdrive.nrdr.sla_button_reserved_until = 1000.
-  # No SLA enum is provided: MVL must return before interpreting the message.
-  assert not selfdrive.nrdr.reserve_distance_button(object())
+@pytest.mark.parametrize("mvl", [True, False])
+def test_sla_reservation_keeps_grace_period_with_or_without_mvl(runtime, tmp_path, mvl):
+  selfdrive = state(runtime, tmp_path, flags=MVL_FLAG if mvl else 0)
+  assert selfdrive.nrdr.reserve_distance_button(1)
+  assert selfdrive.nrdr.sla_button_reserved_until == 100.75
+  runtime["time"].monotonic = lambda: 100.74
+  assert selfdrive.nrdr.reserve_distance_button(0)
+  runtime["time"].monotonic = lambda: 100.76
+  assert not selfdrive.nrdr.reserve_distance_button(0)
   assert selfdrive.nrdr.sla_button_reserved_until == 0.
+  assert selfdrive.personality == 1 and not selfdrive.params.writes
 
 
 @pytest.mark.parametrize("unavailable_on_press", [True, False])
@@ -626,8 +631,12 @@ def test_mici_actual_profile_handler_uses_shared_writer_and_exits_econ(runtime, 
 def remote_writer(params):
   # Execute saveParams and its real admission policy; omit only local imports
   # of native dependencies that are irrelevant to the personality branch.
+  from openpilot.nrdr.params.nidec_pcm import PCM_EXPERIMENTS
+  from openpilot.nrdr.params.tuning_policy import LEGACY_PCM_LOCK_KEYS, MVL_LOCK_KEYS
+
   env = {"params": params, "base64": base64, "gzip": gzip, "Path": Path,
-         "REQUEST": "NrdrResetLiveGas", "MVL_LOCK_KEYS": frozenset(), "mvl_tuning_locked": lambda _: False,
+         "REQUEST": "NrdrResetLiveGas", "MVL_LOCK_KEYS": MVL_LOCK_KEYS, "mvl_tuning_locked": lambda _: False,
+         "LEGACY_PCM_LOCK_KEYS": LEGACY_PCM_LOCK_KEYS, "PCM_EXPERIMENTS": PCM_EXPERIMENTS,
          "tuning_write_allowed": lambda *_args, **_kw: True, "BLOCKED_PARAMS": frozenset(),
          "cloudlog": NS(warning=lambda *_: None, error=lambda *_: None), "write_personality": write_personality}
   definitions("openpilot/nrdr/features/services/sunnylink.py", env)

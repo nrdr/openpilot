@@ -6,7 +6,7 @@ import re
 import pytest
 
 from opendbc.car.honda.values import HondaFlags
-from openpilot.nrdr.params.tuning_policy import LEGACY_PCM_LOCK_KEYS, MVL_LOCK_KEYS
+from openpilot.nrdr.params.tuning_policy import CRUISE_PREFERENCE_KEYS, LEGACY_PCM_LOCK_KEYS, MVL_LOCK_KEYS
 from openpilot.nrdr.tests.test_honda_pcm_ui import ROOT
 from openpilot.nrdr.tests.test_mvl_settings import encoded, rpc as base_rpc
 from openpilot.nrdr.tests.test_nidec_pcm_experiments import cp_bytes
@@ -102,6 +102,12 @@ def test_onroad_saved_and_active_mode_conflicts_still_reject_before_writes(rpc, 
   save, params, _ = rpc
   context(params, mode)
   params.values["IsOffroad"] = False
+  if mode in ("mvl_saved", "mvl_active") and key in CRUISE_PREFERENCE_KEYS:
+    before = dict(params.values)
+    requested = {"ExperimentalMode": True, key: choice(key)}
+    save({name: wire(value) for name, value in requested.items()})
+    assert_only_requested_values_changed(params, before, requested)
+    return
   # Deadzone and LiveGas also have their own parked-only guards under MVL.
   with pytest.raises(ValueError):
     save({"ExperimentalMode": wire(True), key: wire(choice(key))})

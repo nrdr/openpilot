@@ -13,7 +13,6 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode as SpeedLimitMode
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import OffsetType as SpeedLimitOffsetType
 from openpilot.nrdr.ui import apply_speed_limit_preferences
-from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.sunnypilot.widgets import get_highlighted_description
 from openpilot.system.ui.sunnypilot.widgets.list_view import multiple_button_item_sp, option_item_sp, simple_button_item_sp, LineSeparatorSP
@@ -140,11 +139,6 @@ class SpeedLimitSettingsLayout(Widget):
       sla_disallow_in_release = brand == "tesla" and ui_state.is_sp_release
       sla_always_disallow = brand == "rivian"
       sla_available = (has_long or has_icbm) and not sla_disallow_in_release and not sla_always_disallow
-
-      if (not sla_available and speed_limit_mode_param == int(SpeedLimitMode.assist)
-          # An editable saved choice is not permission to downgrade it on refresh.
-          and tuning_write_allowed(ui_state.params, "SpeedLimitMode", CP=ui_state.CP, is_offroad=False)):
-        ui_state.params.put("SpeedLimitMode", int(SpeedLimitMode.warning))
 
     else:
       sla_available = False

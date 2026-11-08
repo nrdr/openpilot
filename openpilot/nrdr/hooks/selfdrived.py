@@ -137,10 +137,6 @@ class NrdrSelfdrive:
       events_sp.add(custom.OnroadEventSP.EventName.stockCmbsStatusChanged)
 
   def reserve_distance_button(self, sla_state) -> bool:
-    if self.personality_sync is not None:
-      # SLA is disabled in startup-latched MVL, including stale publications.
-      self.sla_button_reserved_until = 0.0
-      return False
     if not self.longitudinal_enabled:
       return False
     now = time.monotonic()
@@ -162,10 +158,9 @@ class NrdrSelfdrive:
 
     blocked = button_reserved or getattr(selfdrive, "distance_button_consumed", False)
     if sync is not None:
-      # Ignore stale disabled-SLA consumption for personality selection, but
-      # retain cruise-unavailable protection until a fresh available press.
-      # Experimental holds share the normal latch: keep it through the hold
-      # and suppress personality cycling on that hold's release.
+      # SLA owns its confirmation press even if its reservation expires before
+      # release. Preserve CruiseHelper's consumed latch and the availability
+      # guard; neither press may also cycle personality or toggle Experimental.
       available = getattr(getattr(CS, "cruiseState", None), "available", True)
       if any(event.pressed and event.type == ButtonType.gapAdjustCruise for event in CS.buttonEvents):
         if not nrdr.personality_button_held:
@@ -173,7 +168,7 @@ class NrdrSelfdrive:
         nrdr.personality_button_held = True
       if nrdr.personality_button_held and not available:
         nrdr.personality_safety_consumed = True
-      blocked = not available or nrdr.personality_safety_consumed
+      blocked = blocked or not available or nrdr.personality_safety_consumed
       if distance_released:
         # CruiseHelper also needs this latch while held: availability returning
         # must not turn the tail of an unavailable press into a mode toggle.

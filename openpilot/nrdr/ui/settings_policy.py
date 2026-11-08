@@ -50,9 +50,8 @@ def apply_cruise_preferences(layout, state, values, has_long, has_icbm):
 
 
 def apply_speed_limit_preferences(control, state, value, available):
-  if value is not None and tuning_write_allowed(state.params, "SpeedLimitMode", CP=state.CP, is_offroad=False):
-    state.params.put("SpeedLimitMode", value)
-
+  # Availability changes presentation only. Never replay this UI snapshot over
+  # a newer explicit choice made on the device or through Sunnylink.
   if available:
     return
 

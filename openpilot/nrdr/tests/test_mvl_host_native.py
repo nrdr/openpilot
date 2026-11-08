@@ -21,6 +21,30 @@ from openpilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPl
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib import long_mpc, mvl_planner
 from openpilot.sunnypilot.selfdrive.controls.lib import longitudinal_planner as sp_planner
 from openpilot.nrdr.tests.test_mvl_host_parity import CORE, MPC, constant, definitions, git_source
+from openpilot.nrdr.tests.test_mvl_cruise_targets import IsolatedTargetParams
+
+
+@pytest.fixture(autouse=True)
+def isolated_target_settings(monkeypatch):
+  # Keep real SCC/resolver/NRDR SLA constructors and update methods. Only their
+  # Params boundary is isolated; disabled target features preserve donor parity.
+  from openpilot.sunnypilot.selfdrive.car import cruise_ext
+  from openpilot.sunnypilot.selfdrive.controls.lib.smart_cruise_control import map_controller, vision_controller
+  from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import speed_limit_assist, speed_limit_resolver
+  settings = IsolatedTargetParams()
+  for module in (cruise_ext, map_controller, vision_controller, speed_limit_assist, speed_limit_resolver):
+    monkeypatch.setattr(module, "Params", lambda *_args: settings)
+  yield settings
+
+
+def target_context(sm):
+  """Messages consumed by restored SCC/SLA, with no map/car speed limit."""
+  sm["carState"].vCruiseCluster = sm["carState"].vCruise
+  sm["carControl"] = NS(enabled=sm["selfdriveState"].enabled, cruiseControl=NS(override=False))
+  sm["carStateSP"] = NS(speedLimit=0.)
+  sm["gpsLocation"] = NS(unixTimestampMillis=-1e12)
+  sm["liveMapDataSP"] = NS(speedLimitValid=False, speedLimitAheadValid=False)
+  return sm
 
 
 def donor_mpc():
@@ -87,6 +111,7 @@ def test_native_planner_and_longcontrol_match_pinned_donor(monkeypatch, profile)
           "selfdriveState": NS(enabled=frame > 0, personality=profile, experimentalMode=True),
           "modelV2": NS(action=NS(desiredAcceleration=.5, shouldStop=False)),
           "radarState": NS(leadOne=lead(distance=40., speed=10.), leadTwo=lead(present=False))}
+    target_context(sm)
     for planner in (actual, expected):
       planner.update(sm)
     assert actual.mpc.solution_status == expected.mpc.solution_status == 0
@@ -111,6 +136,7 @@ def test_actual_imports_high_speed_donor_ceiling(monkeypatch, profile):
         "selfdriveState": NS(enabled=True, personality=profile, experimentalMode=False),
         "modelV2": NS(action=NS(desiredAcceleration=2., shouldStop=False)),
         "radarState": NS(leadOne=lead(present=False), leadTwo=lead(present=False))}
+  target_context(sm)
   planner.update(sm)
   assert planner.mpc.solution_status == 0
   assert planner.output_v_target == pytest.approx(donor_maximum / 3.6)
@@ -127,7 +153,7 @@ def test_native_cruise_standstill_initialization_and_minimums(metric, pcm_speed,
   cs = car.CarState.new_message(vEgo=0., standstill=True, cruiseState={"available": True, "standstill": True})
   helper.initialize_v_cruise(cs, experimental)
   assert helper.v_cruise_kph == helper.v_cruise_cluster_kph == 40.
-  assert helper.nrdr is None and helper.params is None
+  assert helper.nrdr is None and isinstance(helper.params, IsolatedTargetParams)
   for frame in range(700):
     cs.buttonEvents = [{"type": "decelCruise", "pressed": True}] if frame == 3 else []
     helper.update_v_cruise(cs, True, metric)
@@ -147,6 +173,7 @@ def test_native_experimental_off_excludes_model_after_live_switch(monkeypatch, p
           "selfdriveState": NS(enabled=True, personality=profile, experimentalMode=experimental),
           "modelV2": NS(action=NS(desiredAcceleration=-3.5, shouldStop=True)),
           "radarState": NS(leadOne=lead(present=lead_present, distance=40., speed=10.), leadTwo=lead(present=False))}
+    target_context(sm)
     neutral = copy.deepcopy(sm)
     if not experimental:
       neutral["modelV2"].action.desiredAcceleration = 2.

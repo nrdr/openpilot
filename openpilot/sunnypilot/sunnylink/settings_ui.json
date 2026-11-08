@@ -2641,8 +2641,8 @@
                   "key": "HondaLiveLearningGas",
                   "widget": "toggle",
                   "title": "Live Learning Gas",
-                  "description": "Selects full MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Custom tuning can be saved while parked; MVL ignores it. Legacy Kegman PCM takes precedence on supported Civics; the saved learning choice is kept. Change while parked. Applies next drive; no device reboot.",
-                  "details": "ON selects full MVL gas, braking and Aggressive/Standard/Relaxed personalities, including following distances, on Honda Nidec PCM, Bosch and gas-interceptor openpilot longitudinal paths. Only Econ keeps nrdr's fixed longer-following and gentler acceleration/jerk defaults; a custom tune file does not change these MVL profiles. Saved ON is not proof that MVL is active yet. Custom tuning stays editable while parked; use depends on the selected controller. Saved custom values are kept. Reset clears gas/wind learning only. Existing OFF choices are preserved; new Honda setups default ON.",
+                  "description": "Selects MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Speed-limit assistance, curve-speed control and custom cruise-button increments keep their own settings. Custom controller tuning can be saved while parked; MVL ignores it. Legacy Kegman PCM takes precedence on supported Civics; the saved learning choice is kept. Change while parked. Applies next drive; no device reboot.",
+                  "details": "ON uses MVL gas/brake control and Aggressive/Standard/Relaxed personalities, including following distances. Econ keeps nrdr's gentler tuning. Speed-limit assistance, curve-speed control and cruise-button increments remain independent. Custom controller tuning is saved but ignored by MVL. Saved ON applies next drive; it does not confirm the running mode. Reset clears gas/wind learning only.",
                   "enablement": [
                     {
                       "type": "offroad_only"
@@ -4445,45 +4445,6 @@
                     {
                       "type": "not",
                       "condition": {
-                        "type": "any",
-                        "conditions": [
-                          {
-                            "type": "all",
-                            "conditions": [
-                              {
-                                "type": "param",
-                                "key": "HondaLiveLearningGas",
-                                "equals": true
-                              },
-                              {
-                                "type": "not",
-                                "condition": {
-                                  "type": "capability",
-                                  "field": "nrdr_mvl_tuning_exempt",
-                                  "equals": true
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "type": "capability",
-                            "field": "nrdr_mvl_longitudinal_active",
-                            "equals": true
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                },
-                {
-                  "type": "any",
-                  "conditions": [
-                    {
-                      "type": "offroad_only"
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
                         "type": "capability",
                         "field": "nrdr_honda_legacy_pcm_locked",
                         "equals": true
@@ -4527,45 +4488,6 @@
                         {
                           "type": "not",
                           "condition": {
-                            "type": "any",
-                            "conditions": [
-                              {
-                                "type": "all",
-                                "conditions": [
-                                  {
-                                    "type": "param",
-                                    "key": "HondaLiveLearningGas",
-                                    "equals": true
-                                  },
-                                  {
-                                    "type": "not",
-                                    "condition": {
-                                      "type": "capability",
-                                      "field": "nrdr_mvl_tuning_exempt",
-                                      "equals": true
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "capability",
-                                "field": "nrdr_mvl_longitudinal_active",
-                                "equals": true
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "offroad_only"
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
                             "type": "capability",
                             "field": "nrdr_honda_legacy_pcm_locked",
                             "equals": true
@@ -4587,45 +4509,6 @@
                       "type": "param",
                       "key": "CustomAccIncrementsEnabled",
                       "equals": true
-                    },
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "offroad_only"
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "any",
-                            "conditions": [
-                              {
-                                "type": "all",
-                                "conditions": [
-                                  {
-                                    "type": "param",
-                                    "key": "HondaLiveLearningGas",
-                                    "equals": true
-                                  },
-                                  {
-                                    "type": "not",
-                                    "condition": {
-                                      "type": "capability",
-                                      "field": "nrdr_mvl_tuning_exempt",
-                                      "equals": true
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "capability",
-                                "field": "nrdr_mvl_longitudinal_active",
-                                "equals": true
-                              }
-                            ]
-                          }
-                        }
-                      ]
                     },
                     {
                       "type": "any",
@@ -4735,45 +4618,6 @@
                         {
                           "type": "not",
                           "condition": {
-                            "type": "any",
-                            "conditions": [
-                              {
-                                "type": "all",
-                                "conditions": [
-                                  {
-                                    "type": "param",
-                                    "key": "HondaLiveLearningGas",
-                                    "equals": true
-                                  },
-                                  {
-                                    "type": "not",
-                                    "condition": {
-                                      "type": "capability",
-                                      "field": "nrdr_mvl_tuning_exempt",
-                                      "equals": true
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "capability",
-                                "field": "nrdr_mvl_longitudinal_active",
-                                "equals": true
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "offroad_only"
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
                             "type": "capability",
                             "field": "nrdr_honda_legacy_pcm_locked",
                             "equals": true
@@ -4810,45 +4654,6 @@
                     }
                   ],
                   "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "offroad_only"
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "any",
-                            "conditions": [
-                              {
-                                "type": "all",
-                                "conditions": [
-                                  {
-                                    "type": "param",
-                                    "key": "HondaLiveLearningGas",
-                                    "equals": true
-                                  },
-                                  {
-                                    "type": "not",
-                                    "condition": {
-                                      "type": "capability",
-                                      "field": "nrdr_mvl_tuning_exempt",
-                                      "equals": true
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "capability",
-                                "field": "nrdr_mvl_longitudinal_active",
-                                "equals": true
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -4895,45 +4700,6 @@
                         {
                           "type": "not",
                           "condition": {
-                            "type": "any",
-                            "conditions": [
-                              {
-                                "type": "all",
-                                "conditions": [
-                                  {
-                                    "type": "param",
-                                    "key": "HondaLiveLearningGas",
-                                    "equals": true
-                                  },
-                                  {
-                                    "type": "not",
-                                    "condition": {
-                                      "type": "capability",
-                                      "field": "nrdr_mvl_tuning_exempt",
-                                      "equals": true
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "capability",
-                                "field": "nrdr_mvl_longitudinal_active",
-                                "equals": true
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "offroad_only"
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
                             "type": "capability",
                             "field": "nrdr_honda_legacy_pcm_locked",
                             "equals": true
@@ -4963,45 +4729,6 @@
                     }
                   ],
                   "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "offroad_only"
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "any",
-                            "conditions": [
-                              {
-                                "type": "all",
-                                "conditions": [
-                                  {
-                                    "type": "param",
-                                    "key": "HondaLiveLearningGas",
-                                    "equals": true
-                                  },
-                                  {
-                                    "type": "not",
-                                    "condition": {
-                                      "type": "capability",
-                                      "field": "nrdr_mvl_tuning_exempt",
-                                      "equals": true
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "type": "capability",
-                                "field": "nrdr_mvl_longitudinal_active",
-                                "equals": true
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -5090,45 +4817,6 @@
                       "type": "capability",
                       "field": "has_icbm",
                       "equals": true
-                    }
-                  ]
-                },
-                {
-                  "type": "any",
-                  "conditions": [
-                    {
-                      "type": "offroad_only"
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "any",
-                        "conditions": [
-                          {
-                            "type": "all",
-                            "conditions": [
-                              {
-                                "type": "param",
-                                "key": "HondaLiveLearningGas",
-                                "equals": true
-                              },
-                              {
-                                "type": "not",
-                                "condition": {
-                                  "type": "capability",
-                                  "field": "nrdr_mvl_tuning_exempt",
-                                  "equals": true
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "type": "capability",
-                            "field": "nrdr_mvl_longitudinal_active",
-                            "equals": true
-                          }
-                        ]
-                      }
                     }
                   ]
                 },
@@ -5267,45 +4955,6 @@
                       "type": "capability",
                       "field": "has_icbm",
                       "equals": true
-                    }
-                  ]
-                },
-                {
-                  "type": "any",
-                  "conditions": [
-                    {
-                      "type": "offroad_only"
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "any",
-                        "conditions": [
-                          {
-                            "type": "all",
-                            "conditions": [
-                              {
-                                "type": "param",
-                                "key": "HondaLiveLearningGas",
-                                "equals": true
-                              },
-                              {
-                                "type": "not",
-                                "condition": {
-                                  "type": "capability",
-                                  "field": "nrdr_mvl_tuning_exempt",
-                                  "equals": true
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "type": "capability",
-                            "field": "nrdr_mvl_longitudinal_active",
-                            "equals": true
-                          }
-                        ]
-                      }
                     }
                   ]
                 },

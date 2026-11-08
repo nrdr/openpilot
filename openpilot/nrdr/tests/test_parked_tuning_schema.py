@@ -272,13 +272,16 @@ def test_compiled_schema_keeps_pid_controls_and_omits_retired_tuning(items):
 
 
 def test_compiled_copy_explains_saved_choices_instead_of_parked_lockout(items):
-  for key in (LONG_SCALE_KEYS - {"LongPidTuneScale"}) | {"HondaLiveLearningGas", "NrdrHondaLegacyPcm",
+  for key in (LONG_SCALE_KEYS - {"LongPidTuneScale"}) | {"NrdrHondaLegacyPcm",
                                                        "NrdrHondaFullBrakeAuthority", "NrdrRoenAccelerationLimits"}:
     details = items[key]["details"]
     assert "editable while parked" in details.lower()
     assert "use depends on the selected controller" in details
     assert "Unavailable while MVL" not in details
     assert "locked" not in details
+  mvl_details = items["HondaLiveLearningGas"]["details"]
+  assert "Speed-limit assistance, curve-speed control and cruise-button increments remain independent" in mvl_details
+  assert "Custom controller tuning is saved but ignored by MVL" in mvl_details
   assert items["NrdrHondaLegacyPcm"]["details"] == PCM_EXPERIMENT_DETAILS["NrdrHondaLegacyPcm"]
   assert items["NrdrMvlPcmDeadzone"]["description"] == MVL_PCM_DEADZONE_DESCRIPTION
   assert "even with MVL off" in items["NrdrMvlPcmDeadzone"]["description"]

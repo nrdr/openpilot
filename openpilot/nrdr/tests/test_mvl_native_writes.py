@@ -197,7 +197,7 @@ def test_tici_bound_widgets_recheck_parked_mode_conflict_policy(kind, key, saved
   assert ui.params[key] == (1 if offroad is True else 0)
 
 
-@pytest.mark.parametrize("kind,key", [("ToggleActionSP", "AccelBoostSP"), ("MultipleButtonActionSP", "SpeedLimitMode")])
+@pytest.mark.parametrize("kind,key", [("ToggleActionSP", "AccelBoostSP"), ("MultipleButtonActionSP", "NrdrRoenAccelerationLimits")])
 def test_tici_post_callback_cannot_write_after_mvl_becomes_selected(kind, key):
   ui = state(offroad=False)
   ui.params[key] = 0
@@ -419,9 +419,9 @@ def test_lateral_diagnostic_callback_can_clear_manual_experimental_without_unloc
   assert not tuning_write_allowed(ui.params, "DynamicExperimentalControl", CP=ui.CP)
 
 
-@pytest.mark.parametrize("saved,active", [(True, False), (False, True)])
+@pytest.mark.parametrize("saved,active", [(True, False), (False, True), (False, False)])
 @pytest.mark.parametrize("offroad", [False, True])
-def test_speed_limit_automatic_downgrade_and_refresh_never_write_while_locked(saved, active, offroad):
+def test_speed_limit_ui_refresh_never_overwrites_saved_mode(saved, active, offroad):
   ui = state(saved, active, offroad=offroad)
   ui.params["SpeedLimitMode"] = 3
   # Simulate a stale UI availability snapshot; the boot-latched CP remains authoritative.

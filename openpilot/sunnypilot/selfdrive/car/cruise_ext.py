@@ -54,14 +54,14 @@ class VCruiseHelperSP:
                                    pcm_mode_qualified(CP, CP_SP, HondaFlags.NIDEC_PCM_FIXED_CRUISE))
     self.v_cruise_kph = V_CRUISE_UNSET
     self.v_cruise_cluster_kph = V_CRUISE_UNSET
-    self.params = None if self.mvl_enabled else Params()
+    self.params = Params()
     self.v_cruise_min = 0
     self.enabled_prev = False
 
-    # Pinned donor defaults, not the device's persisted custom button policy.
-    self.custom_acc_enabled = False if self.mvl_enabled else self.params.get_bool("CustomAccIncrementsEnabled")
-    self.short_increment = 1 if self.mvl_enabled else self.params.get("CustomAccShortPressIncrement", return_default=True)
-    self.long_increment = 5 if self.mvl_enabled else self.params.get("CustomAccLongPressIncrement", return_default=True)
+    # MVL owns the output tune, not the user's cruise-button preferences.
+    self.custom_acc_enabled = self.params.get_bool("CustomAccIncrementsEnabled")
+    self.short_increment = self.params.get("CustomAccShortPressIncrement", return_default=True)
+    self.long_increment = self.params.get("CustomAccLongPressIncrement", return_default=True)
 
     self.enable_button_timers = CRUISE_BUTTON_TIMER.copy() if self.mvl_enabled else CRUISE_BUTTON_TIMER
 
@@ -78,14 +78,12 @@ class VCruiseHelperSP:
     self.req_minus = False
 
   def read_custom_set_speed_params(self) -> None:
-    if self.mvl_enabled:
-      return
     self.custom_acc_enabled = self.params.get_bool("CustomAccIncrementsEnabled")
     self.short_increment = self.params.get("CustomAccShortPressIncrement", return_default=True)
     self.long_increment = self.params.get("CustomAccLongPressIncrement", return_default=True)
 
   def update_v_cruise_delta(self, long_press: bool, v_cruise_delta: float) -> tuple[bool, float]:
-    if self.mvl_enabled or not self.custom_acc_enabled:
+    if not self.custom_acc_enabled:
       v_cruise_delta = v_cruise_delta * (5 if long_press else 1)
       return long_press, v_cruise_delta
 
@@ -136,8 +134,6 @@ class VCruiseHelperSP:
     return enabled
 
   def update_speed_limit_assist(self, is_metric, LP_SP: custom.LongitudinalPlanSP) -> None:
-    if self.mvl_enabled:
-      return
     self.is_metric = is_metric
 
     resolver = LP_SP.speedLimit.resolver
@@ -158,8 +154,6 @@ class VCruiseHelperSP:
     return self.has_speed_limit and bool(self.speed_limit_final_last_kph != self.prev_speed_limit_final_last_kph)
 
   def update_speed_limit_assist_pre_active_confirmed(self, button_type: car.CarState.ButtonEvent.Type) -> bool:
-    if self.mvl_enabled:
-      return False
     if self.sla_state == SpeedLimitAssistState.preActive or self.prev_sla_state == SpeedLimitAssistState.preActive:
       if button_type == ButtonType.decelCruise and self.req_minus:
         return True
@@ -169,12 +163,10 @@ class VCruiseHelperSP:
     return False
 
   def update_speed_limit_assist_v_cruise_non_pcm(self) -> None:
-    if self.mvl_enabled:
-      return
     if self.sla_state in SLA_ACTIVE_STATES and (self.prev_sla_state not in SLA_ACTIVE_STATES or
                                                 self.update_speed_limit_final_last_changed):
       target_kph = quantize_set_speed(self.speed_limit_final_last_kph, self.is_metric, self.CP)
-      maximum = self.v_cruise_max if self.fixed_cruise_enabled else V_CRUISE_MAX
+      maximum = self.v_cruise_max if self.fixed_cruise_enabled or self.mvl_enabled else V_CRUISE_MAX
       self.v_cruise_kph = np.clip(target_kph, self.v_cruise_min, maximum)
 
     self.prev_sla_state = self.sla_state

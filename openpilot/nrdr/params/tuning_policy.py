@@ -3,10 +3,12 @@
 from functools import lru_cache
 
 MVL_DESCRIPTION = (
-  "Selects full MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. " +
+  "Selects MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. " +
   "MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. " +
   "Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. " +
-  "Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. Custom tuning can be saved while parked; MVL ignores it. " +
+  "Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. " +
+  "Speed-limit assistance, curve-speed control and custom cruise-button increments keep their own settings. " +
+  "Custom controller tuning can be saved while parked; MVL ignores it. " +
   "Legacy Kegman PCM takes precedence on supported Civics; the saved learning choice is kept. " +
   "Change while parked. Applies next drive; no device reboot."
 )
@@ -22,20 +24,26 @@ PIF_KEYS = frozenset(
                "NrdrLatStiction", "NrdrDeviceYawCorrection", "NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate"))
 LONG_SCALE_KEYS = frozenset(("LongPidTuneScale", "LongPidTuneScaleAggressive", "LongPidTuneScaleStandard",
                             "LongPidTuneScaleRelaxed", "LongPidTuneScaleEcon"))
+# Target selection is independent of the controller's tune/learning ownership.
+CRUISE_PREFERENCE_KEYS = frozenset((
+  "SmartCruiseControlVision", "SmartCruiseControlMap", "SpeedLimitMode", "SpeedLimitPolicy",
+  "SpeedLimitOffsetType", "SpeedLimitValueOffset", "CustomAccIncrementsEnabled",
+  "CustomAccShortPressIncrement", "CustomAccLongPressIncrement",
+))
 # Manual ExperimentalMode remains authoritative; automatic DEC is a conflict.
 MVL_LOCK_KEYS = LONG_SCALE_KEYS | frozenset((
   "NrdrHondaPcmMode", "NrdrHondaWindBrake", "StaticFeedforwardLong", "NrdrRoenAccelerationLimits",
   "NrdrHondaFullBrakeAuthority", "HondaStoppingDecelRate", "HondaStopAccel", "HondaStoppingDecelRateLong",
   "HondaVEgoStarting", "HondaVEgoStopping", "NrdrStandstillGapExtra", "NrdrCruiseMismatchCorrection",
-  "AccelBoostSP", "SmartCruiseControlVision", "SmartCruiseControlMap", "SpeedLimitMode",
-  "SpeedLimitPolicy", "SpeedLimitOffsetType", "SpeedLimitValueOffset", "DynamicExperimentalControl",
-  "CustomAccIncrementsEnabled", "CustomAccShortPressIncrement", "CustomAccLongPressIncrement",
+  "AccelBoostSP", "DynamicExperimentalControl",
 ))
 YAW_FIXED_KEYS = PIF_KEYS | frozenset((
   "HondaTorqueLowPassFilter",
   "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",
 ))
-LEGACY_PCM_LOCK_KEYS = MVL_LOCK_KEYS | frozenset(("HondaLiveLearningGas", "NrdrMvlPcmDeadzone"))
+# The separate Legacy experiment still bypasses target extensions; this change
+# only restores ordinary cruise preferences alongside MVL control.
+LEGACY_PCM_LOCK_KEYS = MVL_LOCK_KEYS | CRUISE_PREFERENCE_KEYS | frozenset(("HondaLiveLearningGas", "NrdrMvlPcmDeadzone"))
 RETIRED_TUNING_KEYS = frozenset((
   "NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance",
   "NrdrYawDelaySchedule",

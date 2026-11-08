@@ -98,7 +98,7 @@ def test_refresh_preserves_preferences_and_only_relaxes_parked_normal_controls(o
   assert layout.custom_acc_short_increment.enabled is offroad
   assert layout.custom_acc_long_increment.enabled is offroad
   assert layout.accel_boost_toggle.enabled is (offroad or (mode == "custom" and vehicle in ("long", "fixed")))
-  assert layout.scc_v_toggle.enabled is (offroad or (mode == "custom" and vehicle in ("long", "fixed", "icbm")))
+  assert layout.scc_v_toggle.enabled is (offroad or (mode != "legacy" and vehicle in ("long", "fixed", "icbm")))
   assert layout.scc_m_toggle.enabled is layout.scc_v_toggle.enabled
 
 
@@ -109,13 +109,14 @@ def test_explicit_generic_widget_writes_keep_onroad_mode_guard(offroad, mode, ke
   _, ui, _ = cruise_layout(offroad, "missing", mode)
   kind = "OptionControlSP" if key in INCREMENTS.values() else "ToggleActionSP"
   control = tici_control(kind, ui.params, key)
-  assert control.enabled is offroad
+  writable = offroad or (mode == "mvl" and key != "AccelBoostSP")
+  assert control.enabled is writable
   if kind == "OptionControlSP":
     control.set_value(4)
   else:
     control.toggle._handle_mouse_release(None)
   ui.params.flush()
-  assert ui.params.actions == ([("put", key, 4 if kind == "OptionControlSP" else False)] if offroad else [])
+  assert ui.params.actions == ([("put", key, 4 if kind == "OptionControlSP" else False)] if writable else [])
 
 
 @pytest.mark.parametrize("offroad", [False, True])

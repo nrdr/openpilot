@@ -148,7 +148,8 @@ class VCruiseHelper(VCruiseHelperSP):
         self.v_cruise_kph = honda_speed
         self.v_cruise_cluster_kph = honda_speed
         return
-    elif self.update_speed_limit_assist_pre_active_confirmed(button_type):
+    # MVL also uses NRDR's DISTANCE-only SLA confirmation; +/- stays manual.
+    elif not self.mvl_enabled and self.update_speed_limit_assist_pre_active_confirmed(button_type):
       return
 
     long_press, v_cruise_delta = VCruiseHelperSP.update_v_cruise_delta(self, long_press, v_cruise_delta)

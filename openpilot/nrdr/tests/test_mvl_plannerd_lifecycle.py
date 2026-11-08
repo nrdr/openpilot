@@ -5,8 +5,10 @@ import numpy as np
 import pytest
 
 from openpilot.nrdr.tests.test_mvl_host_parity import (
-  CORE, MPC, SP, Messages, PlannerMpcDouble, car_params, definitions, environment, forbidden, planner_messages, source,
+  CORE, MPC, SP, Messages, PlannerMpcDouble, ResolverBoundary, SmartCruiseBoundary,
+  car_params, definitions, environment, forbidden, planner_messages, source,
 )
+from openpilot.nrdr.tests.test_mvl_cruise_targets import IsolatedTargetParams, real_assist_classes
 
 
 class StopLoop(Exception):
@@ -28,24 +30,29 @@ class LoopMessages(Messages):
 def test_plannerd_startup_and_repeated_model_ticks(mvl):
   sent, created, buttons, ldw_ticks = [], [], [], []
   cp, cp_sp = car_params(flagged=mvl), NS(enableGasInterceptor=False)
+  cp.pcmCruise = True
   sm = LoopMessages(planner_messages(1, np.random.default_rng(4), 1))
   sm["radarState"].leadOne = NS(present=True)
-  if not mvl:
-    sm["selfdriveStateSP"] = NS(buttonsReleaseToggle="button-snapshot")
-  # In MVL there is deliberately no selfdriveStateSP entry: the disabled SLA
-  # must not consume button messages, even on ticks without a model update.
+  sm["carState"].vCruiseCluster = sm["carState"].vCruise
+  sm["carControl"].enabled = True
+  sm["carControl"].cruiseControl = NS(override=False)
+  sm["selfdriveStateSP"] = NS(buttonsReleaseToggle=4)
+  # Real NRDR SLA must receive button snapshots on every tick, including the
+  # tick without a model update. Feature settings stay disabled for parity.
+  baseline_sla, nrdr_sla = real_assist_classes(IsolatedTargetParams())
 
   def new_message(service):
-    payload = NS(e2eAlerts=NS()) if service == "longitudinalPlanSP" else NS()
+    payload = (NS(e2eAlerts=NS(), smartCruiseControl=NS(vision=NS(), map=NS()),
+                  speedLimit=NS(resolver=NS(), assist=NS())) if service == "longitudinalPlanSP" else NS())
     return NS(logMonoTime=200, **{service: payload})
 
   messaging = NS(SubMaster=lambda *_a, **_kw: sm, PubMaster=lambda *_: NS(send=lambda *v: sent.append(v)),
                  new_message=new_message, log_from_bytes=lambda value, _schema: value)
   env = environment(
-    EventsSP=lambda: NS(clear=lambda: None, to_msg=list),
+    EventsSP=lambda: NS(clear=lambda: None, add=lambda *_: None, to_msg=list),
     E2EAlertsHelper=lambda: NS(update=lambda *_: None, green_light_alert=False, lead_depart_alert=False),
-    SmartCruiseControl=forbidden, SpeedLimitResolver=forbidden, SpeedLimitAssist=forbidden,
-    NrdrSpeedLimitAssist=forbidden, AccelBoostSP=forbidden, get_active_bundle=forbidden,
+    SmartCruiseControl=SmartCruiseBoundary, SpeedLimitResolver=ResolverBoundary, SpeedLimitAssist=baseline_sla,
+    NrdrSpeedLimitAssist=nrdr_sla, AccelBoostSP=forbidden, get_active_bundle=forbidden,
     messaging=messaging, LongitudinalMpc=PlannerMpcDouble, T_IDXS_MPC=np.linspace(0., 10., 13),
   )
   env["LongitudinalPlannerSP"] = definitions(source(SP + "longitudinal_planner.py"), env)["LongitudinalPlannerSP"]
@@ -59,7 +66,14 @@ def test_plannerd_startup_and_repeated_model_ticks(mvl):
     assert params is cp and params_sp is cp_sp
     if mvl:
       planner = planner_cls(params, params_sp)
-      assert planner.sla is None
+      assert type(planner.sla) is nrdr_sla
+      update_buttons = planner.sla.update_buttons
+
+      def record_buttons(snapshot):
+        buttons.append(snapshot)
+        update_buttons(snapshot)
+
+      planner.sla.update_buttons = record_buttons
     else:
       planner = NS(sla=NS(update_buttons=buttons.append), update=lambda *_: None, publish=lambda *_: None)
     created.append(planner)
@@ -78,8 +92,14 @@ def test_plannerd_startup_and_repeated_model_ticks(mvl):
     main()
   assert len(created) == 1
   assert ldw_ticks == [1, 3]
-  assert buttons == ([] if mvl else ["button-snapshot"] * 3)
+  assert buttons == [4] * 3
   topics = [topic for topic, _ in sent]
   assert topics.count("driverAssistance") == 2
   assert topics.count("longitudinalPlan") == (2 if mvl else 0)
   assert topics.count("longitudinalPlanSP") == (2 if mvl else 0)
+  if mvl:
+    planner = created[0]
+    assert len(planner.scc.vision.calls) == len(planner.scc.map.calls) == len(planner.resolver.calls) == 2
+    assert planner.sla.frame == 1  # starts at -1, advances only on model ticks
+    assert planner.sla._release_toggle_prev == 4
+    assert planner.resolver.kwargs["nrdr_enabled"] and planner.accel_boost_sp is None
