@@ -242,6 +242,26 @@ class NrdrRadar:
       self.prev_lead_track_ids[lead_index] = -1
       self._reset_preferred_stale_evidence(lead_index)
 
+  def record_strict_match(self, lead_index: int, tracks: dict[int, Any], lead, v_ego: float,
+                          ready: bool, lead_prob: float, lead_dict: dict[str, Any]) -> None:
+    """Strict vision match of the published lead, for FCW authority only.
+
+    Used when BoschALeadPolicy owns lead selection: unlike record_lead it never touches
+    prev_lead_track_ids or the staleness counters (the policy keeps its own).
+    """
+    if not self.active:
+      return
+    self.strict_match_track_ids[lead_index] = -1
+    if lead_dict.get("present", False) and lead_dict.get("radar", False):
+      track_id = int(lead_dict.get("radarTrackId", -1))
+      selected_track = tracks.get(track_id)
+      if (selected_track is not None and ready and lead_prob > 0.5 and
+          track_matches_vision(
+            selected_track, lead, v_ego,
+            dist_scale=0.25, dist_floor=5.0, vel_limit=10.0, y_std_scale=1.0, y_floor=1.0,
+          )):
+        self.strict_match_track_ids[lead_index] = track_id
+
   def strict_fcw_authority(self, lead_index: int, lead_dict: dict[str, Any], lead_prob: float) -> bool:
     try:
       lead_prob = float(lead_prob)

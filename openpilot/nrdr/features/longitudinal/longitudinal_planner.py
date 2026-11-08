@@ -110,6 +110,11 @@ class NrdrLongitudinalPlanner:
     """Return the C3 positive cruise/ACC ceiling without changing platform, coast, or braking limits."""
     return c3_personality_accel_max(v_ego, personality)
 
+  def accel_envelope(self, v_ego: float, personality) -> tuple[float, float, float | None]:
+    """(max_accel, turn_accel_threshold, personality ceiling): the three limits the core planner feeds get_cruise_accel.
+    Used only by the Bosch-A planner wiring, so the core planner's own call sites stay as they were."""
+    return self.max_accel(v_ego), self.turn_accel_threshold(), self.personality_accel_ceiling(v_ego, personality)
+
   def turn_accel_threshold(self) -> float:
     return ROEN_TURN_ACCEL_THRESHOLD if self.roen_enabled else 0.0
 

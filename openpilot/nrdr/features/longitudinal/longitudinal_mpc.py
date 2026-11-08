@@ -95,7 +95,7 @@ def _brake_gate(accel: float, accel_tau: float, threshold: float) -> tuple[bool,
 class NrdrLongitudinalMpc:
   def __init__(self, dt: float, time_indices: np.ndarray, time_diffs: np.ndarray,
                cruise_min_accel: float, cruise_max_accel: float, min_lead_factor: float,
-               accel_min: float, log_fn=None, honda_bosch_a_radar: bool = False):
+               accel_min: float, log_fn=None, honda_bosch_a_radar: bool = False, human_following: bool = False):
     self.dt = dt
     self.time_indices = time_indices
     self.time_diffs = time_diffs
@@ -104,6 +104,8 @@ class NrdrLongitudinalMpc:
     self.min_lead_factor = min_lead_factor
     self.accel_min = accel_min
     self.honda_bosch_a_radar = bool(honda_bosch_a_radar)
+    # Bosch-A with MVL off: HumanFollowing owns the present-lead path (see _lead_trajectory).
+    self.human_following = bool(human_following)
     self.lead_time_indices = np.asarray(ModelConstants.LEAD_T_IDXS)
     self.tune = LongTune(log_fn=log_fn)
     self.reset()
@@ -205,11 +207,23 @@ class NrdrLongitudinalMpc:
     return ttc < BOSCH_FCW_MAX_TTC
 
   def _lead_trajectory(self, model_lead, radar_lead, slot: int, v_ego: float,
-                       raw_fallback: np.ndarray | None = None) -> np.ndarray:
+                       raw_fallback: np.ndarray | None = None, human_path: np.ndarray | None = None) -> np.ndarray:
     if not radar_lead.present:
       lead_x = 50.0 + (v_ego + 10.0) * self.lead_time_indices
       lead_v = np.full_like(self.lead_time_indices, v_ego + 10.0)
       return self._to_mpc_trajectory(lead_x, lead_v, v_ego)
+
+    if self.human_following:
+      # Bosch-A, MVL off: HumanFollowing replaces the model-horizon / raw-MLT fallback below (which stays for every other
+      # configuration). Its path is used when it built one; otherwise the raw aLeadK extrapolation, as in SOURCE.
+      if human_path is not None:
+        try:
+          candidate = np.asarray(human_path, dtype=np.float64)
+        except (TypeError, ValueError):
+          candidate = None
+        if candidate is not None and candidate.shape == (len(self.time_indices), 2) and np.all(np.isfinite(candidate)):
+          return candidate
+      return self._finite_raw_fallback(raw_fallback, radar_lead, v_ego)
 
     if self.honda_bosch_a_radar and getattr(radar_lead, "radar", False):
       if (not self._bosch_model_horizon_valid(model_lead, radar_lead, v_ego) or
@@ -309,13 +323,16 @@ class NrdrLongitudinalMpc:
     return max(comfort_brake, self.effective_brakes[slot])
 
   def prepare(self, v_cruise: float, model, radar_state, personality, v_ego: float,
-              base_t_follow: float, raw_lead_trajectories=None) -> MpcPolicyResult:
+              base_t_follow: float, raw_lead_trajectories=None, human_lead_paths=None) -> MpcPolicyResult:
     self.tune.refresh()
     t_follow = max(0.9, base_t_follow + self.tune.t_follow_offset(_personality_name(personality)))
     model_leads = model.leadsV3
     raw_lead_trajectories = (None, None) if raw_lead_trajectories is None else raw_lead_trajectories
-    lead_0 = self._lead_trajectory(model_leads[0], radar_state.leadOne, 0, v_ego, raw_lead_trajectories[0])
-    lead_1 = self._lead_trajectory(model_leads[1], radar_state.leadTwo, 1, v_ego, raw_lead_trajectories[1])
+    human_lead_paths = (None, None) if human_lead_paths is None else human_lead_paths
+    lead_0 = self._lead_trajectory(model_leads[0], radar_state.leadOne, 0, v_ego, raw_lead_trajectories[0],
+                                   human_lead_paths[0])
+    lead_1 = self._lead_trajectory(model_leads[1], radar_state.leadTwo, 1, v_ego, raw_lead_trajectories[1],
+                                   human_lead_paths[1])
     comfort_brake = self.tune.comfort_brake
 
     brake_0 = self._effective_brake(radar_state.leadOne, comfort_brake, 0)

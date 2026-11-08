@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+import time
 import numpy as np
 
 import openpilot.cereal.messaging as messaging
@@ -23,6 +24,14 @@ from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib.mvl_planner import MvlLongitudinalPlanner
 from openpilot.nrdr.features.radar.radar import is_honda_bosch_a_radar
+from openpilot.nrdr.features.longitudinal.bosch_a import human_acceleration, human_following
+from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_coast_first import BoschACoastFirst
+from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_onset_ramp import BoschAOnsetRamp
+from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_release_coast import BoschAReleaseCoast
+from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_smooth import BoschASmooth
+from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_stop_gap import BoschAStopGap
+from openpilot.nrdr.features.longitudinal.bosch_a.honda_bosch_a_long import HondaBoschALongEnhancement
+from openpilot.nrdr.features.longitudinal.bosch_a.model_lead_qualification import ModelLeadHistory, qualified_model_leads
 
 A_CRUISE_MAX_VALS = [1.6, 1.2, 0.8, 0.6]
 A_CRUISE_MAX_BP = [0., 10.0, 25., 40.]
@@ -83,6 +92,30 @@ def get_cruise_accel(e2e, v_cruise, v_ego, a_cruise_prev, angle_steers, CP, dt, 
   return target_accel
 
 
+# Bosch-A engage init only: the same law with the jerk limit made unreachable (dt this large puts the clip bounds far outside
+# any cruise target), so the planner's single get_cruise_accel call site and the function itself stay as they were.
+_cruise_accel_without_jerk_limit = get_cruise_accel
+_NO_JERK_LIMIT_DT = 1.0e6
+
+
+def bosch_a_human_accel_base(nrdr, experimental: bool, v_ego: float, personality) -> float:
+  """HumanAcceleration's base: the planner's own max accel. SOURCE: ACCEL_MAX in experimental mode, else the selected
+  profile cap, else the stock get_max_accel(v_ego). NRDR has no profile cap: its equivalent of get_max_accel is
+  nrdr.max_accel(v_ego), and its personality ceiling is applied on top exactly as get_cruise_accel applies it
+  (min with max(0, ceiling), ignored if None / non-finite), so the cap never exceeds the cruise path's own limit."""
+  if experimental:
+    return ACCEL_MAX
+  max_accel, _, ceiling = nrdr.accel_envelope(v_ego, personality)
+  if ceiling is not None:
+    try:
+      ceiling = float(ceiling)
+    except (OverflowError, TypeError, ValueError):
+      ceiling = math.nan
+    if np.isfinite(ceiling):
+      max_accel = min(max_accel, max(0.0, ceiling))
+  return max_accel
+
+
 class LongitudinalPlanner(LongitudinalPlannerSP):
   def __init__(self, CP, CP_SP, init_v=0.0, init_a=0.0, dt=DT_MDL):
     self.legacy_pcm = legacy_pcm_enabled(CP, CP_SP)
@@ -96,7 +129,21 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     # Legacy feedback uses today's base planner, not the MVL planner and not
     # persisted NRDR acceleration, launch, stopping, gap, or jerk tuning.
     nrdr_enabled = nrdr_longitudinal_enabled(CP) and not self.legacy_pcm
-    self.mpc = LongitudinalMpc(dt=dt, honda_bosch_a_radar=self.honda_bosch_a_radar, nrdr_enabled=nrdr_enabled)
+    # Bosch-A longitudinal tuning (HumanFollowing, HumanAcceleration and the post-MPC chain). Always on for a Bosch-A Honda
+    # with openpilot longitudinal; MVL has already returned above, and the legacy / fixed PCM experiments keep today's planner.
+    from openpilot.nrdr.features.longitudinal.bosch_a import gate as bosch_a_gate
+    self.bosch_a_wired = bool(nrdr_enabled and not self.fixed_pcm_cruise and bosch_a_gate.human_following_enabled(CP))
+    self.mpc = LongitudinalMpc(dt=dt, honda_bosch_a_radar=self.honda_bosch_a_radar, nrdr_enabled=nrdr_enabled,
+                               human_following=self.bosch_a_wired)
+    if self.bosch_a_wired:
+      self.bosch_a_long = HondaBoschALongEnhancement(CP, dt)
+      self.bosch_a_smooth = BoschASmooth(CP, dt)
+      self.bosch_a_coast_first = BoschACoastFirst(CP, dt)
+      self.bosch_a_release_coast = BoschAReleaseCoast(CP, dt)
+      self.bosch_a_onset_ramp = BoschAOnsetRamp(CP, dt)
+      self.bosch_a_stop_gap = BoschAStopGap(CP, dt)
+      self.bosch_a_model_lead_history = ModelLeadHistory()  # SOURCE planner: model_lead_history
+      self.bosch_a_clock_ns = time.monotonic_ns  # SOURCE planner: clock_ns
     self.nrdr = NrdrLongitudinalPlanner(CP, CP_SP, self.mpc.tune) if nrdr_enabled else None
     LongitudinalPlannerSP.__init__(self, self.CP, CP_SP, self.mpc)
     self.fcw = False
@@ -187,9 +234,25 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     personality = longitudinal_personality(sm['selfdriveState'].personality, self.nrdr is not None)
     self.mpc.set_weights(prev_accel_constraint, personality=personality)
     self.mpc.set_cur_state(self.v_desired_filter.x, self.output_a_target)
-    self.mpc.update(sm['radarState'], personality=personality,
+    planner_radar_state = sm['radarState']
+    bosch_a_mpc = {}
+    human_accel_base = None
+    if self.bosch_a_wired:
+      # HumanAcceleration scales the planner's own max accel (SOURCE: profile, else the stock cruise curve; here the
+      # NRDR cruise curve). The MPC and the enhancement's stock-feel law read the same bounded leads (D-080, a2 seg 50).
+      human_accel_base = bosch_a_human_accel_base(self.nrdr, bool(sm['selfdriveState'].experimentalMode), v_ego, personality)
+      planner_radar_state = self.bosch_a_long.planner_radar_state(sm['radarState'], float(sm['carState'].aEgo),
+                                                                   model_v2=sm['modelV2'])
+      bosch_a_mpc = {'acceleration_max': human_acceleration.cap(human_accel_base, v_cruise, v_ego),
+                     # SOURCE: the MPC only sees modelV2 that qualified_model_leads accepted this frame (fresh, matched
+                     # to radarState); otherwise None, so each lead keeps its raw aLeadK extrapolation.
+                     'lead_paths': human_following.upstream_lead_paths(
+                       qualified_model_leads(sm, self.bosch_a_clock_ns(), self.bosch_a_model_lead_history),
+                       planner_radar_state, self.mpc.x0[1])}
+    self.mpc.update(planner_radar_state, personality=personality,
                     model=sm['modelV2'], v_cruise=v_cruise,
-                    extra_stop_distance=self.nrdr.stopped_gap(reset_state) if self.nrdr is not None else 0.0)
+                    extra_stop_distance=self.nrdr.stopped_gap(reset_state) if self.nrdr is not None else 0.0,
+                    **bosch_a_mpc)
 
     self.v_desired_trajectory = np.interp(CONTROL_N_T_IDX, T_IDXS_MPC, self.mpc.v_solution)
     self.a_desired_trajectory = np.interp(CONTROL_N_T_IDX, T_IDXS_MPC, self.mpc.a_solution)
@@ -205,8 +268,9 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     a_prev = self.output_a_target
 
     action_t =  self.CP.longitudinalActuatorDelay + DT_MDL
-    output_a_target_mpc = get_accel_from_plan(self.v_desired_trajectory, self.a_desired_trajectory, CONTROL_N_T_IDX,
-                                              action_t=action_t)
+    output_a_target_mpc = get_accel_from_plan(
+      self.v_desired_trajectory, self.a_desired_trajectory, CONTROL_N_T_IDX,
+      action_t=self.bosch_a_smooth.action_t(self.CP.longitudinalActuatorDelay) if self.bosch_a_wired else action_t)
     output_should_stop_mpc = (bool(self.v_desired_trajectory[0] < self.nrdr.v_ego_stopping and output_a_target_mpc < 0.1)
                               if self.nrdr is not None else should_stop(v_ego, output_a_target_mpc))
     output_a_target_e2e = sm['modelV2'].action.desiredAcceleration
@@ -243,6 +307,39 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       # A saved NRDR stopping threshold of exactly zero must not turn the
       # explicit zero-speed experiment into indefinite creeping.
       self.output_should_stop = True
+    if self.bosch_a_wired:
+      # Post-MPC Bosch-A chain, SOURCE order (starpilot longitudinal_planner.py): HumanAcceleration cap (throttle side
+      # only; the cap is >= 0 so a braking target passes through), engage init, then bosch_a_long -> coast_first ->
+      # release_coast -> smooth -> onset_ramp -> stop_gap.
+      output_a_target = min(output_a_target, bosch_a_mpc['acceleration_max'])
+      if self.bosch_a_long.stock_feel and reset_state:
+        # Engage init: while long is off, a_cruise starts the first engaged frame at min(aEgo, cruise target) instead of
+        # aEgo (jerk-limited around aEgo). Lowers only; output_a_target and the MPC state are unchanged.
+        max_accel, min_lat_accel, accel_ceiling = self.nrdr.accel_envelope(v_ego, personality)
+        self.a_cruise = min(self.a_cruise, float(_cruise_accel_without_jerk_limit(
+          is_e2e, v_cruise, v_ego, self.a_cruise, steer_angle_without_offset, self.CP, _NO_JERK_LIMIT_DT,
+          accel_coast, self.allow_throttle, max_accel_override=max_accel, min_lat_accel=min_lat_accel,
+          positive_accel_ceiling=accel_ceiling)))
+      lead_one, lead_two = planner_radar_state.leadOne, planner_radar_state.leadTwo
+      standstill = bool(sm['carState'].standstill)
+      output_a_target = self.bosch_a_long.step(
+        lead_one=lead_one, lead_two=lead_two, prev=float(a_prev), target=float(output_a_target), v_ego=v_ego,
+        stopping=bool(self.output_should_stop), standstill=standstill, reset_state=bool(reset_state))
+      output_a_target = self.bosch_a_coast_first.step(
+        lead_one=lead_one, lead_two=lead_two, target=float(output_a_target), v_ego=v_ego,
+        follow_s=float(self.mpc.params[0, 4]), fcw=bool(self.fcw), reset_state=bool(reset_state))
+      output_a_target = self.bosch_a_release_coast.update(
+        lead_one=lead_one, target=float(output_a_target), lane_change_state=sm['modelV2'].meta.laneChangeState,
+        left_blinker=bool(sm['carState'].leftBlinker), right_blinker=bool(sm['carState'].rightBlinker),
+        gas_pressed=bool(sm['carState'].gasPressed), reset_state=bool(reset_state))
+      output_a_target = self.bosch_a_smooth.step(float(a_prev), float(output_a_target),
+                                                 reset=bool(reset_state or standstill))
+      output_a_target = self.bosch_a_onset_ramp.step(
+        lead_one=lead_one, lead_two=lead_two, prev=float(a_prev), target=float(output_a_target), fcw=bool(self.fcw),
+        stopping=bool(self.output_should_stop), reset=bool(reset_state or standstill))
+      output_a_target, self.output_should_stop = self.bosch_a_stop_gap.step(
+        lead_one=lead_one, lead_two=lead_two, target=float(output_a_target), should_stop=bool(self.output_should_stop),
+        v_ego=v_ego, standstill=standstill, reset_state=bool(reset_state))
     if self.nrdr is not None:
       for idx in range(2):
         accel_clip[idx] = np.clip(accel_clip[idx], self.prev_accel_clip[idx] - 0.05, self.prev_accel_clip[idx] + 0.05)

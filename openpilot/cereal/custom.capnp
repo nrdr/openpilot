@@ -466,6 +466,15 @@ struct CarStateSP @0xb86e6369214c01c8 {
   stockCmbsStatus @2 :StockCmbsStatus;
   stockCmbsStatusMonoTime @3 :UInt64;
   stockCmbsOffOrProblem @4 :Bool;
+  # Honda Bosch-A: the F0 STATUS nibble of each point of one radarTracks message (7 confirmed; 9 on route 34's
+  # phantom lead). car.capnp's RadarPoint is upstream-owned, so card carries it here. Empty for other radars.
+  radarPointStatus @5 :List(RadarPointStatus);
+  radarTracksMonoTime @6 :UInt64;  # logMonoTime of that radarTracks message; 0 = no radar point status
+
+  struct RadarPointStatus {
+    trackId @0 :UInt64;
+    objectStatus @1 :UInt8;
+  }
 
   enum StockCmbsStatus {
     unknown @0;
