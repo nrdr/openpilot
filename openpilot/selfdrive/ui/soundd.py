@@ -2,6 +2,7 @@ import math
 import numpy as np
 import time
 import wave
+from threading import Lock
 
 
 from openpilot.cereal import log, messaging, custom
@@ -15,6 +16,7 @@ from openpilot.system.audio import open_audio_stream
 from openpilot.common.hardware import HARDWARE
 
 from openpilot.sunnypilot.selfdrive.ui.quiet_mode import QuietMode
+from openpilot.nrdr.ui.engagement_sounds import june_engagement_files, june_engagement_volume
 
 SAMPLE_RATE = 48000
 SAMPLE_BUFFER = 4096 # (approx 100ms)
@@ -78,6 +80,10 @@ class Soundd(QuietMode):
     super().__init__()
 
     self.load_sounds()
+    self.load_june_engagement_sounds()
+    self.sound_lock = Lock()
+    self.active_sound = None
+    self.chime_volume = None
     self.ready_event = ready_event
 
     self.current_alert = AudibleAlert.none
@@ -107,13 +113,32 @@ class Soundd(QuietMode):
         length = wavefile.getnframes()
         self.loaded_sounds[sound] = np.frombuffer(wavefile.readframes(length), dtype=np.int16).astype(np.float32) / (2**16/2)
 
-  def get_sound_data(self, frames): # get "frames" worth of data from the current alert sound, looping when required
+  def load_june_engagement_sounds(self):
+    self.june_engagement_sounds: dict[int, np.ndarray] = {}
+    for name, filename in june_engagement_files(HARDWARE.get_device_type()).items():
+      # A missing optional pack must never prevent the normal alert service starting.
+      try:
+        with wave.open(BASEDIR + "/openpilot/selfdrive/assets/sounds/nrdr_june_2026/" + filename, 'rb') as audio:
+          if (audio.getnchannels(), audio.getsampwidth(), audio.getframerate()) != (1, 2, SAMPLE_RATE) or not audio.getnframes():
+            raise ValueError(f"Invalid engagement sound format: {filename}")
+          data = audio.readframes(audio.getnframes())
+          if len(data) != audio.getnframes() * 2:
+            raise ValueError(f"Truncated engagement sound: {filename}")
+          self.june_engagement_sounds[getattr(AudibleAlert, name)] = np.frombuffer(data, dtype=np.int16).astype(np.float32) / (2**16/2)
+      except (OSError, EOFError, ValueError, wave.Error):
+        cloudlog.exception(f"June engagement sound unavailable; using current sound: {filename}")
+
+  def get_sound_data(self, frames):
+    with self.sound_lock:
+      return self._get_sound_data(frames)
+
+  def _get_sound_data(self, frames): # get "frames" worth of data from the current alert sound, looping when required
 
     ret = np.zeros(frames, dtype=np.float32)
 
     if self.should_play_sound(self.current_alert):
       num_loops = sound_list[self.current_alert][1]
-      sound_data = self.loaded_sounds[self.current_alert]
+      sound_data = self.active_sound if self.active_sound is not None else self.loaded_sounds[self.current_alert]
       written_frames = 0
 
       current_sound_frame = self.current_sound_frame % len(sound_data)
@@ -132,7 +157,7 @@ class Soundd(QuietMode):
           self.pending_stop = False
           break
 
-    return ret * self.current_volume
+    return ret * (self.current_volume if self.chime_volume is None else self.chime_volume)
 
   def callback(self, data_out: np.ndarray, frames: int, time, status) -> None:
     if status:
@@ -140,7 +165,15 @@ class Soundd(QuietMode):
     data_out[:frames, 0] = self.get_sound_data(frames)
 
   def update_alert(self, new_alert):
-    current_alert_played_once = self.current_alert == AudibleAlert.none or self.current_sound_frame >= len(self.loaded_sounds[self.current_alert])
+    # Read outside the audio lock, only when starting an eligible chime. The choice
+    # and gain are then latched for its full duration, not switched mid-recording.
+    use_june = (new_alert != self.current_alert and new_alert in self.june_engagement_sounds and
+                self.params.get("NrdrEngagementSoundPack") == 1)
+    with self.sound_lock:
+      self._update_alert(new_alert, use_june)
+
+  def _update_alert(self, new_alert, use_june):
+    current_alert_played_once = self.current_alert == AudibleAlert.none or self.current_sound_frame >= len(self.active_sound)
     # let looping sounds finish the current loop instead of cutting off mid tone
     if new_alert == AudibleAlert.none and self.current_alert != AudibleAlert.none and sound_list[self.current_alert][1] is None:
       if current_alert_played_once:
@@ -154,6 +187,11 @@ class Soundd(QuietMode):
       if new_alert == AudibleAlert.warningImmediate:
         self.ramp_start_volume = self.current_volume
         self.ramp_start_time = time.monotonic()
+      self.active_sound = self.june_engagement_sounds[new_alert] if use_june else self.loaded_sounds.get(new_alert)
+      self.chime_volume = None
+      if use_june:
+        self.chime_volume = (june_engagement_volume(float(self.spl_filter_weighted.x), HARDWARE.get_device_type())
+                             if self.spl_filter_weighted.initialized else self.current_volume)
       self.current_alert = new_alert
       self.current_sound_frame = 0
 

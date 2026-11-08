@@ -95,7 +95,7 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
 
     canonical_keys = set(canonical_references) & catalog_keys
     generated_nrdr_keys = set(generated_references) & catalog_keys
-    self.assertEqual(len(canonical_keys), 76)
+    self.assertEqual(len(canonical_keys), 77)
     # The adapter adds the pending-apply lock to each suggested-profile control.
     self.assertEqual(canonical_keys | {"NrdrHandcraftedLateralTune"}, generated_nrdr_keys)
     self.assertEqual(set(canonical_references) - catalog_keys, INHERITED_LANE_CENTERING_KEYS)
@@ -116,7 +116,7 @@ class TestSunnylinkSourceOwnership(unittest.TestCase):
     expected = [
       "Apply Suggested Settings", "Force Update", "Prevent Automatic Shutdown",
       "Lateral Tuning", "Lane Centering Method", "Steer Ratio Tuning", "Override Tuning",
-      "Steer Filters", "Longitudinal Tuning", "Driver Monitoring",
+      "Steer Filters", "Longitudinal Tuning", "Driver Monitoring", "Custom Audio & Visuals",
     ]
     source = _yaml_document("pages/steering.yaml")["sections"][0]
     generated_page = next(p for p in compile_schema(DEFAULT_SRC)["panels"] if p["id"] == "steering")

@@ -119,6 +119,24 @@ class TestUiSettingsContract(unittest.TestCase):
     self.assertIn("nrdr_lane_centering_stack", self.panels)
     self.assertIn("nrdr_special", {section["id"] for section in self.pages["steering"]["sections"]})
 
+  def test_engagement_sounds_are_last_in_nrdr_and_live_without_locks(self):
+    panel = self.nrdr["sub_panels"][-1]
+    self.assertEqual(panel["id"], "nrdr_custom_audio_visuals")
+    self.assertEqual(panel["label"], "Custom Audio & Visuals")
+    self.assertIsNone(panel["trigger_key"])
+    item, = panel["items"]
+    self.assertEqual(item["key"], "NrdrEngagementSoundPack")
+    self.assertEqual(item["widget"], "multiple_button")
+    self.assertEqual(item["title"], "Engagement Sounds")
+    self.assertEqual(item["options"], [{"value": 0, "label": "Current"}, {"value": 1, "label": "June 2026"}])
+    self.assertEqual(item["description"],
+                     "Choose engage, disengage and engagement-refused sounds with their matching automatic volume. Other alerts are unchanged.")
+    self.assertEqual(item["details"], "Applies to the next chime without reboot. Quiet Mode still mutes these sounds.")
+    for node in (self.pages["steering"], self.nrdr, panel, item, *item["options"]):
+      for field in ("visibility", "enablement", "trigger_condition", "needs_onroad_cycle", "attestation_required"):
+        self.assertFalse(node.get(field), (field, node))
+    self.assertEqual(sum(i["key"] == item["key"] for i in _items(self.schema)), 1)
+
 
 if __name__ == "__main__":
   unittest.main()

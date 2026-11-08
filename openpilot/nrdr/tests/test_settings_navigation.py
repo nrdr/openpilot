@@ -7,6 +7,7 @@ import unittest
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 MICI_SETTINGS = REPOSITORY_ROOT / "openpilot/selfdrive/ui/mici/layouts/settings/settings.py"
 MICI_TOGGLES = REPOSITORY_ROOT / "openpilot/selfdrive/ui/mici/layouts/settings/toggles.py"
+MICI_DEVICE = REPOSITORY_ROOT / "openpilot/selfdrive/ui/mici/layouts/settings/device.py"
 MICI_SETTINGS_SP = REPOSITORY_ROOT / "openpilot/selfdrive/ui/sunnypilot/mici/layouts/settings.py"
 TICI_SETTINGS_SP = REPOSITORY_ROOT / "openpilot/selfdrive/ui/sunnypilot/layouts/settings/settings.py"
 NRDR_LATERAL = REPOSITORY_ROOT / "openpilot/nrdr/ui/settings/lateral_tuning.py"
@@ -95,6 +96,45 @@ class _LifecycleSpy:
 
 
 class TestSettingsNavigation(unittest.TestCase):
+  def test_custom_audio_visuals_is_last_in_native_device_and_nrdr(self) -> None:
+    device_init = _method(_tree(MICI_DEVICE), "DeviceLayoutMici", "__init__")
+    self.assertEqual(_widget_list(device_init), [
+      "DeviceInfoLayoutMici()", "PairBigButton()", "review_training_guide_btn", "cabin_cam_btn", "terms_btn", "regulatory_btn",
+      "reset_calibration_btn", "reboot_btn", "self._power_off_btn", "self._custom_audio_visuals_btn",
+    ])
+    self.assertEqual(_callback_body(device_init, "_custom_audio_visuals_btn"), "gui_app.push_widget(self._custom_audio_visuals_panel)")
+
+    nrdr_init = _method(_tree(NRDR_LAYOUT), "NrdrLayout", "_initialize_items")
+    items = next(node.value for node in nrdr_init.body if isinstance(node, ast.Return))
+    self.assertEqual(ast.unparse(items.elts[-1]), "self._custom_audio_visuals_button")
+    self.assertIn("callback=lambda: self._set_current_panel(PanelType.CUSTOM_AUDIO_VISUALS)", ast.unparse(nrdr_init))
+
+  def test_custom_audio_visuals_navigation_unwinds_and_refreshes(self) -> None:
+    nrdr_class, panel = _lifecycle_class(
+      NRDR_LAYOUT, "NrdrLayout", "PanelType", ("_panel_widget", "_set_current_panel", "show_event", "hide_event"),
+    )
+    nrdr = nrdr_class()
+    nrdr._shown = False
+    nrdr._current_panel = panel.NRDR
+    nrdr._scroller = _LifecycleSpy()
+    nrdr._custom_audio_visuals_layout = sounds = _LifecycleSpy(refresh_on_show=True)
+    # Unlike Special, this panel must remain reachable on non-Honda vehicles.
+    nrdr._set_current_panel.__globals__["honda_tuning_available"] = lambda: False
+    nrdr.show_event()
+    nrdr._set_current_panel(panel.CUSTOM_AUDIO_VISUALS)
+    self.assertEqual(nrdr._current_panel, panel.CUSTOM_AUDIO_VISUALS)
+    self.assertEqual(sounds.refresh_count, 1)
+    nrdr._set_current_panel(panel.NRDR)
+    self.assertEqual(sounds.hide_count, 1)
+    nrdr._set_current_panel(panel.CUSTOM_AUDIO_VISUALS)
+    self.assertEqual(sounds.refresh_count, 2)
+    nrdr.hide_event()
+    self.assertEqual(sounds.hide_count, 2)
+    self.assertEqual(nrdr._current_panel, panel.NRDR)
+    nrdr.show_event()
+    nrdr._set_current_panel(panel.CUSTOM_AUDIO_VISUALS)
+    self.assertEqual(sounds.refresh_count, 3)
+
   def test_mici_root_buttons_keep_named_network_and_device_routes(self) -> None:
     init = _method(_tree(MICI_SETTINGS), "SettingsLayout", "__init__")
     self.assertEqual(

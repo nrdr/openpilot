@@ -12,6 +12,7 @@ from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialog, BigConfirmatio
 from openpilot.selfdrive.ui.mici.widgets.pairing_dialog import PairingDialog
 from openpilot.selfdrive.ui.mici.onroad.cabin_camera_dialog import CabinCameraDialog
 from openpilot.selfdrive.ui.mici.layouts.onboarding import TrainingGuide, TermsPage
+from openpilot.selfdrive.ui.mici.layouts.settings.custom_audio_visuals import CustomAudioVisualsLayoutMici
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
@@ -205,6 +206,10 @@ class DeviceLayoutMici(NavScroller):
     terms_btn = BigButton("terms &\nconditions", "", gui_app.texture("icons_mici/settings/device/info.png", 64, 64))
     terms_btn.set_click_callback(lambda: gui_app.push_widget(ReviewTermsPage()))
 
+    self._custom_audio_visuals_panel = CustomAudioVisualsLayoutMici()
+    self._custom_audio_visuals_btn = BigButton("Custom Audio\n& Visuals", "settings", font_size=40)
+    self._custom_audio_visuals_btn.set_click_callback(lambda: gui_app.push_widget(self._custom_audio_visuals_panel))
+
     self._scroller.add_widgets([
       DeviceInfoLayoutMici(),
       PairBigButton(),
@@ -215,7 +220,15 @@ class DeviceLayoutMici(NavScroller):
       reset_calibration_btn,
       reboot_btn,
       self._power_off_btn,
+      self._custom_audio_visuals_btn,
     ])
+
+  def show_event(self):
+    # Derived Device layouts append their own controls; keep this entry last.
+    items = self._scroller._items
+    items.remove(self._custom_audio_visuals_btn)
+    items.append(self._custom_audio_visuals_btn)
+    super().show_event()
 
   def _on_regulatory(self):
     if not self._fcc_dialog:

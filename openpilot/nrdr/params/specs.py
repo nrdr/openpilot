@@ -97,6 +97,7 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("HondaBoschARadar", ParamType.BOOL, (P,), "1", owner=ParamOwner.HONDA),
   _added("Offroad_NeosUpdate", ParamType.JSON, (M,), lifecycle=ParamLifecycle.STATUS),
   _added("RecordAudioFeedback", ParamType.BOOL, PB, "0", owner=ParamOwner.DEVICE),
+  _added("NrdrEngagementSoundPack", ParamType.INT, PB, "0", owner=ParamOwner.DEVICE),
   _added("NrdrDriverMonitoringReminderPercent", ParamType.INT, PB, "100", owner=ParamOwner.DEVICE),
   _added("RemoteAccessPinEnabled", ParamType.BOOL, (P,), lifecycle=ParamLifecycle.STATE, owner=ParamOwner.REMOTE),
   _added("RemoteAccessPinSalt", ParamType.BYTES, (P, D), lifecycle=ParamLifecycle.STATE, owner=ParamOwner.REMOTE),

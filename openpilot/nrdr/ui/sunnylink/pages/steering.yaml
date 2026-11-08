@@ -643,6 +643,20 @@ sections:
         unit: '%'
         enablement:
         - $ref: '#/macros/offroad'
+    - id: nrdr_custom_audio_visuals
+      label: Custom Audio & Visuals
+      trigger_key: null
+      items:
+      - key: NrdrEngagementSoundPack
+        widget: multiple_button
+        title: Engagement Sounds
+        description: Choose engage, disengage and engagement-refused sounds with their matching automatic volume. Other alerts are unchanged.
+        details: Applies to the next chime without reboot. Quiet Mode still mutes these sounds.
+        options:
+        - value: 0
+          label: Current
+        - value: 1
+          label: June 2026
   - id: nrdr_special
     title: nrdr Special
     description: Dashboard, diagnostics, and special features.

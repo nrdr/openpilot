@@ -4,6 +4,7 @@ import ast
 import hashlib
 import wave
 from pathlib import Path
+from threading import Lock
 
 import numpy as np
 import pytest
@@ -49,7 +50,7 @@ def test_legacy_prompt_plays_once_without_truncating():
   # Exercise the actual loading/playback methods without Params, messaging or a speaker.
   tree = ast.parse(SOUNDD.read_text(encoding="utf-8"))
   cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Soundd")
-  methods = [node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in ("load_sounds", "get_sound_data")]
+  methods = [node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in ("load_sounds", "get_sound_data", "_get_sound_data")]
   namespace = {"np": np, "wave": wave, "BASEDIR": str(ROOT), "SAMPLE_RATE": 48000,
                "sound_list": {1: ("prompt.wav", 1, 1.0)}}
   exec(compile(ast.Module(body=methods, type_ignores=[]), str(SOUNDD), "exec"), namespace)
@@ -59,6 +60,9 @@ def test_legacy_prompt_plays_once_without_truncating():
   sound.current_sound_frame = 0
   sound.current_volume = 0.5
   sound.pending_stop = False
+  sound.sound_lock = Lock()
+  sound.active_sound = None
+  sound.chime_volume = None
   sound.load_sounds()
   expected = sound.loaded_sounds[1] * sound.current_volume
   block_size = 4096
