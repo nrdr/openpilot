@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import math
 import os
 import time
 import numpy as np
@@ -220,12 +221,12 @@ def gen_long_ocp():
 
 class LongitudinalMpc:
   def __init__(self, dt=DT_MDL, honda_bosch_a_radar: bool = False, *, nrdr_enabled: bool = False,
-               mvl_enabled: bool = False):
+               mvl_enabled: bool = False, human_following: bool = False):
     self.dt = dt
     self.mvl_enabled = mvl_enabled
     self.nrdr = NrdrLongitudinalMpc(
       dt, T_IDXS, T_DIFFS, ACCEL_MIN, ACCEL_MAX, MIN_X_LEAD_FACTOR, ACCEL_MIN, cloudlog.warning,
-      honda_bosch_a_radar=honda_bosch_a_radar,
+      honda_bosch_a_radar=honda_bosch_a_radar, human_following=human_following,
     ) if nrdr_enabled and not mvl_enabled else None
     self.tune = self.nrdr.tune if self.nrdr is not None else None
     self.solver = AcadosOcpSolverCython(MODEL_NAME, ACADOS_SOLVER_TYPE, N)
@@ -331,7 +332,7 @@ class LongitudinalMpc:
     return lead_xv
 
   def update(self, radarstate, personality=log.LongitudinalPersonality.standard, *, model=None, v_cruise=None,
-             extra_stop_distance=0.0):
+             extra_stop_distance=0.0, acceleration_max=None, lead_paths=None):
     personality = longitudinal_personality(personality, self.mvl_enabled or self.nrdr is not None)
     t_follow = get_T_FOLLOW(personality)
     v_ego = self.x0[1]
@@ -352,7 +353,7 @@ class LongitudinalMpc:
       cruise_target = v_ego if v_cruise is None else v_cruise
       result = self.nrdr.prepare(cruise_target, model, radarstate, personality, v_ego,
                                  self.nrdr.t_follow(personality, t_follow),
-                                 raw_lead_trajectories=(lead_xv_0, lead_xv_1))
+                                 raw_lead_trajectories=(lead_xv_0, lead_xv_1), human_lead_paths=lead_paths)
       lead_xv_0, lead_xv_1 = result.lead_0, result.lead_1
       self.status = result.status
       t_follow = result.t_follow
@@ -374,6 +375,9 @@ class LongitudinalMpc:
 
     self.params[:,0] = ACCEL_MIN
     self.params[:,1] = ACCEL_MAX
+    # BOSCH-A (HumanAcceleration): only the planner passes this, and only for Bosch-A with MVL off. Same bound check as SOURCE.
+    if acceleration_max is not None and math.isfinite(acceleration_max) and 0.0 <= acceleration_max <= ACCEL_MAX:
+      self.params[:,1] = acceleration_max
     self.params[:,2] = np.min(x_obstacles, axis=1)
     self.params[:,3] = np.copy(self.a_prev)
     self.params[:,4] = t_follow

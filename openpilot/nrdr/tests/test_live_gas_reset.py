@@ -77,7 +77,7 @@ def rpc(parked, monkeypatch):
 
 def drive_manager(parked):
   params, sm, card, meta = parked
-  reset.consume_reset(params, sm, card, read_cp=lambda p: HONDA, meta_path=meta)
+  reset.consume_reset(params, sm, card, read_cp=lambda p: HONDA, meta_path=meta, bosch_a_path=meta.parent / "bosch_a.json")
 
 
 @pytest.mark.parametrize("compressed", (False, True))
@@ -90,7 +90,10 @@ def test_sunnylink_request_and_device_ack(parked, rpc, compressed):
   rpc({reset.REQUEST: "MA=="})  # Echoed false cannot acknowledge the command.
   rpc({reset.STATUS: "ZmFrZQ=="})  # Remote client cannot forge the result.
   assert params[reset.REQUEST] is True and params[reset.STATUS] == "Requested: HONDA_CIVIC"
+  bosch_a = meta.parent / "bosch_a.json"
+  bosch_a.write_text('{"gas_factor": 1.2}')  # Bosch-A learner state is a separate file and is cleared by the same reset
   drive_manager(parked)
+  assert not bosch_a.exists()
   assert not meta.exists() and not (set(params) & set(reset.GAS_KEYS))
   assert {key: params[key] for key in KEEP} == KEEP
   assert params[reset.REQUEST] is False and params[reset.STATUS] == "Reset complete."

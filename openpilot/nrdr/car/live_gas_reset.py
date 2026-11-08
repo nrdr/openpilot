@@ -1,7 +1,9 @@
 """One-shot parked reset. Only manager may clear state, between card lifetimes."""
 import json
+from pathlib import Path
 
 from openpilot.nrdr.car.mvl_state import LEARNER_META_PATH, MVL_STATE_KEYS
+from openpilot.nrdr.features.longitudinal.bosch_a.learning_params import LEARNER_META_PATH as BOSCH_A_LEARNER_PATH
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity
 
 REQUEST = "NrdrResetLiveGas"
@@ -40,7 +42,7 @@ def request_reset(params, cp):
       raise OSError("Could not queue the reset request.")
 
 
-def consume_reset(params, sm, card, *, read_cp=stored_cp, meta_path=LEARNER_META_PATH):
+def consume_reset(params, sm, card, *, read_cp=stored_cp, meta_path=LEARNER_META_PATH, bosch_a_path=BOSCH_A_LEARNER_PATH):
   if not params.get_bool(REQUEST):
     return
   result = "Not reset: park, turn ignition off and request again."
@@ -68,9 +70,12 @@ def consume_reset(params, sm, card, *, read_cp=stored_cp, meta_path=LEARNER_META
     if params.get(STATUS) != "Resetting":
       return
     meta_path.unlink(missing_ok=True)
+    # The Bosch-A learner keeps its factors in its own file, not in GAS_KEYS (bosch_a/learning_params.py).
+    bosch_a_path = Path(bosch_a_path)
+    bosch_a_path.unlink(missing_ok=True)
     for key in GAS_KEYS:
       params.remove(key)
-    if not meta_path.exists() and all(params.get_raw(key) is None for key in GAS_KEYS):
+    if not meta_path.exists() and not bosch_a_path.exists() and all(params.get_raw(key) is None for key in GAS_KEYS):
       result = "Reset complete."
   finally:
     # Publish the outcome before dropping the switch; never replay a failed

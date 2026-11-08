@@ -16,7 +16,12 @@ from openpilot.common.simple_kalman import KF1D
 from opendbc.car import structs
 from opendbc.car.hyundai.values import HyundaiFlags
 from opendbc.sunnypilot.car.hyundai.values import HyundaiFlagsSP
-from openpilot.nrdr.features.radar.radar import NrdrRadar
+from openpilot.nrdr.features.radar.radar import NrdrRadar, is_honda_bosch_a_radar
+
+try:
+  from opendbc.car.honda.bosch_a_radar import BOSCH_A_FREQ_HZ  # the measured sweep rate (14.35 Hz), not a round 15
+except ImportError:  # pragma: no cover - older opendbc without the Bosch-A module
+  BOSCH_A_FREQ_HZ = 14.35
 
 
 # Default lead acceleration decay set to 50% at 1s
@@ -209,7 +214,14 @@ class RadarD:
     self.current_time = 0.0
     self.tracks: dict[int, Track] = {}
     self.nrdr = NrdrRadar(CP)
-    self.kalman_params = self.nrdr.kalman_params(KalmanParams)
+    # Bosch-A lead selection follows the ported BoschALeadPolicy whenever the Bosch-A radar is active (no toggle).
+    self.bosch_a_policy = None
+    if self.nrdr.active:
+      from openpilot.nrdr.features.radar.bosch_a_lead_policy import BoschALeadPolicy
+      self.bosch_a_policy = BoschALeadPolicy()
+      self.kalman_params = KalmanParams(1.0 / BOSCH_A_FREQ_HZ)
+    else:
+      self.kalman_params = self.nrdr.kalman_params(KalmanParams)
     self.lead_prob_filters = [FirstOrderFilter(0.0, 0.2, DT_MDL) for _ in range(2)]
 
     self.v_ego = 0.0
@@ -229,24 +241,27 @@ class RadarD:
       self.v_ego_hist.append(self.v_ego)
       self.last_v_ego_frame = sm.recv_frame['carState']
 
-    ar_pts = self.nrdr.points(sm, rr)
+    if self.bosch_a_policy is not None:
+      self.bosch_a_policy.update_tracks(sm, rr, self)
+    else:
+      ar_pts = self.nrdr.points(sm, rr)
 
-    # *** remove missing points from meta data ***
-    for ids in list(self.tracks.keys()):
-      if ids not in ar_pts:
-        self.tracks.pop(ids, None)
+      # *** remove missing points from meta data ***
+      for ids in list(self.tracks.keys()):
+        if ids not in ar_pts:
+          self.tracks.pop(ids, None)
 
-    # *** compute the tracks ***
-    for ids in ar_pts:
-      rpt = ar_pts[ids]
+      # *** compute the tracks ***
+      for ids in ar_pts:
+        rpt = ar_pts[ids]
 
-      # align v_ego by a fixed time to align it with the radar measurement
-      v_lead = rpt[2] + self.v_ego_hist[0]
+        # align v_ego by a fixed time to align it with the radar measurement
+        v_lead = rpt[2] + self.v_ego_hist[0]
 
-      # create the track if it doesn't exist or it's a new track
-      if ids not in self.tracks:
-        self.tracks[ids] = self.nrdr.create_track(Track, self, sm, ids, rpt, v_lead)
-      self.nrdr.update_track(self.tracks[ids], rpt, v_lead, self.v_ego_hist[0])
+        # create the track if it doesn't exist or it's a new track
+        if ids not in self.tracks:
+          self.tracks[ids] = self.nrdr.create_track(Track, self, sm, ids, rpt, v_lead)
+        self.nrdr.update_track(self.tracks[ids], rpt, v_lead, self.v_ego_hist[0])
 
     # *** publish radarState ***
     self.radar_state_valid = sm.all_checks()
@@ -268,6 +283,21 @@ class RadarD:
         else:
           self.lead_prob_filters[i].update(lead_prob)
 
+      if self.bosch_a_policy is not None:
+        lead_one, lead_two = self.bosch_a_policy.leads(sm, self, model_v_ego)
+        self.radar_state.leadOne = lead_one
+        self.radar_state.leadTwo = lead_two
+        for i, lead_dict in enumerate((lead_one, lead_two)):
+          self.nrdr.record_strict_match(
+            i, self.tracks, leads_v3[i], self.v_ego, self.ready, self.lead_prob_filters[i].x, lead_dict,
+          )
+        self.nrdr.set_fcw_authority(
+          self.radar_state, (lead_one, lead_two),
+          (self.lead_prob_filters[0].x, self.lead_prob_filters[1].x),
+        )
+        return
+
+      for i in range(2):
         self.nrdr.update_preferred_staleness(
           i, self.tracks, leads_v3[i], self.v_ego, self.ready, self.lead_prob_filters[i].x,
         )
@@ -316,7 +346,10 @@ def main() -> None:
   cloudlog.info("radard got CarParamsSP")
 
   # *** setup messaging
-  sm = messaging.SubMaster(['modelV2', 'carState', 'radarTracks'], poll='modelV2')
+  # Honda Bosch-A: card's carStateSP carries the radar points' F0 STATUS (radar_point_status); not a validity input
+  status_carrier = ['carStateSP'] if is_honda_bosch_a_radar(CP) else []
+  sm = messaging.SubMaster(['modelV2', 'carState', 'radarTracks'] + status_carrier, poll='modelV2',
+                           ignore_alive=status_carrier, ignore_avg_freq=status_carrier, ignore_valid=status_carrier)
   pm = messaging.PubMaster(['radarState'])
 
   RD = RadarD(CP, CP_SP, CP.radarDelay)

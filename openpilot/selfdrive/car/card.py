@@ -25,6 +25,8 @@ from openpilot.selfdrive.car.helpers import convert_carControlSP, convert_to_cap
 from openpilot.sunnypilot.mads.helpers import set_alternative_experience, set_car_specific_params
 from openpilot.nrdr.params import HandcraftedLateralUnsafeStateError, consume_handcrafted_lateral_request
 from openpilot.nrdr.features.driver_policy.stock_cmbs import publish_stock_cmbs_status
+from openpilot.nrdr.features.radar import radar_point_status
+from openpilot.nrdr.features.longitudinal.bosch_a.learning_params import attach as attach_bosch_learning_params
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 
@@ -140,6 +142,10 @@ class Car:
       self.CI, self.CP, self.CP_SP = CI, CI.CP, CI.CP_SP
       self.RI = RI
 
+    # Honda Bosch-A: load and save the actuator's learned gas/wind factors in the learner's own file, not in the
+    # HondaGasFactorParams/HondaWindFactorParams keys that nrdr's provider and MVL own (no-op on other cars)
+    attach_bosch_learning_params(self.CI)
+
     self.CP.alternativeExperience = 0
     # mads
     set_alternative_experience(self.CP, self.CP_SP, self.params)
@@ -217,6 +223,8 @@ class Car:
       publish_stock_cmbs_status(self.CI, CS_SP, can_list[-1][0])
 
     # Update radar tracks from CAN
+    if hasattr(self.RI, 'v_ego'):
+      self.RI.v_ego = CS.vEgo   # the Honda Bosch-A decoder bounds a reversing coast with it
     RD: structs.RadarDataT | None = self.RI.update(can_list)
 
     self.sm.update(0)
@@ -258,6 +266,22 @@ class Car:
     co_send.carOutput.actuatorsOutput = self.last_actuators_output
     self.pm.send('carOutput', co_send)
 
+    tracks_msg = None
+    if RD is not None:
+      # Built ahead of carStateSP only to read its logMonoTime: the Bosch-A point statuses ride on carStateSP stamped
+      # with the radarTracks message they describe (radar_point_status). It is still sent after carState, as before.
+      tracks_msg = messaging.new_message('radarTracks')
+      tracks_msg.valid = not any(RD.errors.to_dict().values())
+      tracks_msg.radarTracks = RD
+      statuses = getattr(getattr(self, 'RI', None), 'point_statuses', None)
+      if statuses is not None:
+        self.radar_point_status = (int(tracks_msg.logMonoTime), dict(statuses))
+
+    # Merged into the one carStateSP card already sends each frame (a second carStateSP per frame would make every
+    # carStateSP subscriber see two messages per step); every one carries the latest radar point statuses.
+    if getattr(self, 'radar_point_status', None) is not None:
+      radar_point_status.write(CS_SP, *self.radar_point_status)
+
     cs_sp_send = messaging.new_message('carStateSP')
     cs_sp_send.valid = CS.canValid
     cs_sp_send.carStateSP = CS_SP
@@ -271,10 +295,7 @@ class Car:
     cs_send.carState.cumLagMs = -self.rk.remaining * 1000.
     self.pm.send('carState', cs_send)
 
-    if RD is not None:
-      tracks_msg = messaging.new_message('radarTracks')
-      tracks_msg.valid = not any(RD.errors.to_dict().values())
-      tracks_msg.radarTracks = RD
+    if tracks_msg is not None:
       self.pm.send('radarTracks', tracks_msg)
 
     # carParamsSP - logged every 50 seconds (> 1 per segment)

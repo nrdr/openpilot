@@ -24,7 +24,7 @@ class FakeSubMaster:
     self.recv_frame = {"radarTracks": 0, "carState": 0}
     self.logMonoTime = {"modelV2": 0, "radarTracks": 0, "carState": 0}
     self.data = {
-      "carState": SimpleNamespace(vEgo=8.0),
+      "carState": SimpleNamespace(vEgo=8.0, standstill=False),
       "modelV2": SimpleNamespace(
         velocity=SimpleNamespace(x=[8.0]),
         leadsV3=[model_lead(), model_lead(probability=0.0)],
