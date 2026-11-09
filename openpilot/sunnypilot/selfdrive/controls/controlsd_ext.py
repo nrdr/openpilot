@@ -18,7 +18,7 @@ from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.nrdr.hooks import initialize_live_parameter_settings
 from openpilot.nrdr.params import read_bool, read_float
-from openpilot.nrdr.features.longitudinal.civic_pcm import pcm_reference
+from openpilot.nrdr.features.longitudinal.civic_pcm import pcm_reference, pcm_coast_eligible
 from openpilot.nrdr.features.lateral.lane_guidance import (
   LaneGuidanceMode,
   model_action_lane_guidance_mode,
@@ -148,6 +148,12 @@ class ControlsExt(ModelStateBase):
       self.CP, self.CP_SP, sm['longitudinalPlan'].speeds, sm.logMonoTime['longitudinalPlan'],
       sm.all_checks(['longitudinalPlan']),
     )
+    if CC_SP.civicPcmEnabled:
+      (CC_SP.civicPcmCoastEligible, CC_SP.civicPcmCruiseSpeed) = pcm_coast_eligible(
+        sm['longitudinalPlan'], sm['radarState'], sm['carState'].vCruise,
+        sm.all_checks(['longitudinalPlan', 'radarState', 'carState', 'driverMonitoringState', 'selfdriveState']),
+        bool(sm['driverMonitoringState'].noResponseForceDecel or str(sm['selfdriveState'].state) == "softDisabling"),
+      )
 
     return CC_SP
 
