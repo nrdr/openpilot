@@ -38,9 +38,11 @@ URGENT_TTC = 4.0          # radar TTC below this: no bound
 WITNESS_PROB = 0.35       # filtered model lead prob for the model lead to count as a witness (= lead_detection_probability)
 
 
-def urgent(lead: dict[str, Any]) -> bool:
+def urgent(lead: dict[str, Any], v_rel: float | None = None) -> bool:
+  """Range or TTC short. `v_rel` replaces the lead's vRel in the TTC when the parser has no direct speed reading for
+  the track (radar.urgency_v_rel): b1 seg14 47.7 s, see there."""
   d_rel = float(lead['dRel'])
-  closing = max(-float(lead['vRel']), 0.0)
+  closing = max(-float(lead['vRel'] if v_rel is None else v_rel), 0.0)
   return d_rel < URGENT_D or (closing > 0.1 and d_rel / closing < URGENT_TTC)
 
 
@@ -65,8 +67,8 @@ class ReversalBound:
     return self.latched_until.get(track_id, -math.inf) >= self.t
 
   def _bound(self, lead: dict[str, Any], vision, v_ego: float, model_v_ego: float, lead_prob: float,
-             weight: float = W) -> tuple[dict[str, Any], float]:
-    if weight <= 0.0 or lead_prob < WITNESS_PROB or urgent(lead):
+             weight: float = W, urgent_v_rel: float | None = None) -> tuple[dict[str, Any], float]:
+    if weight <= 0.0 or lead_prob < WITNESS_PROB or urgent(lead, urgent_v_rel):
       return lead, 0.0
     vision_v = v_ego + (float(vision.v[0]) - model_v_ego)
     dv = weight * max(vision_v - float(lead['vLead']), 0.0)
@@ -81,7 +83,7 @@ class ReversalBound:
     return out, weight
 
   def apply(self, output: list[dict[str, Any]], model_leads, v_ego: float, model_v_ego: float, lead_probs, track_ids,
-            floor_weights=(0.0, 0.0)) -> list[dict[str, Any]]:
+            floor_weights=(0.0, 0.0), urgent_v_rels=(None, None)) -> list[dict[str, Any]]:
     self.t += self.dt
     seen = set()
     for lead in output:
@@ -100,6 +102,7 @@ class ReversalBound:
       self.weights[index] = 0.0
       if lead.get('present', False) and lead.get('radar', False):
         weight = max(W if self.latched(int(lead.get('radarTrackId', -1))) else 0.0, float(floor_weights[index]))
-        lead, self.weights[index] = self._bound(lead, model_leads[index], v_ego, model_v_ego, float(lead_probs[index]), weight)
+        lead, self.weights[index] = self._bound(lead, model_leads[index], v_ego, model_v_ego, float(lead_probs[index]), weight,
+                                                urgent_v_rels[index])
       bounded.append(lead)
     return bounded

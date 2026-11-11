@@ -13,12 +13,13 @@ from openpilot.common.realtime import DT_MDL
 from openpilot.selfdrive.car.card import Car
 from openpilot.selfdrive.controls.radard import RadarD
 from openpilot.nrdr.features.radar import radar_point_status
+from openpilot.nrdr.features.radar.bosch_a_lead_policy import URGENT_LAST_DIRECT_S, urgency_v_rel
 from openpilot.nrdr.features.radar.radar_lead_bound import (CAMERA_CLOSING_MAX, CAMERA_DECEL_MIN, CAMERA_SELF_TOL,
-                                                           CONTRADICTION_FULL, CONTRADICTION_START, DISTANCE_W,
+                                                           CONTRADICTION_FULL, CONTRADICTION_START, DISTANCE_FAR_W, DISTANCE_W,
                                                            RELEASE_S, RISE_S, SLEW_W, TREND_MIN_SAMPLES, TREND_MIN_SPAN_S,
                                                            UNCONFIRMED_W, WeakLeadBound, camera_contradiction,
                                                            camera_passed_ratio, range_slope, tell_weight)
-from openpilot.nrdr.features.radar.radar_reversal_bound import W, ReversalBound
+from openpilot.nrdr.features.radar.radar_reversal_bound import W, ReversalBound, urgent
 from openpilot.nrdr.tests.test_radar_reversal_bound import ABSENT, V_EGO, radar_lead, reverse, vision
 
 
@@ -35,6 +36,11 @@ def test_tell_weight():
   assert tell_weight(7, 0.875) == pytest.approx(DISTANCE_W / 2)
   assert tell_weight(7, 1.02) == DISTANCE_W  # route 37 at the start of the tap
   assert tell_weight(9, 1.02, 9.9) == max(UNCONFIRMED_W, DISTANCE_W)
+  assert tell_weight(7, 0.86) == pytest.approx(0.264, abs=0.01)  # route 37 T323 (ambiguous) at its peak: unchanged
+  assert tell_weight(7, 1.25) == DISTANCE_W
+  assert tell_weight(7, 1.375) == pytest.approx((DISTANCE_W + DISTANCE_FAR_W) / 2)
+  assert tell_weight(7, 1.5) == DISTANCE_FAR_W  # b1 seg14 track 4, the model lead ~110 m past a 57-85 m radar point
+  assert tell_weight(7, 1.9) == DISTANCE_FAR_W
 
 
 def test_range_slope():
@@ -320,3 +326,37 @@ def test_route_37_shape_through_radard():
   bounded = run_radard(None, shape=route_37_shape(29.3)).radar_state.leadOne  # route 37 T903: closing 0.5 m/s
   assert bounded.radar and bounded.radarTrackId == 32 and bounded.dRel == plain.dRel
   assert bounded.vLead == pytest.approx(plain.vLead + DISTANCE_W * (29.3 - plain.vLead), abs=0.05)
+
+
+def test_urgency_uses_the_last_direct_reading_on_an_unmeasured_point():
+  # b1 seg14 47.7 s: track 4 at 69 m, last direct reading -11.7, then the parser's floor estimate -31 (TTC 2.2 s)
+  floor = radar_lead(4, 69.0, V_EGO - 31.0, -3.0)
+  assert urgent(floor) and not urgent(floor, -11.7)
+  assert urgent(floor, -17.5)                              # TTC 3.9 s on a fast last reading: still urgent
+  assert urgent(radar_lead(4, 29.0, V_EGO - 1.0, -3.0), -1.0)  # under 30 m stays urgent whatever the speed
+  hop = [90.0 - 0.75 * k for k in range(31)]               # range falling 15 m/s: a reflector hop, not used
+  track = SimpleNamespace(direct=False, last_direct_vrel=-11.7, direct_age=5, range_history=hop)
+  assert urgency_v_rel(track) == -11.7                     # the range slope does not override the last reading
+  track.direct_age = round(URGENT_LAST_DIRECT_S / DT_MDL) + 1
+  assert urgency_v_rel(track) is None                      # too old: the published vRel, as before
+  track.direct_age, track.last_direct_vrel = 5, math.nan
+  assert urgency_v_rel(track) is None                      # never measured: the published vRel
+  track.direct, track.last_direct_vrel = True, -11.7
+  assert urgency_v_rel(track) is None                      # a direct reading: the published vRel
+  assert urgency_v_rel(None) is None
+
+
+def test_bounds_keep_their_weight_when_only_the_floor_estimate_is_urgent():
+  floor = radar_lead(4, 69.0, V_EGO - 31.0, -3.0)
+  bound = WeakLeadBound()
+  assert bound.update([floor, ABSENT], [9, 0], [0.0, 0.0], [0.95, 0.0], [9.9, 0.0]) == [0.0, 0.0]
+  bound = WeakLeadBound()
+  assert bound.update([floor, ABSENT], [9, 0], [0.0, 0.0], [0.95, 0.0], [9.9, 0.0], [-11.7, None])[0] == UNCONFIRMED_W
+  model = vision(21.5, 0.0)
+  rb = ReversalBound()
+  assert rb.apply([floor, ABSENT], [model, vision()], V_EGO, V_EGO, [0.95, 0.0], {4: None}, floor_weights=(0.6, 0.0))[0] == floor
+  out = rb.apply([floor, ABSENT], [model, vision()], V_EGO, V_EGO, [0.95, 0.0], {4: None}, floor_weights=(0.6, 0.0),
+                 urgent_v_rels=(-11.7, None))[0]
+  assert rb.weights[0] == 0.6 and out['dRel'] == floor['dRel'] and out['present'] and out['radar']
+  assert out['vLead'] == pytest.approx(floor['vLead'] + 0.6 * (21.5 - floor['vLead']))
+
