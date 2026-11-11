@@ -229,12 +229,14 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       human_accel_base = bosch_a_human_accel_base(self.nrdr, bool(sm['selfdriveState'].experimentalMode), v_ego, personality)
       planner_radar_state = self.bosch_a_long.planner_radar_state(sm['radarState'], float(sm['carState'].aEgo),
                                                                    model_v2=sm['modelV2'])
-      bosch_a_mpc = {'acceleration_max': human_acceleration.cap(human_accel_base, v_cruise, v_ego),
-                     # SOURCE: the MPC only sees modelV2 that qualified_model_leads accepted this frame (fresh, matched
+      bosch_a_mpc = {  # SOURCE: the MPC only sees modelV2 that qualified_model_leads accepted this frame (fresh, matched
                      # to radarState); otherwise None, so each lead keeps its raw aLeadK extrapolation.
                      'lead_paths': human_following.upstream_lead_paths(
                        qualified_model_leads(sm, self.bosch_a_clock_ns(), self.bosch_a_model_lead_history),
                        planner_radar_state, self.mpc.x0[1])}
+      # Biscuit-Labs#78: the human acceleration cap is Relaxed, Standard and Econ; Aggressive keeps the planner's own max accel.
+      if human_acceleration.applies(personality):
+        bosch_a_mpc['acceleration_max'] = human_acceleration.cap(human_accel_base, v_cruise, v_ego)
     self.mpc.update(planner_radar_state, personality=personality,
                     model=sm['modelV2'], v_cruise=v_cruise,
                     extra_stop_distance=self.nrdr.stopped_gap(reset_state) if self.nrdr is not None else 0.0,
