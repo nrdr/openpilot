@@ -9,7 +9,8 @@ Active only when `active_for(CP)`: a Honda on a Bosch-A platform (VERIFIED_BOSCH
 disabled (`HondaBoschARadar`), which is the same gate radard uses to build BoschALeadPolicy. Each part also has its own
 switch: Stock Brake Feel is the owner toggle `BoschAStockBrakeFeel` (bosch_a_toggles.py, default Off, read once when
 plannerd starts and passed in as `stock_brake_feel`); STOP_EASE_ENABLED, RADAR_LEAD_RECOVERY and BIRTH_RAIL_ENABLED are
-constants and stay off. Both longitudinal planners (StarPilot's and the upstream one) call it the same way.
+constants and stay off; NEWBORN_HOLD_ENABLED (D-080 alone) is a constant and is on. Both longitudinal planners
+(StarPilot's and the upstream one) call it the same way.
 
 Contents:
 - Stock Brake Feel (D-086, D-100, D-103, D-120): stock Honda ACC's TTC depth and jerk tables, with the soft exit,
@@ -89,8 +90,17 @@ STOP_EASE_MIN_GAP = 2.0  # m
 #   gates (RECOVERED_CAM_GATE, NEWBORN_*) plus RadarPoint fields (`measured`, `recovered`) that 7.0 does not have, so
 #   this switch does NOT turn them on. Turning those decoder constants on without the gates is the rejected
 #   configuration (STATUS 225; D-075 phantom brakes on 280/294/2ae/284).
+# NEWBORN_HOLD_ENABLED: D-080 (newborn aLeadK bound, planner_radar_state()) on its own switch, on since 2026-11-11
+#   (owner: "Port the hold alone to my branch"). It needs none of the decoder or radard parts above. Evidence, open-loop
+#   replay only, not driven: route 000000bd seg10 ~621.8 s, radar track 23 became the lead with aLeadK -2.44 and
+#   tripped the Stock Brake Feel emergency latch through the stopping-need path (need 2.56); with the hold the target
+#   peak went -2.37 -> -2.23, worst step jerk -8.0 -> -1.4 m/s^3, latch rows 44 -> 0; the real hard stop on seg5 (5:34)
+#   was identical (-3.50, 79 latch rows). Corpus (36 routes + second set, on the bob-unify-bd build f0024b0c3d, not this
+#   base): 52 episodes moved, 0 harder, no REAL or PHANTOM label moved; owner reviewed the largest softenings (ep49,
+#   ep417, ep2111) and accepted them. Onsets slipped by up to 0.35 s on unlabelled episodes.
 STOP_EASE_ENABLED = False
 RADAR_LEAD_RECOVERY = False
+NEWBORN_HOLD_ENABLED = True
 
 
 def active_for(CP) -> bool:
@@ -235,7 +245,7 @@ class HondaBoschALongEnhancement:
     self.stock_feel = active and stock_brake_feel is True
     self.stop_ease = active and STOP_EASE_ENABLED
     self.enabled = self.stock_feel or self.stop_ease
-    self.newborn_hold = NewbornLeadHold() if active and RADAR_LEAD_RECOVERY else None
+    self.newborn_hold = NewbornLeadHold() if active and (RADAR_LEAD_RECOVERY or NEWBORN_HOLD_ENABLED) else None
     # Implausible-drop bound (D-041/D-042; owner bookmark route a2 seg 50, 2026-11-07): same gate as the other active
     # checks in this module (Bosch-A supported, radar available); default ON, no toggle.
     self.drop_bound = ImplausibleDropBound() if active else None
@@ -274,7 +284,7 @@ class HondaBoschALongEnhancement:
     return stop_eased_target(prev, target, stop_ease_floor(v_ego, d_lead), self.dt)
 
 
-# ---- Newborn lead aLeadK bound (D-080), under RADAR_LEAD_RECOVERY ---------------------------------------------------
+# ---- Newborn lead aLeadK bound (D-080), under NEWBORN_HOLD_ENABLED (or RADAR_LEAD_RECOVERY) ----------------------------
 # Ported from openpilot-radar longitudinal_planner.py (567495f4ad), where it is part of the StockBrakeFeel toggle (D-086,
 # default off). Replay only, not driven. STATUS 212: on 2e2 (~283 s) a radar lead first seen while its velocity estimate
 # was still converging published aLeadK -3 / -2.5 when ~0.75 m/s^2 was needed, and on 2e1 a jumping track reached
