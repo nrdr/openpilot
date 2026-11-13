@@ -279,7 +279,7 @@ class TestKnownPanels(OpenpilotTestCase):
     assert "NrdrNnlc" not in serialized
     items = {item["key"]: item for panel in schema["panels"] for item in _iter_panel_items(panel)}
     selector = items["NrdrLateralController"]
-    assert [option["label"] for option in selector["options"]] == ["PIF Control", "Firmware Controller"]
+    assert [option["label"] for option in selector["options"]] == ["PIF Control", "PTM Controller"]
 
 
 class TestKnownVehicleSettings(OpenpilotTestCase):

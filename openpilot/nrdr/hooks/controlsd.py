@@ -99,7 +99,8 @@ def vehicle_model_state(controls, live_params, CS, lat_active: bool) -> tuple[fl
     controls.update_lane_centering_params(snapshot)
   if hasattr(controls.LaC, "set_live_tuning_snapshot"):
     controls.LaC.set_live_tuning_snapshot(snapshot)
-  candidate = resolve_steer_ratio_selection(controls.CP, snapshot, _held_comma_ratio(controls, live_params))
+  candidate = resolve_steer_ratio_selection(controls.CP, snapshot, _held_comma_ratio(controls, live_params),
+                                           ptm_baseline=getattr(controls.LaC, "firmware_profile", None) is not None)
   selection = controls.steer_ratio_latch.update(candidate, lat_active)
   # Record requested vs actually accepted geometry outside the realtime loop.
   # Unlike the ratio itself this signature does not change with wheel angle.

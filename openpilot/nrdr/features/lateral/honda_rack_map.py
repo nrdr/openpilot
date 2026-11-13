@@ -24,9 +24,9 @@ import math
 
 import numpy as np
 
-from openpilot.nrdr.features.lateral.honda_spec_plant import CIVIC_2019_SEDAN_SPEC, CIVIC_HATCH_SPORT_SPEC, CRV_2017_SPEC, \
+from openpilot.nrdr.features.lateral.honda_spec_plant import CIVIC_HATCH_SPORT_SPEC, \
   HondaSteeringSpec, spec_ratio_table
-from openpilot.nrdr.features.lateral.honda_vgr import HONDA_VGR_PROFILES, HondaVgrProfile, normalize_honda_eps_firmware
+from openpilot.nrdr.features.lateral.honda_vgr import HONDA_VGR_PROFILES, HondaVgrProfile, normalize_honda_eps_firmware, ptm_inverse
 from openpilot.nrdr.features.lateral.rdx_identity import RDX_CARS, confirmed_rdx
 from openpilot.nrdr.features.lateral.rdx_rack import RdxMeasuredPosition
 
@@ -129,6 +129,23 @@ RDX_MMR_RACK = replace(RDX_TJB_A220_RACK, fingerprint="ACURA_RDX_3G_MMR",
 MEASURED_RACK_MAP_TABLES = (CLARITY_TRW_A020_RACK, CIVIC_TBA_C020_RACK, CIVIC_TEG_A010_RACK, INSIGHT_TXM_A040_RACK,
                             CIVIC_TGG_A120_RACK, RDX_TJB_A220_RACK)
 
+# Biscuit-Labs 3282629883 / d8ccb1866a: A040 yaw fit, checked on A220 routes 30a/30d/39/3d.
+# A040 measured through 173 deg; the outer knots retain the donor's spec-shaped extrapolation.
+CRV_TLA_A040_RACK = RackMapTable(
+  "CR-V TLA-A040", "HONDA_CRV_5G", ("39990-TLA-A040",), 2.66,
+  ratio_bp=(5.4, 13.5, 25.8, 55.4, 85.2, 124.9, 173.4, 228.1, 302.5, 376.8, 414.0),
+  ratio_v=(17.38, 16.91, 16.67, 16.46, 16.25, 16.17, 16.04, 15.86, 15.52, 15.09, 14.83),
+  slip_factor=-0.00084, provenance="VSA yaw, A040 routes 03/04/05; extrapolated beyond 173 deg",
+)
+CRV_TLA_A220_RACK = replace(CRV_TLA_A040_RACK, name="CR-V TLA-A220", firmware=("39990-TLA-A220",),
+                            provenance="inferred: A040 rack, checked on A220 routes 30a/30d/39/3d; no stable independent fit")
+RIDGELINE_T6Z_A110_RACK = RackMapTable(
+  "Ridgeline T6Z-A110", "HONDA_RIDGELINE", ("39990-T6Z-A110",), 3.18,
+  ratio_bp=(5., 400.), ratio_v=(17.08, 17.08), slip_factor=-0.00108,
+  provenance="rear-wheel yaw and livePose/GPS, owner routes 23d/23e; constant-ratio rack",
+)
+MEASURED_RACK_MAP_TABLES += (CRV_TLA_A040_RACK, RIDGELINE_T6Z_A110_RACK)
+
 
 def _spec_table(name: str, fingerprint: str, firmware: str, table_a: str, spec: HondaSteeringSpec) -> RackMapTable:
   profile = next(p for p in HONDA_VGR_PROFILES if p.name == table_a)
@@ -139,25 +156,25 @@ def _spec_table(name: str, fingerprint: str, firmware: str, table_a: str, spec: 
 
 
 # Images with no measurement: each on its own car's specs and its own Table A.
-CIVIC_TBA_C120_SPEC_RACK = _spec_table("Civic Bosch TBA-C120", "HONDA_CIVIC_BOSCH", "39990-TBA-C120", "Civic C120/A030/TEG",
-                                       CIVIC_2019_SEDAN_SPEC)
+# Pinned donor spec table at 45e5b91fae; the existing spec-estimation tools are unchanged.
+CIVIC_TBA_C120_SPEC_RACK = RackMapTable(
+  "Civic Bosch TBA-C120", "HONDA_CIVIC_BOSCH", ("39990-TBA-C120",), 2.70,
+  ratio_bp=(5., 40.9, 76.7, 112.6, 148.5, 184.4, 220.2, 256.1, 292., 327.9, 363.7, 399.6),
+  ratio_v=(14.472, 14.461, 14.429, 14.371, 14.292, 14.175, 14.038, 13.878, 13.691, 13.476, 13.232, 12.956),
+  slip_factor=-0.000676, provenance="spec: donor 2019 Civic sedan through C120 Table A; not road-measured",
+)
 CIVIC_TGG_A120_SPEC_RACK = _spec_table("Civic hatch TGG-A120", "HONDA_CIVIC_BOSCH", "39990-TGG-A120", "Civic C020/TGG-A120",
                                        CIVIC_HATCH_SPORT_SPEC)
-CRV_TLA_A040_SPEC_RACK = _spec_table("CR-V TLA-A040", "HONDA_CRV_5G", "39990-TLA-A040", "CR-V TLA-A040", CRV_2017_SPEC)
-# Exact spec_rack_table(CRV_2020_SPEC, CRV A040 Table A) output from Biscuit-Labs/openpilot
-# Honda-PTM-Testing 01e5a3b8ce2cd7876f03adb03d72c0ec55663dd7, honda_eps_calibrations.py.
-# Pin its upstream slip calculation here; do not refit or change the existing spec maps.
-CRV_TLA_A220_SPEC_RACK = RackMapTable(
-  "CR-V TLA-A220", "HONDA_CRV_5G", ("39990-TLA-A220",), 2.66,
-  ratio_bp=(5.0, 42.2, 79.4, 116.5, 153.7, 190.9, 228.1, 265.3, 302.5, 339.6, 376.8, 414.0),
-  ratio_v=(16.822, 16.81, 16.78, 16.724, 16.642, 16.533, 16.398, 16.236, 16.049, 15.838, 15.599, 15.33),
-  slip_factor=-0.000534,
-  provenance="spec: Honda 2020+ CR-V, 2.30 lock turns, 12.3 lock ratio, 3514 lb, 58% front through its Table A; " +
-             "R0 +-2.5%, not road-measured; upstream 01e5a3b8",
+# Exact donor spec_rack_table(ODYSSEY_2018_SPEC, identity) at 45e5b91fae. Keep existing spec calculations unchanged.
+ODYSSEY_THR_A020_SPEC_RACK = RackMapTable(
+  "Odyssey THR-A020", "HONDA_ODYSSEY", ("39990-THR-A020",), 3.0,
+  ratio_bp=(5., 53.1, 101.3, 149.4, 197.6, 245.7, 293.9, 342., 390.2, 438.3, 486.5, 534.6),
+  ratio_v=(16.488, 16.471, 16.425, 16.35, 16.247, 16.115, 15.953, 15.761, 15.54, 15.288, 15.004, 14.689),
+  slip_factor=-0.000376, provenance="spec: Honda Odyssey 2018-20, 2.97 turns, 14.35 ratio, 4471 lb, 56% front; not road-measured",
 )
-SPEC_RACK_MAP_TABLES = (CIVIC_TBA_C120_SPEC_RACK, CRV_TLA_A040_SPEC_RACK, CRV_TLA_A220_SPEC_RACK)
+SPEC_RACK_MAP_TABLES = (CIVIC_TBA_C120_SPEC_RACK, ODYSSEY_THR_A020_SPEC_RACK)
 
-RACK_MAP_TABLES = MEASURED_RACK_MAP_TABLES + SPEC_RACK_MAP_TABLES + (RDX_MMR_RACK,)
+RACK_MAP_TABLES = MEASURED_RACK_MAP_TABLES + SPEC_RACK_MAP_TABLES + (RDX_MMR_RACK, CRV_TLA_A220_RACK)
 _TABLE_BY_CAR_FIRMWARE = {(table.fingerprint, firmware): table for table in RACK_MAP_TABLES for firmware in table.firmware}
 
 
@@ -187,6 +204,7 @@ class RackMapGeometry:
   profile: HondaVgrProfile | RdxMeasuredPosition
   table: RackMapTable
   cp_ratio: float
+  ptm_baseline: bool = False
   angle_grid: np.ndarray = field(init=False, repr=False, compare=False)
   path_grid: np.ndarray = field(init=False, repr=False, compare=False)
 
@@ -196,6 +214,10 @@ class RackMapGeometry:
     last = self.profile.physical_knots[-1]
     angles = np.unique(np.r_[np.asarray(self.profile.physical_knots, dtype=float), np.linspace(0.0, last, GRID_STEPS)])
     linear = np.radians([self.profile.physical_to_linear(a) for a in angles])
+    if self.ptm_baseline:
+      linear_bp, angle_bp = ptm_inverse(self.profile)
+      angles = np.unique(np.r_[angle_bp, np.linspace(0.0, angle_bp[-1], GRID_STEPS)])
+      linear = np.radians(np.interp(angles, angle_bp, linear_bp))
     path = linear / np.interp(angles, self.table.ratio_bp, self.table.ratio_v)  # = L * k at zero roll and slip
     if np.any(np.diff(path) <= 0.0):
       raise ValueError("rack map must be monotonic to invert")
@@ -218,7 +240,8 @@ class RackMapGeometry:
   def _path(self, angle_deg: float) -> float:
     a = abs(angle_deg)
     if a > self.angle_grid[-1]:
-      path = math.radians(self.profile.physical_to_linear(a)) / self.table.ratio_v[-1]
+      path = (self.path_grid[-1] * a / self.angle_grid[-1] if self.ptm_baseline else
+              math.radians(self.profile.physical_to_linear(a)) / self.table.ratio_v[-1])
     else:
       path = float(np.interp(a, self.angle_grid, self.path_grid))
     return math.copysign(path, angle_deg)
@@ -226,7 +249,8 @@ class RackMapGeometry:
   def _angle(self, path: float) -> float:
     p = abs(path)
     if p > self.path_grid[-1]:
-      angle = self.profile.linear_to_physical(math.degrees(p * self.table.ratio_v[-1]))
+      angle = (self.angle_grid[-1] * p / self.path_grid[-1] if self.ptm_baseline else
+               self.profile.linear_to_physical(math.degrees(p * self.table.ratio_v[-1])))
     else:
       angle = float(np.interp(p, self.path_grid, self.angle_grid))
     return math.copysign(angle, path)
@@ -250,13 +274,14 @@ class RackMapGeometry:
 
 
 @lru_cache(maxsize=16)
-def _geometry(profile: HondaVgrProfile | RdxMeasuredPosition, table: RackMapTable, cp_ratio: float) -> RackMapGeometry:
-  return RackMapGeometry(profile, table, cp_ratio)
+def _geometry(profile: HondaVgrProfile | RdxMeasuredPosition, table: RackMapTable, cp_ratio: float, ptm_baseline: bool) -> RackMapGeometry:
+  return RackMapGeometry(profile, table, cp_ratio, ptm_baseline)
 
 
-def rack_map_geometry(CP, profile: HondaVgrProfile | RdxMeasuredPosition | None, cp_ratio: float) -> RackMapGeometry | None:
+def rack_map_geometry(CP, profile: HondaVgrProfile | RdxMeasuredPosition | None, cp_ratio: float,
+                     *, ptm_baseline: bool = False) -> RackMapGeometry | None:
   """controlsd resolves the selection every frame; building the map's grid costs ~1 ms, so each is built once."""
   table = get_rack_map_table(CP)
   if profile is None or table is None:
     return None
-  return _geometry(profile, table, float(cp_ratio))
+  return _geometry(profile, table, float(cp_ratio), ptm_baseline)

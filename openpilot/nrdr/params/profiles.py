@@ -184,7 +184,7 @@ CLARITY_ROAD_TESTED_2026_08_21 = CLARITY_CURRENT_LATERAL_2026_08_28
 
 HANDCRAFTED_LATERAL_VERSION = 24
 # Owner-approved C4 lateral snapshot, 2026-11-05. Personal learned geometry is
-# deliberately excluded. Firmware control is added only after exact admission.
+# deliberately excluded. PTM Controller is added only after exact admission.
 CIVIC_DIALED_SETTINGS_SHA256 = "c1faf2291527061621c7bdbb2679fd8f90cfa00f0b8acd08fdd27e5ee9770074"
 COMMON_HANDCRAFTED_VALUES = (
   ("LaneGuidanceMode", 2), ("LaneCentering", False), ("LaneCenteringStrength", 1.0),
@@ -306,7 +306,7 @@ def get_handcrafted_lateral_profile(fingerprint: str, CP=None, CP_SP=None) -> Ha
     if firmware_controller_profile(CP, CP_SP) is not None:
       values += FIRMWARE_HANDCRAFTED_VALUES
       scopes = [scope for scope in scopes if scope != "fixed 1% torque / 99% PIF"]
-      scopes.append("matched firmware controller / firmware steer ratio")
+      scopes.append("matched PTM Controller / firmware steer ratio")
   return _make_profile(str(fingerprint), values, ", ".join(scopes))
 
 

@@ -31,7 +31,7 @@ from openpilot.common.transformations.camera import DEVICE_CAMERAS
 from openpilot.system.camerad.cameras.nv12_info import get_nv12_info
 from openpilot.common.transformations.model import get_warp_matrix
 from openpilot.selfdrive.controls.lib.desire_helper import DesireHelper
-from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan, should_stop, smooth_value, get_curvature_from_plan
+from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan, should_stop, smooth_value, get_curvature_from_plan, MIN_STABLE_DELAY
 from openpilot.selfdrive.modeld.parse_model_outputs import Parser
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_driving_model_data, fill_pose_msg, PublishState
 from openpilot.common.file_chunker import open_file_chunked
@@ -46,7 +46,7 @@ from openpilot.nrdr.features.lateral.lane_guidance import (
   lane_guidance_mode_from_params,
   set_lane_guidance_mode,
 )
-from openpilot.nrdr.features.lateral.model_source import delay_input, lateral_source
+from openpilot.nrdr.features.lateral.model_source import PTM_LAT_SMOOTH_SECONDS, delay_input, lateral_source
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 
@@ -57,7 +57,7 @@ BIG_MODEL_TIMEOUT = 60
 
 
 def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
-                          lat_action_t: float, long_action_t: float, v_ego: float) -> log.ModelDataV2.Action:
+                          lat_action_t: float, long_action_t: float, v_ego: float, ptm_controller: bool = False) -> log.ModelDataV2.Action:
   if 'action' not in model_output:
     plan = model_output['plan'][0]
     desired_accel = get_accel_from_plan(plan[:,Plan.VELOCITY][:,0],
@@ -68,14 +68,15 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
                                                 plan[:,Plan.ORIENTATION_RATE][:,2],
                                                 ModelConstants.T_IDXS,
                                                 v_ego,
-                                                lat_action_t)
+                                                lat_action_t, min_stable_delay=0.0 if ptm_controller else MIN_STABLE_DELAY)
   else:
     desired_accel = model_output['action'][0,1]
-    desired_curvature = model_output['action'][0,0] / (max(1.0, v_ego))**2
+    desired_curvature = model_output['action'][0,0] / (max(2.5 if ptm_controller else 1.0, v_ego))**2
   stop = should_stop(v_ego, desired_accel)
   desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, LONG_SMOOTH_SECONDS)
   if v_ego > MIN_LAT_CONTROL_SPEED:
-    desired_curvature = smooth_value(desired_curvature, prev_action.desiredCurvature, LAT_SMOOTH_SECONDS)
+    desired_curvature = smooth_value(desired_curvature, prev_action.desiredCurvature,
+                                     PTM_LAT_SMOOTH_SECONDS if ptm_controller else LAT_SMOOTH_SECONDS)
   else:
     desired_curvature = prev_action.desiredCurvature
 
@@ -87,7 +88,7 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
 def set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t: float,
                               lateral_source: str = "unknown", delay_input: str = "unknown") -> None:
   """Attach one source identity and horizon before either model event is sent, and where the steering came from
-  (nrdr.features.lateral.model_source) so the Firmware Controller can size its command delay."""
+  (nrdr.features.lateral.model_source) so the PTM Controller can size its command delay."""
   action_time = float(lat_action_t)
   modelv2_send.modelV2.action.lateralActionTime = action_time
   modelv2_send.modelV2.action.lateralSource = lateral_source
@@ -388,7 +389,7 @@ def main(demo=False):
     if delay_schedule is not None or sm.updated["lateralDelay"]:
       model.lat_delay = get_lat_delay(params, sm["lateralDelay"].lateralDelay, CP.steerActuatorDelay,
                                      delay_schedule=delay_schedule, v_ego=v_ego)
-    lat_delay = model.lat_delay + LAT_SMOOTH_SECONDS
+    lat_delay = model.lat_delay + (PTM_LAT_SMOOTH_SECONDS if firmware_profile is not None else LAT_SMOOTH_SECONDS)
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["extrinsicsCalibration"].rpyCalib, dtype=np.float32)
       dc = DEVICE_CAMERAS[(str(sm['deviceState'].deviceType), str(sm['narrowRoadCameraState'].sensor))]
@@ -454,7 +455,8 @@ def main(demo=False):
       posenet_send = messaging.new_message('cameraOdometry')
       mdv2sp_send = messaging.new_message('modelDataV2SP')
 
-      action = get_action_from_model(model_output, prev_action, lat_action_t, long_action_t, v_ego)
+      action = get_action_from_model(model_output, prev_action, lat_action_t, long_action_t, v_ego,
+                                     ptm_controller=firmware_profile is not None)
       prev_action = action
       fill_model_msg(modelv2_send, model_output, action,
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,

@@ -88,7 +88,7 @@ def calibration(name: str):
 
 
 def firmware_profile(fingerprint: str, eps_fw: str | None):
-  """The Firmware Controller profile this car/EPS is admitted with, or None."""
+  """The PTM Controller profile this car/EPS is admitted with, or None."""
   from openpilot.nrdr.features.lateral.controller_selection import _PROFILES
   return _PROFILES.get((str(fingerprint), normalize_honda_eps_firmware(eps_fw))) if eps_fw else None
 

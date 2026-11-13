@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from openpilot.nrdr.features.lateral.honda_rack_map import (
-  CIVIC_TEG_A010_RACK, CRV_TLA_A040_SPEC_RACK, CRV_TLA_A220_SPEC_RACK, RACK_MAP_TABLES,
+  CIVIC_TEG_A010_RACK, CRV_TLA_A040_RACK, CRV_TLA_A220_RACK, RACK_MAP_TABLES,
   RackMapGeometry, RackMapTable, get_rack_map_table,
 )
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile
@@ -87,8 +87,7 @@ def test_teg_centre_is_measured_not_cp():
 
 @pytest.mark.parametrize("fingerprint,firmware", (
   ("HONDA_CIVIC_BOSCH", b"39990-TBA-C120"),
-  ("HONDA_CRV_5G", b"39990-TLA-A040"),
-  ("HONDA_CRV_5G", b"39990-TLA-A220"),
+  ("HONDA_ODYSSEY", b"39990-THR,A020"),
 ))
 def test_unmeasured_images_steer_on_their_spec_map(fingerprint, firmware):
   # predicted from the car's own published specs (test_honda_spec_plant.py), not taken from a different measured car
@@ -105,18 +104,15 @@ def test_tgg_uses_the_measured_hatch_not_the_sedan_or_spec_map():
 
 
 @pytest.mark.parametrize("firmware", [b"39990-TLA-A220", b"39990-TLA,A220\x00\x00"])
-def test_a220_spec_map_matches_the_exact_audited_source(firmware):
-  # Biscuit-Labs/openpilot 01e5a3b8ce2cd7876f03adb03d72c0ec55663dd7:
-  # honda_eps_calibrations.CRV_TLA_A220_SPEC_RACK, generated using upstream's axle split/slip gain.
+def test_a220_uses_the_a040_measured_map_with_honest_provenance(firmware):
   table = firmware_selection(cp("HONDA_CRV_5G", firmware)).rack_map.table
-  assert table is CRV_TLA_A220_SPEC_RACK and not table.measured
-  assert table.wheelbase == 2.66 and table.slip_factor == -.000534
-  assert table.ratio_bp == (5., 42.2, 79.4, 116.5, 153.7, 190.9, 228.1, 265.3, 302.5, 339.6, 376.8, 414.)
-  assert table.ratio_v == (16.822, 16.81, 16.78, 16.724, 16.642, 16.533, 16.398, 16.236, 16.049, 15.838, 15.599, 15.33)
-  assert "not road-measured" in table.provenance
-  # Same Table A and lock geometry, but not the A040's mass-derived slip calibration.
+  assert table is CRV_TLA_A220_RACK and not table.measured
+  assert table.wheelbase == 2.66 and table.slip_factor == -.00084
+  assert table.ratio_bp == (5.4, 13.5, 25.8, 55.4, 85.2, 124.9, 173.4, 228.1, 302.5, 376.8, 414.)
+  assert table.ratio_v == (17.38, 16.91, 16.67, 16.46, 16.25, 16.17, 16.04, 15.86, 15.52, 15.09, 14.83)
+  assert table.provenance.startswith("inferred:")
   a040 = get_rack_map_table(cp("HONDA_CRV_5G", b"39990-TLA-A040"))
-  assert a040 is CRV_TLA_A040_SPEC_RACK and a040.slip_factor == -.000589
+  assert a040 is CRV_TLA_A040_RACK and a040.measured and a040.slip_factor == table.slip_factor
   assert a040.ratio_bp == table.ratio_bp and a040.ratio_v == table.ratio_v
 
 

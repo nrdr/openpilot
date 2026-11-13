@@ -343,7 +343,8 @@ def _safe_positive_ratio(value: Any, default: float) -> float:
   return result if math.isfinite(result) and result >= 0.1 else max(float(default), 0.1)
 
 
-def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | None = None) -> SteerRatioSelection:
+def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | None = None,
+                                 *, ptm_baseline: bool = False) -> SteerRatioSelection:
   fingerprint = str(getattr(CP, "carFingerprint", ""))
   is_honda = str(getattr(CP, "brand", "")).lower() == "honda"
   cp_ratio = _safe_positive_ratio(getattr(CP, "steerRatio", MANUAL_CENTER_DEFAULT), MANUAL_CENTER_DEFAULT)
@@ -356,7 +357,7 @@ def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | N
   firmware_profile = get_honda_vgr_profile(CP)
   # A car with a rack map (measured against its yaw sensor, else predicted from its specs) anchors Table A to it
   # instead of CP's ratio.
-  firmware_profile = rack_map_geometry(CP, firmware_profile, cp_ratio) or firmware_profile
+  firmware_profile = rack_map_geometry(CP, firmware_profile, cp_ratio, ptm_baseline=ptm_baseline) or firmware_profile
 
   effective_mode: SteerRatioMode | None = mode
   unavailable_reason = ""

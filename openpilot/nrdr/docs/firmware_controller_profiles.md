@@ -1,21 +1,50 @@
-# Firmware Controller profiles
+# PTM Controller profiles
 
 This is steering-angle feedback plus an EPS-firmware-inversion feedforward, not
 real-time yaw feedback. `NrdrLateralController = 1` is latched at drive startup;
 changing it requires offroad confirmation. PIF's Device Yaw Correction is separate.
 
+## November 2026 donor update
+
+Audited against [Biscuit-Labs Honda-PTM-Testing `45e5b91fae`](https://github.com/Biscuit-Labs/openpilot/tree/45e5b91fae934e4f423ee39055efb84d2150c575).
+The public name is **PTM Controller**; internal identifiers and saved value `1` are unchanged.
+The target is a shared PTM baseline with the StarPilot port: identical core output for identical inputs,
+calibrations and tuning. nrdr's optional geometry, lane guidance and Optimized Lane Changes remain fork-specific.
+Do not silently retune PTM calibrations when adapting them to sunnypilot.
+
+| Donor change | nrdr integration |
+| --- | --- |
+| Ridgeline T6Z-A110 rev b5 (`2200525cb9`) | Exact hybrid-comma revision, linear 4096 E4 transport, V850 output scale/P clamp, measured load and rack, and the donor's default prediction/command timing. Earlier comma-only builds are not admitted to this controller. |
+| Odyssey THR-A020 (`2eba17325c`) | Exact modified revision, 4096 E4 transport, its own P knots, identity angle geometry and donor spec rack/load. Vehicle calibration and timing remain provisional; no donor road validation yet. |
+| CR-V A040/A220 (`3282629883`, `d8ccb1866a`) | Firmware geometry uses the measured A040 rack; A220 reuses that map with inferred provenance. Other steer-ratio modes are unchanged. |
+| CR-V A040 town delay (`a08d164a2b`) | Exact donor 0.18/0 s; A220 0.12/0 s. Both use the donor's default prediction schedule. |
+| RDX prediction delay (`5fcb966386`) | Staged schedule 0.15/0.40/0.40/0.22/0.30 s. Existing RDX identity/transport restrictions remain; not newly enabled. |
+
+C020 now uses corrected rev-b command/P tables (RWD prefix `df67bf6f`), not the old TargetMapD image.
+Clarity uses the donor's hardcoded 0.20/0.10 s command delay (`542ed36dfe`); saved legacy endpoints are
+preserved but ignored. C120 uses the donor's exact spec-predicted rack table; Insight uses its piecewise map.
+RDX/Odyssey retain internal state for dropouts up to 100 ms, with I frozen and zero steering output;
+longer dropouts reset. Other cars still reset on every inactive frame.
+Donor AOL/engagement, radar and longitudinal changes are outside this controller update.
+
+New firmware requirements: Ridgeline `39990-T6Z,A110-REVB5.rwd` (SHA-256 prefix `e7e2d909`),
+Odyssey `39990-THR,A020-20261110-PTM.rwd` (`b89d20f0`). The reported part string is not a firmware hash.
+No EPS firmware is flashed; Panda limits, driver override, disengagement and saved controller/geometry choices are unchanged.
+
 | Detected vehicle / EPS family | Calibration | Prediction delay |
 | --- | --- | --- |
 | HONDA_CLARITY / 39990-TRW-A020, modified EPS | Existing Clarity A020 | Measured speed schedule |
-| HONDA_CIVIC_BOSCH / 39990-TBA-C020, modified EPS | Civic C020 TargetMapD / Tracker4500 / Norm1650 / P117to265 / D737 / KFF45 | Its own speed schedule (provisional) |
+| HONDA_CIVIC_BOSCH / 39990-TBA-C020, modified EPS | Corrected PTM rev b, Clarity-equivalent command/P tables, RWD `df67bf6f` | Its own speed schedule (provisional) |
 | HONDA_CIVIC / 39990-TEG-A010, modified EPS | TEG-A010 corrected PTM build, command row 3 (driven on that build) | Its own measured schedule |
 | HONDA_INSIGHT / 39990-TXM-A040, modified EPS | Insight TXM-A040 corrected PTM build (the Clarity's own command map and P table, 3840 E4 per unit, measured load, R6 from its A table) | Clarity's measured speed schedule |
 | HONDA_CIVIC_BOSCH / 39990-TBA-C120, modified EPS | C120 corrected PTM starting calibration: rows 0-4 the Clarity's R5 per key (3840 E4 per unit, its image's key clamp 1663), R6 from its A table, the C020's load and trims | The C020's speed schedule |
 | HONDA_CIVIC_BOSCH / 39990-TGG-A120, modified EPS | Corrected row 0, built for 4096 E4 but sent 3840. Own measured column load and rack (owner routes 0b–10 on an earlier image); retains C020 trims and A table. No change to C020. | The C020's speed schedule |
 | HONDA_CIVIC / 39990-TBA-A030, modified EPS | A030 corrected PTM starting calibration: the TEG-A010's row 3 on every row, R6 from its A table (the TEG's), the TEG's measured load | The TEG-A010's speed schedule |
-| HONDA_CRV_5G / 39990-TLA-A040, modified EPS | CR-V A040 corrected PTM starting calibration: row 0, key clamp 1774, R6 from its A table, the owner's measured load, untrimmed | Normal live/manual path |
-| HONDA_CRV_5G / 39990-TLA-A220, modified EPS | CR-V A220 corrected PTM starting calibration: rows 0-5 Clarity-equivalent, its own envelope, the A040's A table, R6, load and trims | Normal live/manual path |
-| ACURA_RDX_3G or ACURA_RDX_3G_MMR / 39990-TJB,A220 | Route-A Trk1641 RomCRC only. **Unavailable while its full trusted RWD digest is missing.** The MMR shares the 2019 vehicle measurements; no separate MMR fit. | Normal live/manual path |
+| HONDA_CRV_5G / 39990-TLA-A040, modified EPS | CR-V A040 corrected PTM: row 0, key clamp 1774, measured load/rack, untrimmed | Donor default (Clarity schedule) |
+| HONDA_CRV_5G / 39990-TLA-A220, modified EPS | CR-V A220 corrected PTM: rows 0-5 Clarity-equivalent, its own envelope, A040 load/rack/trims | Donor default (Clarity schedule) |
+| ACURA_RDX_3G or ACURA_RDX_3G_MMR / 39990-TJB,A220 | Route-A Trk1641 RomCRC only. **Unavailable while its full trusted RWD digest is missing.** The MMR shares the 2019 vehicle measurements; no separate MMR fit. | RDX measured schedule, staged only |
+| HONDA_RIDGELINE / 39990-T6Z,A110 | PTM rev b5 only, measured load/rack, provisional timing | Donor default (Clarity schedule) |
+| HONDA_ODYSSEY / 39990-THR,A020 | 2026-11-10 PTM, spec vehicle calibration | Donor default (Clarity schedule) |
 
 PID CarParams and a matching firmware steer-ratio profile are also required. No
 other Civic, firmware version, diesel, CR-V, or generic Honda inherits a calibration.
@@ -46,9 +75,9 @@ and inactive and fallback PIF wire output must be checked against the baseline. 
 The admitted profile still needs the explicit controller selection. Firmware geometry remains separately selectable.
 The donor's measured pinion-rate curve is not a firmware Table A. Rack/load came from a 2019 RDX; angle geometry
 past 169 degrees is extrapolated. TJB's own P knots/values and E4 scale 4096 are used, R6 is -120.1 per deg/s
-at centre, high-speed P trim is 0.7 and the friction knee is 15 deg/s. Command delay uses the nrdr port defaults
-0.145/0.025 s; no inherited Clarity prediction schedule. Unlike the donor, a single inactive frame sends zero
-and resets the controller: no retained integrator or feedforward. No Panda change or road validation is implied.
+at centre, high-speed P trim is 0.7 and the friction knee is 15 deg/s. Command delay is 0.12/0 s with its own
+staged prediction schedule. The donor's 100 ms state retention never authorizes inactive steering output.
+No Panda change or road validation is implied.
 
 The Civic TEG-A010 calibration requires
 `39990-TEG,A010-20261016b-PTMFix-ClarityEquivMap-ClarityPKnots-Row6Stock-A280FlatRows023`
@@ -70,46 +99,46 @@ The controller logs the required build at start and shows it in its description.
 
 Older builds report the same EPS version strings as these corrected builds.
 Family admission cannot verify the actual flashed image. Confirm the flashed
-build separately before selecting Firmware Controller; do not pair these
+build separately before selecting PTM Controller; do not pair these
 calibrations with the older images. This software update does not flash the EPS
 or change safety limits.
 
 ## Timing
 
-The temporary fixed 0.30-second prediction override is removed. Clarity uses
+All admitted PTM profiles use the donor's fixed prediction schedule. Clarity uses
 0.15 / 0.08 / 0.10 / 0.20 / 0.30 seconds at 3.5 / 7 / 12 / 20 / 30 m/s,
 interpolated every frame, with endpoints held. Both model runtimes and controlsd
 use the same profile. Saved live/manual settings are preserved but unavailable
 while that schedule is selected. The Civics have their own schedules (2026-10-18):
 TEG-A010 0.20 seconds at every speed, measured on its owner's drives, and C020 0.28 /
 0.28 / 0.28 / 0.26 / 0.26 seconds, provisional (from a drive on an older controller).
-Each is the car's lag from the camera frame to its yaw-sensor curvature, less modeld's
-fixed 0.075 seconds. lagd told the TEG 0.37-0.39 seconds, which ran it early.
-Model-specific smoothing remains separate, as in the source implementation.
+RDX uses 0.15 / 0.40 / 0.40 / 0.22 / 0.30 seconds at those same speeds.
+Insight, CR-V, Ridgeline and Odyssey use the donor default (Clarity schedule).
 
-Command delay is a separate interpolated curvature history buffer, not a blocking
-sleep. It moves between its ends from 10 to 15 m/s. Clarity retains its saved endpoints,
-default 0.145 / 0.125 seconds (the high end was 0.025 until the Clarity, on an action-head
-model, measured 0.10-0.14 seconds early above 15 m/s without it). The Insight uses fixed 0.175 / 0.025 seconds and the Civics
-0.175 seconds at every speed, since they ran as early on the highway as in town
-(source 0.150 plus the existing port's 0.025-second model-action compensation); saved
-Clarity command-delay settings do not retune them. These are model-dependent
-calibrations, not a guarantee for every driving model.
+Command delay is a separate interpolated history buffer, not a blocking sleep.
+Hardcoded endpoints interpolate from 10 to 15 m/s:
 
-They are what an action-head model needs. modeld now records where the steering came
-from (`modelV2.action.lateralSource`: `plan`, `actionHead` or `curvatureHead`) and how
-the told delay reached the model (`delayInput`). On a plan model (Pop v2, TCP v3) the
-plan is read no earlier than `MIN_STABLE_DELAY` (0.3 s); with the schedule telling it
-the car's own lag, the command delay becomes `max(0.3 - lateralActionTime, 0)`, which
-undoes that floor and nothing else. The delay slews at 0.3 s per second when the
-source changes.
+| Calibration | Below 10 m/s | Above 15 m/s |
+| --- | --- | --- |
+| Clarity | 0.20 s | 0.10 s |
+| All Civics | 0.15 s | 0.15 s |
+| Insight | 0.15 s | 0 s |
+| CR-V A040 | 0.18 s | 0 s |
+| CR-V A220, RDX, Ridgeline, Odyssey | 0.12 s | 0 s |
+
+Both model runners use the donor's 0.1 s PTM curvature filter and add its delay to the
+prediction horizon. Controlsd interpolates model actions between frames. PTM plan
+models use the actual prediction horizon without the 0.3 s floor and no additional
+command delay. Action/curvature heads and unknown sources use the table above; the
+delay multiplier transitions over one second when the source changes.
+Non-PTM model processing retains its existing timing. No saved settings are rewritten.
 
 ## Calibration and unchanged behavior
 
-C020 has its own nonlinear command map, speed envelope, rate scale (-173), column
+C020 has its own nonlinear command map, speed envelope, angle-dependent rate scale (-153.74 at centre), column
 load fit, fixed P trims (115 / 125 / 115%) and I trims (75 / 95 / 100%). Its firmware
 law inversion includes both the command-map and P-map knots. Clarity keeps its
-newer angle-dependent R6 conversion and all existing core numerical behavior.
+angle-dependent R6 conversion, sampled exactly as in the donor's calibration calculation.
 
 TEG-A010 now uses its corrected firmware's command row 3 and shared Clarity P
 knots, with its own telemetry-derived column load and angle-dependent R6. It
@@ -123,30 +152,20 @@ delay, and Clarity prediction schedule. It is sent 3840 counts per unit, the
 image's own command clamp (as the Clarity); no transport or safety limit is increased.
 
 Shared steer-ratio selection, driver override, torque clipping, safety checks,
-inactive reset/history behavior and single output LPF are preserved. Optimized
+zero inactive output and single output LPF are preserved. The RDX/Odyssey state-retention window is described above. Optimized
 lane changes suppress feedforward (including modeled EPS damping) for either
 controller and fade it back in afterward. No extra rate damping or device-yaw
-blend is added to Firmware Controller.
+blend is added to PTM Controller.
 
 ## Source audit and verification boundary
 
-Sources: JamesL787 `honda-eps-controller-update` ab868ea15561 (Clarity prediction
-refit); `civic-command-delay` 59eb99e3183e (C020 calibration, load/P-I trims and
-command delay); `c020-crawl-gate-civic-load` 74938539173c. The later
-`crv-eps-calibration-fix` 898a319842cd was checked: its relevant C020 calibration
-and load remain the same. Its CR-V/radar/model updates are outside this change.
+The baseline is Biscuit-Labs `45e5b91fae`, especially `honda_eps_calibrations.py`,
+`honda_eps_firmware_ff.py`, `honda_eps_rack_map.py` and `latcontrol_honda_eps.py`.
+Calibration provenance distinguishes measured values from defaults and spec estimates.
+The C020 high-speed envelope is firmware-derived, not validated at its high-speed rail.
 
-The Civic crawl gate/friction-width schedule is included. The older Clarity
-constant-R6 model from the Civic branch is not imported. No unmeasured TEG yaw
-calibration is added, and neither controller is converted to live car-yaw feedback.
-The C020 high-speed envelope is firmware-derived; the original source drive did
-not validate its high-speed rail. PRs #21 (`a8aa41534e50`) and #22
-(`5f54846231dd`) supply the corrected TEG and Insight calibrations described
-above. PRs #19/#20 were withdrawn/superseded; their older multi-image
-calibrations and universal Clarity delay schedule are not included.
-
-Host checks validate numerical parity, profile admission, shared schedule wiring,
-lane-change bypass and generated Sunnylink definitions. They do not replace native
-C4 tests, recorded-drive replay or progressive road validation. Do not promote
-this patch to release branches or call the provisional TEG calibration validated
-on this basis.
+Verification: 335 focused host tests pass (7 native-only skips); 9 in-memory C4 tests
+cover timings, model gates, dropout transitions and offline CAN packing. Direct donor
+comparisons match all 12 cores over 18,000 frames and all 12 rack maps. Non-PTM model
+processing matches parent `14d3f1b0af` in 180 cases. Generated Sunnylink definitions agree.
+These checks do not establish road performance or authorize release promotion.

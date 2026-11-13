@@ -4,20 +4,21 @@ import numpy as np
 from openpilot.cereal import log
 from openpilot.sunnypilot.modeld_v2.constants import ModelConstants, Plan
 from openpilot.sunnypilot.models.helpers import plan_x_idxs_helper
-from openpilot.selfdrive.controls.lib.drive_helpers import get_curvature_from_plan
+from openpilot.selfdrive.controls.lib.drive_helpers import MIN_STABLE_DELAY, get_curvature_from_plan
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 
 ConfidenceClass = log.ModelDataV2.ConfidenceClass
 
 
-def get_curvature_from_output(output, plan, vego, lat_action_t, mlsim):
+def get_curvature_from_output(output, plan, vego, lat_action_t, mlsim, ptm_controller=False):
   if not mlsim:
     if desired_curv := output.get('desired_curvature'):  # If the model outputs the desired curvature, use that directly
       return float(desired_curv[0, 0])
 
   return float(get_curvature_from_plan(plan[:, Plan.T_FROM_CURRENT_EULER][:, 2], plan[:, Plan.ORIENTATION_RATE][:, 2],
-                                       ModelConstants.T_IDXS, vego, lat_action_t))
+                                       ModelConstants.T_IDXS, vego, lat_action_t,
+                                       min_stable_delay=0.0 if ptm_controller else MIN_STABLE_DELAY))
 
 
 class PublishState:

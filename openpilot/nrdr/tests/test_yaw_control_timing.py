@@ -17,15 +17,15 @@ def test_reference_schedule_is_the_refit_table():
 
 
 @pytest.mark.parametrize("settings, speed, expected", [
-  (None, 0., .145), (None, 12.5, .135), (None, 30., .125),
-  (ParamSnapshot(1, {}), 5., .145),
-  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": .2, "NrdrYawCommandDelayHigh": .05}), 12.5, .125),
-  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": 9., "NrdrYawCommandDelayHigh": -1.}), 5., timing.MAX_COMMAND_DELAY),
-  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": 9., "NrdrYawCommandDelayHigh": -1.}), 20., 0.),
-  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": math.nan, "NrdrYawCommandDelayHigh": b"x"}), 5., .145),
-  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": math.nan, "NrdrYawCommandDelayHigh": b"x"}), 20., .125),
+  (None, 0., .20), (None, 12.5, .15), (None, 30., .10),
+  (ParamSnapshot(1, {}), 5., .20),
+  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": .2, "NrdrYawCommandDelayHigh": .05}), 12.5, .15),
+  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": 9., "NrdrYawCommandDelayHigh": -1.}), 5., .20),
+  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": 9., "NrdrYawCommandDelayHigh": -1.}), 20., .10),
+  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": math.nan, "NrdrYawCommandDelayHigh": b"x"}), 5., .20),
+  (ParamSnapshot(1, {"NrdrYawCommandDelayLow": math.nan, "NrdrYawCommandDelayHigh": b"x"}), 20., .10),
 ])
-def test_command_delay_defaults_fade_and_bounds(settings, speed, expected):
+def test_clarity_command_delay_matches_donor_ignoring_legacy_values(settings, speed, expected):
   assert timing.command_delay(settings, speed) == pytest.approx(expected)
 
 
@@ -115,15 +115,17 @@ def test_model_and_control_schedule_gates_match_and_update_on_speed_every_frame(
 
 @pytest.mark.parametrize("relative", ["selfdrive/modeld/modeld.py", "sunnypilot/modeld_v2/modeld.py"])
 @pytest.mark.parametrize("smooth", [0., .1, .3])
-def test_measured_schedule_preserves_source_model_specific_smoothing(relative, smooth):
+@pytest.mark.parametrize("ptm", [False, True])
+def test_smoothing_matches_ptm_donor_only_when_selected(relative, smooth, ptm):
   from types import SimpleNamespace as NS
   root = Path(__file__).resolve().parents[2]
   tree = ast.parse((root / relative).read_text())
   assignment, = [node for node in ast.walk(tree) if isinstance(node, ast.Assign)
                   and any(isinstance(target, ast.Name) and target.id == "lat_delay" for target in node.targets)]
   expr = compile(ast.Expression(assignment.value), relative, "eval")
-  context = {"model": NS(lat_delay=.30, LAT_SMOOTH_SECONDS=smooth), "LAT_SMOOTH_SECONDS": smooth}
-  assert eval(expr, context) == pytest.approx(.30 + smooth)
+  context = {"model": NS(lat_delay=.30, LAT_SMOOTH_SECONDS=smooth), "LAT_SMOOTH_SECONDS": smooth,
+             "firmware_profile": object() if ptm else None, "PTM_LAT_SMOOTH_SECONDS": .1}
+  assert eval(expr, context) == pytest.approx(.30 + (.1 if ptm else smooth))
 
 
 def test_model_firmware_selection_never_reads_honda_data_for_another_vehicle():

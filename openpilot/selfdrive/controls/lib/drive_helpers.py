@@ -60,9 +60,9 @@ def curv_from_psis(psi_target, psi_rate, vego, action_t):
   curv_from_psi = psi_target / (vego * action_t)
   return 2*curv_from_psi - psi_rate / vego
 
-def get_curvature_from_plan(yaws, yaw_rates, t_idxs, vego, action_t):
-  if action_t < MIN_STABLE_DELAY:
-    psi_target = (action_t / MIN_STABLE_DELAY) * np.interp(MIN_STABLE_DELAY, t_idxs, yaws)
+def get_curvature_from_plan(yaws, yaw_rates, t_idxs, vego, action_t, *, min_stable_delay=MIN_STABLE_DELAY):
+  if action_t < min_stable_delay:
+    psi_target = (action_t / min_stable_delay) * np.interp(min_stable_delay, t_idxs, yaws)
   else:
     psi_target = np.interp(action_t, t_idxs, yaws)
   psi_rate = yaw_rates[0]

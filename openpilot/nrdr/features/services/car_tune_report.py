@@ -166,7 +166,7 @@ class CarTuneReporter:
     from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile, firmware_controller_selected
     if firmware_controller_selected(self.params, CP, self._cp_sp()):
       profile = firmware_controller_profile(CP, self._cp_sp())
-      return f"Firmware Controller (VFN EPS) | {profile.name}"
+      return f"PTM Controller | {profile.name}"
     return controller.replace("PID/NNLC", "PIF Control")
 
   def _build(self, CP) -> dict[str, str]:

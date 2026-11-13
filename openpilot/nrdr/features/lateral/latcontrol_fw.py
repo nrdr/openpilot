@@ -1,21 +1,11 @@
-"""Firmware Controller: VFN Clarity A020 and James's Civic C020 EPS calibrations.
+"""PTM Controller using Biscuit-Labs 45e5b91fae firmware calibrations and fixed timing.
 
-Uses the source controller's fixed gains, firmware-inversion feedforward, command
-delay and output filter. Geometry is supplied by the shared steer-ratio selection,
-just as for PIF; choosing this controller must not replace the user's ratio choice.
-Optimized lane changes remain an explicit owner-requested adaptation. The command
-delay ends (NrdrYawCommandDelayLow/High) remain Clarity-specific. Civic uses the
-source Civic schedule plus the existing SunnyPilot port compensation. TEG-A010 has
-its own calibration (the corrected PTM build's row 3, 3840 E4 per unit, its own
-measured load, R6 from its A table) and keeps the C020's base gains, trims and command delay; it has
-been driven on its corrected build. Insight TXM-A040 has its own calibration for its corrected PTM build
-(the Clarity's own map and P table, 3840 E4 per unit, measured load, R6 from its A table)
-with the C020's trims, the Civic command delay and the Clarity's model-delay schedule.
-
-On a plan model (modelV2.action.lateralSource) a scheduled profile's command delay is
-max(MIN_STABLE_DELAY - lateralActionTime, 0) instead (nrdr.features.lateral.model_source):
-the schedule tells the model the car's own lag, and that undoes only the floor.
+Shared steer-ratio selection, driver override and model-scoped Optimized Lane Changes
+remain nrdr features. Plan models use no extra command delay; other model sources use
+the calibration's hardcoded delay, with the donor's one-second transition between them.
 """
+import math
+
 import numpy as np
 
 from openpilot.cereal import log
@@ -26,9 +16,10 @@ from openpilot.nrdr.features.lateral.vfn_eps_core import (
   CIVIC_BOSCH_C020, CIVIC_EPS_LOAD, CIVIC_I_SCALE, CIVIC_P_SCALE, CIVIC_TBA_A030, CIVIC_TBA_C120, CIVIC_TEG_A010,
   CIVIC_TEG_EPS_LOAD, CIVIC_TGG_A120, CIVIC_TGG_EPS_LOAD, CRV_I_SCALE, CRV_P_SCALE, CRV_TLA_A040, CRV_TLA_A220, CRV_TLA_EPS_LOAD,
   INSIGHT_TXM_A040, INSIGHT_TXM_EPS_LOAD, RDX_TJB_A220, RDX_TJB_EPS_LOAD,
+  ODYSSEY_THR_A020, ODYSSEY_THR_EPS_LOAD, RIDGELINE_T6Z_A110, RIDGELINE_T6Z_EPS_LOAD,
   HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
 )
-from openpilot.nrdr.features.lateral.model_source import PLAN, CommandDelaySlew, plan_floor_command_delay
+from openpilot.nrdr.features.lateral.model_source import CMD_DELAY_RAMP_S, PLAN
 from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, command_delay, prediction_delay_schedule
 from openpilot.nrdr.features.lateral.latcontrol_pid import _eps_modified_steering_pressed
 from openpilot.nrdr.features.lateral.lane_change_tuning import optimized_lane_change_active
@@ -50,6 +41,8 @@ _OWN_CALIBRATIONS = {
   "crv_tla_a040": (CRV_TLA_A040, CRV_TLA_EPS_LOAD, CRV_P_SCALE, CRV_I_SCALE),
   "crv_tla_a220": (CRV_TLA_A220, CRV_TLA_EPS_LOAD, CRV_P_SCALE, CRV_I_SCALE),
   "rdx_tjb_a220": (RDX_TJB_A220, RDX_TJB_EPS_LOAD, (1., 1., 0.7), (1., 1., 1.)),
+  "odyssey_thr_a020": (ODYSSEY_THR_A020, ODYSSEY_THR_EPS_LOAD, (1., 1., 0.7), (1., 1., 1.)),
+  "ridgeline_t6z_a110": (RIDGELINE_T6Z_A110, RIDGELINE_T6Z_EPS_LOAD, (1., 1., 1.), (1., 1., 1.)),
 }
 
 
@@ -58,7 +51,7 @@ class LatControlFirmware(LatControl):
   def __init__(self, CP, CP_SP, CI, dt):
     self.firmware_profile = firmware_controller_profile(CP, CP_SP)
     if self.firmware_profile is None:
-      raise ValueError("Firmware control requires a supported modified EPS family with PID CarParams")
+      raise ValueError("PTM Controller requires a supported modified EPS family with PID CarParams")
     super().__init__(CP, CP_SP, CI, dt)
     honda_config = getattr(getattr(CI, "interface_config", None), "honda", None)
     self.honda_params_provider = getattr(honda_config, "provider", None)
@@ -72,29 +65,33 @@ class LatControlFirmware(LatControl):
         p_scale=p_scale, i_scale=i_scale)
     else:
       self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt)
-    cloudlog.info("Firmware Controller profile=%s calibration=%s provisional=%s prediction_schedule=%s required_rwd=%s",
+    cloudlog.info("PTM Controller profile=%s calibration=%s provisional=%s prediction_schedule=%s required_rwd=%s",
                   self.firmware_profile.name, self.firmware_profile.calibration,
                   self.firmware_profile.provisional, self.delay_schedule, self.firmware_profile.required_rwd or "-")
     self.cmd_delay = CommandDelay(dt)
-    self.cmd_delay_slew = CommandDelaySlew(dt)
+    self.cmd_delay_scale = 1.0
     self.model_v2 = None
     self.prev_angle = 0.0
     self.pressed_duration = 0.0
     self.pressed_prev = False
+    self.inactive_frames = math.inf
+    self.ride_through_frames = int(round(0.1 / dt)) if self.firmware_profile.calibration in ("rdx_tjb_a220", "odyssey_thr_a020") else 0
 
   def update_model_v2(self, model_v2):
     self.model_v2 = model_v2
 
   def _command_delay(self, v_ego: float) -> float:
-    delay = command_delay(self.live_tuning_snapshot, v_ego, calibration=self.firmware_profile.calibration)
     action = getattr(self.model_v2, "action", None)
-    if self.delay_schedule is not None and str(getattr(action, "lateralSource", "unknown")) == PLAN:
-      floor_delay = plan_floor_command_delay(getattr(action, "lateralActionTime", 0.0))
-      if floor_delay is not None:
-        delay = floor_delay
-    return self.cmd_delay_slew.update(delay)
+    target = 0.0 if str(getattr(action, "lateralSource", "unknown")) == PLAN else 1.0
+    step = self.dt / CMD_DELAY_RAMP_S
+    self.cmd_delay_scale += max(min(target - self.cmd_delay_scale, step), -step)
+    return self.cmd_delay_scale * command_delay(None, v_ego, calibration=self.firmware_profile.calibration)
 
   def reset(self):
+    if self.ride_through_frames == 0 or self.inactive_frames > self.ride_through_frames:
+      self._hard_reset()
+
+  def _hard_reset(self):
     super().reset()
     self.core.reset()
     self.pressed_duration = 0.0
@@ -117,9 +114,15 @@ class LatControlFirmware(LatControl):
     pid_log.steeringAngleDesiredDeg = angle
     pid_log.angleError = angle - CS.steeringAngleDeg
     if not active:
-      self.reset()
+      self.inactive_frames += 1
+      if self.inactive_frames > self.ride_through_frames:
+        self._hard_reset()
+      else:
+        # Donor's brief TJB/THR dropout handling: track internally, freeze I, send zero.
+        self.core.update(desired, params.angleOffsetDeg, CS.steeringAngleDeg, CS.vEgo, params.roll, False, True)
       output = 0.0
     else:
+      self.inactive_frames = 0
       self.pressed_duration, pressed = _eps_modified_steering_pressed(
         bool(CS.steeringPressed), float(CS.steeringTorque), self.core.output,
         self.pressed_duration, self.pressed_prev)

@@ -622,7 +622,7 @@
                   "key": "NrdrLateralController",
                   "widget": "multiple_button",
                   "title": "Controller Type",
-                  "description": "Choose the steering controller: PIF uses your feedback tune, while Firmware Controller uses a vehicle-specific calibration.",
+                  "description": "Choose the steering controller: PIF uses your feedback tune, while PTM Controller uses a vehicle-specific calibration.",
                   "details": "Requires the exact modified steering firmware build shown in Controller Type on the device. Older builds with the same version name are incompatible.",
                   "options": [
                     {
@@ -631,7 +631,7 @@
                     },
                     {
                       "value": 1,
-                      "label": "Firmware Controller",
+                      "label": "PTM Controller",
                       "enablement": [
                         {
                           "type": "capability",
@@ -749,7 +749,7 @@
                   "widget": "toggle",
                   "title": "Use Device Yaw Correction",
                   "description": "Adds a small steering correction based on the car's measured motion. Off uses PIF control alone.",
-                  "details": "Applies to PIF control and pauses during optimized lane changes. Firmware Controller uses its own correction.",
+                  "details": "Applies to PIF control and pauses during optimized lane changes. PTM Controller uses its own correction.",
                   "visibility": [
                     {
                       "type": "not",
@@ -1335,7 +1335,7 @@
                   "widget": "option",
                   "title": "Center Boost",
                   "description": "Adds steering correction near the straight-ahead position to help maintain the planned path.",
-                  "details": "Applies to PIF control within the selected angle and speed range. Firmware Controller is unchanged.",
+                  "details": "Applies to PIF control within the selected angle and speed range. PTM Controller is unchanged.",
                   "min": 0.0,
                   "max": 5.0,
                   "step": 0.01,
@@ -4725,7 +4725,7 @@
               "key": "LagdToggle",
               "widget": "toggle",
               "title": "Live Learning Steer Delay",
-              "description": "Learns the car's steering response time as you drive. Off uses a fixed delay; Firmware Controller uses its own vehicle-specific timing.",
+              "description": "Learns the car's steering response time as you drive. Off uses a fixed delay; PTM Controller uses its own vehicle-specific timing.",
               "enablement": [
                 {
                   "type": "any",

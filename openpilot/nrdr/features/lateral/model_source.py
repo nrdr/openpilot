@@ -1,19 +1,8 @@
-"""Where the model's steering comes from, and the command delay that follows from it.
+"""Model-source metadata and PTM timing shared by both model runners and controlsd."""
+from openpilot.common.realtime import DT_CTRL, DT_MDL
 
-modeld attaches the source to modelV2.action next to lateralActionTime (set_lateral_action_timing), decided where
-get_action_from_model decides it:
-  actionHead     the model has an action output (e.g. Cinque Terre V3). It follows the told delay only in part: Cinque's
-                 aim moves ~0.53 s per 1 s of action_t.
-  curvatureHead  a non-tinygrad model's desired_curvature output.
-  plan           everything else (e.g. Pop v2, The Cool Peoples Model v3): the curvature that reaches the plan's heading at
-                 lateralActionTime, read no earlier than MIN_STABLE_DELAY (0.3 s).
-
-On a plan model the floor is the whole timing story. When the told delay is the car's measured lag (a profile with a
-prediction schedule), the plan should be read at lateralActionTime; the floor reads it at 0.3 s instead, so the curvature
-it hands over is meant for MIN_STABLE_DELAY - lateralActionTime later than the car will reach it. Holding it back that
-long (plan_floor_command_delay) lands it on time, and above the floor it needs no delay at all.
-"""
-from openpilot.selfdrive.controls.lib.drive_helpers import MIN_STABLE_DELAY
+PTM_LAT_SMOOTH_SECONDS = 0.1
+CMD_DELAY_RAMP_S = 1.0
 
 ACTION_HEAD = "actionHead"
 CURVATURE_HEAD = "curvatureHead"
@@ -39,24 +28,23 @@ def delay_input(numpy_inputs) -> str:
   return "none"
 
 
-def plan_floor_command_delay(lateral_action_time: float) -> float | None:
-  """The command delay that cancels the MIN_STABLE_DELAY floor; None without a published action time."""
-  if not lateral_action_time > 0.0:
-    return None
-  return max(MIN_STABLE_DELAY - float(lateral_action_time), 0.0)
+class ModelActionRamp:
+  """Biscuit-Labs 45e5b91fae: interpolate the 20 Hz model action across each control frame."""
 
+  def __init__(self):
+    self.reset(0.0)
 
-class CommandDelaySlew:
-  """Moves the applied command delay at most rate seconds per second, so a model change (or the speed fade) never steps
-  the executed curvature."""
+  def reset(self, curvature: float) -> None:
+    self.output = self.start = self.target = float(curvature)
+    self.elapsed = 0.0
 
-  def __init__(self, dt: float, rate: float = 0.3):
-    self.step = dt * rate
-    self.value: float | None = None
-
-  def update(self, target: float) -> float:
-    if self.value is None:
-      self.value = float(target)
+  def update(self, curvature: float, new_frame: bool, active: bool) -> float:
+    if not active:
+      self.reset(curvature)
+      return self.output
+    if new_frame:
+      self.start, self.target, self.elapsed = self.output, float(curvature), 0.0
     else:
-      self.value += max(min(float(target) - self.value, self.step), -self.step)
-    return self.value
+      self.elapsed += DT_CTRL
+    self.output = self.start + min(self.elapsed / DT_MDL, 1.0) * (self.target - self.start)
+    return self.output

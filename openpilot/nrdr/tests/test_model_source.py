@@ -1,4 +1,4 @@
-"""Where the model's steering comes from, and the command delay the Firmware Controller takes from it."""
+"""Where the model's steering comes from, and the command delay the PTM Controller takes from it."""
 import ast
 import re
 from pathlib import Path
@@ -34,7 +34,7 @@ def test_source_matches_the_actual_curvature_branch_even_at_zero(curvature, mlsi
   from openpilot.sunnypilot.modeld_v2 import fill_model_msg as publisher
 
   plan_curvature = 0.019
-  monkeypatch.setattr(publisher, "get_curvature_from_plan", lambda *args: plan_curvature)
+  monkeypatch.setattr(publisher, "get_curvature_from_plan", lambda *args, **kwargs: plan_curvature)
   output = {"plan": np.zeros((1, 33, 15))}
   if curvature is not None:
     output["desired_curvature"] = np.array([[curvature]])
@@ -69,16 +69,12 @@ def test_the_delay_input_names_how_the_told_delay_reaches_the_model():
   assert ms.delay_input({"desire_pulse": 0, "traffic_convention": 0}) == "none"
 
 
-@pytest.mark.parametrize("action_time,delay", [(0.0, None), (-1.0, None), (0.155, 0.145), (0.275, 0.025), (0.3, 0.0), (0.45, 0.0)])
-def test_the_plan_floor_command_delay_lands_the_plan_at_the_told_time(action_time, delay):
-  assert ms.plan_floor_command_delay(action_time) == (None if delay is None else pytest.approx(delay))
-
-
-def test_the_slew_starts_at_its_first_target_and_moves_at_its_rate():
-  slew = ms.CommandDelaySlew(0.01)
-  assert slew.update(0.175) == 0.175
-  out = [slew.update(0.025) for _ in range(60)]
-  assert out[0] == pytest.approx(0.175 - 0.003) and out[-1] == pytest.approx(0.025)
+def test_model_action_ramp_matches_donor_and_resets_while_inactive():
+  ramp = ms.ModelActionRamp()
+  assert ramp.update(.002, True, False) == .002
+  assert ramp.update(.007, True, True) == .002
+  assert [ramp.update(.007, False, True) for _ in range(6)] == pytest.approx([.003, .004, .005, .006, .007, .007])
+  assert ramp.update(-.001, False, False) == -.001
 
 
 def _controller(fingerprint, firmware):
@@ -105,20 +101,21 @@ def _delays(control, source, action_time, frames, speed=8.):
   ("HONDA_CIVIC", b"39990-TEG-A010", "civic_teg_a010", 0.275),         # 0.20 told
   ("HONDA_CIVIC_BOSCH", b"39990-TBA-C020", "civic_bosch_c020", 0.355),  # 0.28 told: above the floor
 ])
-def test_a_plan_model_on_a_scheduled_profile_only_undoes_the_floor(fingerprint, firmware, calibration, action_time):
+def test_plan_models_ramp_extra_command_delay_to_zero(fingerprint, firmware, calibration, action_time):
   control = _controller(fingerprint, firmware)
   head = _delays(control, "actionHead", action_time, 5)
   assert head[-1] == pytest.approx(command_delay(None, 8., calibration=calibration), abs=1e-6)
   plan = _delays(control, "plan", action_time, 300)
-  assert plan[-1] == pytest.approx(max(0.3 - action_time, 0.), abs=1e-6)
-  assert max(abs(a - b) for a, b in zip([head[-1], *plan], plan, strict=False)) <= 0.003 + 1e-6  # slewed, no step
+  assert plan[99] == pytest.approx(0., abs=1e-6) and plan[-1] == pytest.approx(0., abs=1e-6)
+  assert plan[0] == pytest.approx(head[-1] * .99, abs=1e-6)
+  assert max(abs(a - b) for a, b in zip([head[-1], *plan], plan, strict=False)) <= head[-1] * .01 + 1e-6
 
 
 def test_an_unknown_source_or_an_older_model_message_keeps_the_calibrations_delay():
   control = _controller("HONDA_CIVIC", b"39990-TEG-A010")
-  assert _delays(control, "unknown", 0.275, 3)[-1] == pytest.approx(0.175)
+  assert _delays(control, "unknown", 0.275, 3)[-1] == pytest.approx(0.15)
   control.update_model_v2(NS(meta=NS(laneChangeState=NS(raw=0))))  # no action field (an older publisher)
-  assert control._command_delay(8.) == pytest.approx(0.175)
+  assert control._command_delay(8.) == pytest.approx(0.15)
 
 
 def test_the_schema_names_every_source_and_delay_input():

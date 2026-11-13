@@ -190,7 +190,7 @@ class TestControllerUiLabels(unittest.TestCase):
       "type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 1},
     }])
     self.assertEqual([option["label"] for option in panel["items"][0]["options"]],
-                     ["PIF Control", "Firmware Controller"])
+                     ["PIF Control", "PTM Controller"])
     self.assertEqual(web["enablement"][0], {
       "type": "capability", "field": "nrdr_interpolated_torque_pif_blend_available", "equals": True,
     })

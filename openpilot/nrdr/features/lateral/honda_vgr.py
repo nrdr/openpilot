@@ -1,5 +1,6 @@
 from bisect import bisect_right
 from dataclasses import dataclass, field
+from functools import lru_cache
 import math
 
 import numpy as np
@@ -20,6 +21,27 @@ __all__ = (
 
 Q14 = 1 << 14
 RAW_UNITS_PER_DEGREE = 10.0
+
+
+@lru_cache(maxsize=16)
+def ptm_inverse(profile):
+  """Biscuit-Labs 45e5b91fae sampled angle inverse for matched PTM calibration/output."""
+  if isinstance(profile, RdxMeasuredPosition):
+    return profile.linear_knots, profile.physical_knots
+  if profile.position_y == (Q14, Q14):
+    return profile.physical_knots, profile.physical_knots
+  linear_bp, angle_bp = [], []
+  for x0, x1, y0, y1 in zip(profile.position_x, profile.position_x[1:],
+                            profile.position_y, profile.position_y[1:], strict=False):
+    steps = max(1, math.ceil((x1 - x0) / 20))
+    for step in range(steps):
+      fraction = step / steps
+      raw, divisor = x0 + (x1 - x0) * fraction, y0 + (y1 - y0) * fraction
+      linear_bp.append(raw * Q14 / profile.center_divisor / RAW_UNITS_PER_DEGREE)
+      angle_bp.append(raw * Q14 / divisor / RAW_UNITS_PER_DEGREE)
+  linear_bp.append(profile.position_x[-1] * Q14 / profile.center_divisor / RAW_UNITS_PER_DEGREE)
+  angle_bp.append(profile.position_x[-1] * Q14 / profile.position_y[-1] / RAW_UNITS_PER_DEGREE)
+  return tuple(linear_bp), tuple(angle_bp)
 
 
 @dataclass(frozen=True)
@@ -132,6 +154,9 @@ HONDA_VGR_PROFILES = (
   # The corrected TLA-A220 image carries the A040's Table A byte for byte (same offset, same values).
   HondaVgrProfile("CR-V TLA-A040", ("HONDA_CRV_5G",), ("39990-TLA-A040", "39990-TLA-A220"), _TLA_A040_X, _TLA_A040_Y),
   HondaVgrProfile("Insight TXM-A040", ("HONDA_INSIGHT",), ("39990-TXM-A040",), _TXM_A040_X, _TXM_A040_Y),
+  # Constant-ratio racks: no firmware angle table. Identity geometry, not a copied Civic table.
+  HondaVgrProfile("Ridgeline T6Z-A110", ("HONDA_RIDGELINE",), ("39990-T6Z-A110",), (0, 6000), (16384, 16384)),
+  HondaVgrProfile("Odyssey THR-A020", ("HONDA_ODYSSEY",), ("39990-THR-A020",), (0, 6000), (16384, 16384)),
 )
 
 _PROFILE_BY_CAR_FIRMWARE = {
@@ -144,6 +169,8 @@ _PROFILE_BY_CAR_FIRMWARE = {
   ("HONDA_CRV_5G", "39990-TLA-A040"): HONDA_VGR_PROFILES[3],
   ("HONDA_CRV_5G", "39990-TLA-A220"): HONDA_VGR_PROFILES[3],
   ("HONDA_INSIGHT", "39990-TXM-A040"): HONDA_VGR_PROFILES[4],
+  ("HONDA_RIDGELINE", "39990-T6Z-A110"): HONDA_VGR_PROFILES[5],
+  ("HONDA_ODYSSEY", "39990-THR-A020"): HONDA_VGR_PROFILES[6],
 }
 
 

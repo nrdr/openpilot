@@ -1,4 +1,4 @@
-"""Drive-latched firmware control, with exact EPS-family admission.
+"""Drive-latched PTM Controller, with exact EPS-family admission.
 
 Firmware version strings identify the family, not the contents of a modified image.
 The owner must still confirm the flashed build. TEG-A010 runs its own calibration for the corrected PTM
@@ -9,7 +9,7 @@ The corrected builds of the C120, TGG-A120, A030 and both CR-V images have provi
 """
 from dataclasses import dataclass
 
-from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
+from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP, PTM_EPS_REVISIONS
 
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile, normalize_honda_eps_firmware
 from openpilot.nrdr.features.lateral.rdx_identity import RDX_CARS, confirmed_rdx
@@ -27,7 +27,8 @@ class FirmwareControllerProfile:
 
 
 CLARITY_PROFILE = FirmwareControllerProfile("Clarity A020", "clarity_a020", prediction_schedule=True)
-CIVIC_PROFILE = FirmwareControllerProfile("Civic Bosch C020", "civic_bosch_c020", prediction_schedule=True)
+CIVIC_PROFILE = FirmwareControllerProfile("Civic Bosch C020 corrected PTM", "civic_bosch_c020", prediction_schedule=True,
+                                           required_rwd="df67bf6f")
 TEG_PROFILE = FirmwareControllerProfile(
   "Civic TEG-A010 corrected PTM, row 3", "civic_teg_a010", prediction_schedule=True, required_rwd="04147917",
 )
@@ -47,12 +48,17 @@ A030_PROFILE = FirmwareControllerProfile(
   "Civic TBA-A030 corrected PTM (starting calibration)", "civic_tba_a030", prediction_schedule=True, provisional=True, required_rwd="55c37266",
 )
 CRV_A040_PROFILE = FirmwareControllerProfile(
-  "CR-V TLA-A040 corrected PTM (starting calibration)", "crv_tla_a040", provisional=True, required_rwd="2e6a8802",
+  "CR-V TLA-A040 corrected PTM (starting calibration)", "crv_tla_a040", prediction_schedule=True, provisional=True, required_rwd="2e6a8802",
 )
 CRV_A220_PROFILE = FirmwareControllerProfile(
-  "CR-V TLA-A220 corrected PTM (starting calibration)", "crv_tla_a220", provisional=True, required_rwd="2c992997",
+  "CR-V TLA-A220 corrected PTM (starting calibration)", "crv_tla_a220", prediction_schedule=True, provisional=True, required_rwd="2c992997",
 )
-RDX_PROFILE = FirmwareControllerProfile("Acura RDX TJB-A220 Route-A RomCRC", "rdx_tjb_a220", provisional=True, required_rwd="3dd8b91b")
+RDX_PROFILE = FirmwareControllerProfile("Acura RDX TJB-A220 Route-A RomCRC", "rdx_tjb_a220", prediction_schedule=True,
+                                         provisional=True, required_rwd="3dd8b91b")
+RIDGELINE_PROFILE = FirmwareControllerProfile("Ridgeline T6Z-A110 PTM rev b5", "ridgeline_t6z_a110", prediction_schedule=True,
+                                               provisional=True, required_rwd="e7e2d909")
+ODYSSEY_PROFILE = FirmwareControllerProfile("Odyssey THR-A020 PTM (starting calibration)", "odyssey_thr_a020", prediction_schedule=True,
+                                             provisional=True, required_rwd="b89d20f0")
 _PROFILES = {
   ("HONDA_CLARITY", "39990-TRW-A020"): CLARITY_PROFILE,
   ("HONDA_CIVIC_BOSCH", "39990-TBA-C020"): CIVIC_PROFILE,
@@ -65,6 +71,8 @@ _PROFILES = {
   ("HONDA_CRV_5G", "39990-TLA-A220"): CRV_A220_PROFILE,
   ("ACURA_RDX_3G", "39990-TJB-A220"): RDX_PROFILE,
   ("ACURA_RDX_3G_MMR", "39990-TJB-A220"): RDX_PROFILE,
+  ("HONDA_RIDGELINE", "39990-T6Z-A110"): RIDGELINE_PROFILE,
+  ("HONDA_ODYSSEY", "39990-THR-A020"): ODYSSEY_PROFILE,
 }
 
 
@@ -76,6 +84,9 @@ def _firmware_family(CP) -> FirmwareControllerProfile | None:
     return None
   for firmware in getattr(CP, "carFw", ()):
     if firmware.ecu == "eps":
+      revision = PTM_EPS_REVISIONS.get(str(CP.carFingerprint))
+      if revision is not None and bytes(firmware.fwVersion).rstrip(b"\0") != revision:
+        continue
       profile = _PROFILES.get((str(CP.carFingerprint), normalize_honda_eps_firmware(firmware.fwVersion)))
       if profile is not None:
         return profile

@@ -36,7 +36,7 @@ import math
 
 import numpy as np
 
-from openpilot.nrdr.features.lateral.honda_vgr import HONDA_VGR_PROFILES, HondaVgrProfile
+from openpilot.nrdr.features.lateral.honda_vgr import HONDA_VGR_PROFILES, HondaVgrProfile, ptm_inverse
 from openpilot.nrdr.features.lateral.rdx_rack import RDX_POSITION, RdxMeasuredPosition
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.nrdr.features.lateral.integral_pid import IntegralScaledPIDController as PIDController
@@ -88,9 +88,14 @@ COMPUTED_R6_ANGLE_BP = (0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 180, 210,
 
 def computed_r6(profile: HondaVgrProfile | RdxMeasuredPosition, norm: float = 1650.0) -> tuple[float, tuple, tuple]:
   """(R6 per published deg/s at centre, |angle| axis, gain by angle) from an image's Table A; see above."""
+  linear_bp, angle_bp = ptm_inverse(profile)
+
+  def linear(a: float) -> float:
+    return float(np.interp(a, angle_bp, linear_bp)) if a <= angle_bp[-1] else a * linear_bp[-1] / angle_bp[-1]
+
   def slope(a: float) -> float:
     lo = max(a - 10.0, 0.0)
-    return (profile.physical_to_linear(a + 10.0) - profile.physical_to_linear(lo)) / (a + 10.0 - lo)
+    return (linear(a + 10.0) - linear(lo)) / (a + 10.0 - lo)
 
   centre = R6_PER_RAW_DEG_S * norm / 1650.0 * profile.center_divisor / 16384.0
   return round(centre, 2), COMPUTED_R6_ANGLE_BP, tuple(round(slope(a) / slope(0.0), 4) for a in COMPUTED_R6_ANGLE_BP)
@@ -182,7 +187,10 @@ class EpsFirmwareCalibration:
 
   def __init__(self, e4_per_output, r5_key_bp, r5_v, envelope_bp, envelope_v, r6_per_deg_s,
                *, r5_per_key=None, r6_angle_bp=None, r6_angle_gain=None, kp_key_bp=None, kp_v=KP_V,
-               key_clamp=KEY_CLAMP, friction_width_v=FRICTION_WIDTH_V):
+               key_clamp=KEY_CLAMP, friction_width_v=FRICTION_WIDTH_V, kff=KFF, scale_q8=SCALE_Q8, p_clamp=None):
+    if p_clamp is not None and kff != 0.0:
+      raise ValueError("a P clamp with KFF is not modeled")
+    self.kff, self.scale_q8, self.p_clamp = kff, scale_q8, p_clamp
     self.e4_per_output = e4_per_output
     # The command-input clamp, the header word just before the row 0 command map: 1663 (E4 3840) on every image here
     # except the CR-V's, which clamp at 1774 (E4 4096).
@@ -193,7 +201,7 @@ class EpsFirmwareCalibration:
     self.r6_angle_bp, self.r6_angle_gain = r6_angle_bp, r6_angle_gain
     self.r5_per_key = r5_per_key
     self.friction_width_v = tuple(friction_width_v)
-    # The P row's key axis is row-indexed in the image like the command map; KP_V is the same on every PTM row.
+    # The P row's key axis and values belong to the same firmware image as the command map.
     self.kp_key_bp = tuple(KP_KEY_BP if kp_key_bp is None else kp_key_bp)
     if r5_per_key is not None:
       if self.kp_key_bp != tuple(KP_KEY_BP) or tuple(kp_v) != tuple(KP_V):
@@ -214,8 +222,8 @@ class EpsFirmwareCalibration:
     """Largest useful command before the row ends or the input clamps.
 
     The CR-V's 4096-count transport reaches its row's last key at E4 3841
-    (rounded up); larger commands add no R5. All other admitted images keep
-    1.0. Do not include the speed envelope or change any calibration here.
+    (rounded up); Ridgeline rev b5 reaches its row end at E4 3732. Larger commands add no R5.
+    Do not include the speed envelope or change any calibration here.
     Adapted from JamesL787/openpilot 6a2ac5424fb19e4f753badb4e44da6ded3f9542b.
     """
     key = min(self.key_clamp, self.r5_key_bp[-1])
@@ -226,26 +234,26 @@ CLARITY_A020 = EpsFirmwareCalibration(
   E4_PER_OUTPUT, R5_KEY_BP, R5_V, ENVELOPE_BP, ENVELOPE_V, R6_PER_CENTRE_DEG_S,
   r5_per_key=R5_PER_KEY, r6_angle_bp=R6_ANGLE_BP, r6_angle_gain=R6_ANGLE_GAIN,
 )
-# Only for the C020 TargetMapD / Tracker4500 / Norm1650 / P117to265 / D737 /
-# KFF45 modified build. Version strings alone cannot confirm this image. The
+# C020 corrected PTM rev b, RWD df67bf6f: Clarity-equivalent command/P tables.
+# Older TargetMap-D images report the same version but require reflashing. The
 # source's high-speed envelope is firmware-derived, not road-validated at its rail.
 # R6 computed from its Table A (-153.74 at centre; the telemetry R6 word on the owner's routes 287/289/294 agrees within
 # 1.9% unrailed). The flat -173 it replaces was an angle average fitted against 0x14A: ~12% too strong at centre and too
-# weak in big turns. The P row's key axis is the image's own (0x13B5E row 0 and row 1 alike), not the Clarity's knots.
+# weak in big turns. The corrected P axis is the Clarity's knots scaled by 4096/3840.
 # HONDA_CIVIC_BOSCH is sent 3840 E4 per unit: the image clamps its command input at key 1663 = E4 3840 (as stock
 # firmware does), so 4096 left the last ~6% of the output range dead. Its map was built for 4096, so per unit of output
 # it now asks 0.94x the R5 it did, and reaches the clamp at full output; the inversion uses 3840.
 CIVIC_BOSCH_C020 = EpsFirmwareCalibration(
   e4_per_output=3840.0,
   r5_key_bp=[0, 115, 254, 449, 654, 862, 1111, 1549, 1774],
-  r5_v=[0, 1926, 4938, 8455, 12036, 15926, 20138, 26955, 30000],
+  r5_v=[0, 1943, 4291, 7599, 11065, 14579, 18798, 26202, 30002],
   envelope_bp=[0, 50, 100, 150, 200, 240, 300, 321, 400],
   envelope_v=[1774, 1774, 1774, 1774, 1774, 1552, 1219, 1108, 1108],
   r6_per_deg_s=CIVIC_C020_R6[0], r6_angle_bp=CIVIC_C020_R6[1], r6_angle_gain=CIVIC_C020_R6[2],
-  kp_key_bp=(0, 223, 441, 665, 883, 1108, 1330, 1552, 1774),
+  kp_key_bp=tuple(round(k * 4096 / 3840) for k in KP_KEY_BP),
 )
 CLARITY_EPS_LOAD = (LOAD_K0, LOAD_K1, LOAD_C, LOAD_FRICTION, LOAD_BIAS, LOAD_KROLL)
-# Source fit on Civic C020 firmware-controller route 294 (not its separate PID shadow fit).
+# Source fit on Civic C020 PTM Controller route 294 (not its separate PID shadow fit).
 CIVIC_EPS_LOAD = (-5.574, -0.1831, -4.540, -326.5, -83.6, -3.185)
 # Civic (Nidec) TEG-A010, corrected PTM build only:
 # 39990-TEG,A010-20261016b-PTMFix-ClarityEquivMap-ClarityPKnots-Row6Stock-A280FlatRows023 (RWD sha256
@@ -290,7 +298,7 @@ CIVIC_TEG_EPS_LOAD = (-7.833, -0.169, -8.29, -311.2, 59.18, -4.457)
 # holds across the reflash); route 00000020 held out scores R^2 0.70 / 0.75 against 0.70 / 0.75 for a fit on it.
 INSIGHT_TXM_A040 = EpsFirmwareCalibration(
   3840.0, R5_KEY_BP, R5_V, [0, 50, 100, 150, 200, 250, 300, 350, 400], [1774] * 9, INSIGHT_TXM_R6[0],
-  r5_per_key=R5_PER_KEY, r6_angle_bp=INSIGHT_TXM_R6[1], r6_angle_gain=INSIGHT_TXM_R6[2],
+  r6_angle_bp=INSIGHT_TXM_R6[1], r6_angle_gain=INSIGHT_TXM_R6[2],
 )
 INSIGHT_TXM_EPS_LOAD = (-4.876, -0.1376, -4.452, -397.2, 65.41, -4.29)
 
@@ -339,8 +347,8 @@ CIVIC_TBA_A030 = EpsFirmwareCalibration(
 # CR-V 39990-TLA-A040 (RWD 2e6a8802...). Every variant record selects row 0 (TLBA2's row 1 is identical). Clamps at 1774
 # (E4 4096), and each key carries the Clarity's R5 at key x 3840/4096; P on the Clarity's knots at the same scale. R6
 # from its Table A (centre divisor 16783: -125 at centre; the owner's telemetry fit, an angle average, read -138.4).
-# Load: the owner's telemetry route 82bb. Trims: none, as the owner drives it. Command delay: the default 0.12 s (the
-# owner's PID drive ran 0.08 s late), re-check on this controller.
+# Load: the owner's telemetry route 82bb. Trims: none, as the owner drives it. Command delay is now 0.18 s in the
+# donor (a08d164a2b), fading to zero at 15 m/s without an extra port compensation.
 CRV_TLA_A040 = EpsFirmwareCalibration(
   4096.0, (0, 219, 443, 662, 887, 1108, 1330, 1552, 1663), (0, 3699, 7497, 11200, 15001, 18747, 22502, 26252, 28127),
   (0, 50, 100, 150, 200, 250, 300, 350, 400), (1774,) * 9, CRV_TLA_R6[0],
@@ -370,9 +378,34 @@ RDX_TJB_EPS_LOAD = (-11.19, -0.1363, -2.479, -241.5, 119.2, -3.592)
 RDX_TJB_A220 = EpsFirmwareCalibration(
   4096., tuple(round(a * _TJB_AXIS_SCALE) for a in range(0, 1025, 128)),
   (0, 3968, 7936, 11904, 15872, 19840, 23808, 27776, 30000),
-  (0, 400), (1774, 1774), -120.1, r6_angle_bp=COMPUTED_R6_ANGLE_BP, r6_angle_gain=computed_r6(RDX_POSITION)[2],
+  (0, 50, 100, 150, 200, 250, 300, 350, 400), (1774,) * 9, -120.1,
+  r6_angle_bp=COMPUTED_R6_ANGLE_BP, r6_angle_gain=computed_r6(RDX_POSITION)[2],
   kp_key_bp=tuple(round(a * _TJB_AXIS_SCALE) for a in (0, 58, 109, 243, 320, 448, 640, 896, 1024)),
   kp_v=(112, 128, 144, 176, 208, 240, 256, 272, 272), key_clamp=1774, friction_width_v=(20., 15.),
+)
+
+
+# Biscuit-Labs 45e5b91fae: Odyssey 2026-11-10 PTM, RWD b89d20f0.
+# Spec-derived load (4471 lb, 56% front, 14.35:1, 2.97 turns); no Odyssey drive validates it yet.
+ODYSSEY_THR_EPS_LOAD = (-7.328338852393677, -0.20103897946651755, -6.14, -310.0, 0.0, -4.476029616891653)
+ODYSSEY_THR_A020 = EpsFirmwareCalibration(
+  4096., RDX_TJB_A220.r5_key_bp, RDX_TJB_A220.r5_v,
+  (0, 50, 100, 150, 200, 250, 300, 350, 400), (1774,) * 9, -120.1,
+  r6_angle_bp=COMPUTED_R6_ANGLE_BP, r6_angle_gain=(1.,) * len(COMPUTED_R6_ANGLE_BP),
+  kp_key_bp=tuple(round(a * _TJB_AXIS_SCALE) for a in (0, 55, 166, 319, 532, 776, 887, 942, 998)),
+  kp_v=(112, 128, 160, 208, 240, 256, 272, 272, 272), key_clamp=1774, friction_width_v=(20., 15.),
+)
+
+# Ridgeline rev b5, RWD e7e2d909. Its V850 law has no KFF, an output-stage scale and an internal P clamp.
+# Load/rack measured on owner routes 23d/23e; command timing remains a provisional donor default.
+RIDGELINE_T6Z_EPS_LOAD = (-2.791, -0.03092, -2.007, -51.44, 6.89, -0.6671)
+RIDGELINE_T6Z_A110 = EpsFirmwareCalibration(
+  4096., (0, 107, 218, 329, 439, 557, 668, 778, 889, 1000, 1111, 1222, 1339, 1450, 1560, 1616),
+  (0, 2598, 5065, 7418, 9706, 11927, 14098, 16264, 18434, 20612, 22832, 25045, 27274, 29498, 31747, 32767),
+  (0, 50, 100, 150, 200, 250, 300, 350, 400), (1774,) * 9, -128.,
+  kp_key_bp=(0, 62, 139, 211, 276, 342, 408, 474, 540, 606, 671, 744, 830, 924, 1066, 1388, 1616),
+  kp_v=(12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28),
+  key_clamp=1773, kff=0., scale_q8=655. * 255 * 255 / 65536, p_clamp=942.,
 )
 
 
@@ -414,7 +447,10 @@ def firmware_output(r5: float, steering_rate_deg_s: float, angle_deg: float = 0.
                     cal: EpsFirmwareCalibration = CLARITY_A020) -> float:
   """Steady-state firmware output for a target and a rate (D term omitted): scale*(Kp*(R5-R6) + KFF*R5)/1024/256."""
   r6 = firmware_r6(steering_rate_deg_s, angle_deg, cal)
-  return SCALE_Q8 * (firmware_kp(r5, cal) * (r5 - r6) + KFF * r5) / 1024.0 / 256.0
+  p = firmware_kp(r5, cal) * (r5 - r6)
+  if cal.p_clamp is not None:
+    p = max(min(p, 1024.0 * cal.p_clamp), -1024.0 * cal.p_clamp)
+  return cal.scale_q8 * (p + cal.kff * r5) / 1024.0 / 256.0
 
 
 def column_load(angle_deg: float, rate_deg_s: float, v_ego: float, roll: float,
@@ -433,14 +469,16 @@ def r5_for_motion(load: float, rate_deg_s: float, r5_guess: float = 0.0, angle_d
   one root only exists when a fast unwind outruns a small target). A fixed-point iteration is not enough
   here: it is 1-4% off after three passes from rest and need not contract during a fast unwind.
   """
-  x = 1024.0 * load * 256.0 / SCALE_Q8
+  x = 1024.0 * load * 256.0 / cal.scale_q8
+  if cal.p_clamp is not None:
+    x = max(min(x, 1024.0 * cal.p_clamp), -1024.0 * cal.p_clamp)
   r6 = firmware_r6(rate_deg_s, angle_deg, cal)
   roots = []
   for lo, hi, kp_lo, slope in cal.kp_pieces:
     for side in (1.0, -1.0):
       # on this piece Kp = a + b*R5, and R5*(Kp + KFF) - Kp*R6 = x
       a, b = kp_lo - slope * lo, slope * side
-      qa, qb, qc = b, a + KFF - b * r6, -(a * r6 + x)
+      qa, qb, qc = b, a + cal.kff - b * r6, -(a * r6 + x)
       if abs(qa) < 1e-12:
         candidates = [-qc / qb]
       else:

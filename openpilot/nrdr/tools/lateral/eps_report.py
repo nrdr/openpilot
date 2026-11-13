@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Per-drive lateral report for a Honda on the Firmware Controller, measured against the car's own yaw sensor (0x94).
+"""Per-drive lateral report for a Honda on the PTM Controller, measured against the car's own yaw sensor (0x94).
 
   python -m openpilot.nrdr.tools.lateral.eps_report <rlog.zst | route dir> ...
 
@@ -297,7 +297,7 @@ def turns(s):
 def report(s, R, info):
   mins, engaged, usable = (s['t'][-1] - s['t'][0]) / 60, np.mean(s['lat'] > .5) * 100, np.mean(s['ok']) * 100
   profile = profile_for(info)
-  calibration = profile.calibration if profile else 'no Firmware Controller calibration'
+  calibration = profile.calibration if profile else 'no PTM Controller calibration'
   route = f"{info.get('branch', '?')} @ {info.get('commit', '?')}  {info.get('fingerprint', '?')}  {info.get('eps_fw', '?')}  {calibration}"
   print(f'route: {route}   {mins:.1f} min, engaged {engaged:.0f}%, usable {usable:.0f}%')
   if len(R['vsa']) < 1000:

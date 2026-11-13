@@ -407,7 +407,7 @@ class TestControllerCleanup(OpenpilotTestCase):
       "NrdrLateralController", "NrdrLatStiction", "NrdrDeviceYawCorrection", "NrdrOptimizedLaneChanges",
     ]
     controller = panel["items"][0]
-    assert [(o["value"], o["label"]) for o in controller["options"]] == [(0, "PIF Control"), (1, "Firmware Controller")]
+    assert [(o["value"], o["label"]) for o in controller["options"]] == [(0, "PIF Control"), (1, "PTM Controller")]
     assert "exact modified steering firmware revision" in controller["description"]
     assert "TEG-A010 requires the corrected PTM firmware" in controller["details"]
     assert "its calibration has been driven on that build" in controller["details"]

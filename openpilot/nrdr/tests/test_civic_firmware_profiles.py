@@ -93,7 +93,7 @@ def test_c020_tables_load_trims_and_clarity_angle_feedback_are_separate():
   assert core.firmware_r6(-10., 80., cal) == pytest.approx(1537.4 * 1.1159, rel=1e-3)
   assert core.firmware_r6(10., 200.) != core.firmware_r6(10., 0.)
   # The nonlinear P pieces reproduce the source's interpolation over key, on the image's own P axis.
-  assert cal.kp_key_bp == (0, 223, 441, 665, 883, 1108, 1330, 1552, 1774)
+  assert cal.kp_key_bp == tuple(round(k * 4096 / 3840) for k in core.KP_KEY_BP)
   for target in np.linspace(0., 35000., 350):
     key = np.interp(target, cal.r5_v, cal.r5_key_bp)
     assert core.firmware_kp(target, cal) == pytest.approx(np.interp(key, cal.kp_key_bp, core.KP_V))
@@ -124,7 +124,7 @@ def test_civic_has_its_own_prediction_delay_and_not_saved_clarity_command_delay(
   # the command delay holds above 15 m/s: the Civics ran as early there as in town
   settings = {"NrdrLateralController": 1, "NrdrYawCommandDelayLow": .3, "NrdrYawCommandDelayHigh": .3}
   assert [command_delay(settings, speed, calibration=profile.calibration) for speed in (0., 10., 12.5, 15., 30.)] == \
-    pytest.approx([.175] * 5)
+    pytest.approx([.15] * 5)
   # lagd is locked out once the schedule tells the model the delay
   assert not any(tuning_write_allowed(settings, key, firmware_prediction_schedule=profile.prediction_schedule)
                  for key in ("LagdToggle", "LagdToggleDelay"))
@@ -132,7 +132,7 @@ def test_civic_has_its_own_prediction_delay_and_not_saved_clarity_command_delay(
 
 def test_the_insight_keeps_its_command_delay_fade():
   assert [command_delay(None, speed, calibration="insight_txm_a040") for speed in (0., 15., 30.)] == \
-    pytest.approx([.175, .025, .025])
+    pytest.approx([.15, 0., 0.])
 
 
 @pytest.mark.parametrize("key", ["LagdToggle", "LagdToggleDelay"])
@@ -261,12 +261,12 @@ def test_insight_runs_the_corrected_ptm_at_this_trees_can_scale():
   # rows 0-1 of the corrected image are the Clarity's own command map and P table
   assert (cal.r5_key_bp, cal.r5_v, cal.kp_key_bp) == (core.CLARITY_A020.r5_key_bp, core.CLARITY_A020.r5_v,
                                                      core.CLARITY_A020.kp_key_bp)
-  assert cal.kp_pieces == core.CLARITY_A020.kp_pieces and cal.envelope_v == (1774,) * 9
+  assert cal.r5_per_key is None and cal.envelope_v == (1774,) * 9
   assert cal.r6_per_deg_s == -131.15 and core.INSIGHT_TXM_EPS_LOAD == (-4.876, -.1376, -4.452, -397.2, 65.41, -4.29)
   # R6 per published deg/s follows its own A table: 1.0 at centre, ~1.19-1.20 past 120 deg
   assert core.firmware_r6(1.0, 0.0, cal) == pytest.approx(-131.15)
   assert core.firmware_r6(1.0, 150.0, cal) == pytest.approx(-131.15 * 1.1927, rel=1e-3)
-  assert command_delay(None, 5.0, calibration="insight_txm_a040") == pytest.approx(.175)
+  assert command_delay(None, 5.0, calibration="insight_txm_a040") == pytest.approx(.15)
 
 
 @pytest.mark.parametrize("u", np.linspace(.02, .93, 40))

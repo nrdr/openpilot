@@ -129,7 +129,7 @@ def test_non_teg_center_boost_retains_the_existing_one_degree_fade():
 
 @pytest.mark.parametrize("profile", HONDA_VGR_PROFILES, ids=lambda profile: profile.name)
 def test_forward_map_matches_firmware_formula_inside_segment(profile):
-  index = len(profile.position_x) // 2
+  index = min(len(profile.position_x) // 2, len(profile.position_x) - 2)
   raw = (profile.position_x[index] + profile.position_x[index + 1]) / 2.0
   divisor = (profile.position_y[index] + profile.position_y[index + 1]) / 2.0
   linear_angle = raw * Q14 / (profile.center_divisor * RAW_UNITS_PER_DEGREE)

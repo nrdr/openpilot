@@ -74,7 +74,7 @@ VALUE_DEFAULTS = {
 }
 
 # Same baseline as Apply Suggested Settings, but only for keys that have never
-# been saved. Firmware Controller/SR wait for live CP admission; these defaults
+# been saved. PTM Controller/SR wait for live CP admission; these defaults
 # do not apply the preset lock or copy learned/manual geometry.
 for _key, _value in COMMON_HANDCRAFTED_VALUES + HONDA_FILTER_HANDCRAFTED_VALUES + HONDA_PID_HANDCRAFTED_VALUES:
   (BOOL_DEFAULTS if type(_value) is bool else VALUE_DEFAULTS)[_key] = _value

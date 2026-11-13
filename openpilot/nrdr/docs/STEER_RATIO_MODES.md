@@ -32,7 +32,7 @@ Invalid source choices, invalid angles, and blends that reverse/flatten the mapp
 - **Manual** linearly interpolates the two global values against absolute measured steering-wheel angle only for exact supported Honda endpoint-metadata fingerprints. Unsupported Hondas and non-Hondas resolve to CP-static fallback and the sliders are disabled. There is no lane-change fade.
 - **Comma** uses the last valid, finite `vehicleParameters.steerRatio` as one scalar. It uses immutable `CP.steerRatio` before the first valid sample and holds its last valid sample across transient message invalidity.
 - **NRDR Measured Curve** uses a fixed matching car/EPS profile, not live learning. `HONDA_CLARITY` preserves every original non-monotonic logged median through `247.5` degrees and adds one separately audited bilateral near-lock anchor at `435.7` degrees. It interpolates the raw-domain evidence, converts it into the small-angle ratio expected by `VehicleModel`, and clamps beyond `435.7` degrees. `HONDA_CIVIC` with exact TEG-A010 EPS uses the provisional September 13 vehicle-model-domain curve, with data-derived anchors at 3.292–58.671 degrees and endpoint holds outside that range. Unsupported car/EPS combinations resolve to CP-static fallback; no related-car curve is borrowed.
-- **Firmware** requires an exact recognized `HondaVgrProfile`. EPS Table A supplies relative shape only. Where the exact car and EPS have a rack map (`honda_rack_map.py`), that map is the absolute anchor: yaw-measured for the Clarity TRW-A020, Civic Bosch TBA-C020, Civic TEG-A010 (and the TBA-A030, the same car), Civic hatch TGG-A120 and Insight TXM-A040, predicted from the car's published specs for the Civic Bosch TBA-C120 and CR-V TLA-A040 (see below). Otherwise immutable `CP.steerRatio` is. Unsupported firmware resolves once to CP-static fallback; no family match is borrowed, and a map applies only to the car/EPS images it lists (one image covers another only when it is the same car).
+- **Firmware** requires an exact recognized `HondaVgrProfile`. EPS Table A supplies relative shape only. A matching rack map (`honda_rack_map.py`) supplies the absolute ratio: measured for the supported Clarity, Civic, Insight, CR-V A040 and Ridgeline; inferred from A040 for CR-V A220; spec-predicted for Civic C120 and Odyssey. RDX remains separately restricted. Otherwise immutable `CP.steerRatio` is used. Maps apply only to their listed car/EPS families; unsupported firmware falls back to CP-static geometry.
 
 ## Raw Clarity provenance
 
@@ -58,8 +58,10 @@ angle offset cancels) and `sf` the slip factor, fitted from how `R` changes with
 | Civic Bosch TBA-C020 | 14.93 -> 14.27 (283 deg) | -0.00065 | 15.38 | 294/289/2b7/2c6/2d4/1b8/251 |
 | Civic TEG-A010, TBA-A030 (the same 2016-18 sedan, same Table A) | 14.16 -> 13.78 (293 deg) | -0.00067 | 15.38 | 0000012d-00000139 (0000013d agrees) |
 | Insight TXM-A040 | 17.86 -> 17.17 (221 deg) | -0.00066 | 15.0 | 0000001e |
+| CR-V TLA-A040; A220 inferred from A040 | 17.38 -> 14.83 (414 deg; extrapolated above 173) | -0.00084 | 16.0 | A040 03/04/05; A220 30a/30d/39/3d cross-check |
+| Ridgeline T6Z-A110 | 17.08 constant | -0.00108 | 15.59 | 23d/23e, rear-wheel yaw and livePose/GPS |
 
-With a single-source Firmware rack map selected, the Firmware controller, curvature-measuring controllers and
+With a single-source Firmware rack map selected, the PTM Controller, curvature-measuring controllers and
 controlsd's current-curvature measurement use the full map (`angle_from_curvature`, `curvature_from_angle`), including
 its slip factor. Controlsd first updates VehicleModel from the frame's accepted snapshot, then passes the raw wheel
 angle, separate angle offset, speed and roll through that same selection; other modes retain their VehicleModel
@@ -84,6 +86,9 @@ measurement replaces its spec map. The tables' provenance says `spec`.
 
 | Car / EPS | Specs (lock turns, Honda ratio) | Ratio near centre -> lock | Slip factor |
 | --- | --- | --- | --- |
-| Civic Bosch TBA-C120 (2019-21 sedan) | 2.22, 10.94 | 14.47 -> 12.96 (400 deg) | -0.000675 |
+| Civic Bosch TBA-C120 (2019-21 sedan), donor-pinned | 2.22, 10.94 | 14.47 -> 12.96 (400 deg) | -0.000676 |
 | Civic hatch TGG-A120 (Sport) | 2.11, 11.12 | 14.88 -> 13.52 (380 deg) | -0.000624 |
-| CR-V TLA-A040 (2017-19) | 2.30, 12.3 | 16.82 -> 15.33 (414 deg) | -0.000589 |
+| Odyssey THR-A020 (2018-20), donor-pinned | 2.97, 14.35 | 16.49 -> 14.69 (535 deg) | -0.000376 |
+
+C120 and Odyssey runtime tables are pinned to Biscuit-Labs `45e5b91fae` for PTM baseline parity;
+the general spec-estimation tool remains available unchanged. CR-V now uses the measured A040 map above.

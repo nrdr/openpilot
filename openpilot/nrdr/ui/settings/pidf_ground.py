@@ -76,7 +76,7 @@ class PidfGroundLayout(Widget):
 
   @staticmethod
   def _controller_label():
-    return tr("Firmware Controller") if str(ui_state.params.get("NrdrLateralController")) in ("1", "b'1'") else tr("PIF Control")
+    return tr("PTM Controller") if str(ui_state.params.get("NrdrLateralController")) in ("1", "b'1'") else tr("PIF Control")
 
   @staticmethod
   def _commit_controller_selection(value):
@@ -93,7 +93,7 @@ class PidfGroundLayout(Widget):
       return
     options = [tr("PIF Control")]
     if yaw_controller_available(ui_state.CP, ui_state.CP_SP):
-      options.append(tr("Firmware Controller"))
+      options.append(tr("PTM Controller"))
 
     def selected(result):
       dialog, self._controller_dialog = self._controller_dialog, None
