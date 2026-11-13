@@ -37,10 +37,9 @@ class LongitudinalPlannerSP:
     self.resolver = SpeedLimitResolver(nrdr_enabled=nrdr_enabled)
     self.sla = (NrdrSpeedLimitAssist if nrdr_enabled else SpeedLimitAssist)(CP, CP_SP)
     self.generation = None
-    self.accel_boost_sp = None
+    self.accel_boost_sp = AccelBoostSP()
     if not self.mvl_enabled:
       self.generation = int(model_bundle.generation) if (model_bundle := get_active_bundle()) else None
-      self.accel_boost_sp = AccelBoostSP()
 
   def update_targets(self, sm: messaging.SubMaster, v_ego: float, a_ego: float, v_cruise: float) -> tuple[float, float]:
     CS = sm['carState']
@@ -76,15 +75,14 @@ class LongitudinalPlannerSP:
     return self.output_v_target, self.output_a_target
 
   def update(self, sm: messaging.SubMaster) -> None:
-    if self.accel_boost_sp is not None:
-      self.accel_boost_sp.update_params()
+    self.accel_boost_sp.update_params()
     self.events_sp.clear()
     self.e2e_alerts_helper.update(sm, self.events_sp)
 
   def apply_accel_boost(self, sm, e2e_accel, mpc_accel, cruise_accel):
-    if self.accel_boost_sp is not None and self.accel_boost_sp.enabled and self.openpilot_longitudinal:
+    if self.accel_boost_sp.enabled and self.openpilot_longitudinal:
       return self.accel_boost_sp.update(sm, e2e_accel, mpc_accel, cruise_accel)
-    # This NRDR base has no comma gas-override boost. Off must remain identity.
+    # Off leaves this model-acceleration input unchanged.
     return e2e_accel
 
   def publish_longitudinal_plan_sp(self, sm: messaging.SubMaster, pm: messaging.PubMaster) -> None:

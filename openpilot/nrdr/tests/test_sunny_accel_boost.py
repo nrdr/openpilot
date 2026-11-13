@@ -76,6 +76,8 @@ def load_text(text, env, filename):
 def boost_env():
   clock = [10_000_000_000]
   env = h.environment(log=log, Params=Params, PARAMS_UPDATE_PERIOD=3, time=NS(monotonic_ns=lambda: clock[0]))
+  env['c3_personality_accel_max'] = h.definitions(
+    h.ROOT / 'openpilot/nrdr/features/longitudinal/longitudinal_planner.py', env)['c3_personality_accel_max']
   return h.definitions(h.ROOT / BOOST, env), clock
 
 
@@ -106,10 +108,17 @@ def test_only_econ_changes_upstream_helper_source(boost_env, upstream_module):
   actual_class = next(n for n in actual.body if isinstance(n, ast.ClassDef))
   expected_class = next(n for n in expected.body if isinstance(n, ast.ClassDef))
   actual_update = next(n for n in actual_class.body if isinstance(n, ast.FunctionDef) and n.name == 'update')
-  check = next(n for n in actual_update.body if isinstance(n, ast.If))
-  econ = check.test.values.pop()
-  assert ast.unparse(econ) == "sm['selfdriveState'].personality == log.LongitudinalPersonality.econ"
+  boost_call = next(n for n in ast.walk(actual_update) if isinstance(n, ast.Call) and
+                    isinstance(n.func, ast.Name) and n.func.id == 'get_boost_max')
+  assert ast.unparse(boost_call.args.pop()) == "sm['carState'].vEgo"
   assert ast.dump(actual_class) == ast.dump(expected_class)
+  cap = next(n for n in actual.body if isinstance(n, ast.FunctionDef) and n.name == 'get_boost_max')
+  assert cap.args.args.pop().arg == 'v_ego'
+  assert ast.literal_eval(cap.args.defaults.pop()) == 0.
+  aggressive = cap.body[0].orelse[0].orelse[0]
+  econ = aggressive.orelse[0]
+  assert ast.unparse(econ.test) == 'personality == log.LongitudinalPersonality.econ'
+  aggressive.orelse = econ.orelse
   for tree in (actual, expected):
     tree.body = [n for n in tree.body if isinstance(n, (ast.Assign, ast.FunctionDef))]
   assert ast.dump(actual) == ast.dump(expected)
@@ -199,15 +208,24 @@ def test_upstream_param_poll_and_reset_parity(boost_env, upstream_module):
     assert (actual.boost, actual.total_boost) == (reference.boost, reference.total_boost)
 
 
-def test_econ_immediately_has_no_boost_and_no_new_calibration(boost_env):
+@pytest.mark.parametrize('speed', [0., 1., 1.5, 2., 6., 7., 10., 13., 17.5, 22.5, 27.5, 40., 55.])
+def test_econ_uses_interpolated_existing_curve_ratio(boost_env, speed):
+  module, _ = boost_env
+  ceiling = module['c3_personality_accel_max']
+  expected_cap = .1 * ceiling(speed, log.LongitudinalPersonality.econ) / ceiling(speed, log.LongitudinalPersonality.relaxed)
+  assert 0. < expected_cap < .1
+  assert module['get_boost_max'](log.LongitudinalPersonality.econ, speed) == pytest.approx(expected_cap)
   boost = enabled_boost(boost_env)
+  sm = messages(personality=log.LongitudinalPersonality.econ)
+  sm['carState'].vEgo = speed
+  assert apply(boost, sm) == pytest.approx(.2 + .01 * np.interp(speed, [1., 2.], [0., 1.]))
   for _ in range(100):
-    apply(boost)
-  assert boost.boost > 0
-  assert apply(boost, messages(personality=log.LongitudinalPersonality.econ)) == .2
-  assert boost.boost == boost.total_boost == 0.
-  # Returning to a supported personality starts with the original build step.
-  assert apply(boost) == pytest.approx(.21)
+    result = apply(boost, sm)
+  assert boost.boost == pytest.approx(expected_cap)
+  assert result == pytest.approx(.2 + expected_cap * np.interp(speed, [1., 2.], [0., 1.]))
+  sm['modelV2'].action.shouldStop = True
+  apply(boost, sm)
+  assert boost.boost == pytest.approx(max(0., expected_cap - .05))
 
 
 def test_no_headroom_or_negative_reset_in_helper(boost_env):
@@ -390,7 +408,7 @@ def test_call_point_is_only_core_planner_change(preport_sources):
   assert ast.dump(actual) == ast.dump(baseline)
 
 
-@pytest.mark.parametrize('gate', ['stock_long', 'non_e2e', 'econ', 'missing_predictions'])
+@pytest.mark.parametrize('gate', ['stock_long', 'non_e2e', 'missing_predictions'])
 def test_enabled_planner_gating_keeps_baseline(boost_env, preport_sources, gate):
   ci, _ = interface(pcm_mode=0)
   if gate == 'stock_long':
@@ -402,8 +420,6 @@ def test_enabled_planner_gating_keeps_baseline(boost_env, preport_sources, gate)
     sm = messages(now)
     if gate == 'non_e2e':
       sm['selfdriveState'].experimentalMode = False
-    elif gate == 'econ':
-      sm['selfdriveState'].personality = log.LongitudinalPersonality.econ
     elif gate == 'missing_predictions':
       sm['modelV2'].meta.disengagePredictions.brakePressProbs = []
     actual.update(copy.deepcopy(sm))

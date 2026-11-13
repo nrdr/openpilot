@@ -146,7 +146,7 @@ def planner_environment(mode):
     SpeedLimitResolver=ResolverBoundary,
     NrdrSpeedLimitAssist=NrdrAssistBoundary,
     SpeedLimitAssist=AssistBoundary,
-    AccelBoostSP=BoostBoundary if mode in ("normal", "legacy") else forbidden,
+    AccelBoostSP=BoostBoundary,
     get_active_bundle=(lambda: NS(generation=8)) if mode in ("normal", "legacy") else forbidden,
     messaging=NS(SubMaster=object, PubMaster=object, new_message=new_message),
   )
@@ -200,11 +200,9 @@ def test_target_policy_separate_from_tuning_ownership(mode):
   planner.sla.update_buttons(4)
   assert planner.sla.buttons == [4]
   planner.update(messages())
-  assert planner.apply_accel_boost({}, .2, .3, .4) == pytest.approx(.7 if mode in ("normal", "legacy") else .2)
-  if mode in ("normal", "legacy"):
-    assert planner.accel_boost_sp.reads == 1 and planner.generation == 8
-  else:
-    assert planner.accel_boost_sp is planner.generation is None
+  assert planner.apply_accel_boost({}, .2, .3, .4) == pytest.approx(.7)
+  assert planner.accel_boost_sp.reads == 1
+  assert planner.generation == (8 if mode in ("normal", "legacy") else None)
 
 
 def test_non_honda_target_policy_keeps_baseline_assist():
@@ -353,7 +351,7 @@ def test_restored_targets_reach_mvl_cruise_response_and_publication(target, expe
     planner.update(sm)
   assert planner.output_v_target == 15.
   assert planner.output_a_target < 0.
-  assert planner.accel_boost_sp is None and planner.mpc.kwargs["mvl_enabled"]
+  assert planner.accel_boost_sp.enabled and planner.mpc.kwargs["mvl_enabled"]
   assert planner.mpc.weights[1] == 1  # personality is unchanged
   payload = publish(planner, sm)
   expected_source = {"vision": "sccVision", "map": "sccMap", "speedLimit": "speedLimitAssist"}[target]

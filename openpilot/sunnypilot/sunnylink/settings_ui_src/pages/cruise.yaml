@@ -251,7 +251,7 @@ sections:
   - key: AccelBoostSP
     widget: toggle
     title: Acceleration Boost
-    description: "Adds acceleration assistance when Experimental Mode falls below the set speed. Off leaves the model's acceleration unchanged; this boost is inactive in Econ and with MVL."
+    description: "Adds acceleration assistance when Experimental Mode falls below the set speed, with any personality and MVL live learning. Off restores the usual acceleration behavior."
     enablement:
     - type: any
       conditions:

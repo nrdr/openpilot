@@ -38,7 +38,7 @@ POLLUTED = {
   "HondaLiveLearningGas": False, "HondaStopAccel": -9., "HondaStoppingDecelRateLong": 5.,
   "HondaVEgoStarting": 5., "HondaVEgoStopping": 5., "NrdrRoenAccelerationLimits": True,
   "NrdrCruiseMismatchCorrection": 105., "NrdrStandstillGapExtra": 5.,
-  "NrdrCruiseOverspeedAllowance": 10., "NrdrExperimentalEngineBraking": True, "AccelBoostSP": True,
+  "NrdrCruiseOverspeedAllowance": 10., "NrdrExperimentalEngineBraking": True, "AccelBoostSP": False,
   "LongPidTuneScaleAggressive": 500, "LongPidTuneScaleStandard": 0,
   "LongPidTuneScaleRelaxed": 500, "StaticFeedforwardLong": False,
 }
@@ -241,10 +241,15 @@ def test_planner_only_documented_donor_edits():
     "                  (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop)]\n" +
     "    experimental_mode = sm['selfdriveState'].experimentalMode\n" +
     "    if experimental_mode:\n" +
-    "      output_a_target_e2e = self.accel_boost.update(sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)\n" +
+    "      if self.accel_boost_sp.enabled:\n" +
+    "        output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(\n" +
+    "          self, sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)\n" +
+    "      else:\n" +
+    "        output_a_target_e2e = self.accel_boost.update(sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)\n" +
     "      candidates.append((output_a_target_e2e, LongitudinalPlanSource.e2e, output_should_stop_e2e))\n" +
     "    elif self.experimental_mode:\n" +
     "      self.accel_boost = AccelBoost()\n" +
+    "      self.accel_boost_sp.boost = self.accel_boost_sp.total_boost = 0.0\n" +
     "    self.experimental_mode = experimental_mode",
   )
   expected = expected.replace("longitudinalPlan.allowBrake = True",
@@ -283,10 +288,10 @@ def test_pinned_optional_feature_defaults():
   mode = node(git_source(SP + "speed_limit/common.py"), "Mode")
   values = {n.targets[0].id: ast.literal_eval(n.value) for n in mode.body if isinstance(n, ast.Assign)}
   assert values["information"] == 1 and values["assist"] == 3
-  # Sunny's optional boost remains excluded. Unlike the always-E2E donor,
-  # manual ExperimentalMode now owns whether the model participates at all.
-  names = {n.id for n in ast.walk(ast.parse(source(MPC + "mvl_planner.py"))) if isinstance(n, ast.Name)}
-  assert "AccelBoostSP" not in names
+  # Sunny's optional boost defaults off. Manual ExperimentalMode owns whether
+  # the model participates; enabling boost selects it instead of donor boost.
+  assert '{"AccelBoostSP", {PERSISTENT | BACKUP, BOOL, "0"}}' in source("openpilot/common/params_keys.h")
+  assert "if self.accel_boost_sp.enabled:" in source(MPC + "mvl_planner.py")
   assert "sm['selfdriveState'].experimentalMode" in source(MPC + "mvl_planner.py")
 
 
@@ -418,7 +423,7 @@ def test_econ_changes_only_follow_and_jerk_not_obstacles_or_fcw():
 
 class PlannerSPDouble:
   def __init__(self, *_):
-    pass
+    self.accel_boost_sp = NS(enabled=False, boost=0., total_boost=0.)
 
   def update(self, _):
     pass
@@ -644,7 +649,7 @@ def integrated_planner_classes():
     E2EAlertsHelper=lambda: NS(update=lambda *_: None, green_light_alert=False, lead_depart_alert=False),
     SmartCruiseControl=SmartCruiseBoundary, SpeedLimitResolver=ResolverBoundary,
     SpeedLimitAssist=TargetFeatureBoundary, NrdrSpeedLimitAssist=TargetFeatureBoundary,
-    AccelBoostSP=forbidden, get_active_bundle=lambda: None,
+    AccelBoostSP=lambda: NS(enabled=False, boost=0., total_boost=0., update_params=lambda: None), get_active_bundle=lambda: None,
     messaging=NS(SubMaster=object, PubMaster=object, new_message=message),
     LongitudinalMpc=PlannerMpcDouble, T_IDXS_MPC=np.linspace(0., 10., 13),
   )
@@ -668,14 +673,15 @@ def integrated_planner_messages(frame, rng, profile):
   return sm
 
 
-def test_mvl_constructs_sp_target_features_but_not_custom_accel_or_tune():
+def test_mvl_constructs_sp_target_features_and_optional_boost_but_not_custom_tune():
   current, _ = integrated_planner_classes()
   planner = current(car_params(), NS(enableGasInterceptor=False))
   assert planner.mvl_enabled and planner.mpc.kwargs["mvl_enabled"]
   assert isinstance(planner.scc, SmartCruiseBoundary)
   assert isinstance(planner.resolver, ResolverBoundary)
   assert isinstance(planner.sla, TargetFeatureBoundary)
-  assert planner.accel_boost_sp is planner.mpc.nrdr is planner.mpc.tune is None
+  assert not planner.accel_boost_sp.enabled
+  assert planner.mpc.nrdr is planner.mpc.tune is None
   assert not hasattr(planner, "nrdr")
 
 
@@ -751,7 +757,8 @@ def test_routed_mvl_sp_target_features_reach_planner_and_publication(feature_nam
   assert planner.mpc.a == feature.requested_a_target
   assert planner.a_cruise < neutral.a_cruise
   assert planner.output_a_target < neutral.output_a_target
-  assert planner.accel_boost_sp is planner.mpc.tune is planner.mpc.nrdr is None
+  assert not planner.accel_boost_sp.enabled
+  assert planner.mpc.tune is planner.mpc.nrdr is None
   planner.publish(sm, NS(send=lambda key, value: sent.update({key: value})))
   assert set(sent) == {"longitudinalPlan", "longitudinalPlanSP"}
   main = sent["longitudinalPlan"].longitudinalPlan

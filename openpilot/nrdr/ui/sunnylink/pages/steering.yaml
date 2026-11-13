@@ -45,6 +45,10 @@ sections:
           - {type: capability, field: nrdr_yaw_controller_available, equals: true}
         enablement:
         - {type: offroad_only}
+      - key: NrdrOptimizedLaneChanges
+        widget: toggle
+        title: Optimized Lane Changes
+        description: "Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the normal steering tune throughout the maneuver."
       - key: NrdrLatStiction
         widget: toggle
         title: Predictive Lateral Stiction
@@ -59,10 +63,6 @@ sections:
         - {type: not, condition: {type: param, key: NrdrLateralController, equals: 1}}
         enablement:
         - {type: capability, field: nrdr_interpolated_torque_pif_blend_available, equals: true}
-      - key: NrdrOptimizedLaneChanges
-        widget: toggle
-        title: Optimized Lane Changes
-        description: "Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the normal steering tune throughout the maneuver."
       - key: LatPScaleLowSpeed
         widget: option
       - key: LatIScaleLowSpeed

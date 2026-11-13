@@ -5,7 +5,8 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 
 Port of sunnypilot PR #2089, 8cf6ff9a33c94bdf2fcb02e228a9aef1a7e6dc7f.
-The math is unchanged. NRDR's extra Econ personality bypasses boost.
+The original three personalities retain upstream math. nrdr's Econ boost is
+scaled from Relaxed using the existing speed-dependent acceleration ceilings.
 """
 import numpy as np
 
@@ -13,6 +14,7 @@ from openpilot.cereal import log
 from openpilot.common.params import Params
 from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
+from openpilot.nrdr.features.longitudinal.longitudinal_planner import c3_personality_accel_max
 
 ACCEL_BOOST_MIN_SPEED = 1.0
 ACCEL_BOOST_MAX = (0.4, 0.25, 0.1)  # aggressive, standard, relaxed, m/s^2
@@ -22,13 +24,17 @@ GAS_PROB = (0.6, 0.8)  # predicts a human gas press at this hypothesis at about 
 CURVE_LAT_ACCEL = (1.5, 2.5)
 
 
-def get_boost_max(personality=log.LongitudinalPersonality.standard):
+def get_boost_max(personality=log.LongitudinalPersonality.standard, v_ego=0.0):
   if personality == log.LongitudinalPersonality.relaxed:
     return ACCEL_BOOST_MAX[2]
   elif personality == log.LongitudinalPersonality.standard:
     return ACCEL_BOOST_MAX[1]
   elif personality == log.LongitudinalPersonality.aggressive:
     return ACCEL_BOOST_MAX[0]
+  elif personality == log.LongitudinalPersonality.econ:
+    econ = c3_personality_accel_max(v_ego, log.LongitudinalPersonality.econ)
+    relaxed = c3_personality_accel_max(v_ego, log.LongitudinalPersonality.relaxed)
+    return ACCEL_BOOST_MAX[2] * econ / relaxed
   else:
     raise NotImplementedError("Longitudinal personality not supported")
 
@@ -56,15 +62,14 @@ class AccelBoostSP:
     model = sm['modelV2']
     brake_probs = model.meta.disengagePredictions.brakePressProbs
     gas_probs = model.meta.disengagePredictions.gasPressProbs
-    if (not sm['selfdriveState'].enabled or len(brake_probs) < 2 or len(gas_probs) < 2 or
-        sm['selfdriveState'].personality == log.LongitudinalPersonality.econ):
+    if not sm['selfdriveState'].enabled or len(brake_probs) < 2 or len(gas_probs) < 2:
       self.boost = self.total_boost = 0.0
       return output_a_target_e2e
 
     want = max(float(np.interp(brake_probs[1], BRAKE_PROB, [1.0, 0.0])), float(np.interp(gas_probs[1], GAS_PROB, [0.0, 1.0])))
     want = 0.0 if model.action.shouldStop else want
     want *= float(np.interp(abs(model.action.desiredCurvature) * sm['carState'].vEgo ** 2, CURVE_LAT_ACCEL, [1.0, 0.0]))
-    target = want * get_boost_max(sm['selfdriveState'].personality)
+    target = want * get_boost_max(sm['selfdriveState'].personality, sm['carState'].vEgo)
     self.boost = float(np.clip(target, self.boost - ACCEL_BOOST_RELEASE * DT_MDL, self.boost + ACCEL_BOOST_BUILD * DT_MDL))
     speed_scale = np.interp(sm['carState'].vEgo, [ACCEL_BOOST_MIN_SPEED, 2 * ACCEL_BOOST_MIN_SPEED], [0.0, 1.0])
     self.total_boost = self.boost * speed_scale * np.interp(output_a_target_e2e, [-0.7, -0.2, 5.0], [0.0, 1.0, 1.0], right=0.0)

@@ -62,8 +62,8 @@ class CruiseLayout(Widget):
 
     self.accel_boost_toggle = toggle_item_sp(
       title=tr("Acceleration Boost"),
-      description=tr("Adds acceleration assistance when Experimental Mode falls below the set speed. Off leaves the " +
-          "model's acceleration unchanged; this boost is inactive in Econ and with MVL."),
+      description=tr("Adds acceleration assistance when Experimental Mode falls below the set speed, with any personality " +
+          "and MVL live learning. Off restores the usual acceleration behavior."),
       param="AccelBoostSP")
 
     self.custom_acc_toggle = toggle_item_sp(

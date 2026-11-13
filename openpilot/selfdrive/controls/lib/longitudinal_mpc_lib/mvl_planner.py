@@ -124,12 +124,18 @@ class MvlLongitudinalPlanner(LongitudinalPlannerSP):
                   (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop)]
     experimental_mode = sm['selfdriveState'].experimentalMode
     if experimental_mode:
-      output_a_target_e2e = self.accel_boost.update(sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)
+      # Select one model-acceleration boost; MVL's gas/brake learning is separate.
+      if self.accel_boost_sp.enabled:
+        output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(
+          self, sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)
+      else:
+        output_a_target_e2e = self.accel_boost.update(sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)
       candidates.append((output_a_target_e2e, LongitudinalPlanSource.e2e, output_should_stop_e2e))
     elif self.experimental_mode:
       # Manual ACC-only selection must also stop learning model-override boost.
       # Retain planner/PID continuity, but discard boost from the previous mode.
       self.accel_boost = AccelBoost()
+      self.accel_boost_sp.boost = self.accel_boost_sp.total_boost = 0.0
     self.experimental_mode = experimental_mode
 
     output_a_target, self.mpc.source, _ = min(candidates, key=lambda c: c[0])

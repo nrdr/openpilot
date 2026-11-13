@@ -52,7 +52,8 @@ def test_plannerd_startup_and_repeated_model_ticks(mvl):
     EventsSP=lambda: NS(clear=lambda: None, add=lambda *_: None, to_msg=list),
     E2EAlertsHelper=lambda: NS(update=lambda *_: None, green_light_alert=False, lead_depart_alert=False),
     SmartCruiseControl=SmartCruiseBoundary, SpeedLimitResolver=ResolverBoundary, SpeedLimitAssist=baseline_sla,
-    NrdrSpeedLimitAssist=nrdr_sla, AccelBoostSP=forbidden, get_active_bundle=forbidden,
+    NrdrSpeedLimitAssist=nrdr_sla,
+    AccelBoostSP=lambda: NS(enabled=False, boost=0., total_boost=0., update_params=lambda: None), get_active_bundle=forbidden,
     messaging=messaging, LongitudinalMpc=PlannerMpcDouble, T_IDXS_MPC=np.linspace(0., 10., 13),
   )
   env["LongitudinalPlannerSP"] = definitions(source(SP + "longitudinal_planner.py"), env)["LongitudinalPlannerSP"]
@@ -102,4 +103,4 @@ def test_plannerd_startup_and_repeated_model_ticks(mvl):
     assert len(planner.scc.vision.calls) == len(planner.scc.map.calls) == len(planner.resolver.calls) == 2
     assert planner.sla.frame == 1  # starts at -1, advances only on model ticks
     assert planner.sla._release_toggle_prev == 4
-    assert planner.resolver.kwargs["nrdr_enabled"] and planner.accel_boost_sp is None
+    assert planner.resolver.kwargs["nrdr_enabled"] and not planner.accel_boost_sp.enabled

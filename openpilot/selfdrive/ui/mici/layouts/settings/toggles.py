@@ -54,8 +54,8 @@ class TogglesLayoutMici(NavScroller):
     self._experimental_btn.set_enabled(self._experimental_mode_editable)
     self._accel_boost_toggle = BigParamControl(
       "acceleration boost", "AccelBoostSP",
-      description=("Adds acceleration assistance when Experimental Mode falls below the set speed. Off leaves the " +
-          "model's acceleration unchanged; this boost is inactive in Econ and with MVL."),
+      description=("Adds acceleration assistance when Experimental Mode falls below the set speed, with any personality " +
+          "and MVL live learning. Off restores the usual acceleration behavior."),
     )
     self._accel_boost_toggle.set_enabled(lambda: ui_state.CP is not None and ui_state.has_longitudinal_control)
     is_metric_toggle = BigParamControl("use metric units", "IsMetric")

@@ -672,6 +672,38 @@
                   ]
                 },
                 {
+                  "key": "NrdrOptimizedLaneChanges",
+                  "widget": "toggle",
+                  "title": "Optimized Lane Changes",
+                  "description": "Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the normal steering tune throughout the maneuver.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
                   "key": "NrdrLatStiction",
                   "widget": "toggle",
                   "title": "Predictive Lateral Stiction",
@@ -764,38 +796,6 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
-                      }
-                    }
-                  ]
-                },
-                {
-                  "key": "NrdrOptimizedLaneChanges",
-                  "widget": "toggle",
-                  "title": "Optimized Lane Changes",
-                  "description": "Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the normal steering tune throughout the maneuver.",
-                  "enablement": [
-                    {
-                      "type": "any",
-                      "conditions": [
-                        {
-                          "type": "offroad_only"
-                        },
-                        {
-                          "type": "not",
-                          "condition": {
-                            "type": "param",
-                            "key": "NrdrSuggestedSettings",
-                            "equals": true
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "not",
-                      "condition": {
-                        "type": "param",
-                        "key": "NrdrHandcraftedLateralTune",
-                        "equals": true
                       }
                     }
                   ]
@@ -3593,7 +3593,7 @@
               "key": "AccelBoostSP",
               "widget": "toggle",
               "title": "Acceleration Boost",
-              "description": "Adds acceleration assistance when Experimental Mode falls below the set speed. Off leaves the model's acceleration unchanged; this boost is inactive in Econ and with MVL.",
+              "description": "Adds acceleration assistance when Experimental Mode falls below the set speed, with any personality and MVL live learning. Off restores the usual acceleration behavior.",
               "enablement": [
                 {
                   "type": "any",

@@ -178,8 +178,10 @@ class TestControllerUiLabels(unittest.TestCase):
     native = _native_class("pidf_ground.py", "PidfGroundLayout")(lambda: None, lambda: None)
     panel = _panel(self.schema, "steering", "nrdr_pidf_ground")
     self.assertEqual([item["key"] for item in panel["items"][:4]],
-                     ["NrdrLateralController", "NrdrLatStiction", key, "NrdrOptimizedLaneChanges"])
-    local, web = native._tuning_items[key], panel["items"][2]
+                     ["NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrLatStiction", key])
+    self.assertIs(native._scroller[0], native._controller)
+    self.assertIs(native._scroller[1], native._tuning_items["NrdrOptimizedLaneChanges"])
+    local, web = native._tuning_items[key], panel["items"][3]
     self.assertEqual(local["title"], "Use Device Yaw Correction")
     self.assertEqual(web["title"], local["title"])
     self.assertEqual(web["description"], local["description"])

@@ -32,16 +32,17 @@
       "jerk_factor": 1.5,
       "accel": "fixed pre-mode C3 Eco ceiling and fixed pre-mode cruise ceiling; positive cruise acceleration only",
       "cruise_jerk": "fixed pre-mode [1.6, 1.2, 0.8, 0.6] at [0, 10, 25, 40] m/s",
-      "other_behavior": "donor lead trajectories, obstacles, stopping, PID, FCW, acceleration boost"
+      "other_behavior": "donor lead trajectories, obstacles, stopping, PID and FCW; optional AccelBoostSP uses the speed-interpolated Econ/Relaxed acceleration-ceiling ratio"
     }
   },
   "exceptions": [
     "All personalities retain the fixed pre-MVL positive cruise ceilings: base [2.0, 1.6, 0.8, 0.6] at [0, 10, 25, 40] m/s, with C3 Sport/Normal/Eco ceilings for Standard/Relaxed/Econ. Applied before existing jerk smoothing in ACC and Experimental; radar/model braking, following distances, controller gains and learning are unchanged. No Params/LongTune reads or saved tune overrides are introduced.",
-    "Manual Experimental Mode is an explicit exception to the donor's unconditional model candidate. Off excludes model acceleration/shouldStop and model-override boost; radar MPC, cruise, FCW and forced deceleration remain. On uses the donor candidate/boost. Turning Off clears only model boost state, retaining planner/PID continuity.",
+    "Manual Experimental Mode is an explicit exception to the donor's unconditional model candidate. Off excludes model acceleration/shouldStop and both model boosts; radar MPC, cruise, FCW and forced deceleration remain. On uses the donor model candidate with the selected boost. Turning Off clears both model boost states, retaining planner/PID continuity.",
     "Host schema: allowThrottle=True, matching donor's absence of throttle suppression.",
     "Donor accelBoost publication omitted: host schema currently has no corresponding field; computation unchanged.",
     "Host MPC stores raw donor lead trajectories for existing diagnostics; no lead filtering/shaping.",
-    "User-selected SCC Vision/Map, speed-limit resolver/assist and custom cruise increments remain independent of MVL tuning. These may change the requested speed, not the controller gains, maps, learning, acceleration/jerk profiles or donor boost. AccelBoostSP remains unconstructed. With optional target features inactive, the target adapter is identity."
+    "User-selected SCC Vision/Map, speed-limit resolver/assist and custom cruise increments remain independent of MVL tuning. These may change the requested speed, not the controller gains, maps, learning or acceleration/jerk profiles. With optional target features inactive, the target adapter is identity.",
+    "AccelBoostSP is available alongside MVL. When selected, it replaces rather than stacks with the donor model-override boost. MVL gas/brake learning and cruise/MPC/stop arbitration remain unchanged. With AccelBoostSP off, the donor boost path is unchanged."
   ],
   "retired": [
     "Host cruise overspeed allowance runtime, helper, exports.",
@@ -60,8 +61,8 @@
     "SmartCruiseControlMap": "Driver preference; not overridden by MVL.",
     "SpeedLimitMode": "Driver preference, including Assist; not overridden by MVL.",
     "optional_speed_controls": "Normal SP target arbitration and publication, using NRDR speed-limit confirmation semantics on supported cars. Inactive target features leave MVL output unchanged; enabled features request a lower target without changing the controller tune. Opening the settings UI never overwrites the saved speed-limit choice.",
-    "ExperimentalMode": "Live manual selection via settings or distance-button hold. Off: cruise/radar candidates only, no model stop request or model boost update. On: donor model candidate and boost. DynamicExperimentalControl remains disabled; saved preference is never forced by this mode.",
-    "AccelBoostSP": "Ignored, not constructed. Donor gas-override AccelBoost participates only with Experimental Mode On; max 0.2, rate 0.025, per override 0.05, min speed 10 mph. Switching Off clears accumulated model boost.",
+    "ExperimentalMode": "Live manual selection via settings or distance-button hold. Off: cruise/radar candidates only, no model stop request or model boost update. On: donor model candidate and selected boost. DynamicExperimentalControl remains disabled; saved preference is never forced by this mode.",
+    "AccelBoostSP": "Defaults off. On selects Sunny boost instead of donor gas-override boost: caps 0.4/0.25/0.1 m/s² for Aggressive/Standard/Relaxed; Econ scales Relaxed by the existing speed-interpolated Econ/Relaxed acceleration-ceiling ratio. Off retains donor boost (max 0.2, rate 0.025, per override 0.05, min speed 10 mph). Both require Experimental Mode; MVL gas/brake learning is independent.",
     "GreenLightAlert_and_LeadDepartAlert": "Existing SP alert preferences remain read-only advisory events, not acceleration/trajectory inputs.",
     "not_changed": "Model selection, lateral control, stock safety, hardware/gear safety guard.",
     "V_CRUISE_MAX": "145 km/h pinned locally in MVL planner; host cruise selector's 169 km/h is unchanged outside mode. Above 145 km/h, target arbitration still uses the donor ceiling."

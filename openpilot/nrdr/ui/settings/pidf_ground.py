@@ -34,6 +34,10 @@ class PidfGroundLayout(Widget):
       return item
 
     items = [self._controller,
+      remember("NrdrOptimizedLaneChanges", toggle_item_sp(
+        title=tr("Optimized lane changes"), param="NrdrOptimizedLaneChanges",
+        description=tr("Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the " +
+            "normal steering tune throughout the maneuver."))),
       remember("NrdrLatStiction", toggle_item_sp(
         title=tr("Predictive Lateral Stiction"), param="NrdrLatStiction",
         description=tr("Reduces steering force as the wheel reaches its target, then holds it steady until another " +
@@ -41,10 +45,6 @@ class PidfGroundLayout(Widget):
       remember("NrdrDeviceYawCorrection", toggle_item_sp(
         title=tr("Use Device Yaw Correction"), param="NrdrDeviceYawCorrection",
         description=tr("Adds a small steering correction based on the car's measured motion. Off uses PIF control alone."))),
-      remember("NrdrOptimizedLaneChanges", toggle_item_sp(
-        title=tr("Optimized lane changes"), param="NrdrOptimizedLaneChanges",
-        description=tr("Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the " +
-            "normal steering tune throughout the maneuver."))),
       simple_button_item_sp(button_text=lambda: tr("Steer Ratio Tuning"), button_width=800, callback=steer_ratio_callback),
     ]
     for band, label in (("LowSpeed", "[0-25MPH]"), ("Standard", "[25-50MPH]"), ("Highway", "[50+MPH]")):
