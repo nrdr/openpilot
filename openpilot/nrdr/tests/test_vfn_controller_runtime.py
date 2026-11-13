@@ -13,6 +13,11 @@ from openpilot.nrdr.features.lateral.latcontrol_fw import LatControlFirmware
 from openpilot.nrdr.params.snapshots import ParamSnapshot
 
 
+@pytest.fixture(autouse=True)
+def world_model(monkeypatch):
+  monkeypatch.setattr("openpilot.nrdr.features.lateral.lane_change_tuning.active_model_supports_optimized_lane_changes", lambda: True)
+
+
 def car(fingerprint="HONDA_CLARITY", firmware=b"39990-TRW-A020", modified=True):
   cp = SimpleNamespace(brand="honda", carFingerprint=fingerprint, steerRatio=16.5,
                        wheelbase=2.75, steerLimitTimer=.8,
@@ -197,6 +202,18 @@ def test_disabled_optimization_and_waiting_for_nudge_keep_feedforward():
   control.set_live_tuning_snapshot(ParamSnapshot(2, {"NrdrOptimizedLaneChanges": True}))
   tick(control, state=1)
   assert control.core.ff_weight == 1.
+
+
+def test_ineligible_model_matches_toggle_off_through_complete_lane_change(monkeypatch):
+  monkeypatch.setattr("openpilot.nrdr.features.lateral.lane_change_tuning.active_model_supports_optimized_lane_changes", lambda: False)
+  enabled, baseline = controller(), controller()
+  enabled.set_live_tuning_snapshot(ParamSnapshot(1, {"NrdrOptimizedLaneChanges": True}))
+  baseline.set_live_tuning_snapshot(ParamSnapshot(1, {"NrdrOptimizedLaneChanges": False}))
+  for state in [0, 1, 2, 3, 0]:
+    for _ in range(30):
+      assert tick(enabled, state=state)[0] == tick(baseline, state=state)[0]
+      assert enabled.core.ff_weight == baseline.core.ff_weight
+  assert enabled.core.ff_weight == 1.
 
 
 def test_custom_pif_gains_and_filter_settings_do_not_retune_vfn():

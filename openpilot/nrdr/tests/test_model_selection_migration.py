@@ -84,8 +84,9 @@ def test_local_rebuilds_extend_only_qcom_catalog_without_duplicates(source, hard
                'verified_rebuild_bundles': lambda root, camera: [local],
                'ModelParser': SimpleNamespace(_parse_bundle=lambda bundle: SimpleNamespace(**bundle))}
   path = Path(__file__).resolve().parents[3] / 'openpilot/sunnypilot/models/fetcher.py'
-  method = next(n for n in ast.parse(path.read_text()).body if isinstance(n, ast.FunctionDef) and n.name == 'include_local_rebuilds')
-  exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), namespace)
+  methods = [n for n in ast.parse(path.read_text()).body if isinstance(n, ast.FunctionDef)
+             and n.name in ('local_rebuilds_for_source', 'include_local_rebuilds')]
+  exec(compile(ast.Module(body=methods, type_ignores=[]), str(path), 'exec'), namespace)
   bundles = namespace['include_local_rebuilds']([existing], source)
   assert len(bundles) == expected and bundles[0] is existing
   assert namespace['include_local_rebuilds'](bundles, source) == bundles

@@ -15,6 +15,11 @@ from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
 from openpilot.nrdr.ui.sunnylink_schema import sunnylink_fields_for_key
 
 
+@pytest.fixture(autouse=True)
+def world_model(monkeypatch):
+  monkeypatch.setattr("openpilot.nrdr.features.lateral.lane_change_tuning.active_model_supports_optimized_lane_changes", lambda: True)
+
+
 def settings(reduction=5.0, duration=1.0):
   return {"NrdrOptimizedLaneChanges": reduction != 0, "NrdrLaneChangeEntrySrReduction": reduction, "NrdrLaneChangeEntryReturnTime": duration}
 

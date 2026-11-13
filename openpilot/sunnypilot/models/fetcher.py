@@ -92,13 +92,35 @@ class ModelParser:
     return [bundle for bundle in found_bundles if is_bundle_version_compatible(bundle.to_dict())]
 
 
-def include_local_rebuilds(bundles, source):
+def local_rebuilds_for_source(source):
   if source != "qcom" or not COMMA_HARDWARE:
-    return bundles
+    return []
   camera = (1344, 760) if HARDWARE.get_device_type() == "mici" else (1928, 1208)
+  return verified_rebuild_bundles(Paths.model_root(), camera)
+
+
+def include_local_rebuilds(bundles, source):
   refs = {bundle.ref for bundle in bundles}
-  return bundles + [ModelParser._parse_bundle(bundle) for bundle in verified_rebuild_bundles(Paths.model_root(), camera)
+  return bundles + [ModelParser._parse_bundle(bundle) for bundle in local_rebuilds_for_source(source)
                     if bundle["ref"] not in refs]
+
+
+def sunnylink_model_catalog_overrides(params):
+  """Expose device-local models through Sunnylink's existing catalog fallback.
+
+  Only the RPC response changes. The downloaded catalog, selection, and upstream
+  URLs remain untouched; artifact admission still validates execution separately.
+  """
+  local = local_rebuilds_for_source("qcom")
+  if not local:
+    return {}
+  catalog = params.get("ModelManager_ModelsCache") or {}
+  bundles = catalog.get("bundles", [])
+  refs = {bundle["ref"] for bundle in bundles}
+  return {
+    "ModelManager_ActiveJson": {**(params.get("ModelManager_ActiveJson") or {}), "qcom": ""},
+    "ModelManager_ModelsCache": {**catalog, "bundles": bundles + [bundle for bundle in local if bundle["ref"] not in refs]},
+  }
 
 
 class ModelCache:

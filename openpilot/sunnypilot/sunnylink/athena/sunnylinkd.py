@@ -29,6 +29,7 @@ from websocket import (ABNF, WebSocket, WebSocketException, WebSocketTimeoutExce
 
 import openpilot.cereal.messaging as messaging
 from openpilot.sunnypilot.models.model_name import DEFAULT_MODEL, DEFAULT_BIG_MODEL
+from openpilot.sunnypilot.models.fetcher import sunnylink_model_catalog_overrides
 from openpilot.sunnypilot.selfdrive.car.sync_sunnylink_params import update_car_list_param
 from openpilot.sunnypilot.sunnylink.api import SunnylinkApi
 from openpilot.sunnypilot.sunnylink.utils import sunnylink_need_register, sunnylink_ready, get_param_as_byte, save_param_from_base64_encoded_string
@@ -217,9 +218,11 @@ def getParams(params_keys: list[str], compression: bool = False) -> str | dict[s
     }
 
     param_keys_validated = [key for key in params_keys if key in available_keys]
+    catalog_overrides = (sunnylink_model_catalog_overrides(params)
+                         if {"ModelManager_ActiveJson", "ModelManager_ModelsCache"}.intersection(param_keys_validated) else {})
     params_dict: dict[str, list[dict[str, str | bool | int]]] = {"params": []}
     for key in param_keys_validated:
-      value = get_param_as_byte(key)
+      value = json.dumps(catalog_overrides[key]).encode("utf-8") if key in catalog_overrides else get_param_as_byte(key)
       if value is None:
         value = get_param_as_byte(key, get_default=True)
       if value is None:

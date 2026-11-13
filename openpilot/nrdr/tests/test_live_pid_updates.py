@@ -9,6 +9,11 @@ from openpilot.nrdr.features.lateral.interpolated_torque_pif import ClassicTorqu
 from openpilot.nrdr.params.snapshots import ParamSnapshot
 
 
+@pytest.fixture(autouse=True)
+def world_model(monkeypatch):
+  monkeypatch.setattr("openpilot.nrdr.features.lateral.lane_change_tuning.active_model_supports_optimized_lane_changes", lambda: True)
+
+
 class NoOpLearner:
   def __init__(self, *args):
     pass
@@ -210,3 +215,16 @@ def test_optimized_lane_change_suppresses_feedforward_and_rate_damping(live_pid,
   update()
   assert controller.pid.f == 0.
   assert not controller.interpolated_torque_pif_enabled
+
+
+def test_ineligible_model_matches_toggle_off_through_complete_lane_change(monkeypatch):
+  monkeypatch.setattr("openpilot.nrdr.features.lateral.lane_change_tuning.active_model_supports_optimized_lane_changes", lambda: False)
+  enabled, _, enabled_update = make_live_pid(monkeypatch, SimpleNamespace(snapshot=make_snapshot(1, NrdrOptimizedLaneChanges=True)))
+  baseline, _, baseline_update = make_live_pid(monkeypatch, SimpleNamespace(snapshot=make_snapshot(1, NrdrOptimizedLaneChanges=False)))
+  for state in [0, 1, 2, 3, 0]:
+    for controller in (enabled, baseline):
+      controller.model_v2 = SimpleNamespace(meta=SimpleNamespace(laneChangeState=state))
+    for _ in range(30):
+      assert enabled_update() == baseline_update()
+      assert enabled.pid.f == baseline.pid.f
+      assert enabled.interpolated_torque_pif_enabled == baseline.interpolated_torque_pif_enabled

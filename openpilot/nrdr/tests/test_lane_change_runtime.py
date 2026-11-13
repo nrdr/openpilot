@@ -10,7 +10,7 @@ from openpilot.nrdr.features.driver_policy.lane_change import torque_from_latera
 from openpilot.nrdr.features.lateral.lane_change_tuning import LaneChangeEntry, shape_lane_change_curvature
 from openpilot.nrdr.features.lateral.steer_ratio_tuning import SteerRatioModeLatch, resolve_steer_ratio_selection
 from openpilot.nrdr.hooks.controlsd import lane_change_request
-from openpilot.nrdr.tests.test_lane_change_tuning import VehicleModel, selection
+from openpilot.nrdr.tests.test_lane_change_tuning import VehicleModel, selection, world_model  # noqa: F401
 from openpilot.selfdrive.controls.lib import desire_helper
 
 

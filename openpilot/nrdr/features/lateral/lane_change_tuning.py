@@ -1,6 +1,7 @@
 """Lane-change request shaping, not a change to measured steering geometry."""
 
 from dataclasses import dataclass
+from functools import cache
 import math
 
 
@@ -18,10 +19,56 @@ BASELINE_VALUES = {**OPTIMIZED_VALUES, "NrdrLaneChangeMinTime": 1.0,
                    "NrdrLaneChangeEntrySrReduction": 0.0, "NrdrLaneChangeTorqueFactor": 1.0,
                    "NrdrLaneChangeFrictionPercent": 100.0}
 
+# Catalog families, not generation numbers: World and Deep RL both use generation 12.
+OPTIMIZED_MODEL_FAMILIES = frozenset(("Legacy Models", "2025 Pre World Models", "2025 World Models", "2026 World Models"))
+# Older World/Pre-World models filed under Release, Master, or Custom Merge instead.
+OPTIMIZED_MODEL_REFS = frozenset((
+  "d807b5c476658dba7760d30949baa619074c4a4e",  # Filet o Fish
+  "d134fdd7d51ba84848866c0265e37508c38f9366",  # SP Vikander
+  "d3a0378ae601f61307a53d1173c251ee36c56317",  # Space Lab 2
+  "659898d553eb68c981036811e1b92f6557d4e494",  # Space Lab 3
+  "a6cf39c07a67dbc346af03010093fe4788c402d0",  # Down to Ride v6
+  "f1b8f510b2c554191ca15cebe35f2c5b304cf23c",  # Steam Powered
+  "b74f5189a74446015c0cf78a4a9f0134a347ae3b",  # Firehose
+  "3193eac5e385aa010694a8ac192ff38ffe000193",  # Nevada
+  "83b81b83cdf76a577946a1567f4644e1a018443c",  # North Nevada v2
+  "5eb912c025a2207c7d428deee74ded49e5905527",  # Cool Peoples v3
+  "ba783b9f913de089816598aa367a30499727a0ce",  # Dark Souls
+  "5ff0e48f90d662d8c9d5061adc63e90c198c9b81",  # Dark Souls v2
+  "7e3fd7a63c5a09c3fabe108b1b62bba3cf684878",  # WMI v12
+  "5b6436a90cf6902b8aaa71c2b6f3d7164d8ae391",  # CD210 (default small model)
+  "cb327933002bc1a00bf60a3c20af2eb7a5f653e5",  # OP Model, April 01
+  "052692b25d63c5ddda276b5c2271383b6aff129f",  # OP Model 7
+))
+
+
+def model_supports_optimized_lane_changes(bundle: dict | None, *, chestnut: bool = False) -> bool:
+  if chestnut:
+    return False
+  if not bundle:
+    from openpilot.sunnypilot.models.model_name import DEFAULT_MODEL_REF
+    return DEFAULT_MODEL_REF in OPTIMIZED_MODEL_REFS
+  if bundle.get("is_big", False):
+    return False
+  overrides = bundle.get("overrides", [])
+  if not isinstance(overrides, dict):
+    overrides = {item["key"]: item["value"] for item in overrides}
+  return overrides.get("folder") in OPTIMIZED_MODEL_FAMILIES or bundle.get("ref") in OPTIMIZED_MODEL_REFS
+
+
+@cache
+def active_model_supports_optimized_lane_changes() -> bool:
+  # Model selection is fixed for an onroad process lifetime. Warm this during
+  # live-parameter initialization; never poll Params/USB in the control loop.
+  from openpilot.common.params import Params
+  from openpilot.selfdrive.modeld.helpers import chestnut_present
+  return model_supports_optimized_lane_changes(Params().get("ModelManager_ActiveBundle"), chestnut=chestnut_present())
+
 
 def optimized_lane_changes_enabled(settings) -> bool:
   value = settings.get("NrdrOptimizedLaneChanges") if settings is not None else None
-  return value is None or str(value).strip().lower() in ("1", "true", "b'1'", "b'true'")
+  requested = value is None or str(value).strip().lower() in ("1", "true", "b'1'", "b'true'")
+  return requested and active_model_supports_optimized_lane_changes()
 
 
 def optimized_lane_change_active(settings, state) -> bool:

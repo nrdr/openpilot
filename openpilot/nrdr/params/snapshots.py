@@ -293,6 +293,9 @@ def get_live_params(profile: str = "controlsd") -> LiveParams:
     raise ValueError(f"unknown live parameter profile: {profile}")
   with _instances_lock:
     if profile not in _instances:
+      if profile in ("controlsd", "modeld"):
+        from openpilot.nrdr.features.lateral.lane_change_tuning import active_model_supports_optimized_lane_changes
+        active_model_supports_optimized_lane_changes()
       _instances[profile] = LiveParams(groups)
     return _instances[profile]
 

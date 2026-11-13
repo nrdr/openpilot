@@ -94,12 +94,14 @@ def test_mvl_locks_scales_without_erasing_custom_saved_values():
 
 
 @pytest.mark.parametrize("state,active", [(0, False), (1, False), (2, True), (3, True)])
-def test_optimized_lane_change_gate_supports_capnp_enum(state, active):
+def test_optimized_lane_change_gate_supports_capnp_enum(monkeypatch, state, active):
+  monkeypatch.setattr("openpilot.nrdr.features.lateral.lane_change_tuning.active_model_supports_optimized_lane_changes", lambda: True)
   assert optimized_lane_change_active({}, NS(raw=state)) == active
   assert not optimized_lane_change_active({"NrdrOptimizedLaneChanges": False}, NS(raw=state))
 
 
-def test_lane_change_retired_sliders_cannot_change_fixed_settings():
+def test_lane_change_retired_sliders_cannot_change_fixed_settings(monkeypatch):
+  monkeypatch.setattr("openpilot.nrdr.features.lateral.lane_change_tuning.active_model_supports_optimized_lane_changes", lambda: True)
   stale = {"NrdrLaneChangeMinTime": 9, "NrdrLaneChangeEntrySrReduction": 0,
            "NrdrLaneChangeEntryReturnTime": 2, "NrdrLaneChangeTorqueFactor": 9, "NrdrLaneChangeFrictionPercent": 100}
   for key, expected in (("NrdrLaneChangeMinTime", .5), ("NrdrLaneChangeEntrySrReduction", 5),
