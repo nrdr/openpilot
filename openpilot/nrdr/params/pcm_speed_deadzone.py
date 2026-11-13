@@ -5,15 +5,10 @@ PCM_SPEED_DEADZONE_KEY = "NrdrPcmSpeedDeadzone"
 PCM_SPEED_DEADZONE_DEFAULT = 0.15
 PCM_SPEED_DEADZONE_TITLE = "PCM Speed-Error Deadzone"
 PCM_SPEED_DEADZONE_DESCRIPTION = (
-  "Deadbands the Experimental Civic PCM speed-target error, not acceleration feedback. " +
-  "0 = Off; default 0.15 m/s. Editable while parked, even with Experimental off. Applies next drive; no device reboot."
+  "Reduces small speed corrections in Experimental Civic PCM control; zero disables it."
 )
 PCM_SPEED_DEADZONE_DETAILS = (
-  "Width ramps from zero at 0 m/s to the selected maximum at 9 m/s (about 20 mph). " +
-  "Inside the band, PCM requests current speed, not zero. Outside it, the width is subtracted from the error. " +
-  "Launch, friction-brake requests, stopping and override/AEB releases are not delayed. " +
-  "Speed-gain and ceiling learning pause while the deadband changes the target. " +
-  "This is not the old speed-error PID or an overspeed allowance."
+  "The deadzone grows from zero at standstill to your selected value at 9 m/s (about 20 mph), without delaying brake requests or stopping."
 )
 
 

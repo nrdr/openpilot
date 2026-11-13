@@ -23,16 +23,15 @@ class SteerRatioTuningLayout(Widget):
     self._back_button.set_click_callback(back_btn_callback)
     self._hybrid = toggle_item_sp(
       title=lambda: tr("Enable Hybrid Steer Ratio"), param="NrdrSteerRatioHybrid",
-      description=lambda: tr("Experimental: configure while parked. Blend A into B across 5 degrees. " +
-                             "OFF keeps your existing single-source selection. No speed-based switch."),
+      description=lambda: tr("Uses source A near center and blends into source B as the steering wheel turns. Off uses source A " +
+          "alone and preserves both selections."),
     )
     self._source_a = self._source_item("NrdrSteerRatioMode", "Ratio A: Near Center / Single Source")
     self._blend_start = option_item_sp(
       title=lambda: tr("Blend Starts At"), param="NrdrSteerRatioBlendStart", min_value=0, max_value=18000,
       value_change_step=100, use_float_scaling=True,
       label_callback=lambda value: f"{value / 100:g}-{value / 100 + 5:g}°",
-      description=lambda: tr("Angle from straight ahead, in either direction. Source B takes over fully 5 degrees later. " +
-                             "The same transition is followed in reverse when unwinding."),
+      description=lambda: tr("Sets the steering-wheel angle where the blend begins, in either direction. Source B takes over fully 5 degrees later."),
     )
     self._source_b = self._source_item("NrdrSteerRatioSourceB", "Ratio B: Beyond the Blend")
     self._manual_center = option_item_sp(
@@ -59,9 +58,7 @@ class SteerRatioTuningLayout(Widget):
     return multiple_button_item_sp(
       title=lambda: tr(title), param=param, button_width=215,
       buttons=[lambda: tr("Manual"), lambda: tr("Comma"), lambda: tr("Measured"), lambda: tr("Firmware")],
-      description=lambda: tr("Measured uses fixed logged data, not on-road learning. Firmware requires a recognized EPS and uses " +
-                             "the car's rack map: yaw-measured where one exists, else predicted from its specs. " +
-                             "Unavailable sources and invalid hybrid blends are rejected."),
+      description=lambda: tr("Choose Manual ratios, Comma's learned ratio, a Measured vehicle profile, or the Firmware steering-rack profile."),
     )
 
   @staticmethod
@@ -97,9 +94,9 @@ class SteerRatioTuningLayout(Widget):
       return tr("Waiting for car")
     selection = resolve_steer_ratio_selection(ui_state.CP, ui_state.params)
     detail = selection.effective_label if selection.available else selection.unavailable_reason
-    return tr(detail.replace("NRDR", "nrdr") + ". Configured preview, not proof of live controller consumption. " +
-              "Comma preview uses the stock anchor; runtime uses its last valid learned ratio. " +
-              "Invalid hybrid edits hold the last accepted geometry while active; startup uses stock fallback.")
+    return tr(detail.replace("NRDR", "nrdr") + ". Preview of the configured ratio. " +
+              "Comma uses its learned ratio while driving. " +
+              "Invalid blends retain the last working ratio, or the stock ratio at startup.")
 
   def _update_state(self):
     super()._update_state()

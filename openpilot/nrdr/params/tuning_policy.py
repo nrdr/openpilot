@@ -3,20 +3,12 @@
 from functools import lru_cache
 
 MVL_DESCRIPTION = (
-  "Selects MVL longitudinal control on Honda Nidec PCM, Bosch and gas-interceptor paths. " +
-  "MVL owns gas, braking and the complete Aggressive, Standard and Relaxed profiles, including following distances. " +
-  "Experimental Mode remains manually selectable: OFF uses ACC, ON uses end-to-end longitudinal planning. " +
-  "Only Econ retains nrdr's longer-following and gentler acceleration/jerk defaults. " +
-  "Speed-limit assistance, curve-speed control and custom cruise-button increments keep their own settings. " +
-  "Custom controller tuning stays editable; MVL ignores incompatible custom tuning. " +
-  "Civic Experimental PCM shaping can run alongside MVL learning; shaping bypasses Wind Brake without changing its saved choice. " +
-  "Change while parked. Applies next drive; no device reboot."
+  "Uses MVL's adaptive acceleration, braking, and driving profiles. Off returns to custom longitudinal " +
+      "control while preserving learned values and saved tuning."
 )
 
 SUGGESTED_DESCRIPTION = (
-  "Use the November 5 lateral setup: Sunny and matched Firmware Controller/steer ratio where supported. " +
-  "Tested with PopV2; your model stays unchanged. Confirm the exact modified EPS build before using firmware control. " +
-  "You can adjust the applied settings while parked. Turning this off keeps your saved tuning."
+  "Applies the recommended steering settings for your vehicle. Turning this off leaves the applied settings unchanged."
 )
 PIF_KEYS = frozenset(
   f"Lat{term}Scale{band}" for term in "PIF" for band in ("LowSpeed", "Standard", "Highway")

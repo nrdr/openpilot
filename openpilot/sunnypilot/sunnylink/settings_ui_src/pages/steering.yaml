@@ -14,7 +14,7 @@ sections:
   - key: Mads
     widget: toggle
     title: Enable Modular Assistive Driving System (MADS)
-    description: Enable MADS. Disable toggle to revert back to stock sunnypilot engagement/disengagement.
+    description: "Allows steering assistance to stay active independently of cruise control. Off restores normal combined engagement and disengagement."
     enablement:
     - $ref: '#/macros/offroad'
   sub_panels:
@@ -29,22 +29,22 @@ sections:
     - key: MadsMainCruiseAllowed
       widget: toggle
       title: Toggle with Main Cruise
-      description: 'Note: For vehicles without LFA/LKAS button, disabling this will prevent lateral control engagement.'
+      description: "Allows the main cruise button to enable steering assistance. Turning this off prevents steering engagement on cars without a separate LFA/LKAS button."
       enablement:
       - $ref: '#/macros/offroad'
       - $ref: '#/macros/mads_full_platforms'
     - key: MadsUnifiedEngagementMode
       widget: toggle
       title: Unified Engagement Mode (UEM)
-      description: Engage lateral and longitudinal control together with cruise control engagement.
-      details: 'Engage lateral and longitudinal control with cruise control engagement. Note: Once lateral control is engaged via UEM, it will remain engaged until it is manually disabled via the MADS button or car shut off.'
+      description: "Engages steering assistance together with cruise control. Steering remains active until you turn MADS off or shut down the car."
+      details: "Turning this setting off restores separate steering and cruise engagement."
       enablement:
       - $ref: '#/macros/offroad'
       - $ref: '#/macros/mads_full_platforms'
     - key: MadsSteeringMode
       widget: multiple_button
       title: Steering Mode on Brake Pedal
-      description: Choose how Automatic Lane Centering (ALC) behaves after the brake pedal is manually pressed in sunnypilot.
+      description: "Choose whether steering assistance continues or pauses when you press the brake pedal."
       options:
       - value: 0
         label: Remain Active
@@ -65,7 +65,7 @@ sections:
   - key: BlinkerPauseLateralControl
     widget: toggle
     title: Pause Lateral Control with Blinker
-    description: Pause lateral control with blinker when traveling below the desired speed selected.
+    description: "Pauses steering assistance when the turn signal is on below the selected speed. Off keeps steering assistance active."
     sub_items:
     - key: BlinkerMinLateralControlSpeed
       widget: option
@@ -103,7 +103,7 @@ sections:
   - key: EnforceTorqueControl
     widget: toggle
     title: Enforce Torque Lateral Control
-    description: Enable this to enforce sunnypilot to steer with Torque lateral control.
+    description: "Uses torque-based steering control instead of the vehicle's default controller. Off restores the default controller."
     visibility:
     - type: not
       condition:
@@ -127,7 +127,7 @@ sections:
     - key: LateralJerkTorqueController
       widget: toggle
       title: Lateral Jerk Torque Controller
-      description: Looks ahead at planned steering to reduce sudden corrections, so the wheel moves more smoothly through turns. Works with Self-Tune and custom tuning. Thanks to @twilsonco for the implementation.
+      description: "Anticipates changes in steering to reduce abrupt corrections through turns. Works with Self-Tune and custom tuning."
       visibility:
       - type: not
         condition:
@@ -139,13 +139,13 @@ sections:
     - key: LiveTorqueParamsToggle
       widget: toggle
       title: Self-Tune
-      description: Enables self-tune for Torque lateral control for platforms that do not use Torque lateral control by default.
+      description: "Learns torque-controller tuning while you drive, including on vehicles that do not use it by default."
       enablement:
       - $ref: '#/macros/offroad'
     - key: LiveTorqueParamsRelaxedToggle
       widget: toggle
       title: Less Restrict Settings for Self-Tune (Beta)
-      description: Less strict settings when using Self-Tune. This allows torqued to be more forgiving when learning values.
+      description: "Allows Self-Tune to learn from a wider range of driving conditions. Off uses the standard learning criteria."
       enablement:
       - $ref: '#/macros/offroad'
       - type: param
@@ -154,16 +154,13 @@ sections:
     - key: CustomTorqueParams
       widget: toggle
       title: Enable Custom Tuning
-      description: Enables custom tuning for Torque lateral control. Modifying Lateral Acceleration Factor and Friction below
-        will override the offline values indicated in the YAML files within "opendbc/car/torque_data". The values will also
-        be used live when "Manual Real-Time Tuning" toggle is enabled.
+      description: "Uses your acceleration-factor and friction values instead of the default torque tune. Manual Real-Time Tuning also applies them instead of learned values."
       enablement:
       - $ref: '#/macros/offroad'
     - key: TorqueParamsOverrideEnabled
       widget: toggle
       title: Manual Real-Time Tuning
-      description: Enforces the torque lateral controller to use the fixed values instead of the learned values from Self-Tune.
-        Enabling this toggle overrides Self-Tune values.
+      description: "Uses your fixed torque-tuning values instead of Self-Tune's learned values. Off allows learned values to be used again."
       enablement:
       - $ref: '#/macros/offroad'
       - type: param
@@ -232,9 +229,8 @@ sections:
   - key: AutoLaneChangeTimer
     widget: option
     title: Auto Lane Change by Blinker
-    description: Set a timer to delay the auto lane change when the blinker is used. Default is Nudge.
-    details: |-
-      Set a timer to delay the auto lane change operation when the blinker is used. No nudge on the steering wheel is required to auto lane change if a timer is set. Default is Nudge. Please use caution when using this feature. Only use the blinker when traffic and road conditions permit.
+    description: "Starts a lane change after the selected delay without a steering nudge; Nudge keeps manual confirmation. Signal only when it is safe to change lanes."
+    details: "You remain responsible for checking surrounding traffic before a lane change."
     options:
     - value: -1
       label: 'Off'
@@ -257,8 +253,8 @@ sections:
   - key: AutoLaneChangeBsmDelay
     widget: toggle
     title: 'Auto Lane Change: Delay with Blind Spot'
-    description: Add a delay timer for lane changes when BSM detects a vehicle in your blind spot.
-    details: Toggle to enable a delay timer for lane changes when blind spot monitoring (BSM) detects a vehicle in your blind spot.
+    description: "Adds a lane-change delay when blind-spot monitoring detects another vehicle."
+    details: "Off removes this extra delay."
     enablement:
     - type: capability
       field: enable_bsm

@@ -24,20 +24,19 @@ DESCRIPTIONS = {
     "Use the sunnypilot system for adaptive cruise control and lane keep driver assistance. " +
     "Your attention is required at all times to use this feature."
   ),
-  "DisengageOnAccelerator": tr_noop("When enabled, pressing the accelerator pedal will disengage sunnypilot."),
+  "DisengageOnAccelerator": tr_noop("Disengages cruise control when you press the accelerator. Off allows a temporary accelerator override."),
   "LongitudinalPersonality": tr_noop(
-    "Standard is recommended. In aggressive mode, sunnypilot will follow lead cars closer and be more aggressive with the gas and brake. " +
-    "In relaxed mode sunnypilot will stay further away from lead cars. Econ keeps the largest following gap with the smoothest gas and brake. " +
-    "On supported cars, you can cycle through these personalities with your steering wheel distance button."
+    "Choose the following distance and driving response: Aggressive follows closer, Relaxed leaves more space, " +
+    "and Econ favors gentler driving. Standard balances the two."
   ),
   "IsLdwEnabled": tr_noop(
     "Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line " +
     "without a turn signal activated while driving over 31 mph (50 km/h)."
   ),
   "AlwaysOnDM": tr_noop("Enable driver monitoring even when sunnypilot is not engaged."),
-  'RecordFront': tr_noop("Upload data from the driver facing camera and help improve the driver monitoring algorithm."),
+  'RecordFront': tr_noop("Uploads driver-camera recordings to help improve driver monitoring. Off stops these uploads."),
   "IsMetric": tr_noop("Display speed in km/h instead of mph."),
-  "RecordAudio": tr_noop("Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect."),
+  "RecordAudio": tr_noop("Records microphone audio during drives for dashcam playback. Off stops new recordings without deleting existing audio."),
 }
 
 
@@ -169,15 +168,8 @@ class TogglesLayout(Widget):
     )
 
     e2e_description = tr(
-      "sunnypilot defaults to driving in chill mode. Experimental mode enables alpha-level features that aren't ready for chill mode. " +
-      "Experimental features are listed below:<br>" +
-      "<h4>End-to-End Longitudinal Control</h4><br>" +
-      "Let the driving model control the gas and brakes. sunnypilot will drive as it thinks a human would, including stopping for red lights and stop signs. " +
-      "Since the driving model decides the speed to drive, the set speed will only act as an upper bound. This is an alpha quality feature; " +
-      "mistakes should be expected.<br>" +
-      "<h4>New Driving Visualization</h4><br>" +
-      "The driving visualization will transition to the road-facing wide-angle camera at low speeds to better show some turns. " +
-      "The Experimental mode logo will also be shown in the top right corner."
+      "Lets the model choose acceleration and braking, using set speed as a ceiling; Off uses normal adaptive cruise control. " +
+      "Experimental behavior can be unpredictable, so stay ready to take over."
     )
 
     if ui_state.CP is not None:

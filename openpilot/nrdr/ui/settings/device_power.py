@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 def automatic_shutdown_timer_description() -> str:
   from openpilot.system.ui.lib.multilang import tr
 
-  return tr("Sets the automatic shutdown timer after the vehicle is turned off. This applies only when Prevent Automatic Shutdown is disabled; battery safeguards may shut the device down sooner.\n(30h is the default)")  # noqa: E501
+  return tr("Sets how long the device stays on after the car is turned off. Battery protection may shut it down sooner; Prevent Automatic Shutdown bypasses both.")  # noqa: E501
 
 
 def automatic_shutdown_timer_enabled() -> bool:
@@ -30,7 +30,7 @@ def automatic_shutdown_toggle_item() -> ListItemSP:
 
   return toggle_item_sp(
     title=lambda: tr("Prevent Automatic Shutdown"),
-    description=lambda: tr("Prevents openpilot's automatic offroad shutdowns after the vehicle is turned off. This bypasses the Max Time Offroad timer and its low-voltage and estimated-battery safeguards, and can drain the vehicle battery. When disabled, those safeguards resume after a 60-second grace period. Manual Power Off still works."),  # noqa: E501
+    description=lambda: tr("Keeps the device on after the car is off, bypassing the shutdown timer and battery protection; this can drain the car battery. Turning this off restores those protections after 60 seconds."),  # noqa: E501
     param=NrdrParamKey.DISABLE_POWER_DOWN,
     enabled=ui_state.is_offroad,
   )

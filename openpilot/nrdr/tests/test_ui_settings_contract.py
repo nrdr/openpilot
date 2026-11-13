@@ -73,7 +73,8 @@ class TestUiSettingsContract(unittest.TestCase):
     self.assertNotIn("enablement", mode["options"][2])
     for item in tuning:
       self.assertIn({"type": "param", "key": "LaneGuidanceMode", "equals": 1}, item["enablement"])
-    self.assertIn("mutually exclusive", mode["details"])
+    self.assertIn("Off follows the driving model's path", mode["description"])
+    self.assertIn("Sunny requires a custom model", mode["details"])
 
   def test_driver_monitoring_first_reminder_contract(self):
     panel = self.panels["nrdr_driver_monitoring"]
@@ -88,10 +89,8 @@ class TestUiSettingsContract(unittest.TestCase):
     self.assertEqual(item["title"], "First Reminder Timing")
     self.assertTrue(item["needs_onroad_cycle"])
     self.assertEqual(item["enablement"], [{"type": "offroad_only"}])
-    self.assertIn("100% uses upstream timing", item["description"])
-    self.assertIn("gaps between later warnings stay unchanged", item["description"])
-    for text in ("No disable option", "12.5, 15.5, and 20.5", "12.5, 22.5, and 32.5", "5-second no-response interval",
-                 "Changes apply after reboot", "does not guarantee an emergency stop"):
+    self.assertIn("100% uses standard timing", item["description"])
+    for text in ("Driver monitoring stays enabled", "same intervals between later warnings", "Changes apply after reboot"):
       self.assertIn(text, item["details"])
     self.assertNotIn("capped", item["details"])
     contract = json.loads((Path(DEFAULT_SRC).parent / "settings_ui.schema.json").read_text(encoding="utf-8"))
@@ -124,18 +123,50 @@ class TestUiSettingsContract(unittest.TestCase):
     self.assertEqual(panel["id"], "nrdr_custom_audio_visuals")
     self.assertEqual(panel["label"], "Custom Audio & Visuals")
     self.assertIsNone(panel["trigger_key"])
-    item, = panel["items"]
+    item, ball, sidebar = panel["items"]
+    self.assertEqual([ball["key"], sidebar["key"]], ["NrdrConfidenceBall", "NrdrDeveloperSidebar"])
     self.assertEqual(item["key"], "NrdrEngagementSoundPack")
     self.assertEqual(item["widget"], "multiple_button")
     self.assertEqual(item["title"], "Engagement Sounds")
     self.assertEqual(item["options"], [{"value": 0, "label": "Current"}, {"value": 1, "label": "June 2026"}])
     self.assertEqual(item["description"],
-                     "Choose engage, disengage and engagement-refused sounds with their matching automatic volume. Other alerts are unchanged.")
-    self.assertEqual(item["details"], "Applies to the next chime without reboot. Quiet Mode still mutes these sounds.")
+                     "Choose current or June 2026 engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged.")
+    self.assertEqual(item["details"], "Applies to the next engagement, disengagement, or engagement-refused chime.")
+    for visual in (ball, sidebar):
+      self.assertEqual(visual["visibility"], [{"type": "capability", "field": "device_type", "equals": "mici"}])
+      self.assertFalse(visual.get("enablement"))
+      self.assertFalse(visual.get("needs_onroad_cycle"))
     for node in (self.pages["steering"], self.nrdr, panel, item, *item["options"]):
       for field in ("visibility", "enablement", "trigger_condition", "needs_onroad_cycle", "attestation_required"):
         self.assertFalse(node.get(field), (field, node))
     self.assertEqual(sum(i["key"] == item["key"] for i in _items(self.schema)), 1)
+
+  def test_copy_explains_saved_values_and_reset_behavior(self):
+    items = {item["key"]: item for item in _items(self.schema)}
+    for key, phrase in (
+      ("NrdrSuggestedSettings", "Turning this off leaves the applied settings unchanged"),
+      ("HondaTorqueLowPassFilter", "without changing your saved values"),
+      ("HondaLiveLearningGas", "preserving learned values and saved tuning"),
+      ("NrdrHondaWindBrake", "without changing your saved choice"),
+      ("NrdrResetLiveGas", "Brake tuning, PID settings, and the learning switch are unchanged"),
+      ("TeslaMadsScreenButton", "Off resets MADS settings to their defaults"),
+    ):
+      with self.subTest(key=key):
+        self.assertIn(phrase, items[key]["description"])
+
+  def test_copy_retains_critical_warnings(self):
+    items = {item["key"]: item for item in _items(self.schema)}
+    for key, field, phrase in (
+      ("DisablePowerDown", "description", "can drain the car battery"),
+      ("AlphaLongitudinalEnabled", "description", "disables factory Automatic Emergency Braking"),
+      ("HondaBoschARadar", "description", "does not restore factory emergency braking"),
+      ("HondaTorqueLowPassFilter", "details", "excessive delay can cause steering oscillations"),
+      ("HondaInjectionTest", "description", "do not use on public roads"),
+      ("NrdrClearDashFaults", "description", "silences the factory forward-collision warning chime"),
+      ("NrdrLateralController", "details", "Older builds with the same version name are incompatible"),
+    ):
+      with self.subTest(key=key):
+        self.assertIn(phrase, items[key][field])
 
 
 if __name__ == "__main__":

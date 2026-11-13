@@ -22,8 +22,8 @@ class SteerFiltersLayout(Widget):
       param="HondaTorqueLowPassFilter",
       title=lambda: tr("Low Pass Filter (tau) (Default: ON)"),
       description=lambda: tr(
-        "Master switch for all three speed bands. OFF bypasses filtering even when saved tau values are nonzero. " +
-        "Changing tau does not enable the filter. Higher tau adds smoothing and delay; too much delay can cause oscillations."
+        "Smooths steering commands; Off disables filtering without changing saved values. Higher values add " +
+            "delay, which can cause steering oscillations if excessive."
       ),
     )
 
@@ -33,7 +33,7 @@ class SteerFiltersLayout(Widget):
       min_value=0,
       max_value=500,
       value_change_step=1,
-      description=lambda: tr("Time constant below 25 mph, in seconds. Requires the master switch ON. 0 bypasses only this speed band."),
+      description=lambda: tr("Sets steering smoothing below 25 mph, in seconds. Higher values add smoothing and delay; zero disables smoothing in this range."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -44,7 +44,8 @@ class SteerFiltersLayout(Widget):
       min_value=0,
       max_value=500,
       value_change_step=1,
-      description=lambda: tr("Time constant from 25 to below 50 mph, in seconds. Requires the master switch ON. 0 bypasses only this speed band."),
+      description=lambda: tr("Sets steering smoothing from 25 to 50 mph, in seconds. Higher values add smoothing and delay; zero " +
+          "disables smoothing in this range."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -55,7 +56,8 @@ class SteerFiltersLayout(Widget):
       min_value=0,
       max_value=500,
       value_change_step=1,
-      description=lambda: tr("Time constant at or above 50 mph, in seconds. Requires the master switch ON. 0 bypasses only this speed band."),
+      description=lambda: tr("Sets steering smoothing at 50 mph and above, in seconds. Higher values add smoothing and delay; " +
+          "zero disables smoothing in this range."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -64,8 +66,7 @@ class SteerFiltersLayout(Widget):
       param="HondaSteerDeltaLimiter",
       title=lambda: tr("Legacy Steer Delta Rate Limiter (Default: OFF)"),
       description=lambda: tr(
-        "Limits how quickly requested steering torque can rise or fall. This is an older system of limiting and may no longer prove useful " +
-        "compared to the low pass filter."
+        "Limits how quickly steering force can change. Off removes this additional rate limit without changing the saved limits."
       ),
     )
 
@@ -75,7 +76,7 @@ class SteerFiltersLayout(Widget):
       min_value=0,
       max_value=10000,
       value_change_step=10,
-      description=lambda: tr("Controls the maximum upward steering torque rate when the rate limiter is enabled. Too low will add lag."),
+      description=lambda: tr("Sets how quickly steering force can increase when the rate limiter is on. Lower values add lag."),
       label_callback=lambda value: f"{value / 100:.1f}",
       use_float_scaling=True,
     )
@@ -86,7 +87,7 @@ class SteerFiltersLayout(Widget):
       min_value=0,
       max_value=10000,
       value_change_step=10,
-      description=lambda: tr("Controls the maximum downward steering torque rate when the rate limiter is enabled. Too low will add lag."),
+      description=lambda: tr("Sets how quickly steering force can decrease when the rate limiter is on. Lower values add lag."),
       label_callback=lambda value: f"{value / 100:.1f}",
       use_float_scaling=True,
     )

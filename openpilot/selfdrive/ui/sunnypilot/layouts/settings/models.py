@@ -93,20 +93,19 @@ class ModelsLayout(Widget):
                                                             f" {'km/h' if ui_state.is_metric else 'mph'}")
 
     self.lane_turn_desire_toggle = toggle_item_sp(tr("Use Lane Turn Desires"),
-                                                  tr("If you're driving at 20 mph (32 km/h) or below and have your blinker on," +
-                                                     " the car will plan a turn in that direction at the nearest drivable path. " +
-                                                     "This prevents situations (like at red lights) where the car might plan the wrong turn direction."),
+                                                  tr("Uses the turn signal to guide the model's turn direction at low speeds. Off leaves turn " +
+                                                      "selection to the model."),
                                                   param="LaneTurnDesire")
 
     self.delay_control = option_item_sp(tr("Adjust Software Delay"), "LagdToggleDelay", 5, 100,
-                                         tr("Additional software delay when live learning is off. Clarity Firmware Controller " +
-                                           "uses its measured speed schedule instead; Civic uses this setting normally."),
+                                         tr("Sets the additional steering prediction delay when live delay learning is off."),
                                         1, None, True, "", style.BUTTON_ACTION_WIDTH, None, True, lambda v: f"{v / 100:.2f}s")
 
     self.lagd_toggle = toggle_item_sp(tr("Live Learning Steer Delay"), "", param="LagdToggle")
 
     self.camera_offset = option_item_sp(tr("Adjust Camera Offset"), "CameraOffset", -35, 35,
-                                        tr("Virtually shift camera's perspective to move model's center to Left(+ values) or Right (- values)"),
+                                        tr("Adjusts the model's view of the camera position. Positive values shift its center left; negative " +
+                                            "values shift it right."),
                                         1, None, True, "", style.BUTTON_ACTION_WIDTH, None, True,
                                         lambda v: f"{v / 100:.2f} m")
 
@@ -116,13 +115,10 @@ class ModelsLayout(Widget):
   def _update_lagd_description(self, lagd_toggle: bool):
     profile = firmware_controller_profile(ui_state.CP, ui_state.CP_SP)
     if firmware_controller_selected(ui_state.params, ui_state.CP, ui_state.CP_SP) and profile.prediction_schedule:
-      self.lagd_toggle.set_description(tr("Clarity Firmware Controller uses a measured speed-dependent prediction delay: " +
-                                         "0.15/0.08/0.10/0.20/0.30 s at 3.5/7/12/20/30 m/s, smoothly interpolated. " +
-                                         "Live/manual settings are preserved, not overwritten. " +
-                                         "Command delay and model-specific smoothing are separate."))
+      self.lagd_toggle.set_description(tr("Uses vehicle-specific steering prediction timing. Your manual delay and learning choices are " +
+          "preserved for other controllers."))
       return
-    desc = tr("Enable this for the car to learn and adapt its steering response time. Disable to use a fixed steering response time. " +
-              "Keeping this on provides the stock openpilot experience.")
+    desc = tr("Learns the car's steering response time as you drive. Off uses a fixed delay.")
     if lagd_toggle:
       desc += f"<br>{tr('Live Steer Delay:')} {ui_state.sm['lateralDelay'].lateralDelay:.3f} s"
     elif ui_state.CP is not None:

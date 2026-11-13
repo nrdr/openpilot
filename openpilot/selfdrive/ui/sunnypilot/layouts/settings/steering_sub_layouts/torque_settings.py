@@ -43,9 +43,7 @@ class TorqueSettingsLayout(Widget):
     self._jerk_aware_toggle = toggle_item_sp(
       param="LateralJerkTorqueController",
       title=lambda: tr("Lateral Jerk Torque Controller"),
-      description=lambda: tr("Looks ahead at planned steering to reduce sudden corrections, so the wheel moves " +
-                             "more smoothly through turns. Works with Self-Tune and custom tuning. " +
-                             "Thanks to @twilsonco for the implementation."),
+      description=lambda: tr("Anticipates changes in steering to reduce abrupt corrections through turns. Works with Self-Tune and custom tuning."),
     )
     self._torque_control_versions = ListItemSP(
       title=tr("Torque Control Tune Version"),
@@ -56,28 +54,23 @@ class TorqueSettingsLayout(Widget):
     self._self_tune_toggle = toggle_item_sp(
       param="LiveTorqueParamsToggle",
       title=lambda: tr("Self-Tune"),
-      description=lambda: tr("Enables self-tune for Torque lateral control for platforms that do not use " +
-                             "Torque lateral control by default."),
+      description=lambda: tr("Learns torque-controller tuning while you drive, including on vehicles that do not use it by default."),
     )
     self._relaxed_tune_toggle = toggle_item_sp(
       param="LiveTorqueParamsRelaxedToggle",
       title=lambda: tr("Less Restrict Settings for Self-Tune (Beta)"),
-      description=lambda: tr("Less strict settings when using Self-Tune. This allows torqued to be more " +
-                             "forgiving when learning values."),
+      description=lambda: tr("Allows Self-Tune to learn from a wider range of driving conditions. Off uses the standard learning criteria."),
     )
     self._custom_tune_toggle = toggle_item_sp(
       param="CustomTorqueParams",
       title=lambda: tr("Enable Custom Tuning"),
-      description=lambda: tr("Enables custom tuning for Torque lateral control. " +
-                             "Modifying Lateral Acceleration Factor and Friction below will override the offline values " +
-                             "indicated in the YAML files within \"opendbc/car/torque_data\". " +
-                             "The values will also be used live when \"Manual Real-Time Tuning\" toggle is enabled."),
+      description=lambda: tr("Uses your acceleration-factor and friction values instead of the default torque tune. Manual " +
+          "Real-Time Tuning also applies them instead of learned values."),
     )
     self._torque_prams_override_toggle = toggle_item_sp(
       param="TorqueParamsOverrideEnabled",
       title=lambda: tr("Manual Real-Time Tuning"),
-      description=lambda: tr("Enforces the torque lateral controller to use the fixed values instead of the learned " +
-                             "values from Self-Tune. Enabling this toggle overrides Self-Tune values."),
+      description=lambda: tr("Uses your fixed torque-tuning values instead of Self-Tune's learned values. Off allows learned values to be used again."),
     )
     self._torque_lat_accel_factor = option_item_sp(
       title=lambda: tr("Lateral Acceleration Factor"),

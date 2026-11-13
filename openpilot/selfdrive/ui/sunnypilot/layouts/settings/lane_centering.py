@@ -54,10 +54,8 @@ class LaneCenteringLayout(Widget):
 
     self._lane_guidance_mode = multiple_button_item_sp(
       title=tr("Lane Centering Method"),
-      description=tr("Choose exactly one method. Off uses the model unchanged. Sunny adds SunnyPilot's confidence-weighted alpha correction " +
-                     "inside the custom model runner and yields when the model appears to be going around an obstacle. " +
-                     "Sunny requires a non-Default custom model. Star uses nrdr's delay-aware lane-centering controller and the tuning below. " +
-                     "Sunny and Star are mutually exclusive."),
+      description=tr("Choose Sunny or Star lane-centering assistance; Off follows the model's path without added " +
+          "correction. Sunny requires a custom model; Star uses the tuning below."),
       buttons=[tr("Off"), tr("Sunny"), tr("Star")],
       selected_index=LANE_GUIDANCE_MODES.index(lane_guidance_mode_from_params(ui_state.params)),
       button_width=260,
@@ -67,16 +65,15 @@ class LaneCenteringLayout(Widget):
     self._lane_guidance_mode.action_item.set_enabled(self._write_allowed)
     self._pause_on_signal_toggle = toggle_item_sp(
       title=tr("Fade on Turn Signal"),
-      description=tr("Fade out the correction while a turn signal is active. Lane-change maneuvers always suspend the correction immediately, " +
-                     "regardless of this setting."),
+      description=tr("Pauses lane-centering corrections while the turn signal is on. Lane changes always pause these corrections, even with this setting off."),
       initial_state=bool(ui_state.params.get("LaneCenteringPauseOnSignal", return_default=True)),
       enabled=self._settings_writable,
       callback=self._on_pause_on_signal,
     )
     self._minimum_speed_control = self._option_item(
       title=tr("Minimum Lane Centering Speed"),
-      description=tr("Arm lane centering at this speed. Once active, it releases smoothly 3 mph below the selected speed, bounded by the " +
-                     "5 m/s controller floor."),
+      description=tr("Sets the speed at which lane-centering assistance starts. Once active, it fades out 3 mph below " +
+          "this speed, with a lower limit of about 11 mph."),
       param="LaneCenteringMinSpeed",
       min_value=LANE_CENTERING_MIN_SPEED_MIN_MPH,
       max_value=LANE_CENTERING_MIN_SPEED_MAX_MPH,
@@ -94,8 +91,8 @@ class LaneCenteringLayout(Widget):
     )
     self._strength_control = self._option_item(
       title=tr("Lane-Centering Strength"),
-      description=tr("Blend the model path toward the lane-center path. 0% uses the model path; 100% requests the lane-center path. " +
-                     "Confidence, Model Break-In, and the existing correction and steering limits still apply. 30% is the default."),
+      description=tr("Sets how strongly Star favors the lane center over the model's path. Zero follows the model path " +
+          "without added lane-centering correction."),
       param="LaneCenteringStrength",
       min_value=0,
       max_value=100,
@@ -106,8 +103,8 @@ class LaneCenteringLayout(Widget):
     )
     self._model_authority_control = self._option_item(
       title=tr("Model Break-In"),
-      description=tr("When a confident model path disagrees with lane center by more than 0.15 m, allow it to reduce the correction. At 100%, " +
-                     "the correction can reach zero by 0.50 m of disagreement; 0% never reduces it."),
+      description=tr("Lets Star yield to a confident model path that differs from the lane center. Higher values allow " +
+          "more correction to be removed; zero disables this behavior."),
       param="LaneCenteringE2EAuthority",
       min_value=0,
       max_value=100,

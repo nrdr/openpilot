@@ -38,8 +38,8 @@ class SteeringLayout(Widget):
     self._scroller = Scroller(items, line_separator=False, spacing=0)
 
   def _initialize_items(self):
-    self._mads_base_desc = tr("Enable the beloved MADS feature. " +
-                              "Disable toggle to revert back to stock sunnypilot engagement/disengagement.")
+    self._mads_base_desc = tr("Allows steering assistance to stay active independently of cruise control. Off restores normal " +
+        "combined engagement and disengagement.")
     self._mads_limited_desc = tr("This platform supports limited MADS settings.")
     self._mads_full_desc = tr("This platform supports all MADS settings.")
     self._mads_check_compat_desc = tr("Start the vehicle to check vehicle compatibility.")
@@ -61,7 +61,7 @@ class SteeringLayout(Widget):
     )
     self._blinker_control_toggle = toggle_item_sp(
       param="BlinkerPauseLateralControl",
-      description=lambda: tr("Pause lateral control with blinker when traveling below the desired speed selected."),
+      description=lambda: tr("Pauses steering assistance when the turn signal is on below the selected speed. Off keeps steering assistance active."),
       title=lambda: tr("Pause Lateral Control with Blinker"),
     )
     self._blinker_control_options = option_item_sp(
@@ -85,7 +85,7 @@ class SteeringLayout(Widget):
     self._torque_control_toggle = toggle_item_sp(
       param="EnforceTorqueControl",
       title=lambda: tr("Enforce Torque Lateral Control"),
-      description=lambda: tr("Enable this to enforce sunnypilot to steer with Torque lateral control."),
+      description=lambda: tr("Uses torque-based steering control instead of the vehicle's default controller. Off restores the default controller."),
     )
     self._torque_customization_button = simple_button_item_sp(
       button_text=lambda: tr("Customize Torque Params"),

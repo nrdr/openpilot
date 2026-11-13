@@ -31,8 +31,7 @@ class VisualsLayout(Widget):
     self._toggle_defs = {
       "BlindSpot": (
         lambda: tr("Show Blind Spot Warnings"),
-        tr("Enabling this will display warnings when a vehicle is detected in your " +
-           "blind spot as long as your car has BSM supported."),
+        tr("Shows a warning when the car's blind-spot sensors detect another vehicle. Off hides the on-screen warnings without changing those sensors."),
         None,
       ),
       "TorqueBar": (
@@ -42,8 +41,7 @@ class VisualsLayout(Widget):
       ),
       "RainbowMode": (
         lambda: tr("Enable Tesla Rainbow Mode"),
-        tr("A beautiful rainbow effect on the path the model wants to take. " +
-           "It does not affect driving in any way."),
+        tr("Adds a rainbow effect to the displayed driving path without changing driving behavior."),
         None,
       ),
       "StandstillTimer": (
@@ -53,45 +51,37 @@ class VisualsLayout(Widget):
       ),
       "RoadNameToggle": (
         lambda: tr("Display Road Name"),
-        tr("Displays the name of the road the car is traveling on." +
-           "<br>The OpenStreetMap database of the location must be downloaded from " +
-           "the OSM panel to fetch the road name."),
+        tr("Shows the current road name on the driving screen. Requires downloaded OpenStreetMap data for the area."),
         None,
       ),
       "GreenLightAlert": (
         lambda: tr("Green Traffic Light Alert (Beta)"),
-        tr("A chime and on-screen alert will play when the traffic light you are waiting for " +
-           "turns green and you have no vehicle in front of you." +
-           "<br>Note: This chime is only designed as a notification. " +
-           "It is the driver's responsibility to observe their environment and make decisions accordingly."),
+        tr("Plays an alert when the light turns green and there is no vehicle ahead. Check traffic before proceeding."),
         None,
       ),
       "LeadDepartAlert": (
         lambda: tr("Lead Departure Alert (Beta)"),
-        tr("A chime and on-screen alert will play when you are stopped, and the vehicle in front of you start moving." +
-           "<br>Note: This chime is only designed as a notification. " +
-           "It is the driver's responsibility to observe their environment and make decisions accordingly."),
+        tr("Plays an alert when you are stopped and the vehicle ahead starts moving. Check traffic before proceeding."),
         None,
       ),
       "TrueVEgoUI": (
         lambda: tr("Speedometer: Always Display True Speed"),
-        tr("For applicable vehicles, always display the true vehicle current speed from wheel speed sensors."),
+        tr("Shows wheel-sensor speed instead of the dashboard-adjusted speed on supported vehicles."),
         None,
       ),
       "HideVEgoUI": (
         lambda: tr("Speedometer: Hide from Onroad Screen"),
-        tr("When enabled, the speedometer on the onroad screen is not displayed."),
+        tr("Hides the speedometer on the driving screen. Off shows it again."),
         None,
       ),
       "ShowTurnSignals": (
         lambda: tr("Display Turn Signals"),
-        tr("When enabled, visual turn indicators are drawn on the HUD."),
+        tr("Shows turn-signal indicators on the driving screen."),
         None,
       ),
       "RocketFuel": (
         lambda: tr("Real-time Acceleration Bar"),
-        tr("Show an indicator on the left side of the screen to display real-time vehicle acceleration and deceleration. " +
-           "This displays what the car is currently doing, not what the planner is requesting."),
+        tr("Shows the car's measured acceleration and braking on the left side of the driving screen."),
         None,
       ),
     }

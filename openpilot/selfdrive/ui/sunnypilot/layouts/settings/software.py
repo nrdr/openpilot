@@ -20,7 +20,7 @@ from openpilot.system.ui.sunnypilot.widgets.tree_dialog import TreeOptionDialog,
 
 DESCRIPTIONS = {
   'disable_updates_offroad': tr_noop(
-    "When enabled, automatic software updates will be off.<br><b>This requires a reboot to take effect.</b>"
+    "Stops automatic software updates. Restart the device for the change to take effect."
   ),
   'disable_updates_onroad': tr_noop(
     "Please enable \"Always Offroad\" mode or turn off the vehicle to adjust these toggles."

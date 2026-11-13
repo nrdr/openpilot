@@ -18,8 +18,7 @@ class CustomAudioVisualsLayout(Widget):
     self._engagement_sounds = multiple_button_item_sp(
       title=lambda: tr("Engagement Sounds"),
       description=lambda: tr(
-        "Choose engage, disengage and engagement-refused sounds with their matching automatic volume. Other alerts are unchanged. " +
-        "Applies to the next chime without reboot. Quiet Mode still mutes these sounds."
+        "Choose current or June 2026 engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged."
       ),
       buttons=[lambda: tr("Current"), lambda: tr("June 2026")],
       button_width=330,

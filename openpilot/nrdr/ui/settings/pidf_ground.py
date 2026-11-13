@@ -36,21 +36,23 @@ class PidfGroundLayout(Widget):
     items = [self._controller,
       remember("NrdrLatStiction", toggle_item_sp(
         title=tr("Predictive Lateral Stiction"), param="NrdrLatStiction",
-        description=tr("Tapers torque near a stable target. Driver input, lane changes, faults and steering limits bypass it."))),
+        description=tr("Reduces steering force as the wheel reaches its target, then holds it steady until another " +
+            "correction is needed. Off uses the normal steering response."))),
       remember("NrdrDeviceYawCorrection", toggle_item_sp(
         title=tr("Use Device Yaw Correction"), param="NrdrDeviceYawCorrection",
-        description=tr("Mix 1% device-yaw torque feedback with 99% PIF output. This is the legacy option; use Firmware Controller for a matching rack. Optimized lane changes temporarily disable the blend."))),
+        description=tr("Adds a small steering correction based on the car's measured motion. Off uses PIF control alone."))),
       remember("NrdrOptimizedLaneChanges", toggle_item_sp(
         title=tr("Optimized lane changes"), param="NrdrOptimizedLaneChanges",
-        description=tr("nrdr lane-change entry shaping. During the maneuver, uses P/I feedback without torque blend, feedforward or rate damping."))),
+        description=tr("Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the " +
+            "normal steering tune throughout the maneuver."))),
       simple_button_item_sp(button_text=lambda: tr("Steer Ratio Tuning"), button_width=800, callback=steer_ratio_callback),
     ]
     for band, label in (("LowSpeed", "[0-25MPH]"), ("Standard", "[25-50MPH]"), ("Highway", "[50+MPH]")):
       items.append(LineSeparatorSP(40))
       for term, name in (("P", "Proportional"), ("I", "Integral"), ("D", "Derivative"), ("F", "Feedforward")):
         key = f"NrdrLatRateDamping{band}" if term == "D" else f"Lat{term}Scale{band}"
-        description = ("Opposes steering-wheel motion to help reduce overshoot (steering-rate damping). "
-                       + "Defaults to 0% (off). Optimized lane changes bypass it." if term == "D"
+        description = (("Resists rapid steering-wheel movement to reduce overshoot. Set to 0% to disable; optimized lane " +
+            "changes temporarily bypass it.") if term == "D"
                        else "Supplies anticipated steering torque before an error occurs.")
         spec = get_native_option_spec(key) if term in ("P", "I") else None
         if spec is not None:

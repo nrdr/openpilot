@@ -14,20 +14,19 @@ class CustomAudioVisualsLayoutMici(NavScroller):
       select_callback=self._on_sound_pack,
       font_size=40,
       description=tr(
-        "Choose engage, disengage and engagement-refused sounds with their matching automatic volume. Other alerts are unchanged. " +
-        "Applies to the next chime without reboot. Quiet Mode still mutes these sounds."
+        "Choose current or June 2026 engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged."
       ),
     )
     self._confidence_ball = BigToggle(
       tr("Confidence Ball"), initial_state=ui_state.params.get("NrdrConfidenceBall", return_default=True),
       toggle_callback=lambda value: ui_state.params.put_bool("NrdrConfidenceBall", value, block=True), font_size=36,
-      description=tr("Show the C4 confidence ball. Off hides it completely and stops its animation. Applies live."),
+      description=tr("Shows the confidence ball on the driving screen. Off hides it and stops its animation."),
     )
     self._developer_sidebar = BigToggle(
       tr("Developer Sidebar"), initial_state=ui_state.params.get("NrdrDeveloperSidebar", return_default=True),
       toggle_callback=lambda value: ui_state.params.put_bool("NrdrDeveloperSidebar", value, block=True), font_size=34,
-      description=tr("Show the C4 developer strip with the ball fixed beside it. " +
-                     "Off hides the strip and restores the ball's original animated position. Applies live."),
+      description=tr("Shows the developer sidebar with the confidence ball fixed beside it. " +
+                     "Off hides the sidebar and returns the ball to its original animated position."),
     )
     self._scroller.add_widgets([self._engagement_sounds, self._confidence_ball, self._developer_sidebar])
 

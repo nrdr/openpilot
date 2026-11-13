@@ -22,13 +22,11 @@ sections:
   - key: DisengageOnAccelerator
     widget: toggle
     title: Disengage Cruise on Accelerator Pedal
-    description: When enabled, pressing the accelerator pedal will disengage longitudinal control.
+    description: "Disengages cruise control when you press the accelerator. Off allows a temporary accelerator override."
   - key: LongitudinalPersonality
     widget: multiple_button
     title: Driving Personality
-    description: Standard is recommended. In aggressive mode, sunnypilot will follow lead cars closer and be more aggressive
-      with the gas and brake. In relaxed mode sunnypilot will stay further away from lead cars. On supported cars, you can
-      cycle through these personalities with your steering wheel distance button.
+    description: "Choose the following distance and driving response: Aggressive follows closer, Relaxed leaves more space, and Econ favors gentler driving. Standard balances the two."
     options:
     - value: 0
       label: Aggressive
@@ -48,7 +46,7 @@ sections:
   - key: IntelligentCruiseButtonManagement
     widget: toggle
     title: Intelligent Cruise Button Management (ICBM) (Alpha)
-    description: Adjusts factory ACC set speed using cruise-button commands. Factory ACC controls gas, brakes and following distance. Applies next drive; no device reboot.
+    description: "Automatically adjusts factory ACC's set speed while the car controls acceleration, braking, and following distance. Off leaves set-speed changes to you."
     needs_onroad_cycle: true
     visibility:
     - type: capability
@@ -229,7 +227,7 @@ sections:
   - key: SmartCruiseControlVision
     widget: toggle
     title: Vision
-    description: Use vision path predictions to estimate the appropriate speed to drive through turns ahead.
+    description: "Uses the camera's view of the road to reduce cruise speed for upcoming curves. Off disables this additional curve-speed adjustment."
     visibility:
     - type: any
       conditions:
@@ -253,7 +251,7 @@ sections:
   - key: AccelBoostSP
     widget: toggle
     title: Acceleration Boost
-    description: Sunny's boost in Experimental Mode. Off by default; inactive in Econ.
+    description: "Adds acceleration assistance when Experimental Mode falls below the set speed. Off leaves the model's acceleration unchanged; this boost is inactive in Econ and with MVL."
     enablement:
     - type: any
       conditions:
@@ -262,7 +260,7 @@ sections:
   - key: SmartCruiseControlMap
     widget: toggle
     title: Map
-    description: Use map data to estimate the appropriate speed to drive through turns ahead.
+    description: "Uses map data to reduce cruise speed for upcoming curves. Off disables map-based curve-speed adjustments."
     visibility:
     - type: any
       conditions:

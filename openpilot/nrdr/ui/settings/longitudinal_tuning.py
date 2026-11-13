@@ -31,7 +31,7 @@ class LongitudinalTuningLayout(Widget):
                      else tr("Custom longitudinal active") if nrdr_longitudinal_enabled(ui_state.CP)
                      and getattr(ui_state.CP, "openpilotLongitudinalControl", False)
                      else tr("Baseline longitudinal - nrdr tuning inactive")),
-      description=lambda: tr("Change while parked. Applies next drive; no device reboot. ")
+      description=lambda: tr("Changes apply next drive. ")
                           + tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP,
                                                is_offroad=ui_state.is_offroad()).replace("\n", "; ")),
     )
@@ -44,10 +44,7 @@ class LongitudinalTuningLayout(Widget):
       min_value=0, max_value=500, value_change_step=25, use_float_scaling=True,
       label_callback=lambda value: f"+{value / 100:.2f} m",
       description=lambda: tr(
-        "Additional lead clearance retained through creeping and at a complete stop. " +
-        "This adds to the planner's distance floor, not the distance-bar time gap. " +
-        "0 preserves existing behavior. Measured bumper clearance can vary with lead sensing and braking. " +
-        "Configure offroad; applies on the next engagement. Requires nrdr-supported openpilot longitudinal control."
+        "Adds space behind the vehicle ahead while creeping or stopped. Zero keeps the normal gap without changing the selected following-time profile."
       ),
     )
     self._long_pid_tune_scale_aggressive = option_item_sp(
@@ -57,8 +54,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Used with the Aggressive personality (distance setting 1). Effective only with a gas pedal interceptor and Live Learning Gas OFF; " +
-        "otherwise longitudinal PID scaling is fixed at 100%."
+        "Adjusts feedback strength for Aggressive; 100% keeps the base tune. Applies with a pedal interceptor and Live Learning Gas off."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -70,8 +66,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Used with the Standard personality (distance setting 2). Effective only with a gas pedal interceptor and Live Learning Gas OFF; " +
-        "otherwise longitudinal PID scaling is fixed at 100%."
+        "Adjusts feedback strength for Standard; 100% keeps the base tune. Applies with a pedal interceptor and Live Learning Gas off."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -83,8 +78,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Used with the Relaxed personality (distance setting 3). Effective only with a gas pedal interceptor and Live Learning Gas OFF; " +
-        "otherwise longitudinal PID scaling is fixed at 100%."
+        "Adjusts feedback strength for Relaxed; 100% keeps the base tune. Applies with a pedal interceptor and Live Learning Gas off."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -96,8 +90,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Used with the Econ personality (distance setting 4). Effective only with a gas pedal interceptor and Live Learning Gas OFF; " +
-        "otherwise longitudinal PID scaling is fixed at 100%."
+        "Adjusts feedback strength for Econ; 100% keeps the base tune. Applies with a pedal interceptor and Live Learning Gas off."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -105,7 +98,7 @@ class LongitudinalTuningLayout(Widget):
     self._static_feedforward_long = toggle_item_sp(
       param="StaticFeedforwardLong",
       title=lambda: tr("Keep Feedforward Static (Default: OFF)"),
-      description=lambda: tr("On: feedforward stays the same. Off: feedforward scales with the rest of the PID tune."),
+      description=lambda: tr("Keeps feedforward strength unchanged when adjusting the PID scale. Off scales feedforward with the rest of the tune."),
     )
 
     self._pcm_mode = multiple_button_item_sp(
@@ -113,9 +106,8 @@ class LongitudinalTuningLayout(Widget):
       buttons=[lambda: tr("Off"), lambda: tr("ECU-Matched"), lambda: tr("Experimental")],
       button_width=300, callback=lambda value: save_pcm_choice(ui_state, "NrdrHondaPcmMode", value),
       description=lambda: tr(
-        "Off uses upstream PCM control. ECU-Matched adds mmmorks' ramp, coast and brake-release rules. " +
-        "Experimental uses the shaped Civic speed target with eligible MVL learning and bypasses Wind Brake. No gas interceptor. " +
-        "Change while parked. Applies next drive; no device reboot."
+        "Adjusts PCM acceleration and the transition to braking; Off restores standard control. Experimental " +
+            "supports Civic MVL learning and bypasses Wind Brake without changing its saved setting."
       ),
     )
 
@@ -125,9 +117,8 @@ class LongitudinalTuningLayout(Widget):
       title=lambda: tr("Wind Brake"), initial_state=True,
       callback=lambda value: save_pcm_choice(ui_state, "NrdrHondaWindBrake", value),
       description=lambda: tr(
-        "Subtracts estimated wind drag from brake demand. Ignored during Civic Experimental shaping; the saved choice is kept. " +
-        "PCM only; gas compensation is unchanged. " +
-        "Change while parked. Applies next drive; no device reboot."
+        "Reduces brake demand to account for estimated air resistance. Off removes this compensation; " +
+            "Experimental PCM shaping ignores it without changing your saved choice."
       ),
     )
 
@@ -135,8 +126,7 @@ class LongitudinalTuningLayout(Widget):
       param="NrdrHondaFullBrakeAuthority",
       title=lambda: tr("Full Nidec Brake Authority (Default: ON)"),
       description=lambda: tr(
-        "Allows supported Honda Nidec longitudinal control to use the full normalized brake-command range. " +
-        "Disable to retain the upstream brake-command headroom."
+        "Allows the full available brake-command range. Off restores the standard brake-command limit."
       ),
     )
 
@@ -144,8 +134,7 @@ class LongitudinalTuningLayout(Widget):
       param="NrdrRoenAccelerationLimits",
       title=lambda: tr("Roen Nidec Acceleration Limits (Default: OFF)"),
       description=lambda: tr(
-        "Uses Roen's ISO-based planner and Nidec pedal-controller acceleration envelopes with full low-speed pedal scaling. " +
-        "Saved while parked; ignored when MVL longitudinal is active."
+        "Uses Roen's acceleration limits and full low-speed pedal response when Live Learning Gas is off. Off restores the normal acceleration limits."
       ),
     )
 
@@ -156,9 +145,8 @@ class LongitudinalTuningLayout(Widget):
       max_value=10500,
       value_change_step=10,
       description=lambda: tr(
-        "Correct slight variances in final cruising target speed to better match the current and set speeds together. Tire, suspension, " +
-        "and other vehicle dynamics can affect this including manufacturer design. If your car permanently drives at 71mph set at 70mph, " +
-        "lower this until correct on a flat road, or vice versa for the opposite problem."
+        "Adjusts the cruise target when the car consistently drives above or below the set speed. Lower the " +
+            "value if it runs too fast; raise it if it runs too slowly."
       ),
       label_callback=lambda value: f"{value / 100:.1f}%",
       use_float_scaling=True,
@@ -178,7 +166,7 @@ class LongitudinalTuningLayout(Widget):
       min_value=0,
       max_value=100,
       value_change_step=1,
-      description=lambda: tr("Brake-rate limiter used while coming to a stop (carcontroller)."),
+      description=lambda: tr("Limits how quickly braking builds as the car comes to a stop."),
       label_callback=lambda value: f"{value / 100:.2f}",
     )
 
@@ -188,7 +176,7 @@ class LongitudinalTuningLayout(Widget):
       min_value=-400,
       max_value=0,
       value_change_step=1,
-      description=lambda: tr("Target acceleration once stopped (holds the brake)."),
+      description=lambda: tr("Sets the braking target used to hold the car at a stop."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -199,7 +187,7 @@ class LongitudinalTuningLayout(Widget):
       min_value=0,
       max_value=500,
       value_change_step=1,
-      description=lambda: tr("How quickly commanded deceleration ramps down while coming to a stop."),
+      description=lambda: tr("Sets how quickly the planned braking target increases when stopping."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -210,7 +198,7 @@ class LongitudinalTuningLayout(Widget):
       min_value=0,
       max_value=300,
       value_change_step=1,
-      description=lambda: tr("Speed (m/s) below which the planner treats the car as stopping."),
+      description=lambda: tr("Sets the speed below which stopping control takes over, in m/s."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -221,7 +209,7 @@ class LongitudinalTuningLayout(Widget):
       min_value=0,
       max_value=300,
       value_change_step=1,
-      description=lambda: tr("Speed (m/s) above which the car is considered moving again."),
+      description=lambda: tr("Sets the speed above which the car is treated as moving again, in m/s."),
       label_callback=lambda value: f"{value / 100:.2f}",
       use_float_scaling=True,
     )
@@ -230,10 +218,8 @@ class LongitudinalTuningLayout(Widget):
       param="HondaBoschARadar",
       title=lambda: tr("Honda Bosch-A Radar (Default: ON)"),
       description=lambda: tr(
-        "EXPERIMENTAL - Decodes the factory radar on supported Honda Bosch-A vehicles with stock longitudinal or openpilot Alpha Long. " +
-        "The reverse-engineered object format has not been road-validated on every supported model, so disable this setting if radar tracks " +
-        "look incorrect. With Alpha Long, these tracks feed openpilot's lead tracking and longitudinal commands; factory Honda AEB/CMBS " +
-        "remains unavailable."
+        "Uses factory radar for lead detection; disable it if detected vehicles are shown incorrectly. Alpha " +
+            "Long does not restore factory emergency braking (AEB/CMBS)."
       ),
     )
 
@@ -241,9 +227,7 @@ class LongitudinalTuningLayout(Widget):
       param="NrdrHondaDashVariantB",
       title=lambda: tr("Honda Dashboard Variant B (Default: OFF)"),
       description=lambda: tr(
-        "Honda clusters round the cruise set-speed (km/h to mph) two different ways. Variant A (3 dashed lane lines drawn, the default) and " +
-        "Variant B (4 dashed lane lines) round differently, so the same speed reads e.g. 60 on A vs 61 on B. Turn ON if your cluster is " +
-        "Variant B. Placeholder for now - has no effect until the rounding correction is built."
+        "Saves the dashboard variant with four dashed lane lines. This setting currently has no effect."
       ),
     )
 

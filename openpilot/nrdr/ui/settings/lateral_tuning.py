@@ -355,8 +355,7 @@ class LateralTuningLayout(Widget):
     self._tune_report_item = ListItem(
       title=lambda: tr("Run Tune Report Scan"),
       description=lambda: tr(
-        "Analyze the drive logs on this device and report, per speed band and turn direction, how well the lateral tune is tracking. " +
-        "Scanning a full day of logs can take a few minutes. DELETE permanently wipes all dashcam media in /data/media/0."
+        "Reviews recorded drives to summarize steering accuracy by speed and turn direction. DELETE permanently erases all recorded drives on the device."
       ),
       action_item=_TuneReportAction(
         scan_text=lambda: tr("SCANNING") if self._scanning() else tr("SCAN"),
@@ -371,8 +370,7 @@ class LateralTuningLayout(Widget):
       lambda: tr("Loaded Vehicle & Tune"),
       lambda: tr("VIEW"),
       lambda: tr(
-        "Your car's full profile: fingerprint, EPS firmware, gas interceptor and radar status, plus the lateral/longitudinal " +
-        "kp/ki/kf and geometry currently loaded for it."
+        "Shows the detected vehicle, steering firmware, connected hardware, and active tuning."
       ),
       callback=self._show_pid_tune_info,
     )

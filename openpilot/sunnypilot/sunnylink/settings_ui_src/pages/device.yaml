@@ -17,8 +17,8 @@ sections:
   - key: DeviceBootMode
     widget: option
     title: Wake Up Behavior
-    description: Controls the state of the device after boot or sleep.
-    details: 'Controls state of the device after boot/sleep. Default: Device will boot/wake-up normally and will be ready to engage. Offroad: Device will be in Always Offroad mode after boot/wake-up.'
+    description: "Choose whether the device starts normally or stays in Offroad mode after starting or waking."
+    details: "Default prepares the device for driving; Offroad keeps driving assistance inactive."
     options:
     - value: 0
       label: Standard
@@ -33,8 +33,8 @@ sections:
   - key: MaxTimeOffroad
     widget: option
     title: Max Time Offroad
-    description: Sets the automatic shutdown timer after the vehicle is turned off.
-    details: This applies only when Prevent Automatic Shutdown is disabled; battery safeguards may shut the device down sooner. The default is 30 hours.
+    description: "Sets how long the device stays on after the car is turned off."
+    details: "Battery protection may shut it down sooner; Prevent Automatic Shutdown bypasses both the timer and that protection."
     enablement:
     - $ref: '#/macros/offroad'
     options:

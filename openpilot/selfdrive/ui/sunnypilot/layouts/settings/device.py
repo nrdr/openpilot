@@ -144,9 +144,9 @@ class DeviceLayoutSP(DeviceLayout):
 
   @staticmethod
   def wake_mode_description() -> str:
-    def_str = tr("Default: Device will boot/wake-up normally & will be ready to engage.")
-    offrd_str = tr("Offroad: Device will be in Always Offroad mode after boot/wake-up.")
-    header = tr("Controls state of the device after boot/sleep.")
+    def_str = tr("Default: Starts normally and prepares for driving.")
+    offrd_str = tr("Offroad: Keeps driving assistance inactive.")
+    header = tr("Choose how the device starts or wakes")
 
     return f"{header}\n\n{def_str}\n{offrd_str}"
 

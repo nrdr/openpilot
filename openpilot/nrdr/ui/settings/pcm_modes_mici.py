@@ -18,11 +18,8 @@ class PcmModeControl(BigMultiToggle):
     self._labels = [tr("Off"), tr("ECU-Matched"), tr("Experimental")]
     super().__init__(tr("PCM Command Shaping"), self._labels,
                      select_callback=self._select, font_size=34,
-                     description=tr("Honda Nidec: ECU-Matched PCM Command Shaping. " +
-                                    "Off uses upstream PCM control. ECU-Matched adds mmmorks' ramp, coast and brake-release rules. " +
-                                    "Experimental uses the shaped Civic speed target with eligible MVL learning and bypasses Wind Brake. " +
-                                    "No gas interceptor. " +
-                                    "Change while parked. Applies next drive; no device reboot."))
+                     description=tr("Adjusts PCM acceleration and the transition to braking; Off restores standard control. Experimental " +
+                         "supports Civic MVL learning and bypasses Wind Brake without changing its saved setting."))
     self.set_enabled(lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
                      and tuning_write_allowed(ui_state.params, "NrdrHondaPcmMode", CP=ui_state.CP, CP_SP=ui_state.CP_SP,
                                               is_offroad=ui_state.is_offroad()))
@@ -56,9 +53,8 @@ class WindBrakeControl(BigToggle):
   def __init__(self):
     super().__init__(tr("Wind Brake"), initial_state=saved_wind_brake(ui_state.params),
                      toggle_callback=self._select,
-                     description=tr("Subtracts estimated wind drag from brake demand. Ignored during Civic Experimental shaping; the saved choice is kept. " +
-                                    "PCM only; gas compensation is unchanged. " +
-                                    "Change while parked. Applies next drive; no device reboot."))
+                     description=tr("Reduces brake demand to account for estimated air resistance. Off removes this compensation; " +
+                         "Experimental PCM shaping ignores it without changing your saved choice."))
     self.set_enabled(lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
                      and tuning_write_allowed(ui_state.params, "NrdrHondaWindBrake", CP=ui_state.CP, CP_SP=ui_state.CP_SP,
                                               is_offroad=ui_state.is_offroad()))
@@ -76,7 +72,7 @@ class StaticFeedforwardControl(BigToggle):
   def __init__(self):
     super().__init__(tr("Keep Feedforward Static"), initial_state=ui_state.params.get_bool("StaticFeedforwardLong"),
                      toggle_callback=self._select,
-                     description=tr("On: feedforward stays the same. Off: feedforward scales with the rest of the PID tune."))
+                     description=tr("Keeps feedforward strength unchanged when adjusting the PID scale. Off scales feedforward with the rest of the tune."))
     self.set_enabled(self._available)
 
   @staticmethod

@@ -191,8 +191,7 @@ class FootageLayout(Widget):
       param="EnableCopyparty",
       title=lambda: tr("File Server (Default: ON)"),
       description=lambda: tr(
-        "The QR links below are served by the copyparty file server. It must be ON, and it only runs while the car is off "
-        + "(ignition off). Same toggle as in Developer."
+        "Enable the file server and turn the ignition off to use these links. Connect your phone to the device's hotspot or the same Wi-Fi network."
       ),
     )
 

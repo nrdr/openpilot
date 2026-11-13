@@ -30,9 +30,8 @@ class LaneChangeSettingsLayout(Widget):
     self._lane_change_timer = option_item_sp(
       title=lambda: tr("Auto Lane Change by Blinker"),
       param="AutoLaneChangeTimer",
-      description=lambda: tr("Set a timer to delay the auto lane change operation when the blinker is used. " +
-                             "No nudge on the steering wheel is required to auto lane change if a timer is set. Default is Nudge.<br>" +
-                             "Please use caution when using this feature. Only use the blinker when traffic and road conditions permit."),
+      description=lambda: tr("Starts a lane change after the selected delay without a steering nudge; Nudge keeps manual " +
+          "confirmation. Signal only when it is safe to change lanes."),
       min_value=-1,
       max_value=5,
       value_change_step=1,
@@ -48,8 +47,7 @@ class LaneChangeSettingsLayout(Widget):
     self._bsm_delay = toggle_item_sp(
       param="AutoLaneChangeBsmDelay",
       title=lambda: tr("Auto Lane Change: Delay with Blind Spot"),
-      description=lambda: tr("Toggle to enable a delay timer for seamless lane changes when blind spot monitoring " +
-                             "(BSM) detects a obstructing vehicle, ensuring safe maneuvering."),
+      description=lambda: tr("Adds a lane-change delay when blind-spot monitoring detects another vehicle. Off removes this extra delay."),
     )
     self._road_edge_block = toggle_item_sp(
       param="RoadEdgeLaneChangeEnabled",

@@ -20,8 +20,7 @@ def submit():
 
 
 def reset_description():
-  return tr("Clears gas and wind learning shared across Hondas on this device. " +
-            "Wind returns to baseline, which may change when braking starts on the next drive. Brake tuning is kept.")
+  return tr("Resets learned Honda gas and wind compensation without changing brake tuning. Resetting wind compensation may change when braking begins.")
 
 
 def description():

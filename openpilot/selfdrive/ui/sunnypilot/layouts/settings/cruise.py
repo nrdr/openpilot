@@ -26,7 +26,8 @@ ICMB_UNAVAILABLE = tr_noop("Intelligent Cruise Button Management is currently un
 ICMB_UNAVAILABLE_LONG_AVAILABLE = tr_noop("Disable the sunnypilot Longitudinal Control (alpha) toggle to allow Intelligent Cruise Button Management.")
 ICMB_UNAVAILABLE_LONG_UNAVAILABLE = tr_noop("sunnypilot Longitudinal Control is the default longitudinal control for this platform.")
 
-ACC_ENABLED_DESCRIPTION = tr_noop("Enable custom Short & Long press increments for cruise speed increase/decrease.")
+ACC_ENABLED_DESCRIPTION = tr_noop("Choose separate speed increments for short and long cruise-button presses. Off restores the normal " +
+    "increments without deleting your choices.")
 ACC_NOLONG_DESCRIPTION = tr_noop("This feature can only be used with sunnypilot longitudinal control enabled.")
 ACC_PCMCRUISE_DISABLED_DESCRIPTION = tr_noop("This feature is not supported on this platform due to vehicle limitations.")
 ONROAD_ONLY_DESCRIPTION = tr_noop("Start the vehicle to check vehicle compatibility.")
@@ -51,17 +52,18 @@ class CruiseLayout(Widget):
 
     self.scc_v_toggle = toggle_item_sp(
       title=tr("Smart Cruise Control - Vision"),
-      description=tr("Use vision path predictions to estimate the appropriate speed to drive through turns ahead."),
+      description=tr("Uses the camera's view of the road to reduce cruise speed for upcoming curves. Off disables this additional curve-speed adjustment."),
       param="SmartCruiseControlVision")
 
     self.scc_m_toggle = toggle_item_sp(
       title=tr("Smart Cruise Control - Map"),
-      description=tr("Use map data to estimate the appropriate speed to drive through turns ahead."),
+      description=tr("Uses map data to reduce cruise speed for upcoming curves. Off disables map-based curve-speed adjustments."),
       param="SmartCruiseControlMap")
 
     self.accel_boost_toggle = toggle_item_sp(
       title=tr("Acceleration Boost"),
-      description=tr("Sunny's boost in Experimental Mode. Off by default; inactive in Econ."),
+      description=tr("Adds acceleration assistance when Experimental Mode falls below the set speed. Off leaves the " +
+          "model's acceleration unchanged; this boost is inactive in Econ and with MVL."),
       param="AccelBoostSP")
 
     self.custom_acc_toggle = toggle_item_sp(

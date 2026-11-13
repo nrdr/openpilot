@@ -152,7 +152,7 @@ class SunnylinkLayout(Widget):
   def _initialize_items(self):
     self._sunnylink_toggle = toggle_item_sp(
       title=tr("Enable sunnylink"),
-      description=tr("This is the master switch, it will allow you to cutoff any sunnylink requests should you want to do that."),
+      description=tr("Enables the device's connection to sunnylink. Off stops sunnylink requests."),
       param="SunnylinkEnabled",
       callback=self._sunnylink_toggle_callback
     )
@@ -176,8 +176,8 @@ class SunnylinkLayout(Widget):
     )
     self._sunnylink_uploader_toggle = toggle_item_sp(
       title=tr("Enable sunnylink uploader (infrastructure test)"),
-      description=tr("Enable sunnylink uploader to allow sunnypilot to upload your driving data to sunnypilot servers. ") +
-                  tr("(Only for highest tiers, and does NOT bring ANY benefit to you yet. We are just testing data volume.)"),
+      description=tr("Uploads driving data to sunnypilot for infrastructure testing. ") +
+                  tr("Available to eligible sponsor tiers; this does not add driving features."),
       param="EnableSunnylinkUploader"
     )
     self._sunnylink_backup_restore_buttons = dual_button_item(

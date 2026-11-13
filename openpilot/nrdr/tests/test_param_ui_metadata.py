@@ -156,8 +156,14 @@ class TestParamUiMetadata(unittest.TestCase):
         self.assertEqual(sunnylink_fields_for_key(key.value), expected)
         merged = apply_sunnylink_metadata({"key": key.value, "widget": "option"})
         self.assertEqual({k: v for k, v in merged.items() if k != "enablement"}, {"key": key.value, **expected})
-        self.assertEqual({c["condition"]["key"] for c in merged["enablement"]},
-                         {"NrdrSuggestedSettings", "NrdrHandcraftedLateralTune", "NrdrLateralController"})
+        self.assertEqual(merged["enablement"], [
+          {"type": "any", "conditions": [
+            {"type": "offroad_only"},
+            {"type": "not", "condition": {"type": "param", "key": "NrdrSuggestedSettings", "equals": True}},
+          ]},
+          {"type": "not", "condition": {"type": "param", "key": "NrdrHandcraftedLateralTune", "equals": True}},
+          {"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 1}},
+        ])
 
   def test_sunnylink_explicit_metadata_drift_is_rejected(self):
     with self.assertRaisesRegex(SunnylinkMetadataConflict, "LatPScaleLowSpeed.*'max'"):
@@ -193,7 +199,8 @@ class TestParamUiMetadata(unittest.TestCase):
     self.assertIn("spec.min_value", native_source)
     self.assertIn("spec.max_value", native_source)
     self.assertIn("spec.value_change_step", native_source)
-    lane_source = (repository_root / "openpilot/selfdrive/ui/sunnypilot/layouts/settings/steering_sub_layouts/lane_change_settings.py").read_text(encoding="utf-8")
+    lane_path = repository_root / "openpilot/selfdrive/ui/sunnypilot/layouts/settings/steering_sub_layouts/lane_change_settings.py"
+    lane_source = lane_path.read_text(encoding="utf-8")
     self.assertNotIn("NrdrLaneChangeEntrySrReduction", lane_source)
     self.assertNotIn('title=tr("Interpolated Torque/PIF Blend")', native_source)
     self.assertIn('NrdrOptimizedLaneChanges', native_source)

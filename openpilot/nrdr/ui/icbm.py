@@ -3,8 +3,7 @@ from opendbc.car.honda.values import CAR
 
 
 ICBM_DESCRIPTION = (
-  "Adjusts factory ACC set speed using cruise-button commands. Factory ACC controls gas, brakes and following distance. " +
-  "Applies next drive; no device reboot."
+  "Automatically adjusts factory ACC's set speed while the car controls acceleration, braking, and following distance. Off leaves set-speed changes to you."
 )
 
 

@@ -37,16 +37,15 @@ class DeveloperLayoutSP(DeveloperLayout):
 
   def _initialize_items(self):
     self.show_advanced_controls = toggle_item_sp(tr("Show Advanced Controls"),
-                                                 tr("Toggle visibility of advanced sunnypilot controls.<br>This only changes the visibility of the toggles; " +
-                                                    "it does not change the actual enabled/disabled state."), param="ShowAdvancedControls")
+                                                 tr("Shows advanced settings. Hiding them leaves their current values unchanged."),
+                                                 param="ShowAdvancedControls")
 
     self.enable_github_runner_toggle = toggle_item_sp(tr("GitHub Runner Service"), tr("Enables or disables the GitHub runner service."),
                                                       param="EnableGithubRunner")
 
     self.enable_copyparty_toggle = toggle_item_sp(tr("copyparty Service"),
-                                                  tr("copyparty is a very capable file server, you can use it to download your routes, view your logs " +
-                                                     "and even make some edits on some files from your browser. " +
-                                                     "Requires you to connect to your comma locally via its IP address."), param="EnableCopyparty")
+                                                  tr("Lets you browse, download, and manage device files in a web browser on the same network. " +
+                                                      "Available while the car is off."), param="EnableCopyparty")
 
     self.prebuilt_toggle = toggle_item_sp(tr("Quickboot Mode"), "", param="QuickBootToggle", callback=self._on_prebuilt_toggled)
 
@@ -97,8 +96,7 @@ class DeveloperLayoutSP(DeveloperLayout):
     self.prebuilt_toggle.action_item.set_enabled(disable_updates)
 
     if disable_updates:
-      self.prebuilt_toggle.set_description(tr("When toggled on, this creates a prebuilt file to allow accelerated boot times. When toggled off, it " +
-                                              "removes the prebuilt file so compilation of locally edited cpp files can be made."))
+      self.prebuilt_toggle.set_description(tr("Skips local compilation for faster startup. Off restores compilation so local C++ changes can take effect."))
     else:
       self.prebuilt_toggle.set_description(tr("Quickboot mode requires updates to be disabled.<br>Enable 'Disable Updates' in the Software panel first."))
 

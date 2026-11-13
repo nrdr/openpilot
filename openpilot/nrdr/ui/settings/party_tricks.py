@@ -69,8 +69,7 @@ class PartyTricksLayout(Widget):
       lambda: tr("Show Footage"),
       lambda: tr("OPEN"),
       lambda: tr(
-        "Pick a drive and get a QR code that lets a phone on this device's hotspot (or the same Wi-Fi) watch the recorded video. " +
-        "Made for the roadside \"can I see the footage?\" moment."
+        "Choose a recorded drive and scan its QR code to watch it on your phone. Connect to the device's hotspot or the same Wi-Fi network."
       ),
       callback=self._open_footage,
     )
@@ -79,8 +78,7 @@ class PartyTricksLayout(Widget):
       lambda: tr("Re-register with konik"),
       lambda: tr("RE-REGISTER"),
       lambda: tr(
-        "Forces a fresh konik registration by clearing the cached dongle ID. Use this only if you switched from comma connect and the " +
-        "device won't come online on konik. Existing konik users never need this - your dongle is kept automatically."
+        "Registers the device with konik again. Use this if the device cannot connect after switching from comma connect."
       ),
       callback=self._on_reregister,
     )
@@ -89,19 +87,14 @@ class PartyTricksLayout(Widget):
       param="HondaInjectionTest",
       title=lambda: tr("Injection Test (Caution!) (Default: OFF)"),
       description=lambda: tr(
-        "When enabled, the lateral PID output scale is multiplied by 999%. This is a diagnostic stress test to see how the car reacts to a " +
-        "massive steering command. Use with extreme caution on a safe, empty road."
+        "Multiplies the lateral PID output scale by 999% for diagnostic testing. Can cause abrupt steering; do not use on public roads."
       ),
     )
 
     self._alt_dashboard_speed = multiple_button_item_sp(
       title=lambda: tr("Alternative Dashboard Speed Design (Default: Stock)"),
       description=lambda: tr(
-        "Repurposes the cluster's set-speed slot (requires openpilot longitudinal). " +
-        "Stock: normal set speed. " +
-        "Lead Speed: the lead's speed in mph, always whole numbers (\"Stopped\" below 1 mph, \"--\" when no lead). " +
-        "GPS Speed: the comma's own true speed. " +
-        "Cluster Speed: exactly what the dash cluster reads."
+        "Choose whether the dashboard's set-speed display shows cruise set speed, lead speed, GPS speed, or cluster speed. Stock restores the normal display."
       ),
       buttons=[lambda: tr("Stock"), lambda: tr("Lead Speed"), lambda: tr("GPS Speed"), lambda: tr("Cluster Speed")],
       button_width=330,
@@ -111,11 +104,8 @@ class PartyTricksLayout(Widget):
     self._alt_dashboard_distance = multiple_button_item_sp(
       title=lambda: tr("Alternative Dashboard Distance Design (Default: Stock)"),
       description=lambda: tr(
-        "Repurposes the cluster's distance bars / mini car (requires openpilot longitudinal). " +
-        "Stock: normal personality bars while engaged. " +
-        "Radar: the bars close in as the lead approaches. " +
-        "Velocity: the bars push out under acceleration and pull in under braking. " +
-        "Non-stock designs stay on the cluster permanently, even when not engaged."
+        "Choose distance bars that show the personality, lead proximity, or acceleration and braking. " +
+            "Alternate designs remain visible while disengaged; Stock restores the normal display."
       ),
       buttons=[lambda: tr("Stock"), lambda: tr("Radar"), lambda: tr("Velocity")],
       button_width=330,
@@ -126,8 +116,8 @@ class PartyTricksLayout(Widget):
       param="NrdrClearDashFaults",
       title=lambda: tr("Clear Dashboard Fault Codes (Default: ON)"),
       description=lambda: tr(
-        "Forces the cluster's FCM/icon fault bits off and suppresses the stock FCW chime. Lets a car with a dead or absent stock camera run " +
-        "a clean dash. Turn OFF for stock openpilot behavior (camera values passed through, FCW chime active)."
+        "Hides camera-related fault indicators and silences the factory forward-collision warning chime " +
+            "without fixing the underlying faults. Off restores those warnings."
       ),
     )
 
@@ -135,8 +125,7 @@ class PartyTricksLayout(Widget):
       param="HondaSpoofCameraMessages",
       title=lambda: tr("Spoof Camera Messages (Default: OFF)"),
       description=lambda: tr(
-        "Dead camera only: keeps the camera's CAMERA_MESSAGES broadcast alive so the cluster never raises \"Auto High Beam System Problem\" - " +
-        "that fault is a message timeout, not a code. Leave OFF if your stock camera works; a live camera already sends this message."
+        "Prevents the automatic high-beam fault caused by a missing or failed camera. Leave off if the factory camera works."
       ),
     )
 
@@ -144,10 +133,8 @@ class PartyTricksLayout(Widget):
       param="NrdrCruiseButtonSubMode",
       title=lambda: tr("Cruise Button Sub-Mode (Default: ON)"),
       description=lambda: tr(
-        "Dynamic HUD: pressing the distance button or set/resume first wakes a 15-second preview on the cluster - " +
-        "the distance bars light up with your CURRENT personality (parked or driving, any design) and the set speed shows if cruise is " +
-        "engaged, all blinking. Only presses made during the preview actually change the personality or set speed. " +
-        "The blink starts lazy and accelerates continuously until it cuts off."
+        "The first cruise-button press opens a blinking preview; further presses adjust speed or " +
+            "personality. Off lets the first press make the adjustment immediately."
       ),
     )
 
@@ -158,8 +145,7 @@ class PartyTricksLayout(Widget):
       max_value=60,
       value_change_step=1,
       description=lambda: tr(
-        "How long the preview stays on the cluster after a button press. The blink ramp always spans the whole window, slow at the start and " +
-        "rapid right before it falls off."
+        "Sets how long the dashboard preview remains visible after a button press. Blinking speeds up as the preview approaches its timeout."
       ),
       label_callback=lambda value: f"{value}s",
     )

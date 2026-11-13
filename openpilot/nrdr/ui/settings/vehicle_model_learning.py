@@ -36,7 +36,7 @@ class VehicleModelLearningLayout(Widget):
     self._learn_stiffness = toggle_item_sp(
       param="NrdrLearnStiffness",
       title=lambda: tr("Learn Tire Stiffness (Auto)"),
-      description=lambda: tr("When ON (Auto), uses the live-learned tire stiffness factor. When OFF, uses the static base value of 1.0."),
+      description=lambda: tr("Uses learned tire stiffness to adapt the vehicle model. Off uses the fixed base value of 1.0."),
       initial_state=True,
     )
     self._lp_angle_avg = ListItemSP(
@@ -48,8 +48,7 @@ class VehicleModelLearningLayout(Widget):
     self._learn_angle_offset = toggle_item_sp(
       param="NrdrLearnAngleOffset",
       title=lambda: tr("Learn Angle Offset (Auto)"),
-      description=lambda: tr("When ON (Auto), uses the live-learned steering angle offset. When OFF, uses a static 0.0 offset. " +
-                             "Turn OFF if a bad learned offset is pulling the car to one side."),
+      description=lambda: tr("Uses the learned steering-angle offset. Off uses zero offset without deleting the learned value."),
       initial_state=True,
     )
 

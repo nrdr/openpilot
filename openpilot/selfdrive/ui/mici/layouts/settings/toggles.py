@@ -44,15 +44,18 @@ class TogglesLayoutMici(NavScroller):
     super().__init__()
 
     self._personality_toggle = BigMultiParamToggle("driving personality", "LongitudinalPersonality", ["aggressive", "standard", "relaxed", "econ"],
-                                                   description="Standard is recommended. Aggressive follows closer, relaxed leaves more space, " +
-                                                               "and econ softens acceleration.")
+                                                   description=("Choose the following distance and driving response: Aggressive follows closer, " +
+                                                       "Relaxed leaves more space, ") +
+                                                               "and Econ favors gentler driving. Standard balances the two.")
     self._experimental_btn = BigToggle("experimental mode", initial_state=ui_state.params.get_bool("ExperimentalMode"),
                                        toggle_callback=self._on_experimental_mode,
-                                       description="Let the driving model control gas and brakes. These are alpha features. Expect mistakes.")
+                                       description="Lets the driving model control acceleration and braking; Off uses normal adaptive cruise control. " +
+                                                   "Experimental behavior may be unpredictable; be ready to take over.")
     self._experimental_btn.set_enabled(self._experimental_mode_editable)
     self._accel_boost_toggle = BigParamControl(
       "acceleration boost", "AccelBoostSP",
-      description="Sunny's boost in Experimental Mode. Off by default; inactive in Econ.",
+      description=("Adds acceleration assistance when Experimental Mode falls below the set speed. Off leaves the " +
+          "model's acceleration unchanged; this boost is inactive in Econ and with MVL."),
     )
     self._accel_boost_toggle.set_enabled(lambda: ui_state.CP is not None and ui_state.has_longitudinal_control)
     is_metric_toggle = BigParamControl("use metric units", "IsMetric")

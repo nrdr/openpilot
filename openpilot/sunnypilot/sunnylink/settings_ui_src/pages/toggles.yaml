@@ -40,10 +40,10 @@ sections:
     widget: toggle
     needs_onroad_cycle: true
     title: Record and Upload Driver Camera
-    description: Upload data from the driver facing camera and help improve the driver monitoring algorithm.
+    description: "Uploads driver-camera recordings to help improve driver monitoring. Off stops these uploads."
   - key: RecordAudio
     widget: toggle
     needs_onroad_cycle: true
     title: Record and Upload Microphone Audio
-    description: Record and store microphone audio while driving.
-    details: Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect.
+    description: "Records microphone audio during drives and includes it in dashcam playback on comma connect."
+    details: "Off stops recording new audio; existing recordings are unchanged."

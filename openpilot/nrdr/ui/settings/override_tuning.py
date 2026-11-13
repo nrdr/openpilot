@@ -25,8 +25,7 @@ class OverrideTuningLayout(Widget):
       max_value=5000,
       value_change_step=100,
       description=lambda: tr(
-        "Override threshold outside the straight-ahead steering-angle band, or at all angles when that band is disabled. Default: 1400. " +
-        "1200 represents the stock threshold, scaled proportionally on cars with a different stock threshold."
+        "Sets the driver steering force needed to override assistance outside the straight-ahead range. Higher values require more force."
       ),
       label_callback=lambda value: f"{value}",
     )
@@ -38,8 +37,7 @@ class OverrideTuningLayout(Widget):
       max_value=5000,
       value_change_step=100,
       description=lambda: tr(
-        "Override threshold within the straight-ahead steering-angle band configured by Center Boost Degrees. This uses wheel angle, " +
-        "not detected road curvature. Default: 1200. Set equal to the curves threshold to use the same threshold at all angles."
+        "Sets the driver steering force needed to override assistance within the Center Boost angle range. Higher values require more force."
       ),
       label_callback=lambda value: f"{value}",
     )
@@ -48,8 +46,7 @@ class OverrideTuningLayout(Widget):
       param="HondaDriverAssistDuringOverride",
       title=lambda: tr("Assist Pass-Through"),
       description=lambda: tr(
-        "Stops requesting lane assist when you take over, so you're not steering against it. "
-        "This can make manual steering feel smoother without switching assist off."
+        "Reduces steering assistance when you take over to make manual steering feel smoother. Off keeps the normal override response."
       ),
     )
 
@@ -81,7 +78,7 @@ class OverrideTuningLayout(Widget):
       min_value=0,
       max_value=100,
       value_change_step=1,
-      description=lambda: tr("Controls how much openpilot steering torque remains when the override has gone past Override Torque Fade Down."),
+      description=lambda: tr("Sets how much steering assistance remains after the override fade-out. Zero removes it completely."),
       label_callback=lambda value: f"{value}%",
     )
 

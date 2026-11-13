@@ -14,7 +14,7 @@ sections:
     widget: toggle
     needs_onroad_cycle: true
     title: 'Honda Nidec: Enforce Factory Longitudinal Control'
-    description: sunnypilot will not take over control of gas and brakes. Factory Honda Nidec longitudinal control will be used.
+    description: "Uses factory ACC to control acceleration and braking instead of openpilot. Off allows openpilot cruise control."
     enablement:
     - $ref: '#/macros/not_engaged'
 - id: hyundai
@@ -70,10 +70,7 @@ sections:
   - key: TeslaMadsScreenButton
     widget: multiple_button
     title: MADS Screen Activation
-    description: 'Use a multi-finger press on the infotainment screen to toggle MADS.
-      This allows the use of full MADS functionality when enabled. Selecting a higher
-      finger count may reduce accidental activations. Note: Setting this to Off will
-      reset your MADS settings to default.'
+    description: 'Toggle MADS with a multi-finger press on the infotainment screen; more fingers reduce accidental activation. Off resets MADS settings to their defaults.'
     options:
     - value: 0
       label: 'Off'
@@ -97,15 +94,15 @@ sections:
     widget: toggle
     needs_onroad_cycle: true
     title: Enforce Factory Longitudinal Control
-    description: sunnypilot will not take over gas and brakes; factory Toyota longitudinal control will be used.
+    description: "Uses factory ACC to control acceleration and braking instead of openpilot. Off allows openpilot cruise control."
     enablement:
     - $ref: '#/macros/not_engaged'
   - key: ToyotaStopAndGoHack
     widget: toggle
     needs_onroad_cycle: true
     title: Stop and Go Hack (Alpha)
-    description: Allows some Toyota/Lexus cars to auto resume during stop and go traffic. Alpha feature - use at your own risk.
-    details: sunnypilot will allow some Toyota/Lexus cars to auto resume during stop and go traffic. This feature is only applicable to certain models that are able to use longitudinal control. This is an alpha feature. Use at your own risk.
+    description: "Enables automatic resume in stop-and-go traffic on supported Toyota and Lexus vehicles. Experimental: be ready to take over."
+    details: "Off restores the normal resume behavior."
     enablement:
     - $ref: '#/macros/not_engaged'
     - $ref: '#/macros/longitudinal'
