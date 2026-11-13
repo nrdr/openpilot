@@ -295,7 +295,8 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       # Post-MPC Bosch-A chain, SOURCE order (starpilot longitudinal_planner.py): HumanAcceleration cap (throttle side
       # only; the cap is >= 0 so a braking target passes through), engage init, then bosch_a_long -> coast_first ->
       # release_coast -> smooth -> onset_ramp -> stop_gap.
-      output_a_target = min(output_a_target, bosch_a_mpc['acceleration_max'])
+      if 'acceleration_max' in bosch_a_mpc:
+        output_a_target = min(output_a_target, bosch_a_mpc['acceleration_max'])
       if self.bosch_a_long.stock_feel and reset_state:
         # Engage init: while long is off, a_cruise starts the first engaged frame at min(aEgo, cruise target) instead of
         # aEgo (jerk-limited around aEgo). Lowers only; output_a_target and the MPC state are unchanged.
