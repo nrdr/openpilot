@@ -74,14 +74,19 @@ def build(selection: dict, source_artifact: Path, source_dir: Path, camera: tupl
   destination = destination_dir / "driving.pkl"
   with tempfile.TemporaryDirectory(prefix="build-", dir=destination_dir) as staging:
     output = Path(staging) / "compiler.pkl"
-    command = [sys.executable, "-m", "openpilot.sunnypilot.modeld_v2.compile_modeld", "--model-type", recipe["model_type"],
-               "--model-size", "x".join(map(str, recipe["model_size"])), "--camera-resolutions", "x".join(map(str, camera)),
-               "--benchmark-runs", "1", "--output", str(output),
-               "--vision-onnx", str((source_dir / "driving_vision.onnx").resolve()),
-               "--policy-onnx", str((source_dir / "driving_policy.onnx").resolve())]
-    if recipe["frame_skip"] is not None:
-      command += ["--frame-skip", str(recipe["frame_skip"])]
-    subprocess.run(command, check=True, env=dict(os.environ, DEV=device))
+    if recipe["model_type"] == "native_onnx":
+      command = [sys.executable, "-m", "openpilot.nrdr.tools.model_compile", "onnx",
+                 "--onnx", str((source_dir / recipe["model_file"]).resolve()), "--output", str(output),
+                 "--device-input", "*", "--benchmark-runs", "3", "--out-of-band"]
+    else:
+      command = [sys.executable, "-m", "openpilot.sunnypilot.modeld_v2.compile_modeld", "--model-type", recipe["model_type"],
+                 "--model-size", "x".join(map(str, recipe["model_size"])), "--camera-resolutions", "x".join(map(str, camera)),
+                 "--benchmark-runs", "1", "--output", str(output),
+                 "--vision-onnx", str((source_dir / "driving_vision.onnx").resolve()),
+                 "--policy-onnx", str((source_dir / "driving_policy.onnx").resolve())]
+      if recipe["frame_skip"] is not None:
+        command += ["--frame-skip", str(recipe["frame_skip"])]
+    subprocess.run(command, check=True, env=dict(os.environ, DEV=device, **recipe.get("compiler_env", {})))
     combined = Path(staging) / "driving.pkl"
     with open_file_chunked(str(output)) as source, combined.open("wb") as target:
       shutil.copyfileobj(source, target)
@@ -136,7 +141,7 @@ def verify(selection: dict, source_artifact: Path, camera: tuple[int, int]) -> d
       elif name in ("lateral_control_params", "action_t"):
         value[:] = [20., .2] if name == "lateral_control_params" else [.3, .4]
     outputs = adapter.run()
-    arrays = [output.numpy().flatten() for output in outputs]
+    arrays = [output.numpy().flatten() for output in ([outputs] if adapter.is_native else outputs)]
     if not arrays or not all(array.size and np.isfinite(array).all() for array in arrays):
       raise ModelAdmissionError("Selected model produced empty/non-finite synthetic outputs")
     parsed = parser.parse_vision_outputs({key: arrays[0][None, sl] for key, sl in adapter.vision_output_slices.items()})

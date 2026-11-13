@@ -121,3 +121,58 @@ def test_committed_runtime_manifest_matches_the_checked_out_source():
   assert manifest['tinygrad_ref'] == admission.TINYGRAD_RUNTIME_REF
   for name, digest in manifest['tinygrad_files'].items():
     assert hashlib.sha256((root / name).read_bytes().replace(b'\r\n', b'\n')).hexdigest() == digest
+
+
+@pytest.mark.parametrize('change', [None, 'unverified', 'camera', 'runtime', 'device', 'missing', 'model', 'source'])
+def test_local_catalog_only_lists_verified_rebuilds_for_this_camera(tmp_path, monkeypatch, change):
+  original = tmp_path / 'original.pkl'
+  original.write_bytes(b'upstream artifact')
+  compiled = tmp_path / 'compiled.pkl'
+  compiled.write_bytes(b'local native model')
+  selected = {'ref': 'cheddar-ref', 'short_name': 'CHEDDAR', 'models': [{'artifact': {'file_name': original.name}}]}
+  manifest = tmp_path / 'manifest.json'
+  manifest.write_text(json.dumps({'legacy_rebuilds': {'source-hash': {'catalog_bundle': selected}}}))
+  monkeypatch.setattr(admission, '_MANIFEST', manifest)
+  record = {'verified': True, 'abi': admission.ARTIFACT_ABI, 'tinygrad_ref': admission.TINYGRAD_RUNTIME_REF,
+            'camera': [1344, 760], 'model_ref': selected['ref'], 'model_name': selected['short_name'],
+            'source_artifact_sha256': 'source-hash', 'artifact': compiled.name, 'device': 'QCOM'}
+  if change:
+    key, value = {'unverified': ('verified', False), 'camera': ('camera', [1928, 1208]), 'runtime': ('tinygrad_ref', 'old'),
+                  'device': ('device', 'CPU:LLVM'), 'missing': ('artifact', 'missing.pkl'),
+                  'model': ('model_ref', 'other'), 'source': ('source_artifact_sha256', 'other')}[change]
+    record[key] = value
+  model_rebuild.write_record(model_rebuild.record_path(original), record)
+  assert admission.verified_rebuild_bundles(tmp_path, (1344, 760)) == ([] if change else [selected])
+
+
+@pytest.mark.parametrize('kind', ['native_onnx', 'vision_policy'])
+def test_rebuild_uses_existing_native_or_legacy_compiler(tmp_path, runtime, monkeypatch, kind):
+  original = tmp_path / 'original.pkl'
+  original.write_bytes(b'upstream artifact')
+  selected = {'ref': 'model-ref', 'internalName': 'test', 'models': [{'artifact': {
+    'downloadUri': {'sha256': admission.artifact_sha256(original)}}}]}
+  source = tmp_path / 'cheddar.onnx'
+  source.write_bytes(b'original weights')
+  recipe = {'model_ref': selected['ref'], 'model_name': selected['internalName'], 'model_type': kind,
+            'model_file': source.name, 'model_size': [512, 256], 'frame_skip': None,
+            'source_models': {source.name: {'sha256': admission.artifact_sha256(source), 'size': source.stat().st_size}}}
+  if kind == 'native_onnx':
+    recipe['compiler_env'] = {'IMAGE': '2', 'FLOAT16': '1'}
+  runtime['legacy_rebuilds'][admission.artifact_sha256(original)] = recipe
+  monkeypatch.setenv('DEV', 'QCOM')
+  calls = []
+  def compile_model(command, **kwargs):
+    calls.append((command, kwargs))
+    Path(command[command.index('--output') + 1]).write_bytes(b'compiled model')
+  monkeypatch.setattr(model_rebuild.subprocess, 'run', compile_model)
+  record = model_rebuild.build(selected, original, tmp_path, (1344, 760))
+  command, options = calls[0]
+  assert record['verified'] is False and record['model_ref'] == selected['ref']
+  assert original.read_bytes() == b'upstream artifact'
+  if kind == 'native_onnx':
+    assert command[2] == 'openpilot.nrdr.tools.model_compile'
+    assert command[command.index('--onnx') + 1] == str(source.resolve())
+    assert '--out-of-band' in command and options['env']['IMAGE'] == '2' and options['env']['FLOAT16'] == '1'
+  else:
+    assert command[2] == 'openpilot.sunnypilot.modeld_v2.compile_modeld'
+    assert '--vision-onnx' in command and '--policy-onnx' in command

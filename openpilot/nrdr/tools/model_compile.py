@@ -1,5 +1,6 @@
 """Atomic wrapper around the pinned generic ONNX/warp compilers."""
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -32,7 +33,8 @@ def main():
     temporary = Path(staging) / destination.name
     command = [sys.executable, str(compiler)]
     command += [args.onnx, str(temporary)] if args.kind == "onnx" else ["--output", str(temporary)]
-    subprocess.run(command + extra, check=True)
+    pythonpath = os.pathsep.join(filter(None, (str(root), str(root / "tinygrad_repo"), os.environ.get("PYTHONPATH"))))
+    subprocess.run(command + extra, check=True, env=dict(os.environ, PYTHONPATH=pythonpath))
     # Verify the output can be decoded before replacing a previous valid build.
     from openpilot.selfdrive.modeld.helpers import load_oob
     import pickle

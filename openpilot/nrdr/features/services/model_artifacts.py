@@ -97,3 +97,24 @@ def write_artifact_record(path: str | Path, *, source_sha256: str | None = None,
   temporary = Path(str(destination) + ".tmp")
   temporary.write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
   temporary.replace(destination)
+
+
+def verified_rebuild_bundles(model_root: str | Path, camera: tuple[int, int]) -> list[dict]:
+  """List locally verified QCOM rebuilds; execution still requires full admission."""
+  root = Path(model_root).resolve()
+  bundles = []
+  for source_sha, recipe in _read_record(_MANIFEST).get("legacy_rebuilds", {}).items():
+    if not (bundle := recipe.get("catalog_bundle")):
+      continue
+    source = root / bundle["models"][0]["artifact"]["file_name"]
+    record = _read_record(Path(str(source) + ".nrdr-migration.json"))
+    if (record.get("verified") is not True or record.get("abi") != ARTIFACT_ABI or
+        record.get("tinygrad_ref") != TINYGRAD_RUNTIME_REF or record.get("camera") != list(camera) or
+        record.get("source_artifact_sha256") != source_sha or record.get("model_ref") != bundle["ref"] or
+        record.get("model_name") != bundle["short_name"] or
+        str(record.get("device", "")).split(":")[0].split("+")[-1] != "QCOM"):
+      continue
+    target = (root / record.get("artifact", "")).resolve()
+    if source.is_file() and target.is_relative_to(root) and target.is_file():
+      bundles.append(bundle)
+  return bundles

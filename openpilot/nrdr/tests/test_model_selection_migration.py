@@ -64,14 +64,31 @@ def helpers():
     'cloudlog': SimpleNamespace(error=lambda *_: None)})
 
 
-def test_selector_v19_retains_exact_pop_preference_and_replaces_only_stale_runner_cache(monkeypatch, helpers):
-  raw = saved_pop()
+@pytest.mark.parametrize('version', (19, 20, 21))
+def test_supported_selector_retains_exact_preference_and_replaces_only_stale_runner_cache(monkeypatch, helpers, version):
+  raw = saved_pop(version)
   params = ParamsMemory({'ModelManager_ActiveBundle': raw, 'ModelRunnerTypeCache': int(custom.ModelManagerSP.Runner.stock)})
   monkeypatch.setattr(helpers, 'chestnut_present', lambda: False)
   assert helpers.get_selected_bundle(params).to_dict() == raw
   assert helpers.get_active_model_runner(params) == int(custom.ModelManagerSP.Runner.tinygrad)
   assert params.values['ModelManager_ActiveBundle'] == raw
   assert params.writes == [('ModelRunnerTypeCache', int(custom.ModelManagerSP.Runner.tinygrad))]
+
+
+@pytest.mark.parametrize('source,hardware,expected', [('qcom', True, 2), ('chestnut', True, 1), ('qcom', False, 1)])
+def test_local_rebuilds_extend_only_qcom_catalog_without_duplicates(source, hardware, expected):
+  local = {'ref': 'cheddar', 'internalName': 'CHEDDAR'}
+  existing = SimpleNamespace(ref='pop', internalName='PMV2')
+  namespace = {'COMMA_HARDWARE': hardware, 'HARDWARE': SimpleNamespace(get_device_type=lambda: 'mici'),
+               'Paths': SimpleNamespace(model_root=lambda: '/models'),
+               'verified_rebuild_bundles': lambda root, camera: [local],
+               'ModelParser': SimpleNamespace(_parse_bundle=lambda bundle: SimpleNamespace(**bundle))}
+  path = Path(__file__).resolve().parents[3] / 'openpilot/sunnypilot/models/fetcher.py'
+  method = next(n for n in ast.parse(path.read_text()).body if isinstance(n, ast.FunctionDef) and n.name == 'include_local_rebuilds')
+  exec(compile(ast.Module(body=[method], type_ignores=[]), str(path), 'exec'), namespace)
+  bundles = namespace['include_local_rebuilds']([existing], source)
+  assert len(bundles) == expected and bundles[0] is existing
+  assert namespace['include_local_rebuilds'](bundles, source) == bundles
 
 
 def test_first_run_waits_on_legacy_catalog_and_keeps_stock_until_a_compatible_download_finishes(helpers):

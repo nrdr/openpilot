@@ -22,6 +22,32 @@
     "dmonitoring_model.onnx": {"sha256": "dd299afabe7a3e0d04cbe2bd97fdb0c93bba8ad6d3cc3663a0e0ededaf243ac2", "size": 7497335}
   },
   "legacy_rebuilds": {
+    "24fa1b3e67b64a1531d564aeca672969e4fcb8c120866325ff6eb71a31bb7f20": {
+      "model_ref": "875a6b7e1e59a76e1c5d9972371564a4feb1deb9",
+      "model_name": "CHEDDAR",
+      "model_type": "native_onnx",
+      "model_file": "cheddar.onnx",
+      "compiler_env": {"IMAGE": "2", "FLOAT16": "1"},
+      "source_models": {
+        "cheddar.onnx": {"sha256": "5520d198bbbe2736b7fbbc432c2d7a97e306db74214aa1677fed70521b9b9eb4", "size": 82558205,
+          "url": "https://raw.githubusercontent.com/commaai/openpilot/875a6b7e1e59a76e1c5d9972371564a4feb1deb9/openpilot/selfdrive/modeld/models/driving_supercombo.onnx"}
+      },
+      "catalog_bundle": {
+        "short_name": "CHEDDAR", "display_name": "Cheddar Model (November 05, 2026)",
+        "is_20hz": true, "is_big": false, "ref": "875a6b7e1e59a76e1c5d9972371564a4feb1deb9",
+        "environment": "development", "runner": "tinygrad", "index": 77,
+        "minimum_selector_version": "21", "generation": "12", "build_time": "2026-11-05T21:41:12Z",
+        "tinygrad_ref": "5d186bdb43c2bcc6c56b6ececf427c34bada0de9",
+        "overrides": {"folder": "2026 Deep RL Models", "lat": ".0", "long": ".3"},
+        "models": [{"type": "chunked", "artifact": {
+          "file_name": "driving_ch_driving_november_05_2026_tinygrad.pkl",
+          "download_uri": {
+            "url": "https://huggingface.co/datasets/sunnypilot/sunnypilot_models_v1/resolve/main/models/recompiled44/model-CH%20Driving%20%28November%2005%2C%202026%29-867/driving_ch_driving_november_05_2026_tinygrad.pkl",
+            "sha256": "24fa1b3e67b64a1531d564aeca672969e4fcb8c120866325ff6eb71a31bb7f20"
+          }
+        }}]
+      }
+    },
     "6dcaddf515ec60b860d20cab5b0892cb855082e5db56e7992d27833aa485227b": {
       "model_ref": "62bf6fb072880905a4c490f0f4f4a6b3c23346ec",
       "model_name": "PMV2",

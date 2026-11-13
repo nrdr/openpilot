@@ -9,10 +9,13 @@ import time
 import requests
 from requests.exceptions import (SSLError, RequestException, HTTPError)
 from openpilot.common.params import Params
+from openpilot.common.hardware import COMMA_HARDWARE, HARDWARE
+from openpilot.common.hardware.hw import Paths
 from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot.models.helpers import is_bundle_version_compatible
 from openpilot.cereal import custom
 from openpilot.nrdr.features.services import TINYGRAD_RUNTIME_REF
+from openpilot.nrdr.features.services.model_artifacts import verified_rebuild_bundles
 
 
 class ModelParser:
@@ -87,6 +90,15 @@ class ModelParser:
     found_bundles = [ModelParser._parse_bundle({"tinygrad_ref": json_data.get("tinygrad_ref", ""), **bundle})
                      for bundle in json_data.get("bundles", [])]
     return [bundle for bundle in found_bundles if is_bundle_version_compatible(bundle.to_dict())]
+
+
+def include_local_rebuilds(bundles, source):
+  if source != "qcom" or not COMMA_HARDWARE:
+    return bundles
+  camera = (1344, 760) if HARDWARE.get_device_type() == "mici" else (1928, 1208)
+  refs = {bundle.ref for bundle in bundles}
+  return bundles + [ModelParser._parse_bundle(bundle) for bundle in verified_rebuild_bundles(Paths.model_root(), camera)
+                    if bundle["ref"] not in refs]
 
 
 class ModelCache:
@@ -215,7 +227,7 @@ class ModelFetcher:
                                                     for bundle in parsed)
           if parsed and (current_runtime or time.monotonic() < self._runtime_refresh_at.get(source, 0)):
             cloudlog.debug(f"Using valid cached models data for source {source}")
-            return parsed
+            return include_local_rebuilds(parsed, source)
           if parsed:
             # An unavailable catalog must not cause a 1 Hz download loop. An
             # old fallback is still shown, but cannot authorize an ABI upgrade.
@@ -229,16 +241,16 @@ class ModelFetcher:
 
     fetched_bundles = self._fetch_and_cache_models(source)
     if fetched_bundles is not None:
-      return fetched_bundles
+      return include_local_rebuilds(fetched_bundles, source)
 
     if not cached_data:
       cloudlog.warning("Failed to fetch fresh data and no cache available")
 
     cloudlog.warning("Failed to fetch fresh data. Using expired cache as fallback")
     try:
-      return self.model_parser.parse_models(cached_data)
+      return include_local_rebuilds(self.model_parser.parse_models(cached_data), source)
     except Exception:
-      return []
+      return include_local_rebuilds([], source)
 
 
 def get_cached_bundles(params: Params, source: str) -> list[custom.ModelManagerSP.ModelBundle]:
@@ -249,12 +261,12 @@ def get_cached_bundles(params: Params, source: str) -> list[custom.ModelManagerS
   _, suffix = ModelFetcher.MODEL_SOURCES[source]
   cached_data = params.get(f"ModelManager_ModelsCache{suffix}")
   if not cached_data:
-    return []
+    return include_local_rebuilds([], source)
   try:
-    return ModelParser.parse_models(cached_data)
+    return include_local_rebuilds(ModelParser.parse_models(cached_data), source)
   except Exception as e:
     cloudlog.warning(f"Failed to parse cached models for source {source}: {e}")
-    return []
+    return include_local_rebuilds([], source)
 
 
 if __name__ == "__main__":
