@@ -164,7 +164,7 @@ The baseline is Biscuit-Labs `45e5b91fae`, especially `honda_eps_calibrations.py
 Calibration provenance distinguishes measured values from defaults and spec estimates.
 The C020 high-speed envelope is firmware-derived, not validated at its high-speed rail.
 
-Verification: 335 focused host tests pass (7 native-only skips); 9 in-memory C4 tests
+Verification: 335 focused host tests pass (7 native-only skips); 10 installed C4 tests
 cover timings, model gates, dropout transitions and offline CAN packing. Direct donor
 comparisons match all 12 cores over 18,000 frames and all 12 rack maps. Non-PTM model
 processing matches parent `14d3f1b0af` in 180 cases. Generated Sunnylink definitions agree.
