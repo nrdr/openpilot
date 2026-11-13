@@ -54,9 +54,9 @@ class LaneCenteringLayout(Widget):
 
     self._lane_guidance_mode = multiple_button_item_sp(
       title=tr("Lane Centering Method"),
-      description=tr("Choose Sunny or Star lane-centering assistance; Off follows the model's path without added " +
-          "correction. Sunny requires a custom model; Star uses the tuning below."),
-      buttons=[tr("Off"), tr("Sunny"), tr("Star")],
+      description=tr("Choose Blendful or Star lane-centering assistance; Off follows the model's path without added " +
+          "correction. Blendful requires a custom model; Star uses the tuning below."),
+      buttons=[tr("Off"), tr("Blendful"), tr("Star")],
       selected_index=LANE_GUIDANCE_MODES.index(lane_guidance_mode_from_params(ui_state.params)),
       button_width=260,
       callback=self._on_lane_guidance_mode,

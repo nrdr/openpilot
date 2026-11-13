@@ -103,13 +103,13 @@ class LaneCenteringStatusElement:
     lane_centering = sm["laneCenteringStateSP"]
     if int(getattr(lane_centering, "laneGuidanceMode", 0)) == 2:
       if not bool(getattr(lane_centering, "blendfulDetailsValid", False)):
-        return UiElement("SYNC", "Sunny", "", rl.Color(255, 188, 0, 255))
+        return UiElement("SYNC", "Blendful", "", rl.Color(255, 188, 0, 255))
       trust = float(getattr(lane_centering, "blendfulTrust", 0.0))
       correction = float(getattr(lane_centering, "blendfulCorrectionCurvature", 0.0))
       if trust > 0.0:
-        return UiElement("ON", "Sunny", "", rl.Color(0, 255, 0, 255))
+        return UiElement("ON", "Blendful", "", rl.Color(0, 255, 0, 255))
       value = "FADING" if abs(correction) > 1e-9 else "WAIT"
-      return UiElement(value, "Sunny", "", rl.Color(255, 188, 0, 255))
+      return UiElement(value, "Blendful", "", rl.Color(255, 188, 0, 255))
 
     reason = lane_centering_reason_code(lane_centering.reason)
     value = LANE_CENTERING_REASON_LABELS.get(reason, "--")

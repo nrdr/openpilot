@@ -155,13 +155,13 @@ sections:
       - key: LaneGuidanceMode
         widget: multiple_button
         title: Lane Centering Method
-        description: "Choose Sunny or Star lane-centering assistance. Off follows the driving model's path without added lane-centering corrections."
-        details: "Sunny blends lane guidance into the model path; Star adds a separate steering correction. Sunny requires a custom model."
+        description: "Choose Blendful or Star lane-centering assistance. Off follows the driving model's path without added lane-centering corrections."
+        details: "Blendful blends lane guidance into the model path; Star adds a separate steering correction. Blendful requires a custom model."
         options:
         - value: 0
           label: 'Off'
         - value: 2
-          label: Sunny
+          label: Blendful
           enablement:
           - {type: capability, field: custom_model_active, equals: true}
         - value: 1

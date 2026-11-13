@@ -548,7 +548,7 @@ class TestLiveLaneCentering(OpenpilotTestCase):
     item = _find_item(schema, "LaneGuidanceMode")
     assert item["widget"] == "multiple_button"
     assert [(option["value"], option["label"]) for option in item["options"]] == [
-      (0, "Off"), (2, "Sunny"), (1, "Star"),
+      (0, "Off"), (2, "Blendful"), (1, "Star"),
     ]
     assert "custom_model_active" in json.dumps(item["options"][1]["enablement"])
 

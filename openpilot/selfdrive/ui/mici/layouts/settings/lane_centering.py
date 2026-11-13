@@ -34,8 +34,8 @@ class LaneCenteringLayoutMici(NavScroller):
       list(LANE_GUIDANCE_LABELS),
       select_callback=self._on_lane_guidance_mode,
       font_size=40,
-      description="Choose Sunny or Star lane-centering assistance; Off follows the model's path without added correction. " +
-                  "Sunny requires a custom model; Star uses the tuning below.",
+      description="Choose Blendful or Star lane-centering assistance; Off follows the model's path without added correction. " +
+                  "Blendful requires a custom model; Star uses the tuning below.",
     )
     self._pause_on_signal_toggle = BigToggle(
       "fade on turn signal",

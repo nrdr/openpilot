@@ -392,7 +392,7 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     if lane_guidance_selection not in (0, 1, 2):
       raise ValueError("Invalid Lane Centering Method. The selection was not saved.")
     if lane_guidance_selection == 2 and capabilities.get("custom_model_active") is not True:
-      raise ValueError("Sunny requires a non-Default custom model. The selection was not saved.")
+      raise ValueError("Blendful requires a non-Default custom model. The selection was not saved.")
   for key, value in params_to_update.items():
     write_onroad = not params.get_bool("IsOffroad")
     if write_onroad and key in ("HondaLiveLearningGas", "NrdrPcmSpeedDeadzone", *pcm_selections):

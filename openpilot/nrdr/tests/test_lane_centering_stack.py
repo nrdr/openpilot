@@ -54,6 +54,25 @@ def _collect_keys(node, found: list[str]) -> None:
 
 
 class TestLaneCenteringStack(unittest.TestCase):
+  def test_blendful_labels_preserve_saved_method_on_both_devices(self) -> None:
+    self.assertEqual(LANE_GUIDANCE_LABELS, ("Off", "Blendful", "Star"))
+    self.assertEqual(tuple(map(int, LANE_GUIDANCE_MODES)), (0, 2, 1))
+    params = SimpleNamespace(get_raw=lambda key: b"2" if key == "LaneGuidanceMode" else None)
+    mode = lane_guidance_mode_from_params(params)
+    self.assertEqual(mode, LaneGuidanceMode.BLENDFUL)
+    self.assertEqual(LANE_GUIDANCE_LABELS[LANE_GUIDANCE_MODES.index(mode)], "Blendful")
+
+    tici_tree = ast.parse(TICI_PANEL.read_text(encoding="utf-8"))
+    selector = next(node for node in ast.walk(tici_tree) if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name) and node.func.id == "multiple_button_item_sp")
+    buttons = next(keyword.value for keyword in selector.keywords if keyword.arg == "buttons")
+    self.assertEqual(tuple(ast.literal_eval(button.args[0]) for button in buttons.elts), LANE_GUIDANCE_LABELS)
+    mici_tree = ast.parse(MICI_PANEL.read_text(encoding="utf-8"))
+    selector = next(node for node in ast.walk(mici_tree) if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name) and node.func.id == "BigMultiToggle"
+                    and isinstance(node.args[0], ast.Constant) and node.args[0].value == "Lane Centering Method")
+    self.assertEqual(ast.unparse(selector.args[1]), "list(LANE_GUIDANCE_LABELS)")
+
   def test_existing_defaults_remain_exact(self) -> None:
     source = PARAM_HEADER.read_text(encoding="utf-8")
     expected = {
@@ -165,7 +184,7 @@ class TestLaneCenteringStack(unittest.TestCase):
         self.assertFalse(memory.values["LaneCenteringPauseOnSignal"])
         if class_name == "LaneCenteringLayoutMici":
           memory.values["ModelRunnerTypeCache"] = 0
-          panel._on_lane_guidance_mode("Sunny")
+          panel._on_lane_guidance_mode("Blendful")
           self.assertEqual(memory.values["LaneGuidanceMode"], 1)
           self.assertTrue(memory.values["LaneCentering"])
         for lock in ("NrdrSuggestedSettings", "NrdrHandcraftedLateralTune"):
@@ -181,7 +200,7 @@ class TestLaneCenteringStack(unittest.TestCase):
         # runner, and a missing transition cache. Sunny must never trap C4 at Off.
         for runner in (1, 0, None):
           memory.values.update(LaneGuidanceMode=0, LaneCentering=False, ModelRunnerTypeCache=runner)
-          selections = (1, 2, 0) if class_name == "LaneCenteringLayout" else ("Sunny", "Star", "Off")
+          selections = (1, 2, 0) if class_name == "LaneCenteringLayout" else ("Blendful", "Star", "Off")
           sunny_result = 2 if runner == 1 else 0 if class_name == "LaneCenteringLayout" else 1
           for selection, expected in zip(selections, (sunny_result, 1, 0), strict=True):
             panel._on_lane_guidance_mode(selection)
@@ -240,7 +259,7 @@ class TestLaneCenteringStack(unittest.TestCase):
                 allowed = not pending and (offroad or not completed)
                 self.assertIs(panel._write_allowed(), allowed)
                 self.assertIs(panel._settings_writable(), allowed)
-                panel._on_lane_guidance_mode(1 if class_name == "LaneCenteringLayout" else "Sunny")
+                panel._on_lane_guidance_mode(1 if class_name == "LaneCenteringLayout" else "Blendful")
                 self.assertEqual(params["LaneGuidanceMode"], 2 if allowed and runner == 1 else 1)
                 self.assertEqual(params["LaneCentering"], not (allowed and runner == 1))
                 if not allowed or (runner != 1 and class_name == "LaneCenteringLayout"):
@@ -360,8 +379,8 @@ class TestLaneCenteringStack(unittest.TestCase):
 
         if class_name == "LaneCenteringLayoutMici":
           memory.values["LaneGuidanceMode"] = 0
-          lane_action.value = "Sunny"  # BigMultiToggle updates its display before the callback.
-          panel._on_lane_guidance_mode("Sunny")
+          lane_action.value = "Blendful"  # BigMultiToggle updates its display before the callback.
+          panel._on_lane_guidance_mode("Blendful")
           self.assertEqual(memory.values["LaneGuidanceMode"], 1)
           self.assertTrue(memory.values["LaneCentering"])
           self.assertEqual(lane_action.value, "Star")
@@ -374,10 +393,10 @@ class TestLaneCenteringStack(unittest.TestCase):
         memory.values.pop("ModelRunnerTypeCache", None)
         panel._refresh()
         self.assertEqual(memory.values["LaneGuidanceMode"], 2)
-        self.assertEqual(lane_action.value, 1 if class_name == "LaneCenteringLayout" else "Sunny")
+        self.assertEqual(lane_action.value, 1 if class_name == "LaneCenteringLayout" else "Blendful")
 
         memory.values["LaneGuidanceMode"] = 1
-        panel._on_lane_guidance_mode(1 if class_name == "LaneCenteringLayout" else "Sunny")
+        panel._on_lane_guidance_mode(1 if class_name == "LaneCenteringLayout" else "Blendful")
         self.assertEqual(memory.values["LaneGuidanceMode"], 1)
         self.assertEqual(lane_action.value, 2 if class_name == "LaneCenteringLayout" else "Star")
 
@@ -429,25 +448,25 @@ class TestLaneCenteringStack(unittest.TestCase):
       {field: minimum_speed[field] for field in ("min", "max", "step", "unit")},
       {"min": 12, "max": 100, "step": 1, "unit": "mph"},
     )
-    self.assertIn("5 m/s controller floor", minimum_speed["description"])
+    self.assertIn("lower limit of about 11 mph", minimum_speed["details"])
     self.assertEqual(items[0]["key"], "LaneGuidanceMode")
     self.assertEqual([(option["value"], option["label"]) for option in items[0]["options"]],
-                     [(0, "Off"), (2, "Sunny"), (1, "Star")])
-    self.assertIn("mutually exclusive", items[0]["details"])
-    self.assertIn("requires a non-Default custom model", items[0]["details"])
+                     [(0, "Off"), (2, "Blendful"), (1, "Star")])
+    self.assertIn("Off follows the driving model's path", items[0]["description"])
+    self.assertIn("Blendful requires a custom model", items[0]["details"])
     self.assertIn("custom_model_active", json.dumps(items[0]["options"][1]["enablement"]))
     self.assertEqual(items[2]["title"], "Fade on Turn Signal")
-    self.assertIn("always suspend", items[2]["description"])
-    self.assertIn("regardless of this setting", items[2]["description"])
+    self.assertIn("Lane changes always pause these corrections", items[2]["description"])
+    self.assertIn("even with this setting off", items[2]["description"])
     strength = items[4]
     self.assertEqual(strength["title"], "Lane-Centering Strength")
     self.assertEqual({field: strength[field] for field in ("min", "max", "step")}, {"min": 0.0, "max": 1.0, "step": 0.05})
-    self.assertIn("0.95 is the suggested setting", strength["description"])
-    self.assertIn("1.0 requests the lane-center path", strength["description"])
-    self.assertIn("without raising the existing maximum correction ceiling", strength["description"])
+    self.assertIn("Zero follows the model path", strength["description"])
+    self.assertIn("Higher values favor the lane center", strength["details"])
+    self.assertIn("subject to lane confidence and steering limits", strength["details"])
     self.assertEqual(items[5]["title"], "Model Break-In")
-    self.assertIn("more than 0.15 m", items[5]["description"])
-    self.assertIn("zero by 0.50 m", items[5]["description"])
+    self.assertIn("yield to a confident model path", items[5]["description"])
+    self.assertIn("zero disables this behavior", items[5]["description"])
     lane_centering_copy = json.dumps(source_panel)
     self.assertNotIn("StarPilot", lane_centering_copy)
     self.assertNotIn("SPLC", lane_centering_copy)
@@ -496,7 +515,7 @@ class TestLaneCenteringStack(unittest.TestCase):
     self.assertIn('{"LaneCenteringMinSpeed", {PERSISTENT | BACKUP, INT, "12"}}', generated)
     self.assertIn('{"LaneCenteringStrength", {PERSISTENT | BACKUP, FLOAT, "0.95"}}', generated)
     self.assertIn('{"LaneGuidanceMode", {PERSISTENT | BACKUP, INT, "2"}}', generated)
-    self.assertIn("5 m/s controller floor", NRDR_STEERING.read_text(encoding="utf-8"))
+    self.assertIn("lower limit of about 11 mph", NRDR_STEERING.read_text(encoding="utf-8"))
 
   def test_driver_override_is_wired_without_other_starpilot_controls(self) -> None:
     controlsd = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/controlsd.py").read_text(encoding="utf-8")
@@ -624,12 +643,12 @@ class TestLaneCenteringStack(unittest.TestCase):
           reason=reasons.disabled, active=False))
         rendered = element.update(sm, False)
         self.assertEqual((rendered.value, rendered.label, rendered.color),
-                         (expected_value, "Sunny", expected_color))
+                         (expected_value, "Blendful", expected_color))
 
     sm = SubMasterHarness(laneCenteringStateSP=SimpleNamespace(
       laneGuidanceMode=2, blendfulDetailsValid=False, reason=reasons.disabled, active=False))
     rendered = element.update(sm, False)
-    self.assertEqual((rendered.value, rendered.label, rendered.color), ("SYNC", "Sunny", amber))
+    self.assertEqual((rendered.value, rendered.label, rendered.color), ("SYNC", "Blendful", amber))
 
   def test_diagnostics_cannot_feed_control_branches_state_or_returns(self) -> None:
     controller = (REPOSITORY_ROOT / "openpilot/selfdrive/controls/lib/lane_centering.py").read_text(encoding="utf-8")

@@ -67,14 +67,14 @@ class TestUiSettingsContract(unittest.TestCase):
     panel = self.panels["nrdr_lane_centering_stack"]
     mode, *tuning = panel["items"]
     self.assertEqual((panel["label"], mode["title"]), ("Lane Centering Method", "Lane Centering Method"))
-    self.assertEqual([(option["label"], option["value"]) for option in mode["options"]], [("Off", 0), ("Sunny", 2), ("Star", 1)])
+    self.assertEqual([(option["label"], option["value"]) for option in mode["options"]], [("Off", 0), ("Blendful", 2), ("Star", 1)])
     self.assertEqual(mode["options"][1]["enablement"], [{"type": "capability", "field": "custom_model_active", "equals": True}])
     self.assertNotIn("enablement", mode["options"][0])
     self.assertNotIn("enablement", mode["options"][2])
     for item in tuning:
       self.assertIn({"type": "param", "key": "LaneGuidanceMode", "equals": 1}, item["enablement"])
     self.assertIn("Off follows the driving model's path", mode["description"])
-    self.assertIn("Sunny requires a custom model", mode["details"])
+    self.assertIn("Blendful requires a custom model", mode["details"])
 
   def test_driver_monitoring_first_reminder_contract(self):
     panel = self.panels["nrdr_driver_monitoring"]
@@ -96,7 +96,7 @@ class TestUiSettingsContract(unittest.TestCase):
     contract = json.loads((Path(DEFAULT_SRC).parent / "settings_ui.schema.json").read_text(encoding="utf-8"))
     self.assertLessEqual(item.keys(), contract["$defs"]["SchemaItem"]["properties"].keys())
 
-  def test_display_copy_uses_nrdr_sunny_and_star_without_renaming_ids(self):
+  def test_display_copy_uses_nrdr_blendful_and_star_without_renaming_ids(self):
     def strings(node):
       if isinstance(node, dict):
         for key, value in node.items():
@@ -113,7 +113,7 @@ class TestUiSettingsContract(unittest.TestCase):
     # The implementation name can appear in explanatory prose; the selector
     # presents user-facing names while retaining the stored numeric IDs.
     guidance = self.panels["nrdr_lane_centering_stack"]["items"][0]
-    self.assertEqual([(o["value"], o["label"]) for o in guidance["options"]], [(0, "Off"), (2, "Sunny"), (1, "Star")])
+    self.assertEqual([(o["value"], o["label"]) for o in guidance["options"]], [(0, "Off"), (2, "Blendful"), (1, "Star")])
     self.assertNotIn("Lane Centering Stack", copy)
     self.assertIn("nrdr_lane_centering_stack", self.panels)
     self.assertIn("nrdr_special", {section["id"] for section in self.pages["steering"]["sections"]})
