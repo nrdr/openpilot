@@ -19,6 +19,8 @@ def without_monitoring_panel(document: dict) -> dict:
   def walk(node):
     nonlocal removed
     if isinstance(node, dict):
+      if node.get("id") == "nrdr":
+        node["description"] = "Customize steering, cruise control, and device behavior."
       for key, value in node.items():
         if key == "sub_panels":
           kept = [panel for panel in value if panel.get("id") != PANEL_ID]

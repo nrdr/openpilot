@@ -43,7 +43,6 @@ class DRIVER_MONITOR_SETTINGS:
     self._MAX_ALERT_3 = 2
     self._MAX_NO_RESPONSE = 1
     self._LOCKOUT_TIMES = [int(60 * n_min / DT_DMON) for n_min in [1, 5, 15, 30]]
-    apply_driver_monitoring_policy(self)
 
     self._TIMEOUT_RECOVERY_FACTOR_MAX = 5.
     self._TIMEOUT_RECOVERY_FACTOR_MIN = 1.25
@@ -88,6 +87,7 @@ class DRIVER_MONITOR_SETTINGS:
     self._WHEELPOS_DATA_AVG = 0.03
     self._WHEELPOS_DATA_VAR = 3*5.5e-5
     self._WHEELPOS_MAX_COUNT = -1
+    apply_driver_monitoring_policy(self)
 
 class DriverPose:
   def __init__(self, settings):

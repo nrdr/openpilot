@@ -4,6 +4,8 @@ from pathlib import Path, PurePosixPath
 import shutil
 import stat
 import subprocess
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -188,7 +190,6 @@ def make_source(tmp_path: Path, entries: list[str], existing_entries: list[str])
   for name in ("events.py", "events_sp.py", "driver_monitoring.py", "mads.py"):
     (clean_overlay / name).write_text("# clean overlay fixture\n", encoding="utf-8")
   shutil.copy2(CLEAN_OVERLAY / "backend_env.sh", clean_overlay / "backend_env.sh")
-  shutil.copy2(CLEAN_OVERLAY / "restore_comm_events.py", clean_overlay / "restore_comm_events.py")
   shutil.copy2(CLEAN_OVERLAY / "strip_monitoring_ui.py", clean_overlay / "strip_monitoring_ui.py")
 
   # A deliberately broken copy at the pre-migration location proves preflight
@@ -290,6 +291,57 @@ def test_release_forces_shared_camera_models_and_checks_both_variants() -> None:
   second = source.index(checks, first + 1)
   assert build < first < source.index('RELEASE_COMMIT="$(git rev-parse HEAD)"')
   assert source.index('echo "[-] Building mandatory') < second < source.index('CLEAN_COMMIT="$(git rev-parse HEAD)"')
+
+
+def test_releases_preserve_source_communication_policy_and_clean_monitoring() -> None:
+  source = BUILD_SCRIPT.read_text(encoding="utf-8")
+  assert "restore_comm_events" not in source
+  assert "restore_comm_events" not in BUILD_LAUNCHER.read_text(encoding="utf-8")
+  assert 'cp -p -- "$CLEAN_OVERLAY_DIR/driver_monitoring.py" "$hooks_target/driver_monitoring.py"' in source
+  assert 'python3 "$CLEAN_OVERLAY_DIR/strip_monitoring_ui.py" "$BUILD_DIR"' in source
+  tree = ast.parse((REPO_ROOT / "openpilot/selfdrive/selfdrived/events.py").read_text(encoding="utf-8"))
+  mapping = next(node.value for node in tree.body if isinstance(node, ast.AnnAssign)
+                 and isinstance(node.target, ast.Name) and node.target.id == "EVENTS")
+  handlers = {key.attr: value for key, value in zip(mapping.keys, mapping.values, strict=True)}
+  for name in ("commIssue", "commIssueAvgFreq"):
+    assert isinstance(handlers[name], ast.Dict) and not handlers[name].keys
+  assert handlers["driverMonitoringFault"].keys
+
+
+@pytest.mark.parametrize("failure,event", [("alive", "commIssue"), ("freq_ok", "commIssueAvgFreq"), ("valid", "commIssue")])
+def test_communication_diagnostics_and_logging_survive_empty_alert_handlers(failure: str, event: str) -> None:
+  tree = ast.parse((REPO_ROOT / "openpilot/selfdrive/selfdrived/selfdrived.py").read_text(encoding="utf-8"))
+  selfdrive = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "SelfdriveD")
+  method = next(node for node in selfdrive.body if isinstance(node, ast.FunctionDef) and node.name == "update_events")
+  start = next(index for index, node in enumerate(method.body) if isinstance(node, ast.Assign)
+               and isinstance(node.targets[0], ast.Name) and node.targets[0].id == "has_disable_events")
+  end = next(index for index in range(start, len(method.body)) if isinstance(method.body[index], ast.If))
+  diagnostic = compile(ast.Module(body=method.body[start:end + 1], type_ignores=[]), "<production comm diagnostics>", "exec")
+  sm = SimpleNamespace(alive={"modelV2": True}, freq_ok={"modelV2": True}, valid={"modelV2": True})
+  sm.all_alive = lambda: all(sm.alive.values())
+  sm.all_freq_ok = lambda: all(sm.freq_ok.values())
+  sm.all_checks = lambda: sm.all_alive() and sm.all_freq_ok() and all(sm.valid.values())
+  events = set()
+  state = SimpleNamespace(sm=sm, events=SimpleNamespace(contains=lambda _: False, add=events.add),
+                          big_model_loading=False, big_model_ready_t=0., logged_comm_issue=None)
+  logger = Mock()
+  namespace = {"self": state, "num_events": 0, "len": lambda _: len(events), "cloudlog": logger,
+               "time": SimpleNamespace(monotonic=lambda: 100.),
+               "ET": SimpleNamespace(NO_ENTRY="noEntry", SOFT_DISABLE="softDisable", IMMEDIATE_DISABLE="immediateDisable"),
+               "EventName": SimpleNamespace(commIssue="commIssue", commIssueAvgFreq="commIssueAvgFreq")}
+  getattr(sm, failure)["modelV2"] = False
+  exec(diagnostic, namespace)
+  assert events == {event}
+  logger.event.assert_called_once_with("commIssue", error=True,
+                                      invalid=["modelV2"] if failure == "valid" else [],
+                                      not_alive=["modelV2"] if failure == "alive" else [],
+                                      not_freq_ok=["modelV2"] if failure == "freq_ok" else [])
+  exec(diagnostic, namespace)
+  assert logger.event.call_count == 1  # Unchanged diagnostic details are not spammed.
+  getattr(sm, failure)["modelV2"] = True
+  events.clear()
+  exec(diagnostic, namespace)
+  assert not events and state.logged_comm_issue is None
 
 
 def test_launch_env_selects_nrdr_backend_through_owned_fragment() -> None:
@@ -698,9 +750,8 @@ def test_clean_overlay_only_applies_current_exclusions_without_branch_or_build_s
   assert git("remote", "get-url", "origin", cwd=build).stdout.strip() == "https://example.invalid/original.git"
   assert git("branch", "--list", "nrdr-clean", cwd=build).stdout.strip() == ""
   assert not (build / "prebuilt").exists()
-  from openpilot.nrdr.tools.release.clean_overlay.restore_comm_events import restore_comm_event_source
-  source_events = (REPO_ROOT / "openpilot/selfdrive/selfdrived/events.py").read_text(encoding="utf-8")
-  assert (build / "openpilot/selfdrive/selfdrived/events.py").read_text(encoding="utf-8") == restore_comm_event_source(source_events)
+  source_events = (REPO_ROOT / "openpilot/selfdrive/selfdrived/events.py").read_bytes()
+  assert (build / "openpilot/selfdrive/selfdrived/events.py").read_bytes() == source_events
 
   for name, relative in CLEAN_OVERLAY_TARGETS.items():
     assert (build / relative).read_bytes() == (CLEAN_OVERLAY / name).read_bytes()
