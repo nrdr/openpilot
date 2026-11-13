@@ -15,17 +15,17 @@
     "aggressive": {
       "t_follow": 1.25,
       "jerk_factor": 0.5,
-      "dynamics": "exact donor"
+      "dynamics": "donor with fixed nrdr base cruise acceleration ceiling"
     },
     "standard": {
       "t_follow": 1.45,
       "jerk_factor": 1,
-      "dynamics": "exact donor"
+      "dynamics": "donor with fixed nrdr base cruise and C3 Sport acceleration ceilings"
     },
     "relaxed": {
       "t_follow": 1.75,
       "jerk_factor": 1,
-      "dynamics": "exact donor"
+      "dynamics": "donor with fixed nrdr base cruise and C3 Normal acceleration ceilings"
     },
     "econ": {
       "t_follow": 2.25,
@@ -36,7 +36,7 @@
     }
   },
   "exceptions": [
-    "Econ only, as enumerated above. No Params/LongTune or live personality setting inputs to dynamics in MVL mode.",
+    "All personalities retain the fixed pre-MVL positive cruise ceilings: base [2.0, 1.6, 0.8, 0.6] at [0, 10, 25, 40] m/s, with C3 Sport/Normal/Eco ceilings for Standard/Relaxed/Econ. Applied before existing jerk smoothing in ACC and Experimental; radar/model braking, following distances, controller gains and learning are unchanged. No Params/LongTune reads or saved tune overrides are introduced.",
     "Manual Experimental Mode is an explicit exception to the donor's unconditional model candidate. Off excludes model acceleration/shouldStop and model-override boost; radar MPC, cruise, FCW and forced deceleration remain. On uses the donor candidate/boost. Turning Off clears only model boost state, retaining planner/PID continuity.",
     "Host schema: allowThrottle=True, matching donor's absence of throttle suppression.",
     "Donor accelBoost publication omitted: host schema currently has no corresponding field; computation unchanged.",
@@ -48,14 +48,14 @@
     "Host engine braking helper, SP publication, and dedicated tests. Cereal ordinal deprecation and DBC cleanup owned by parent/DBC agent."
   ],
   "validation": {
-    "command": "python -m pytest openpilot/nrdr/tests/test_mvl_host_parity.py openpilot/nrdr/tests/test_mvl_plannerd_lifecycle.py openpilot/nrdr/tests/test_mvl_host_native.py openpilot/nrdr/tests/test_mvl_cruise.py openpilot/nrdr/tests/test_experimental_button_regressions.py",
-    "scope": "Pinned git blob verification; exact AST comparison of copied algorithms and optimizer definition; differential controller/planner/solver-input/FCW/boost tests; polluted custom-settings isolation; legacy non-Honda equivalence.",
+    "command": "python -m pytest openpilot/nrdr/tests/test_mvl_personality_acceleration.py openpilot/nrdr/tests/test_mvl_host_parity.py openpilot/nrdr/tests/test_mvl_plannerd_lifecycle.py openpilot/nrdr/tests/test_mvl_host_native.py openpilot/nrdr/tests/test_mvl_cruise.py openpilot/nrdr/tests/test_experimental_button_regressions.py",
+    "scope": "Pinned git blob verification; exact AST comparison of copied algorithms and optimizer definition; differential planner tests against donor plus historical positive ceilings; unchanged controller/solver/FCW/boost algorithms; polluted custom-settings isolation; legacy non-Honda equivalence.",
     "native_release_gate": "Run test_mvl_host_native against the native acados solver, capnp imports, startup policy, settings and controller parity on the C4, then repeat acceptance checks after building the exact installed revision.",
     "not_validated": "Physical actuator response, on-road behavior, future learned-state convergence, or the donor author's private settings. Source parity and native software tests are not road validation."
   },
   "configuration_contract": {
     "effective_selections": "Driver cruise set speed, custom button increments, SCC Vision/Map, speed-limit preferences, four personality selector and manual Experimental Mode remain effective. Honda MVL-controller ownership is startup-latched; Experimental Mode is live.",
-    "first_three": "Pinned donor code and checked-in defaults, not a claim about the donor author's private runtime preferences.",
+    "first_three": "Pinned donor control and learning with restored fixed nrdr positive cruise ceilings; existing jerk smoothing also applies when switching personality. Not a claim about the donor author's private runtime preferences.",
     "SmartCruiseControlVision": "Driver preference; not overridden by MVL.",
     "SmartCruiseControlMap": "Driver preference; not overridden by MVL.",
     "SpeedLimitMode": "Driver preference, including Assist; not overridden by MVL.",

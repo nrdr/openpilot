@@ -17,6 +17,7 @@ from openpilot.selfdrive.car.cruise import V_CRUISE_UNSET
 from openpilot.common.swaglog import cloudlog
 
 from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP
+from openpilot.nrdr.features.longitudinal.longitudinal_planner import CRUISE_ACCEL_VALUES, c3_personality_accel_max
 
 J_CRUISE_VALS = [1.6, 1.2, 0.8, 0.6]
 J_CRUISE_BP = [0., 10.0, 25., 40.]
@@ -25,8 +26,13 @@ V_CRUISE_MAX = 145  # Pinned donor ceiling; the host's 169 km/h is legacy-only.
 CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 
 
-def get_cruise_accel(v_cruise, v_ego, a_cruise_prev, dt):
-  target_accel = np.clip(v_cruise - v_ego, A_CRUISE_MIN, ACCEL_MAX)
+def get_cruise_accel(v_cruise, v_ego, a_cruise_prev, dt, personality):
+  # Restore the fixed nrdr ceilings without changing MVL learning or braking.
+  max_accel = min(ACCEL_MAX, np.interp(v_ego, J_CRUISE_BP, CRUISE_ACCEL_VALUES))
+  personality_ceiling = c3_personality_accel_max(v_ego, personality)
+  if personality_ceiling is not None:
+    max_accel = min(max_accel, personality_ceiling)
+  target_accel = np.clip(v_cruise - v_ego, A_CRUISE_MIN, max_accel)
   j_cruise = np.interp(v_ego, J_CRUISE_BP, J_CRUISE_VALS)
   target_accel = float(np.clip(target_accel, a_cruise_prev - j_cruise * dt, a_cruise_prev + j_cruise * dt))
 
@@ -111,7 +117,7 @@ class MvlLongitudinalPlanner(LongitudinalPlannerSP):
 
     self.a_cruise = (econ_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt)
                      if sm['selfdriveState'].personality == 3 else
-                     get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt))
+                     get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt, sm['selfdriveState'].personality))
     cruise_should_stop = should_stop(v_ego, self.a_cruise)
 
     candidates = [(output_a_target_mpc, self.mpc.source, output_should_stop_mpc),

@@ -1,8 +1,8 @@
-"""The sole dynamics exception to pinned MVL: fixed, gentler Econ.
+"""Fixed, gentler Econ acceleration, following distance and jerk.
 
 No Params, LongTune, model/lead shaping, stop thresholds or hill compensation.
 The curves are the pre-mode NRDR Eco and cruise ceilings; MPC uses the existing
-2.25 second headway and 1.5 jerk/a-change factors. All other modes use MVL.
+2.25 second headway and 1.5 jerk/a-change factors.
 """
 import numpy as np
 

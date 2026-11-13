@@ -20,7 +20,9 @@ from openpilot.selfdrive.controls.lib.longcontrol import LongControl
 from openpilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlanner
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib import long_mpc, mvl_planner
 from openpilot.sunnypilot.selfdrive.controls.lib import longitudinal_planner as sp_planner
-from openpilot.nrdr.tests.test_mvl_host_parity import CORE, MPC, constant, definitions, git_source
+from openpilot.nrdr.tests.test_mvl_host_parity import (
+  CORE, MPC, constant, definitions, donor_with_personality_limits, git_source, historical_accel_max,
+)
 from openpilot.nrdr.tests.test_mvl_cruise_targets import IsolatedTargetParams
 
 
@@ -90,14 +92,15 @@ def test_native_mpc_matches_pinned_donor(profile):
 
 
 @pytest.mark.parametrize("profile", [0, 1, 2])
-def test_native_planner_and_longcontrol_match_pinned_donor(monkeypatch, profile):
+def test_native_planner_and_longcontrol_match_donor_with_historical_ceilings(monkeypatch, profile):
   # Advisory alert I/O is irrelevant to acceleration parity. Do not read/write
   # the device Params namespace while running the isolated acceptance suite.
   monkeypatch.setattr(sp_planner, "E2EAlertsHelper", lambda: NS(update=lambda *_: None))
   env = vars(mvl_planner).copy()
+  env["historical_accel_max"] = historical_accel_max
   env["V_CRUISE_MAX"] = constant(git_source("openpilot/selfdrive/car/cruise.py"), "V_CRUISE_MAX")
   env["LongitudinalMpc"] = donor_mpc()
-  expected_cls = definitions(git_source(CORE + "longitudinal_planner.py"), env)["LongitudinalPlanner"]
+  expected_cls = definitions(donor_with_personality_limits(git_source(CORE + "longitudinal_planner.py")), env)["LongitudinalPlanner"]
   params, params_sp = cp(), custom.CarParamsSP.new_message()
   actual, expected = LongitudinalPlanner(params, params_sp, init_v=20.), expected_cls(params, params_sp, init_v=20.)
   import openpilot.selfdrive.controls.lib.longcontrol as controller_module

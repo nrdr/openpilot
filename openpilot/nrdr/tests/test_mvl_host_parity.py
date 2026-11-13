@@ -118,6 +118,9 @@ def environment(**extra):
   }
   econ = definitions(source(MPC + "mvl_econ.py"), {"np": np})
   env.update({k: v for k, v in econ.items() if not k.startswith("__")})
+  curves = definitions(source("openpilot/nrdr/features/longitudinal/longitudinal_planner.py"), env)
+  env.update({key: curves[key] for key in ("CRUISE_ACCEL_VALUES", "c3_personality_accel_max")})
+  env["historical_accel_max"] = historical_accel_max
   env.update(extra)
   return env
 
@@ -133,6 +136,29 @@ def car_params(brand="honda", flagged=True, openlong=True):
 
 def parsed(text):
   return ast.dump(ast.parse(text), include_attributes=False)
+
+
+@lru_cache
+def historical_accel_curves():
+  return definitions(git_source("openpilot/nrdr/features/longitudinal/longitudinal_planner.py", LEGACY),
+                     {"np": np, "log": NS(LongitudinalPersonality=PERSONALITY)})
+
+
+def historical_accel_max(speed, profile):
+  curves = historical_accel_curves()
+  maximum = min(2., np.interp(speed, [0., 10., 25., 40.], curves["CRUISE_ACCEL_VALUES"]))
+  ceiling = curves["c3_personality_accel_max"](speed, profile)
+  return maximum if ceiling is None else min(maximum, ceiling)
+
+
+def donor_with_personality_limits(text):
+  """Only the restored positive ceiling differs from this donor reference."""
+  return (text.replace("def get_cruise_accel(v_cruise, v_ego, a_cruise_prev, dt):",
+                       "def get_cruise_accel(v_cruise, v_ego, a_cruise_prev, dt, personality):")
+              .replace("np.clip(v_cruise - v_ego, A_CRUISE_MIN, ACCEL_MAX)",
+                       "np.clip(v_cruise - v_ego, A_CRUISE_MIN, historical_accel_max(v_ego, personality))")
+              .replace("get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt)",
+                       "get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt, sm['selfdriveState'].personality)"))
 
 
 @pytest.mark.parametrize("path,blob", MANIFEST["donor_blobs"].items())
@@ -188,12 +214,23 @@ def test_planner_only_documented_donor_edits():
   expected = expected.replace("from openpilot.selfdrive.car.cruise import V_CRUISE_MAX, V_CRUISE_UNSET",
                               "from openpilot.selfdrive.car.cruise import V_CRUISE_UNSET")
   expected = expected.replace("A_CRUISE_MIN = -0.5", "A_CRUISE_MIN = -0.5\nV_CRUISE_MAX = 145")
+  expected = expected.replace("from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP",
+                              "from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP\n" +
+                              "from openpilot.nrdr.features.longitudinal.longitudinal_planner import CRUISE_ACCEL_VALUES, c3_personality_accel_max")
+  expected = expected.replace("def get_cruise_accel(v_cruise, v_ego, a_cruise_prev, dt):",
+                              "def get_cruise_accel(v_cruise, v_ego, a_cruise_prev, dt, personality):")
+  expected = expected.replace("  target_accel = np.clip(v_cruise - v_ego, A_CRUISE_MIN, ACCEL_MAX)",
+                              "  max_accel = min(ACCEL_MAX, np.interp(v_ego, J_CRUISE_BP, CRUISE_ACCEL_VALUES))\n" +
+                              "  personality_ceiling = c3_personality_accel_max(v_ego, personality)\n" +
+                              "  if personality_ceiling is not None:\n" +
+                              "    max_accel = min(max_accel, personality_ceiling)\n" +
+                              "  target_accel = np.clip(v_cruise - v_ego, A_CRUISE_MIN, max_accel)")
   expected = expected.replace("LongitudinalMpc(dt=dt)", "LongitudinalMpc(dt=dt, mvl_enabled=True)")
   expected = expected.replace("self.accel_boost = AccelBoost()", "self.accel_boost = AccelBoost()\n    self.experimental_mode = False")
   expected = expected.replace("self.a_cruise = get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt)",
                               "self.a_cruise = (econ_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt)\n" +
                               "                     if sm['selfdriveState'].personality == 3 else\n" +
-                              "                     get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt))")
+                              "                     get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt, sm['selfdriveState'].personality))")
   expected = expected.replace("    longitudinalPlan.accelBoost = float(self.accel_boost.total_boost)\n", "")
   expected = expected.replace(
     "    output_a_target_e2e = self.accel_boost.update(sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)\n\n" +
@@ -433,7 +470,7 @@ def constant(text, name):
               if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in n.targets))
 
 
-def planner_modules(legacy=False):
+def planner_modules(legacy=False, personality_limits=False):
   host_cruise_max = constant(source("openpilot/selfdrive/car/cruise.py"), "V_CRUISE_MAX")
   donor_cruise_max = constant(git_source("openpilot/selfdrive/car/cruise.py"), "V_CRUISE_MAX")
   env = environment(LongitudinalMpc=PlannerMpcDouble, LongitudinalPlannerSP=PlannerSPDouble,
@@ -442,8 +479,11 @@ def planner_modules(legacy=False):
   env.update({key: helpers[key] for key in ("get_accel_from_plan", "should_stop")})
   env["AccelBoost"] = definitions(source(MPC + "mvl_accel_boost.py"), env)["AccelBoost"]
   env["MvlLongitudinalPlanner"] = definitions(source(MPC + "mvl_planner.py"), env)["MvlLongitudinalPlanner"]
+  reference = git_source(CORE + "longitudinal_planner.py", LEGACY if legacy else DONOR)
+  if personality_limits:
+    reference = donor_with_personality_limits(reference)
   return (definitions(source(CORE + "longitudinal_planner.py"), env),
-          definitions(git_source(CORE + "longitudinal_planner.py", LEGACY if legacy else DONOR),
+          definitions(reference,
                       env | {"V_CRUISE_MAX": host_cruise_max if legacy else donor_cruise_max}))
 
 
@@ -485,8 +525,8 @@ def planner_messages(frame, rng, profile):
 
 @pytest.mark.parametrize("profile", [0, 1, 2])
 @pytest.mark.parametrize("interceptor", [False, True])
-def test_planner_exact_donor_first_three_with_polluted_custom_inputs(profile, interceptor):
-  current, donor = planner_modules()
+def test_planner_donor_with_historical_ceilings_and_polluted_custom_inputs(profile, interceptor):
+  current, donor = planner_modules(personality_limits=True)
   cp, cp_sp = car_params(), NS(enableGasInterceptor=interceptor)
   actual, expected = (m["LongitudinalPlanner"](cp, cp_sp) for m in (current, donor))
   assert actual.mpc.kwargs["mvl_enabled"]
@@ -496,7 +536,7 @@ def test_planner_exact_donor_first_three_with_polluted_custom_inputs(profile, in
   rng = np.random.default_rng(376)
   for frame in range(250):
     sm = planner_messages(frame, rng, profile)
-    sm['selfdriveState'].experimentalMode = True  # Exact donor parity when explicitly selected.
+    sm['selfdriveState'].experimentalMode = True  # Only the documented positive ceilings differ from donor.
     actual.update(sm)
     expected.update(copy.deepcopy(sm))
     for attr in ("output_a_target", "output_should_stop", "a_cruise", "fcw", "seen_cruise_target"):
@@ -616,7 +656,7 @@ def integrated_planner_classes():
   current_env["MvlLongitudinalPlanner"] = definitions(source(MPC + "mvl_planner.py"), current_env)["MvlLongitudinalPlanner"]
   env["LongitudinalPlannerSP"] = definitions(git_source(SP + "longitudinal_planner.py"), env)["LongitudinalPlannerSP"]
   return (definitions(source(CORE + "longitudinal_planner.py"), current_env)["LongitudinalPlanner"],
-          definitions(git_source(CORE + "longitudinal_planner.py"), env)["LongitudinalPlanner"])
+          definitions(donor_with_personality_limits(git_source(CORE + "longitudinal_planner.py")), env)["LongitudinalPlanner"])
 
 
 def integrated_planner_messages(frame, rng, profile):
@@ -641,7 +681,7 @@ def test_mvl_constructs_sp_target_features_but_not_custom_accel_or_tune():
 
 @pytest.mark.parametrize("profile", [0, 1, 2])
 @pytest.mark.parametrize("interceptor", [False, True])
-def test_integrated_sp_disabled_features_preserve_numerical_donor_parity(profile, interceptor):
+def test_integrated_sp_disabled_features_preserve_donor_with_historical_ceilings(profile, interceptor):
   actual, expected = (cls(car_params(), NS(enableGasInterceptor=interceptor)) for cls in integrated_planner_classes())
   actual.saved_settings, actual.tune_file = POLLUTED.copy(), POLLUTED_TUNE.copy()
   rng = np.random.default_rng(376)
