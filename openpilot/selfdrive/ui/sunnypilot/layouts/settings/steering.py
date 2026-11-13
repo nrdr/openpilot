@@ -15,7 +15,6 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.lane_change_settings import LaneChangeSettingsLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.mads_settings import MadsSettingsLayout
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.steering_sub_layouts.torque_settings import TorqueSettingsLayout
-from openpilot.nrdr.ui import hide_global_controller_settings
 
 
 class PanelType(IntEnum):
@@ -102,12 +101,9 @@ class SteeringLayout(Widget):
       self._blinker_control_toggle,
       self._blinker_control_options,
       self._blinker_reengage_delay,
-      LineSeparatorSP(40),
-      self._torque_control_toggle,
-      self._torque_customization_button,
-      LineSeparatorSP(40),
     ]
-    return hide_global_controller_settings(items)
+    # nrdr hides global torque controls, not the post-blinker delay above.
+    return items
 
   def _set_current_panel(self, panel: PanelType):
     self._current_panel = panel

@@ -1,9 +1,11 @@
 from enum import IntEnum
 
 from openpilot.system.ui.lib.multilang import tr
-from openpilot.system.ui.sunnypilot.widgets.list_view import simple_button_item_sp, LineSeparatorSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import simple_button_item_sp, option_item_sp, LineSeparatorSP
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets import Widget
+from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.nrdr.hooks.driver_monitoring import monitoring_customization_available
 from openpilot.nrdr.ui.settings.lateral_tuning import LateralTuningLayout, honda_tuning_available
 from openpilot.nrdr.ui.settings.longitudinal_tuning import LongitudinalTuningLayout
 from openpilot.nrdr.ui.settings.party_tricks import PartyTricksLayout
@@ -53,6 +55,19 @@ class NrdrLayout(Widget):
     for item in self._honda_only_items:
       item.set_visible(False)
 
+    self._monitoring_reminder = option_item_sp(
+      title=lambda: tr("Driver Monitoring: First Reminder Timing"),
+      param="NrdrDriverMonitoringReminderPercent",
+      min_value=50, max_value=250, value_change_step=5,
+      label_callback=lambda value: f"{value}%",
+      description=lambda: tr("Adjusts the delay before the first attention reminder; 100% uses standard timing. " +
+                             "Monitoring stays enabled with unchanged later-warning intervals; applies after reboot."),
+      enabled=lambda: monitoring_customization_available() and ui_state.is_offroad(),
+    )
+    self._monitoring_reminder.set_visible(monitoring_customization_available)
+    self._monitoring_separator = LineSeparatorSP(40)
+    self._monitoring_separator.set_visible(monitoring_customization_available)
+
     self._custom_audio_visuals_button = simple_button_item_sp(
       button_text=lambda: tr("Custom Audio & Visuals"),
       button_width=800,
@@ -64,6 +79,8 @@ class NrdrLayout(Widget):
       LineSeparatorSP(40),
       self._longitudinal_button,
       *self._honda_only_items,
+      self._monitoring_separator,
+      self._monitoring_reminder,
       LineSeparatorSP(40),
       self._custom_audio_visuals_button,
     ]

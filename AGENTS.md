@@ -1,5 +1,11 @@
 # Engineering and Workspace Instructions
 
+## Project Naming
+
+- The official project name is `nrdr`, always lowercase; never capitalize it.
+- Use lowercase naming in documentation, UI labels, release notes, comments, generated text, and all project references across branches and repositories.
+- Do not rename existing identifiers or modify functionality solely to enforce this convention.
+
 ## Repository and branches
 
 - Use `C:\Openpilot Workspace\openpilot` for routine development.
@@ -14,6 +20,15 @@
 - Prefer the simplest correct implementation consistent with the existing architecture.
 - Avoid unnecessary abstractions, redundant checks, speculative safeguards, and unrelated refactoring.
 - Preserve existing safety-critical behavior and unrelated user changes.
+
+## Task Tracking
+
+- Before starting a development task, consult `TASKS.md` for relevant context.
+- After completing meaningful work, update the corresponding task's status and next action.
+- Do not treat discussions, proposals, or investigations as completed implementations.
+- Do not automatically begin work on unrelated pending tasks.
+- Keep task updates concise and focused on actual progress.
+- If `TASKS.md` does not exist, do not create it unless explicitly requested.
 
 ## Publishing and deployment
 
