@@ -14,6 +14,7 @@ from openpilot.common.simple_kalman import KF1D
 from openpilot.nrdr.features.radar import radar_point_status
 from openpilot.nrdr.features.radar.radar_lead_bound import (CAMERA_PROB_MIN, TREND_SAMPLES, WeakLeadBound,
                                                             camera_contradiction, camera_passed_ratio, range_slope)
+from openpilot.nrdr.features.radar.radar_camera_cap import CameraCap
 from openpilot.nrdr.features.radar.radar_camera_slow_bound import CameraSlowBound
 from openpilot.nrdr.features.radar.radar_reversal_bound import ReversalBound
 
@@ -58,6 +59,18 @@ HONDA_BOSCH_A_GROSS_DISTANCE_M = 25.0
 KEEP_Y_MAX = 1.2
 KEEP_VREL_MAX = 0.0
 KEEP_VLEAD_MIN = -1.0
+# Bosch-A urgency on a point with no direct speed reading (b1 seg14 47.7 s, route 000000b1--c417f37f1c;
+# parser replay on logged CAN, and logged radarState/carControl). Track 4 at 69-59 m was measured closing at 11.7 m/s,
+# then for 0.75 s the parser had no direct reading and published its floor estimate, vRel -31 -> -8.4. On that floor
+# the reversal/weak-lead bounds took it as urgent (TTC 2.2 s) and dropped their weight at once; leadOne read vRel -21,
+# vLead 0, and the plan ramped to -3.5 for about 1 s until Peter pressed the gas. Its own last reading and its range
+# slope (-9 to -15) both put TTC above 4 s. So while the parser marks a point unmeasured, the urgency TTC uses the
+# last direct reading if it is no older than URGENT_LAST_DIRECT_S, else the published vRel as before. The range slope
+# is not used: on b1 its 82 -> 69 m reflector hop read -17 to -22 and kept the lead urgent 47.80-48.45 s (probe), while
+# the last reading alone keeps TTC 5.1-5.9 s. Cost (Peter chose it, 2026-11-08): a lead that starts closing faster while
+# unmeasured is judged on a reading up to 1 s old. Only the urgency test moves: the published point, its vRel and dRel
+# are untouched, and dRel < 30 m stays urgent. One event, one road (limited road evidence).
+URGENT_LAST_DIRECT_S = 1.0
 POST_STANDSTILL_RADAR_LEAD_PERSISTENCE_FRAMES = 3
 POST_STANDSTILL_RADAR_LEAD_URGENT_TTC = 1.5
 POST_STANDSTILL_RADAR_LEAD_URGENT_DISTANCE = 1.5
@@ -70,6 +83,9 @@ class Track:
     self.cnt = 0
     self.objectStatus = 0  # Bosch-A F0 STATUS of the latest point, from card (radar_point_status); 0 = not known
     self.range_history: deque[float] = deque(maxlen=TREND_SAMPLES)  # dRel per radard cycle, for the WeakLeadBound
+    self.direct = True                 # the parser's measured flag on the latest point (radarTracks, not this cycle's freshness)
+    self.last_direct_vrel = math.nan   # vRel of the latest point the parser marked measured
+    self.direct_age = 0                # radard cycles since then
     self.aLeadTau = FirstOrderFilter(_LEAD_ACCEL_TAU, 0.45, DT_MDL)
     self.K_A = kalman_params.A
     self.K_C = kalman_params.C
@@ -159,6 +175,15 @@ def track_matches_vision(
   vel_sane = abs(track.vRel + v_ego - lead.v[0]) < vel_limit or v_ego + track.vRel > 3
   lat_sane = abs(track.yRel + lead.y[0]) < max(y_floor, y_std_scale * max(float(lead.yStd[0]), 0.2))
   return dist_sane and vel_sane and lat_sane
+
+
+def urgency_v_rel(track: Track | None) -> float | None:
+  """The vRel the bounds' urgency test uses for this track; None keeps the published vRel (see URGENT_LAST_DIRECT_S)."""
+  if track is None or track.direct:
+    return None
+  if track.direct_age * DT_MDL > URGENT_LAST_DIRECT_S or math.isnan(track.last_direct_vrel):
+    return None
+  return track.last_direct_vrel
 
 
 def weak_lead_distance_ratio(track: Track, lead: capnp._DynamicStructReader, model_v_ego: float) -> float:
@@ -385,6 +410,7 @@ class BoschALeadPolicy:
     self._last_tracks_frame = -1
     self.reversal_bound = ReversalBound()
     self.camera_slow_bound = CameraSlowBound()
+    self.camera_cap = CameraCap(hold=True)  # C-012 D+E mode, always on in nrdr (Testing's BoschACameraCapHold default; no toggle)
     self.weak_lead_bound = WeakLeadBound()
     self.camera_ranges: list[deque[float]] = [deque(maxlen=TREND_SAMPLES) for _ in range(2)]  # model lead x per cycle
 
@@ -407,7 +433,14 @@ class BoschALeadPolicy:
       if identifier not in self.tracks:
         self.tracks[identifier] = Track(identifier, v_lead, radar.kalman_params)
       measured = bool(point.deprecated.measured and fresh)
-      self.tracks[identifier].update(point.dRel, point.yRel, point.vRel, v_lead, measured, measured)
+      track = self.tracks[identifier]
+      track.update(point.dRel, point.yRel, point.vRel, v_lead, measured, measured)
+      track.direct = bool(point.deprecated.measured)
+      if track.direct:
+        track.last_direct_vrel = float(point.vRel)
+        track.direct_age = 0
+      else:
+        track.direct_age += 1
       self.tracks[identifier].objectStatus = statuses.get(identifier, 0)
 
   def leads(self, sm, radar, model_v_ego):
@@ -434,6 +467,7 @@ class BoschALeadPolicy:
     lead_probs = [radar.lead_prob_filters[index].x for index in range(2)]
     lead_tracks = [self.tracks.get(int(lead.get('radarTrackId', -1))) if lead.get('present', False) and lead.get('radar', False)
                    else None for lead in output]
+    urgent_v_rels = [urgency_v_rel(track) for track in lead_tracks]
     weak_weights = self.weak_lead_bound.update(
       output,
       [track.objectStatus if track is not None else 0 for track in lead_tracks],
@@ -442,9 +476,12 @@ class BoschALeadPolicy:
       lead_probs,
       [weak_lead_contradiction(track, self.camera_ranges[index], leads[index], model_v_ego) if track is not None else 0.0
        for index, track in enumerate(lead_tracks)],
+      urgent_v_rels,
     )
-    output = self.reversal_bound.apply(output, leads, self.v_ego, model_v_ego, lead_probs, self.tracks, floor_weights=weak_weights)
+    output = self.reversal_bound.apply(output, leads, self.v_ego, model_v_ego, lead_probs, self.tracks, floor_weights=weak_weights,
+                                       urgent_v_rels=urgent_v_rels)
     output = self.camera_slow_bound.apply(output, leads, self.v_ego, model_v_ego, lead_probs)
+    output = self.camera_cap.apply(output, leads, model_v_ego, lead_probs, self.tracks, self.camera_ranges)
     for index, lead in enumerate(output):
       if lead.get('present', False) and lead.get('radar', False):
         identifier = int(lead.get('radarTrackId', -1))

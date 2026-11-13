@@ -431,6 +431,19 @@ def test_planner_caps_the_mpc_with_the_personality_ceiling():
   assert seen_uncapped[-1]["acceleration_max"] > 0.3
 
 
+def test_human_acceleration_cap_applies_to_relaxed_standard_and_econ_but_not_aggressive():
+  # Biscuit-Labs#78: Aggressive keeps the MPC's own max accel (no acceleration_max kwarg); lead paths still pass.
+  for personality, capped in ((log.LongitudinalPersonality.relaxed, True), (log.LongitudinalPersonality.standard, True),
+                              (log.LongitudinalPersonality.econ, True),
+                              (log.LongitudinalPersonality.aggressive, False)):
+    planner = build(BOSCH_A)
+    seen = spy_mpc_update(planner)
+    run(planner, frames=2, personality=personality)
+    assert all("lead_paths" in kwargs for kwargs in seen)
+    assert all(("acceleration_max" in kwargs) is capped for kwargs in seen), personality
+  assert planner.mpc.params[0, 1] == ACCEL_MAX  # the last (aggressive) frame left the MPC at its own limit
+
+
 def lead_paths_for(sm, planner=None):
   planner = planner or build(BOSCH_A)
   seen = spy_mpc_update(planner)
