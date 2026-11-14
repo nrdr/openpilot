@@ -71,7 +71,7 @@ def rlog_files(paths):
 
 
 def read(files):
-  R = {k: [] for k in ('vsa', 'cs', 'cc', 'ctl', 'lp', 'pose', 'model')}
+  R = {k: [] for k in ('vsa', 'cs', 'cc', 'ctl', 'lp', 'pose', 'model', 'cmd')}
   vsa = {}
   info = {}
   # Each route's logMonoTime restarts at its device boot, so a later route can run backwards from an earlier one.
@@ -106,6 +106,9 @@ def read(files):
           lcs = e.controlsState.lateralControlState
           des = lcs.pidState.steeringAngleDesiredDeg if lcs.which() == 'pidState' else math.nan
           R['ctl'].append((t, e.controlsState.desiredCurvature, des))
+          # nrdr logs PTM command delay in pidState rather than starpilotLateralState.
+          cmd = lcs.pidState.commandDelay if lcs.which() == 'pidState' and lcs.pidState.epsFfActive else math.nan
+          R['cmd'].append((t, cmd))
         elif w in VEHICLE_PARAMETERS:
           R['lp'].append((t, getattr(e, w).angleOffsetDeg, getattr(e, w).roll))
         elif w in DEVICE_POSE:
@@ -148,6 +151,7 @@ def build(R, info):
   s['yaw'] = np.radians(counts * vsa_deg_s + right_loss)  # rad/s, RIGHT-positive like openpilot curvature (yaw_rate.yaw_rate_deg_s)
   s['k'] = np.convolve(s['yaw'], np.ones(10) / 10, 'same') / np.maximum(s['v'], 0.1)
   s['gyro'] = at(R['pose'], 1)
+  s['cmd'] = at(R['cmd'], 1)
 
   rack = rack_map(str(info.get('fingerprint')), info.get('eps_fw'), info.get('steer_ratio') or 15.0)
   lag_frames = np.round(np.interp(s['v'], *WHEEL_TO_YAW_LAG) / 0.01).astype(int)
@@ -245,21 +249,28 @@ def timing(s, model, info):
   schedule = shipped_delay_schedule(info)
   bp, vals = schedule if schedule is not None else (None, None)
   told = 'its profile\'s schedule' if schedule is not None else 'the live (lagd) or manual delay: no schedule to compare'
-  print(f'\ntiming: car curvature behind the model action   (on-time delay = lag - {PIPELINE_OFFSET:.3f}; told {told})')
+  print(f'\ntiming: car curvature behind the model action   (on-time delay = lag - {PIPELINE_OFFSET:.3f} - command delay; told {told})')
   if len(model) < 100:
     return
   for vlo, vhi in SPEED_BANDS:
     m = s['ok'] & (s['bl'] < .5) & (s['v'] >= vlo) & (s['v'] < vhi) & (np.abs(s['k']) > (0.001 if vlo >= 15 else 0.004))
     if m.sum() < 600:
       continue
-    on_time = best_lag(s['t'], s['k'], model[:, 0], model[:, 1], np.flatnonzero(m)[::5]) - PIPELINE_OFFSET
+    lag = best_lag(s['t'], s['k'], model[:, 0], model[:, 1], np.flatnonzero(m)[::5])
+    # Biscuit-Labs 45e5b91fae: separate the deliberately applied delay from the prediction horizon.
+    cmd = s['cmd'][m]
+    cmd = float(np.nanmedian(cmd)) if np.isfinite(cmd).any() else math.nan
+    on_time = lag - PIPELINE_OFFSET - (0.0 if math.isnan(cmd) else cmd)
+    cmd_note = 'command delay not logged, not subtracted' if math.isnan(cmd) else f'command delay {cmd:.2f} s'
     note = '   (includes lane centering)' if vlo >= 15 else ''
     if bp is None:
-      print(f'  {vlo:4.1f}-{vhi:<4.0f} on-time {on_time:.2f} s ({m.sum() / FRAMES_PER_MIN:.1f} min){note}')
+      print(f'  {vlo:4.1f}-{vhi:<4.0f} on-time {on_time:.2f} s ({m.sum() / FRAMES_PER_MIN:.1f} min, {cmd_note}){note}')
       continue
-    sched = float(np.interp((vlo + vhi) / 2, bp, vals))
+    # Compare the fitted samples with their actual speed-dependent schedule, not the band midpoint.
+    sched = float(np.median(np.interp(s['v'][m], bp, vals)))
     verdict = f"car {'late' if on_time > sched else 'early'} {abs(on_time - sched) * 1000:.0f} ms"
-    print(f'  {vlo:4.1f}-{vhi:<4.0f} on-time {on_time:.2f} s, schedule {sched:.2f} s: {verdict} ({m.sum() / FRAMES_PER_MIN:.1f} min){note}')
+    print(f'  {vlo:4.1f}-{vhi:<4.0f} on-time {on_time:.2f} s, schedule {sched:.2f} s: {verdict} '
+          + f'({m.sum() / FRAMES_PER_MIN:.1f} min, {cmd_note}){note}')
 
 
 def left_right(s, des_s, ang_s):

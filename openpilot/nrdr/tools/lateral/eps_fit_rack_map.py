@@ -5,16 +5,18 @@ Every moving frame, wheel angle shifted by the wheel->yaw lag, gives y = lin_rad
 is the firmware VGR (A table) linear angle of the physical wheel angle and k_eff = k (1 - sf v^2) - g sf roll with
 k = yaw / v from 0x94. sf comes from the speed dependence of y inside each wheel-angle band (it is the value that
 makes R the same at every speed); R per band is the mean of the left and right medians, so an angle offset cancels.
-Then held-out by route: how well the fitted map, and the Firmware steer ratio at CP's ratio (Table A at
-CP.steerRatio with VehicleModel's slip factor, what Firmware mode does without a map), predict the measured curvature.
+Then held-out by route: how well the fitted map, the shipped PTM map, and an optional donor road curve predict
+the measured curvature. --road-curves accepts the donor's honda_lateral_common.py, without importing its controller.
 
   python -m openpilot.nrdr.tools.lateral.eps_fit_rack_map --car HONDA_CIVIC --eps 39990-TEG-A010 --bus 0 --scale 0.2414 \
     --right 0.098 '<route>/rlog*' ...
 The printed table is a honda_rack_map.RackMapTable (ratio_bp, ratio_v, slip_factor) for that car and EPS.
 """
 import argparse
+import ast
 import bz2
 import glob
+from pathlib import Path
 
 import numpy as np
 import zstandard as zstd
@@ -23,9 +25,21 @@ from openpilot.cereal import log
 from opendbc.car.honda.interface import CarInterface
 from opendbc.car.honda.values import CAR
 from opendbc.car.vehicle_model import VehicleModel, calc_slip_factor
-from openpilot.nrdr.tools.lateral.eps_common import RIGHT_LOSS_BP, VEHICLE_PARAMETERS, log_segment_number as seg, vgr_inverse, vgr_profile
+from openpilot.nrdr.tools.lateral.eps_common import RIGHT_LOSS_BP, VEHICLE_PARAMETERS, log_segment_number as seg, rack_map, vgr_inverse, vgr_profile
 
 G = 9.81
+
+
+def road_curves(path):
+  """Read donor road-curve constants as in Biscuit-Labs 45e5b91fae's fit_rack_map.py."""
+  env = {}
+  for node in ast.parse(Path(path).read_text(encoding='utf-8')).body:
+    if isinstance(node, ast.Assign) and all(isinstance(t, ast.Name) for t in node.targets):
+      try:
+        exec(compile(ast.Module([node], []), str(path), 'exec'), {}, env)
+      except Exception:
+        pass
+  return env.get('HONDA_SR_CURVE_BY_FP', {})
 
 
 def firmware_cp_geometry(car):
@@ -152,6 +166,11 @@ class Fit:
     v, th, k, ro = D.T
     return (np.radians(self.to_lin(th)) / (cp_ratio * self.L) + G * sf_vm * ro) / (1 - sf_vm * v ** 2)
 
+  def predict_curve(self, D, curve, sf_vm=-0.00061):
+    v, th, k, ro = D.T
+    sr = np.interp(np.abs(th), *curve)
+    return (np.radians(th) / (sr * self.L) + G * sf_vm * ro) / (1 - sf_vm * v ** 2)
+
 
 def score(D, pred, label):
   v, th, k = D[:, 0], D[:, 1], D[:, 2]
@@ -171,6 +190,7 @@ def main():
   ap.add_argument('--scale', type=float, required=True, help='deg/s per 0x94 count (GPS-checked)')
   ap.add_argument('--right', type=float, default=0.0, help='clockwise correction, deg/s')
   ap.add_argument('--wheelbase', type=float, default=None)
+  ap.add_argument('--road-curves', type=Path, help='optional donor honda_lateral_common.py for road-curve comparison')
   ap.add_argument('routes', nargs='+', help='rlog glob per route, comma-separated globs allowed (quote it)')
   a = ap.parse_args()
   wheelbase = a.wheelbase or CAR(a.car).config.specs.wheelbase
@@ -198,12 +218,19 @@ def main():
   print('\nmeasured / predicted curvature, held out by route (1.000 = exact)')
   print('  ' + ' ' * 22 + ' '.join(f'{h:>6s}' for h in ('3-20s', '3-20f', '20-70s', '20-70f', '70-150s', '70-150f', '150+s', '150+f')))
   cp_ratio, sf_vm = firmware_cp_geometry(a.car)
+  shipped = rack_map(a.car, a.eps, cp_ratio)
+  curve = road_curves(a.road_curves).get(a.car) if a.road_curves else None
   for i in range(len(per)) if len(per) > 1 else []:
     tr = np.vstack([p for j, p in enumerate(per) if j != i])
     sfi = fit.fit_sf(tr)
     bpi, vali, _ = fit.table(tr, sfi)
     score(per[i], fit.predict_map(per[i], sfi, bpi, vali), f'route {i}: rack map')
     score(per[i], fit.predict_cp(per[i], cp_ratio, sf_vm), f'route {i}: CP {cp_ratio:g}')
+    if shipped is not None:
+      table = shipped.table
+      score(per[i], fit.predict_map(per[i], table.slip_factor, table.ratio_bp, table.ratio_v), f'route {i}: shipped PTM')
+    if curve is not None:
+      score(per[i], fit.predict_curve(per[i], curve), f'route {i}: donor road')
   print('  (s = 2.5-9 m/s, f = 9-40 m/s)')
 
 

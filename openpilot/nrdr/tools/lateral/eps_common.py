@@ -1,7 +1,7 @@
 """Shared lookups for the offline EPS measuring tools (eps_*.py): VSA yaw decode, Table A, calibrations.
 
-Offline only: nothing here runs on the car. Ported from JamesL787 ns-bosch-radar-testing tools/lateral, where these
-tools measured every calibration in vfn_eps_core (rows, R6, column load, command delay, rack maps, yaw scales).
+Offline only: nothing here runs in vehicle control. Lookups follow Biscuit-Labs Honda-PTM-Testing 45e5b91fae;
+nrdr's existing parameter and log-format adapters are retained.
 """
 from types import SimpleNamespace
 import os
@@ -10,7 +10,7 @@ import re
 import numpy as np
 
 from openpilot.nrdr.features.lateral import vfn_eps_core as core
-from openpilot.nrdr.features.lateral.honda_vgr import HONDA_VGR_PROFILES, get_honda_vgr_profile, normalize_honda_eps_firmware
+from openpilot.nrdr.features.lateral.honda_vgr import HONDA_VGR_PROFILES, get_honda_vgr_profile, normalize_honda_eps_firmware, ptm_inverse
 
 # VSA yaw rate, 0x94 KINEMATICS YAW_RATE (top 10 bits, clockwise-positive). Per car: deg/s per count, standstill zero
 # in counts (each drive's own standstill mean replaces it), clockwise under-read in deg/s ramped in over RIGHT_LOSS_BP
@@ -27,6 +27,7 @@ YAW_RATE_CALIBRATION = {
   "HONDA_CRV_5G": (0.245, 509.5, 0.49),
   "HONDA_INSIGHT": (0.243, 512.0, 0.16),
   "HONDA_CIVIC": (0.241, 512.0, 0.10),
+  "ACURA_RDX_3G": (0.2511, 512.3, -0.20),
 }
 DEFAULT_YAW_RATE_CALIBRATION = (0.25, 512.0, 0.0)  # the DBC's own scale and zero
 # Event names that changed upstream: newer logs (this tree) carry vehicleParameters / deviceMotion, older ones
@@ -65,10 +66,9 @@ def vgr_profile_by_name(name: str):
   return next((p for p in HONDA_VGR_PROFILES if p.name == name), None)
 
 
-def vgr_inverse(profile, steps: int = 4001):
-  """(linear_bp, angle_bp) for np.interp, sampled finely from the profile's exact Table A conversion."""
-  angles = np.unique(np.r_[np.asarray(profile.physical_knots, float), np.linspace(0.0, profile.physical_knots[-1], steps)])
-  return np.array([profile.physical_to_linear(a) for a in angles]), angles
+def vgr_inverse(profile):
+  """(linear_bp, angle_bp) using the same sampled Table A inverse as the PTM baseline."""
+  return tuple(np.asarray(axis, float) for axis in ptm_inverse(profile))
 
 
 def _own_calibrations():
@@ -94,11 +94,9 @@ def firmware_profile(fingerprint: str, eps_fw: str | None):
 
 
 def prediction_schedule(profile):
-  """The measured delay schedule told to the model, or None where the live/manual delay is used."""
-  if profile is None or not profile.prediction_schedule:
-    return None
-  from openpilot.nrdr.features.lateral.yaw_control_timing import DELAY_SCHEDULE_BP, DELAY_SCHEDULE_V  # reads Params
-  return DELAY_SCHEDULE_BP, DELAY_SCHEDULE_V
+  """The selected calibration's prediction schedule, not a shared Clarity fallback."""
+  from openpilot.nrdr.features.lateral.yaw_control_timing import prediction_delay_schedule
+  return prediction_delay_schedule(profile)
 
 
 def rack_map(fingerprint: str, eps_fw: str | None, cp_ratio: float):
@@ -108,4 +106,4 @@ def rack_map(fingerprint: str, eps_fw: str | None, cp_ratio: float):
   except ImportError:  # a tree without rack maps
     return None
   cp = SimpleNamespace(brand="honda", carFingerprint=str(fingerprint), carFw=[SimpleNamespace(ecu="eps", fwVersion=eps_fw)])
-  return rack_map_geometry(cp, vgr_profile(fingerprint, eps_fw), cp_ratio)
+  return rack_map_geometry(cp, vgr_profile(fingerprint, eps_fw), cp_ratio, ptm_baseline=True)

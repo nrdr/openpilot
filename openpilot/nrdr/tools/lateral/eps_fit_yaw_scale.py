@@ -8,6 +8,7 @@ ramped in over RIGHT_LOSS_BP counts, the form eps_common.YAW_RATE_CALIBRATION de
 
   python -m openpilot.nrdr.tools.lateral.eps_fit_yaw_scale --bus 1 '<route dir>/rlog*' ['<another route>' ...]
 """
+# Fit arithmetic and empty-result handling: Biscuit-Labs Honda-PTM-Testing 45e5b91fae.
 import argparse
 import bz2
 import glob
@@ -45,7 +46,8 @@ def read_route(pattern, bus):
 
 def pairs(Y, G, V):
   Y, G, V = Y[np.argsort(Y[:, 0])], G[np.argsort(G[:, 0])], V[np.argsort(V[:, 0])]
-  t = Y[:, 0]
+  # np.interp otherwise copies this strided column for every GPS-pair endpoint.
+  t = np.ascontiguousarray(Y[:, 0])
   v = np.interp(t, V[:, 0], V[:, 1])
   stopped = v < 0.01
   zero = float(np.mean(Y[stopped, 1])) if stopped.sum() > 300 else 512.0
@@ -88,6 +90,8 @@ def main():
     print(f'{r}: zero {zero:.2f}, {len(R)} pairs, scale {sc:.4f} deg/s per count')
     per.append(sc)
     allr.append(R)
+  if not allr:
+    raise SystemExit('no straight-to-straight GPS pairs in these routes: need longer drives with turns')
   R = np.vstack(allr)
   one = np.linalg.lstsq(R[:, 1:2], R[:, 0], rcond=None)[0]
   two = np.linalg.lstsq(R[:, 1:3], R[:, 0], rcond=None)[0]
