@@ -80,6 +80,10 @@ configure_build_environment() {
 }
 
 run_scons() {
+  # Match the normal AGNOS build: full debug info exhausts RAM in params.o.
+  if [ -f "$AGNOS_MARKER" ]; then
+    set -- --ccflags=-g0 "$@"
+  fi
   if "$SCONS_BIN" -j"$SCONS_JOBS" "$@"; then
     return 0
   fi

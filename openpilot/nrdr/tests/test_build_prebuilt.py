@@ -309,6 +309,21 @@ def test_releases_preserve_source_communication_policy_and_clean_monitoring() ->
 
 
 @pytest.mark.parametrize("agnos", [False, True])
+def test_agnos_release_uses_existing_low_memory_compiler_flags(tmp_path: Path, agnos: bool) -> None:
+  source = BUILD_SCRIPT.read_text(encoding="utf-8")
+  run_scons = source[source.index("run_scons() {"):source.index("validate_runtime_linkage() {")]
+  marker = tmp_path / "AGNOS"
+  if agnos:
+    marker.touch()
+  probe = 'record_args() { printf "%s\\n" "$@"; }; SCONS_BIN=record_args; SCONS_JOBS=1; run_scons --minimal'
+  result = subprocess.run(
+    [BASH, "-c", run_scons + probe], env={**os.environ, "AGNOS_MARKER": bash_path(marker)},
+    capture_output=True, text=True, check=True,
+  )
+  assert result.stdout.splitlines() == ["-j1", *(["--ccflags=-g0"] if agnos else []), "--minimal"]
+
+
+@pytest.mark.parametrize("agnos", [False, True])
 def test_clean_ui_cleanup_python_selection(tmp_path: Path, agnos: bool) -> None:
   source = BUILD_SCRIPT.read_text(encoding="utf-8")
   start = source.index('  local ui_python="python3"')
