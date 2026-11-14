@@ -175,6 +175,8 @@ def test_selector_supports_all_nidec_pedals_and_bosch_radar_without_duplication(
   assert len(selector) == 1
   assert [x["value"] for x in selector[0]["options"]] == [0, 1, 2, 3]
   assert not [x for x in items if x["key"] in ("HondaLiveLearningGas", "HondaBoschARadar")]
+  keys = [item["key"] for item in items]
+  assert keys.index("NrdrLiveGasResetStatus") == keys.index("NrdrResetLiveGas") + 1
   layout = native_layout(state(enableGasInterceptor=True))
   assert layout._tuning_items[0] is layout._longitudinal_controller
   assert not hasattr(layout, "_radar_tryout")

@@ -460,6 +460,11 @@ sections:
         - {type: capability, field: nrdr_honda_tuning_available, equals: true}
         enablement:
         - $ref: '#/macros/offroad'
+      - key: NrdrLiveGasResetStatus
+        widget: info
+        title: Live Gas Reset Status
+        visibility:
+        - {type: capability, field: nrdr_honda_tuning_available, equals: true}
       - key: NrdrPcmSpeedDeadzone
         widget: option
         title: PCM Speed-Error Deadzone
@@ -474,11 +479,6 @@ sections:
         enablement:
         - $ref: '#/macros/offroad'
         - {type: capability, field: nrdr_mvl_pcm_deadzone_available, equals: true}
-      - key: NrdrLiveGasResetStatus
-        widget: info
-        title: Live Gas Reset Status
-        visibility:
-        - {type: capability, field: nrdr_honda_tuning_available, equals: true}
       - key: NrdrHondaPcmMode
         widget: multiple_button
         title: 'Honda Nidec: ECU-Matched PCM Command Shaping'
