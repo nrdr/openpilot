@@ -6,6 +6,7 @@ from openpilot.common.pid import PIDController
 from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.nrdr.features.longitudinal.longcontrol import NrdrLongControl
 from openpilot.nrdr.features.longitudinal.policy import nrdr_custom_longitudinal_enabled
+from openpilot.nrdr.features.longitudinal.personal_pedal import PersonalPedalControl, personal_pedal_enabled
 
 CONTROL_N_T_IDX = ModelConstants.T_IDXS[:CONTROL_N]
 
@@ -51,9 +52,17 @@ class LongControl:
     self.last_output_accel = 0.0
     # The startup MVL flag selects the donor state machine/PID below. Never
     # instantiate NRDR's live tuning, hill or custom stopping in that mode.
-    self.nrdr_controller = NrdrLongControl(CP, CP_SP) if nrdr_custom_longitudinal_enabled(CP) else None
+    self.personal_pedal = personal_pedal_enabled(CP, CP_SP)
+    if self.personal_pedal:
+      self.nrdr_controller = PersonalPedalControl(CP, CP_SP)
+    else:
+      self.nrdr_controller = NrdrLongControl(CP, CP_SP) if nrdr_custom_longitudinal_enabled(CP) else None
     if self.nrdr_controller is not None:
       self.pid = self.nrdr_controller.pid
+
+  def set_plan(self, plan, updated):
+    if self.personal_pedal:
+      self.nrdr_controller.set_plan(plan, updated)
 
   def reset(self):
     if self.nrdr_controller is not None:

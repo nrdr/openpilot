@@ -7,15 +7,20 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.list_view import ListItem
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled, nrdr_longitudinal_enabled
 from openpilot.nrdr.ui.settings.live_gas_reset import available as gas_reset_available, large_reset_button
-from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, tuning_write_allowed
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_LABELS, CONTROLLER_DESCRIPTION, BOSCH_RADAR_WARNING
 from openpilot.nrdr.ui.settings.pcm_speed_deadzone import speed_deadzone_item
 from openpilot.nrdr.ui.honda_pcm import (pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice,
-                                       live_gas_available, save_live_gas_choice,
+                                       live_gas_available, longitudinal_controller_choices,
+                                       longitudinal_controller_label, save_longitudinal_controller,
                                        live_gas_status,
                                        mvl_pcm_deadzone_available)
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
-from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, multiple_button_item_sp, LineSeparatorSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import button_item_sp, toggle_item_sp, option_item_sp, multiple_button_item_sp, LineSeparatorSP
+from openpilot.system.ui.lib.application import gui_app
+from openpilot.system.ui.widgets import DialogResult
+from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 
 
 class LongitudinalTuningLayout(Widget):
@@ -54,7 +59,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Adjusts feedback strength for Aggressive; 100% keeps the base tune. Applies with a pedal interceptor and Live Learning Gas off."
+        "Adjusts Standard-controller pedal feedback for Aggressive; 100% keeps the base tune. Personal Pedal uses fixed gains."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -66,7 +71,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Adjusts feedback strength for Standard; 100% keeps the base tune. Applies with a pedal interceptor and Live Learning Gas off."
+        "Adjusts Standard-controller pedal feedback for the Standard personality; 100% keeps the base tune. Personal Pedal uses fixed gains."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -78,7 +83,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Adjusts feedback strength for Relaxed; 100% keeps the base tune. Applies with a pedal interceptor and Live Learning Gas off."
+        "Adjusts Standard-controller pedal feedback for Relaxed; 100% keeps the base tune. Personal Pedal uses fixed gains."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -90,7 +95,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Adjusts feedback strength for Econ; 100% keeps the base tune. Applies with a pedal interceptor and Live Learning Gas off."
+        "Adjusts Standard-controller pedal feedback for Econ; 100% keeps the base tune. Personal Pedal uses fixed gains."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -134,7 +139,7 @@ class LongitudinalTuningLayout(Widget):
       param="NrdrRoenAccelerationLimits",
       title=lambda: tr("Roen Nidec Acceleration Limits (Default: OFF)"),
       description=lambda: tr(
-        "Uses Roen's acceleration limits and full low-speed pedal response when Live Learning Gas is off. Off restores the normal acceleration limits."
+        "Uses Roen's acceleration limits and full low-speed pedal response with Standard control. Off restores the normal acceleration limits."
       ),
     )
 
@@ -152,12 +157,13 @@ class LongitudinalTuningLayout(Widget):
       use_float_scaling=True,
     )
 
-    self._live_learning_gas = toggle_item_sp(
-      title=lambda: tr("Live Learning Gas - Full MVL Longitudinal"),
-      initial_state=ui_state.params.get_bool("HondaLiveLearningGas"),
-      description=lambda: tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP,
-                                             is_offroad=ui_state.is_offroad()).replace("\n", "; ")) + ". " + tr(MVL_DESCRIPTION),
-      callback=self._set_live_gas,
+    self._controller_dialog = None
+    self._longitudinal_controller = button_item_sp(
+      title=lambda: tr("Longitudinal Controller"),
+      button_text=lambda: tr(longitudinal_controller_label(ui_state)),
+      description=lambda: tr(CONTROLLER_DESCRIPTION) + (" " + tr(BOSCH_RADAR_WARNING) if 2 in
+        longitudinal_controller_choices(ui_state.CP, ui_state.CP_SP, ui_state.params) else ""),
+      callback=self._show_controller_selector,
     )
 
     self._stopping_decel_rate = option_item_sp(
@@ -214,15 +220,6 @@ class LongitudinalTuningLayout(Widget):
       use_float_scaling=True,
     )
 
-    self._radar_tryout = toggle_item_sp(
-      param="HondaBoschARadar",
-      title=lambda: tr("Honda Bosch-A Radar (Default: ON)"),
-      description=lambda: tr(
-        "Uses factory radar for lead detection; disable it if detected vehicles are shown incorrectly. Alpha " +
-            "Long does not restore factory emergency braking (AEB/CMBS)."
-      ),
-    )
-
     self._dashboard_variant = toggle_item_sp(
       param="NrdrHondaDashVariantB",
       title=lambda: tr("Honda Dashboard Variant B (Default: OFF)"),
@@ -233,7 +230,7 @@ class LongitudinalTuningLayout(Widget):
 
     self._reset_live_gas = large_reset_button()
     return [
-      self._live_learning_gas,
+      self._longitudinal_controller,
       self._reset_live_gas,
       self._mvl_pcm_deadzone,
       LineSeparatorSP(40),
@@ -242,7 +239,6 @@ class LongitudinalTuningLayout(Widget):
       self._static_feedforward_long,
       self._full_brake_authority,
       self._roen_acceleration_limits,
-      self._radar_tryout,
       self._dashboard_variant,
       LineSeparatorSP(40),
       self._long_pid_tune_scale_aggressive,
@@ -258,11 +254,20 @@ class LongitudinalTuningLayout(Widget):
       self._v_ego_starting,
     ]
 
-  def _set_live_gas(self, value):
-    # No param binding: ToggleSP otherwise writes after the guarded callback,
-    # even when the vehicle became ineligible since the last display update.
-    save_live_gas_choice(ui_state, value)
-    self._live_learning_gas.action_item.set_state(ui_state.params.get_bool("HondaLiveLearningGas"))
+  def _show_controller_selector(self):
+    if not ui_state.is_offroad():
+      return
+    choices = longitudinal_controller_choices(ui_state.CP, ui_state.CP_SP, ui_state.params)
+    labels = [tr(CONTROLLER_LABELS[value]) for value in choices]
+
+    def selected(result):
+      dialog, self._controller_dialog = self._controller_dialog, None
+      if result == DialogResult.CONFIRM and dialog is not None and dialog.selection in labels:
+        save_longitudinal_controller(ui_state, int(choices[labels.index(dialog.selection)]))
+
+    self._controller_dialog = MultiOptionDialog(tr("Longitudinal Controller"), labels,
+                                                tr(longitudinal_controller_label(ui_state)), callback=selected)
+    gui_app.push_widget(self._controller_dialog)
 
   def _update_state(self):
     super()._update_state()
@@ -271,9 +276,8 @@ class LongitudinalTuningLayout(Widget):
       if action := getattr(item, "action_item", None):
         action.set_enabled(enabled and tuning_write_allowed(ui_state.params, getattr(action, "param_key", None),
                                                            CP=ui_state.CP, CP_SP=ui_state.CP_SP, is_offroad=ui_state.is_offroad()))
-    self._live_learning_gas.action_item.set_enabled(
+    self._longitudinal_controller.action_item.set_enabled(
       ui_state.is_offroad() and live_gas_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
-    self._live_learning_gas.action_item.set_state(ui_state.params.get_bool("HondaLiveLearningGas"))
     self._reset_live_gas.action_item.set_enabled(gas_reset_available())
     self._mvl_pcm_deadzone.action_item.set_enabled(
       ui_state.is_offroad() and mvl_pcm_deadzone_available(ui_state.CP, ui_state.CP_SP, ui_state.params))

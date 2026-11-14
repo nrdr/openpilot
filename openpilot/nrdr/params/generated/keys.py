@@ -6,6 +6,7 @@ from enum import StrEnum
 class NrdrParamKey(StrEnum):
   DISABLE_POWER_DOWN = "DisablePowerDown"
   HONDA_BOSCH_A_RADAR = "HondaBoschARadar"
+  NRDR_LONGITUDINAL_CONTROLLER = "NrdrLongitudinalController"
   OFFROAD_NEOS_UPDATE = "Offroad_NeosUpdate"
   RECORD_AUDIO_FEEDBACK = "RecordAudioFeedback"
   NRDR_ENGAGEMENT_SOUND_PACK = "NrdrEngagementSoundPack"
@@ -174,6 +175,7 @@ class NrdrParamKey(StrEnum):
 
 ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.HONDA_BOSCH_A_RADAR,
+  NrdrParamKey.NRDR_LONGITUDINAL_CONTROLLER,
   NrdrParamKey.OFFROAD_NEOS_UPDATE,
   NrdrParamKey.RECORD_AUDIO_FEEDBACK,
   NrdrParamKey.NRDR_ENGAGEMENT_SOUND_PACK,

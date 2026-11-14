@@ -431,11 +431,22 @@ sections:
       trigger_key: null
       trigger_condition: {type: capability, field: nrdr_longitudinal_tuning_available, equals: true}
       items:
-      - key: HondaLiveLearningGas
-        widget: toggle
-        title: Live Learning Gas
-        description: "Uses MVL's adaptive acceleration, braking, and driving profiles. Off returns to custom longitudinal control while preserving learned values and saved tuning."
-        details: "Econ retains its gentler nrdr profile; speed-limit and curve-speed settings remain independent. Changes apply next drive."
+      - key: NrdrLongitudinalController
+        widget: multiple_button
+        title: Longitudinal Controller
+        description: "Choose Standard, MVL adaptive control, Bosch-A Radar, or Aragon's speed-feedback pedal tune. Personal Pedal uses fixed personality gains and resets learned gas/wind compensation; changes apply next drive."
+        details: "Standard uses your existing custom control. MVL retains adaptive learning. Bosch-A Radar uses factory radar with the Bosch-A tune; Alpha Long does not restore factory emergency braking (AEB/CMBS). Personal Pedal uses the historical Econ, Relaxed, Standard and Aggressive speed-feedback gains without learning. Other saved tuning is preserved."
+        options:
+        - {label: Standard, value: 0}
+        - {label: MVL Live Learning Gas, value: 1}
+        - label: Bosch-A Radar
+          value: 2
+          enablement:
+          - {type: capability, field: nrdr_bosch_radar_controller_available, equals: true}
+        - label: Aragon's Personal Pedal
+          value: 3
+          enablement:
+          - {type: capability, field: nrdr_personal_pedal_available, equals: true}
         enablement:
         - $ref: '#/macros/offroad'
         - {type: capability, field: nrdr_honda_mvl_selection_available, equals: true}
@@ -496,7 +507,7 @@ sections:
         widget: toggle
         title: Keep Feedforward Static
         description: "Keeps feedforward strength unchanged when adjusting the PID scale. Off scales feedforward with the rest of the tune."
-        details: "Affects longitudinal tuning only; steering feedforward has separate settings."
+        details: "Applies to Standard control. Personal Pedal uses fixed gains and feedforward."
       - key: NrdrHondaFullBrakeAuthority
         widget: toggle
         title: Full Nidec Brake Authority
@@ -506,12 +517,7 @@ sections:
         widget: toggle
         title: Roen Nidec Acceleration Limits
         description: "Uses Roen's acceleration limits and full low-speed pedal response. Off restores the normal acceleration limits."
-        details: "Applies to Nidec pedal control with Live Learning Gas off."
-      - key: HondaBoschARadar
-        widget: toggle
-        title: Honda Bosch-A Radar (experimental)
-        description: "Uses factory radar for lead detection with stock ACC or Alpha Long. Alpha Long does not restore factory emergency braking (AEB/CMBS)."
-        details: "Experimental radar support: disable it if detected vehicles are shown incorrectly."
+        details: "Applies to Standard Nidec pedal control, not MVL or Personal Pedal."
       - key: NrdrHondaDashVariantB
         widget: toggle
         title: Honda Dashboard Variant B
@@ -521,7 +527,7 @@ sections:
         widget: option
         title: Distance 1 / Aggressive PID Scale
         description: "Adjusts acceleration and braking feedback strength for the Aggressive profile. 100% keeps the base tune."
-        details: "Applies with a pedal interceptor and Live Learning Gas off; otherwise the base scale is used."
+        details: "Applies to Standard control with a pedal interceptor. Personal Pedal uses fixed personality gains."
         min: 0
         max: 500
         step: 5
@@ -530,7 +536,7 @@ sections:
         widget: option
         title: Distance 2 / Standard PID Scale
         description: "Adjusts acceleration and braking feedback strength for the Standard profile. 100% keeps the base tune."
-        details: "Applies with a pedal interceptor and Live Learning Gas off; otherwise the base scale is used."
+        details: "Applies to Standard control with a pedal interceptor. Personal Pedal uses fixed personality gains."
         min: 0
         max: 500
         step: 5
@@ -539,7 +545,7 @@ sections:
         widget: option
         title: Distance 3 / Relaxed PID Scale
         description: "Adjusts acceleration and braking feedback strength for the Relaxed profile. 100% keeps the base tune."
-        details: "Applies with a pedal interceptor and Live Learning Gas off; otherwise the base scale is used."
+        details: "Applies to Standard control with a pedal interceptor. Personal Pedal uses fixed personality gains."
         min: 0
         max: 500
         step: 5
@@ -548,7 +554,7 @@ sections:
         widget: option
         title: Distance 4 / Econ PID Scale
         description: "Adjusts acceleration and braking feedback strength for the Econ profile. 100% keeps the base tune."
-        details: "Applies with a pedal interceptor and Live Learning Gas off; otherwise the base scale is used."
+        details: "Applies to Standard control with a pedal interceptor. Personal Pedal uses fixed personality gains."
         min: 0
         max: 500
         step: 5

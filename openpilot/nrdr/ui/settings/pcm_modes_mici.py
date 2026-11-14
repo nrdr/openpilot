@@ -1,12 +1,15 @@
 """Compact longitudinal controls with the same saved-choice guards as tici."""
 from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
-from openpilot.nrdr.params.tuning_policy import MVL_DESCRIPTION, tuning_write_allowed
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_LABELS, CONTROLLER_DESCRIPTION, BOSCH_RADAR_WARNING
 from openpilot.nrdr.ui.settings.pcm_speed_deadzone import PcmSpeedDeadzoneSlider
 from openpilot.nrdr.ui.honda_pcm import (pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice,
-                                       live_gas_available, save_live_gas_choice,
-                                       live_gas_status)
+                                       live_gas_available, longitudinal_controller_choices,
+                                       longitudinal_controller_label, save_longitudinal_controller)
 from openpilot.nrdr.ui.settings.live_gas_reset import mici_reset_button
-from openpilot.selfdrive.ui.mici.widgets.button import BigMultiToggle, BigToggle
+from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigMultiToggle, BigToggle
+from openpilot.system.ui.widgets.scroller import NavScroller
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr
 
@@ -94,28 +97,32 @@ class StaticFeedforwardControl(BigToggle):
     self.refresh()
 
 
-class LiveGasControl(BigToggle):
+class LongitudinalControllerControl(BigButton):
   def __init__(self):
-    super().__init__(tr("Live Learning Gas"), initial_state=ui_state.params.get_bool("HondaLiveLearningGas"),
-                     toggle_callback=self._select, font_size=30,
-                     description=tr(MVL_DESCRIPTION))
+    super().__init__(tr("Longitudinal Controller"), font_size=30, description=tr(CONTROLLER_DESCRIPTION))
+    self.set_click_callback(self._show_choices)
     self.set_enabled(lambda: ui_state.is_offroad() and live_gas_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
     self._refresh()
 
-  def _title_width_hint(self) -> int:
-    return max(1, int(self._rect.width - self.LABEL_HORIZONTAL_PADDING - self._txt_enabled_toggle.width - 12))
-
-  @staticmethod
-  def _mode_status():
-    return tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP, is_offroad=ui_state.is_offroad()))
-
   def _refresh(self):
-    self.set_checked(ui_state.params.get_bool("HondaLiveLearningGas"))
-    self.set_value(self._mode_status())
+    self.set_value(tr(longitudinal_controller_label(ui_state)))
 
-  def _select(self, value):
-    save_live_gas_choice(ui_state, value)
-    self._refresh()
+  def _show_choices(self):
+    if not ui_state.is_offroad():
+      return
+    panel = NavScroller()
+    for value in longitudinal_controller_choices(ui_state.CP, ui_state.CP_SP, ui_state.params):
+      button = BigButton(tr(CONTROLLER_LABELS[value]), font_size=30,
+                         description=tr(BOSCH_RADAR_WARNING if value == 2 else CONTROLLER_DESCRIPTION))
+
+      def selected(choice=int(value)):
+        if save_longitudinal_controller(ui_state, choice):
+          self._refresh()
+          gui_app.pop_widget()
+
+      button.set_click_callback(selected)
+      panel._scroller.add_widgets([button])
+    gui_app.push_widget(panel)
 
   def _update_state(self):
     super()._update_state()
@@ -123,4 +130,4 @@ class LiveGasControl(BigToggle):
 
 
 def longitudinal_controls():
-  return [LiveGasControl(), mici_reset_button(), PcmModeControl(), WindBrakeControl(), StaticFeedforwardControl(), MvlPcmDeadzoneControl()]
+  return [LongitudinalControllerControl(), mici_reset_button(), PcmModeControl(), WindBrakeControl(), StaticFeedforwardControl(), MvlPcmDeadzoneControl()]

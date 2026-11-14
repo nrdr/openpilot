@@ -98,7 +98,7 @@ def test_cached_factory_acc_allows_parked_preconfiguration_without_changing_runt
                          CarPlatformBundle={"brand": "honda", "platform": "HONDA_CIVIC"})
   layout = native_layout(ui)
   layout._update_state()
-  assert all(item.enabled for item in (layout._pcm_mode, layout._wind_brake, layout._live_learning_gas, layout._mvl_pcm_deadzone))
+  assert all(item.enabled for item in (layout._pcm_mode, layout._wind_brake, layout._longitudinal_controller, layout._mvl_pcm_deadzone))
   assert save_pcm_choice(ui, "NrdrHondaPcmMode", 2)
   assert save_pcm_choice(ui, "NrdrHondaWindBrake", True)
   assert save_live_gas_choice(ui, True)
@@ -316,7 +316,7 @@ def native_layout(ui, toggle_factory=None):
          "nrdr_longitudinal_enabled": nrdr_longitudinal_enabled, "pcm_tuning_available": pcm_tuning_available,
          "saved_pcm_mode": saved_pcm_mode, "saved_wind_brake": saved_wind_brake, "save_pcm_choice": save_pcm_choice,
          "gas_reset_available": lambda: False, "large_reset_button": Item, "LineSeparatorSP": lambda _: NS(),
-         "toggle_item_sp": toggle_factory or Item, "option_item_sp": Item, "multiple_button_item_sp": Item,
+         "toggle_item_sp": toggle_factory or Item, "button_item_sp": Item, "option_item_sp": Item, "multiple_button_item_sp": Item,
          "speed_deadzone_item": Item}
   env.update(MVL_DESCRIPTION=MVL_DESCRIPTION, mvl_tuning_locked=mvl_tuning_locked, tuning_write_allowed=tuning_write_allowed,
              live_gas_available=live_gas_available, save_live_gas_choice=save_live_gas_choice)

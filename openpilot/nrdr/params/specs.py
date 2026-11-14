@@ -95,6 +95,7 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
             ParamOwner.SYSTEM, RegistryAction.OVERRIDE),
 
   _added("HondaBoschARadar", ParamType.BOOL, (P,), "1", owner=ParamOwner.HONDA),
+  _added("NrdrLongitudinalController", ParamType.INT, PB, "-1", owner=ParamOwner.LONGITUDINAL),
   _added("Offroad_NeosUpdate", ParamType.JSON, (M,), lifecycle=ParamLifecycle.STATUS),
   _added("RecordAudioFeedback", ParamType.BOOL, PB, "0", owner=ParamOwner.DEVICE),
   _added("NrdrEngagementSoundPack", ParamType.INT, PB, "0", owner=ParamOwner.DEVICE),

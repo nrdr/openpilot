@@ -63,6 +63,8 @@ CAPABILITY_FIELDS = (
   "nrdr_honda_pcm_tuning_available",
   "nrdr_mvl_pcm_deadzone_available",
   "nrdr_honda_mvl_selection_available",
+  "nrdr_bosch_radar_controller_available",
+  "nrdr_personal_pedal_available",
   "nrdr_mvl_longitudinal_active",
   "nrdr_mvl_tuning_exempt",
   "nrdr_manual_steer_ratio_available",
@@ -103,6 +105,8 @@ CAPABILITY_LABELS: dict[str, str] = {
   "nrdr_honda_pcm_tuning_available": "Confirmed non-interceptor Honda Nidec; saved tuning applies when openpilot controls longitudinal",
   "nrdr_mvl_pcm_deadzone_available": "Confirmed non-interceptor Civic Nidec PCM; configure while parked, applies only during Experimental PCM shaping",
   "nrdr_honda_mvl_selection_available": "Confirmed Honda; saved MVL selection applies when openpilot controls longitudinal",
+  "nrdr_bosch_radar_controller_available": "Honda Bosch-A radar hardware",
+  "nrdr_personal_pedal_available": "Honda Nidec with a gas interceptor",
   "nrdr_mvl_longitudinal_active": "Drive-latched MVL longitudinal control; saved tuning choices remain editable",
   "nrdr_mvl_tuning_exempt": "Current vehicle is outside Honda openpilot longitudinal; saved Honda modes do not restrict its tuning",
   "nrdr_manual_steer_ratio_available": "nrdr manual steer-ratio geometry available",
@@ -245,6 +249,10 @@ def generate_capabilities(params: Params | None = None) -> dict:
   caps["nrdr_honda_pcm_tuning_available"] = pcm_tuning_available(CP, CP_SP, params)
   caps["nrdr_mvl_pcm_deadzone_available"] = mvl_pcm_deadzone_available(CP, CP_SP, params)
   caps["nrdr_honda_mvl_selection_available"] = live_gas_available(CP, CP_SP, params)
+  from openpilot.nrdr.ui.honda_pcm import longitudinal_controller_choices
+  controller_choices = longitudinal_controller_choices(CP, CP_SP, params)
+  caps["nrdr_bosch_radar_controller_available"] = 2 in controller_choices
+  caps["nrdr_personal_pedal_available"] = 3 in controller_choices
   caps["nrdr_mvl_longitudinal_active"] = mvl_longitudinal_enabled(CP)
   caps["nrdr_mvl_tuning_exempt"] = mvl_tuning_exempt(CP)
   # A selected platform and deserialized CP must agree before exposing a

@@ -111,6 +111,8 @@ def environment(**extra):
     "legacy_pcm_enabled": lambda *_: False,
     "fixed_pcm_cruise_enabled": lambda *_: False,
     "nrdr_custom_longitudinal_enabled": lambda cp: cp.brand == "honda" and not mvl_enabled(cp),
+    "personal_pedal_enabled": lambda cp, cp_sp: bool(cp.flags & 1048576),
+    "PersonalPedalControl": forbidden,
     "longitudinal_personality": personality, "is_honda_bosch_a_radar": lambda _: True,
     "NrdrLongControl": forbidden, "NrdrLongitudinalPlanner": forbidden, "NrdrLongitudinalMpc": forbidden,
     "Params": forbidden, "get_live_params": forbidden, "LongTune": forbidden, "apply_standstill_gap": forbidden,

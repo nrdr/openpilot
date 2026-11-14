@@ -19,6 +19,7 @@ from opendbc.sunnypilot.car.runtime_config import HondaLiveTuning
 
 from openpilot.nrdr.params.generated.keys import NrdrParamKey
 from openpilot.nrdr.params.pcm_speed_deadzone import read_speed_deadzone
+from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_KEY, LongitudinalController, decode_controller
 from openpilot.nrdr.car.mvl_state import LEARNER_META_PATH, MvlStateStore
 
 
@@ -519,6 +520,7 @@ class NrdrHondaConfig:
   nidec_pcm_mode: int = 0
   nidec_wind_brake: bool = True
   mvl_longitudinal: bool = False
+  personal_pedal: bool = False
   mvl_pcm_deadzone: float = 0.0
   civic_pcm_speed_deadzone: float = 0.15
 
@@ -532,6 +534,13 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
   # when the registered key has no stored value (it does not consult registry defaults).
   radar_value = _read_param(params, OpendbcParamKey.HONDA_BOSCH_A_RADAR)
   mode_value = _read_param(params, OpendbcParamKey.NRDR_HONDA_PCM_MODE)
+  controller = decode_controller(_read_param(params, CONTROLLER_KEY))
+  mvl = _bool_value(_read_param(params, OpendbcParamKey.HONDA_LIVE_LEARNING_GAS), True)
+  radar = _bool_value(radar_value, False)
+  if controller is not None:
+    mvl = controller == LongitudinalController.MVL
+    if controller in (LongitudinalController.STANDARD, LongitudinalController.BOSCH_RADAR):
+      radar = controller == LongitudinalController.BOSCH_RADAR
   # Invalid/missing values select upstream, never an experiment. Do not migrate
   # the retired bool: it controlled a different algorithm from the donor patch.
   mode = {"0": 0, "1": 1, "2": 2}.get(
@@ -539,11 +548,12 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
   )
 
   return NrdrHondaConfig(
-    bosch_a_radar=_bool_value(radar_value, False),
+    bosch_a_radar=radar,
     provider=provider,
     nidec_pcm_mode=mode,
     nidec_wind_brake=_bool_value(_read_param(params, OpendbcParamKey.NRDR_HONDA_WIND_BRAKE), True),
-    mvl_longitudinal=_bool_value(_read_param(params, OpendbcParamKey.HONDA_LIVE_LEARNING_GAS), True),
+    mvl_longitudinal=mvl,
+    personal_pedal=controller == LongitudinalController.PERSONAL_PEDAL,
     # Old acceleration-error settings are retained on disk, never reinterpreted as speed.
     mvl_pcm_deadzone=0.0,
     civic_pcm_speed_deadzone=read_speed_deadzone(_read_param(params, "NrdrPcmSpeedDeadzone")),

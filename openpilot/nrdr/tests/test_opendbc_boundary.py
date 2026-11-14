@@ -146,11 +146,21 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertEqual([key for key, _ in params.reads], [
       str(NrdrHondaParamKey.HONDA_BOSCH_A_RADAR),
       str(NrdrHondaParamKey.NRDR_HONDA_PCM_MODE),
-      str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE),
+      "NrdrLongitudinalController",
       str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS),
+      str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE),
       "NrdrPcmSpeedDeadzone",
       *(str(key) for key in HOST_STARTUP_DEFAULTS),
     ])
+
+  def test_longitudinal_controller_selection_uses_existing_startup_boundary(self):
+    for mode, mvl, radar, personal in ((-1, True, True, False), (0, False, False, False),
+                                       (1, True, True, False), (2, False, True, False), (3, False, True, True)):
+      with self.subTest(mode=mode):
+        params = FakeParams({"NrdrLongitudinalController": mode, "HondaLiveLearningGas": True, "HondaBoschARadar": True})
+        config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+        self.assertEqual((config.honda.mvl_longitudinal, config.honda.bosch_a_radar, config.honda.personal_pedal), (mvl, radar, personal))
+        self.assertEqual(params.writes, [])
 
   def test_pcm_choices_are_startup_latched_and_old_bool_does_not_migrate(self):
     for value, expected in ((None, 0), (True, 0), (False, 0), (3, 0), (-1, 0), (1.0, 0),

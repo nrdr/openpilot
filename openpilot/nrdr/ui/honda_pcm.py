@@ -1,10 +1,55 @@
 """Presentation eligibility and saved choices; never an actuation authority."""
-from opendbc.car.honda.values import CAR, HONDA_BOSCH
+from opendbc.car.honda.values import CAR, HONDA_BOSCH, HONDA_BOSCH_A
 
 from openpilot.nrdr.params import confirmed_vehicle_identity, get_selected_car_identity
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
 from openpilot.nrdr.params.pcm_speed_deadzone import PCM_SPEED_DEADZONE_KEY, decode_speed_deadzone, read_speed_deadzone
+from openpilot.nrdr.params.longitudinal_controller import (
+  CONTROLLER_KEY, CONTROLLER_LABELS, CONTROLLER_DESCRIPTION, LongitudinalController, decode_controller, saved_controller,
+)
+
+
+def longitudinal_controller_choices(CP, CP_SP, params):
+  if not live_gas_available(CP, CP_SP, params):
+    return ()
+  choices = [LongitudinalController.STANDARD, LongitudinalController.MVL]
+  if CP.carFingerprint in HONDA_BOSCH_A:
+    choices.append(LongitudinalController.BOSCH_RADAR)
+  if CP.carFingerprint not in HONDA_BOSCH and CP_SP.enableGasInterceptor:
+    choices.append(LongitudinalController.PERSONAL_PEDAL)
+  return tuple(choices)
+
+
+def longitudinal_controller_selection(CP, CP_SP, params):
+  choices = longitudinal_controller_choices(CP, CP_SP, params)
+  return saved_controller(params, bosch_radar_available=LongitudinalController.BOSCH_RADAR in choices)
+
+
+def store_controller_choice(params, value, choices, CP=None):
+  if type(value) not in (int, LongitudinalController) or value not in choices or not params.get_bool("IsOffroad"):
+    return False
+  previous = saved_controller(params, bosch_radar_available=LongitudinalController.BOSCH_RADAR in choices)
+  if value == LongitudinalController.PERSONAL_PEDAL and previous != value:
+    from openpilot.nrdr.car.live_gas_reset import request_reset
+    request_reset(params, CP)
+  # Keep old readers/downgrades consistent, but never rewrite tuning values.
+  params.put_bool("HondaLiveLearningGas", value == LongitudinalController.MVL, block=True)
+  if LongitudinalController.BOSCH_RADAR in choices and value in (0, 2):
+    params.put_bool("HondaBoschARadar", value == LongitudinalController.BOSCH_RADAR, block=True)
+  params.put(CONTROLLER_KEY, int(value), block=True)
+  params.put_bool("OnroadCycleRequested", True, block=True)
+  return True
+
+
+def save_longitudinal_controller(state, value):
+  return state.is_offroad() and store_controller_choice(
+    state.params, value, longitudinal_controller_choices(state.CP, state.CP_SP, state.params), state.CP,
+  )
+
+
+def longitudinal_controller_label(state):
+  return CONTROLLER_LABELS[longitudinal_controller_selection(state.CP, state.CP_SP, state.params)]
 
 
 def live_gas_available(CP, CP_SP, params) -> bool:
@@ -21,6 +66,8 @@ def save_live_gas_choice(state, value) -> bool:
       or not live_gas_available(state.CP, state.CP_SP, state.params)):
     return False
   state.params.put_bool("HondaLiveLearningGas", value, block=True)
+  if decode_controller(state.params.get(CONTROLLER_KEY)) is not None:
+    state.params.put(CONTROLLER_KEY, -1, block=True)
   state.params.put_bool("OnroadCycleRequested", True)
   return True
 

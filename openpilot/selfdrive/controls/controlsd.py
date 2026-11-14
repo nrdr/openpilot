@@ -163,6 +163,7 @@ class Controls(ControlsExt):
     # accel PID loop
     pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, self.CP_SP, CS.vEgo, CS.vCruise * CV.KPH_TO_MS)
     long_pitch, long_drel = stopping_inputs(self.calibrated_pose, long_plan)
+    self.LoC.set_plan(long_plan, self.sm.updated['longitudinalPlan'])
     actuators.accel = float(self.LoC.update(CC.longActive, CS, long_plan.aTarget, long_plan.shouldStop, pid_accel_limits,
                                             pitch=long_pitch, drel=long_drel,
                                             personality=self.sm['selfdriveState'].personality))
@@ -275,6 +276,8 @@ class Controls(ControlsExt):
     cs.upAccelCmd = float(self.LoC.pid.p)
     cs.uiAccelCmd = float(self.LoC.pid.i)
     cs.ufAccelCmd = float(self.LoC.pid.f)
+    if self.LoC.personal_pedal:
+      cs.deprecated.vPid = float(self.LoC.nrdr_controller.v_pid)
     cs.forceDecel = bool(self.sm['driverMonitoringState'].noResponseForceDecel or
                          (self.sm['selfdriveState'].state == State.softDisabling))
 
