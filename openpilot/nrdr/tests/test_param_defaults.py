@@ -41,7 +41,7 @@ EXPECTED_BOOL_DEFAULTS = {
   "HondaDriverAssistDuringOverride": True,
   "HondaSteerDeltaLimiter": False,
   "NrdrLatStiction": False,
-  "NrdrOptimizedLaneChanges": False,
+  "NrdrOptimizedLaneChanges": True,
   "NrdrTuneLearner": False,
 }
 
@@ -54,10 +54,10 @@ EXPECTED_VALUE_DEFAULTS = {
   "SpeedLimitValueOffset": 5,
   "CustomAccShortPressIncrement": 5,
   "CustomAccLongPressIncrement": 1,
-  "NrdrDriverOverrideThreshold": 1500,
-  "NrdrOverrideThresholdCenterBoost": 1000,
-  "HondaOverrideFadeDownSecs": 0.5,
-  "HondaOverrideFadeUpSecs": 2.0,
+  "NrdrDriverOverrideThreshold": 1200,
+  "NrdrOverrideThresholdCenterBoost": 1200,
+  "HondaOverrideFadeDownSecs": 0.1,
+  "HondaOverrideFadeUpSecs": 1.0,
   "ChevronInfo": 4,
   "DevUIInfo": 3,
   "OnroadScreenOffBrightness": 1,
@@ -169,6 +169,7 @@ class TestParamDefaults(unittest.TestCase):
 
   def test_missing_values_are_seeded_in_order_and_existing_values_are_preserved(self):
     existing = {
+      "NrdrSettingsDefaultsVersion": 1,
       "QuietMode": False,
       "LaneTurnValue": 99.0,
       "EnforceTorqueControl": True,
@@ -313,7 +314,7 @@ class TestParamDefaults(unittest.TestCase):
     for device_type in ("pc", "tici", "mici"):
       with self.subTest(device_type=device_type, state="missing"):
         defaults, _cloudlog = _load_defaults(device_type)
-        params = FakeParams()
+        params = FakeParams({"NrdrSettingsDefaultsVersion": 1})
 
         _apply(defaults, params)
 
@@ -325,7 +326,7 @@ class TestParamDefaults(unittest.TestCase):
 
       with self.subTest(device_type=device_type, state="explicit-off"):
         defaults, _cloudlog = _load_defaults(device_type)
-        params = FakeParams({"QuietMode": False})
+        params = FakeParams({"QuietMode": False, "NrdrSettingsDefaultsVersion": 1})
 
         _apply(defaults, params)
 
@@ -335,7 +336,7 @@ class TestParamDefaults(unittest.TestCase):
   def test_quiet_mode_is_persisted_before_generic_defaults(self):
     class DeferredParams(FakeParams):
       def __init__(self):
-        super().__init__()
+        super().__init__({"NrdrSettingsDefaultsVersion": 1})
         self.pending = []
 
       def _write(self, setter, key, value, args, kwargs):

@@ -37,6 +37,7 @@ HONDA_TUNING_WRITE_KEYS = frozenset((
   "NrdrLatStiction",
   # Steer ratio, override, and steering filters.
   "NrdrSteerRatioMode",
+  "NrdrSteerRatioModelBlend",
   "NrdrSteerRatioHybrid",
   "NrdrSteerRatioSourceB",
   "NrdrSteerRatioBlendStart",
@@ -99,7 +100,7 @@ def allow_param_write(key: str, onroad: bool, *, handcrafted_profile_available: 
                       honda_tuning_available: bool | None = None,
                       device_yaw_correction_available: bool | None = None,
                       requested_bool: bool | None = None) -> bool:
-  if key == "NrdrHandcraftedLateralRequest":
+  if key in ("NrdrHandcraftedLateralRequest", "NrdrSettingsDefaultsVersion", "NrdrVehicleDefaultsApplied"):
     return False
   if onroad and key in ONROAD_WRITE_BLOCKLIST:
     return False

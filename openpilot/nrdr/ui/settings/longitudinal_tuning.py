@@ -8,17 +8,14 @@ from openpilot.system.ui.widgets.list_view import ListItem
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled, nrdr_longitudinal_enabled
 from openpilot.nrdr.ui.settings.live_gas_reset import available as gas_reset_available, large_reset_button
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
-from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_LABELS, CONTROLLER_DESCRIPTION, BOSCH_RADAR_WARNING
-from openpilot.nrdr.ui.settings.pcm_speed_deadzone import speed_deadzone_item
-from openpilot.nrdr.ui.honda_pcm import (pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice,
-                                       wind_brake_editable,
+from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_LABELS, CONTROLLER_DESCRIPTION, BOSCH_RADAR_WARNING, LongitudinalController
+from openpilot.nrdr.ui.honda_pcm import (saved_wind_brake, save_pcm_choice, wind_brake_editable,
                                        live_gas_available, longitudinal_controller_choices,
-                                       longitudinal_controller_label, save_longitudinal_controller,
-                                       live_gas_status,
-                                       mvl_pcm_deadzone_available)
+                                       longitudinal_controller_label, longitudinal_controller_selection,
+                                       save_longitudinal_controller, live_gas_status)
 from openpilot.system.ui.widgets.network import NavButton
 from openpilot.system.ui.widgets.scroller_tici import Scroller
-from openpilot.system.ui.sunnypilot.widgets.list_view import button_item_sp, toggle_item_sp, option_item_sp, multiple_button_item_sp, LineSeparatorSP
+from openpilot.system.ui.sunnypilot.widgets.list_view import button_item_sp, toggle_item_sp, option_item_sp, LineSeparatorSP
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import DialogResult
 from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
@@ -60,7 +57,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Adjusts Standard-controller pedal feedback for Aggressive; 100% keeps the base tune. Personal Pedal uses fixed gains."
+        "Adjusts Standard-controller pedal feedback for Aggressive; 100% keeps the base tune. PTM Pedal Interceptor uses fixed gains."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -72,7 +69,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Adjusts Standard-controller pedal feedback for the Standard personality; 100% keeps the base tune. Personal Pedal uses fixed gains."
+        "Adjusts Standard-controller pedal feedback for the Standard personality; 100% keeps the base tune. PTM Pedal Interceptor uses fixed gains."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -84,7 +81,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Adjusts Standard-controller pedal feedback for Relaxed; 100% keeps the base tune. Personal Pedal uses fixed gains."
+        "Adjusts Standard-controller pedal feedback for Relaxed; 100% keeps the base tune. PTM Pedal Interceptor uses fixed gains."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -96,7 +93,7 @@ class LongitudinalTuningLayout(Widget):
       max_value=500,
       value_change_step=5,
       description=lambda: tr(
-        "Adjusts Standard-controller pedal feedback for Econ; 100% keeps the base tune. Personal Pedal uses fixed gains."
+        "Adjusts Standard-controller pedal feedback for Econ; 100% keeps the base tune. PTM Pedal Interceptor uses fixed gains."
       ),
       label_callback=lambda value: f"{value}%",
     )
@@ -106,18 +103,6 @@ class LongitudinalTuningLayout(Widget):
       title=lambda: tr("Keep Feedforward Static (Default: OFF)"),
       description=lambda: tr("Keeps feedforward strength unchanged when adjusting the PID scale. Off scales feedforward with the rest of the tune."),
     )
-
-    self._pcm_mode = multiple_button_item_sp(
-      title=lambda: tr("Honda Nidec: ECU-Matched PCM Command Shaping"),
-      buttons=[lambda: tr("Off"), lambda: tr("ECU-Matched"), lambda: tr("Experimental")],
-      button_width=300, callback=lambda value: save_pcm_choice(ui_state, "NrdrHondaPcmMode", value),
-      description=lambda: tr(
-        "Adjusts PCM acceleration and the transition to braking; Off restores standard control. Experimental " +
-            "supports Civic MVL learning and bypasses Wind Brake without changing its saved setting."
-      ),
-    )
-
-    self._mvl_pcm_deadzone = speed_deadzone_item()
 
     self._wind_brake = toggle_item_sp(
       title=lambda: tr("Wind Brake"), initial_state=True,
@@ -133,14 +118,6 @@ class LongitudinalTuningLayout(Widget):
       title=lambda: tr("Full Nidec Brake Authority (Default: ON)"),
       description=lambda: tr(
         "Allows the full available brake-command range. Off restores the standard brake-command limit."
-      ),
-    )
-
-    self._roen_acceleration_limits = toggle_item_sp(
-      param="NrdrRoenAccelerationLimits",
-      title=lambda: tr("Roen Nidec Acceleration Limits (Default: OFF)"),
-      description=lambda: tr(
-        "Uses Roen's acceleration limits and full low-speed pedal response with Standard control. Off restores the normal acceleration limits."
       ),
     )
 
@@ -221,26 +198,14 @@ class LongitudinalTuningLayout(Widget):
       use_float_scaling=True,
     )
 
-    self._dashboard_variant = toggle_item_sp(
-      param="NrdrHondaDashVariantB",
-      title=lambda: tr("Honda Dashboard Variant B (Default: OFF)"),
-      description=lambda: tr(
-        "Saves the dashboard variant with four dashed lane lines. This setting currently has no effect."
-      ),
-    )
-
     self._reset_live_gas = large_reset_button()
     return [
       self._longitudinal_controller,
       self._reset_live_gas,
-      self._mvl_pcm_deadzone,
       LineSeparatorSP(40),
-      self._pcm_mode,
       self._wind_brake,
       self._static_feedforward_long,
       self._full_brake_authority,
-      self._roen_acceleration_limits,
-      self._dashboard_variant,
       LineSeparatorSP(40),
       self._long_pid_tune_scale_aggressive,
       self._long_pid_tune_scale_standard,
@@ -280,15 +245,11 @@ class LongitudinalTuningLayout(Widget):
     self._longitudinal_controller.action_item.set_enabled(
       ui_state.is_offroad() and live_gas_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
     self._reset_live_gas.action_item.set_enabled(gas_reset_available())
-    self._mvl_pcm_deadzone.action_item.set_enabled(
-      ui_state.is_offroad() and mvl_pcm_deadzone_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
-    pcm_available = pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
-    pcm_enabled = ui_state.is_offroad() and pcm_available
-    self._pcm_mode.action_item.set_enabled(pcm_enabled)
     self._wind_brake.action_item.set_enabled(
       wind_brake_editable(ui_state.CP, ui_state.CP_SP, ui_state.params, is_offroad=ui_state.is_offroad()))
-    self._pcm_mode.action_item.set_selected_button(saved_pcm_mode(ui_state.params))
     self._wind_brake.action_item.set_state(saved_wind_brake(ui_state.params))
+    self._full_brake_authority.set_visible(
+      longitudinal_controller_selection(ui_state.CP, ui_state.CP_SP, ui_state.params) == LongitudinalController.STANDARD)
     self._standstill_gap.action_item.set_enabled(
       enabled and ui_state.is_offroad() and bool(ui_state.CP and ui_state.CP.openpilotLongitudinalControl)
     )

@@ -128,9 +128,9 @@ class TestUiSettingsContract(unittest.TestCase):
     self.assertEqual(item["key"], "NrdrEngagementSoundPack")
     self.assertEqual(item["widget"], "multiple_button")
     self.assertEqual(item["title"], "Engagement Sounds")
-    self.assertEqual(item["options"], [{"value": 0, "label": "Current"}, {"value": 1, "label": "June 2026"}])
+    self.assertEqual(item["options"], [{"value": 0, "label": "Current"}, {"value": 1, "label": "Legacy"}])
     self.assertEqual(item["description"],
-                     "Choose current or June 2026 engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged.")
+                     "Choose current or Legacy engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged.")
     self.assertEqual(item["details"], "Applies to the next engagement, disengagement, or engagement-refused chime.")
     for visual in (ball, sidebar):
       self.assertEqual(visual["visibility"], [{"type": "capability", "field": "device_type", "equals": "mici"}])
@@ -144,22 +144,21 @@ class TestUiSettingsContract(unittest.TestCase):
   def test_copy_explains_saved_values_and_reset_behavior(self):
     items = {item["key"]: item for item in _items(self.schema)}
     for key, phrase in (
-      ("NrdrSuggestedSettings", "Turning this off leaves the applied settings unchanged"),
       ("HondaTorqueLowPassFilter", "without changing your saved values"),
-      ("HondaLiveLearningGas", "preserving learned values and saved tuning"),
-      ("NrdrHondaWindBrake", "without changing your saved choice"),
+      ("NrdrHondaWindBrake", "leaves braking unchanged"),
       ("NrdrResetLiveGas", "Brake tuning, PID settings, and the learning switch are unchanged"),
       ("TeslaMadsScreenButton", "Off resets MADS settings to their defaults"),
     ):
       with self.subTest(key=key):
         self.assertIn(phrase, items[key]["description"])
+    self.assertIn("Turning this off leaves the applied settings unchanged", items["NrdrSuggestedSettings"]["details"])
 
   def test_copy_retains_critical_warnings(self):
     items = {item["key"]: item for item in _items(self.schema)}
     for key, field, phrase in (
-      ("DisablePowerDown", "description", "can drain the car battery"),
+      ("DisablePowerDown", "details", "can drain the car battery"),
       ("AlphaLongitudinalEnabled", "description", "disables factory Automatic Emergency Braking"),
-      ("HondaBoschARadar", "description", "does not restore factory emergency braking"),
+      ("NrdrLongitudinalController", "details", "does not restore factory emergency braking"),
       ("HondaTorqueLowPassFilter", "details", "excessive delay can cause steering oscillations"),
       ("HondaInjectionTest", "description", "do not use on public roads"),
       ("NrdrClearDashFaults", "description", "silences the factory forward-collision warning chime"),

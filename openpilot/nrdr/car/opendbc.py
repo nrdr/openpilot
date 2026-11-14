@@ -18,7 +18,6 @@ from opendbc.sunnypilot.car.honda.longitudinal import LEARN_VERSION
 from opendbc.sunnypilot.car.runtime_config import HondaLiveTuning
 
 from openpilot.nrdr.params.generated.keys import NrdrParamKey
-from openpilot.nrdr.params.pcm_speed_deadzone import read_speed_deadzone
 from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_KEY, LongitudinalController, decode_controller
 from openpilot.nrdr.car.mvl_state import LEARNER_META_PATH, MvlStateStore
 
@@ -53,6 +52,7 @@ class NrdrHondaParamKey(StrEnum):
   HONDA_LPF_TAU_STANDARD = NrdrParamKey.HONDA_LPF_TAU_STANDARD
   HONDA_LPF_TAU_HIGHWAY = NrdrParamKey.HONDA_LPF_TAU_HIGHWAY
   HONDA_STEER_DELTA_LIMITER = NrdrParamKey.HONDA_STEER_DELTA_LIMITER
+  NRDR_LATERAL_CONTROLLER = NrdrParamKey.NRDR_LATERAL_CONTROLLER
   HONDA_STEER_DELTA_UP = NrdrParamKey.HONDA_STEER_DELTA_UP
   HONDA_STEER_DELTA_DOWN = NrdrParamKey.HONDA_STEER_DELTA_DOWN
   HONDA_STOPPING_DECEL_RATE = NrdrParamKey.HONDA_STOPPING_DECEL_RATE
@@ -71,7 +71,6 @@ class NrdrHondaParamKey(StrEnum):
   NRDR_MVL_PCM_DEADZONE = NrdrParamKey.NRDR_MVL_PCM_DEADZONE
   NRDR_HONDA_WIND_BRAKE = NrdrParamKey.NRDR_HONDA_WIND_BRAKE
   NRDR_HONDA_FULL_BRAKE_AUTHORITY = NrdrParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY
-  NRDR_ROEN_ACCELERATION_LIMITS = NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS
 
 
 # Compatibility name for the typed key enum introduced with the first boundary.
@@ -94,6 +93,7 @@ SLOW_PARAM_GROUPS = (
   ),
   (
     OpendbcParamKey.HONDA_STEER_DELTA_LIMITER,
+    OpendbcParamKey.NRDR_LATERAL_CONTROLLER,
     OpendbcParamKey.HONDA_STEER_DELTA_UP,
     OpendbcParamKey.HONDA_STEER_DELTA_DOWN,
   ),
@@ -101,7 +101,6 @@ SLOW_PARAM_GROUPS = (
     OpendbcParamKey.HONDA_LIVE_LEARNING_GAS,
     OpendbcParamKey.HONDA_STOPPING_DECEL_RATE,
     OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY,
-    OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS,
     OpendbcParamKey.NRDR_HONDA_WIND_BRAKE,
   ),
   (
@@ -235,8 +234,8 @@ class HondaParamsProvider:
     values = snapshot.values
     tuning = HondaLiveTuning(
       generation=snapshot.generation,
-      override_fade_down_s=_float_value(values.get(OpendbcParamKey.HONDA_OVERRIDE_FADE_DOWN_SECS), 0.5, 0.0, 10.0),
-      override_fade_up_s=_float_value(values.get(OpendbcParamKey.HONDA_OVERRIDE_FADE_UP_SECS), 0.01, 0.0, 10.0),
+      override_fade_down_s=_float_value(values.get(OpendbcParamKey.HONDA_OVERRIDE_FADE_DOWN_SECS), 0.1, 0.0, 10.0),
+      override_fade_up_s=_float_value(values.get(OpendbcParamKey.HONDA_OVERRIDE_FADE_UP_SECS), 1.0, 0.0, 10.0),
       override_torque_scale=_float_value(values.get(OpendbcParamKey.HONDA_OVERRIDE_TORQUE_SCALE), 0.0, 0.0, 100.0, 100.0),
       driver_assist_during_override=_bool_value(values.get(OpendbcParamKey.HONDA_DRIVER_ASSIST_DURING_OVERRIDE), True),
       live_learning_gas=_bool_value(values.get(OpendbcParamKey.HONDA_LIVE_LEARNING_GAS), self._live_learning_default),
@@ -244,12 +243,13 @@ class HondaParamsProvider:
       lpf_tau_low=_float_value(values.get(OpendbcParamKey.HONDA_LPF_TAU_LOW_SPEED), 0.1, 0.0, 5.0),
       lpf_tau_standard=_float_value(values.get(OpendbcParamKey.HONDA_LPF_TAU_STANDARD), 0.02, 0.0, 5.0),
       lpf_tau_highway=_float_value(values.get(OpendbcParamKey.HONDA_LPF_TAU_HIGHWAY), 0.0, 0.0, 5.0),
-      steer_delta_limiter_enabled=_bool_value(values.get(OpendbcParamKey.HONDA_STEER_DELTA_LIMITER), False),
+      steer_delta_limiter_enabled=(_bool_value(values.get(OpendbcParamKey.HONDA_STEER_DELTA_LIMITER), False)
+                                   and _float_value(values.get(OpendbcParamKey.NRDR_LATERAL_CONTROLLER), 0.0) != 1.0),
       steer_delta_up=_float_value(values.get(OpendbcParamKey.HONDA_STEER_DELTA_UP), 4.0, 0.0, 100.0),
       steer_delta_down=_float_value(values.get(OpendbcParamKey.HONDA_STEER_DELTA_DOWN), 4.0, 0.0, 100.0),
       stopping_decel_rate=_float_value(values.get(OpendbcParamKey.HONDA_STOPPING_DECEL_RATE), 0.3, 0.0, 1.0, 100.0),
       increase_override_tolerance=False,
-      driver_override_threshold=_positive_threshold(values.get(OpendbcParamKey.NRDR_DRIVER_OVERRIDE_THRESHOLD), 1400.0),
+      driver_override_threshold=_positive_threshold(values.get(OpendbcParamKey.NRDR_DRIVER_OVERRIDE_THRESHOLD), 1200.0),
       center_override_threshold=_positive_threshold(values.get(OpendbcParamKey.NRDR_OVERRIDE_THRESHOLD_CENTER_BOOST), 1200.0),
       center_boost_angle=_float_value(values.get(OpendbcParamKey.HONDA_CENTER_BOOST_THRESHOLD), 0.0, 0.0),
       alt_dashboard_speed=int(_float_value(values.get(OpendbcParamKey.HONDA_ALT_DASHBOARD_SPEED), 0.0, 0.0, 3.0)),
@@ -260,7 +260,7 @@ class HondaParamsProvider:
       sub_mode_until=_float_value(values.get(OpendbcParamKey.NRDR_HUD_SUB_MODE_UNTIL), 0.0, 0.0),
       ecu_matched_long=False,  # Retired live switch; command law is selected once at startup.
       full_brake_authority=_bool_value(values.get(OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY), True),
-      roen_acceleration_limits=_bool_value(values.get(OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS), False),
+      roen_acceleration_limits=False,
       pedal_wind_brake=_bool_value(values.get(OpendbcParamKey.NRDR_HONDA_WIND_BRAKE), True),
     )
     self._tuning_cache = tuning
@@ -540,7 +540,7 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
   mvl = _bool_value(_read_param(params, OpendbcParamKey.HONDA_LIVE_LEARNING_GAS), True)
   radar = _bool_value(radar_value, False)
   if controller is not None:
-    mvl = controller == LongitudinalController.MVL
+    mvl = controller in (LongitudinalController.MVL, LongitudinalController.EXPERIMENTAL_PCM)
     if controller in (LongitudinalController.STANDARD, LongitudinalController.BOSCH_RADAR):
       radar = controller == LongitudinalController.BOSCH_RADAR
   # Invalid/missing values select upstream, never an experiment. Do not migrate
@@ -548,6 +548,8 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
   mode = {"0": 0, "1": 1, "2": 2}.get(
     mode_value.decode("utf-8", errors="replace") if isinstance(mode_value, bytes) else str(mode_value), 0,
   )
+  if controller is not None:
+    mode = 2 if controller == LongitudinalController.EXPERIMENTAL_PCM else 0
 
   return NrdrHondaConfig(
     bosch_a_radar=radar,
@@ -558,7 +560,7 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
     personal_pedal=controller == LongitudinalController.PERSONAL_PEDAL,
     # Old acceleration-error settings are retained on disk, never reinterpreted as speed.
     mvl_pcm_deadzone=0.0,
-    civic_pcm_speed_deadzone=read_speed_deadzone(_read_param(params, "NrdrPcmSpeedDeadzone")),
+    civic_pcm_speed_deadzone=0.0,
   )
 
 

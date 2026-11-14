@@ -289,20 +289,19 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
   import math
 
   from openpilot.nrdr.car.live_gas_reset import REQUEST, request_reset, stored_cp
-  from openpilot.nrdr.params.tuning_policy import CRUISE_PREFERENCE_KEYS, MVL_LOCK_KEYS, tuning_write_allowed
+  from openpilot.nrdr.params.tuning_policy import CRUISE_PREFERENCE_KEYS, MVL_LOCK_KEYS, RETIRED_TUNING_KEYS, tuning_write_allowed
   from openpilot.nrdr.params.pcm_speed_deadzone import decode_speed_deadzone
   from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_KEY
   from openpilot.nrdr.ui.honda_pcm import store_controller_choice
   mode_lock_keys = MVL_LOCK_KEYS | CRUISE_PREFERENCE_KEYS
   onroad = not params.get_bool("IsOffroad")
-  retired = {"NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance", "NrdrHondaPcmFixedCruise",
-             "NrdrHondaLegacyPcm", "NrdrMvlPcmDeadzone"}.intersection(params_to_update)
+  retired = RETIRED_TUNING_KEYS.intersection(params_to_update)
   if retired:
     raise ValueError(f"Retired settings cannot be written: {', '.join(sorted(retired))}")
   live_gas_selection = None
   long_controller_selection = None
   if CONTROLLER_KEY in params_to_update:
-    long_controller_selection = _remote_int_value(params_to_update[CONTROLLER_KEY], compression, (0, 1, 2, 3))
+    long_controller_selection = _remote_int_value(params_to_update[CONTROLLER_KEY], compression, (0, 1, 2, 3, 4))
     if (long_controller_selection is None or onroad
         or {"HondaLiveLearningGas", "HondaBoschARadar", REQUEST}.intersection(params_to_update)):
       raise ValueError("Choose one longitudinal controller while parked. Changes apply next drive.")
@@ -343,6 +342,7 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     if caps.get("nrdr_honda_mvl_selection_available") is not True:
       return ()
     return (0, 1) + ((2,) if caps.get("nrdr_bosch_radar_controller_available") is True else ()) + \
+                   ((4,) if caps.get("nrdr_mvl_pcm_deadzone_available") is True else ()) + \
                    ((3,) if caps.get("nrdr_personal_pedal_available") is True else ())
 
   if long_controller_selection is not None and long_controller_selection not in available_long_controllers(capabilities):
@@ -398,6 +398,11 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     except Exception as error:
       raise ValueError(f"Invalid saved tuning value for {key}. Nothing was saved.") from error
   controller_selection = None
+  ratio_selection = None
+  if "NrdrSteerRatioMode" in params_to_update:
+    ratio_selection = _remote_int_value(params_to_update["NrdrSteerRatioMode"], compression, (1, 3))
+    if ratio_selection is None or (ratio_selection == 3 and capabilities.get("nrdr_firmware_steer_ratio_available") is not True):
+      raise ValueError("Choose an available primary steering-ratio source.")
   lane_guidance_selection = None
   if "NrdrLateralController" in params_to_update:
     # A rejected controller request must be an RPC error, not a success-looking
@@ -498,6 +503,8 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
         params.put(key, controller_selection, block=True)
         if str(params.get(key)) not in (str(controller_selection), f"b'{controller_selection}'"):
           raise ValueError("Controller Type readback did not match the requested selection.")
+      elif key == "NrdrSteerRatioMode":
+        params.put(key, ratio_selection, block=True)
       elif key == "LaneGuidanceMode":
         from openpilot.nrdr.features.lateral.lane_guidance import set_lane_guidance_mode
         set_lane_guidance_mode(params, lane_guidance_selection)

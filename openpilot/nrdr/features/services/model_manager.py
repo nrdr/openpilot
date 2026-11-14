@@ -20,14 +20,15 @@ def _compatible_automatic_download(model) -> bool:
               len(digest) == 64 and all(char in "0123456789abcdef" for char in digest))
 
 
-def select_default_model(params, available_models) -> None:
+def select_default_model(params, available_models, *, device_type: str = "") -> None:
   if not params.get_bool("NrdrAutoSelectModel") or params.get("ModelManager_DownloadRef") is not None:
     return
   # A first-run request is not permission to replace an existing preference,
   # including a legacy selection waiting for a compatible rebuild.
   if any(params.get(key) is not None for key in ("ModelManager_ActiveBundle", "ModelManager_ActiveBundleChestnut")):
     return
-  candidates = [model for model in available_models if model.ref and getattr(model, "internalName", "") == "PMV2" and
+  preferred = "OPM10V3" if device_type == "tizi" else "PMV2"
+  candidates = [model for model in available_models if model.ref and getattr(model, "internalName", "") == preferred and
                 _compatible_automatic_download(model)]
   if candidates:
     params.put("ModelManager_DownloadRef", max(candidates, key=lambda model: model.index).ref)

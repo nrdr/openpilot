@@ -18,9 +18,9 @@ class CustomAudioVisualsLayout(Widget):
     self._engagement_sounds = multiple_button_item_sp(
       title=lambda: tr("Engagement Sounds"),
       description=lambda: tr(
-        "Choose current or June 2026 engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged."
+        "Choose current or Legacy engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged."
       ),
-      buttons=[lambda: tr("Current"), lambda: tr("June 2026")],
+      buttons=[lambda: tr("Current"), lambda: tr("Legacy")],
       button_width=330,
       param="NrdrEngagementSoundPack",
     )

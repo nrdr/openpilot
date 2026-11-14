@@ -112,7 +112,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       OpendbcParamKey.NRDR_CRUISE_BUTTON_SUB_MODE,
       OpendbcParamKey.NRDR_HUD_SUB_MODE_UNTIL,
       OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY,
-      OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS,
+      OpendbcParamKey.NRDR_LATERAL_CONTROLLER,
       OpendbcParamKey.NRDR_HONDA_WIND_BRAKE,
     })
     self.assertIs(OpendbcParamKey, NrdrHondaParamKey)
@@ -149,7 +149,6 @@ class TestOpendbcBoundary(unittest.TestCase):
       "NrdrLongitudinalController",
       str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS),
       str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE),
-      "NrdrPcmSpeedDeadzone",
       *(str(key) for key in HOST_STARTUP_DEFAULTS),
     ])
 
@@ -257,8 +256,8 @@ class TestOpendbcBoundary(unittest.TestCase):
 
     expected = HondaLiveTuning(
       generation=tuning.generation,
-      override_fade_down_s=0.5,
-      override_fade_up_s=0.01,
+      override_fade_down_s=0.1,
+      override_fade_up_s=1.0,
       override_torque_scale=0.0,
       driver_assist_during_override=True,
       live_learning_gas=True,
@@ -271,7 +270,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       steer_delta_down=4.0,
       stopping_decel_rate=0.3,
       increase_override_tolerance=False,
-      driver_override_threshold=1400.0,
+      driver_override_threshold=1200.0,
       center_override_threshold=1200.0,
       center_boost_angle=0.0,
       alt_dashboard_speed=0,
@@ -319,7 +318,7 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertEqual(tuning.override_fade_up_s, 10.0)
     self.assertEqual(tuning.override_torque_scale, 0.25)
     self.assertEqual(tuning.stopping_decel_rate, 0.3)
-    self.assertEqual(tuning.driver_override_threshold, 1400.0)
+    self.assertEqual(tuning.driver_override_threshold, 1200.0)
     self.assertEqual(tuning.center_override_threshold, 1800.0)
     self.assertEqual(tuning.center_boost_angle, 0.0)
     self.assertEqual(tuning.alt_dashboard_speed, 3)

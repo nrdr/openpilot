@@ -7,14 +7,14 @@ from openpilot.system.ui.widgets.scroller import NavScroller
 class CustomAudioVisualsLayoutMici(NavScroller):
   def __init__(self):
     super().__init__()
-    self._sound_labels = [tr("Current"), tr("June 2026")]
+    self._sound_labels = [tr("Current"), tr("Legacy")]
     self._engagement_sounds = BigMultiToggle(
       tr("Engagement\nSounds"),
       self._sound_labels,
       select_callback=self._on_sound_pack,
       font_size=40,
       description=tr(
-        "Choose current or June 2026 engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged."
+        "Choose current or Legacy engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged."
       ),
     )
     self._confidence_ball = BigToggle(

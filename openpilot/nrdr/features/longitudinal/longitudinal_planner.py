@@ -1,13 +1,12 @@
 import numpy as np
 
-from opendbc.car.honda.values import HondaFlags
 from opendbc.car.interfaces import ACCEL_MAX
 from openpilot.cereal import log
 from openpilot.common.constants import CV
 from openpilot.selfdrive.car.cruise import V_CRUISE_MAX
 from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan
 from openpilot.selfdrive.modeld.constants import ModelConstants
-from openpilot.nrdr.params import NrdrParamKey, get_live_params, read_bool, read_float
+from openpilot.nrdr.params import NrdrParamKey, get_live_params, read_float
 
 
 LAUNCH_DISARM_SPEED = 2.0
@@ -15,9 +14,6 @@ LAUNCH_COMMIT_TIME = 3.5
 LAUNCH_MOVING_SPEED = 1.2
 LAUNCH_MAX_ACCEL = 3.5
 CRUISE_ACCEL_VALUES = (2.0, 1.6, 0.8, 0.6)
-ROEN_ACCEL_BP = (0.0, 5.0, 20.0)
-ROEN_PLANNER_ACCEL = (4.0, 4.0, 2.0)
-ROEN_TURN_ACCEL_THRESHOLD = 1.3
 # Positive-only acceleration ceilings from Sunny's C3 implementation
 # (e8df8fad). C3 used a separate selector; NRDR's deliberately monotonic
 # mapping keeps distance bar 1 on the stock platform ceiling and assigns bars
@@ -73,7 +69,6 @@ class NrdrLongitudinalPlanner:
     self.v_ego_stopping = CP.deprecated.vEgoStopping
     self.cruise_scale = 1.0
     self.standstill_gap_extra = 0.0
-    self.roen_acceleration_limits = False
     self.launch_armed = False
     self._refresh_settings()
 
@@ -85,7 +80,6 @@ class NrdrLongitudinalPlanner:
     snapshot = self.params.snapshot
     self.v_ego_stopping = read_float(snapshot, NrdrParamKey.HONDA_V_EGO_STOPPING, self.CP.deprecated.vEgoStopping, 0.0, 5.0)
     self.cruise_scale = read_float(snapshot, NrdrParamKey.NRDR_CRUISE_MISMATCH_CORRECTION, 100.0, 95.0, 105.0) / 100.0
-    self.roen_acceleration_limits = read_bool(snapshot, NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS, False)
     self.standstill_gap_requested = read_float(snapshot, NrdrParamKey.NRDR_STANDSTILL_GAP_EXTRA, 0.0, 0.0, 5.0)
     self.settings_generation = snapshot.generation
 
@@ -95,14 +89,7 @@ class NrdrLongitudinalPlanner:
       self.standstill_gap_extra = self.standstill_gap_requested
     return self.standstill_gap_extra
 
-  @property
-  def roen_enabled(self) -> bool:
-    return bool(self.roen_acceleration_limits and self.CP.brand == "honda" and
-                self.CP.flags & HondaFlags.NIDEC and self.CP_SP.enableGasInterceptor)
-
   def max_accel(self, v_ego: float) -> float:
-    if self.roen_enabled:
-      return float(np.interp(v_ego, ROEN_ACCEL_BP, ROEN_PLANNER_ACCEL))
     values = np.minimum(np.asarray(CRUISE_ACCEL_VALUES) * self.tune.a_cruise_max_scale, ACCEL_MAX)
     return float(np.interp(v_ego, (0.0, 10.0, 25.0, 40.0), values))
 
@@ -116,7 +103,7 @@ class NrdrLongitudinalPlanner:
     return self.max_accel(v_ego), self.turn_accel_threshold(), self.personality_accel_ceiling(v_ego, personality)
 
   def turn_accel_threshold(self) -> float:
-    return ROEN_TURN_ACCEL_THRESHOLD if self.roen_enabled else 0.0
+    return 0.0
 
   def cruise_target(self, target: float) -> float:
     if target <= 0.0:

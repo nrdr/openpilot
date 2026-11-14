@@ -4,8 +4,8 @@ from enum import IntEnum
 
 CONTROLLER_KEY = "NrdrLongitudinalController"
 CONTROLLER_DESCRIPTION = (
-  "Choose Standard, MVL adaptive control, Bosch-A Radar, or Aragon's speed-feedback pedal tune. "
-  "Personal Pedal uses fixed personality gains and resets learned gas/wind compensation; changes apply next drive."
+  "Choose how acceleration and braking are controlled. PTM Pedal Interceptor uses fixed, personality-specific "
+  "speed feedback; controller changes apply next drive."
 )
 BOSCH_RADAR_WARNING = "Bosch-A Radar with Alpha Long does not restore factory emergency braking (AEB/CMBS)."
 
@@ -15,9 +15,10 @@ class LongitudinalController(IntEnum):
   MVL = 1
   BOSCH_RADAR = 2
   PERSONAL_PEDAL = 3
+  EXPERIMENTAL_PCM = 4
 
 
-CONTROLLER_LABELS = ("Standard", "MVL Live Learning Gas", "Bosch-A Radar", "Aragon's Personal Pedal")
+CONTROLLER_LABELS = ("Standard", "MVL Live Learning Gas", "Bosch-A Radar", "PTM Pedal Interceptor", "Nidec Experimental PCM")
 
 
 def decode_controller(value):

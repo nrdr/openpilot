@@ -116,9 +116,8 @@ def test_a220_uses_the_a040_measured_map_with_honest_provenance(firmware):
   assert a040.ratio_bp == table.ratio_bp and a040.ratio_v == table.ratio_v
 
 
-@pytest.mark.parametrize("mode", [SteerRatioMode.MANUAL, SteerRatioMode.COMMA, SteerRatioMode.NRDR_RAW])
-def test_a220_spec_map_does_not_change_other_ratio_modes(mode):
-  selection = resolve_steer_ratio_selection(cp("HONDA_CRV_5G", b"39990-TLA-A220"), {"NrdrSteerRatioMode": mode})
+def test_a220_spec_map_does_not_change_comma_ratio_mode():
+  selection = resolve_steer_ratio_selection(cp("HONDA_CRV_5G", b"39990-TLA-A220"), {"NrdrSteerRatioMode": SteerRatioMode.COMMA})
   assert selection.rack_map is None and not selection.firmware_vgr_selected
 
 
@@ -138,16 +137,14 @@ def test_maps_are_never_borrowed(fingerprint, firmware):
   assert get_rack_map_table(cp("HONDA_CLARITY", b"39990-TRW-A020", brand="toyota")) is None
 
 
-def test_other_modes_and_hybrid_firmware_source():
+def test_retired_modes_resolve_to_ptm_and_ignore_old_hybrid_settings():
   CP = cp(*MEASURED["clarity"])
   manual = resolve_steer_ratio_selection(CP, {"NrdrSteerRatioMode": SteerRatioMode.MANUAL})
-  assert manual.rack_map is None and not manual.firmware_vgr_selected
+  assert manual.rack_map is not None and manual.firmware_vgr_selected
   hybrid = resolve_steer_ratio_selection(CP, {"NrdrSteerRatioMode": 2, "NrdrSteerRatioSourceB": 3,
                                              "NrdrSteerRatioBlendStart": 10.0, "NrdrSteerRatioHybrid": True})
-  # A hybrid's Firmware side is the measured map too, through the speed-free path.
-  assert hybrid.hybrid is not None and hybrid.rack_map is None
-  assert hybrid.hybrid.forward(120.0) == pytest.approx(hybrid.firmware_profile.physical_to_linear(120.0))
-  assert isinstance(hybrid.firmware_profile, RackMapGeometry)
+  assert hybrid.hybrid is None and hybrid.rack_map is not None
+  assert hybrid.linearize_measured_angle(120.0) == manual.linearize_measured_angle(120.0)
 
 
 def test_tables_are_valid_and_inside_their_table_a():

@@ -36,11 +36,7 @@ class ParamSnapshot:
 
 STEER_RATIO_PARAM_GROUP = ParamGroup((
   "NrdrSteerRatioMode",
-  "NrdrSteerRatioHybrid",
-  "NrdrSteerRatioSourceB",
-  "NrdrSteerRatioBlendStart",
-  "NrdrSteerRatioManualCenter",
-  "NrdrSteerRatioManualFinal",
+  "NrdrSteerRatioModelBlend",
 ))
 INTERPOLATED_TORQUE_PIF_PARAM_GROUP = ParamGroup((
   "NrdrInterpolatedTorquePifBlend",
@@ -83,8 +79,7 @@ CONTROL_GROUPS = (
   ParamGroup(("NrdrTuneLearner", "NrdrTuneLearnerStrength", "NrdrTuneLearnerRate", "NrdrTuneLearnerReset")),
   ParamGroup(("LongPidTuneScaleAggressive", "LongPidTuneScaleStandard", "LongPidTuneScaleRelaxed",
               "LongPidTuneScaleEcon", "HondaLiveLearningGas", "StaticFeedforwardLong", "HondaStopAccel",
-              "HondaStoppingDecelRateLong", "HondaVEgoStarting", "HondaVEgoStopping",
-              "NrdrRoenAccelerationLimits")),
+              "HondaStoppingDecelRateLong", "HondaVEgoStarting", "HondaVEgoStopping")),
   ParamGroup(("NrdrLearnStiffness", "NrdrLearnAngleOffset")),
   LANE_CENTERING_PARAM_GROUP,
   ParamGroup(("LagdToggle", "LagdToggleDelay")),
@@ -100,7 +95,7 @@ LIVE_LATERAL_KEYS = tuple(key for group in CONTROL_GROUPS for key in group.keys
 
 PLANNER_GROUPS = (
   ParamGroup(("HondaVEgoStopping", "NrdrCruiseMismatchCorrection",
-              "NrdrRoenAccelerationLimits", "NrdrStandstillGapExtra")),
+              "NrdrStandstillGapExtra")),
 )
 
 

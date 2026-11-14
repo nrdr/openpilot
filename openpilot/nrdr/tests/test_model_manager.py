@@ -149,7 +149,7 @@ class TestSelectDefaultModel(unittest.TestCase):
         pass
 
       def __getitem__(self, service):
-        return SimpleNamespace(chestnutPresent=False)
+        return SimpleNamespace(chestnutPresent=False, deviceType="mici")
 
     manager.sm = FakeSubMaster()
     namespace = {"Ratekeeper": lambda *args, **kwargs: SimpleNamespace(keep_time=stop),

@@ -8,7 +8,7 @@ MVL_DESCRIPTION = (
 )
 
 SUGGESTED_DESCRIPTION = (
-  "Applies the recommended steering settings for your vehicle. Turning this off leaves the applied settings unchanged."
+  "Applies the recommended settings for your vehicle. Turning this off leaves the applied settings unchanged."
 )
 PIF_KEYS = frozenset(
   f"Lat{term}Scale{band}" for term in "PIF" for band in ("LowSpeed", "Standard", "Highway")
@@ -33,9 +33,13 @@ MVL_LOCK_KEYS = LONG_SCALE_KEYS | frozenset((
 YAW_FIXED_KEYS = PIF_KEYS | frozenset((
   "HondaTorqueLowPassFilter",
   "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",
+  "HondaSteerDeltaLimiter", "HondaSteerDeltaUp", "HondaSteerDeltaDown",
 ))
 RETIRED_TUNING_KEYS = frozenset((
   "NrdrMvlPcmDeadzone",
+  "NrdrSteerRatioHybrid", "NrdrSteerRatioSourceB", "NrdrSteerRatioBlendStart",
+  "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
+  "NrdrPcmSpeedDeadzone", "NrdrHondaPcmMode", "NrdrRoenAccelerationLimits", "NrdrHondaDashVariantB",
   "NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance", "NrdrHondaPcmFixedCruise", "NrdrHondaLegacyPcm",
   "NrdrYawDelaySchedule",
   "NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed",
@@ -103,6 +107,14 @@ def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedul
     return True
   if key in RETIRED_TUNING_KEYS or key.startswith("NrdrNnlc"):
     return False
+  if key in LONG_SCALE_KEYS or key in ("NrdrHondaFullBrakeAuthority", "StaticFeedforwardLong", "NrdrHondaWindBrake"):
+    from openpilot.nrdr.params.longitudinal_controller import LongitudinalController, saved_controller
+    controller = saved_controller(params, bosch_radar_available=True)
+    if key in LONG_SCALE_KEYS or key == "NrdrHondaFullBrakeAuthority":
+      if controller != LongitudinalController.STANDARD:
+        return False
+    if key in ("StaticFeedforwardLong", "NrdrHondaWindBrake") and controller == LongitudinalController.PERSONAL_PEDAL:
+      return False
   # A controller's ownership of its running tune does not prevent preparing
   # another tune while parked. Persistent CP describes the previous drive.
   # Unknown road state retains the onroad guards; no saved choice is rewritten.

@@ -10,6 +10,8 @@ from types import SimpleNamespace
 import pytest
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
+from opendbc.car.honda.values import HondaFlags
+from openpilot.nrdr.params.profiles import recommended_shared_values, HONDA_LONGITUDINAL_RECOMMENDED_VALUES
 from openpilot.nrdr.params import (
   consume_handcrafted_lateral_request,
   get_handcrafted_lateral_profile,
@@ -27,9 +29,9 @@ COMMON_VALUES = (
   ("LagdToggle", False), ("LagdToggleDelay", 0.05),
 )
 HONDA_FILTER_VALUES = (
-  ("NrdrDriverOverrideThreshold", 1500), ("NrdrOverrideThresholdCenterBoost", 1000),
-  ("HondaDriverAssistDuringOverride", True), ("HondaOverrideFadeUpSecs", 2.0),
-  ("HondaOverrideFadeDownSecs", 0.5), ("HondaOverrideTorqueScale", 0),
+  ("NrdrDriverOverrideThreshold", 1200), ("NrdrOverrideThresholdCenterBoost", 1200),
+  ("HondaDriverAssistDuringOverride", True), ("HondaOverrideFadeUpSecs", 1.0),
+  ("HondaOverrideFadeDownSecs", 0.1), ("HondaOverrideTorqueScale", 0),
   ("HondaTorqueLowPassFilter", True), ("HondaLpfTauLowSpeed", 0.1), ("HondaLpfTauStandard", 0.02),
   ("HondaLpfTauHighway", 0.0), ("HondaSteerDeltaLimiter", False),
   ("HondaSteerDeltaUp", 4.0), ("HondaSteerDeltaDown", 4.0),
@@ -38,7 +40,7 @@ HONDA_PID_VALUES = (
   ("LatPScaleLowSpeed", 100), ("LatIScaleLowSpeed", 100), ("LatFScaleLowSpeed", 100),
   ("LatPScaleStandard", 100), ("LatIScaleStandard", 100), ("LatFScaleStandard", 150),
   ("LatPScaleHighway", 100), ("LatIScaleHighway", 100), ("LatFScaleHighway", 200),
-  ("NrdrLatStiction", False), ("NrdrOptimizedLaneChanges", False),
+  ("NrdrLatStiction", False), ("NrdrOptimizedLaneChanges", True),
   ("NrdrLatRateDampingLowSpeed", 0), ("NrdrLatRateDampingStandard", 0), ("NrdrLatRateDampingHighway", 0),
   ("HondaCenterScale", 0.0), ("HondaCenterBoostThreshold", 5.0), ("HondaCenterBoostMinSpeed", 0),
   ("NrdrTuneLearner", False), ("NrdrTuneLearnerStrength", 0), ("NrdrTuneLearnerRate", 10),
@@ -46,11 +48,16 @@ HONDA_PID_VALUES = (
 HYBRID_VALUES = (("NrdrDeviceYawCorrection", True),)
 FIRMWARE_VALUES = (
   ("NrdrSteerRatioHybrid", False), ("NrdrSteerRatioMode", 3), ("NrdrLateralController", 1),
+  ("NrdrSteerRatioModelBlend", True),
 )
 TORQUE_VALUES = (
   ("TorqueParamsOverrideEnabled", False), ("TorqueParamsOverrideLatAccelFactor", 2.5),
   ("TorqueParamsOverrideFriction", 0.1), ("TorqueControlTune", 0.0), ("LateralJerkTorqueController", False),
 )
+
+SHARED_VALUES = recommended_shared_values()
+LONG_VALUES = HONDA_LONGITUDINAL_RECOMMENDED_VALUES + (("HondaLiveLearningGas", True), ("NrdrHondaPcmMode", 0), ("NrdrLongitudinalController", 1))
+COMMA_VALUES = (("NrdrSteerRatioMode", 1), ("NrdrSteerRatioModelBlend", True))
 
 PRESERVED_VALUES = {
   "NrdrSteerRatioManualCenter": 18.75,
@@ -103,7 +110,7 @@ class FakeParams:
 def vehicle_cp(fingerprint="HONDA_CIVIC", *, brand="honda", controller="pid",
                steer_control_type="torque", firmware=b"39990-TEG-A010\x00", not_car=False):
   return SimpleNamespace(
-    brand=brand,
+    brand=brand, flags=HondaFlags.NIDEC,
     carFingerprint=fingerprint,
     carFw=[SimpleNamespace(ecu="eps", fwVersion=firmware)],
     lateralTuning=SimpleNamespace(which=lambda: controller),
@@ -113,7 +120,7 @@ def vehicle_cp(fingerprint="HONDA_CIVIC", *, brand="honda", controller="pid",
 
 
 def cp_sp(*, modified=True):
-  return SimpleNamespace(flags=HondaFlagsSP.EPS_MODIFIED.value if modified else 0)
+  return SimpleNamespace(flags=HondaFlagsSP.EPS_MODIFIED.value if modified else 0, enableGasInterceptor=False)
 
 
 def selected_params(CP, values=None):
@@ -153,52 +160,52 @@ def request_profile(CP, CP_SP, params):
 def test_current_static_lookup_and_honda_hybrid_profiles_are_exact():
   static_civic = get_handcrafted_lateral_profile("HONDA_CIVIC")
   assert static_civic is not None
-  assert static_civic.version == 24
+  assert static_civic.version == 25
   assert static_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
 
   static_clarity = get_handcrafted_lateral_profile("HONDA_CLARITY")
   assert static_clarity is not None
-  assert static_clarity.version == 24
+  assert static_clarity.version == 25
   assert static_clarity.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + TORQUE_VALUES
 
   civic = vehicle_cp()
   runtime_civic = get_handcrafted_lateral_profile(civic.carFingerprint, civic, cp_sp())
   assert runtime_civic is not None
-  assert runtime_civic.version == 24
-  assert runtime_civic.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + FIRMWARE_VALUES
+  assert runtime_civic.version == 25
+  assert runtime_civic.values == COMMON_VALUES + SHARED_VALUES + LONG_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + FIRMWARE_VALUES
 
   clarity = vehicle_cp("HONDA_CLARITY", controller="torque", firmware=b"39990-TRW-A020\x00")
   runtime_clarity = get_handcrafted_lateral_profile(clarity.carFingerprint, clarity, cp_sp())
   assert runtime_clarity is not None
-  assert runtime_clarity.version == 24
-  assert runtime_clarity.values == COMMON_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES
+  assert runtime_clarity.version == 25
+  assert runtime_clarity.values == COMMON_VALUES + SHARED_VALUES + LONG_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + HYBRID_VALUES + COMMA_VALUES
 
 
 def test_current_capability_subsets_exclude_inapplicable_groups():
   honda_stock = vehicle_cp()
   honda_stock_profile = get_handcrafted_lateral_profile(honda_stock.carFingerprint, honda_stock, cp_sp(modified=False))
   assert honda_stock_profile is not None
-  assert honda_stock_profile.values == COMMON_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES
+  assert honda_stock_profile.values == COMMON_VALUES + SHARED_VALUES + LONG_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + COMMA_VALUES
 
   honda_angle = vehicle_cp(steer_control_type="angle")
   honda_angle_profile = get_handcrafted_lateral_profile(honda_angle.carFingerprint, honda_angle, cp_sp())
   assert honda_angle_profile is not None
-  assert honda_angle_profile.values == COMMON_VALUES
+  assert honda_angle_profile.values == COMMON_VALUES + SHARED_VALUES + LONG_VALUES
 
   toyota_angle = vehicle_cp("LEXUS_ES_TSS2", brand="toyota", controller="lqr", steer_control_type="angle")
   toyota_angle_profile = get_handcrafted_lateral_profile(toyota_angle.carFingerprint, toyota_angle, None)
   assert toyota_angle_profile is not None
-  assert toyota_angle_profile.values == COMMON_VALUES
+  assert toyota_angle_profile.values == COMMON_VALUES + SHARED_VALUES
 
   toyota_torque = vehicle_cp("TOYOTA_CAMRY_TSS2", brand="toyota", controller="torque")
   toyota_torque_profile = get_handcrafted_lateral_profile(toyota_torque.carFingerprint, toyota_torque, None)
   assert toyota_torque_profile is not None
-  assert toyota_torque_profile.values == COMMON_VALUES + TORQUE_VALUES
+  assert toyota_torque_profile.values == COMMON_VALUES + SHARED_VALUES + TORQUE_VALUES
 
   civic_torque = vehicle_cp(controller="torque")
   civic_torque_profile = get_handcrafted_lateral_profile(civic_torque.carFingerprint, civic_torque, cp_sp())
   assert civic_torque_profile is not None
-  assert civic_torque_profile.values == COMMON_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES
+  assert civic_torque_profile.values == COMMON_VALUES + SHARED_VALUES + LONG_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES + COMMA_VALUES
 
   hybrid_keys = dict(HYBRID_VALUES).keys()
   assert hybrid_keys.isdisjoint(dict(honda_stock_profile.values))
@@ -212,7 +219,7 @@ def test_stock_clarity_torque_keeps_its_pid_leg_settings_without_enabling_modifi
   clarity = vehicle_cp("HONDA_CLARITY", controller="torque", firmware=b"stock-clarity-eps")
   profile = get_handcrafted_lateral_profile(clarity.carFingerprint, clarity, cp_sp(modified=False))
   assert profile is not None
-  assert profile.values == COMMON_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES
+  assert profile.values == COMMON_VALUES + SHARED_VALUES + LONG_VALUES + TORQUE_VALUES + HONDA_FILTER_VALUES + HONDA_PID_VALUES + COMMA_VALUES
   assert dict(HYBRID_VALUES).keys().isdisjoint(dict(profile.values))
 
 
@@ -255,7 +262,7 @@ def test_request_writes_exact_json_context_before_legacy_boolean():
   assert profile is not None
   firmware = sorted((str(fw.ecu), bytes(fw.fwVersion).hex()) for fw in civic.carFw)
   assert params.values[CONTEXT_KEY] == {
-    "version": 24,
+    "version": 25,
     "fingerprint": "HONDA_CIVIC",
     "brand": "honda",
     "controller": "pid",
@@ -427,7 +434,7 @@ for name in ('capnp', 'numpy', 'pyray', 'zmq', 'openpilot.common.params'):
   sys.modules[name] = None
 from openpilot.nrdr.params import get_handcrafted_lateral_profile
 profile = get_handcrafted_lateral_profile('HONDA_CIVIC')
-assert profile is not None and profile.version == 24
+assert profile is not None and profile.version == 25
 """
   subprocess.run(
     [sys.executable, "-c", script], cwd=repo_root, env=environment,

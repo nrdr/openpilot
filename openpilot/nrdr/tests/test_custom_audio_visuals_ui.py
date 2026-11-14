@@ -15,8 +15,7 @@ MICI = ROOT / "openpilot/selfdrive/ui/mici/layouts/settings/custom_audio_visuals
 DEVICE = MICI.with_name("device.py")
 KEY = "NrdrEngagementSoundPack"
 DESCRIPTION = (
-  "Choose engage, disengage and engagement-refused sounds with their matching automatic volume. Other alerts are unchanged. " +
-  "Applies to the next chime without reboot. Quiet Mode still mutes these sounds."
+  "Choose current or Legacy engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged."
 )
 
 
@@ -109,7 +108,7 @@ class TestCustomAudioVisualsUi(unittest.TestCase):
     self.assertEqual(control.config["param"], KEY)
     self.assertEqual(control.config["title"](), "Engagement Sounds")
     self.assertEqual(control.config["description"](), DESCRIPTION)
-    self.assertEqual([label() for label in control.config["buttons"]], ["Current", "June 2026"])
+    self.assertEqual([label() for label in control.config["buttons"]], ["Current", "Legacy"])
     self.assertEqual(layout._scroller._items, [control])
     for value, expected in ((None, 0), (1, 1), (0, 0), (8, 0)):
       self.params.values[KEY] = value
@@ -125,18 +124,18 @@ class TestCustomAudioVisualsUi(unittest.TestCase):
     layout = _load_class(MICI, "CustomAudioVisualsLayoutMici", self.params)()
     control = layout._engagement_sounds
     self.assertEqual(control.text.replace("\n", " "), "Engagement Sounds")
-    self.assertEqual(control.options, ["Current", "June 2026"])
+    self.assertEqual(control.options, ["Current", "Legacy"])
     self.assertEqual(control.config["font_size"], 40)
     self.assertEqual(control.config["description"], DESCRIPTION)
     self.assertEqual(layout._scroller._items, [control, layout._confidence_ball, layout._developer_sidebar])
     layout.show_event()
     self.assertEqual(control.value, "Current")
-    for label, value in (("June 2026", 1), ("Current", 0)):
+    for label, value in (("Legacy", 1), ("Current", 0)):
       control.config["select_callback"](label)
       self.assertEqual(self.params.writes[-1], (KEY, value, {"block": True}))
     self.params.values[KEY] = 1  # Sunnylink changed it while the panel was closed.
     layout.show_event()
-    self.assertEqual(control.value, "June 2026")
+    self.assertEqual(control.value, "Legacy")
     self.params.values[KEY] = 99
     layout.show_event()
     self.assertEqual(control.value, "Current")

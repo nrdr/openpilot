@@ -16,6 +16,8 @@ def longitudinal_controller_choices(CP, CP_SP, params):
   choices = [LongitudinalController.STANDARD, LongitudinalController.MVL]
   if CP.carFingerprint in HONDA_BOSCH_A:
     choices.append(LongitudinalController.BOSCH_RADAR)
+  if CP.carFingerprint == CAR.HONDA_CIVIC and not CP_SP.enableGasInterceptor:
+    choices.append(LongitudinalController.EXPERIMENTAL_PCM)
   if CP.carFingerprint not in HONDA_BOSCH and CP_SP.enableGasInterceptor:
     choices.append(LongitudinalController.PERSONAL_PEDAL)
   return tuple(choices)
@@ -34,7 +36,8 @@ def store_controller_choice(params, value, choices, CP=None):
     from openpilot.nrdr.car.live_gas_reset import request_reset
     request_reset(params, CP)
   # Keep old readers/downgrades consistent, but never rewrite tuning values.
-  params.put_bool("HondaLiveLearningGas", value == LongitudinalController.MVL, block=True)
+  params.put_bool("HondaLiveLearningGas", value in (LongitudinalController.MVL, LongitudinalController.EXPERIMENTAL_PCM), block=True)
+  params.put("NrdrHondaPcmMode", 2 if value == LongitudinalController.EXPERIMENTAL_PCM else 0, block=True)
   if LongitudinalController.BOSCH_RADAR in choices and value in (0, 2):
     params.put_bool("HondaBoschARadar", value == LongitudinalController.BOSCH_RADAR, block=True)
   params.put(CONTROLLER_KEY, int(value), block=True)
@@ -120,6 +123,8 @@ def saved_wind_brake(params) -> bool:
 
 
 def wind_brake_editable(CP, CP_SP, params, *, is_offroad: bool) -> bool:
+  if longitudinal_controller_selection(CP, CP_SP, params) == LongitudinalController.PERSONAL_PEDAL:
+    return False
   return (LongitudinalController.PERSONAL_PEDAL in longitudinal_controller_choices(CP, CP_SP, params)
           or (is_offroad and pcm_tuning_available(CP, CP_SP, params)))
 

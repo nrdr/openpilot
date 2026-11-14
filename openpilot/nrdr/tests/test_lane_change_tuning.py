@@ -1,6 +1,5 @@
 """Deterministic request-shaping checks; these are not road validation."""
 import math
-from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -147,9 +146,8 @@ def test_comma_uses_actual_held_ratio_not_platform_default():
 
 
 def test_ratio_floor_and_disabled_path_preserve_request():
-  selected = selection(0)
-  selected = replace(selected, manual_center=8, manual_final=8)
-  assert shape_lane_change_curvature(selected, VehicleModel(), 20, 25, 0, 0.01, 5) == 0.01
+  selected = selection(1)
+  assert shape_lane_change_curvature(selected, VehicleModel(8), 20, 25, 0, 0.01, 5) == 0.01
 
 
 def test_zero_does_not_touch_geometry():

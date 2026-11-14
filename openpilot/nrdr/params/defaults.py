@@ -6,6 +6,7 @@ from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.nrdr.params.profiles import (
   COMMON_HANDCRAFTED_VALUES, HONDA_FILTER_HANDCRAFTED_VALUES, HONDA_PID_HANDCRAFTED_VALUES, seed_firmware_defaults,
+  SETTINGS_DEFAULTS_VERSION, recommended_shared_values,
 )
 
 
@@ -177,7 +178,13 @@ def apply_defaults(params: Params) -> None:
   for key, value in VALUE_DEFAULTS.items():
     _write(params, key, value, params.put, block=True)
 
-  # Request a compatible PopV2 artifact only on first setup. A saved false is
+  if (params.get("NrdrSettingsDefaultsVersion") or 0) < SETTINGS_DEFAULTS_VERSION:
+    for key, value in recommended_shared_values():
+      if not _write(params, key, value, params.put_bool if type(value) is bool else params.put, force=True, block=True):
+        raise RuntimeError(f"could not apply recommended setting {key}")
+    params.put("NrdrSettingsDefaultsVersion", SETTINGS_DEFAULTS_VERSION, block=True)
+
+  # Request the hardware's recommended model only on first setup. A saved false is
   # an opt-out, not a missing preference, and model choices always win.
   if params.get("NrdrFirstRunSetupDone") is None and all(params.get(key) is None for key in (
     "NrdrAutoSelectModel", "ModelManager_ActiveBundle", "ModelManager_ActiveBundleChestnut", "ModelManager_DownloadRef",

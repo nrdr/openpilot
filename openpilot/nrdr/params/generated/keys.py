@@ -103,6 +103,9 @@ class NrdrParamKey(StrEnum):
   HONDA_LPF_TAU_LOW_SPEED = "HondaLpfTauLowSpeed"
   HONDA_LPF_TAU_STANDARD = "HondaLpfTauStandard"
   HONDA_LPF_TAU_HIGHWAY = "HondaLpfTauHighway"
+  NRDR_SETTINGS_DEFAULTS_VERSION = "NrdrSettingsDefaultsVersion"
+  NRDR_VEHICLE_DEFAULTS_APPLIED = "NrdrVehicleDefaultsApplied"
+  NRDR_STEER_RATIO_MODEL_BLEND = "NrdrSteerRatioModelBlend"
   NRDR_FIRST_RUN_SETUP_DONE = "NrdrFirstRunSetupDone"
   NRDR_AUTO_SELECT_MODEL = "NrdrAutoSelectModel"
   STATIC_FEEDFORWARD_LONG = "StaticFeedforwardLong"
@@ -272,6 +275,9 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.HONDA_LPF_TAU_LOW_SPEED,
   NrdrParamKey.HONDA_LPF_TAU_STANDARD,
   NrdrParamKey.HONDA_LPF_TAU_HIGHWAY,
+  NrdrParamKey.NRDR_SETTINGS_DEFAULTS_VERSION,
+  NrdrParamKey.NRDR_VEHICLE_DEFAULTS_APPLIED,
+  NrdrParamKey.NRDR_STEER_RATIO_MODEL_BLEND,
   NrdrParamKey.NRDR_FIRST_RUN_SETUP_DONE,
   NrdrParamKey.NRDR_AUTO_SELECT_MODEL,
   NrdrParamKey.STATIC_FEEDFORWARD_LONG,

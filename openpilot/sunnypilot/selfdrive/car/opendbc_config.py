@@ -110,6 +110,20 @@ def build_sunnypilot_car_config(params, *, start_worker: bool = True,
   )
 
 
+def configure_detected_car_defaults(CP, CP_SP, config, params):
+  """Resolve the one-time controller default from live hardware, before constructing actuators."""
+  from openpilot.nrdr.params.profiles import _put_verified, recommended_longitudinal_controller, vehicle_defaults_pending
+  from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_KEY
+  controller = recommended_longitudinal_controller(CP, CP_SP)
+  if controller is None or not vehicle_defaults_pending(params, CP.carFingerprint):
+    return config
+  _put_verified(params, "HondaLiveLearningGas", controller == 1)
+  _put_verified(params, "NrdrHondaPcmMode", 0)
+  _put_verified(params, CONTROLLER_KEY, int(controller))
+  config.honda.provider.close()
+  return build_sunnypilot_car_config(params)
+
+
 __all__ = (
   "SunnypilotCarParamKey",
   "build_sunnypilot_car_config",

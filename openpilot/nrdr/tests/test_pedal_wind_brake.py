@@ -47,7 +47,7 @@ def test_both_native_uis_expose_the_same_live_pedal_control(compact):
   else:
     layout = native_layout(ui)
     layout._update_state()
-    assert layout._wind_brake.enabled and not layout._pcm_mode.enabled
+    assert layout._wind_brake.enabled and not hasattr(layout, "_pcm_mode")
     layout._wind_brake.kwargs["callback"](False)
     layout._update_state()
     assert layout._wind_brake.value is False
@@ -73,11 +73,11 @@ def test_sunnylink_visibility_and_write_conditions_match_hardware(pedal, pcm, of
 def test_remote_pedal_toggle_is_live_typed_and_preserves_other_settings(rpc, selected, compressed, offroad):
   save, params, caps = rpc
   caps.update(nrdr_personal_pedal_available=True, nrdr_honda_pcm_tuning_available=False)
-  params.values.update(IsOffroad=offroad, ModelSelection="Cheddar", HondaLiveLearningGas=True, NrdrLongitudinalController=3)
+  params.values.update(IsOffroad=offroad, ModelSelection="Cheddar", HondaLiveLearningGas=True, NrdrLongitudinalController=0)
   save({"NrdrHondaWindBrake": encoded(int(selected), compressed)}, compressed)
   assert params.writes == [("NrdrHondaWindBrake", selected), ("ParamsVersion", "1")]
   assert params.get("ModelSelection") == "Cheddar" and params.get_bool("HondaLiveLearningGas")
-  assert params.get("NrdrLongitudinalController") == 3
+  assert params.get("NrdrLongitudinalController") == 0
 
 
 def test_remote_write_rechecks_vehicle_and_rejects_malformed_values(rpc):

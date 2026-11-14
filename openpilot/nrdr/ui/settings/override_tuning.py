@@ -52,7 +52,7 @@ class OverrideTuningLayout(Widget):
 
     self._override_fade_down = option_item_sp(
       param="HondaOverrideFadeDownSecs",
-      title=lambda: tr("Override Torque Fade Down (Default: 0.50 s)"),
+      title=lambda: tr("Override Torque Fade Down (Default: 0.10 s)"),
       min_value=0,
       max_value=1000,
       value_change_step=1,
@@ -63,7 +63,7 @@ class OverrideTuningLayout(Widget):
 
     self._override_fade_up = option_item_sp(
       param="HondaOverrideFadeUpSecs",
-      title=lambda: tr("Override Torque Fade Up (Default: 0.01 s)"),
+      title=lambda: tr("Override Torque Fade Up (Default: 1.00 s)"),
       min_value=0,
       max_value=1000,
       value_change_step=1,

@@ -2,55 +2,16 @@
 from openpilot.nrdr.features.longitudinal.policy import nrdr_longitudinal_enabled
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_LABELS, CONTROLLER_DESCRIPTION, BOSCH_RADAR_WARNING
-from openpilot.nrdr.ui.settings.pcm_speed_deadzone import PcmSpeedDeadzoneSlider
-from openpilot.nrdr.ui.honda_pcm import (pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice,
+from openpilot.nrdr.ui.honda_pcm import (saved_wind_brake, save_pcm_choice,
                                        wind_brake_editable,
                                        live_gas_available, longitudinal_controller_choices,
                                        longitudinal_controller_label, save_longitudinal_controller)
 from openpilot.nrdr.ui.settings.live_gas_reset import mici_reset_button
-from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigMultiToggle, BigToggle
+from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigToggle
 from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr
-
-
-class PcmModeControl(BigMultiToggle):
-  PILL_TEXT_GAP = 12
-
-  def __init__(self):
-    self._labels = [tr("Off"), tr("ECU-Matched"), tr("Experimental")]
-    super().__init__(tr("PCM Command Shaping"), self._labels,
-                     select_callback=self._select, font_size=34,
-                     description=tr("Adjusts PCM acceleration and the transition to braking; Off restores standard control. Experimental " +
-                         "supports Civic MVL learning and bypasses Wind Brake without changing its saved setting."))
-    self.set_enabled(lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
-                     and tuning_write_allowed(ui_state.params, "NrdrHondaPcmMode", CP=ui_state.CP, CP_SP=ui_state.CP_SP,
-                                              is_offroad=ui_state.is_offroad()))
-    self.set_value(self._labels[saved_pcm_mode(ui_state.params)])
-
-  def _title_width_hint(self) -> int:
-    # BigMultiToggle's three pills occupy the right column, but BigButton's
-    # default text widths only account for an icon, not these pills.
-    return max(1, int(self._rect.width - self.LABEL_HORIZONTAL_PADDING - self._txt_enabled_toggle.width - self.PILL_TEXT_GAP))
-
-  def _subtitle_width_hint(self) -> int:
-    return self._title_width_hint()
-
-  def _select(self, label):
-    save_pcm_choice(ui_state, "NrdrHondaPcmMode", self._labels.index(label))
-    self.set_value(self._labels[saved_pcm_mode(ui_state.params)])
-
-  def _update_state(self):
-    super()._update_state()
-    label = self._labels[saved_pcm_mode(ui_state.params)]
-    if self.value != label:
-      self.set_value(label)
-
-
-class MvlPcmDeadzoneControl(PcmSpeedDeadzoneSlider):
-  def __init__(self):
-    super().__init__(compact=True)
 
 
 class WindBrakeControl(BigToggle):
@@ -129,4 +90,4 @@ class LongitudinalControllerControl(BigButton):
 
 
 def longitudinal_controls():
-  return [LongitudinalControllerControl(), mici_reset_button(), PcmModeControl(), WindBrakeControl(), StaticFeedforwardControl(), MvlPcmDeadzoneControl()]
+  return [LongitudinalControllerControl(), mici_reset_button(), WindBrakeControl(), StaticFeedforwardControl()]

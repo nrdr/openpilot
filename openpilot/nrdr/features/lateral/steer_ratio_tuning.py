@@ -9,7 +9,7 @@ import numpy as np
 
 from openpilot.nrdr.features.lateral.honda_rack_map import RackMapGeometry, rack_map_geometry
 from openpilot.nrdr.features.lateral.honda_vgr import HondaVgrProfile, get_honda_vgr_profile, normalize_honda_eps_firmware
-from openpilot.nrdr.features.lateral.hybrid_steer_ratio import AngleSource, HybridGeometry, BLEND_START_DEFAULT, build_hybrid
+from openpilot.nrdr.features.lateral.hybrid_steer_ratio import AngleSource, HybridGeometry
 
 
 MANUAL_CENTER_DEFAULT = 15.38
@@ -178,6 +178,7 @@ class SteerRatioSelection:
   unavailable_reason: str = ""
   hybrid_requested: bool = False
   hybrid: HybridGeometry | None = None
+  model_blend: AngleSource | None = None
 
   @property
   def available(self) -> bool:
@@ -224,6 +225,8 @@ class SteerRatioSelection:
     return self.cp_ratio
 
   def linearize_measured_angle(self, measured_angle_deg: float) -> float:
+    if self.model_blend is not None:
+      return self.model_blend.forward(measured_angle_deg)
     if self.hybrid is not None:
       return self.hybrid.forward(measured_angle_deg)
     if self.firmware_vgr_selected:
@@ -231,6 +234,8 @@ class SteerRatioSelection:
     return measured_angle_deg
 
   def physicalize_desired_angle(self, linear_angle_deg: float) -> float:
+    if self.model_blend is not None:
+      return self.model_blend.inverse(linear_angle_deg)
     if self.hybrid is not None:
       return self.hybrid.inverse(linear_angle_deg)
     if self.firmware_vgr_selected:
@@ -246,7 +251,10 @@ class SteerRatioSelection:
                          angle_offset_deg: float = 0.0) -> float:
     self.configure_vehicle_model(VM, measured_angle_deg)
     if (rack_map := self.rack_map) is not None:
-      return -rack_map.curvature_from_angle(measured_angle_deg - angle_offset_deg, speed, roll)
+      angle = measured_angle_deg - angle_offset_deg
+      if self.model_blend is not None:
+        angle = rack_map.linear_to_physical(self.model_blend.forward(angle))
+      return -rack_map.curvature_from_angle(angle, speed, roll)
     linear_angle = self.linearize_measured_angle(measured_angle_deg - angle_offset_deg)
     return -VM.calc_curvature(math.radians(linear_angle), speed, roll)
 
@@ -277,7 +285,8 @@ class SteerRatioSelection:
                               desired_curvature: float) -> float:
     self.configure_vehicle_model(VM, measured_angle_deg)
     if (rack_map := self.rack_map) is not None:
-      return rack_map.angle_from_curvature(-desired_curvature, speed, roll)
+      angle = rack_map.angle_from_curvature(-desired_curvature, speed, roll)
+      return self.model_blend.inverse(rack_map.physical_to_linear(angle)) if self.model_blend is not None else angle
     linear_angle = math.degrees(VM.get_steer_from_curvature(-desired_curvature, speed, roll))
     return self.physicalize_desired_angle(linear_angle)
 
@@ -303,9 +312,9 @@ class SteerRatioModeLatch:
 def steer_ratio_mode_label(mode: SteerRatioMode) -> str:
   return {
     SteerRatioMode.MANUAL: "Manual override",
-    SteerRatioMode.COMMA: "Comma steer-ratio learner",
+    SteerRatioMode.COMMA: "Comma’s Learner (Legacy)",
     SteerRatioMode.NRDR_RAW: "NRDR measured-angle curve",
-    SteerRatioMode.FIRMWARE: "Firmware steer ratio",
+    SteerRatioMode.FIRMWARE: "PTM (Auto)",
   }[mode]
 
 
@@ -349,8 +358,7 @@ def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | N
   is_honda = str(getattr(CP, "brand", "")).lower() == "honda"
   cp_ratio = _safe_positive_ratio(getattr(CP, "steerRatio", MANUAL_CENTER_DEFAULT), MANUAL_CENTER_DEFAULT)
   mode = _mode_value(_value(settings, "NrdrSteerRatioMode"))
-  center = _bounded_ratio(_value(settings, "NrdrSteerRatioManualCenter"), MANUAL_CENTER_DEFAULT)
-  final = _bounded_ratio(_value(settings, "NrdrSteerRatioManualFinal"), MANUAL_FINAL_DEFAULT)
+  center, final = MANUAL_CENTER_DEFAULT, MANUAL_FINAL_DEFAULT
   metadata = get_steer_ratio_metadata(fingerprint) if is_honda else None
   outer_angle = metadata.outer_angle if metadata is not None else GENERIC_MANUAL_OUTER_ANGLE_DEG
   raw_profile = get_raw_steer_ratio_profile(CP)
@@ -359,15 +367,11 @@ def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | N
   # instead of CP's ratio.
   firmware_profile = rack_map_geometry(CP, firmware_profile, cp_ratio, ptm_baseline=ptm_baseline) or firmware_profile
 
+  if mode not in (SteerRatioMode.COMMA, SteerRatioMode.FIRMWARE):
+    mode = SteerRatioMode.FIRMWARE if firmware_profile is not None else SteerRatioMode.COMMA
   effective_mode: SteerRatioMode | None = mode
   unavailable_reason = ""
-  if mode is SteerRatioMode.MANUAL and metadata is None:
-    effective_mode = None
-    unavailable_reason = f"Manual endpoint geometry is not supported for {fingerprint or 'this car'}"
-  elif mode is SteerRatioMode.NRDR_RAW and raw_profile is None:
-    effective_mode = SteerRatioMode.COMMA
-    unavailable_reason = f"No matching NRDR measured curve exists for {fingerprint or 'this car'} and its reported EPS; using Comma learner"
-  elif mode is SteerRatioMode.FIRMWARE and firmware_profile is None:
+  if mode is SteerRatioMode.FIRMWARE and firmware_profile is None:
     effective_mode = None
     unavailable_reason = f"No exact recognized EPS firmware profile exists for {fingerprint or 'this car'}"
 
@@ -383,37 +387,46 @@ def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | N
     firmware_profile=firmware_profile,
     unavailable_reason=unavailable_reason,
   )
-  enabled = _value(settings, "NrdrSteerRatioHybrid")
-  if str(enabled).lower() not in ("1", "true", "b'1'", "b'true'"):
-    return selection
-  selection = replace(selection, hybrid_requested=True)
-  try:
-    mode = SteerRatioMode(int(_value(settings, "NrdrSteerRatioMode")))
-    mode_b_value = _value(settings, "NrdrSteerRatioSourceB")
-    start_value = _value(settings, "NrdrSteerRatioBlendStart")
-    mode_b = SteerRatioMode(3 if mode_b_value is None else int(mode_b_value))
-    start = BLEND_START_DEFAULT if start_value is None else float(start_value)
-    if SteerRatioMode.NRDR_RAW in (mode, mode_b) and raw_profile is None:
-      # Without measured evidence, use the real live learner for the entire
-      # mapping. Do not blend an invented curve or hold a stale custom map.
-      return replace(selection, effective_mode=SteerRatioMode.COMMA,
-                     unavailable_reason="Measured hybrid source unavailable; using Comma learner")
-    if not selection.available:
-      raise ValueError(selection.unavailable_reason)
-    if not is_honda or metadata is None:
-      raise ValueError("Hybrid requires supported Honda geometry metadata")
-    if SteerRatioMode.FIRMWARE in (mode, mode_b) and firmware_profile is None:
-      raise ValueError("Hybrid source has no recognized EPS firmware profile")
-    comma = _safe_positive_ratio(live_comma_ratio, cp_ratio) if SteerRatioMode.COMMA in (mode, mode_b) else cp_ratio
-    def source(source_mode):
-      label = steer_ratio_mode_label(source_mode)
-      if source_mode is SteerRatioMode.NRDR_RAW and raw_profile.provisional:
-        label += " (provisional)"
-      return AngleSource(int(source_mode), label, cp_ratio,
-                         center, final, outer_angle, comma, raw_profile, firmware_profile)
-    return replace(selection, hybrid=build_hybrid(source(mode), source(mode_b), start))
-  except (TypeError, ValueError, OverflowError) as error:
-    return replace(selection, effective_mode=None, unavailable_reason=f"Hybrid unavailable: {error}")
+  enabled = _value(settings, "NrdrSteerRatioModelBlend")
+  if (selection.firmware_vgr_selected and str(enabled).lower() in ("1", "true", "b'1'", "b'true'")):
+    from openpilot.nrdr.features.lateral.lane_change_tuning import active_model_supports_optimized_lane_changes
+    endpoint = model_blend_endpoint(CP)
+    if endpoint is not None and active_model_supports_optimized_lane_changes():
+      final, lock = endpoint
+      center = cp_ratio * 0.01 / firmware_profile.physical_to_linear(0.01)
+      source = AngleSource(0, "Model-Specific Blend", cp_ratio, center, final, lock, cp_ratio)
+      selection = replace(selection, model_blend=source)
+  return selection
+
+
+# Published ratio and half of lock-to-lock travel. Exact EPS variants keep the
+# sedan, Sport and hatch specifications separate. Sources: ptm_settings_plan_2026-11-14.md.
+_MODEL_BLEND_ENDPOINTS = {
+  ("HONDA_CLARITY", "39990-TRW-A020"): (12.72, 2.41 * 180),
+  ("HONDA_CIVIC", "39990-TBA-A030"): (10.93, 2.22 * 180),
+  ("HONDA_CIVIC", "39990-TEG-A010"): (10.93, 2.22 * 180),
+  ("HONDA_CIVIC_BOSCH", "39990-TBA-C120"): (10.94, 2.22 * 180),
+  ("HONDA_CIVIC_BOSCH", "39990-TBA-C020"): (11.12, 2.11 * 180),
+  ("HONDA_CIVIC_BOSCH", "39990-TGG-A120"): (11.12, 2.11 * 180),
+  ("HONDA_CRV_5G", "39990-TLA-A040"): (12.30, 2.30 * 180),
+  ("HONDA_CRV_5G", "39990-TLA-A220"): (12.30, 2.30 * 180),
+  ("HONDA_INSIGHT", "39990-TXM-A040"): (12.58, 2.54 * 180),
+  ("HONDA_RIDGELINE", "39990-T6Z-A110"): (15.59, 3.04 * 180),
+  ("HONDA_ODYSSEY", "39990-THR-A020"): (14.35, 2.97 * 180),
+}
+
+
+def model_blend_endpoint(CP):
+  from openpilot.nrdr.features.lateral.rdx_identity import RDX_CARS, confirmed_rdx
+  fingerprint = str(getattr(CP, "carFingerprint", ""))
+  if fingerprint in RDX_CARS and confirmed_rdx(CP):
+    return 11.95, 2.23 * 180
+  for fw in getattr(CP, "carFw", ()):
+    if fw.ecu == "eps":
+      endpoint = _MODEL_BLEND_ENDPOINTS.get((fingerprint, normalize_honda_eps_firmware(fw.fwVersion)))
+      if endpoint is not None:
+        return endpoint
+  return None
 
 
 def stock_steer_ratio_selection(CP) -> SteerRatioSelection:

@@ -158,7 +158,7 @@ def test_selector_supports_all_nidec_pedals_and_bosch_radar_without_duplication(
   ui = state(carFingerprint=next(iter(HONDA_BOSCH_A)), enableGasInterceptor=False)
   assert longitudinal_controller_choices(ui.CP, ui.CP_SP, ui.params) == (0, 1, 2)
   ui = state(enableGasInterceptor=False)
-  assert longitudinal_controller_choices(ui.CP, ui.CP_SP, ui.params) == (0, 1)
+  assert longitudinal_controller_choices(ui.CP, ui.CP_SP, ui.params) == (0, 1, 4)
   schema = compile_schema(DEFAULT_SRC)
   items = []
   def walk(value):
@@ -173,7 +173,7 @@ def test_selector_supports_all_nidec_pedals_and_bosch_radar_without_duplication(
   walk(schema)
   selector = [x for x in items if x["key"] == CONTROLLER_KEY]
   assert len(selector) == 1
-  assert [x["value"] for x in selector[0]["options"]] == [0, 1, 2, 3]
+  assert [x["value"] for x in selector[0]["options"]] == [0, 1, 2, 4, 3]
   assert not [x for x in items if x["key"] in ("HondaLiveLearningGas", "HondaBoschARadar")]
   keys = [item["key"] for item in items]
   assert keys.index("NrdrLiveGasResetStatus") == keys.index("NrdrResetLiveGas") + 1
@@ -229,8 +229,9 @@ def test_personal_actuator_uses_neutral_factors_and_disables_learning():
   obj = cls(cp(), NS(enableGasInterceptor=True, flags=0), NS(provider=provider))
   assert obj.longitudinal_factors == (1., 1.) and obj.gas_alpha == 0.
   assert not obj.live_tuning().live_learning_gas and not obj.live_tuning().roen_acceleration_limits
-  live = replace(live, pedal_wind_brake=False)
+  live = replace(live, pedal_wind_brake=True, full_brake_authority=False)
   assert not obj.live_tuning().pedal_wind_brake
+  assert obj.live_tuning().full_brake_authority
   assert obj.longitudinal_factors == (1., 1.) and obj.gas_alpha == 0.
 
 
@@ -339,11 +340,11 @@ def test_c4_selector_uses_shared_choices_and_rechecks_selection(onroad_at_click,
   ctl = env["LongitudinalControllerControl"]()
   assert ctl.value == "MVL Live Learning Gas"
   ctl.click_callback()
-  assert [button.text for button in buttons] == ["Standard", "MVL Live Learning Gas", "Aragon's Personal Pedal"]
+  assert [button.text for button in buttons] == ["Standard", "MVL Live Learning Gas", "PTM Pedal Interceptor"]
   ui.params.values["IsOffroad"] = not onroad_at_click
   buttons[-1].click_callback()
   if onroad_at_click:
     assert not ui.params.writes and not resets
   else:
-    assert ctl.value == "Aragon's Personal Pedal" and ui.params.get(CONTROLLER_KEY) == 3
+    assert ctl.value == "PTM Pedal Interceptor" and ui.params.get(CONTROLLER_KEY) == 3
     assert len(resets) == 1 and not panels

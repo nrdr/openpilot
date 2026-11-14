@@ -28,7 +28,7 @@ from openpilot.nrdr.features.driver_policy.stock_cmbs import publish_stock_cmbs_
 from openpilot.nrdr.features.radar import radar_point_status
 from openpilot.nrdr.features.longitudinal.bosch_a.learning_params import attach as attach_bosch_learning_params
 from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfaces
-from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
+from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config, configure_detected_car_defaults
 
 REPLAY = "REPLAY" in os.environ
 
@@ -116,13 +116,14 @@ class Car:
 
       self.CI = get_car(*self.can_callbacks, obd_callback(self.params), alpha_long_allowed, is_release,
                         cached_params=cached_params, fixed_fingerprint=fixed_fingerprint,
-                        interface_config=interface_config, is_release_sp=is_release_sp)
+                        interface_config=interface_config, is_release_sp=is_release_sp,
+                        configure_detected_car=lambda cp, cp_sp, config: configure_detected_car_defaults(cp, cp_sp, config, self.params))
       sunnypilot_interfaces.setup_interfaces(self.CI, self.params)
       self.RI = interfaces[self.CI.CP.carFingerprint].RadarInterface(self.CI.CP, self.CI.CP_SP)
       self.CP = self.CI.CP
       self.CP_SP = self.CI.CP_SP
 
-      # Resolve pending presets or fresh firmware defaults after live CP/CP_SP
+      # Resolve pending presets and one-time vehicle defaults after live CP/CP_SP
       # admission and before publishing either CP. The consumer guards saved
       # choices and is a no-op when neither kind of request is pending.
       try:
@@ -132,8 +133,8 @@ class Car:
         # verify its safe failure state.
         raise
       except Exception:
-        # The consumer retains explicit requests for retry but retires failed
-        # automatic defaults. Neither ordinary failure should cause a boot loop.
+        # Retry incomplete presets/defaults next startup after verifying that
+        # their partially configured compound features are disabled.
         cloudlog.exception("car: lateral startup settings apply failed")
 
       # continue onto next fingerprinting step in pandad

@@ -15,8 +15,6 @@ from openpilot.nrdr.features.longitudinal.longitudinal_stopping import compute_s
 LongCtrlState = car.CarControl.Actuators.LongControlState
 DREL_FILTER_FRAMES = 10
 DREL_FILTER_ALPHA = 0.3
-ROEN_ACCEL_BP = (0.0, 5.0, 20.0)
-ROEN_NIDEC_ACCEL_MAX = (4.0, 4.0, 3.0)
 LONG_PID_SCALE_KEYS = (
   NrdrParamKey.LONG_PID_TUNE_SCALE_AGGRESSIVE,
   NrdrParamKey.LONG_PID_TUNE_SCALE_STANDARD,
@@ -119,7 +117,6 @@ class NrdrLongControl:
     self.stopping_decel_rate = CP.deprecated.stoppingDecelRate
     self.v_ego_starting = CP.deprecated.vEgoStarting
     self.v_ego_stopping = CP.deprecated.vEgoStopping
-    self.roen_acceleration_limits = True
     self.drel_window = deque(maxlen=DREL_FILTER_FRAMES)
     self.drel_filtered = math.inf
     self._refresh_params()
@@ -143,14 +140,9 @@ class NrdrLongControl:
     )
     self.v_ego_starting = read_float(snapshot, NrdrParamKey.HONDA_V_EGO_STARTING, self.CP.deprecated.vEgoStarting, 0.0, 5.0)
     self.v_ego_stopping = read_float(snapshot, NrdrParamKey.HONDA_V_EGO_STOPPING, self.CP.deprecated.vEgoStopping, 0.0, 5.0)
-    self.roen_acceleration_limits = read_bool(snapshot, NrdrParamKey.NRDR_ROEN_ACCELERATION_LIMITS, True)
     self.settings_generation = snapshot.generation
 
   def _accel_limits(self, accel_limits, v_ego: float):
-    if (self.roen_acceleration_limits and self.CP.brand == "honda" and self.CP.flags & HondaFlags.NIDEC and
-        self.CP_SP.enableGasInterceptor):
-      roen_max = float(np.interp(v_ego, ROEN_ACCEL_BP, ROEN_NIDEC_ACCEL_MAX))
-      return accel_limits[0], max(accel_limits[1], roen_max)
     return accel_limits
 
   def _filter_drel(self, drel) -> float:
