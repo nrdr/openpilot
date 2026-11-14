@@ -2788,23 +2788,48 @@
                   "key": "NrdrHondaWindBrake",
                   "widget": "toggle",
                   "title": "Wind Brake",
-                  "description": "Reduces brake demand to account for estimated air resistance. Off removes this compensation; Experimental PCM shaping ignores it without changing your saved choice.",
-                  "details": "Changes apply next drive and do not affect gas compensation.",
+                  "description": "Adds coasting compensation on pedal cars; Off uses the gas request alone and leaves braking unchanged. On PCM cars, reduces braking for air resistance; Off removes that reduction.",
+                  "details": "Pedal changes apply live; PCM changes apply next drive. Experimental PCM shaping ignores this setting without changing your saved choice.",
                   "visibility": [
                     {
-                      "type": "capability",
-                      "field": "nrdr_honda_pcm_tuning_available",
-                      "equals": true
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_honda_pcm_tuning_available",
+                          "equals": true
+                        },
+                        {
+                          "type": "capability",
+                          "field": "nrdr_personal_pedal_available",
+                          "equals": true
+                        }
+                      ]
                     }
                   ],
                   "enablement": [
                     {
-                      "type": "offroad_only"
-                    },
-                    {
-                      "type": "capability",
-                      "field": "nrdr_honda_pcm_tuning_available",
-                      "equals": true
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_personal_pedal_available",
+                          "equals": true
+                        },
+                        {
+                          "type": "all",
+                          "conditions": [
+                            {
+                              "type": "offroad_only"
+                            },
+                            {
+                              "type": "capability",
+                              "field": "nrdr_honda_pcm_tuning_available",
+                              "equals": true
+                            }
+                          ]
+                        }
+                      ]
                     }
                   ]
                 },

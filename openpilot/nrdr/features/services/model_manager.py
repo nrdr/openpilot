@@ -2,13 +2,13 @@ from pathlib import PurePosixPath
 from urllib.parse import urlparse
 
 from openpilot.nrdr.features.services import TINYGRAD_RUNTIME_REF
+from openpilot.nrdr.features.services.model_artifacts import PLAIN_ARTIFACT_REFS
 
 
 def _compatible_automatic_download(model) -> bool:
-  # Catalog provenance can admit a new download only for this exact runtime.
-  # A model source ref or the existence of a legacy rebuild recipe is not proof
-  # that a fresh install has a compatible compiled artifact.
-  if getattr(model, "tinygradRef", "") != TINYGRAD_RUNTIME_REF or str(getattr(model, "runner", "")) != "tinygrad":
+  # Admit known portable catalogs as well as the existing pinned pickle ABI.
+  # The runner separately checks artifact bytes and compile-time reference outputs.
+  if getattr(model, "tinygradRef", "") not in (TINYGRAD_RUNTIME_REF, *PLAIN_ARTIFACT_REFS) or str(getattr(model, "runner", "")) != "tinygrad":
     return False
   models = getattr(model, "models", ())
   if not models:
@@ -63,7 +63,7 @@ def get_model_repair_candidate(saved, available_models):
     hashes = [artifact.downloadUri.sha256, *(chunk.sha256 for chunk in artifact.chunks)]
     if any(len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest.lower()) for digest in hashes):
       return None
-  if saved.tinygradRef == TINYGRAD_RUNTIME_REF and _artifact_identity(saved) == _artifact_identity(target):
+  if (saved.tinygradRef == TINYGRAD_RUNTIME_REF or target.tinygradRef in PLAIN_ARTIFACT_REFS) and _artifact_identity(saved) == _artifact_identity(target):
     return None
   return target
 

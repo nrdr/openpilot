@@ -14,6 +14,7 @@ import pytest
 from openpilot.cereal import custom
 from openpilot.nrdr.features.services import ModelAdmissionError, TINYGRAD_RUNTIME_REF
 from openpilot.nrdr.features.services.model_manager import select_default_model
+from openpilot.nrdr.features.services.model_artifacts import PLAIN_ARTIFACT_REFS
 
 
 class ParamsMemory:
@@ -116,6 +117,46 @@ def test_first_run_waits_on_legacy_catalog_and_keeps_stock_until_a_compatible_do
   assert helpers.get_active_bundle(params) is None  # Queuing isn't a preference switch.
   assert helpers.get_active_model_runner(params) == int(custom.ModelManagerSP.Runner.stock)
 
+
+@pytest.mark.parametrize('compiler_ref', sorted(PLAIN_ARTIFACT_REFS))
+def test_portable_upgrade_keeps_model_identity_and_does_not_replace_identical_bytes(compiler_ref):
+  from openpilot.nrdr.features.services.model_manager import get_model_repair_candidate
+  raw = saved_pop()
+  raw['models'] = [{'type': 'chunked', 'artifact': {'fileName': 'model.pkl', 'downloadUri': {
+    'uri': 'https://example.invalid/model.pkl', 'sha256': 'a' * 64}}}]
+  saved = custom.ModelManagerSP.ModelBundle(**raw)
+  target = custom.ModelManagerSP.ModelBundle(**dict(raw, tinygradRef=compiler_ref))
+  before = saved.to_dict()
+  assert get_model_repair_candidate(saved, [target]) is None
+  target.models[0].artifact.downloadUri.sha256 = 'b' * 64
+  assert get_model_repair_candidate(saved, [target]) is target
+  assert saved.to_dict() == before
+  target.ref = 'different-model'
+  assert get_model_repair_candidate(saved, [target]) is None
+
+
+@pytest.mark.parametrize('source', ['qcom', 'chestnut'])
+def test_old_catalog_refreshes_without_repeated_network_polling(source):
+  path = Path(__file__).resolve().parents[3] / 'openpilot/sunnypilot/models/fetcher.py'
+  cls = next(n for n in ast.parse(path.read_text()).body if isinstance(n, ast.ClassDef) and n.name == 'ModelFetcher')
+  namespace = {'custom': custom, 'Params': ParamsMemory, 'PLAIN_ARTIFACT_REFS': PLAIN_ARTIFACT_REFS,
+               'time': SimpleNamespace(monotonic=lambda: 100), 'include_local_rebuilds': lambda bundles, _: bundles,
+               'cloudlog': SimpleNamespace(warning=lambda *a, **k: None, debug=lambda *a: None)}
+  exec(compile(ast.Module(body=[cls], type_ignores=[]), str(path), 'exec'), namespace)
+  fetcher = namespace['ModelFetcher'].__new__(namespace['ModelFetcher'])
+  old = custom.ModelManagerSP.ModelBundle(**dict(saved_pop(), tinygradRef=TINYGRAD_RUNTIME_REF))
+  fetcher.model_caches = {source: SimpleNamespace(get=lambda: ({'bundles': [{'is_big': source == 'chestnut'}]}, False))}
+  fetcher.model_parser = SimpleNamespace(parse_models=lambda _: [old])
+  fetcher._refetched, fetcher._runtime_refresh_at = set(), {}
+  attempts = []
+  fetcher._fetch_and_cache_models = lambda source: attempts.append(source)
+  assert fetcher.get_bundles_for_source(source) == [old]
+  assert fetcher.get_bundles_for_source(source) == [old]
+  assert attempts == [source]
+  old.tinygradRef = next(iter(PLAIN_ARTIFACT_REFS))
+  namespace['time'].monotonic = lambda: 200
+  assert fetcher.get_bundles_for_source(source) == [old]
+  assert attempts == [source]
 
 @pytest.mark.parametrize('raw', [saved_pop(18), {'invalid': True}, 'not a bundle'])
 def test_unsupported_saved_selection_cannot_turn_into_default(raw, helpers):

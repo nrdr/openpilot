@@ -4,6 +4,7 @@ from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_LABELS, CONTROLLER_DESCRIPTION, BOSCH_RADAR_WARNING
 from openpilot.nrdr.ui.settings.pcm_speed_deadzone import PcmSpeedDeadzoneSlider
 from openpilot.nrdr.ui.honda_pcm import (pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice,
+                                       wind_brake_editable,
                                        live_gas_available, longitudinal_controller_choices,
                                        longitudinal_controller_label, save_longitudinal_controller)
 from openpilot.nrdr.ui.settings.live_gas_reset import mici_reset_button
@@ -56,11 +57,9 @@ class WindBrakeControl(BigToggle):
   def __init__(self):
     super().__init__(tr("Wind Brake"), initial_state=saved_wind_brake(ui_state.params),
                      toggle_callback=self._select,
-                     description=tr("Reduces brake demand to account for estimated air resistance. Off removes this compensation; " +
-                         "Experimental PCM shaping ignores it without changing your saved choice."))
-    self.set_enabled(lambda: ui_state.is_offroad() and pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
-                     and tuning_write_allowed(ui_state.params, "NrdrHondaWindBrake", CP=ui_state.CP, CP_SP=ui_state.CP_SP,
-                                              is_offroad=ui_state.is_offroad()))
+                     description=tr("Adds coasting compensation on pedal cars; Off uses the gas request alone and leaves braking unchanged. "
+                                    "On PCM cars, reduces braking for air resistance; Off removes that reduction."))
+    self.set_enabled(lambda: wind_brake_editable(ui_state.CP, ui_state.CP_SP, ui_state.params, is_offroad=ui_state.is_offroad()))
 
   def _select(self, value):
     save_pcm_choice(ui_state, "NrdrHondaWindBrake", value)

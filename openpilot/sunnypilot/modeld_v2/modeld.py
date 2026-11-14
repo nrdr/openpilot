@@ -25,7 +25,6 @@ from openpilot.cereal.messaging import PubMaster, SubMaster
 from openpilot.cereal.visionipc import VisionStreamType
 from msgq.visionipc import VisionIpcClient, VisionBuf
 from opendbc.car.car_helpers import get_demo_car_params
-from openpilot.common.file_chunker import open_file_chunked
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
 from openpilot.common.filter_simple import FirstOrderFilter
@@ -44,7 +43,7 @@ from openpilot.sunnypilot.modeld_v2.meta_helper import load_meta_constants
 from openpilot.sunnypilot.modeld_v2.camera_offset_helper import CameraOffsetHelper
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
-from openpilot.sunnypilot.modeld_v2.helpers import load_oob
+from openpilot.sunnypilot.modeld_v2.helpers import load_model
 from openpilot.sunnypilot.modeld_v2.model_adapters import get_model_adapter
 from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeController
@@ -116,7 +115,7 @@ class ModelState(ModelStateBase):
     pkl_path = (admit_selected_artifact(pkl_path, bundle, (cam_w, cam_h), device=device) if bundle is not None
                 else admit_default_artifact(pkl_path))
     cloudlog.warning(f"loading combined pkl: {pkl_path}")
-    jits = load_oob(open_file_chunked(pkl_path))
+    jits = load_model(pkl_path)
 
     metadata = jits['metadata']
     self.WARP_DEV = metadata.get('warp_dev', 'QCOM') if COMMA_HARDWARE else 'CPU'
@@ -194,7 +193,7 @@ class ModelState(ModelStateBase):
 
     if self._combined_model_type == 'supercombo':
       model_output = raw_outputs.numpy().flatten()
-      if self.chestnut and not np.all(np.isfinite(model_output)):
+      if not np.all(np.isfinite(model_output)):
         raise RuntimeError("model output not finite")
       sliced = {k: model_output[np.newaxis, v] for k, v in self.vision_output_slices.items()}
       outputs = self.parser.parse_outputs(sliced)
@@ -202,7 +201,10 @@ class ModelState(ModelStateBase):
         (self.numpy_inputs['prev_feat'].flat if self.adapter.is_native else self.numpy_inputs['prev_feat'])[:] = \
           model_output[self.vision_output_slices['hidden_state']]
     else:
-      vision_output = raw_outputs[0].numpy().flatten()
+      model_outputs = [output.numpy().flatten() for output in raw_outputs]
+      if not all(np.all(np.isfinite(output)) for output in model_outputs):
+        raise RuntimeError("model output not finite")
+      vision_output = model_outputs[0]
       vision_sliced = {k: vision_output[np.newaxis, v] for k, v in self.vision_output_slices.items()}
       outputs = self.parser.parse_vision_outputs(vision_sliced)
       vision_hidden_state = outputs.get('hidden_state')
@@ -212,7 +214,7 @@ class ModelState(ModelStateBase):
           vision_output[self.vision_output_slices['hidden_state']]
 
       for i, policy_slices in enumerate(self._policy_slices_list):
-        policy_output = raw_outputs[i + 1].numpy().flatten()
+        policy_output = model_outputs[i + 1]
         policy_sliced = {k: policy_output[np.newaxis, v] for k, v in policy_slices.items()}
         parsed = self.parser.parse_policy_outputs(policy_sliced)
         if 'off' in self._policy_keys[i] and self._has_on_policy:

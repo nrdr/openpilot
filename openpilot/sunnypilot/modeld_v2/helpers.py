@@ -14,6 +14,23 @@ import tempfile
 import shutil
 import enum
 
+from openpilot.common.file_chunker import open_file_chunked
+
+
+def is_plain_artifact(path):
+  from openpilot.sunnypilot.modeld_v2.plain_artifact import MAGIC
+  with open_file_chunked(str(path)) as stream:
+    return stream.read(len(MAGIC)) == MAGIC
+
+
+def load_model(path):
+  """Read upstream portable artifacts or existing runtime-pinned nrdr artifacts."""
+  if is_plain_artifact(path):
+    from openpilot.sunnypilot.modeld_v2.plain_artifact import load_model as load_plain_model
+    return load_plain_model(str(path))
+  with open_file_chunked(str(path)) as stream:
+    return load_oob(stream)
+
 
 def _patch_system_flock_acquire():
   try:

@@ -56,7 +56,6 @@ def test_exact_nidec_catalog_hardware_eligibility(car):
 
 @pytest.mark.parametrize("overrides", [
   {"brand": "toyota"}, {"carFingerprint": "UNKNOWN_HONDA"},
-  {"enableGasInterceptor": True},
 ])
 def test_ineligible_control_cannot_save(overrides):
   ui = state(**overrides)
@@ -198,6 +197,7 @@ def test_mici_saved_selection_refresh_and_click_time_recheck():
   tree.body = [n for n in tree.body if isinstance(n, ast.ClassDef) and n.name in ("PcmModeControl", "WindBrakeControl")]
   ui = state()
   env = {"BigMultiToggle": Widget, "BigToggle": Widget, "ui_state": ui, "tr": lambda s: s,
+         "wind_brake_editable": honda_pcm.wind_brake_editable,
          "pcm_tuning_available": pcm_tuning_available, "saved_pcm_mode": saved_pcm_mode,
          "saved_wind_brake": saved_wind_brake, "save_pcm_choice": save_pcm_choice, "tuning_write_allowed": tuning_write_allowed}
   exec(compile(tree, str(path), "exec"), env)

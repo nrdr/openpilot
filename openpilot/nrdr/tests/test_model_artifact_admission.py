@@ -57,6 +57,24 @@ def test_model_ref_is_never_assumed_to_be_compiler_ref(tmp_path, runtime):
   assert admission.admit_selected_artifact(path, selection, (1344, 760)) == path
 
 
+def test_portable_admission_requires_catalog_hash_and_preserves_verified_rebuild(tmp_path, runtime):
+  path = tmp_path / 'portable.pkl'
+  path.write_bytes(b'SPTGPLN1test payload')
+  selected = bundle(path, next(iter(admission.PLAIN_ARTIFACT_REFS)))
+  assert admission.admit_selected_artifact(path, selected, (1344, 760)) == path
+  selected.models[0].artifact.downloadUri.sha256 = '0' * 64
+  with pytest.raises(admission.ModelAdmissionError):
+    admission.admit_selected_artifact(path, selected, (1344, 760))
+  selected = bundle(path)
+  compiled = tmp_path / 'cheddar-rebuild.pkl'
+  compiled.write_bytes(b'known working Cheddar')
+  record = {'source_artifact_sha256': admission.artifact_sha256(path), 'model_ref': selected.ref,
+            'model_name': selected.internalName, 'verified': True, 'camera': [1344, 760], 'artifact': compiled.name,
+            'tinygrad_ref': admission.TINYGRAD_RUNTIME_REF, 'artifact_sha256': admission.artifact_sha256(compiled), 'abi': admission.ARTIFACT_ABI}
+  Path(str(path) + '.nrdr-migration.json').write_text(json.dumps(record))
+  assert admission.admit_selected_artifact(path, selected, (1344, 760)) == compiled
+
+
 @pytest.mark.parametrize('change', ['camera', 'sha', 'source', 'verified', 'abi', 'path', 'model', 'compiler'])
 def test_migration_requires_every_identity_and_validation_gate(tmp_path, runtime, change):
   path = tmp_path / 'selected.pkl'

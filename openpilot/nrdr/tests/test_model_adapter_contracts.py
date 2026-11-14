@@ -35,6 +35,25 @@ def model_run_definition():
   return namespace['run']
 
 
+@pytest.mark.parametrize('chestnut', [False, True])
+@pytest.mark.parametrize('layout,bad_output', [('supercombo', 0), ('multi_policy', 0), ('multi_policy', 1), ('multi_policy', 2)])
+@pytest.mark.parametrize('bad_value', [np.nan, np.inf])
+def test_invalid_inference_is_rejected_before_parsing_on_all_hardware(chestnut, layout, bad_output, bad_value):
+  arrays = [np.ones(2, dtype=np.float32) for _ in range(1 if layout == 'supercombo' else 3)]
+  arrays[bad_output][0] = bad_value
+  tensors = [NS(numpy=lambda arr=arr: arr) for arr in arrays]
+  def no_parse(*_args):
+    raise AssertionError('invalid inference must not reach parsing/publication')
+  state = NS(adapter=NS(copy_frames=lambda bufs: None, is_native=False,
+                       run=lambda: tensors[0] if layout == 'supercombo' else tensors),
+             numpy_inputs={'desire': np.zeros(8), 'tfm': np.eye(3), 'big_tfm': np.eye(3)},
+             desire_key='desire', prev_desire=np.zeros(8), _road_key='img', _wide_key='big_img',
+             chestnut=chestnut, _combined_model_type=layout, vision_output_slices={'plan': slice(0, 2)},
+             parser=NS(parse_outputs=no_parse, parse_vision_outputs=no_parse))
+  with pytest.raises(RuntimeError, match='model output not finite'):
+    model_run_definition()(state, {}, {'img': np.eye(3), 'big_img': np.eye(3)}, {'desire': np.zeros(8)})
+
+
 @pytest.mark.parametrize('camera', [(1344, 760), (1928, 1208)])
 def test_native_recurrent_image_state_is_not_a_camera_and_both_transforms_are_filled(adapters, camera):
   captures = []
@@ -79,8 +98,9 @@ def test_native_recurrent_image_state_is_not_a_camera_and_both_transforms_are_fi
 
 
 @pytest.mark.parametrize('chestnut', [False, True])
+@pytest.mark.parametrize('portable', [False, True])
 @pytest.mark.parametrize('layout', ['split', 'separate_supercombo', 'unified_supercombo'])
-def test_legacy_dispatch_depends_on_artifact_layout_not_hardware(adapters, chestnut, layout):
+def test_legacy_dispatch_depends_on_artifact_layout_not_hardware(adapters, chestnut, portable, layout):
   camera = (16, 16)
   image_shapes = {'img': (1, 12, 2, 2), 'big_img': (1, 12, 2, 2)}
   policy_shapes = {'features_buffer': (1, 2, 2), 'desire_pulse': (1, 2, 8), 'traffic_convention': (1, 2)}
@@ -100,9 +120,18 @@ def test_legacy_dispatch_depends_on_artifact_layout_not_hardware(adapters, chest
     assert set(inputs) == {'img_q', 'big_img_q', 'feat_q', 'desire_q', 'packed_npy_inputs'}
     return inputs['packed_npy_inputs']
   jits = {'metadata': metadata, camera: unified if layout == 'unified_supercombo' else warp}
+  if portable:
+    jits['input_devices'] = {'warp': 'NPY'}
   if layout != 'unified_supercombo':
     jits['run_policy'] = policy
   adapter = adapters.get_model_adapter(jits, *camera, 'NPY', 'NPY', 'NPY', chestnut=chestnut)
+  adapter.numpy_inputs['tfm'][:] = 3
+  adapter.numpy_inputs['big_tfm'][:] = 7
+  adapter.numpy_inputs['desire'][:] = .25
+  if not adapter.is_unified:
+    np.testing.assert_array_equal(adapter.input_queues['tfm'].numpy(), 3)
+    np.testing.assert_array_equal(adapter.input_queues['big_tfm'].numpy(), 7)
+    assert np.count_nonzero(adapter.input_queues['packed_npy_inputs'].numpy() == .25) == 8
   assert adapter.is_unified == (layout == 'unified_supercombo')
   assert hasattr(adapter, 'frame_slots') == adapter.is_unified
   frames, _, _ = adapter.get_dummy_inputs()
@@ -131,6 +160,24 @@ def test_legacy_missing_camera_is_explicitly_unsupported_not_a_generic_warp_abi_
   monkeypatch.setattr(adapters.BaseModelAdapter, '_load_warp', forbidden)
   with pytest.raises(ValueError, match='rebuild it for this camera'):
     adapters.get_model_adapter({'metadata': metadata, 'run_policy': object()}, 16, 16, 'NPY', 'NPY', 'NPY', chestnut=True)
+
+
+@pytest.mark.parametrize('device_inputs', [False, True])
+def test_legacy_input_memory_matches_artifact_and_host_updates_reach_device(monkeypatch, device_inputs):
+  from openpilot.sunnypilot.modeld_v2.compile_modeld import make_split_input_queues
+  monkeypatch.delenv('CHESTNUT', raising=False)
+  vision = {'img': (1, 12, 2, 2), 'big_img': (1, 12, 2, 2)}
+  policy = {'desire_pulse': (1, 2, 8), 'features_buffer': (1, 2, 2), 'traffic_convention': (1, 2)}
+  queues, arrays = make_split_input_queues(vision, policy, 2, device='PYTHON', device_inputs=device_inputs)
+  for name in ('tfm', 'big_tfm', 'packed_npy_inputs'):
+    assert queues[name].device == ('PYTHON' if device_inputs else 'NPY')
+  for value in (.25, .75):
+    arrays['tfm'][:] = value
+    arrays['big_tfm'][:] = -value
+    arrays['desire'][:] = value
+    np.testing.assert_array_equal(queues['tfm'].numpy(), value)
+    np.testing.assert_array_equal(queues['big_tfm'].numpy(), -value)
+    assert np.count_nonzero(queues['packed_npy_inputs'].numpy() == value) == 8
 
 
 @pytest.mark.parametrize('target,expected', [

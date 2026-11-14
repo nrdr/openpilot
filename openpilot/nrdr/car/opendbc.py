@@ -102,6 +102,7 @@ SLOW_PARAM_GROUPS = (
     OpendbcParamKey.HONDA_STOPPING_DECEL_RATE,
     OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY,
     OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS,
+    OpendbcParamKey.NRDR_HONDA_WIND_BRAKE,
   ),
   (
     OpendbcParamKey.HONDA_ALT_DASHBOARD_SPEED,
@@ -260,6 +261,7 @@ class HondaParamsProvider:
       ecu_matched_long=False,  # Retired live switch; command law is selected once at startup.
       full_brake_authority=_bool_value(values.get(OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY), True),
       roen_acceleration_limits=_bool_value(values.get(OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS), False),
+      pedal_wind_brake=_bool_value(values.get(OpendbcParamKey.NRDR_HONDA_WIND_BRAKE), True),
     )
     self._tuning_cache = tuning
     return tuning

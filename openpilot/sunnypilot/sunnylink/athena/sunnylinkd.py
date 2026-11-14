@@ -361,16 +361,21 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     if onroad or deadzone_selection is None or capabilities.get("nrdr_mvl_pcm_deadzone_available") is not True:
       raise ValueError("PCM speed deadzone requires 0.00–0.20 m/s in 0.01 steps on a parked, supported Civic PCM. Applies next drive.")
   pcm_selections = {}
-  for key in ("NrdrHondaPcmMode", "NrdrHondaWindBrake"):
-    if key in params_to_update:
-      selected = (_remote_int_value if key == "NrdrHondaPcmMode" else _remote_bool_value)(params_to_update[key], compression)
-      if onroad or selected is None or capabilities.get("nrdr_honda_pcm_tuning_available") is not True:
-        raise ValueError("PCM settings require a valid choice on a parked non-interceptor Nidec. Applies next drive.")
-      pcm_selections[key] = selected
+  if "NrdrHondaPcmMode" in params_to_update:
+    selected = _remote_int_value(params_to_update["NrdrHondaPcmMode"], compression)
+    if onroad or selected is None or capabilities.get("nrdr_honda_pcm_tuning_available") is not True:
+      raise ValueError("PCM settings require a valid choice on a parked non-interceptor Nidec. Applies next drive.")
+    pcm_selections["NrdrHondaPcmMode"] = selected
+  wind_selection = None
+  if "NrdrHondaWindBrake" in params_to_update:
+    wind_selection = _remote_bool_value(params_to_update["NrdrHondaWindBrake"], compression)
+    if wind_selection is None or not (capabilities.get("nrdr_personal_pedal_available") is True or
+                                     (not onroad and capabilities.get("nrdr_honda_pcm_tuning_available") is True)):
+      raise ValueError("Wind Brake requires a supported Nidec pedal car, or a parked Nidec PCM car.")
   # Preconfiguration changes saved values only. Validate the whole mode-tuning
   # batch before writing, including when a mode selection shares the batch.
   tuning_selections = {}
-  for key in mode_lock_keys.intersection(params_to_update) - {"HondaLiveLearningGas", "NrdrPcmSpeedDeadzone", *pcm_selections}:
+  for key in mode_lock_keys.intersection(params_to_update) - {"HondaLiveLearningGas", "NrdrHondaWindBrake", "NrdrPcmSpeedDeadzone", *pcm_selections}:
     try:
       raw = base64.b64decode(params_to_update[key], validate=True)
       if compression:
@@ -449,6 +454,15 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
           raise ValueError("PCM speed-error deadzone is no longer available. Nothing was saved for this setting.")
         params.put(key, deadzone_selection, block=True)
         params.put_bool("OnroadCycleRequested", True, block=True)
+      elif key == "NrdrHondaWindBrake":
+        current_caps = _vehicle_tuning_capabilities()
+        if current_caps.get("nrdr_personal_pedal_available") is True:
+          params.put_bool(key, wind_selection, block=True)
+        elif current_caps.get("nrdr_honda_pcm_tuning_available") is True and params.get_bool("IsOffroad"):
+          params.put_bool(key, wind_selection, block=True)
+          params.put_bool("OnroadCycleRequested", True, block=True)
+        else:
+          raise ValueError("Wind Brake is no longer available for this vehicle. Nothing was saved for this setting.")
       elif key == "HondaLiveLearningGas" or key in pcm_selections:
         capability = "nrdr_honda_mvl_selection_available" if key == "HondaLiveLearningGas" else "nrdr_honda_pcm_tuning_available"
         if _vehicle_tuning_capabilities().get(capability) is not True or not params.get_bool("IsOffroad"):
@@ -498,7 +512,7 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     except Exception as e:
       cloudlog.error(f"sunnylinkd.saveParams.exception {e}")
       if key in ("NrdrLateralController", CONTROLLER_KEY, "NrdrDriverMonitoringReminderPercent", "HondaLiveLearningGas", "LongitudinalPersonality",
-                 "NrdrPcmSpeedDeadzone", *pcm_selections, *tuning_selections):
+                 "NrdrPcmSpeedDeadzone", "NrdrHondaWindBrake", *pcm_selections, *tuning_selections):
         raise ValueError("Setting could not be saved. Refresh settings to read the device's selection.") from e
 
   # Increment version counter for frontend change detection

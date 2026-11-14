@@ -6,7 +6,7 @@
     "tinygrad/engine/jit.py": "725bf4a0fdbaaaecfaa1af160cc0656708e17e08fe8d457bd82d0af5347a7e17",
     "tinygrad/uop/ops.py": "186ddac516b55ca0e117a5b00f137e8e26cbb47781561c86eb19a89f41d21c6e",
     "tinygrad/nn/onnx.py": "4ff1b2096d44c1dd3638193153664b5d0d8ac4fa1f8c9195e90c2f81ac61d7ca",
-    "tinygrad/runtime/ops_qcom.py": "ac9039af57358b5d685ff2968b7974f844f69eb2d2e8bfc8c64cfbcfb625bcf6",
+    "tinygrad/runtime/ops_qcom.py": "0b2c5b51e503e8bdf2777a151ea233a581421dd31588643be9624c805319de63",
     "examples/openpilot/compile_onnx.py": "a70a0c15e03f4be537f8480f729414883e21ef3c9820dc6578753f0a0000b351",
     "examples/openpilot/compile_warp.py": "2f7cf2f16a3febc35a91d420814130147e12bbbd12c6fb82d7cd7a69ead7fdb5"
   },

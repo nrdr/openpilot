@@ -14,8 +14,7 @@ from openpilot.common.hardware.hw import Paths
 from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot.models.helpers import is_bundle_version_compatible
 from openpilot.cereal import custom
-from openpilot.nrdr.features.services import TINYGRAD_RUNTIME_REF
-from openpilot.nrdr.features.services.model_artifacts import verified_rebuild_bundles
+from openpilot.nrdr.features.services.model_artifacts import PLAIN_ARTIFACT_REFS, verified_rebuild_bundles
 
 
 class ModelParser:
@@ -162,8 +161,8 @@ class ModelCache:
 
 class ModelFetcher:
   """Handles fetching and caching of model data from remote source"""
-  MODEL_URL = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_v23.json"
-  MODEL_URL_CHESTNUT = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_chestnut_v27.json"
+  MODEL_URL = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_v25.json"
+  MODEL_URL_CHESTNUT = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_chestnut_v28.json"
 
   MODEL_SOURCES = {
     "qcom": (MODEL_URL, ""),
@@ -245,8 +244,7 @@ class ModelFetcher:
         except Exception:
           cloudlog.warning(f"Failed to parse cached models for {source}; refetching", exc_info=True)
         else:
-          current_runtime = source != "qcom" or all(str(bundle.runner) != "tinygrad" or bundle.tinygradRef == TINYGRAD_RUNTIME_REF
-                                                    for bundle in parsed)
+          current_runtime = all(str(bundle.runner) != "tinygrad" or bundle.tinygradRef in PLAIN_ARTIFACT_REFS for bundle in parsed)
           if parsed and (current_runtime or time.monotonic() < self._runtime_refresh_at.get(source, 0)):
             cloudlog.debug(f"Using valid cached models data for source {source}")
             return include_local_rebuilds(parsed, source)

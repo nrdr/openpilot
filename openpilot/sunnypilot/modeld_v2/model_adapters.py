@@ -82,6 +82,7 @@ class LegacyModelAdapter(BaseModelAdapter):
     super().__init__(*args, **kwargs)
 
     metadata = self.jits['metadata']
+    device_inputs = 'input_devices' in self.jits
     self.frame_copy_size = nv12_copy_size(*self.nv12_info[:3])
     # Unified artifacts pack raw frames into the policy input. Separate
     # artifacts always run a warp first, including when hosted on Chestnut.
@@ -103,7 +104,8 @@ class LegacyModelAdapter(BaseModelAdapter):
           self.input_shapes, self.frame_skip, device=self.QUEUE_DEV, frame_copy_size=self.frame_copy_size)
         self._vision_input_names = list(self.frame_slots)
       else:
-        self.input_queues, self.numpy_inputs = make_supercombo_input_queues(self.input_shapes, self.frame_skip, device=self.QUEUE_DEV)
+        self.input_queues, self.numpy_inputs = make_supercombo_input_queues(self.input_shapes, self.frame_skip, device=self.QUEUE_DEV,
+                                                                          device_inputs=device_inputs)
       self.run_policy = self.jits['run_policy'] if 'run_policy' in self.jits else self.jits[(self.cam_w, self.cam_h)]
     else:
       self.run_policy = self.jits['run_policy']
@@ -119,7 +121,7 @@ class LegacyModelAdapter(BaseModelAdapter):
       first_policy_meta = metadata[policy_keys[0]]
       self.frame_skip = derive_frame_skip(vision_metadata['input_shapes'], first_policy_meta['input_shapes'])
       self.input_queues, self.numpy_inputs = make_split_input_queues(vision_metadata['input_shapes'], first_policy_meta['input_shapes'],
-                                                                     self.frame_skip, device=self.QUEUE_DEV)
+                                                                     self.frame_skip, device=self.QUEUE_DEV, device_inputs=device_inputs)
 
     if not self.is_unified and (self.cam_w, self.cam_h) not in self.jits:
       # Generic external warps use input_frame/M_inv, not the legacy

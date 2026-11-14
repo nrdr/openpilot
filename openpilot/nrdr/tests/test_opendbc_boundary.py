@@ -113,6 +113,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       OpendbcParamKey.NRDR_HUD_SUB_MODE_UNTIL,
       OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY,
       OpendbcParamKey.NRDR_ROEN_ACCELERATION_LIMITS,
+      OpendbcParamKey.NRDR_HONDA_WIND_BRAKE,
     })
     self.assertIs(OpendbcParamKey, NrdrHondaParamKey)
     self.assertTrue(set(HOST_STARTUP_DEFAULTS).isdisjoint(set(NrdrHondaParamKey)))
@@ -123,7 +124,6 @@ class TestOpendbcBoundary(unittest.TestCase):
       OpendbcParamKey.HONDA_WIND_FACTOR,
       OpendbcParamKey.NRDR_HONDA_ECU_MATCHED_LONG,
       OpendbcParamKey.NRDR_HONDA_PCM_MODE,
-      OpendbcParamKey.NRDR_HONDA_WIND_BRAKE,
       OpendbcParamKey.NRDR_MVL_PCM_DEADZONE,
     })
 
@@ -205,7 +205,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       # The full longitudinal mode is captured once at startup. Background
       # refresh and all other live-setting reads remain dormant here.
       self.assertEqual({key for key, _ in params.reads} & {str(key) for group in SLOW_PARAM_GROUPS for key in group},
-                       {str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS)})
+                       {str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS), str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE)})
       provider.initialize_live_learning_gas(False)
       self.assertTrue(provider._workers_started)
     finally:

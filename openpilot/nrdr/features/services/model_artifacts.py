@@ -9,6 +9,8 @@ from pathlib import Path
 from openpilot.common.file_chunker import open_file_chunked
 
 TINYGRAD_RUNTIME_REF = "fe5d3169ba4f41d0947ad174925f413cbea9d056"
+# The current sunnypilot catalogs publish SPTGPLN1 kernels, not tinygrad objects.
+PLAIN_ARTIFACT_REFS = frozenset(("5d186bdb43c2bcc6c56b6ececf427c34bada0de9", "52e8c3e840b44de2ac9e98a0a1484fa09caf0064"))
 ARTIFACT_ABI = "generic-onnx-warp-v1"
 _MANIFEST = Path(__file__).resolve().parents[2] / "config" / "model_artifacts.json"
 
@@ -83,6 +85,11 @@ def admit_selected_artifact(path: str | Path, bundle, camera: tuple[int, int], *
     if relative.parts and not relative.is_absolute() and migrated.is_relative_to(path.parent.resolve()):
       if _matching_artifact(migrated, record, camera=camera, device=device):
         return migrated
+  # Prefer an already-verified local rebuild above. New downloads use upstream's
+  # portable loader, which verifies their embedded reference outputs at load.
+  from openpilot.sunnypilot.modeld_v2.helpers import is_plain_artifact
+  if is_plain_artifact(path) and artifact_sha256(path) == source_sha:
+    return path
   raise ModelAdmissionError(
     f"Selected model {bundle.displayName} retained but not admitted for tinygrad {TINYGRAD_RUNTIME_REF}; " +
     "recompile its original ONNX and validate this camera before driving. No default was substituted.")

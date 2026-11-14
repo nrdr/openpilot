@@ -119,14 +119,24 @@ def saved_wind_brake(params) -> bool:
   return value if type(value) is bool else True
 
 
+def wind_brake_editable(CP, CP_SP, params, *, is_offroad: bool) -> bool:
+  return (LongitudinalController.PERSONAL_PEDAL in longitudinal_controller_choices(CP, CP_SP, params)
+          or (is_offroad and pcm_tuning_available(CP, CP_SP, params)))
+
+
 def save_pcm_choice(state, key: str, value) -> bool:
+  if key == "NrdrHondaWindBrake":
+    if type(value) is not bool or not wind_brake_editable(state.CP, state.CP_SP, state.params, is_offroad=state.is_offroad()):
+      return False
+    state.params.put_bool(key, value, block=True)
+    if pcm_tuning_available(state.CP, state.CP_SP, state.params):
+      state.params.put_bool("OnroadCycleRequested", True)
+    return True
   if (not pcm_tuning_available(state.CP, state.CP_SP, state.params) or not state.is_offroad()
       or not tuning_write_allowed(state.params, key, CP=state.CP, CP_SP=state.CP_SP, is_offroad=state.is_offroad())):
     return False
   if key == "NrdrHondaPcmMode" and type(value) is int and value in (0, 1, 2):
     state.params.put(key, value, block=True)
-  elif key == "NrdrHondaWindBrake" and type(value) is bool:
-    state.params.put_bool(key, value, block=True)
   else:
     return False
   # Saving is not evidence that the startup-latched controller has changed.

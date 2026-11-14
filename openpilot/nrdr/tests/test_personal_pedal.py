@@ -229,6 +229,9 @@ def test_personal_actuator_uses_neutral_factors_and_disables_learning():
   obj = cls(cp(), NS(enableGasInterceptor=True, flags=0), NS(provider=provider))
   assert obj.longitudinal_factors == (1., 1.) and obj.gas_alpha == 0.
   assert not obj.live_tuning().live_learning_gas and not obj.live_tuning().roen_acceleration_limits
+  live = replace(live, pedal_wind_brake=False)
+  assert not obj.live_tuning().pedal_wind_brake
+  assert obj.longitudinal_factors == (1., 1.) and obj.gas_alpha == 0.
 
 
 @pytest.mark.parametrize("pedal,stock,nidec,selected", [(True, False, True, True), (False, False, True, True),

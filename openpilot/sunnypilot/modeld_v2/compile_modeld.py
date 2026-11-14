@@ -149,8 +149,13 @@ def get_policy_npy_shapes(input_shapes: dict, is_supercombo: bool = False) -> tu
   return shapes, sizes
 
 
+def host_view(tensor: Tensor) -> np.ndarray:
+  # Upstream portable artifacts use host-writable GPU inputs; avoid a copy each frame.
+  return np.frombuffer(tensor._buffer()._host_mv(), dtype=np.float32).reshape(tensor.shape)
+
+
 def generate_queues_and_npy(input_shapes: dict, frame_skip: int, device: str = Device.DEFAULT,
-                            is_supercombo: bool = False) -> tuple[dict, dict]:
+                            is_supercombo: bool = False, device_inputs: bool = False) -> tuple[dict, dict]:
   road_key, _ = _detect_vision_keys(input_shapes)
   if not road_key:
     raise ValueError("Vision road key missing from input shapes.")
@@ -184,7 +189,7 @@ def generate_queues_and_npy(input_shapes: dict, frame_skip: int, device: str = D
     'big_img_q': Tensor(np.zeros(img_buf_shape, dtype=np.uint8), device=device).contiguous().realize(),
     'desire_q': Tensor(np.zeros((frame_skip * desire_shape[1], desire_shape[0], desire_shape[2]),
                   dtype=np.float32), device=device).contiguous().realize(),
-    'packed_npy_inputs': Tensor(packed_npy_inputs, device=device if os.getenv('CHESTNUT') else 'NPY').realize(),
+    'packed_npy_inputs': Tensor(packed_npy_inputs, device=device if device_inputs or os.getenv('CHESTNUT') else 'NPY').realize(),
   }
 
   if features_buffer:
@@ -196,19 +201,24 @@ def generate_queues_and_npy(input_shapes: dict, frame_skip: int, device: str = D
   for key in ('tfm', 'big_tfm'):
     if key not in npy_arrays:
       npy_arrays[key] = np.eye(3, dtype=np.float32)
-    queues[key] = Tensor(npy_arrays[key], device='NPY').realize()
+    queues[key] = Tensor(npy_arrays[key], device=device if device_inputs else 'NPY').realize()
+
+  if device_inputs:
+    packed = host_view(queues['packed_npy_inputs'])
+    npy_arrays |= {k: v.reshape(s) for (k, s), v in zip(shapes.items(), np.split(packed, split_indices) if sizes else [], strict=True)}
+    npy_arrays |= {k: host_view(queues[k]) for k in ('tfm', 'big_tfm')}
 
   return queues, npy_arrays
 
 
 def make_split_input_queues(vision_input_shapes: dict, policy_input_shapes: dict,
-                            frame_skip: int, device: str = Device.DEFAULT) -> tuple[dict, dict]:
-  return generate_queues_and_npy({**vision_input_shapes, **policy_input_shapes}, frame_skip, device, is_supercombo=False)
+                            frame_skip: int, device: str = Device.DEFAULT, device_inputs: bool = False) -> tuple[dict, dict]:
+  return generate_queues_and_npy({**vision_input_shapes, **policy_input_shapes}, frame_skip, device, is_supercombo=False, device_inputs=device_inputs)
 
 
 def make_supercombo_input_queues(input_shapes: dict, frame_skip: int,
-                                 device: str = Device.DEFAULT) -> tuple[dict, dict]:
-  return generate_queues_and_npy(input_shapes, frame_skip, device, is_supercombo=True)
+                                 device: str = Device.DEFAULT, device_inputs: bool = False) -> tuple[dict, dict]:
+  return generate_queues_and_npy(input_shapes, frame_skip, device, is_supercombo=True, device_inputs=device_inputs)
 
 
 def make_random_images(keys, shape, device, rng=None):

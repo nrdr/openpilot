@@ -11,6 +11,7 @@ from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_LABELS, CONTROLLER_DESCRIPTION, BOSCH_RADAR_WARNING
 from openpilot.nrdr.ui.settings.pcm_speed_deadzone import speed_deadzone_item
 from openpilot.nrdr.ui.honda_pcm import (pcm_tuning_available, saved_pcm_mode, saved_wind_brake, save_pcm_choice,
+                                       wind_brake_editable,
                                        live_gas_available, longitudinal_controller_choices,
                                        longitudinal_controller_label, save_longitudinal_controller,
                                        live_gas_status,
@@ -31,12 +32,12 @@ class LongitudinalTuningLayout(Widget):
 
     self._tuning_items = self._initialize_items()
     status = ListItem(
-      title=lambda: (tr("Parked - saved settings apply next drive") if ui_state.is_offroad()
+      title=lambda: (tr("Parked - controller changes apply next drive") if ui_state.is_offroad()
                      else tr("Full MVL longitudinal active") if mvl_longitudinal_enabled(ui_state.CP)
                      else tr("Custom longitudinal active") if nrdr_longitudinal_enabled(ui_state.CP)
                      and getattr(ui_state.CP, "openpilotLongitudinalControl", False)
                      else tr("Baseline longitudinal - nrdr tuning inactive")),
-      description=lambda: tr("Changes apply next drive. ")
+      description=lambda: tr("Controller changes apply next drive. ")
                           + tr(live_gas_status(ui_state.CP, ui_state.params, ui_state.CP_SP,
                                                is_offroad=ui_state.is_offroad()).replace("\n", "; ")),
     )
@@ -122,8 +123,8 @@ class LongitudinalTuningLayout(Widget):
       title=lambda: tr("Wind Brake"), initial_state=True,
       callback=lambda value: save_pcm_choice(ui_state, "NrdrHondaWindBrake", value),
       description=lambda: tr(
-        "Reduces brake demand to account for estimated air resistance. Off removes this compensation; " +
-            "Experimental PCM shaping ignores it without changing your saved choice."
+        "Adds coasting compensation on pedal cars; Off uses the gas request alone and leaves braking unchanged. "
+        "On PCM cars, reduces braking for air resistance; Off removes that reduction."
       ),
     )
 
@@ -284,7 +285,8 @@ class LongitudinalTuningLayout(Widget):
     pcm_available = pcm_tuning_available(ui_state.CP, ui_state.CP_SP, ui_state.params)
     pcm_enabled = ui_state.is_offroad() and pcm_available
     self._pcm_mode.action_item.set_enabled(pcm_enabled)
-    self._wind_brake.action_item.set_enabled(pcm_enabled)
+    self._wind_brake.action_item.set_enabled(
+      wind_brake_editable(ui_state.CP, ui_state.CP_SP, ui_state.params, is_offroad=ui_state.is_offroad()))
     self._pcm_mode.action_item.set_selected_button(saved_pcm_mode(ui_state.params))
     self._wind_brake.action_item.set_state(saved_wind_brake(ui_state.params))
     self._standstill_gap.action_item.set_enabled(
