@@ -298,7 +298,7 @@ def test_releases_preserve_source_communication_policy_and_clean_monitoring() ->
   assert "restore_comm_events" not in source
   assert "restore_comm_events" not in BUILD_LAUNCHER.read_text(encoding="utf-8")
   assert 'cp -p -- "$CLEAN_OVERLAY_DIR/driver_monitoring.py" "$hooks_target/driver_monitoring.py"' in source
-  assert 'python3 "$CLEAN_OVERLAY_DIR/strip_monitoring_ui.py" "$BUILD_DIR"' in source
+  assert '"$ui_python" "$CLEAN_OVERLAY_DIR/strip_monitoring_ui.py" "$BUILD_DIR"' in source
   tree = ast.parse((REPO_ROOT / "openpilot/selfdrive/selfdrived/events.py").read_text(encoding="utf-8"))
   mapping = next(node.value for node in tree.body if isinstance(node, ast.AnnAssign)
                  and isinstance(node.target, ast.Name) and node.target.id == "EVENTS")
@@ -306,6 +306,23 @@ def test_releases_preserve_source_communication_policy_and_clean_monitoring() ->
   for name in ("commIssue", "commIssueAvgFreq"):
     assert isinstance(handlers[name], ast.Dict) and not handlers[name].keys
   assert handlers["driverMonitoringFault"].keys
+
+
+@pytest.mark.parametrize("agnos", [False, True])
+def test_clean_ui_cleanup_python_selection(tmp_path: Path, agnos: bool) -> None:
+  source = BUILD_SCRIPT.read_text(encoding="utf-8")
+  start = source.index('  local ui_python="python3"')
+  end = source.index('  [ -d "$BUILD_DIR/.git" ]', start)
+  marker = tmp_path / "AGNOS"
+  if agnos:
+    marker.touch()
+  selection = source[start:end].replace("local ui_python=", "ui_python=", 1)
+  result = subprocess.run(
+    [BASH, "-c", selection + '\nprintf "%s" "$ui_python"'],
+    env={**os.environ, "AGNOS_MARKER": bash_path(marker)},
+    capture_output=True, text=True, check=True,
+  )
+  assert result.stdout == ("/usr/bin/python3" if agnos else "python3")
 
 
 @pytest.mark.parametrize("failure,event", [("alive", "commIssue"), ("freq_ok", "commIssueAvgFreq"), ("valid", "commIssue")])

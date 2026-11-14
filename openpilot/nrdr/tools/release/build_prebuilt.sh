@@ -235,6 +235,11 @@ apply_clean_overlay() {
   local hooks_target="$BUILD_DIR/openpilot/nrdr/hooks"
   local driver_policy_target="$BUILD_DIR/openpilot/nrdr/features/driver_policy"
   local backend_target="$BUILD_DIR/openpilot/nrdr/config/backend_env.sh"
+  local ui_python="python3"
+  # AGNOS ships PyYAML with system Python, not its read-only runtime venv.
+  if [ -f "$AGNOS_MARKER" ]; then
+    ui_python="/usr/bin/python3"
+  fi
   [ -d "$BUILD_DIR/.git" ] || die "clean overlay target is not a Git tree: $BUILD_DIR"
   [ -d "$hooks_target" ] || die "clean hook overlay target is missing: $hooks_target"
   [ -d "$driver_policy_target" ] || die "clean driver-policy overlay target is missing: $driver_policy_target"
@@ -247,7 +252,7 @@ apply_clean_overlay() {
   cp -p -- "$CLEAN_OVERLAY_DIR/backend_env.sh" "$backend_target"
   # Preserve source communication-alert policy and diagnostics in every build.
   # Clean's monitoring timings and customization restrictions remain separate.
-  python3 "$CLEAN_OVERLAY_DIR/strip_monitoring_ui.py" "$BUILD_DIR"
+  "$ui_python" "$CLEAN_OVERLAY_DIR/strip_monitoring_ui.py" "$BUILD_DIR"
 
   # Clean releases retain the host seam but replace its NRDR-owned backend policy.
   replace_once "$BUILD_DIR/openpilot/nrdr/ui/home/layout.py" \
