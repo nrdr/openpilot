@@ -1,0 +1,262 @@
+from openpilot.cereal import log
+from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
+from openpilot.nrdr.features.longitudinal.personality import write_personality
+from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.common.params import Params, UnknownKeyName
+from openpilot.system.ui.widgets import Widget
+from openpilot.system.ui.widgets.list_view import multiple_button_item, toggle_item
+from openpilot.system.ui.widgets.scroller_tici import Scroller
+from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
+from openpilot.system.ui.lib.application import gui_app
+from openpilot.system.ui.lib.multilang import tr, tr_noop
+from openpilot.system.ui.widgets import DialogResult
+from openpilot.selfdrive.ui.ui_state import ui_state
+
+if gui_app.sunnypilot_ui():
+  from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp as toggle_item
+  from openpilot.system.ui.sunnypilot.widgets.list_view import multiple_button_item_sp as multiple_button_item
+
+PERSONALITY_TO_INT = log.LongitudinalPersonality.schema.enumerants
+
+# Description constants
+DESCRIPTIONS = {
+  "OpenpilotEnabledToggle": tr_noop(
+    "Use the sunnypilot system for adaptive cruise control and lane keep driver assistance. " +
+    "Your attention is required at all times to use this feature."
+  ),
+  "DisengageOnAccelerator": tr_noop("Disengages cruise control when you press the accelerator. Off allows a temporary accelerator override."),
+  "LongitudinalPersonality": tr_noop(
+    "Choose the following distance and driving response: Aggressive follows closer, Relaxed leaves more space, " +
+    "and Econ favors gentler driving. Standard balances the two."
+  ),
+  "IsLdwEnabled": tr_noop(
+    "Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line " +
+    "without a turn signal activated while driving over 31 mph (50 km/h)."
+  ),
+  "AlwaysOnDM": tr_noop("Enable driver monitoring even when sunnypilot is not engaged."),
+  'RecordFront': tr_noop("Uploads driver-camera recordings to help improve driver monitoring. Off stops these uploads."),
+  "IsMetric": tr_noop("Display speed in km/h instead of mph."),
+  "RecordAudio": tr_noop("Records microphone audio during drives for dashcam playback. Off stops new recordings without deleting existing audio."),
+}
+
+
+class TogglesLayout(Widget):
+  def __init__(self):
+    super().__init__()
+    self._params = Params()
+    self._is_release = False  # self._params.get_bool("IsReleaseBranch")
+
+    # param, title, desc, icon, needs_restart
+    self._toggle_defs = {
+      "OpenpilotEnabledToggle": (
+        lambda: tr("Enable sunnypilot"),
+        DESCRIPTIONS["OpenpilotEnabledToggle"],
+        "chffr_wheel.png",
+        True,
+      ),
+      "ExperimentalMode": (
+        lambda: tr("Experimental Mode"),
+        "",
+        "experimental_white.png",
+        False,
+      ),
+      "DisengageOnAccelerator": (
+        lambda: tr("Disengage on Accelerator Pedal"),
+        DESCRIPTIONS["DisengageOnAccelerator"],
+        "disengage_on_accelerator.png",
+        False,
+      ),
+      "IsLdwEnabled": (
+        lambda: tr("Enable Lane Departure Warnings"),
+        DESCRIPTIONS["IsLdwEnabled"],
+        "warning.png",
+        False,
+      ),
+      "AlwaysOnDM": (
+        lambda: tr("Always-On Driver Monitoring"),
+        DESCRIPTIONS["AlwaysOnDM"],
+        "monitoring.png",
+        False,
+      ),
+      "RecordFront": (
+        lambda: tr("Record and Upload Driver Camera"),
+        DESCRIPTIONS["RecordFront"],
+        "monitoring.png",
+        True,
+      ),
+      "RecordAudio": (
+        lambda: tr("Record and Upload Microphone Audio"),
+        DESCRIPTIONS["RecordAudio"],
+        "microphone.png",
+        True,
+      ),
+      "IsMetric": (
+        lambda: tr("Use Metric System"),
+        DESCRIPTIONS["IsMetric"],
+        "metric.png",
+        False,
+      ),
+    }
+
+    self._long_personality_setting = multiple_button_item(
+      lambda: tr("Driving Personality"),
+      lambda: tr(DESCRIPTIONS["LongitudinalPersonality"]),
+      buttons=[lambda: tr("Aggressive"), lambda: tr("Standard"), lambda: tr("Relaxed"), lambda: tr("Econ")],
+      button_width=300,
+      callback=self._set_longitudinal_personality,
+      selected_index=self._params.get("LongitudinalPersonality", return_default=True),
+      icon="speed_limit.png"
+    )
+
+    self._toggles = {}
+    self._locked_toggles = set()
+    for param, (title, desc, icon, needs_restart) in self._toggle_defs.items():
+      toggle = toggle_item(
+        title,
+        desc,
+        self._params.get_bool(param),
+        callback=lambda state, p=param: self._toggle_callback(state, p),
+        icon=icon,
+      )
+
+      try:
+        locked = self._params.get_bool(param + "Lock")
+      except UnknownKeyName:
+        locked = False
+      toggle.action_item.set_enabled(not locked)
+
+      # Make description callable for live translation
+      additional_desc = ""
+      if needs_restart and not locked:
+        additional_desc = tr("Changing this setting will restart sunnypilot if the car is powered on.")
+      toggle.set_description(lambda og_desc=toggle.description, add_desc=additional_desc: tr(og_desc) + (" " + tr(add_desc) if add_desc else ""))
+
+      # track for engaged state updates
+      if locked:
+        self._locked_toggles.add(param)
+
+      self._toggles[param] = toggle
+
+      # insert longitudinal personality after NDOG toggle
+      if param == "DisengageOnAccelerator":
+        self._toggles["LongitudinalPersonality"] = self._long_personality_setting
+
+    self._update_experimental_mode_icon()
+    self._scroller = Scroller(list(self._toggles.values()), line_separator=True, spacing=0)
+
+    ui_state.add_engaged_transition_callback(self._update_toggles)
+
+  def _update_state(self):
+    self._toggles["ExperimentalMode"].action_item.set_enabled(self._experimental_mode_editable())
+    if ui_state.sm.updated["selfdriveState"]:
+      personality = PERSONALITY_TO_INT[ui_state.sm["selfdriveState"].personality]
+      if personality != ui_state.personality and ui_state.started:
+        self._long_personality_setting.action_item.set_selected_button(personality)
+      ui_state.personality = personality
+
+  def show_event(self):
+    super().show_event()
+    self._scroller.show_event()
+    self._update_toggles()
+
+  def _update_toggles(self):
+    ui_state.update_params()
+    enabled = nrdr_longitudinal_enabled(ui_state.CP)
+    self._long_personality_setting.action_item.set_enabled_buttons(set(range(4 if enabled else 3)))
+    self._long_personality_setting.action_item.set_selected_button(
+      longitudinal_personality(self._params.get("LongitudinalPersonality", return_default=True), enabled),
+    )
+
+    e2e_description = tr(
+      "Lets the model choose acceleration and braking, using set speed as a ceiling; Off uses normal adaptive cruise control. " +
+      "Experimental behavior can be unpredictable, so stay ready to take over."
+    )
+
+    if ui_state.CP is not None:
+      if ui_state.has_longitudinal_control:
+        self._toggles["ExperimentalMode"].action_item.set_enabled(True)
+        self._toggles["ExperimentalMode"].set_description(e2e_description)
+        self._long_personality_setting.action_item.set_enabled(True)
+      else:
+        # no long for now
+        self._toggles["ExperimentalMode"].action_item.set_enabled(False)
+        self._toggles["ExperimentalMode"].action_item.set_state(False)
+        self._long_personality_setting.action_item.set_enabled(False)
+        if self._params.get("ExperimentalMode") is not False and tuning_write_allowed(self._params, "ExperimentalMode", CP=ui_state.CP):
+          self._params.put_bool("ExperimentalMode", False, block=True)
+
+        unavailable = tr("Experimental mode is currently unavailable on this car since the car's stock ACC is used for longitudinal control.")
+
+        long_desc = unavailable + " " + tr("sunnypilot longitudinal control may come in a future update.")
+        if ui_state.CP.alphaLongitudinalAvailable:
+          if self._is_release:
+            long_desc = unavailable + " " + tr("An alpha version of sunnypilot longitudinal control can be tested, along with " +
+                                               "Experimental mode, on non-release branches.")
+          else:
+            long_desc = tr("Enable the sunnypilot longitudinal control (alpha) toggle to allow Experimental mode.")
+
+        self._toggles["ExperimentalMode"].set_description("<b>" + long_desc + "</b><br><br>" + e2e_description)
+    else:
+      self._toggles["ExperimentalMode"].set_description(e2e_description)
+
+    self._update_experimental_mode_icon()
+
+    # TODO: make a param control list item so we don't need to manage internal state as much here
+    # refresh toggles from params to mirror external changes
+    for param in self._toggle_defs:
+      self._toggles[param].action_item.set_state(self._params.get_bool(param))
+
+    # these toggles need restart, block while engaged
+    for toggle_def in self._toggle_defs:
+      if self._toggle_defs[toggle_def][3] and toggle_def not in self._locked_toggles:
+        self._toggles[toggle_def].action_item.set_enabled(not ui_state.engaged)
+    self._toggles["ExperimentalMode"].action_item.set_enabled(self._experimental_mode_editable())
+
+  def _render(self, rect):
+    self._scroller.render(rect)
+
+  def _update_experimental_mode_icon(self):
+    icon = "experimental.png" if self._toggles["ExperimentalMode"].action_item.get_state() else "experimental_white.png"
+    self._toggles["ExperimentalMode"].set_icon(icon)
+
+  def _experimental_mode_editable(self):
+    return ("ExperimentalMode" not in self._locked_toggles and (ui_state.CP is None or ui_state.has_longitudinal_control)
+            and tuning_write_allowed(self._params, "ExperimentalMode", CP=ui_state.CP))
+
+  def _handle_experimental_mode_toggle(self, state: bool):
+    if not self._experimental_mode_editable():
+      self._toggles["ExperimentalMode"].action_item.set_state(self._params.get_bool("ExperimentalMode"))
+      return
+    confirmed = self._params.get_bool("ExperimentalModeConfirmed")
+    if state and not confirmed:
+      def confirm_callback(result: DialogResult):
+        if result == DialogResult.CONFIRM and self._experimental_mode_editable():
+          self._params.put_bool("ExperimentalMode", True, block=True)
+          self._params.put_bool("ExperimentalModeConfirmed", True, block=True)
+        else:
+          self._toggles["ExperimentalMode"].action_item.set_state(self._params.get_bool("ExperimentalMode"))
+        self._update_experimental_mode_icon()
+
+      # show confirmation dialog
+      content = (f"<h1>{self._toggles['ExperimentalMode'].title}</h1><br>" +
+                 f"<p>{self._toggles['ExperimentalMode'].description}</p>")
+      dlg = ConfirmDialog(content, tr("Enable"), rich=True, callback=confirm_callback)
+      gui_app.push_widget(dlg)
+    else:
+      self._update_experimental_mode_icon()
+      self._params.put_bool("ExperimentalMode", state, block=True)
+
+  def _toggle_callback(self, state: bool, param: str):
+    if param == "ExperimentalMode":
+      self._handle_experimental_mode_toggle(state)
+      return
+
+    self._params.put_bool(param, state, block=True)
+    if self._toggle_defs[param][3]:
+      self._params.put_bool("OnroadCycleRequested", True, block=True)
+
+  def _set_longitudinal_personality(self, button_index: int):
+    if isinstance(button_index, str):
+      button_index = int(button_index)
+    personality = longitudinal_personality(button_index, nrdr_longitudinal_enabled(ui_state.CP))
+    write_personality(self._params, personality)

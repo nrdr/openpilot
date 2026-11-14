@@ -1,0 +1,26 @@
+"""Compatibility exports for canonical NRDR longitudinal planning."""
+
+from openpilot.nrdr.features.longitudinal.longitudinal_planner import (
+  CRUISE_ACCEL_VALUES,
+  LAUNCH_COMMIT_TIME,
+  LAUNCH_DISARM_SPEED,
+  LAUNCH_MAX_ACCEL,
+  LAUNCH_MOVING_SPEED,
+  ROEN_ACCEL_BP,
+  ROEN_PLANNER_ACCEL,
+  ROEN_TURN_ACCEL_THRESHOLD,
+  NrdrLongitudinalPlanner,
+)
+
+
+__all__ = (
+  "CRUISE_ACCEL_VALUES",
+  "LAUNCH_COMMIT_TIME",
+  "LAUNCH_DISARM_SPEED",
+  "LAUNCH_MAX_ACCEL",
+  "LAUNCH_MOVING_SPEED",
+  "ROEN_ACCEL_BP",
+  "ROEN_PLANNER_ACCEL",
+  "ROEN_TURN_ACCEL_THRESHOLD",
+  "NrdrLongitudinalPlanner",
+)
