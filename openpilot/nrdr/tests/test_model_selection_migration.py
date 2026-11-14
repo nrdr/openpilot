@@ -1,0 +1,273 @@
+"""Saved selection identity and per-model compiler provenance; no native I/O."""
+import ast
+import asyncio
+import copy
+import hashlib
+import os
+from pathlib import Path
+from types import ModuleType, SimpleNamespace
+
+import numpy as np
+
+import pytest
+
+from openpilot.cereal import custom
+from openpilot.nrdr.features.services import ModelAdmissionError, TINYGRAD_RUNTIME_REF
+from openpilot.nrdr.features.services.model_manager import select_default_model
+from openpilot.nrdr.features.services.model_artifacts import PLAIN_ARTIFACT_REFS
+
+
+class ParamsMemory:
+  def __init__(self, values):
+    self.values = copy.deepcopy(values)
+    self.writes = []
+
+  def get(self, key):
+    return self.values.get(key)
+
+  def get_bool(self, key):
+    return bool(self.values.get(key, False))
+
+  def put(self, key, value, **_kwargs):
+    self.values[key] = value
+    self.writes.append((key, value))
+
+  put_bool = put
+
+  def remove(self, key):
+    self.values.pop(key, None)
+    self.writes.append((key, None))
+
+
+def saved_pop(minimum=19):
+  return custom.ModelManagerSP.ModelBundle(internalName='PMV2', displayName='Pop Model v2', index=59, generation=12,
+                                          ref='source-model-ref', runner='tinygrad', is20hz=True, minimumSelectorVersion=minimum,
+                                          overrides=[{'key': 'lat', 'value': '.0'}, {'key': 'long', 'value': '.3'}]).to_dict()
+
+
+def definitions(relative, namespace):
+  path = Path(__file__).resolve().parents[3] / relative
+  tree = ast.parse(path.read_text(encoding='utf-8'))
+  tree.body = [node for node in tree.body if isinstance(node, (ast.Assign, ast.AnnAssign, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
+  module = ModuleType('selection_test')
+  module.__dict__.update(namespace)
+  exec(compile(tree, str(path), 'exec'), module.__dict__)
+  return module
+
+
+@pytest.fixture
+def helpers():
+  # Execute all real definitions with platform I/O imports replaced, not mocked
+  # selection behavior. Native model-manager tests cover the real import graph.
+  return definitions('openpilot/sunnypilot/models/helpers.py', {
+    'custom': custom, 'np': np, 'os': os, 'hashlib': hashlib, 'Params': ParamsMemory,
+    'Paths': SimpleNamespace(model_root=lambda: ''), 'chestnut_present': lambda: False,
+    'cloudlog': SimpleNamespace(error=lambda *_: None)})
+
+
+@pytest.mark.parametrize('version', (19, 20, 21))
+def test_supported_selector_retains_exact_preference_and_replaces_only_stale_runner_cache(monkeypatch, helpers, version):
+  raw = saved_pop(version)
+  params = ParamsMemory({'ModelManager_ActiveBundle': raw, 'ModelRunnerTypeCache': int(custom.ModelManagerSP.Runner.stock)})
+  monkeypatch.setattr(helpers, 'chestnut_present', lambda: False)
+  assert helpers.get_selected_bundle(params).to_dict() == raw
+  assert helpers.get_active_model_runner(params) == int(custom.ModelManagerSP.Runner.tinygrad)
+  assert params.values['ModelManager_ActiveBundle'] == raw
+  assert params.writes == [('ModelRunnerTypeCache', int(custom.ModelManagerSP.Runner.tinygrad))]
+
+
+@pytest.mark.parametrize('source,hardware,expected', [('qcom', True, 2), ('chestnut', True, 1), ('qcom', False, 1)])
+def test_local_rebuilds_extend_only_qcom_catalog_without_duplicates(source, hardware, expected):
+  local = {'ref': 'cheddar', 'internalName': 'CHEDDAR'}
+  existing = SimpleNamespace(ref='pop', internalName='PMV2')
+  namespace = {'COMMA_HARDWARE': hardware, 'HARDWARE': SimpleNamespace(get_device_type=lambda: 'mici'),
+               'Paths': SimpleNamespace(model_root=lambda: '/models'),
+               'verified_rebuild_bundles': lambda root, camera: [local],
+               'ModelParser': SimpleNamespace(_parse_bundle=lambda bundle: SimpleNamespace(**bundle))}
+  path = Path(__file__).resolve().parents[3] / 'openpilot/sunnypilot/models/fetcher.py'
+  methods = [n for n in ast.parse(path.read_text()).body if isinstance(n, ast.FunctionDef)
+             and n.name in ('local_rebuilds_for_source', 'include_local_rebuilds')]
+  exec(compile(ast.Module(body=methods, type_ignores=[]), str(path), 'exec'), namespace)
+  bundles = namespace['include_local_rebuilds']([existing], source)
+  assert len(bundles) == expected and bundles[0] is existing
+  assert namespace['include_local_rebuilds'](bundles, source) == bundles
+
+
+def test_first_run_waits_on_legacy_catalog_and_keeps_stock_until_a_compatible_download_finishes(helpers):
+  params = ParamsMemory({'NrdrAutoSelectModel': True, 'ModelRunnerTypeCache': int(custom.ModelManagerSP.Runner.tinygrad)})
+  legacy = custom.ModelManagerSP.ModelBundle(**saved_pop())
+  legacy.models = [{'type': 'chunked', 'artifact': {'fileName': 'pop.pkl', 'downloadUri': {
+    'uri': 'https://example.invalid/pop.pkl', 'sha256': '6dcaddf515ec60b860d20cab5b0892cb855082e5db56e7992d27833aa485227b'}}}]
+  select_default_model(params, (legacy,))
+  assert params.writes == []
+  assert params.get_bool('NrdrAutoSelectModel')
+  assert params.get('ModelManager_DownloadRef') is None
+  assert helpers.get_active_bundle(params) is None
+  assert helpers.get_active_model_runner(params) == int(custom.ModelManagerSP.Runner.stock)
+
+  # Use the real Capnp enum/text fields too, not only SimpleNamespace fixtures.
+  compatible = custom.ModelManagerSP.ModelBundle(**legacy.to_dict())
+  compatible.ref = 'new-compiled-pop'
+  compatible.tinygradRef = TINYGRAD_RUNTIME_REF
+  compatible.models[0].artifact.fileName = 'compatible-pop.pkl'
+  compatible.models[0].artifact.downloadUri.sha256 = 'a' * 64
+  select_default_model(params, (legacy, compatible))
+  assert params.get('ModelManager_DownloadRef') == 'new-compiled-pop'
+  assert not params.get_bool('NrdrAutoSelectModel')
+  assert helpers.get_active_bundle(params) is None  # Queuing isn't a preference switch.
+  assert helpers.get_active_model_runner(params) == int(custom.ModelManagerSP.Runner.stock)
+
+
+@pytest.mark.parametrize('compiler_ref', sorted(PLAIN_ARTIFACT_REFS))
+def test_portable_upgrade_keeps_model_identity_and_does_not_replace_identical_bytes(compiler_ref):
+  from openpilot.nrdr.features.services.model_manager import get_model_repair_candidate
+  raw = saved_pop()
+  raw['models'] = [{'type': 'chunked', 'artifact': {'fileName': 'model.pkl', 'downloadUri': {
+    'uri': 'https://example.invalid/model.pkl', 'sha256': 'a' * 64}}}]
+  saved = custom.ModelManagerSP.ModelBundle(**raw)
+  target = custom.ModelManagerSP.ModelBundle(**dict(raw, tinygradRef=compiler_ref))
+  before = saved.to_dict()
+  assert get_model_repair_candidate(saved, [target]) is None
+  target.models[0].artifact.downloadUri.sha256 = 'b' * 64
+  assert get_model_repair_candidate(saved, [target]) is target
+  assert saved.to_dict() == before
+  target.ref = 'different-model'
+  assert get_model_repair_candidate(saved, [target]) is None
+
+
+@pytest.mark.parametrize('source', ['qcom', 'chestnut'])
+def test_old_catalog_refreshes_without_repeated_network_polling(source):
+  path = Path(__file__).resolve().parents[3] / 'openpilot/sunnypilot/models/fetcher.py'
+  cls = next(n for n in ast.parse(path.read_text()).body if isinstance(n, ast.ClassDef) and n.name == 'ModelFetcher')
+  namespace = {'custom': custom, 'Params': ParamsMemory, 'PLAIN_ARTIFACT_REFS': PLAIN_ARTIFACT_REFS,
+               'time': SimpleNamespace(monotonic=lambda: 100), 'include_local_rebuilds': lambda bundles, _: bundles,
+               'cloudlog': SimpleNamespace(warning=lambda *a, **k: None, debug=lambda *a: None)}
+  exec(compile(ast.Module(body=[cls], type_ignores=[]), str(path), 'exec'), namespace)
+  fetcher = namespace['ModelFetcher'].__new__(namespace['ModelFetcher'])
+  old = custom.ModelManagerSP.ModelBundle(**dict(saved_pop(), tinygradRef=TINYGRAD_RUNTIME_REF))
+  fetcher.model_caches = {source: SimpleNamespace(get=lambda: ({'bundles': [{'is_big': source == 'chestnut'}]}, False))}
+  fetcher.model_parser = SimpleNamespace(parse_models=lambda _: [old])
+  fetcher._refetched, fetcher._runtime_refresh_at = set(), {}
+  attempts = []
+  fetcher._fetch_and_cache_models = lambda source: attempts.append(source)
+  assert fetcher.get_bundles_for_source(source) == [old]
+  assert fetcher.get_bundles_for_source(source) == [old]
+  assert attempts == [source]
+  old.tinygradRef = next(iter(PLAIN_ARTIFACT_REFS))
+  namespace['time'].monotonic = lambda: 200
+  assert fetcher.get_bundles_for_source(source) == [old]
+  assert attempts == [source]
+
+@pytest.mark.parametrize('raw', [saved_pop(18), {'invalid': True}, 'not a bundle'])
+def test_unsupported_saved_selection_cannot_turn_into_default(raw, helpers):
+  params = ParamsMemory({'ModelManager_ActiveBundle': raw})
+  with pytest.raises(ModelAdmissionError, match='no default substituted'):
+    helpers.get_selected_bundle(params)
+  assert params.values['ModelManager_ActiveBundle'] == raw
+  assert params.writes == []
+
+
+@pytest.mark.parametrize('qcom', [None, saved_pop(), 'test-qcom'])
+@pytest.mark.parametrize('chestnut_present', [False, True])
+def test_chestnut_download_preserves_qcom_slot_and_admission(tmp_path, helpers, qcom, chestnut_present):
+  source = Path(__file__).resolve().parents[3] / 'openpilot/sunnypilot/models/manager.py'
+  cls = next(node for node in ast.parse(source.read_text(encoding='utf-8')).body if isinstance(node, ast.ClassDef) and node.name == 'ModelManagerSP')
+  method = next(node for node in cls.body if isinstance(node, ast.AsyncFunctionDef) and node.name == '_download_bundle')
+  namespace = {'custom': custom, 'os': os, 'ACTIVE_BUNDLE_KEYS': helpers.ACTIVE_BUNDLE_KEYS,
+               'get_active_bundle': helpers.get_active_bundle, 'DownloadCancelled': type('Cancelled', (Exception,), {})}
+  exec(compile(ast.Module(body=[method], type_ignores=[]), str(source), 'exec'), namespace)
+  params = ParamsMemory({'ModelManager_ActiveBundle': qcom})
+  selected = custom.ModelManagerSP.ModelBundle(**saved_pop())
+  selected.ref = 'downloaded-chestnut'
+  manager = SimpleNamespace(params=params, chestnut_present=chestnut_present, active_bundle=None,
+                            _report_status=lambda: None, _download_interrupted=lambda: False)
+  download = namespace['_download_bundle'](manager, selected, str(tmp_path), 'chestnut')
+  if not chestnut_present and qcom == 'test-qcom':
+    with pytest.raises(ModelAdmissionError, match='Saved qcom model selection is unsupported or malformed'):
+      asyncio.run(download)
+    assert selected.status == custom.ModelManagerSP.DownloadStatus.failed
+    assert manager.active_bundle is None
+  else:
+    asyncio.run(download)
+    assert selected.status == custom.ModelManagerSP.DownloadStatus.downloaded
+    if chestnut_present:
+      assert manager.active_bundle.ref == 'downloaded-chestnut'
+    elif qcom is None:
+      assert manager.active_bundle is None
+    else:
+      assert manager.active_bundle.to_dict() == qcom
+  assert params.values['ModelManager_ActiveBundle'] == qcom
+  assert [key for key, _ in params.writes] == ['ModelManager_ActiveBundleChestnut']
+
+
+def test_catalog_mismatch_keeps_saved_preference(monkeypatch, helpers):
+  raw = saved_pop()
+  params = ParamsMemory({'ModelManager_ActiveBundle': raw})
+  monkeypatch.setattr(helpers, 'cloudlog', SimpleNamespace(error=lambda *_: None))
+  helpers._LAST_VALIDATED_RAW.clear()
+  helpers._validate_active_bundle(params, 'qcom', [custom.ModelManagerSP.ModelBundle(internalName='other', ref='another-ref')])
+  assert params.values['ModelManager_ActiveBundle'] == raw
+  assert not params.writes
+
+
+def test_compiler_ref_is_per_bundle_not_model_source_ref_or_catalog_blanket(helpers):
+  # Fetching, manifest writes and networking are outside this pure parser test.
+  source = Path(__file__).resolve().parents[3] / 'openpilot/sunnypilot/models/fetcher.py'
+  node = next(node for node in ast.parse(source.read_text(encoding='utf-8')).body if isinstance(node, ast.ClassDef) and node.name == 'ModelParser')
+  namespace = {'custom': custom, 'is_bundle_version_compatible': helpers.is_bundle_version_compatible}
+  exec(compile(ast.Module(body=[node], type_ignores=[]), str(source), 'exec'), namespace)
+  ModelParser = namespace['ModelParser']
+  base = {'short_name': 'PMV2', 'display_name': 'Pop', 'index': 59, 'generation': 12, 'environment': 'development', 'runner': 'tinygrad',
+              'is_20hz': True, 'minimum_selector_version': '19', 'models': [], 'ref': 'model-source', 'overrides': {'long': '.3'}}
+  parsed = ModelParser.parse_models({'tinygrad_ref': 'catalog-compiler', 'bundles': [base, dict(base, tinygrad_ref=TINYGRAD_RUNTIME_REF)]})
+  assert [bundle.tinygradRef for bundle in parsed] == ['catalog-compiler', TINYGRAD_RUNTIME_REF]
+  assert all(bundle.ref == 'model-source' and bundle.overrides[0].value == '.3' for bundle in parsed)
+
+
+def test_catalog_parsing_does_not_touch_cached_chunk_manifest(tmp_path):
+  source = Path(__file__).resolve().parents[3] / 'openpilot/sunnypilot/models/fetcher.py'
+  node = next(node for node in ast.parse(source.read_text(encoding='utf-8')).body if isinstance(node, ast.ClassDef) and node.name == 'ModelParser')
+  def forbidden(*_args, **_kwargs):
+    raise AssertionError('Catalog parser must not write the model cache')
+  namespace = {'custom': custom, 'Paths': SimpleNamespace(model_root=forbidden), 'os': SimpleNamespace(makedirs=forbidden)}
+  exec(compile(ast.Module(body=[node], type_ignores=[]), str(source), 'exec'), namespace)
+  manifest = tmp_path / 'driving.pkl.chunkmanifest'
+  manifest.write_text('2')
+  artifact = namespace['ModelParser']._parse_artifact({
+    'file_name': 'driving.pkl', 'download_uri': {'url': 'https://example.invalid/driving.pkl', 'sha256': 'digest'},
+    'chunks': [{'file_name': f'driving.pkl.chunk{i:02d}of03', 'sha256': str(i)} for i in range(1, 4)]})
+  assert len(artifact.chunks) == 3
+  assert manifest.read_text() == '2'
+
+
+def test_verified_cache_repairs_manifest_without_a_download_and_removes_stale_whole_file(tmp_path):
+  from openpilot.common.file_chunker import get_chunk_name, get_manifest_path
+  source = Path(__file__).resolve().parents[3] / 'openpilot/sunnypilot/models/manager.py'
+  cls = next(node for node in ast.parse(source.read_text(encoding='utf-8')).body if isinstance(node, ast.ClassDef) and node.name == 'ModelManagerSP')
+  node = next(node for node in cls.body if isinstance(node, ast.AsyncFunctionDef) and node.name == '_process_artifact')
+  def verify_sync(path, expected):
+    return Path(path).is_file() and hashlib.sha256(Path(path).read_bytes()).hexdigest() == expected
+  async def verify(path, expected):
+    return await asyncio.to_thread(verify_sync, path, expected)
+  def forbidden(*_args, **_kwargs):
+    raise AssertionError('Verified cache must not access the network')
+  namespace = {'os': os, 'custom': custom, 'verify_file': verify, 'DownloadCancelled': type('Cancelled', (Exception,), {}),
+               'cloudlog': SimpleNamespace(error=forbidden)}
+  exec(compile(ast.Module(body=[node], type_ignores=[]), str(source), 'exec'), namespace)
+  artifact = SimpleNamespace(fileName='driving.pkl', downloadUri=SimpleNamespace(uri='https://example.invalid/model', sha256=''),
+                             chunks=[], downloadProgress=SimpleNamespace())
+  base = tmp_path / artifact.fileName
+  base.write_bytes(b'old whole artifact')
+  manifest = Path(get_manifest_path(str(base)))
+  manifest.write_text('7')
+  bodies = (b'new first chunk', b'new second chunk')
+  for i, data in enumerate(bodies):
+    Path(get_chunk_name(str(base), i, len(bodies))).write_bytes(data)
+    artifact.chunks.append(SimpleNamespace(sha256=hashlib.sha256(data).hexdigest()))
+  manager = SimpleNamespace(_download_interrupted=lambda: False, _download_chunked=forbidden, _download_file=forbidden,
+                            _sync_artifact_progress=lambda *_: None, _report_status=lambda: None)
+  asyncio.run(namespace['_process_artifact'](manager, artifact, str(tmp_path)))
+  assert manifest.read_text() == '2' and not base.exists()
+  assert artifact.downloadProgress.status == custom.ModelManagerSP.DownloadStatus.cached
+  for i, data in enumerate(bodies):
+    assert Path(get_chunk_name(str(base), i, len(bodies))).read_bytes() == data

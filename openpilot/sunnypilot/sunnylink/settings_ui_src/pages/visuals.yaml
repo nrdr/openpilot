@@ -1,0 +1,109 @@
+# Page: visuals
+# Edit this file. Run compile_settings_ui.py to emit settings_ui.json.
+id: visuals
+label: Visuals
+icon: visuals
+order: 4
+remote_configurable: true
+description: HUD overlays, alerts, and on-screen display elements
+sections:
+- id: hud_elements
+  title: HUD Elements
+  description: Overlays shown on the driving screen
+  items:
+  - key: BlindSpot
+    widget: toggle
+    title: Show Blind Spot Warnings
+    description: "Shows a warning when the car's blind-spot sensors detect another vehicle."
+    details: "Off hides these on-screen warnings without changing the car's blind-spot monitoring."
+  - key: TorqueBar
+    widget: toggle
+    title: Steering Arc
+    description: Display steering arc on the driving screen when lateral control is enabled.
+  - key: ShowTurnSignals
+    widget: toggle
+    title: Display Turn Signals
+    description: "Shows turn-signal indicators on the driving screen."
+  - key: RoadNameToggle
+    widget: toggle
+    title: Display Road Name
+    description: "Shows the current road name on the driving screen."
+    details: "Requires downloaded OpenStreetMap data for the area."
+    visibility:
+    - $ref: '#/macros/hide_on_mici'
+  - key: StandstillTimer
+    widget: toggle
+    title: Standstill Timer
+    description: Show a timer on the HUD when the car is at a standstill.
+    visibility:
+    - $ref: '#/macros/hide_on_mici'
+  - key: RocketFuel
+    widget: toggle
+    title: Real-time Acceleration Bar
+    description: "Shows the car's measured acceleration and braking on the left side of the driving screen."
+    details: "Displays actual vehicle motion rather than the requested acceleration."
+    visibility:
+    - $ref: '#/macros/hide_on_mici'
+  - key: ChevronInfo
+    widget: option
+    title: Display Metrics Below Chevron
+    options:
+    - value: 0
+      label: 'Off'
+    - value: 1
+      label: Distance
+    - value: 2
+      label: Speed
+    - value: 3
+      label: Time
+    - value: 4
+      label: All
+    visibility:
+    - $ref: '#/macros/hide_on_mici'
+    enablement:
+    - $ref: '#/macros/longitudinal'
+- id: developer_ui
+  title: Developer UI Info
+  description: Speedometer and debug display options
+  visibility:
+  - $ref: '#/macros/hide_on_mici'
+  items:
+  - key: DevUIInfo
+    widget: option
+    title: Developer UI
+    description: Display real-time parameters and metrics from various sources.
+    options:
+    - value: 0
+      label: 'Off'
+    - value: 1
+      label: Bottom
+    - value: 2
+      label: Right
+    - value: 3
+      label: Right & Bottom
+  - key: TrueVEgoUI
+    widget: toggle
+    title: 'Speedometer: Always Display True Speed'
+    description: "Shows wheel-sensor speed instead of the dashboard-adjusted speed on supported vehicles."
+  - key: HideVEgoUI
+    widget: toggle
+    title: 'Speedometer: Hide from Onroad Screen'
+    description: "Hides the speedometer on the driving screen. Off shows it again."
+- id: alerts_extras
+  title: Alerts & Extras
+  description: Traffic light alerts and visual flair
+  items:
+  - key: GreenLightAlert
+    widget: toggle
+    title: Green Traffic Light Alert (Beta)
+    description: "Plays an alert when the light turns green and there is no vehicle ahead. Check traffic before proceeding."
+    details: "The on-screen notification is available on comma 3X."
+  - key: LeadDepartAlert
+    widget: toggle
+    title: Lead Departure Alert (Beta)
+    description: "Plays an alert when you are stopped and the vehicle ahead starts moving. Check traffic before proceeding."
+    details: "The on-screen notification is available on comma 3X."
+  - key: RainbowMode
+    widget: toggle
+    title: Tesla Rainbow Mode
+    description: "Adds a rainbow effect to the displayed driving path without changing driving behavior."

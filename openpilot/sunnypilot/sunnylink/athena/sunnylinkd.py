@@ -1,0 +1,602 @@
+#!/usr/bin/env python3
+"""
+Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
+
+This file is part of sunnypilot and is licensed under the MIT License.
+See the LICENSE.md file in the root directory for more details.
+"""
+from __future__ import annotations
+
+import base64
+import errno
+import gzip
+import json
+import os
+import ssl
+import threading
+import time
+
+from functools import partial
+from openpilot.system.athena.rpc import dispatcher
+from openpilot.common.params import Params, ParamKeyType
+from openpilot.common.realtime import set_core_affinity
+from openpilot.common.swaglog import cloudlog
+from openpilot.common.hardware.hw import Paths
+from openpilot.system.athena.athenad import ws_send, jsonrpc_handler, \
+  recv_queue, UploadQueueCache, upload_queue, cur_upload_items, backoff, ws_manage, log_handler, start_local_proxy_shim, upload_handler, stat_handler
+from websocket import (ABNF, WebSocket, WebSocketException, WebSocketTimeoutException,
+                       create_connection, WebSocketConnectionClosedException)
+
+import openpilot.cereal.messaging as messaging
+from openpilot.sunnypilot.models.model_name import DEFAULT_MODEL, DEFAULT_BIG_MODEL
+from openpilot.sunnypilot.models.fetcher import sunnylink_model_catalog_overrides
+from openpilot.sunnypilot.selfdrive.car.sync_sunnylink_params import update_car_list_param
+from openpilot.sunnypilot.sunnylink.api import SunnylinkApi
+from openpilot.sunnypilot.sunnylink.utils import sunnylink_need_register, sunnylink_ready, get_param_as_byte, save_param_from_base64_encoded_string
+from openpilot.sunnypilot.sunnylink.capabilities import generate_capabilities, CAPABILITY_LABELS
+from openpilot.sunnypilot.sunnylink.tools.generate_settings_schema import generate_schema
+from openpilot.nrdr.features.services.sunnylink import (
+  HONDA_TUNING_WRITE_KEYS, allow_param_write, request_stored_handcrafted_lateral_profile,
+)
+from openpilot.nrdr.features.longitudinal.personality import write_personality
+
+SUNNYLINK_ATHENA_HOST = os.getenv('SUNNYLINK_ATHENA_HOST', 'wss://athena.sunnylink.ai')
+HANDLER_THREADS = int(os.getenv('HANDLER_THREADS', "4"))
+LOCAL_PORT_WHITELIST = {8022}
+SUNNYLINK_LOG_ATTR_NAME = "user.sunny.upload"
+SUNNYLINK_RECONNECT_TIMEOUT_S = 70  # FYI changing this will also would require a change on sidebar.cc
+DISALLOW_LOG_UPLOAD = threading.Event()
+
+params = Params()
+
+# Parameters that should never be remotely modified
+BLOCKED_PARAMS = {
+  "AdbEnabled",
+  "CompletedSunnylinkConsentVersion",
+  "CompletedTrainingVersion",
+  "DriverLockoutCount",  # Monitoring-owned state, not a user setting.
+  "DriverTooDistracted",
+  "GithubUsername",  # Could grant SSH access
+  "GithubSshKeys",   # Direct SSH key injection
+  "HasAcceptedTerms",
+  "HasAcceptedTermsSP",
+  "IsOffroad",  # Manager-owned state; remote clients must not forge parked-only guards.
+  "NrdrHandcraftedLateralRequest",  # Device-generated vehicle/version binding; never accept remote context.
+  "OnroadCycleRequested",      # Prevent remote cycle trigger
+  "ParamsVersion",         # Device-managed version counter
+  "NrdrLiveGasResetStatus",  # Only the device can bind a request or acknowledge its completion.
+}
+
+
+def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
+  cloudlog.info("sunnylinkd.handle_long_poll started")
+  sm = messaging.SubMaster(['deviceState'])
+  end_event = threading.Event()
+  comma_prime_cellular_end_event = threading.Event()
+
+  threads = [
+              threading.Thread(target=ws_manage, args=(ws, end_event), name='ws_manage'),
+              threading.Thread(target=ws_recv, args=(ws, end_event), name='ws_recv'),
+              threading.Thread(target=ws_send, args=(ws, end_event), name='ws_send'),
+              threading.Thread(target=ws_ping, args=(ws, end_event), name='ws_ping'),
+              threading.Thread(target=upload_handler, args=(end_event,), name='upload_handler'),
+              threading.Thread(target=sunny_log_handler, args=(end_event, comma_prime_cellular_end_event), name='log_handler'),
+              threading.Thread(target=stat_handler, args=(end_event, Paths.stats_sp_root(), True), name='stat_handler'),
+            ] + [
+              threading.Thread(target=jsonrpc_handler, args=(end_event, partial(startLocalProxy, end_event),), name=f'worker_{x}')
+              for x in range(HANDLER_THREADS)
+            ]
+
+  for thread in threads:
+    thread.start()
+  try:
+    while not end_event.wait(0.1):
+      if not sunnylink_ready(params):
+        cloudlog.warning("Exiting sunnylinkd.handle_long_poll as SunnylinkEnabled is False")
+        break
+
+      sm.update(0)
+      if exit_event is not None and exit_event.is_set():
+        end_event.set()
+        comma_prime_cellular_end_event.set()
+
+      prime_type = params.get("PrimeType") or 0
+      metered = sm['deviceState'].networkMetered
+
+      if DISALLOW_LOG_UPLOAD.is_set() and not comma_prime_cellular_end_event.is_set():
+        cloudlog.debug("sunnylinkd.handle_long_poll: DISALLOW_LOG_UPLOAD, setting comma_prime_cellular_end_event")
+        comma_prime_cellular_end_event.set()
+      elif metered and int(prime_type) > 2:
+        cloudlog.debug(f"sunnylinkd.handle_long_poll: PrimeType({prime_type}) > 2 and networkMetered({metered})")
+        comma_prime_cellular_end_event.set()
+      elif comma_prime_cellular_end_event.is_set() and not DISALLOW_LOG_UPLOAD.is_set():
+        cloudlog.debug(
+          f"sunnylinkd.handle_long_poll: comma_prime_cellular_end_event is set and not PrimeType({prime_type}) > 2 or not networkMetered({metered})")
+        comma_prime_cellular_end_event.clear()
+  finally:
+    end_event.set()
+    comma_prime_cellular_end_event.set()
+    for thread in threads:
+      cloudlog.debug(f"sunnylinkd athena.joining {thread.name}")
+      thread.join()
+      cloudlog.debug(f"sunnylinkd athena.joined {thread.name}")
+
+
+def ws_recv(ws: WebSocket, end_event: threading.Event) -> None:
+  last_ping = int(time.monotonic() * 1e9)
+  while not end_event.is_set():
+    try:
+      opcode, data = ws.recv_data(control_frame=True)
+      if opcode in (ABNF.OPCODE_TEXT, ABNF.OPCODE_BINARY):
+        if opcode == ABNF.OPCODE_TEXT:
+          data = data.decode("utf-8")
+        recv_queue.put_nowait(data)
+        cloudlog.debug(f"sunnylinkd.ws_recv.recv {data}")
+      elif opcode in (ABNF.OPCODE_PING, ABNF.OPCODE_PONG):
+        cloudlog.debug("sunnylinkd.ws_recv.pong")
+        last_ping = int(time.monotonic() * 1e9)
+        Params().put("LastSunnylinkPingTime", last_ping, block=True)
+    except WebSocketTimeoutException:
+      ns_since_last_ping = int(time.monotonic() * 1e9) - last_ping
+      if ns_since_last_ping > SUNNYLINK_RECONNECT_TIMEOUT_S * 1e9:
+        cloudlog.warning("sunnylinkd.ws_recv.timeout")
+        end_event.set()
+    except Exception as e:
+      if isinstance(e, WebSocketConnectionClosedException):
+        cloudlog.warning(f"sunnylinkd.ws_recv.{type(e).__name__}")
+      else:
+        cloudlog.exception("sunnylinkd.ws_recv.exception")
+      end_event.set()
+
+
+def ws_ping(ws: WebSocket, end_event: threading.Event) -> None:
+  ws.ping()  # Send the first ping
+  while not end_event.wait(SUNNYLINK_RECONNECT_TIMEOUT_S * 0.7):  # Sleep about 70% before a timeout
+    try:
+      ws.ping()
+      cloudlog.debug("sunnylinkd.ws_recv.ws_ping: Pinging")
+    except Exception:
+      cloudlog.exception("sunnylinkd.ws_ping.exception")
+      end_event.set()
+  cloudlog.debug("sunnylinkd.ws_ping.end_event is set, exiting ws_ping thread")
+
+
+def sunny_log_handler(end_event: threading.Event, comma_prime_cellular_end_event: threading.Event) -> None:
+  while not end_event.wait(0.1):
+    if not comma_prime_cellular_end_event.is_set():
+      log_handler(comma_prime_cellular_end_event, SUNNYLINK_LOG_ATTR_NAME)
+  comma_prime_cellular_end_event.set()
+
+
+@dispatcher.add_method
+def toggleLogUpload(enabled: bool):
+  DISALLOW_LOG_UPLOAD.clear() if enabled and DISALLOW_LOG_UPLOAD.is_set() else DISALLOW_LOG_UPLOAD.set()
+
+
+@dispatcher.add_method
+def getParamsAllKeys() -> list[str]:
+  keys: list[str] = [k.decode('utf-8') for k in Params().all_keys()]
+  return keys
+
+
+@dispatcher.add_method
+def getParamsMetadata() -> str:
+  """Return settings_ui.json + live capabilities as gzip-compressed, base64-encoded string.
+
+  Reads settings_ui.json, injects live capabilities from CarParams, compresses,
+  and returns. Single RPC for the frontend to get the complete settings UI and
+  runtime capabilities.
+  """
+  try:
+    schema = generate_schema()
+    schema["capabilities"] = generate_capabilities()
+    schema["capability_labels"] = CAPABILITY_LABELS
+    schema["default_model"] = DEFAULT_MODEL
+    schema["default_big_model"] = DEFAULT_BIG_MODEL
+    schema["chestnut_active"] = params.get_bool("ChestnutActive")
+    raw = json.dumps(schema, separators=(",", ":")).encode("utf-8")
+    return base64.b64encode(gzip.compress(raw)).decode("utf-8")
+  except Exception:
+    cloudlog.exception("sunnylinkd.getParamsMetadata.exception")
+    raise
+
+
+@dispatcher.add_method
+def getParams(params_keys: list[str], compression: bool = False) -> str | dict[str, str]:
+  params = Params()
+  available_keys: list[str] = [k.decode('utf-8') for k in Params().all_keys()]
+
+  try:
+    zero_values: dict[int, bytes] = {
+      ParamKeyType.STRING.value: b"",
+      ParamKeyType.BOOL.value: b"0",
+      ParamKeyType.INT.value: b"0",
+      ParamKeyType.FLOAT.value: b"0.0",
+      ParamKeyType.TIME.value: b"",
+      ParamKeyType.JSON.value: b"{}",
+      ParamKeyType.BYTES.value: b"",
+    }
+
+    param_keys_validated = [key for key in params_keys if key in available_keys]
+    catalog_overrides = (sunnylink_model_catalog_overrides(params)
+                         if {"ModelManager_ActiveJson", "ModelManager_ModelsCache"}.intersection(param_keys_validated) else {})
+    from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_KEY, saved_controller
+    controller_caps = _vehicle_tuning_capabilities() if CONTROLLER_KEY in param_keys_validated else {}
+    params_dict: dict[str, list[dict[str, str | bool | int]]] = {"params": []}
+    for key in param_keys_validated:
+      value = json.dumps(catalog_overrides[key]).encode("utf-8") if key in catalog_overrides else get_param_as_byte(key)
+      if key == CONTROLLER_KEY:
+        value = str(int(saved_controller(params, bosch_radar_available=controller_caps.get("nrdr_bosch_radar_controller_available") is True))).encode()
+      if value is None:
+        value = get_param_as_byte(key, get_default=True)
+      if value is None:
+        param_type = params.get_type(key)
+        value = zero_values.get(param_type.value, b"")
+
+      params_dict["params"].append({
+        "key": key,
+        "value": base64.b64encode(gzip.compress(value) if compression else value).decode('utf-8'),
+        "type": int(params.get_type(key).value),
+        "is_compressed": compression
+      })
+
+    response = {str(param.get('key')): str(param.get('value')) for param in params_dict.get("params", [])}
+    response |= {"params": json.dumps(params_dict.get("params", []))} # Upcoming for settings v1
+    return response
+
+  except Exception as e:
+    cloudlog.exception("sunnylinkd.getParams.exception", e)
+    raise
+
+
+def _vehicle_tuning_capabilities() -> dict:
+  """Fail-closed vehicle capabilities for NRDR's remote tuning controls."""
+  try:
+    return generate_capabilities(params)
+  except Exception:
+    cloudlog.exception("sunnylinkd.saveParams.capabilities.exception")
+    return {}
+
+
+def _remote_bool_value(value: str, compression: bool) -> bool | None:
+  try:
+    raw = base64.b64decode(value, validate=True)
+    if compression:
+      raw = gzip.decompress(raw)
+    decoded = raw.decode("utf-8").lower()
+    if decoded in ("true", "1", "yes"):
+      return True
+    if decoded in ("false", "0", "no"):
+      return False
+    return None
+  except Exception:
+    return None
+
+
+def _remote_int_value(value: str, compression: bool, choices: tuple[int, ...] = (0, 1, 2)) -> int | None:
+  try:
+    raw = base64.b64decode(value, validate=True)
+    if compression:
+      raw = gzip.decompress(raw)
+    decoded = raw.decode("utf-8")
+    return int(decoded) if decoded in tuple(str(choice) for choice in choices) else None
+  except Exception:
+    return None
+
+
+@dispatcher.add_method
+def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
+  import math
+
+  from openpilot.nrdr.car.live_gas_reset import REQUEST, request_reset, stored_cp
+  from openpilot.nrdr.params.tuning_policy import CRUISE_PREFERENCE_KEYS, MVL_LOCK_KEYS, tuning_write_allowed
+  from openpilot.nrdr.params.pcm_speed_deadzone import decode_speed_deadzone
+  from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_KEY
+  from openpilot.nrdr.ui.honda_pcm import store_controller_choice
+  mode_lock_keys = MVL_LOCK_KEYS | CRUISE_PREFERENCE_KEYS
+  onroad = not params.get_bool("IsOffroad")
+  retired = {"NrdrExperimentalEngineBraking", "NrdrCruiseOverspeedAllowance", "NrdrHondaPcmFixedCruise",
+             "NrdrHondaLegacyPcm", "NrdrMvlPcmDeadzone"}.intersection(params_to_update)
+  if retired:
+    raise ValueError(f"Retired settings cannot be written: {', '.join(sorted(retired))}")
+  live_gas_selection = None
+  long_controller_selection = None
+  if CONTROLLER_KEY in params_to_update:
+    long_controller_selection = _remote_int_value(params_to_update[CONTROLLER_KEY], compression, (0, 1, 2, 3))
+    if (long_controller_selection is None or onroad
+        or {"HondaLiveLearningGas", "HondaBoschARadar", REQUEST}.intersection(params_to_update)):
+      raise ValueError("Choose one longitudinal controller while parked. Changes apply next drive.")
+  if "HondaLiveLearningGas" in params_to_update:
+    live_gas_selection = _remote_bool_value(params_to_update["HondaLiveLearningGas"], compression)
+    if live_gas_selection is None or onroad:
+      raise ValueError("Live Learning Gas requires a boolean and can only be changed while parked. Applies next drive.")
+  if REQUEST in params_to_update:
+    selected = _remote_bool_value(params_to_update[REQUEST], compression)
+    if selected is None or (selected and len(params_to_update) != 1):
+      raise ValueError("Request a live gas reset separately using a boolean.")
+    if selected:
+      request_reset(params, stored_cp(params))
+    # An OFF echo is not a request, cancellation, or acknowledgment.
+    params_to_update = {key: value for key, value in params_to_update.items() if key != REQUEST}
+  monitoring_selection = None
+  if "NrdrDriverMonitoringReminderPercent" in params_to_update:
+    from openpilot.nrdr.hooks.driver_monitoring import monitoring_customization_available, validate_reminder_percent
+    if onroad or not monitoring_customization_available():
+      raise ValueError("Monitoring reminder timing is only editable offroad in non-clean builds.")
+    try:
+      decoded = base64.b64decode(params_to_update["NrdrDriverMonitoringReminderPercent"], validate=True)
+      if compression:
+        decoded = gzip.decompress(decoded)
+      monitoring_selection = validate_reminder_percent(decoded)
+    except (ValueError, TypeError, OSError) as error:
+      raise ValueError("Invalid monitoring reminder timing. Nothing was saved.") from error
+    if monitoring_selection is None:
+      raise ValueError("Monitoring reminder timing must be 50–250% in 5% steps.")
+  vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {
+    "NrdrHandcraftedLateralTune", "NrdrSuggestedSettings", "LagdToggle", "LagdToggleDelay", "LaneGuidanceMode",
+    "HondaLiveLearningGas", "NrdrHondaPcmMode", "NrdrHondaWindBrake", "NrdrPcmSpeedDeadzone", CONTROLLER_KEY,
+  }
+  capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
+  handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
+  honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
+  def available_long_controllers(caps):
+    if caps.get("nrdr_honda_mvl_selection_available") is not True:
+      return ()
+    return (0, 1) + ((2,) if caps.get("nrdr_bosch_radar_controller_available") is True else ()) + \
+                   ((3,) if caps.get("nrdr_personal_pedal_available") is True else ())
+
+  if long_controller_selection is not None and long_controller_selection not in available_long_controllers(capabilities):
+    raise ValueError("This longitudinal controller is not supported by the connected hardware.")
+  if live_gas_selection is not None and capabilities.get("nrdr_honda_mvl_selection_available") is not True:
+    raise ValueError("Live Learning Gas requires a confirmed supported Honda; its saved choice applies with openpilot longitudinal control.")
+  deadzone_selection = None
+  if "NrdrPcmSpeedDeadzone" in params_to_update:
+    try:
+      raw = base64.b64decode(params_to_update["NrdrPcmSpeedDeadzone"], validate=True)
+      if compression:
+        raw = gzip.decompress(raw)
+      deadzone_selection = decode_speed_deadzone(raw)
+    except (ValueError, OSError):
+      deadzone_selection = None
+    if onroad or deadzone_selection is None or capabilities.get("nrdr_mvl_pcm_deadzone_available") is not True:
+      raise ValueError("PCM speed deadzone requires 0.00–0.20 m/s in 0.01 steps on a parked, supported Civic PCM. Applies next drive.")
+  pcm_selections = {}
+  if "NrdrHondaPcmMode" in params_to_update:
+    selected = _remote_int_value(params_to_update["NrdrHondaPcmMode"], compression)
+    if onroad or selected is None or capabilities.get("nrdr_honda_pcm_tuning_available") is not True:
+      raise ValueError("PCM settings require a valid choice on a parked non-interceptor Nidec. Applies next drive.")
+    pcm_selections["NrdrHondaPcmMode"] = selected
+  wind_selection = None
+  if "NrdrHondaWindBrake" in params_to_update:
+    wind_selection = _remote_bool_value(params_to_update["NrdrHondaWindBrake"], compression)
+    if wind_selection is None or not (capabilities.get("nrdr_personal_pedal_available") is True or
+                                     (not onroad and capabilities.get("nrdr_honda_pcm_tuning_available") is True)):
+      raise ValueError("Wind Brake requires a supported Nidec pedal car, or a parked Nidec PCM car.")
+  # Preconfiguration changes saved values only. Validate the whole mode-tuning
+  # batch before writing, including when a mode selection shares the batch.
+  tuning_selections = {}
+  for key in mode_lock_keys.intersection(params_to_update) - {"HondaLiveLearningGas", "NrdrHondaWindBrake", "NrdrPcmSpeedDeadzone", *pcm_selections}:
+    try:
+      raw = base64.b64decode(params_to_update[key], validate=True)
+      if compression:
+        raw = gzip.decompress(raw)
+      decoded = raw.decode("utf-8")
+      param_type = params.get_type(key)
+      if param_type == ParamKeyType.BOOL:
+        selected = _remote_bool_value(params_to_update[key], compression)
+        if selected is None:
+          raise ValueError("Expected a boolean")
+      elif param_type == ParamKeyType.INT:
+        selected = int(decoded)
+      elif param_type == ParamKeyType.FLOAT:
+        selected = float(decoded)
+        if not math.isfinite(selected):
+          raise ValueError("Expected a finite number")
+      else:
+        raise ValueError("Unsupported tuning parameter type")
+      tuning_selections[key] = selected
+    except Exception as error:
+      raise ValueError(f"Invalid saved tuning value for {key}. Nothing was saved.") from error
+  controller_selection = None
+  lane_guidance_selection = None
+  if "NrdrLateralController" in params_to_update:
+    # A rejected controller request must be an RPC error, not a success-looking
+    # no-op. Selection is drive-latched; never switch the running controller.
+    if onroad:
+      raise ValueError("Controller Type can only be changed while the device is offroad. The selection was not saved.")
+    try:
+      decoded = base64.b64decode(params_to_update["NrdrLateralController"], validate=True)
+      if compression:
+        decoded = gzip.decompress(decoded)
+      controller_selection = int(decoded)
+    except (ValueError, TypeError, OSError) as error:
+      raise ValueError("Invalid Controller Type. The selection was not saved.") from error
+    if not honda_tuning_available or controller_selection not in (0, 1) or (
+      controller_selection == 1 and capabilities.get("nrdr_yaw_controller_available") is not True
+    ):
+      raise ValueError("This Controller Type is unavailable for the detected vehicle. The selection was not saved.")
+  if "LaneGuidanceMode" in params_to_update:
+    lane_guidance_selection = _remote_int_value(params_to_update["LaneGuidanceMode"], compression)
+    if lane_guidance_selection not in (0, 1, 2):
+      raise ValueError("Invalid Lane Centering Method. The selection was not saved.")
+    if lane_guidance_selection == 2 and capabilities.get("custom_model_active") is not True:
+      raise ValueError("Blendful requires a non-Default custom model. The selection was not saved.")
+  for key, value in params_to_update.items():
+    write_onroad = not params.get_bool("IsOffroad")
+    if write_onroad and key in ("HondaLiveLearningGas", CONTROLLER_KEY, "NrdrPcmSpeedDeadzone", *pcm_selections):
+      raise ValueError("Longitudinal modes can only be changed while parked. Applies next drive.")
+    if not tuning_write_allowed(params, key, firmware_prediction_schedule=capabilities.get("nrdr_firmware_prediction_schedule") is True):
+      cloudlog.warning(f"sunnylinkd.saveParams.locked: '{key}'")
+      continue
+    # disallow modifications to blocked parameters
+    if key in BLOCKED_PARAMS:
+      cloudlog.warning(f"sunnylinkd.saveParams.blocked: Attempted to modify blocked parameter '{key}'")
+      continue
+    requested_bool = _remote_bool_value(value, compression) \
+      if key in ("NrdrHandcraftedLateralTune", "NrdrSuggestedSettings") else None
+    if not allow_param_write(
+      key, write_onroad,
+      handcrafted_profile_available=handcrafted_available,
+      honda_tuning_available=honda_tuning_available,
+      device_yaw_correction_available=capabilities.get("nrdr_interpolated_torque_pif_blend_available") is True,
+      requested_bool=requested_bool,
+    ):
+      cloudlog.warning(f"sunnylinkd.saveParams.policy: Attempted to modify unavailable parameter '{key}'")
+      continue
+
+    try:
+      if key == CONTROLLER_KEY:
+        if not store_controller_choice(params, long_controller_selection,
+                                       available_long_controllers(_vehicle_tuning_capabilities()), stored_cp(params)):
+          raise ValueError("Longitudinal controller is no longer available. Refresh settings.")
+      elif key == "NrdrPcmSpeedDeadzone":
+        if _vehicle_tuning_capabilities().get("nrdr_mvl_pcm_deadzone_available") is not True or not params.get_bool("IsOffroad"):
+          raise ValueError("PCM speed-error deadzone is no longer available. Nothing was saved for this setting.")
+        params.put(key, deadzone_selection, block=True)
+        params.put_bool("OnroadCycleRequested", True, block=True)
+      elif key == "NrdrHondaWindBrake":
+        current_caps = _vehicle_tuning_capabilities()
+        if current_caps.get("nrdr_personal_pedal_available") is True:
+          params.put_bool(key, wind_selection, block=True)
+        elif current_caps.get("nrdr_honda_pcm_tuning_available") is True and params.get_bool("IsOffroad"):
+          params.put_bool(key, wind_selection, block=True)
+          params.put_bool("OnroadCycleRequested", True, block=True)
+        else:
+          raise ValueError("Wind Brake is no longer available for this vehicle. Nothing was saved for this setting.")
+      elif key == "HondaLiveLearningGas" or key in pcm_selections:
+        capability = "nrdr_honda_mvl_selection_available" if key == "HondaLiveLearningGas" else "nrdr_honda_pcm_tuning_available"
+        if _vehicle_tuning_capabilities().get(capability) is not True or not params.get_bool("IsOffroad"):
+          raise ValueError("Longitudinal mode can only be changed while parked with the matching vehicle.")
+        selected = live_gas_selection if key == "HondaLiveLearningGas" else pcm_selections[key]
+        writer = params.put if key == "NrdrHondaPcmMode" else params.put_bool
+        writer(key, selected, block=True)
+        if key == "HondaLiveLearningGas":
+          # Legacy clients still control the old switch; return to legacy resolution.
+          params.put(CONTROLLER_KEY, -1, block=True)
+        params.put_bool("OnroadCycleRequested", True, block=True)
+      elif key in tuning_selections:
+        if not tuning_write_allowed(params, key):
+          raise ValueError("Setting is no longer available. Nothing was saved for this setting.")
+        params.put(key, tuning_selections[key], block=True)
+      elif key == "LongitudinalPersonality":
+        decoded = base64.b64decode(value, validate=True)
+        if compression:
+          decoded = gzip.decompress(decoded)
+        if decoded not in (b"0", b"1", b"2", b"3"):
+          raise ValueError("Invalid longitudinal personality")
+        write_personality(params, int(decoded))
+      elif key == "NrdrDriverMonitoringReminderPercent":
+        if not params.get_bool("IsOffroad"):
+          raise ValueError("Monitoring reminder timing cannot be changed after the car starts.")
+        params.put(key, monitoring_selection, block=True)
+        if params.get(key) != monitoring_selection:
+          raise ValueError("Monitoring reminder timing readback did not match.")
+      elif key == "NrdrLateralController":
+        # Recheck road state immediately before the write, including stale UI.
+        if not params.get_bool("IsOffroad"):
+          raise ValueError("Controller Type cannot be changed after the car starts.")
+        params.put(key, controller_selection, block=True)
+        if str(params.get(key)) not in (str(controller_selection), f"b'{controller_selection}'"):
+          raise ValueError("Controller Type readback did not match the requested selection.")
+      elif key == "LaneGuidanceMode":
+        from openpilot.nrdr.features.lateral.lane_guidance import set_lane_guidance_mode
+        set_lane_guidance_mode(params, lane_guidance_selection)
+      elif key == "NrdrSuggestedSettings" and requested_bool is False:
+        from openpilot.nrdr.params.profiles import disable_suggested_settings
+        disable_suggested_settings(params)
+      elif key in ("NrdrHandcraftedLateralTune", "NrdrSuggestedSettings") and requested_bool is True:
+        if not request_stored_handcrafted_lateral_profile(params):
+          cloudlog.warning("sunnylinkd.saveParams.handcrafted: Fresh request rejected for current vehicle or state")
+      else:
+        save_param_from_base64_encoded_string(key, value, compression)
+    except Exception as e:
+      cloudlog.error(f"sunnylinkd.saveParams.exception {e}")
+      if key in ("NrdrLateralController", CONTROLLER_KEY, "NrdrDriverMonitoringReminderPercent", "HondaLiveLearningGas", "LongitudinalPersonality",
+                 "NrdrPcmSpeedDeadzone", "NrdrHondaWindBrake", *pcm_selections, *tuning_selections):
+        raise ValueError("Setting could not be saved. Refresh settings to read the device's selection.") from e
+
+  # Increment version counter for frontend change detection
+  try:
+    current = int(params.get("ParamsVersion") or "0")
+    params.put("ParamsVersion", str(current + 1), block=True)
+  except Exception:
+    pass
+
+
+def startLocalProxy(global_end_event: threading.Event, remote_ws_uri: str, local_port: int) -> dict[str, int]:
+  sunnylink_dongle_id = params.get("SunnylinkDongleId")
+  sunnylink_api = SunnylinkApi(sunnylink_dongle_id)
+
+  cloudlog.debug("athena.startLocalProxy.starting")
+  ws = create_connection(
+    remote_ws_uri, header={"Authorization": f"Bearer {sunnylink_api.get_token()}"}, enable_multithread=True, sslopt={"cert_reqs": ssl.CERT_NONE}
+  )
+
+  return start_local_proxy_shim(global_end_event, local_port, ws)
+
+
+def main(exit_event: threading.Event | None = None):
+  try:
+    set_core_affinity([0, 1, 2, 3])
+  except Exception:
+    cloudlog.exception("failed to set core affinity")
+
+  while sunnylink_need_register(params):
+    cloudlog.info("Waiting for sunnylink registration to complete")
+    time.sleep(10)
+
+  sunnylink_dongle_id = params.get("SunnylinkDongleId")
+  sunnylink_api = SunnylinkApi(sunnylink_dongle_id)
+  UploadQueueCache.initialize(upload_queue)
+
+  update_car_list_param()
+
+  ws_uri = f"{SUNNYLINK_ATHENA_HOST}"
+  conn_start = None
+  conn_retries = 0
+  while (exit_event is None or not exit_event.is_set()) and sunnylink_ready(params):
+    try:
+      if conn_start is None:
+        conn_start = time.monotonic()
+
+      cloudlog.event("sunnylinkd.main.connecting_ws", ws_uri=ws_uri, retries=conn_retries)
+      ws = create_connection(
+        ws_uri,
+        header={"Authorization": f"Bearer {sunnylink_api.get_token()}"},
+        enable_multithread=True,
+        sslopt={"cert_reqs": ssl.CERT_NONE if "localhost" in ws_uri else ssl.CERT_REQUIRED},
+        timeout=SUNNYLINK_RECONNECT_TIMEOUT_S,
+      )
+      cloudlog.event("sunnylinkd.main.connected_ws", ws_uri=ws_uri, retries=conn_retries,
+                     duration=time.monotonic() - conn_start)
+      conn_start = None
+
+      conn_retries = 0
+      cur_upload_items.clear()
+
+      handle_long_poll(ws, exit_event)
+    except (KeyboardInterrupt, SystemExit):
+      break
+    except Exception as e:
+      conn_retries += 1
+      params.remove("LastSunnylinkPingTime")
+
+      if isinstance(e, (ConnectionError, TimeoutError, WebSocketException)):
+        cloudlog.warning(f"sunnylinkd.main.{type(e).__name__}")
+      elif isinstance(e, OSError):
+        name = errno.errorcode.get(e.errno or -1, "UNKNOWN")
+        msg = f"sunnylinkd.main.OSError.{name} ({e.errno})"
+        is_expected_error = e.errno in (errno.ENETDOWN, errno.ENETRESET, errno.ENETUNREACH)
+        cloudlog.warning(msg) if is_expected_error else cloudlog.exception(msg)
+      else:
+        cloudlog.exception("sunnylinkd.main.exception")
+
+    time.sleep(backoff(conn_retries))
+
+  if not sunnylink_ready(params):
+    cloudlog.debug("Reached end of sunnylinkd.main while sunnylink is not ready. Waiting 60s before retrying")
+    time.sleep(60)
+
+
+if __name__ == "__main__":
+  main()

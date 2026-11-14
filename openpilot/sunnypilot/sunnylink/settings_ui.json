@@ -1,0 +1,5111 @@
+{
+  "$schema": "./settings_ui.schema.json",
+  "schema_version": "1.0",
+  "panels": [
+    {
+      "id": "steering",
+      "label": "Steering",
+      "icon": "steering_wheel",
+      "order": 1,
+      "remote_configurable": true,
+      "description": "Lateral control, lane changes, and steering behavior",
+      "sections": [
+        {
+          "id": "mads",
+          "title": "Modular Assistive Driving System (MADS)",
+          "description": "",
+          "items": [
+            {
+              "key": "Mads",
+              "widget": "toggle",
+              "title": "Enable Modular Assistive Driving System (MADS)",
+              "description": "Allows steering assistance to stay active independently of cruise control. Off restores normal combined engagement and disengagement.",
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                }
+              ]
+            }
+          ],
+          "sub_panels": [
+            {
+              "id": "mads_settings",
+              "label": "MADS Settings",
+              "trigger_key": "Mads",
+              "trigger_condition": {
+                "type": "param",
+                "key": "Mads",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "MadsMainCruiseAllowed",
+                  "widget": "toggle",
+                  "title": "Toggle with Main Cruise",
+                  "description": "Allows the main cruise button to enable steering assistance. Turning this off prevents steering engagement on cars without a separate LFA/LKAS button.",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "any",
+                        "conditions": [
+                          {
+                            "type": "capability",
+                            "field": "brand",
+                            "equals": "rivian"
+                          },
+                          {
+                            "type": "all",
+                            "conditions": [
+                              {
+                                "type": "capability",
+                                "field": "brand",
+                                "equals": "tesla"
+                              },
+                              {
+                                "type": "not",
+                                "condition": {
+                                  "type": "capability",
+                                  "field": "tesla_has_vehicle_bus",
+                                  "equals": true
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "MadsUnifiedEngagementMode",
+                  "widget": "toggle",
+                  "title": "Unified Engagement Mode (UEM)",
+                  "description": "Engages steering assistance together with cruise control. Steering remains active until you turn MADS off or shut down the car.",
+                  "details": "Turning this setting off restores separate steering and cruise engagement.",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "any",
+                        "conditions": [
+                          {
+                            "type": "capability",
+                            "field": "brand",
+                            "equals": "rivian"
+                          },
+                          {
+                            "type": "all",
+                            "conditions": [
+                              {
+                                "type": "capability",
+                                "field": "brand",
+                                "equals": "tesla"
+                              },
+                              {
+                                "type": "not",
+                                "condition": {
+                                  "type": "capability",
+                                  "field": "tesla_has_vehicle_bus",
+                                  "equals": true
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "MadsSteeringMode",
+                  "widget": "multiple_button",
+                  "title": "Steering Mode on Brake Pedal",
+                  "description": "Choose whether steering assistance continues or pauses when you press the brake pedal.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Remain Active",
+                      "enablement": [
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "any",
+                            "conditions": [
+                              {
+                                "type": "capability",
+                                "field": "brand",
+                                "equals": "rivian"
+                              },
+                              {
+                                "type": "all",
+                                "conditions": [
+                                  {
+                                    "type": "capability",
+                                    "field": "brand",
+                                    "equals": "tesla"
+                                  },
+                                  {
+                                    "type": "not",
+                                    "condition": {
+                                      "type": "capability",
+                                      "field": "tesla_has_vehicle_bus",
+                                      "equals": true
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "value": 1,
+                      "label": "Pause",
+                      "enablement": [
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "any",
+                            "conditions": [
+                              {
+                                "type": "capability",
+                                "field": "brand",
+                                "equals": "rivian"
+                              },
+                              {
+                                "type": "all",
+                                "conditions": [
+                                  {
+                                    "type": "capability",
+                                    "field": "brand",
+                                    "equals": "tesla"
+                                  },
+                                  {
+                                    "type": "not",
+                                    "condition": {
+                                      "type": "capability",
+                                      "field": "tesla_has_vehicle_bus",
+                                      "equals": true
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "value": 2,
+                      "label": "Disengage"
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "blinker",
+          "title": "Blinker Control",
+          "description": "Lateral pause behavior during turn signals",
+          "items": [
+            {
+              "key": "BlinkerPauseLateralControl",
+              "widget": "toggle",
+              "title": "Pause Lateral Control with Blinker",
+              "description": "Pauses steering assistance when the turn signal is on below the selected speed. Off keeps steering assistance active.",
+              "sub_items": [
+                {
+                  "key": "BlinkerMinLateralControlSpeed",
+                  "widget": "option",
+                  "title": "Minimum Speed to Pause Lateral Control",
+                  "min": 0,
+                  "max": 255,
+                  "step": 5,
+                  "unit": {
+                    "metric": "km/h",
+                    "imperial": "mph"
+                  },
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "BlinkerPauseLateralControl",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "BlinkerLateralReengageDelay",
+                  "widget": "option",
+                  "title": "Post-Blinker Delay",
+                  "description": "Delay before lateral control resumes after the turn signal ends.",
+                  "min": 0,
+                  "max": 10,
+                  "step": 1,
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "BlinkerPauseLateralControl",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "torque",
+          "title": "Torque Control",
+          "description": "Steering torque tuning and lateral control method",
+          "enablement": [
+            {
+              "type": "capability",
+              "field": "torque_allowed",
+              "equals": true
+            }
+          ],
+          "items": [
+            {
+              "key": "EnforceTorqueControl",
+              "widget": "toggle",
+              "title": "Enforce Torque Lateral Control",
+              "description": "Uses torque-based steering control instead of the vehicle's default controller. Off restores the default controller.",
+              "visibility": [
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "capability",
+                    "field": "steer_control_type",
+                    "equals": "angle"
+                  }
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                },
+                {
+                  "type": "capability",
+                  "field": "torque_allowed",
+                  "equals": true
+                }
+              ]
+            }
+          ],
+          "sub_panels": [
+            {
+              "id": "torque_settings",
+              "label": "Torque Settings",
+              "trigger_key": "EnforceTorqueControl",
+              "trigger_condition": {
+                "type": "param",
+                "key": "EnforceTorqueControl",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "LateralJerkTorqueController",
+                  "widget": "toggle",
+                  "title": "Lateral Jerk Torque Controller",
+                  "description": "Anticipates changes in steering to reduce abrupt corrections through turns. Works with Self-Tune and custom tuning.",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "steer_control_type",
+                        "equals": "angle"
+                      }
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                },
+                {
+                  "key": "LiveTorqueParamsToggle",
+                  "widget": "toggle",
+                  "title": "Self-Tune",
+                  "description": "Learns torque-controller tuning while you drive, including on vehicles that do not use it by default.",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                },
+                {
+                  "key": "LiveTorqueParamsRelaxedToggle",
+                  "widget": "toggle",
+                  "title": "Less Restrict Settings for Self-Tune (Beta)",
+                  "description": "Allows Self-Tune to learn from a wider range of driving conditions. Off uses the standard learning criteria.",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "param",
+                      "key": "LiveTorqueParamsToggle",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "CustomTorqueParams",
+                  "widget": "toggle",
+                  "title": "Enable Custom Tuning",
+                  "description": "Uses your acceleration-factor and friction values instead of the default torque tune. Manual Real-Time Tuning also applies them instead of learned values.",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                },
+                {
+                  "key": "TorqueParamsOverrideEnabled",
+                  "widget": "toggle",
+                  "title": "Manual Real-Time Tuning",
+                  "description": "Uses your fixed torque-tuning values instead of Self-Tune's learned values. Off allows learned values to be used again.",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "param",
+                      "key": "CustomTorqueParams",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "TorqueParamsOverrideLatAccelFactor",
+                  "widget": "option",
+                  "title": "Lateral Acceleration Factor",
+                  "title_param_suffix": {
+                    "param": "TorqueParamsOverrideEnabled",
+                    "values": {
+                      "true": "(Real-Time & Offline)",
+                      "false": "(Offline Only)"
+                    }
+                  },
+                  "min": 0.1,
+                  "max": 5.0,
+                  "step": 0.1,
+                  "unit": "m/s\u00b2",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "CustomTorqueParams",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "TorqueParamsOverrideEnabled",
+                          "equals": true
+                        },
+                        {
+                          "type": "offroad_only"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "TorqueParamsOverrideFriction",
+                  "widget": "option",
+                  "title": "Friction",
+                  "title_param_suffix": {
+                    "param": "TorqueParamsOverrideEnabled",
+                    "values": {
+                      "true": "(Real-Time & Offline)",
+                      "false": "(Offline Only)"
+                    }
+                  },
+                  "min": 0.0,
+                  "max": 1.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "CustomTorqueParams",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "TorqueParamsOverrideEnabled",
+                          "equals": true
+                        },
+                        {
+                          "type": "offroad_only"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "TorqueControlTune",
+                  "widget": "multiple_button",
+                  "title": "Torque Control Tune Version",
+                  "description": "Select the version of Torque Control Tune to use.",
+                  "options": [
+                    {
+                      "value": "",
+                      "label": "Default"
+                    },
+                    {
+                      "value": 1.0,
+                      "label": "v1.0"
+                    },
+                    {
+                      "value": 0.0,
+                      "label": "v0.0"
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lane_change",
+          "title": "Lane Change",
+          "description": "Automatic lane change timing and behavior",
+          "items": [
+            {
+              "key": "AutoLaneChangeTimer",
+              "widget": "option",
+              "title": "Auto Lane Change by Blinker",
+              "description": "Starts a lane change after the selected delay without a steering nudge; Nudge keeps manual confirmation. Signal only when it is safe to change lanes.",
+              "details": "You remain responsible for checking surrounding traffic before a lane change.",
+              "options": [
+                {
+                  "value": -1,
+                  "label": "Off"
+                },
+                {
+                  "value": 0,
+                  "label": "Nudge"
+                },
+                {
+                  "value": 1,
+                  "label": "Nudgeless"
+                },
+                {
+                  "value": 2,
+                  "label": "0.5 second"
+                },
+                {
+                  "value": 3,
+                  "label": "1 second"
+                },
+                {
+                  "value": 4,
+                  "label": "2 seconds"
+                },
+                {
+                  "value": 5,
+                  "label": "3 seconds"
+                }
+              ]
+            },
+            {
+              "key": "RoadEdgeLaneChangeEnabled",
+              "widget": "toggle",
+              "title": "Block Lane Change: Road Edge Detection",
+              "description": "Blocks lane change when the model sees a road edge on the side you signal."
+            },
+            {
+              "key": "AutoLaneChangeBsmDelay",
+              "widget": "toggle",
+              "title": "Auto Lane Change: Delay with Blind Spot",
+              "description": "Adds a lane-change delay when blind-spot monitoring detects another vehicle.",
+              "details": "Off removes this extra delay.",
+              "enablement": [
+                {
+                  "type": "capability",
+                  "field": "enable_bsm",
+                  "equals": true
+                },
+                {
+                  "type": "param_compare",
+                  "key": "AutoLaneChangeTimer",
+                  "op": ">",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "nrdr",
+          "title": "nrdr",
+          "description": "Customize steering, cruise control, device behavior, and driver monitoring.",
+          "items": [
+            {
+              "key": "NrdrSuggestedSettings",
+              "widget": "toggle",
+              "title": "Apply Suggested Settings",
+              "description": "Applies the recommended steering settings for your vehicle. Turning this off leaves the applied settings unchanged.",
+              "visibility": [
+                {
+                  "type": "capability",
+                  "field": "has_handcrafted_lateral_profile",
+                  "equals": true
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                }
+              ]
+            },
+            {
+              "key": "NrdrRemoteForceUpdate",
+              "widget": "toggle",
+              "title": "Force Update",
+              "description": "Download and install the latest update, then restart the device while the car is off.",
+              "details": "The switch turns off once the request is accepted; this does not cancel the update. Follow progress in Remote Action Status."
+            },
+            {
+              "key": "DisablePowerDown",
+              "widget": "toggle",
+              "title": "Prevent Automatic Shutdown",
+              "description": "Keeps the device on after the car is turned off, bypassing automatic shutdown and battery protection; this can drain the car battery.",
+              "details": "Turning this off restores the shutdown timer and battery protection after 60 seconds. Manual Power Off remains available.",
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                }
+              ]
+            }
+          ],
+          "sub_panels": [
+            {
+              "id": "nrdr_pidf_ground",
+              "label": "Lateral Tuning",
+              "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_honda_tuning_available",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "NrdrLateralController",
+                  "widget": "multiple_button",
+                  "title": "Controller Type",
+                  "description": "Choose the steering controller: PIF uses your feedback tune, while PTM Controller uses a vehicle-specific calibration.",
+                  "details": "Requires the exact modified steering firmware build shown in Controller Type on the device. Older builds with the same version name are incompatible.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "PIF Control"
+                    },
+                    {
+                      "value": 1,
+                      "label": "PTM Controller",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_yaw_controller_available",
+                          "equals": true
+                        }
+                      ]
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrOptimizedLaneChanges",
+                  "widget": "toggle",
+                  "title": "Optimized Lane Changes",
+                  "description": "Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the normal steering tune throughout the maneuver.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrLatStiction",
+                  "widget": "toggle",
+                  "title": "Predictive Lateral Stiction",
+                  "description": "Reduces steering force as the wheel reaches its target, then holds it steady until another correction is needed. Off uses the normal steering response.",
+                  "details": "Pauses during driver steering input and lane changes. Steering faults and control limits take priority.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrDeviceYawCorrection",
+                  "widget": "toggle",
+                  "title": "Use Device Yaw Correction",
+                  "description": "Adds a small steering correction based on the car's measured motion. Off uses PIF control alone.",
+                  "details": "Applies to PIF control and pauses during optimized lane changes. PTM Controller uses its own correction.",
+                  "visibility": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_interpolated_torque_pif_blend_available",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LatPScaleLowSpeed",
+                  "widget": "option",
+                  "title": "[0-25MPH] Proportional",
+                  "description": "Corrects steering error as it occurs.",
+                  "details": "Corrects steering error as it occurs.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LatIScaleLowSpeed",
+                  "widget": "option",
+                  "title": "[0-25MPH] Integral",
+                  "description": "Builds correction over time for persistent steering error, such as an alignment bias.",
+                  "details": "Builds correction over time for persistent steering error, such as an alignment bias.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrLatRateDampingLowSpeed",
+                  "widget": "option",
+                  "title": "[0-25MPH] Derivative",
+                  "description": "Resists rapid steering-wheel movement to reduce overshoot. Set to 0% to disable; optimized lane changes temporarily bypass it.",
+                  "min": 0,
+                  "max": 300,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LatFScaleLowSpeed",
+                  "widget": "option",
+                  "title": "[0-25MPH] Feedforward",
+                  "description": "Supplies anticipated steering torque before an error occurs.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LatPScaleStandard",
+                  "widget": "option",
+                  "title": "[25-50MPH] Proportional",
+                  "description": "Corrects steering error as it occurs.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LatIScaleStandard",
+                  "widget": "option",
+                  "title": "[25-50MPH] Integral",
+                  "description": "Builds correction over time for persistent steering error, such as an alignment bias.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrLatRateDampingStandard",
+                  "widget": "option",
+                  "title": "[25-50MPH] Derivative",
+                  "description": "Resists rapid steering-wheel movement to reduce overshoot. Set to 0% to disable; optimized lane changes temporarily bypass it.",
+                  "min": 0,
+                  "max": 300,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LatFScaleStandard",
+                  "widget": "option",
+                  "title": "[25-50MPH] Feedforward",
+                  "description": "Supplies anticipated steering torque before an error occurs.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LatPScaleHighway",
+                  "widget": "option",
+                  "title": "[50+MPH] Proportional",
+                  "description": "Corrects steering error as it occurs.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LatIScaleHighway",
+                  "widget": "option",
+                  "title": "[50+MPH] Integral",
+                  "description": "Builds correction over time for persistent steering error, such as an alignment bias.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrLatRateDampingHighway",
+                  "widget": "option",
+                  "title": "[50+MPH] Derivative",
+                  "description": "Resists rapid steering-wheel movement to reduce overshoot. Set to 0% to disable; optimized lane changes temporarily bypass it.",
+                  "min": 0,
+                  "max": 300,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LatFScaleHighway",
+                  "widget": "option",
+                  "title": "[50+MPH] Feedforward",
+                  "description": "Supplies anticipated steering torque before an error occurs.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaCenterScale",
+                  "widget": "option",
+                  "title": "Center Boost",
+                  "description": "Adds steering correction near the straight-ahead position to help maintain the planned path.",
+                  "details": "Applies to PIF control within the selected angle and speed range. PTM Controller is unchanged.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaCenterBoostThreshold",
+                  "widget": "option",
+                  "title": "Center Boost Threshold (deg)",
+                  "description": "Sets how far the steering wheel can turn from center before Center Boost stops applying.",
+                  "min": 0.0,
+                  "max": 10.0,
+                  "step": 0.1,
+                  "unit": "deg",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaCenterBoostMinSpeed",
+                  "widget": "option",
+                  "title": "Center Boost Minimum Speed",
+                  "description": "Sets the minimum speed for Center Boost. The boost remains available at higher speeds.",
+                  "details": "Center Boost gradually takes effect above this speed.",
+                  "min": 0,
+                  "max": 80,
+                  "step": 1,
+                  "unit": "mph",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nrdr_lane_centering_stack",
+              "label": "Lane Centering Method",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "LaneGuidanceMode",
+                  "widget": "multiple_button",
+                  "title": "Lane Centering Method",
+                  "description": "Choose Blendful or Star lane-centering assistance. Off follows the driving model's path without added lane-centering corrections.",
+                  "details": "Blendful blends lane guidance into the model path; Star adds a separate steering correction. Blendful requires a custom model.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Off"
+                    },
+                    {
+                      "value": 2,
+                      "label": "Blendful",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "custom_model_active",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "value": 1,
+                      "label": "Star"
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LaneCenteringMinSpeed",
+                  "widget": "option",
+                  "title": "Minimum Lane Centering Speed",
+                  "description": "Sets the speed at which lane-centering assistance starts. It fades out below this speed to avoid repeated switching.",
+                  "details": "Once active, assistance fades out 3 mph below the selected speed, with a lower limit of about 11 mph.",
+                  "min": 12,
+                  "max": 100,
+                  "step": 1,
+                  "unit": "mph",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "LaneGuidanceMode",
+                      "equals": 1
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LaneCenteringPauseOnSignal",
+                  "widget": "toggle",
+                  "title": "Fade on Turn Signal",
+                  "description": "Pauses lane-centering corrections while the turn signal is on. Lane changes always pause these corrections, even with this setting off.",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "LaneGuidanceMode",
+                      "equals": 1
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LaneCenterOffset",
+                  "widget": "option",
+                  "title": "Center Offset",
+                  "description": "Shift the target left or right of the detected lane center. The controller reduces the offset in a narrow lane.",
+                  "min": -0.3,
+                  "max": 0.3,
+                  "step": 0.01,
+                  "unit": "meters",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "LaneGuidanceMode",
+                      "equals": 1
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LaneCenteringStrength",
+                  "widget": "option",
+                  "title": "Lane-Centering Strength",
+                  "description": "Sets how strongly Star favors the lane center over the model's path. Zero follows the model path without added lane-centering correction.",
+                  "details": "Higher values favor the lane center more strongly, subject to lane confidence and steering limits. Model Break-In can reduce the correction.",
+                  "min": 0.0,
+                  "max": 1.0,
+                  "step": 0.05,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "LaneGuidanceMode",
+                      "equals": 1
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "LaneCenteringE2EAuthority",
+                  "widget": "option",
+                  "title": "Model Break-In",
+                  "description": "Lets Star yield to a confident model path that differs from the lane center. Higher values allow more correction to be removed; zero disables this behavior.",
+                  "details": "Adjusts when the model can take priority without changing the selected lane-centering strength.",
+                  "min": 0.0,
+                  "max": 1.0,
+                  "step": 0.05,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "LaneGuidanceMode",
+                      "equals": 1
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nrdr_steer_ratio_tuning",
+              "label": "Steer Ratio Tuning",
+              "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_honda_tuning_available",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "NrdrSteerRatioHybrid",
+                  "widget": "toggle",
+                  "title": "Enable Hybrid Steer Ratio",
+                  "description": "Uses source A near center and blends into source B as the steering wheel turns. Off uses source A alone and preserves both selections.",
+                  "details": "The transition spans 5 degrees from the selected starting angle, in either direction.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrSteerRatioMode",
+                  "widget": "multiple_button",
+                  "title": "Ratio A \u2014 Near Center / Single Source",
+                  "description": "Choose the steering-ratio source used near center, or at all angles when Hybrid is off.",
+                  "details": "Manual uses your entered ratios, Comma uses its learned ratio, Measured uses recorded vehicle data, and Firmware uses a matching steering-rack profile.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Manual",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_manual_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "value": 1,
+                      "label": "Comma Learner"
+                    },
+                    {
+                      "value": 2,
+                      "label": "nrdr Measured Curve",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_raw_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "value": 3,
+                      "label": "Firmware",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_firmware_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrSteerRatioBlendStart",
+                  "widget": "option",
+                  "title": "Blend Starts At",
+                  "description": "Sets the steering-wheel angle where the blend begins, in either direction. Source B takes over fully 5 degrees later.",
+                  "min": 0.0,
+                  "max": 180.0,
+                  "step": 1.0,
+                  "unit": "\u00b0",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrSteerRatioHybrid",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrSteerRatioSourceB",
+                  "widget": "multiple_button",
+                  "title": "Ratio B \u2014 Beyond the Blend",
+                  "description": "Choose the steering-ratio source used beyond the blend range. Turning the wheel back toward center blends back into source A.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Manual",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_manual_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "value": 1,
+                      "label": "Comma Learner"
+                    },
+                    {
+                      "value": 2,
+                      "label": "nrdr Measured Curve",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_raw_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "value": 3,
+                      "label": "Firmware",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_firmware_steer_ratio_available",
+                          "equals": true
+                        }
+                      ]
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrSteerRatioHybrid",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrSteerRatioManualCenter",
+                  "widget": "option",
+                  "title": "Manual Override On-Center Ratio",
+                  "description": "Sets the manual steering ratio near center. Higher values request more steering-wheel movement for the same curve.",
+                  "min": 8.0,
+                  "max": 25.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrSteerRatioMode",
+                          "equals": 0
+                        },
+                        {
+                          "type": "all",
+                          "conditions": [
+                            {
+                              "type": "param",
+                              "key": "NrdrSteerRatioHybrid",
+                              "equals": true
+                            },
+                            {
+                              "type": "param",
+                              "key": "NrdrSteerRatioSourceB",
+                              "equals": 0
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_manual_steer_ratio_available",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrSteerRatioManualFinal",
+                  "widget": "option",
+                  "title": "Manual Override Final Ratio",
+                  "description": "Sets the manual steering ratio near the end of the wheel's travel.",
+                  "details": "The ratio blends smoothly from the on-center value using the vehicle's steering profile. Vehicles without a matching profile retain their stock ratio.",
+                  "min": 8.0,
+                  "max": 25.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "param",
+                          "key": "NrdrSteerRatioMode",
+                          "equals": 0
+                        },
+                        {
+                          "type": "all",
+                          "conditions": [
+                            {
+                              "type": "param",
+                              "key": "NrdrSteerRatioHybrid",
+                              "equals": true
+                            },
+                            {
+                              "type": "param",
+                              "key": "NrdrSteerRatioSourceB",
+                              "equals": 0
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_manual_steer_ratio_available",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nrdr_override",
+              "label": "Override Tuning",
+              "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_honda_tuning_available",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "NrdrOverrideThresholdCenterBoost",
+                  "widget": "option",
+                  "title": "Driver Override Threshold (During Straights)",
+                  "description": "Sets the driver steering force needed to override assistance near the straight-ahead position. Higher values require more force.",
+                  "details": "Applies within the Center Boost angle range. Use the same value as the curves threshold for a uniform override response.",
+                  "min": 100,
+                  "max": 5000,
+                  "step": 100,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrDriverOverrideThreshold",
+                  "widget": "option",
+                  "title": "Driver Override Threshold (During Curves)",
+                  "description": "Sets the driver steering force needed to override assistance outside the straight-ahead range. Higher values require more force.",
+                  "details": "Applies at all angles when the Center Boost angle range is disabled.",
+                  "min": 100,
+                  "max": 5000,
+                  "step": 100,
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaDriverAssistDuringOverride",
+                  "widget": "toggle",
+                  "title": "Assist Pass-Through",
+                  "description": "Reduces steering assistance when you take over to make manual steering feel smoother. Off keeps the normal override response.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaOverrideFadeDownSecs",
+                  "widget": "option",
+                  "title": "Override Torque Fade Down",
+                  "description": "Controls how quickly steering torque fades out when driver override begins.",
+                  "min": 0.0,
+                  "max": 10.0,
+                  "step": 0.01,
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaOverrideFadeUpSecs",
+                  "widget": "option",
+                  "title": "Override Torque Fade Up",
+                  "description": "Controls how quickly steering torque fades back in after driver override ends.",
+                  "min": 0.0,
+                  "max": 10.0,
+                  "step": 0.01,
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaOverrideTorqueScale",
+                  "widget": "option",
+                  "title": "Override Torque Retain",
+                  "description": "Sets how much steering assistance remains after the override fade-out. Zero removes it completely.",
+                  "min": 0,
+                  "max": 100,
+                  "step": 1,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nrdr_steer_filters",
+              "label": "Steer Filters",
+              "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_honda_tuning_available",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "HondaTorqueLowPassFilter",
+                  "widget": "toggle",
+                  "title": "Low Pass Filter (tau)",
+                  "description": "Smooths steering commands across all three speed ranges. Off disables filtering without changing your saved values.",
+                  "details": "Higher values add smoothing and delay; excessive delay can cause steering oscillations. Zero disables filtering for an individual speed range.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaLpfTauLowSpeed",
+                  "widget": "option",
+                  "title": "Low Pass Filter Tau (Below 25mph)",
+                  "description": "Sets steering smoothing below 25 mph, in seconds. Higher values add smoothing and delay; zero disables smoothing in this range.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaTorqueLowPassFilter",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaLpfTauStandard",
+                  "widget": "option",
+                  "title": "Standard Tau (25-50mph)",
+                  "description": "Sets steering smoothing from 25 to 50 mph, in seconds. Higher values add smoothing and delay; zero disables smoothing in this range.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaTorqueLowPassFilter",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaLpfTauHighway",
+                  "widget": "option",
+                  "title": "Highway Tau (50mph+)",
+                  "description": "Sets steering smoothing at 50 mph and above, in seconds. Higher values add smoothing and delay; zero disables smoothing in this range.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaTorqueLowPassFilter",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaSteerDeltaLimiter",
+                  "widget": "toggle",
+                  "title": "Legacy Steer Delta Rate Limiter",
+                  "description": "Limits how quickly steering force can change. Off removes this additional rate limit without changing the saved limits.",
+                  "details": "Lower limits produce a slower steering response and can add lag.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaSteerDeltaUp",
+                  "widget": "option",
+                  "title": "Steer Delta Up",
+                  "description": "Sets how quickly steering force can increase when the rate limiter is on. Lower values add lag.",
+                  "min": 0.0,
+                  "max": 100.0,
+                  "step": 0.1,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaSteerDeltaLimiter",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaSteerDeltaDown",
+                  "widget": "option",
+                  "title": "Steer Delta Down",
+                  "description": "Sets how quickly steering force can decrease when the rate limiter is on. Lower values add lag.",
+                  "min": 0.0,
+                  "max": 100.0,
+                  "step": 0.1,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "HondaSteerDeltaLimiter",
+                      "equals": true
+                    },
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "param",
+                            "key": "NrdrSuggestedSettings",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrHandcraftedLateralTune",
+                        "equals": true
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nrdr_longitudinal",
+              "label": "Longitudinal Tuning",
+              "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_longitudinal_tuning_available",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "NrdrLongitudinalController",
+                  "widget": "multiple_button",
+                  "title": "Longitudinal Controller",
+                  "description": "Choose Standard, MVL adaptive control, Bosch-A Radar, or Aragon's speed-feedback pedal tune. Personal Pedal uses fixed personality gains and resets learned gas/wind compensation; changes apply next drive.",
+                  "details": "Standard uses your existing custom control. MVL retains adaptive learning. Bosch-A Radar uses factory radar with the Bosch-A tune; Alpha Long does not restore factory emergency braking (AEB/CMBS). Personal Pedal uses the historical Econ, Relaxed, Standard and Aggressive speed-feedback gains without learning. Other saved tuning is preserved.",
+                  "options": [
+                    {
+                      "label": "Standard",
+                      "value": 0
+                    },
+                    {
+                      "label": "MVL Live Learning Gas",
+                      "value": 1
+                    },
+                    {
+                      "label": "Bosch-A Radar",
+                      "value": 2,
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_bosch_radar_controller_available",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "label": "Aragon's Personal Pedal",
+                      "value": 3,
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_personal_pedal_available",
+                          "equals": true
+                        }
+                      ]
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_honda_mvl_selection_available",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrResetLiveGas",
+                  "widget": "toggle",
+                  "requires_attestation": true,
+                  "title": "Reset Live Learning Gas",
+                  "description": "Resets learned Honda gas and wind compensation on this device. Brake tuning, PID settings, and the learning switch are unchanged.",
+                  "details": "Resetting wind compensation may change when braking begins. Run while parked with the ignition off; the status shows when the reset finishes.",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_honda_tuning_available",
+                      "equals": true
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrLiveGasResetStatus",
+                  "widget": "info",
+                  "title": "Live Gas Reset Status",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_honda_tuning_available",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrPcmSpeedDeadzone",
+                  "widget": "option",
+                  "title": "PCM Speed-Error Deadzone",
+                  "description": "Reduces small speed corrections in Experimental Civic PCM control; zero disables it.",
+                  "details": "The deadzone grows from zero at standstill to your selected value at 9 m/s (about 20 mph), without delaying brake requests or stopping.",
+                  "min": 0.0,
+                  "max": 0.2,
+                  "step": 0.01,
+                  "unit": "m/s",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_mvl_pcm_deadzone_available",
+                      "equals": true
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_mvl_pcm_deadzone_available",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrHondaPcmMode",
+                  "widget": "multiple_button",
+                  "title": "Honda Nidec: ECU-Matched PCM Command Shaping",
+                  "description": "Adjusts PCM acceleration and the transition to braking using ECU-Matched or Experimental control. Off restores standard PCM control.",
+                  "details": "Experimental supports Civic MVL learning and bypasses Wind Brake without changing its saved setting. Applies next drive.",
+                  "options": [
+                    {
+                      "label": "Off",
+                      "value": 0
+                    },
+                    {
+                      "label": "ECU-Matched",
+                      "value": 1
+                    },
+                    {
+                      "label": "Experimental",
+                      "value": 2
+                    }
+                  ],
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_honda_pcm_tuning_available",
+                      "equals": true
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_honda_pcm_tuning_available",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrHondaWindBrake",
+                  "widget": "toggle",
+                  "title": "Wind Brake",
+                  "description": "Adds coasting compensation on pedal cars; Off uses the gas request alone and leaves braking unchanged. On PCM cars, reduces braking for air resistance; Off removes that reduction.",
+                  "details": "Pedal changes apply live; PCM changes apply next drive. Experimental PCM shaping ignores this setting without changing your saved choice.",
+                  "visibility": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_honda_pcm_tuning_available",
+                          "equals": true
+                        },
+                        {
+                          "type": "capability",
+                          "field": "nrdr_personal_pedal_available",
+                          "equals": true
+                        }
+                      ]
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_personal_pedal_available",
+                          "equals": true
+                        },
+                        {
+                          "type": "all",
+                          "conditions": [
+                            {
+                              "type": "offroad_only"
+                            },
+                            {
+                              "type": "capability",
+                              "field": "nrdr_honda_pcm_tuning_available",
+                              "equals": true
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "StaticFeedforwardLong",
+                  "widget": "toggle",
+                  "title": "Keep Feedforward Static",
+                  "description": "Keeps feedforward strength unchanged when adjusting the PID scale. Off scales feedforward with the rest of the tune.",
+                  "details": "Applies to Standard control. Personal Pedal uses fixed gains and feedforward."
+                },
+                {
+                  "key": "NrdrHondaFullBrakeAuthority",
+                  "widget": "toggle",
+                  "title": "Full Nidec Brake Authority",
+                  "description": "Allows the full available brake-command range. Off restores the standard brake-command limit.",
+                  "details": "Applies when the active controller supports this setting."
+                },
+                {
+                  "key": "NrdrRoenAccelerationLimits",
+                  "widget": "toggle",
+                  "title": "Roen Nidec Acceleration Limits",
+                  "description": "Uses Roen's acceleration limits and full low-speed pedal response. Off restores the normal acceleration limits.",
+                  "details": "Applies to Standard Nidec pedal control, not MVL or Personal Pedal."
+                },
+                {
+                  "key": "NrdrHondaDashVariantB",
+                  "widget": "toggle",
+                  "title": "Honda Dashboard Variant B",
+                  "description": "Saves the dashboard variant with four dashed lane lines. This setting currently has no effect.",
+                  "details": "Reserved for a future dashboard speed-display adjustment."
+                },
+                {
+                  "key": "LongPidTuneScaleAggressive",
+                  "widget": "option",
+                  "title": "Distance 1 / Aggressive PID Scale",
+                  "description": "Adjusts acceleration and braking feedback strength for the Aggressive profile. 100% keeps the base tune.",
+                  "details": "Applies to Standard control with a pedal interceptor. Personal Pedal uses fixed personality gains.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LongPidTuneScaleStandard",
+                  "widget": "option",
+                  "title": "Distance 2 / Standard PID Scale",
+                  "description": "Adjusts acceleration and braking feedback strength for the Standard profile. 100% keeps the base tune.",
+                  "details": "Applies to Standard control with a pedal interceptor. Personal Pedal uses fixed personality gains.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LongPidTuneScaleRelaxed",
+                  "widget": "option",
+                  "title": "Distance 3 / Relaxed PID Scale",
+                  "description": "Adjusts acceleration and braking feedback strength for the Relaxed profile. 100% keeps the base tune.",
+                  "details": "Applies to Standard control with a pedal interceptor. Personal Pedal uses fixed personality gains.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "LongPidTuneScaleEcon",
+                  "widget": "option",
+                  "title": "Distance 4 / Econ PID Scale",
+                  "description": "Adjusts acceleration and braking feedback strength for the Econ profile. 100% keeps the base tune.",
+                  "details": "Applies to Standard control with a pedal interceptor. Personal Pedal uses fixed personality gains.",
+                  "min": 0,
+                  "max": 500,
+                  "step": 5,
+                  "unit": "%"
+                },
+                {
+                  "key": "NrdrCruiseMismatchCorrection",
+                  "widget": "option",
+                  "title": "Cruise Mismatch Correction",
+                  "description": "Adjusts the cruise target when the car consistently drives above or below the set speed. Lower the value if it runs too fast; raise it if it runs too slowly.",
+                  "details": "100% leaves the target unchanged.",
+                  "min": 95.0,
+                  "max": 105.0,
+                  "step": 0.1,
+                  "unit": "%"
+                },
+                {
+                  "key": "NrdrStandstillGapExtra",
+                  "widget": "option",
+                  "title": "Extra Stopped Lead Gap",
+                  "description": "Adds space behind the vehicle ahead while creeping or stopped. Zero keeps the normal gap without changing the selected following-time profile.",
+                  "details": "Applies on the next engagement; actual clearance depends on lead detection and braking.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.25,
+                  "unit": "m",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaStoppingDecelRate",
+                  "widget": "option",
+                  "title": "Stopping Decel Rate",
+                  "description": "Limits how quickly braking builds as the car comes to a stop.",
+                  "min": 0,
+                  "max": 100,
+                  "step": 1
+                },
+                {
+                  "key": "HondaStopAccel",
+                  "widget": "option",
+                  "title": "Stop Accel",
+                  "description": "Sets the braking target used to hold the car at a stop.",
+                  "min": -4.0,
+                  "max": 0.0,
+                  "step": 0.01
+                },
+                {
+                  "key": "HondaStoppingDecelRateLong",
+                  "widget": "option",
+                  "title": "Planner Stopping Rate",
+                  "description": "Sets how quickly the planned braking target increases when stopping.",
+                  "min": 0.0,
+                  "max": 5.0,
+                  "step": 0.01
+                },
+                {
+                  "key": "HondaVEgoStopping",
+                  "widget": "option",
+                  "title": "vEgo Stopping",
+                  "description": "Sets the speed below which stopping control takes over, in m/s.",
+                  "min": 0.0,
+                  "max": 3.0,
+                  "step": 0.01
+                },
+                {
+                  "key": "HondaVEgoStarting",
+                  "widget": "option",
+                  "title": "vEgo Starting",
+                  "description": "Sets the speed above which the car is treated as moving again, in m/s.",
+                  "min": 0.0,
+                  "max": 3.0,
+                  "step": 0.01
+                }
+              ]
+            },
+            {
+              "id": "nrdr_driver_monitoring",
+              "label": "Driver Monitoring",
+              "trigger_key": null,
+              "trigger_condition": {
+                "type": "capability",
+                "field": "nrdr_driver_monitoring_tuning_available",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "NrdrDriverMonitoringReminderPercent",
+                  "widget": "option",
+                  "needs_onroad_cycle": true,
+                  "title": "First Reminder Timing",
+                  "description": "Adjusts the delay before the first attention reminder: higher values wait longer, lower values warn sooner, and 100% uses standard timing.",
+                  "details": "Driver monitoring stays enabled, with the same intervals between later warnings. Changes apply after reboot.",
+                  "min": 50,
+                  "max": 250,
+                  "step": 5,
+                  "unit": "%",
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nrdr_custom_audio_visuals",
+              "label": "Custom Audio & Visuals",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "NrdrEngagementSoundPack",
+                  "widget": "multiple_button",
+                  "title": "Engagement Sounds",
+                  "description": "Choose current or June 2026 engagement sounds with their matching volume levels. Other alerts and Quiet Mode are unchanged.",
+                  "details": "Applies to the next engagement, disengagement, or engagement-refused chime.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Current"
+                    },
+                    {
+                      "value": 1,
+                      "label": "June 2026"
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrConfidenceBall",
+                  "widget": "toggle",
+                  "title": "Confidence Ball",
+                  "description": "Shows the confidence ball on the driving screen. Off hides it and stops its animation.",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "device_type",
+                      "equals": "mici"
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrDeveloperSidebar",
+                  "widget": "toggle",
+                  "title": "C4 Developer Sidebar",
+                  "description": "Shows the developer sidebar with the confidence ball fixed beside it. Off hides the sidebar and returns the ball to its original animated position.",
+                  "details": "Uses your selected Developer UI layout; the confidence ball stays hidden if its own switch is off.",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "device_type",
+                      "equals": "mici"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "nrdr_special",
+          "title": "nrdr Special",
+          "description": "Dashboard, diagnostics, and special features.",
+          "visibility": [
+            {
+              "type": "capability",
+              "field": "nrdr_honda_tuning_available",
+              "equals": true
+            }
+          ],
+          "items": [],
+          "sub_panels": [
+            {
+              "id": "nrdr_party_tricks",
+              "label": "Special",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "HondaInjectionTest",
+                  "widget": "toggle",
+                  "title": "Injection Test (Caution!)",
+                  "description": "Multiplies the lateral PID output scale by 999% for diagnostic testing. Can cause abrupt steering; do not use on public roads.",
+                  "details": "Off restores the normal output scale."
+                },
+                {
+                  "key": "HondaAltDashboardSpeed",
+                  "widget": "multiple_button",
+                  "title": "Alternative Dashboard Speed Design",
+                  "description": "Choose what appears in the dashboard's set-speed display: cruise set speed, lead speed, GPS speed, or cluster speed.",
+                  "details": "Stock restores the usual set-speed display; alternate displays require openpilot cruise control.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Stock"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Lead Speed"
+                    },
+                    {
+                      "value": 2,
+                      "label": "GPS Speed"
+                    },
+                    {
+                      "value": 3,
+                      "label": "Cluster Speed"
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaAltDashboardDistance",
+                  "widget": "option",
+                  "title": "Alternative Dashboard Distance Design",
+                  "description": "Choose distance bars that show the normal personality, lead proximity, or acceleration and braking.",
+                  "details": "Alternate designs remain visible while disengaged. Stock restores the normal personality bars.",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Stock"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Radar"
+                    },
+                    {
+                      "value": 2,
+                      "label": "Velocity"
+                    }
+                  ]
+                },
+                {
+                  "key": "NrdrClearDashFaults",
+                  "widget": "toggle",
+                  "title": "Clear Dashboard Fault Codes",
+                  "description": "Hides camera-related dashboard fault indicators and silences the factory forward-collision warning chime. Off restores those warnings; this does not repair or clear the underlying faults.",
+                  "details": "Intended for vehicles with a missing or failed factory camera."
+                },
+                {
+                  "key": "HondaSpoofCameraMessages",
+                  "widget": "toggle",
+                  "title": "Spoof Camera Messages",
+                  "description": "Prevents the automatic high-beam fault caused by a missing or failed camera. Leave off if the factory camera works.",
+                  "details": "Does not repair the camera or restore its functions."
+                },
+                {
+                  "key": "NrdrCruiseButtonSubMode",
+                  "widget": "toggle",
+                  "title": "Cruise Button Sub-Mode",
+                  "description": "The first cruise-button press opens a blinking preview; further presses adjust speed or personality. Off lets the first press make the adjustment immediately.",
+                  "details": "The preview shows the selected personality and, when cruise is engaged, the set speed."
+                },
+                {
+                  "key": "NrdrCruiseButtonSubModeSecs",
+                  "widget": "option",
+                  "title": "Sub-Mode Visibility Time",
+                  "description": "Sets how long the dashboard preview remains visible after a button press.",
+                  "details": "Blinking speeds up as the preview approaches its timeout.",
+                  "min": 5,
+                  "max": 60,
+                  "step": 1,
+                  "unit": "second",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrCruiseButtonSubMode",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cruise",
+      "label": "Cruise",
+      "icon": "cruise_control",
+      "order": 2,
+      "remote_configurable": true,
+      "description": "Longitudinal control, speed limits, and cruise behavior",
+      "sections": [
+        {
+          "id": "core_cruise_features",
+          "title": "",
+          "description": "",
+          "items": [
+            {
+              "key": "ExperimentalMode",
+              "widget": "toggle",
+              "title": "Experimental Mode",
+              "enablement": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "DisengageOnAccelerator",
+              "widget": "toggle",
+              "title": "Disengage Cruise on Accelerator Pedal",
+              "description": "Disengages cruise control when you press the accelerator. Off allows a temporary accelerator override."
+            },
+            {
+              "key": "LongitudinalPersonality",
+              "widget": "multiple_button",
+              "title": "Driving Personality",
+              "description": "Choose the following distance and driving response: Aggressive follows closer, Relaxed leaves more space, and Econ favors gentler driving. Standard balances the two.",
+              "options": [
+                {
+                  "value": 0,
+                  "label": "Aggressive"
+                },
+                {
+                  "value": 1,
+                  "label": "Standard"
+                },
+                {
+                  "value": 2,
+                  "label": "Relaxed"
+                },
+                {
+                  "value": 3,
+                  "label": "Econ",
+                  "enablement": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ]
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "IntelligentCruiseButtonManagement",
+              "widget": "toggle",
+              "needs_onroad_cycle": true,
+              "title": "Intelligent Cruise Button Management (ICBM) (Alpha)",
+              "description": "Automatically adjusts factory ACC's set speed while the car controls acceleration, braking, and following distance. Off leaves set-speed changes to you.",
+              "visibility": [
+                {
+                  "type": "capability",
+                  "field": "icbm_available",
+                  "equals": true
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                },
+                {
+                  "type": "capability",
+                  "field": "icbm_available",
+                  "equals": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "custom_acc_increments",
+          "title": "Custom ACC Speed Intervals",
+          "description": "",
+          "enablement": [
+            {
+              "type": "offroad_only"
+            },
+            {
+              "type": "any",
+              "conditions": [
+                {
+                  "type": "offroad_only"
+                },
+                {
+                  "type": "all",
+                  "conditions": [
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "pcm_cruise",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "capability",
+                  "field": "has_icbm",
+                  "equals": true
+                }
+              ]
+            }
+          ],
+          "items": [
+            {
+              "key": "CustomAccIncrementsEnabled",
+              "widget": "toggle",
+              "title": "Enable Custom ACC Speed Intervals",
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                },
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "all",
+                      "conditions": [
+                        {
+                          "type": "capability",
+                          "field": "has_longitudinal_control",
+                          "equals": true
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "pcm_cruise",
+                            "equals": true
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_icbm",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "sub_panels": [
+            {
+              "id": "custom_acc_intervals",
+              "label": "Custom ACC Speed Intervals Settings",
+              "trigger_key": "CustomAccIncrementsEnabled",
+              "trigger_condition": {
+                "type": "param",
+                "key": "CustomAccIncrementsEnabled",
+                "equals": true
+              },
+              "items": [
+                {
+                  "key": "CustomAccShortPressIncrement",
+                  "widget": "option",
+                  "title": "Short Press Increment",
+                  "min": 1,
+                  "max": 10,
+                  "step": 1,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "CustomAccIncrementsEnabled",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "CustomAccLongPressIncrement",
+                  "widget": "option",
+                  "title": "Long Press Increment",
+                  "min": 1,
+                  "max": 10,
+                  "step": 1,
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "CustomAccIncrementsEnabled",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "speed_limits",
+          "title": "Speed Limits",
+          "description": "Speed limit detection and offset behavior",
+          "items": [],
+          "sub_panels": [
+            {
+              "id": "speed_limit_settings",
+              "label": "Speed Limit Settings",
+              "trigger_key": "SpeedLimitMode",
+              "items": [
+                {
+                  "key": "SpeedLimitMode",
+                  "widget": "multiple_button",
+                  "title": "Speed Limit Assist Mode",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Off"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Information"
+                    },
+                    {
+                      "value": 2,
+                      "label": "Warning"
+                    },
+                    {
+                      "value": 3,
+                      "label": "Assist",
+                      "enablement": [
+                        {
+                          "type": "any",
+                          "conditions": [
+                            {
+                              "type": "capability",
+                              "field": "has_longitudinal_control",
+                              "equals": true
+                            },
+                            {
+                              "type": "capability",
+                              "field": "has_icbm",
+                              "equals": true
+                            }
+                          ]
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "capability",
+                            "field": "brand",
+                            "equals": "rivian"
+                          }
+                        },
+                        {
+                          "type": "not",
+                          "condition": {
+                            "type": "all",
+                            "conditions": [
+                              {
+                                "type": "capability",
+                                "field": "brand",
+                                "equals": "tesla"
+                              },
+                              {
+                                "type": "capability",
+                                "field": "is_sp_release",
+                                "equals": true
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "key": "SpeedLimitPolicy",
+                  "widget": "multiple_button",
+                  "title": "Speed Limit Source",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Car State Only"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Map Data Only"
+                    },
+                    {
+                      "value": 2,
+                      "label": "Car State Priority"
+                    },
+                    {
+                      "value": 3,
+                      "label": "Map Data Priority"
+                    },
+                    {
+                      "value": 4,
+                      "label": "Combined"
+                    }
+                  ]
+                },
+                {
+                  "key": "SpeedLimitOffsetType",
+                  "widget": "multiple_button",
+                  "title": "Speed Limit Offset Type",
+                  "options": [
+                    {
+                      "value": 0,
+                      "label": "Off"
+                    },
+                    {
+                      "value": 1,
+                      "label": "Fixed"
+                    },
+                    {
+                      "value": 2,
+                      "label": "Percentage"
+                    }
+                  ]
+                },
+                {
+                  "key": "SpeedLimitValueOffset",
+                  "widget": "option",
+                  "title": "Speed Limit Offset Value",
+                  "min": -30,
+                  "max": 30,
+                  "step": 1,
+                  "unit": {
+                    "metric": "km/h",
+                    "imperial": "mph"
+                  },
+                  "visibility": [
+                    {
+                      "type": "param_compare",
+                      "key": "SpeedLimitOffsetType",
+                      "op": ">",
+                      "value": 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "smart_cruise",
+          "title": "Smart Cruise Control",
+          "description": "",
+          "enablement": [
+            {
+              "type": "any",
+              "conditions": [
+                {
+                  "type": "offroad_only"
+                },
+                {
+                  "type": "capability",
+                  "field": "has_longitudinal_control",
+                  "equals": true
+                },
+                {
+                  "type": "capability",
+                  "field": "has_icbm",
+                  "equals": true
+                }
+              ]
+            }
+          ],
+          "items": [
+            {
+              "key": "SmartCruiseControlVision",
+              "widget": "toggle",
+              "title": "Vision",
+              "description": "Uses the camera's view of the road to reduce cruise speed for upcoming curves. Off disables this additional curve-speed adjustment.",
+              "visibility": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_icbm",
+                      "equals": true
+                    }
+                  ]
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_icbm",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "AccelBoostSP",
+              "widget": "toggle",
+              "title": "Acceleration Boost",
+              "description": "Adds acceleration assistance when Experimental Mode falls below the set speed, with any personality and MVL live learning. Off restores the usual acceleration behavior.",
+              "enablement": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "key": "SmartCruiseControlMap",
+              "widget": "toggle",
+              "title": "Map",
+              "description": "Uses map data to reduce cruise speed for upcoming curves. Off disables map-based curve-speed adjustments.",
+              "visibility": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_icbm",
+                      "equals": true
+                    }
+                  ]
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_longitudinal_control",
+                      "equals": true
+                    },
+                    {
+                      "type": "capability",
+                      "field": "has_icbm",
+                      "equals": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "display",
+      "label": "Display",
+      "icon": "display",
+      "order": 3,
+      "remote_configurable": true,
+      "description": "Screen brightness, timeout, and interactivity settings",
+      "sections": [
+        {
+          "id": "brightness_timeout",
+          "title": "Brightness & Timeout",
+          "description": "Screen dimming and sleep behavior while driving",
+          "items": [
+            {
+              "key": "OnroadScreenOffBrightness",
+              "widget": "multiple_button",
+              "title": "Onroad Brightness",
+              "options": [
+                {
+                  "value": 0,
+                  "label": "Auto (Default)"
+                },
+                {
+                  "value": 1,
+                  "label": "Auto (Dark)"
+                },
+                {
+                  "value": 2,
+                  "label": "Screen Off"
+                },
+                {
+                  "value": 3,
+                  "label": "5 %"
+                },
+                {
+                  "value": 4,
+                  "label": "10 %"
+                },
+                {
+                  "value": 5,
+                  "label": "15 %"
+                },
+                {
+                  "value": 6,
+                  "label": "20 %"
+                },
+                {
+                  "value": 7,
+                  "label": "25 %"
+                },
+                {
+                  "value": 8,
+                  "label": "30 %"
+                },
+                {
+                  "value": 9,
+                  "label": "35 %"
+                },
+                {
+                  "value": 10,
+                  "label": "40 %"
+                },
+                {
+                  "value": 11,
+                  "label": "45 %"
+                },
+                {
+                  "value": 12,
+                  "label": "50 %"
+                },
+                {
+                  "value": 13,
+                  "label": "55 %"
+                },
+                {
+                  "value": 14,
+                  "label": "60 %"
+                },
+                {
+                  "value": 15,
+                  "label": "65 %"
+                },
+                {
+                  "value": 16,
+                  "label": "70 %"
+                },
+                {
+                  "value": 17,
+                  "label": "75 %"
+                },
+                {
+                  "value": 18,
+                  "label": "80 %"
+                },
+                {
+                  "value": 19,
+                  "label": "85 %"
+                },
+                {
+                  "value": 20,
+                  "label": "90 %"
+                },
+                {
+                  "value": 21,
+                  "label": "95 %"
+                },
+                {
+                  "value": 22,
+                  "label": "100 %"
+                }
+              ]
+            },
+            {
+              "key": "OnroadScreenOffTimer",
+              "widget": "multiple_button",
+              "title": "Onroad Brightness Delay",
+              "options": [
+                {
+                  "value": 3,
+                  "label": "3s"
+                },
+                {
+                  "value": 5,
+                  "label": "5s"
+                },
+                {
+                  "value": 7,
+                  "label": "7s"
+                },
+                {
+                  "value": 10,
+                  "label": "10s"
+                },
+                {
+                  "value": 15,
+                  "label": "15s"
+                },
+                {
+                  "value": 30,
+                  "label": "30s"
+                },
+                {
+                  "value": 60,
+                  "label": "1m"
+                },
+                {
+                  "value": 120,
+                  "label": "2m"
+                },
+                {
+                  "value": 180,
+                  "label": "3m"
+                },
+                {
+                  "value": 240,
+                  "label": "4m"
+                },
+                {
+                  "value": 300,
+                  "label": "5m"
+                },
+                {
+                  "value": 360,
+                  "label": "6m"
+                },
+                {
+                  "value": 420,
+                  "label": "7m"
+                },
+                {
+                  "value": 480,
+                  "label": "8m"
+                },
+                {
+                  "value": 540,
+                  "label": "9m"
+                },
+                {
+                  "value": 600,
+                  "label": "10m"
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "any",
+                    "conditions": [
+                      {
+                        "type": "param",
+                        "key": "OnroadScreenOffBrightness",
+                        "equals": 0
+                      },
+                      {
+                        "type": "param",
+                        "key": "OnroadScreenOffBrightness",
+                        "equals": 1
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "key": "InteractivityTimeout",
+              "widget": "multiple_button",
+              "title": "Interactivity Timeout",
+              "description": "Sets how long the settings screen stays open without interaction.",
+              "details": "The screen closes automatically when this timer expires.",
+              "options": [
+                {
+                  "value": 0,
+                  "label": "Default"
+                },
+                {
+                  "value": 10,
+                  "label": "10 s"
+                },
+                {
+                  "value": 20,
+                  "label": "20 s"
+                },
+                {
+                  "value": 30,
+                  "label": "30 s"
+                },
+                {
+                  "value": 40,
+                  "label": "40 s"
+                },
+                {
+                  "value": 50,
+                  "label": "50 s"
+                },
+                {
+                  "value": 60,
+                  "label": "1 m"
+                },
+                {
+                  "value": 70,
+                  "label": "1 m"
+                },
+                {
+                  "value": 80,
+                  "label": "1 m"
+                },
+                {
+                  "value": 90,
+                  "label": "1 m"
+                },
+                {
+                  "value": 100,
+                  "label": "1 m"
+                },
+                {
+                  "value": 110,
+                  "label": "1 m"
+                },
+                {
+                  "value": 120,
+                  "label": "2 m"
+                }
+              ]
+            },
+            {
+              "key": "ScreenSaverEnabled",
+              "widget": "toggle",
+              "title": "Screen Saver",
+              "description": "Show a screen saver when the device is offroad and idle, instead of turning the screen off."
+            },
+            {
+              "key": "ScreenSaverTimeout",
+              "widget": "multiple_button",
+              "title": "Screen Saver Duration",
+              "description": "How long the screen saver runs before the screen turns off.",
+              "options": [
+                {
+                  "value": 60,
+                  "label": "1 m"
+                },
+                {
+                  "value": 120,
+                  "label": "2 m"
+                },
+                {
+                  "value": 180,
+                  "label": "3 m"
+                },
+                {
+                  "value": 240,
+                  "label": "4 m"
+                },
+                {
+                  "value": 300,
+                  "label": "5 m"
+                },
+                {
+                  "value": 360,
+                  "label": "6 m"
+                },
+                {
+                  "value": 420,
+                  "label": "7 m"
+                },
+                {
+                  "value": 480,
+                  "label": "8 m"
+                },
+                {
+                  "value": 540,
+                  "label": "9 m"
+                },
+                {
+                  "value": 600,
+                  "label": "10 m"
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "ScreenSaverEnabled",
+                  "equals": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "visuals",
+      "label": "Visuals",
+      "icon": "visuals",
+      "order": 4,
+      "remote_configurable": true,
+      "description": "HUD overlays, alerts, and on-screen display elements",
+      "sections": [
+        {
+          "id": "hud_elements",
+          "title": "HUD Elements",
+          "description": "Overlays shown on the driving screen",
+          "items": [
+            {
+              "key": "BlindSpot",
+              "widget": "toggle",
+              "title": "Show Blind Spot Warnings",
+              "description": "Shows a warning when the car's blind-spot sensors detect another vehicle.",
+              "details": "Off hides these on-screen warnings without changing the car's blind-spot monitoring."
+            },
+            {
+              "key": "TorqueBar",
+              "widget": "toggle",
+              "title": "Steering Arc",
+              "description": "Display steering arc on the driving screen when lateral control is enabled."
+            },
+            {
+              "key": "ShowTurnSignals",
+              "widget": "toggle",
+              "title": "Display Turn Signals",
+              "description": "Shows turn-signal indicators on the driving screen."
+            },
+            {
+              "key": "RoadNameToggle",
+              "widget": "toggle",
+              "title": "Display Road Name",
+              "description": "Shows the current road name on the driving screen.",
+              "details": "Requires downloaded OpenStreetMap data for the area.",
+              "visibility": [
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "capability",
+                    "field": "device_type",
+                    "equals": "mici"
+                  }
+                }
+              ]
+            },
+            {
+              "key": "StandstillTimer",
+              "widget": "toggle",
+              "title": "Standstill Timer",
+              "description": "Show a timer on the HUD when the car is at a standstill.",
+              "visibility": [
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "capability",
+                    "field": "device_type",
+                    "equals": "mici"
+                  }
+                }
+              ]
+            },
+            {
+              "key": "RocketFuel",
+              "widget": "toggle",
+              "title": "Real-time Acceleration Bar",
+              "description": "Shows the car's measured acceleration and braking on the left side of the driving screen.",
+              "details": "Displays actual vehicle motion rather than the requested acceleration.",
+              "visibility": [
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "capability",
+                    "field": "device_type",
+                    "equals": "mici"
+                  }
+                }
+              ]
+            },
+            {
+              "key": "ChevronInfo",
+              "widget": "option",
+              "title": "Display Metrics Below Chevron",
+              "options": [
+                {
+                  "value": 0,
+                  "label": "Off"
+                },
+                {
+                  "value": 1,
+                  "label": "Distance"
+                },
+                {
+                  "value": 2,
+                  "label": "Speed"
+                },
+                {
+                  "value": 3,
+                  "label": "Time"
+                },
+                {
+                  "value": 4,
+                  "label": "All"
+                }
+              ],
+              "visibility": [
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "capability",
+                    "field": "device_type",
+                    "equals": "mici"
+                  }
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "capability",
+                  "field": "has_longitudinal_control",
+                  "equals": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "developer_ui",
+          "title": "Developer UI Info",
+          "description": "Speedometer and debug display options",
+          "visibility": [
+            {
+              "type": "not",
+              "condition": {
+                "type": "capability",
+                "field": "device_type",
+                "equals": "mici"
+              }
+            }
+          ],
+          "items": [
+            {
+              "key": "DevUIInfo",
+              "widget": "option",
+              "title": "Developer UI",
+              "description": "Display real-time parameters and metrics from various sources.",
+              "options": [
+                {
+                  "value": 0,
+                  "label": "Off"
+                },
+                {
+                  "value": 1,
+                  "label": "Bottom"
+                },
+                {
+                  "value": 2,
+                  "label": "Right"
+                },
+                {
+                  "value": 3,
+                  "label": "Right & Bottom"
+                }
+              ]
+            },
+            {
+              "key": "TrueVEgoUI",
+              "widget": "toggle",
+              "title": "Speedometer: Always Display True Speed",
+              "description": "Shows wheel-sensor speed instead of the dashboard-adjusted speed on supported vehicles."
+            },
+            {
+              "key": "HideVEgoUI",
+              "widget": "toggle",
+              "title": "Speedometer: Hide from Onroad Screen",
+              "description": "Hides the speedometer on the driving screen. Off shows it again."
+            }
+          ]
+        },
+        {
+          "id": "alerts_extras",
+          "title": "Alerts & Extras",
+          "description": "Traffic light alerts and visual flair",
+          "items": [
+            {
+              "key": "GreenLightAlert",
+              "widget": "toggle",
+              "title": "Green Traffic Light Alert (Beta)",
+              "description": "Plays an alert when the light turns green and there is no vehicle ahead. Check traffic before proceeding.",
+              "details": "The on-screen notification is available on comma 3X."
+            },
+            {
+              "key": "LeadDepartAlert",
+              "widget": "toggle",
+              "title": "Lead Departure Alert (Beta)",
+              "description": "Plays an alert when you are stopped and the vehicle ahead starts moving. Check traffic before proceeding.",
+              "details": "The on-screen notification is available on comma 3X."
+            },
+            {
+              "key": "RainbowMode",
+              "widget": "toggle",
+              "title": "Tesla Rainbow Mode",
+              "description": "Adds a rainbow effect to the displayed driving path without changing driving behavior."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "toggles",
+      "label": "Toggles",
+      "icon": "toggles",
+      "order": 5,
+      "remote_configurable": true,
+      "description": "Core openpilot feature toggles",
+      "sections": [
+        {
+          "id": "core_toggles",
+          "title": "",
+          "description": "",
+          "items": [
+            {
+              "key": "OpenpilotEnabledToggle",
+              "widget": "toggle",
+              "needs_onroad_cycle": true,
+              "title": "Enable sunnypilot",
+              "description": "Use sunnypilot for adaptive cruise control and lane keep driver assistance.",
+              "details": "Use the sunnypilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature.",
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                }
+              ]
+            },
+            {
+              "key": "IsLdwEnabled",
+              "widget": "toggle",
+              "title": "Enable Lane Departure Warnings",
+              "description": "Receive alerts to steer back when you drift over a lane line without a turn signal above 31 mph (50 km/h).",
+              "details": "Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line without a turn signal activated while driving over 31 mph (50 km/h)."
+            },
+            {
+              "key": "AlwaysOnDM",
+              "widget": "toggle",
+              "title": "Always-On Driver Monitoring",
+              "description": "Enable driver monitoring even when sunnypilot is not engaged."
+            },
+            {
+              "key": "IsMetric",
+              "widget": "toggle",
+              "title": "Use Metric System",
+              "description": "Display speed in km/h instead of mph."
+            }
+          ]
+        },
+        {
+          "id": "recording",
+          "title": "Recording",
+          "description": "Camera and audio recording during drives",
+          "items": [
+            {
+              "key": "RecordFront",
+              "widget": "toggle",
+              "needs_onroad_cycle": true,
+              "title": "Record and Upload Driver Camera",
+              "description": "Uploads driver-camera recordings to help improve driver monitoring. Off stops these uploads."
+            },
+            {
+              "key": "RecordAudio",
+              "widget": "toggle",
+              "needs_onroad_cycle": true,
+              "title": "Record and Upload Microphone Audio",
+              "description": "Records microphone audio during drives and includes it in dashcam playback on comma connect.",
+              "details": "Off stops recording new audio; existing recordings are unchanged."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "device",
+      "label": "Device",
+      "icon": "device",
+      "order": 6,
+      "remote_configurable": true,
+      "description": "Device behavior, units, and recording settings",
+      "sections": [
+        {
+          "id": "general",
+          "title": "General",
+          "description": "Power, boot, and unit preferences",
+          "items": [
+            {
+              "key": "OffroadMode",
+              "widget": "toggle",
+              "title": "Force Offroad Mode"
+            },
+            {
+              "key": "DeviceBootMode",
+              "widget": "option",
+              "title": "Wake Up Behavior",
+              "description": "Choose whether the device starts normally or stays in Offroad mode after starting or waking.",
+              "details": "Default prepares the device for driving; Offroad keeps driving assistance inactive.",
+              "options": [
+                {
+                  "value": 0,
+                  "label": "Standard"
+                },
+                {
+                  "value": 1,
+                  "label": "Always Offroad"
+                }
+              ]
+            },
+            {
+              "key": "QuietMode",
+              "widget": "toggle",
+              "title": "Quiet Mode"
+            },
+            {
+              "key": "OnroadUploads",
+              "widget": "toggle",
+              "title": "Onroad Uploads"
+            },
+            {
+              "key": "MaxTimeOffroad",
+              "widget": "option",
+              "title": "Max Time Offroad",
+              "description": "Sets how long the device stays on after the car is turned off.",
+              "details": "Battery protection may shut it down sooner; Prevent Automatic Shutdown bypasses both the timer and that protection.",
+              "options": [
+                {
+                  "value": 0,
+                  "label": "No Time Limit"
+                },
+                {
+                  "value": 5,
+                  "label": "5m"
+                },
+                {
+                  "value": 10,
+                  "label": "10m"
+                },
+                {
+                  "value": 15,
+                  "label": "15m"
+                },
+                {
+                  "value": 30,
+                  "label": "30m"
+                },
+                {
+                  "value": 60,
+                  "label": "1h"
+                },
+                {
+                  "value": 120,
+                  "label": "2h"
+                },
+                {
+                  "value": 180,
+                  "label": "3h"
+                },
+                {
+                  "value": 300,
+                  "label": "5h"
+                },
+                {
+                  "value": 600,
+                  "label": "10h"
+                },
+                {
+                  "value": 1440,
+                  "label": "24h"
+                },
+                {
+                  "value": 1800,
+                  "label": "30h (Default)"
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                },
+                {
+                  "type": "param",
+                  "key": "DisablePowerDown",
+                  "equals": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "language",
+          "title": "Language",
+          "items": [
+            {
+              "key": "LanguageSetting",
+              "widget": "info",
+              "title": "Language"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "software",
+      "label": "Software",
+      "icon": "software",
+      "order": 7,
+      "remote_configurable": true,
+      "description": "Software update preferences",
+      "sections": [
+        {
+          "id": "updates",
+          "title": "Updates",
+          "description": "Control software updates",
+          "items": [
+            {
+              "key": "DisableUpdates",
+              "widget": "toggle",
+              "title": "Disable Updates",
+              "description": "Stops automatic software updates. Restart the device for the change to take effect.",
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                },
+                {
+                  "type": "param",
+                  "key": "ShowAdvancedControls",
+                  "equals": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "developer",
+      "label": "Developer",
+      "icon": "developer",
+      "order": 9,
+      "remote_configurable": true,
+      "description": "Debug tools, remote access, and advanced services",
+      "sections": [
+        {
+          "id": "connectivity",
+          "title": "Connectivity",
+          "description": "Remote access and debugging interfaces",
+          "items": [
+            {
+              "key": "AdbEnabled",
+              "widget": "toggle",
+              "blocked": true,
+              "title": "Enable ADB",
+              "description": "Enables Android Debug Bridge access over USB or the local network.",
+              "details": "Use ADB to access developer tools on the device.",
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                }
+              ]
+            },
+            {
+              "key": "SshEnabled",
+              "widget": "toggle",
+              "blocked": true,
+              "title": "Enable SSH"
+            },
+            {
+              "key": "JoystickDebugMode",
+              "widget": "toggle",
+              "title": "Joystick Debug Mode",
+              "enablement": [
+                {
+                  "type": "offroad_only"
+                }
+              ]
+            },
+            {
+              "key": "AlphaLongitudinalEnabled",
+              "widget": "toggle",
+              "needs_onroad_cycle": true,
+              "title": "sunnypilot Longitudinal Control (Alpha)",
+              "description": "Replaces factory ACC with experimental openpilot acceleration and braking. This disables factory Automatic Emergency Braking (AEB).",
+              "details": "Off restores factory ACC; changing this setting while the car is on restarts sunnypilot.",
+              "visibility": [
+                {
+                  "type": "all",
+                  "conditions": [
+                    {
+                      "type": "capability",
+                      "field": "alpha_long_available",
+                      "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "has_icbm",
+                        "equals": true
+                      }
+                    }
+                  ]
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "not_engaged"
+                }
+              ]
+            },
+            {
+              "key": "ShowDebugInfo",
+              "widget": "toggle",
+              "title": "UI Debug Mode"
+            }
+          ]
+        },
+        {
+          "id": "test_maneuvers",
+          "title": "Test Maneuvers",
+          "description": "DANGER: enabling these maneuvers replaces normal driving behavior with deterministic test sequences. Each toggle requires explicit confirmation per write. Use only in a closed environment.",
+          "visibility": [
+            {
+              "type": "any",
+              "conditions": [
+                {
+                  "type": "capability",
+                  "field": "is_development",
+                  "equals": true
+                },
+                {
+                  "type": "capability",
+                  "field": "is_sp_release",
+                  "equals": true
+                }
+              ]
+            }
+          ],
+          "enablement": [
+            {
+              "type": "any",
+              "conditions": [
+                {
+                  "type": "capability",
+                  "field": "is_development",
+                  "equals": true
+                },
+                {
+                  "type": "param",
+                  "key": "ShowAdvancedControls",
+                  "equals": true
+                }
+              ]
+            }
+          ],
+          "attestation_required": true,
+          "items": [
+            {
+              "key": "LateralManeuverMode",
+              "widget": "toggle",
+              "title": "[TEST] Lateral Maneuver Mode",
+              "description": "Replaces normal lateral control with a deterministic test sequence. NOT for road use.",
+              "enablement": [
+                {
+                  "type": "not_engaged"
+                },
+                {
+                  "type": "capability",
+                  "field": "torque_allowed",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "LongitudinalManeuverMode",
+              "widget": "toggle",
+              "title": "[TEST] Longitudinal Maneuver Mode",
+              "description": "Replaces normal longitudinal control with a deterministic test sequence. NOT for road use.",
+              "enablement": [
+                {
+                  "type": "not_engaged"
+                },
+                {
+                  "type": "capability",
+                  "field": "has_longitudinal_control",
+                  "equals": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "advanced_services",
+          "title": "Advanced Settings",
+          "description": "",
+          "items": [
+            {
+              "key": "ShowAdvancedControls",
+              "widget": "toggle",
+              "title": "Show Advanced Controls",
+              "description": "Shows advanced settings. Hiding them leaves their current values unchanged.",
+              "details": "Only changes which settings are visible."
+            },
+            {
+              "key": "EnableGithubRunner",
+              "widget": "toggle",
+              "title": "GitHub Runner Service",
+              "description": "Enables or disables the GitHub runner service.",
+              "visibility": [
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "capability",
+                    "field": "is_sp_release",
+                    "equals": true
+                  }
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "ShowAdvancedControls",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "EnableCopyparty",
+              "widget": "toggle",
+              "title": "copyparty Service",
+              "description": "Lets you browse, download, and manage device files in a web browser on the same network.",
+              "details": "Available while the car is off; disabling it stops browser access to the file server.",
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "ShowAdvancedControls",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "QuickBootToggle",
+              "widget": "toggle",
+              "title": "Quickboot Mode",
+              "visibility": [
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "any",
+                    "conditions": [
+                      {
+                        "type": "capability",
+                        "field": "is_sp_release",
+                        "equals": true
+                      },
+                      {
+                        "type": "capability",
+                        "field": "is_development",
+                        "equals": true
+                      }
+                    ]
+                  }
+                }
+              ],
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "DisableUpdates",
+                  "equals": true
+                },
+                {
+                  "type": "param",
+                  "key": "ShowAdvancedControls",
+                  "equals": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "models",
+      "label": "Models",
+      "icon": "models",
+      "order": 10,
+      "remote_configurable": false,
+      "description": "Driving model behavior and camera calibration",
+      "sections": [
+        {
+          "id": "model_behavior",
+          "title": "Model Behavior",
+          "description": "Lane desire and lead-vehicle awareness tuning",
+          "items": [
+            {
+              "key": "LaneTurnDesire",
+              "widget": "toggle",
+              "title": "Use Lane Turn Desires",
+              "description": "Uses the turn signal to guide the model's turn direction at low speeds. Off leaves turn selection to the model.",
+              "details": "Applies up to the selected lane-turn speed."
+            },
+            {
+              "key": "LaneTurnValue",
+              "widget": "option",
+              "title": "Adjust Lane Turn Speed",
+              "description": "Set the maximum speed for lane turn desires.",
+              "min": 0,
+              "max": 20,
+              "step": 1,
+              "unit": {
+                "metric": "km/h",
+                "imperial": "mph"
+              },
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "LaneTurnDesire",
+                  "equals": true
+                },
+                {
+                  "type": "param",
+                  "key": "ShowAdvancedControls",
+                  "equals": true
+                }
+              ]
+            },
+            {
+              "key": "LagdToggle",
+              "widget": "toggle",
+              "title": "Live Learning Steer Delay",
+              "description": "Learns the car's steering response time as you drive. Off uses a fixed delay; PTM Controller uses its own vehicle-specific timing.",
+              "enablement": [
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "param",
+                    "key": "NrdrHandcraftedLateralTune",
+                    "equals": true
+                  }
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "all",
+                    "conditions": [
+                      {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      },
+                      {
+                        "type": "capability",
+                        "field": "nrdr_firmware_prediction_schedule",
+                        "equals": true
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "key": "LagdToggleDelay",
+              "widget": "option",
+              "title": "Adjust Software Delay",
+              "description": "Sets the additional steering prediction delay when live delay learning is off.",
+              "details": "Controllers with vehicle-specific timing ignore this value but preserve it for other controllers.",
+              "min": 0.05,
+              "max": 1.0,
+              "step": 0.01,
+              "enablement": [
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "param",
+                    "key": "LagdToggle",
+                    "equals": true
+                  }
+                },
+                {
+                  "type": "param",
+                  "key": "ShowAdvancedControls",
+                  "equals": true
+                },
+                {
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrSuggestedSettings",
+                        "equals": true
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "param",
+                    "key": "NrdrHandcraftedLateralTune",
+                    "equals": true
+                  }
+                },
+                {
+                  "type": "not",
+                  "condition": {
+                    "type": "all",
+                    "conditions": [
+                      {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 1
+                      },
+                      {
+                        "type": "capability",
+                        "field": "nrdr_firmware_prediction_schedule",
+                        "equals": true
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "camera",
+          "title": "Camera",
+          "description": "Camera position and calibration",
+          "items": [
+            {
+              "key": "CameraOffset",
+              "widget": "option",
+              "title": "Adjust Camera Offset",
+              "description": "Adjusts the model's view of the camera position. Positive values shift its center left; negative values shift it right.",
+              "min": -0.35,
+              "max": 0.35,
+              "step": 0.01,
+              "unit": "meters",
+              "enablement": [
+                {
+                  "type": "param",
+                  "key": "ShowAdvancedControls",
+                  "equals": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "vehicle_settings": {
+    "honda": {
+      "title": "Honda / Acura Settings",
+      "description": "",
+      "items": [
+        {
+          "key": "HondaEnforceStockLongitudinal",
+          "widget": "toggle",
+          "needs_onroad_cycle": true,
+          "title": "Honda Nidec: Enforce Factory Longitudinal Control",
+          "description": "Uses factory ACC to control acceleration and braking instead of openpilot. Off allows openpilot cruise control.",
+          "enablement": [
+            {
+              "type": "not_engaged"
+            }
+          ]
+        }
+      ]
+    },
+    "hyundai": {
+      "title": "Hyundai / Kia / Genesis Settings",
+      "description": "",
+      "items": [
+        {
+          "key": "HyundaiLongitudinalTuning",
+          "widget": "multiple_button",
+          "title": "Custom Longitudinal Tuning",
+          "options": [
+            {
+              "value": 0,
+              "label": "Off"
+            },
+            {
+              "value": 1,
+              "label": "Dynamic"
+            },
+            {
+              "value": 2,
+              "label": "Predictive"
+            }
+          ],
+          "visibility": [
+            {
+              "type": "capability",
+              "field": "hyundai_alpha_long_available",
+              "equals": true
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            },
+            {
+              "type": "capability",
+              "field": "has_longitudinal_control",
+              "equals": true
+            }
+          ]
+        }
+      ]
+    },
+    "subaru": {
+      "title": "Subaru Settings",
+      "description": "",
+      "items": [
+        {
+          "key": "SubaruStopAndGo",
+          "widget": "toggle",
+          "title": "Stop and Go (Beta)",
+          "enablement": [
+            {
+              "type": "offroad_only"
+            },
+            {
+              "type": "capability",
+              "field": "has_stop_and_go",
+              "equals": true
+            }
+          ]
+        },
+        {
+          "key": "SubaruStopAndGoManualParkingBrake",
+          "widget": "toggle",
+          "title": "Stop and Go for Manual Parking Brake (Beta)",
+          "enablement": [
+            {
+              "type": "offroad_only"
+            },
+            {
+              "type": "capability",
+              "field": "has_stop_and_go",
+              "equals": true
+            }
+          ]
+        }
+      ]
+    },
+    "tesla": {
+      "title": "Tesla Settings",
+      "description": "",
+      "items": [
+        {
+          "key": "TeslaCoopSteering",
+          "widget": "toggle",
+          "title": "Cooperative Steering (Beta)",
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "TeslaMadsScreenButton",
+          "widget": "multiple_button",
+          "title": "MADS Screen Activation",
+          "description": "Toggle MADS with a multi-finger press on the infotainment screen; more fingers reduce accidental activation. Off resets MADS settings to their defaults.",
+          "options": [
+            {
+              "value": 0,
+              "label": "Off"
+            },
+            {
+              "value": 1,
+              "label": "3-Finger"
+            },
+            {
+              "value": 2,
+              "label": "4-Finger"
+            },
+            {
+              "value": 3,
+              "label": "5-Finger"
+            }
+          ],
+          "visibility": [
+            {
+              "type": "capability",
+              "field": "tesla_has_vehicle_bus",
+              "equals": true
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        }
+      ]
+    },
+    "toyota": {
+      "title": "Toyota / Lexus Settings",
+      "description": "",
+      "items": [
+        {
+          "key": "ToyotaEnforceStockLongitudinal",
+          "widget": "toggle",
+          "needs_onroad_cycle": true,
+          "title": "Enforce Factory Longitudinal Control",
+          "description": "Uses factory ACC to control acceleration and braking instead of openpilot. Off allows openpilot cruise control.",
+          "enablement": [
+            {
+              "type": "not_engaged"
+            }
+          ]
+        },
+        {
+          "key": "ToyotaStopAndGoHack",
+          "widget": "toggle",
+          "needs_onroad_cycle": true,
+          "title": "Stop and Go Hack (Alpha)",
+          "description": "Enables automatic resume in stop-and-go traffic on supported Toyota and Lexus vehicles. Experimental: be ready to take over.",
+          "details": "Off restores the normal resume behavior.",
+          "enablement": [
+            {
+              "type": "not_engaged"
+            },
+            {
+              "type": "capability",
+              "field": "has_longitudinal_control",
+              "equals": true
+            },
+            {
+              "type": "param",
+              "key": "ToyotaEnforceStockLongitudinal",
+              "equals": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

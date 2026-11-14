@@ -1,0 +1,70 @@
+# Page: device
+# Edit this file. Run compile_settings_ui.py to emit settings_ui.json.
+id: device
+label: Device
+icon: device
+order: 6
+remote_configurable: true
+description: Device behavior, units, and recording settings
+sections:
+- id: general
+  title: General
+  description: Power, boot, and unit preferences
+  items:
+  - key: OffroadMode
+    widget: toggle
+    title: Force Offroad Mode
+  - key: DeviceBootMode
+    widget: option
+    title: Wake Up Behavior
+    description: "Choose whether the device starts normally or stays in Offroad mode after starting or waking."
+    details: "Default prepares the device for driving; Offroad keeps driving assistance inactive."
+    options:
+    - value: 0
+      label: Standard
+    - value: 1
+      label: Always Offroad
+  - key: QuietMode
+    widget: toggle
+    title: Quiet Mode
+  - key: OnroadUploads
+    widget: toggle
+    title: Onroad Uploads
+  - key: MaxTimeOffroad
+    widget: option
+    title: Max Time Offroad
+    description: "Sets how long the device stays on after the car is turned off."
+    details: "Battery protection may shut it down sooner; Prevent Automatic Shutdown bypasses both the timer and that protection."
+    enablement:
+    - $ref: '#/macros/offroad'
+    options:
+    - value: 0
+      label: No Time Limit
+    - value: 5
+      label: 5m
+    - value: 10
+      label: 10m
+    - value: 15
+      label: 15m
+    - value: 30
+      label: 30m
+    - value: 60
+      label: 1h
+    - value: 120
+      label: 2h
+    - value: 180
+      label: 3h
+    - value: 300
+      label: 5h
+    - value: 600
+      label: 10h
+    - value: 1440
+      label: 24h
+    - value: 1800
+      label: 30h (Default)
+- id: language
+  title: Language
+  items:
+  - key: LanguageSetting
+    widget: info
+    title: Language

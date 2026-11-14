@@ -1,0 +1,283 @@
+# Page: cruise
+# Edit this file. Run compile_settings_ui.py to emit settings_ui.json.
+id: cruise
+label: Cruise
+icon: cruise_control
+order: 2
+remote_configurable: true
+description: Longitudinal control, speed limits, and cruise behavior
+sections:
+- id: core_cruise_features
+  title: ''
+  description: ''
+  items:
+  - key: ExperimentalMode
+    widget: toggle
+    title: Experimental Mode
+    enablement:
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - {type: capability, field: has_longitudinal_control, equals: true}
+  - key: DisengageOnAccelerator
+    widget: toggle
+    title: Disengage Cruise on Accelerator Pedal
+    description: "Disengages cruise control when you press the accelerator. Off allows a temporary accelerator override."
+  - key: LongitudinalPersonality
+    widget: multiple_button
+    title: Driving Personality
+    description: "Choose the following distance and driving response: Aggressive follows closer, Relaxed leaves more space, and Econ favors gentler driving. Standard balances the two."
+    options:
+    - value: 0
+      label: Aggressive
+    - value: 1
+      label: Standard
+    - value: 2
+      label: Relaxed
+    - value: 3
+      label: Econ
+      enablement:
+      - {type: capability, field: nrdr_longitudinal_tuning_available, equals: true}
+    enablement:
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - {type: capability, field: has_longitudinal_control, equals: true}
+  - key: IntelligentCruiseButtonManagement
+    widget: toggle
+    title: Intelligent Cruise Button Management (ICBM) (Alpha)
+    description: "Automatically adjusts factory ACC's set speed while the car controls acceleration, braking, and following distance. Off leaves set-speed changes to you."
+    needs_onroad_cycle: true
+    visibility:
+    - type: capability
+      field: icbm_available
+      equals: true
+    enablement:
+    - $ref: '#/macros/offroad'
+    - {type: capability, field: icbm_available, equals: true}
+- id: custom_acc_increments
+  title: Custom ACC Speed Intervals
+  description: ''
+  enablement:
+  - $ref: '#/macros/offroad'
+  - type: any
+    conditions:
+    - {type: offroad_only}
+    - type: all
+      conditions:
+      - type: capability
+        field: has_longitudinal_control
+        equals: true
+      - type: not
+        condition:
+          type: capability
+          field: pcm_cruise
+          equals: true
+    - type: capability
+      field: has_icbm
+      equals: true
+  items:
+  - key: CustomAccIncrementsEnabled
+    widget: toggle
+    title: Enable Custom ACC Speed Intervals
+    enablement:
+    - $ref: '#/macros/offroad'
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - type: all
+        conditions:
+        - type: capability
+          field: has_longitudinal_control
+          equals: true
+        - type: not
+          condition:
+            type: capability
+            field: pcm_cruise
+            equals: true
+      - type: capability
+        field: has_icbm
+        equals: true
+  sub_panels:
+  - id: custom_acc_intervals
+    label: Custom ACC Speed Intervals Settings
+    trigger_key: CustomAccIncrementsEnabled
+    trigger_condition:
+      type: param
+      key: CustomAccIncrementsEnabled
+      equals: true
+    items:
+    - key: CustomAccShortPressIncrement
+      widget: option
+      title: Short Press Increment
+      min: 1
+      max: 10
+      step: 1
+      enablement:
+      - type: param
+        key: CustomAccIncrementsEnabled
+        equals: true
+    - key: CustomAccLongPressIncrement
+      widget: option
+      title: Long Press Increment
+      min: 1
+      max: 10
+      step: 1
+      enablement:
+      - type: param
+        key: CustomAccIncrementsEnabled
+        equals: true
+- id: speed_limits
+  title: Speed Limits
+  description: Speed limit detection and offset behavior
+  items: []
+  sub_panels:
+  - id: speed_limit_settings
+    label: Speed Limit Settings
+    trigger_key: SpeedLimitMode
+    items:
+    - key: SpeedLimitMode
+      widget: multiple_button
+      title: Speed Limit Assist Mode
+      options:
+      - value: 0
+        label: 'Off'
+      - value: 1
+        label: Information
+      - value: 2
+        label: Warning
+      - value: 3
+        label: Assist
+        enablement:
+        - type: any
+          conditions:
+          - type: capability
+            field: has_longitudinal_control
+            equals: true
+          - type: capability
+            field: has_icbm
+            equals: true
+        - type: not
+          condition:
+            type: capability
+            field: brand
+            equals: rivian
+        - type: not
+          condition:
+            type: all
+            conditions:
+            - type: capability
+              field: brand
+              equals: tesla
+            - type: capability
+              field: is_sp_release
+              equals: true
+    - key: SpeedLimitPolicy
+      widget: multiple_button
+      title: Speed Limit Source
+      options:
+      - value: 0
+        label: Car State Only
+      - value: 1
+        label: Map Data Only
+      - value: 2
+        label: Car State Priority
+      - value: 3
+        label: Map Data Priority
+      - value: 4
+        label: Combined
+    - key: SpeedLimitOffsetType
+      widget: multiple_button
+      title: Speed Limit Offset Type
+      options:
+      - value: 0
+        label: 'Off'
+      - value: 1
+        label: Fixed
+      - value: 2
+        label: Percentage
+    - key: SpeedLimitValueOffset
+      widget: option
+      title: Speed Limit Offset Value
+      min: -30
+      max: 30
+      step: 1
+      unit:
+        metric: km/h
+        imperial: mph
+      visibility:
+      - type: param_compare
+        key: SpeedLimitOffsetType
+        op: '>'
+        value: 0
+- id: smart_cruise
+  title: Smart Cruise Control
+  description: ''
+  enablement:
+  - type: any
+    conditions:
+    - {type: offroad_only}
+    - type: capability
+      field: has_longitudinal_control
+      equals: true
+    - type: capability
+      field: has_icbm
+      equals: true
+  items:
+  - key: SmartCruiseControlVision
+    widget: toggle
+    title: Vision
+    description: "Uses the camera's view of the road to reduce cruise speed for upcoming curves. Off disables this additional curve-speed adjustment."
+    visibility:
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - type: capability
+        field: has_longitudinal_control
+        equals: true
+      - type: capability
+        field: has_icbm
+        equals: true
+    enablement:
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - type: capability
+        field: has_longitudinal_control
+        equals: true
+      - type: capability
+        field: has_icbm
+        equals: true
+  - key: AccelBoostSP
+    widget: toggle
+    title: Acceleration Boost
+    description: "Adds acceleration assistance when Experimental Mode falls below the set speed, with any personality and MVL live learning. Off restores the usual acceleration behavior."
+    enablement:
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - {type: capability, field: has_longitudinal_control, equals: true}
+  - key: SmartCruiseControlMap
+    widget: toggle
+    title: Map
+    description: "Uses map data to reduce cruise speed for upcoming curves. Off disables map-based curve-speed adjustments."
+    visibility:
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - type: capability
+        field: has_longitudinal_control
+        equals: true
+      - type: capability
+        field: has_icbm
+        equals: true
+    enablement:
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - type: capability
+        field: has_longitudinal_control
+        equals: true
+      - type: capability
+        field: has_icbm
+        equals: true
