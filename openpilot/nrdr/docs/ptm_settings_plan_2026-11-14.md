@@ -1,6 +1,6 @@
 # PTM settings consolidation and Experimental PCM proposal
 
-Status: implemented and validated; development publishing and C4 deployment authorized, with installed checks pending. The cleanup and default migration are implemented; the proposed PCM mode strategy below remains research. The pedal PI module, gains, speed reference and feedforward are unchanged. Model selection, vehicle setup, privacy and remote access are excluded from the migration; no release branch or release script is changed.
+Status: published to development and installed on C4 as `aa3fbcd5a8` plus `80a2dea27f`, with opendbc `5320fe2df`. The cleanup and default migration are implemented; the proposed PCM mode strategy below remains research. The pedal PI module, gains, speed reference and feedforward are unchanged. Model selection, vehicle setup, privacy and remote access are preserved; no release branch or release script is changed.
 
 ## Confirmed scope
 
@@ -78,7 +78,7 @@ The existing DM option scales the **first reminder** to 250%, retaining the spac
 
 `NrdrSettingsDefaultsVersion` records the global migration; `NrdrVehicleDefaultsApplied` records each confirmed vehicle. Subsequent boots do not overwrite edits. Live pedal detection resolves the controller before actuator construction; the remaining vehicle recipe applies before publishing CarParams. Existing verified preset ordering is reused. Model choice, calibration, learned factors, hardware/stock-ACC setup, recording and remote-access keys are excluded from these migration writes. The pre-existing onboarding/default policies outside the new recipe are unchanged.
 
-These changes affect future builds from development. No published release branch or device has been updated in this task.
+These changes affect future builds from development. The C4 is updated; no published release branch was changed. Shared defaults completed with receipt 1; vehicle defaults wait for confirmed live hardware detection on the next normal ignition. The installed model remains OPM10V3, not Cheddar, matching the user's selection before deployment.
 
 ## Experimental PCM: proposed order of work
 
@@ -105,4 +105,7 @@ This is an offline candidate plan, not a claim that the proposed firmware strate
 - Geometry checks cover every listed Honda EPS endpoint, both PTM map modes, center/midpoint/lock, left/right symmetry, monotonic inverse, curvature round-trip, model exclusion, and lane-change composition. Existing model-family tests exclude Cheddar/TSFDO/big models.
 - Driver-monitoring tests verify the 250% schedule and clean's restoration of all 19 upstream timing/lockout fields even if development values change.
 - First-install C3X model selection uses the existing verified-artifact admission; existing model selections and C4's model default are untouched. Physical C3X OPM10V3 execution and graphical rendering remain unverified.
-- Final test totals and remaining host-environment limitations are recorded in `TASKS.md`. No full build, release, push, or deployment was run.
+- Final focused host suite: 618 tests / 206 subtests passed. Registry and generated-schema checks pass. Two native LongControl cases previously blocked by Windows dependencies passed on the C4.
+- First installed startup caught two nonexistent recipe names (`RoadEdgeLaneChange` and `ScreenSaver`). Correction `80a2dea27f` uses the existing `RoadEdgeLaneChangeEnabled` and `ScreenSaverEnabled` keys; seven recipe-registration checks now cover this failure. All recipe keys also pass the actual native registry check.
+- Normal one-job incremental startup compilation completed. Offroad UI, panda, hardware, model manager and remote services are running; Sunnylink's installed schema exposes the five labels, new ratio blend and correct Clarity pedal eligibility. No full release build or release script was run.
+- Compared 335 existing persistent keys against the pre-deployment snapshot: changes were limited to runtime/version/report metadata. Both model bundles are byte-identical, and setup/privacy/access, calibration and learned values were preserved. Snapshot retained at `/tmp/nrdr-settings-deploy.YuB2p5/params` on the C4 (temporary, lost on reboot). Vehicle-default application, physical C3X rendering/execution and road validation remain outstanding.
