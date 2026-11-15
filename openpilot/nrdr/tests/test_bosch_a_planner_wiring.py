@@ -266,9 +266,16 @@ def test_post_mpc_chain_runs_in_source_order_on_bosch_a():
       order.append(_name)
       return _original(*args, **kwargs)
     setattr(obj, method, spy)
+  # Need floor (a method of bosch_a_long, not a separate object) runs after stop_gap, before the final clip.
+  original_nf = planner.bosch_a_long.need_floor
+
+  def spy_nf(*args, **kwargs):
+    order.append("need_floor")
+    return original_nf(*args, **kwargs)
+  planner.bosch_a_long.need_floor = spy_nf
   outputs, _ = run(planner, frames=2)
   assert order == ["bosch_a_long", "bosch_a_coast_first", "bosch_a_release_coast", "bosch_a_smooth", "bosch_a_onset_ramp",
-                   "bosch_a_stop_gap"] * 2
+                   "bosch_a_stop_gap", "need_floor"] * 2
   assert all(np.isfinite(o[0]) for o in outputs)
 
 

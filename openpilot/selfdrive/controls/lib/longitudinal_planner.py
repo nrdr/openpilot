@@ -325,6 +325,9 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       output_a_target, self.output_should_stop = self.bosch_a_stop_gap.step(
         lead_one=lead_one, lead_two=lead_two, target=float(output_a_target), should_stop=bool(self.output_should_stop),
         v_ego=v_ego, standstill=standstill, reset_state=bool(reset_state))
+      # Need floor (ported from PTM; caps braking depth, later frames can brake deeper in PTM replay; not replayed on nrdr, not driven): after stop_gap, before the final clip.
+      output_a_target = self.bosch_a_long.need_floor(
+        lead_one=lead_one, lead_two=lead_two, target=float(output_a_target), v_ego=v_ego, reset_state=bool(reset_state))
     if self.nrdr is not None:
       for idx in range(2):
         accel_clip[idx] = np.clip(accel_clip[idx], self.prev_accel_clip[idx] - 0.05, self.prev_accel_clip[idx] + 0.05)
