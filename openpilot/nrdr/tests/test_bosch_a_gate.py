@@ -57,7 +57,8 @@ class TestEnhancementAlwaysOn(unittest.TestCase):
     self.assertTrue(e.stock_feel)
     self.assertTrue(e.enabled)
     self.assertIsNotNone(e.drop_bound)
-    self.assertIsNone(e.newborn_hold)  # RADAR_LEAD_RECOVERY stays False
+    self.assertTrue(hbl.NEWBORN_HOLD_ENABLED)
+    self.assertIsNotNone(e.newborn_hold)  # independent of RADAR_LEAD_RECOVERY
 
   def test_nothing_armed_on_other_cars(self):
     for cp in NOT_BOSCH_A:

@@ -21,6 +21,7 @@ from openpilot.nrdr.features.longitudinal.bosch_a import gate, human_acceleratio
 from openpilot.selfdrive.controls.lib import longitudinal_planner
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib import long_mpc
 from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
+from openpilot.sunnypilot.selfdrive.controls.lib import accel_boost
 from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP
 
 LEAD_T = human_following.LEAD_T_IDXS_MODEL
@@ -147,7 +148,9 @@ def build(CP):
        patch.object(LongitudinalPlannerSP, "update", lambda *_: None), \
        patch.object(LongitudinalPlannerSP, "update_targets", lambda self, sm, v, a, cruise: (cruise, a)):
     planner = longitudinal_planner.LongitudinalPlanner(CP, custom.CarParamsSP.new_message(), init_v=22.0)
-  planner.accel_boost_sp = None  # attribute the isolated SP base __init__ would have set
+  with patch.object(accel_boost, "Params", lambda: NS(get_bool=lambda _key: False)):
+    planner.accel_boost_sp = accel_boost.AccelBoostSP()
+  planner.openpilot_longitudinal = CP.openpilotLongitudinalControl
   if hasattr(planner, "bosch_a_clock_ns"):
     planner.bosch_a_clock_ns = lambda: NOW_NS
   return planner
@@ -266,9 +269,18 @@ def test_post_mpc_chain_runs_in_source_order_on_bosch_a():
       order.append(_name)
       return _original(*args, **kwargs)
     setattr(obj, method, spy)
+  original_nf = planner.bosch_a_long.need_floor
+
+  def spy_nf(*args, **kwargs):
+    order.append("need_floor")
+    return original_nf(*args, **kwargs)
+  planner.bosch_a_long.need_floor = spy_nf
   outputs, _ = run(planner, frames=2)
-  assert order == ["bosch_a_long", "bosch_a_coast_first", "bosch_a_release_coast", "bosch_a_smooth", "bosch_a_onset_ramp",
-                   "bosch_a_stop_gap"] * 2
+  # GHOST_ARM: the ghost let-off in bosch_a_smooth replaces the release coast, so the planner skips it.
+  expected = ["bosch_a_long", "bosch_a_coast_first", "bosch_a_smooth", "bosch_a_onset_ramp", "bosch_a_stop_gap", "need_floor"]
+  if not planner.bosch_a_smooth.ghost_enabled:
+    expected.insert(2, "bosch_a_release_coast")
+  assert order == expected * 2
   assert all(np.isfinite(o[0]) for o in outputs)
 
 
@@ -493,3 +505,88 @@ def test_qualified_model_leads_rejects_a_clock_that_is_ahead_of_the_pair():
   assert model_lead_qualification.qualified_model_leads(sm, NOW_NS + 1, model_lead_qualification.ModelLeadHistory()) is None
   assert model_lead_qualification.qualified_model_leads(sm, NOW_NS - 200_000_000, model_lead_qualification.ModelLeadHistory()) is None
   assert model_lead_qualification.qualified_model_leads(sm, float(NOW_NS), model_lead_qualification.ModelLeadHistory()) is None
+
+
+def test_new_shapers_require_bosch_a_radar():
+  radar = build(BOSCH_A)
+  assert radar.bosch_a_smooth.ghost_enabled
+  assert radar.bosch_a_long._need_floor is not None
+  vision = build(cp(radar_unavailable=True))
+  assert not vision.bosch_a_smooth.ghost_enabled
+  assert vision.bosch_a_long._need_floor is None
+  with patch.object(vision.bosch_a_release_coast, 'update', wraps=vision.bosch_a_release_coast.update) as coast:
+    run(vision, frames=2)
+  assert coast.call_count == 2  # keep the previous vision-only path
+
+
+@pytest.mark.parametrize('condition', ['stopping', 'fcw', 'standstill', 'reset'])
+def test_planner_does_not_floor_protected_braking(condition):
+  planner = build(BOSCH_A)
+  sm = submaster(0 if condition == 'reset' else 1)
+  sm['carState'].standstill = condition == 'standstill'
+  if condition == 'fcw':
+    original_update = planner.mpc.update
+
+    def crash_update(*args, **kwargs):
+      original_update(*args, **kwargs)
+      planner.mpc.crash_cnt = 3
+    planner.mpc.update = crash_update
+    planner.mpc.nrdr.fcw_authorized = lambda *_: True
+  planner.bosch_a_stop_gap.step = lambda **_kw: (-3.0, condition == 'stopping')
+  floor = planner.bosch_a_long._need_floor
+  floor.gate_id = (1, 1)
+  floor.gate_count = 30
+  seen = []
+  original_nf = planner.bosch_a_long.need_floor
+
+  def spy(**kwargs):
+    out = original_nf(**kwargs)
+    seen.append((kwargs, out))
+    return out
+  planner.bosch_a_long.need_floor = spy
+  with patch.object(LongitudinalPlannerSP, 'update', lambda *_: None), \
+       patch.object(LongitudinalPlannerSP, 'update_targets', lambda self, sm, v, a, cruise: (cruise, a)):
+    planner.update(sm)
+  kw, out = seen[0]
+  assert kw['stopping' if condition == 'stopping' else 'fcw' if condition == 'fcw' else 'reset_state']
+  assert out == kw['target'] == -3.0
+  assert floor.gate_count == 0
+
+
+@pytest.mark.parametrize('state', ['fresh', 'stale', 'invalid'])
+def test_ghost_camera_evidence_uses_existing_freshness_checks(state):
+  planner = build(BOSCH_A)
+  sm = submaster(1)
+  if state == 'stale':
+    sm.logMonoTime['modelV2'] = NOW_NS - 400_000_000
+  elif state == 'invalid':
+    sm.valid['modelV2'] = False
+  with patch.object(planner.bosch_a_smooth, 'step', wraps=planner.bosch_a_smooth.step) as smooth, \
+       patch.object(LongitudinalPlannerSP, 'update', lambda *_: None), \
+       patch.object(LongitudinalPlannerSP, 'update_targets', lambda self, sm, v, a, cruise: (cruise, a)):
+    planner.update(sm)
+  assert (smooth.call_args.kwargs['model_lead0'] is not None) == (state == 'fresh')
+
+
+@pytest.mark.parametrize('condition', ['leftBlinker', 'rightBlinker', 'gasPressed', 'laneChange'])
+def test_planner_passes_driver_override_to_ghost(condition):
+  planner = build(BOSCH_A)
+  sm = submaster(1)
+  if condition == 'laneChange':
+    sm['modelV2'].meta.laneChangeState = log.LaneChangeState.laneChangeStarting
+  else:
+    setattr(sm['carState'], condition, True)
+  with patch.object(planner.bosch_a_smooth, 'step', wraps=planner.bosch_a_smooth.step) as smooth, \
+       patch.object(LongitudinalPlannerSP, 'update', lambda *_: None), \
+       patch.object(LongitudinalPlannerSP, 'update_targets', lambda self, sm, v, a, cruise: (cruise, a)):
+    planner.update(sm)
+  assert smooth.call_args.kwargs['skip']
+
+
+def test_optional_raw_tracks_do_not_invalidate_planning():
+  sm = messaging.SubMaster(['modelV2', 'radarTracks'], poll='modelV2',
+                           ignore_alive=['radarTracks'], ignore_avg_freq=['radarTracks'], ignore_valid=['radarTracks'])
+  for field in (sm.valid, sm.alive, sm.freq_ok):
+    field['modelV2'] = True
+    field['radarTracks'] = False
+  assert sm.all_checks()
