@@ -23,6 +23,19 @@ from openpilot.sunnypilot.sunnylink.tools.compile_settings_ui import compile_sch
 ROOT = Path(__file__).resolve().parents[3]
 
 
+@pytest.mark.parametrize("recipe", [
+  "SHARED_RECOMMENDED_VALUES", "HONDA_LONGITUDINAL_RECOMMENDED_VALUES", "COMMON_HANDCRAFTED_VALUES",
+  "HONDA_FILTER_HANDCRAFTED_VALUES", "HONDA_PID_HANDCRAFTED_VALUES", "FIRMWARE_HANDCRAFTED_VALUES",
+  "TORQUE_HANDCRAFTED_VALUES",
+])
+def test_recommended_keys_exist_in_native_registry(recipe):
+  from openpilot.nrdr.params.generate import HEADER_ENTRY_RE
+  from openpilot.nrdr.params.specs import ADDED_PARAM_SPECS
+  header = (ROOT / "openpilot/common/params_keys.h").read_text(encoding="utf-8")
+  registered = {match.group("key") for match in HEADER_ENTRY_RE.finditer(header)} | {spec.key for spec in ADDED_PARAM_SPECS}
+  assert {str(key) for key, _ in getattr(profiles, recipe)} <= registered
+
+
 def vehicle(pedal=True, brand="honda", firmware=b"39990-TRW-A020"):
   CP = vehicle_cp("HONDA_CLARITY", controller="pid", brand=brand, firmware=firmware)
   CP.flags = HondaFlags.NIDEC
