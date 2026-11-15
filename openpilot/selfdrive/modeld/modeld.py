@@ -31,7 +31,7 @@ from openpilot.common.transformations.camera import DEVICE_CAMERAS
 from openpilot.system.camerad.cameras.nv12_info import get_nv12_info
 from openpilot.common.transformations.model import get_warp_matrix
 from openpilot.selfdrive.controls.lib.desire_helper import DesireHelper
-from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan, should_stop, smooth_value, get_curvature_from_plan, MIN_STABLE_DELAY
+from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan, should_stop, smooth_value, get_curvature_from_plan
 from openpilot.selfdrive.modeld.parse_model_outputs import Parser
 from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_driving_model_data, fill_pose_msg, PublishState
 from openpilot.common.file_chunker import open_file_chunked
@@ -68,7 +68,7 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
                                                 plan[:,Plan.ORIENTATION_RATE][:,2],
                                                 ModelConstants.T_IDXS,
                                                 v_ego,
-                                                lat_action_t, min_stable_delay=0.0 if ptm_controller else MIN_STABLE_DELAY)
+                                                lat_action_t)
   else:
     desired_accel = model_output['action'][0,1]
     desired_curvature = model_output['action'][0,0] / (max(2.5 if ptm_controller else 1.0, v_ego))**2
@@ -76,7 +76,7 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
   desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, LONG_SMOOTH_SECONDS)
   if v_ego > MIN_LAT_CONTROL_SPEED:
     desired_curvature = smooth_value(desired_curvature, prev_action.desiredCurvature,
-                                     PTM_LAT_SMOOTH_SECONDS if ptm_controller else LAT_SMOOTH_SECONDS)
+                                     PTM_LAT_SMOOTH_SECONDS if ptm_controller and 'action' in model_output else LAT_SMOOTH_SECONDS)
   else:
     desired_curvature = prev_action.desiredCurvature
 
@@ -170,6 +170,7 @@ class ModelState(ModelStateBase):
     self.state_pairs = {name: f'next_{name}' for name in self.input_shapes if f'next_{name}' in jits['metadata']['output_shapes']}
     self.vision_input_names = ('img', 'big_img')
     self.output_slices = pickle.loads(base64.b64decode(jits['metadata']['metadata']['output_slices']))
+    self.uses_plan = 'action' not in self.output_slices
 
     self.prev_desire = np.zeros(ModelConstants.DESIRE_LEN, dtype=np.float32)
     self.chestnut = chestnut
@@ -389,7 +390,7 @@ def main(demo=False):
     if delay_schedule is not None or sm.updated["lateralDelay"]:
       model.lat_delay = get_lat_delay(params, sm["lateralDelay"].lateralDelay, CP.steerActuatorDelay,
                                      delay_schedule=delay_schedule, v_ego=v_ego)
-    lat_delay = model.lat_delay + (PTM_LAT_SMOOTH_SECONDS if firmware_profile is not None else LAT_SMOOTH_SECONDS)
+    lat_delay = model.lat_delay + (PTM_LAT_SMOOTH_SECONDS if firmware_profile is not None and not model.uses_plan else LAT_SMOOTH_SECONDS)
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["extrinsicsCalibration"].rpyCalib, dtype=np.float32)
       dc = DEVICE_CAMERAS[(str(sm['deviceState'].deviceType), str(sm['narrowRoadCameraState'].sensor))]

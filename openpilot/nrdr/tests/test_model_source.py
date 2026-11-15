@@ -101,14 +101,16 @@ def _delays(control, source, action_time, frames, speed=8.):
   ("HONDA_CIVIC", b"39990-TEG-A010", "civic_teg_a010", 0.275),         # 0.20 told
   ("HONDA_CIVIC_BOSCH", b"39990-TBA-C020", "civic_bosch_c020", 0.355),  # 0.28 told: above the floor
 ])
-def test_plan_models_ramp_extra_command_delay_to_zero(fingerprint, firmware, calibration, action_time):
+def test_plan_models_restore_floor_compensation_with_slewed_transitions(fingerprint, firmware, calibration, action_time):
   control = _controller(fingerprint, firmware)
   head = _delays(control, "actionHead", action_time, 5)
   assert head[-1] == pytest.approx(command_delay(None, 8., calibration=calibration), abs=1e-6)
   plan = _delays(control, "plan", action_time, 300)
-  assert plan[99] == pytest.approx(0., abs=1e-6) and plan[-1] == pytest.approx(0., abs=1e-6)
-  assert plan[0] == pytest.approx(head[-1] * .99, abs=1e-6)
-  assert max(abs(a - b) for a, b in zip([head[-1], *plan], plan, strict=False)) <= head[-1] * .01 + 1e-6
+  expected = max(.3 - action_time, 0.)
+  assert plan[99] == pytest.approx(expected, abs=1e-6) and plan[-1] == pytest.approx(expected, abs=1e-6)
+  assert max(abs(a - b) for a, b in zip([head[-1], *plan], plan, strict=False)) <= .003 + 1e-6
+  head = _delays(control, "actionHead", action_time, 100)
+  assert head[-1] == pytest.approx(command_delay(None, 8., calibration=calibration), abs=1e-6)
 
 
 def test_an_unknown_source_or_an_older_model_message_keeps_the_calibrations_delay():

@@ -50,7 +50,7 @@ def test_gate_covers_all_adjustments_without_editing_preference(monkeypatch, sup
   entry = tuning.LaneChangeEntry()
   values = [entry.update(active=True, valid=True, state=2, direction=1, driver_override=False, settings=settings, dt=.01)
             for _ in range(20)]
-  assert (max(values) > 0) == (supported and enabled)
+  assert values == [0.0] * 20
   assert settings == {"NrdrOptimizedLaneChanges": enabled}
 
 

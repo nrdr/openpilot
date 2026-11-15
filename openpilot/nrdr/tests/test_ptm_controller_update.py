@@ -65,6 +65,7 @@ class TestPtmUpdate(unittest.TestCase):
   def test_model_processing_is_ptm_only_and_longitudinal_is_unchanged(self):
     from openpilot.selfdrive.controls.lib import drive_helpers as helpers
     from openpilot.selfdrive.modeld.constants import ModelConstants, Plan
+    from openpilot.nrdr.features.lateral.model_source import PLAN, lateral_source
     root = Path(__file__).resolve().parents[2]
     def function(path, name, namespace):
       node, = [n for n in ast.walk(ast.parse((root / path).read_text())) if isinstance(n, ast.FunctionDef) and n.name == name]
@@ -74,7 +75,8 @@ class TestPtmUpdate(unittest.TestCase):
 
     namespace = {**vars(helpers), "np": np, "ModelConstants": ModelConstants, "Plan": Plan,
                  "log": NS(ModelDataV2=NS(Action=lambda **kw: NS(**kw))), "PTM_LAT_SMOOTH_SECONDS": .1,
-                 "LAT_SMOOTH_SECONDS": 0., "LONG_SMOOTH_SECONDS": .3, "MIN_LAT_CONTROL_SPEED": .3}
+                 "LAT_SMOOTH_SECONDS": 0., "LONG_SMOOTH_SECONDS": .3, "MIN_LAT_CONTROL_SPEED": .3,
+                 "PLAN": PLAN, "lateral_source": lateral_source}
     function("sunnypilot/modeld_v2/fill_model_msg.py", "get_curvature_from_output", namespace)
     prev = NS(desiredCurvature=.001, desiredAcceleration=.1)
     model = NS(constants=ModelConstants, mlsim=True, PLANPLUS_CONTROL=1., generation=9,
@@ -90,7 +92,8 @@ class TestPtmUpdate(unittest.TestCase):
         ptm = action(*args, ptm_controller=True)
         self.assertEqual(vars(normal), vars(disabled))
         self.assertEqual((ptm.desiredAcceleration, ptm.shouldStop), (normal.desiredAcceleration, normal.shouldStop))
-        self.assertAlmostEqual(ptm.desiredCurvature, helpers.smooth_value(normal.desiredCurvature, prev.desiredCurvature, .1))
+        expected = helpers.smooth_value(normal.desiredCurvature, prev.desiredCurvature, .1) if 'action' in output else normal.desiredCurvature
+        self.assertAlmostEqual(ptm.desiredCurvature, expected)
 
     times = np.array([0., .1, .2, .3, .4])
     yaws, rates = times ** 2, times * 0
@@ -109,11 +112,11 @@ class TestPtmUpdate(unittest.TestCase):
       cp.steerRatio, cp.wheelbase, cp.steerLimitTimer = 16.5, 2.75, .8
       controller = LatControlFirmware(cp, sp, None, .01)
       full = command_delay(None, 8., calibration=controller.firmware_profile.calibration)
-      controller.update_model_v2(NS(meta=NS(laneChangeState=NS(raw=0)), action=NS(lateralSource="plan")))
-      self.assertAlmostEqual(controller._command_delay(8.), .99 * full)
+      controller.update_model_v2(NS(meta=NS(laneChangeState=NS(raw=0)), action=NS(lateralSource="plan", lateralActionTime=.2)))
+      self.assertAlmostEqual(controller._command_delay(8.), .1)
       for _ in range(99):
         value = controller._command_delay(8.)
-      self.assertAlmostEqual(value, 0.)
+      self.assertAlmostEqual(value, .1)
       controller.update_model_v2(NS(meta=NS(laneChangeState=NS(raw=0)), action=NS(lateralSource="actionHead")))
       for _ in range(100):
         value = controller._command_delay(8.)

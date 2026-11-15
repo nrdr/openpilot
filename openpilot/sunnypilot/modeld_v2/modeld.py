@@ -48,7 +48,7 @@ from openpilot.sunnypilot.modeld_v2.model_adapters import get_model_adapter
 from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeController
 from openpilot.nrdr.features.services import admit_selected_artifact, admit_default_artifact
-from openpilot.nrdr.features.lateral.model_source import PTM_LAT_SMOOTH_SECONDS, delay_input, lateral_source
+from openpilot.nrdr.features.lateral.model_source import PLAN, PTM_LAT_SMOOTH_SECONDS, delay_input, lateral_source, model_uses_plan
 from openpilot.nrdr.features.lateral.lane_guidance import LaneGuidanceMode, lane_guidance_mode_from_params
 
 PROCESS_NAME = "openpilot.selfdrive.modeld.modeld_tinygrad"
@@ -125,6 +125,8 @@ class ModelState(ModelStateBase):
     self.vision_output_slices = self.adapter.vision_output_slices
     self.policy_output_slices = self.adapter.policy_output_slices
     self._policy_slices_list = self.adapter._policy_slices_list
+    output_names = set(self.vision_output_slices).union(*self._policy_slices_list)
+    self.uses_plan = model_uses_plan(output_names, self.mlsim)
     self._combined_model_type = self.adapter._combined_model_type
     self._vision_input_names = self.adapter._vision_input_names
     self.numpy_inputs = self.adapter.numpy_inputs
@@ -244,8 +246,7 @@ class ModelState(ModelStateBase):
 
       curvature_plan = (plan + (self.PLANPLUS_CONTROL - 1.0) * model_output['planplus'][0]
                         if 'planplus' in model_output and self.PLANPLUS_CONTROL != 1.0 else plan)
-      desired_curvature = get_curvature_from_output(model_output, curvature_plan, v_ego, lat_action_t, self.mlsim,
-                                                   ptm_controller=ptm_controller)
+      desired_curvature = get_curvature_from_output(model_output, curvature_plan, v_ego, lat_action_t, self.mlsim)
     else:
       desired_accel = model_output['action'][0, 1]
       desired_curvature = model_output['action'][0, 0] / (max(2.5, v_ego))**2
@@ -255,10 +256,11 @@ class ModelState(ModelStateBase):
     stop = v_ego < 0.3 and desired_accel < 0.1
     desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, self.LONG_SMOOTH_SECONDS)
 
-    if ptm_controller or (self.generation is not None and self.generation >= 10): # smooth curvature for post FOF models
+    ptm_head = ptm_controller and lateral_source(model_output, self.mlsim) != PLAN
+    if ptm_head or (self.generation is not None and self.generation >= 10): # smooth curvature for post FOF models
       if v_ego > self.MIN_LAT_CONTROL_SPEED:
         desired_curvature = smooth_value(desired_curvature, prev_action.desiredCurvature,
-                                         PTM_LAT_SMOOTH_SECONDS if ptm_controller else self.LAT_SMOOTH_SECONDS)
+                                         PTM_LAT_SMOOTH_SECONDS if ptm_head else self.LAT_SMOOTH_SECONDS)
       else:
         desired_curvature = prev_action.desiredCurvature
 
@@ -421,7 +423,7 @@ def main(demo=False):
     # Lane-guidance mode is live and safety-critical. Read it every model frame
     # so selecting Model Only takes effect on the next output, not seconds later.
     lane_guidance_mode = lane_guidance_mode_from_params(params)
-    lat_delay = model.lat_delay + (PTM_LAT_SMOOTH_SECONDS if firmware_profile is not None else model.LAT_SMOOTH_SECONDS)
+    lat_delay = model.lat_delay + (PTM_LAT_SMOOTH_SECONDS if firmware_profile is not None and not model.uses_plan else model.LAT_SMOOTH_SECONDS)
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["extrinsicsCalibration"].rpyCalib, dtype=np.float32)
       dc = DEVICE_CAMERAS[(str(sm['deviceState'].deviceType), str(sm['narrowRoadCameraState'].sensor))]

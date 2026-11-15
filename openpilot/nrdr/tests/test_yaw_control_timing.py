@@ -116,16 +116,17 @@ def test_model_and_control_schedule_gates_match_and_update_on_speed_every_frame(
 @pytest.mark.parametrize("relative", ["selfdrive/modeld/modeld.py", "sunnypilot/modeld_v2/modeld.py"])
 @pytest.mark.parametrize("smooth", [0., .1, .3])
 @pytest.mark.parametrize("ptm", [False, True])
-def test_smoothing_matches_ptm_donor_only_when_selected(relative, smooth, ptm):
+@pytest.mark.parametrize("uses_plan", [False, True])
+def test_smoothing_matches_ptm_donor_only_for_heads(relative, smooth, ptm, uses_plan):
   from types import SimpleNamespace as NS
   root = Path(__file__).resolve().parents[2]
   tree = ast.parse((root / relative).read_text())
   assignment, = [node for node in ast.walk(tree) if isinstance(node, ast.Assign)
                   and any(isinstance(target, ast.Name) and target.id == "lat_delay" for target in node.targets)]
   expr = compile(ast.Expression(assignment.value), relative, "eval")
-  context = {"model": NS(lat_delay=.30, LAT_SMOOTH_SECONDS=smooth), "LAT_SMOOTH_SECONDS": smooth,
+  context = {"model": NS(lat_delay=.30, LAT_SMOOTH_SECONDS=smooth, uses_plan=uses_plan), "LAT_SMOOTH_SECONDS": smooth,
              "firmware_profile": object() if ptm else None, "PTM_LAT_SMOOTH_SECONDS": .1}
-  assert eval(expr, context) == pytest.approx(.30 + (.1 if ptm else smooth))
+  assert eval(expr, context) == pytest.approx(.30 + (.1 if ptm and not uses_plan else smooth))
 
 
 def test_model_firmware_selection_never_reads_honda_data_for_another_vehicle():

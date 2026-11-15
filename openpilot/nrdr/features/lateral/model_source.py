@@ -1,8 +1,8 @@
 """Model-source metadata and PTM timing shared by both model runners and controlsd."""
 from openpilot.common.realtime import DT_CTRL, DT_MDL
+from openpilot.selfdrive.controls.lib.drive_helpers import MIN_STABLE_DELAY
 
 PTM_LAT_SMOOTH_SECONDS = 0.1
-CMD_DELAY_RAMP_S = 1.0
 
 ACTION_HEAD = "actionHead"
 CURVATURE_HEAD = "curvatureHead"
@@ -26,6 +26,33 @@ def delay_input(numpy_inputs) -> str:
   if "lateral_control_params" in numpy_inputs:
     return "lateralControlParams"
   return "none"
+
+
+def model_uses_plan(output_names, mlsim: bool) -> bool:
+  """Select the prediction horizon from declared outputs before inference."""
+  return "action" not in output_names and (mlsim or "desired_curvature" not in output_names)
+
+
+def plan_floor_command_delay(lateral_action_time: float) -> float | None:
+  """Compensate for reading the trajectory no earlier than MIN_STABLE_DELAY."""
+  if not lateral_action_time > 0.0:
+    return None
+  return max(MIN_STABLE_DELAY - float(lateral_action_time), 0.0)
+
+
+class CommandDelaySlew:
+  """Keep the pre-November-13 delay transition rate of 0.3 seconds per second."""
+
+  def __init__(self, dt: float, rate: float = 0.3):
+    self.step = dt * rate
+    self.value: float | None = None
+
+  def update(self, target: float) -> float:
+    if self.value is None:
+      self.value = float(target)
+    else:
+      self.value += max(min(float(target) - self.value, self.step), -self.step)
+    return self.value
 
 
 class ModelActionRamp:

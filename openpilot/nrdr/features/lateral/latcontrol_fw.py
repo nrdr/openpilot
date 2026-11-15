@@ -1,8 +1,8 @@
 """PTM Controller using Biscuit-Labs 45e5b91fae firmware calibrations and fixed timing.
 
 Shared steer-ratio selection, driver override and model-scoped Optimized Lane Changes
-remain nrdr features. Plan models use no extra command delay; other model sources use
-the calibration's hardcoded delay, with the donor's one-second transition between them.
+remain nrdr features. Plan models retain the pre-November-13 trajectory-floor
+compensation; other sources use the calibration's hardcoded command delay.
 """
 import math
 
@@ -19,7 +19,7 @@ from openpilot.nrdr.features.lateral.vfn_eps_core import (
   ODYSSEY_THR_A020, ODYSSEY_THR_EPS_LOAD, RIDGELINE_T6Z_A110, RIDGELINE_T6Z_EPS_LOAD,
   HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
 )
-from openpilot.nrdr.features.lateral.model_source import CMD_DELAY_RAMP_S, PLAN
+from openpilot.nrdr.features.lateral.model_source import PLAN, CommandDelaySlew, plan_floor_command_delay
 from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, command_delay, prediction_delay_schedule
 from openpilot.nrdr.features.lateral.latcontrol_pid import _eps_modified_steering_pressed
 from openpilot.nrdr.features.lateral.lane_change_tuning import optimized_lane_change_active
@@ -69,7 +69,7 @@ class LatControlFirmware(LatControl):
                   self.firmware_profile.name, self.firmware_profile.calibration,
                   self.firmware_profile.provisional, self.delay_schedule, self.firmware_profile.required_rwd or "-")
     self.cmd_delay = CommandDelay(dt)
-    self.cmd_delay_scale = 1.0
+    self.cmd_delay_slew = CommandDelaySlew(dt)
     self.model_v2 = None
     self.prev_angle = 0.0
     self.pressed_duration = 0.0
@@ -81,11 +81,13 @@ class LatControlFirmware(LatControl):
     self.model_v2 = model_v2
 
   def _command_delay(self, v_ego: float) -> float:
+    delay = command_delay(None, v_ego, calibration=self.firmware_profile.calibration)
     action = getattr(self.model_v2, "action", None)
-    target = 0.0 if str(getattr(action, "lateralSource", "unknown")) == PLAN else 1.0
-    step = self.dt / CMD_DELAY_RAMP_S
-    self.cmd_delay_scale += max(min(target - self.cmd_delay_scale, step), -step)
-    return self.cmd_delay_scale * command_delay(None, v_ego, calibration=self.firmware_profile.calibration)
+    if self.delay_schedule is not None and str(getattr(action, "lateralSource", "unknown")) == PLAN:
+      floor_delay = plan_floor_command_delay(getattr(action, "lateralActionTime", 0.0))
+      if floor_delay is not None:
+        delay = floor_delay
+    return self.cmd_delay_slew.update(delay)
 
   def reset(self):
     if self.ride_through_frames == 0 or self.inactive_frames > self.ride_through_frames:

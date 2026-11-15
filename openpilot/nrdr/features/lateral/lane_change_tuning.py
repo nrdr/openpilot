@@ -10,7 +10,8 @@ CANCEL_RETURN_SECONDS = 0.20
 MIN_EFFECTIVE_RATIO = 8.0
 OPTIMIZED_VALUES = {
   "NrdrLaneChangeMinTime": 0.5,
-  "NrdrLaneChangeEntrySrReduction": 5.0,
+  # Keep the selected geometry/request unchanged, including with legacy saved values.
+  "NrdrLaneChangeEntrySrReduction": 0.0,
   "NrdrLaneChangeEntryReturnTime": 1.0,
   "NrdrLaneChangeTorqueFactor": 2.0,
   "NrdrLaneChangeFrictionPercent": 0.0,

@@ -31,18 +31,13 @@ def tick(entry, state=2, direction=1, **kwargs):
 
 
 @pytest.mark.parametrize("direction", (1, 2))
-def test_envelope_has_smooth_entry_bounded_peak_return_and_no_retrigger(direction):
+def test_optimized_entry_keeps_the_current_steering_ratio(direction):
   entry = LaneChangeEntry()
   assert tick(entry, state=1, direction=direction) == 0
   values = [tick(entry, direction=direction) for _ in range(200)]
-  assert values[0] < 0.1
-  assert max(values) == pytest.approx(5.0)
-  assert all(0 <= v <= 5 for v in values)
-  assert values[115:] == [0.0] * len(values[115:])
-  assert all(a <= b + 1e-10 for a, b in zip(values[:14], values[1:15], strict=True))
-  assert all(a >= b - 1e-10 for a, b in zip(values[14:114], values[15:115], strict=True))
+  assert values == [0.0] * 200
   assert tick(entry, state=1, direction=direction) == 0
-  assert tick(entry, direction=direction) > 0
+  assert tick(entry, direction=direction) == 0
 
 
 @pytest.mark.parametrize("state", (0, 1, 3))
@@ -57,11 +52,8 @@ def test_cancel_returns_without_step_or_retrigger(change):
   entry = LaneChangeEntry()
   for _ in range(15):
     tick(entry)
-  before = entry.applied
   values = [tick(entry, **change) for _ in range(25)]
-  assert 0 < values[0] < before
-  assert values[-1] == 0
-  assert all(a >= b for a, b in zip(values, values[1:], strict=False))
+  assert values == [0.0] * 25
 
 
 @pytest.mark.parametrize("change", ({"active": False}, {"valid": False}))
@@ -79,17 +71,17 @@ def test_driver_nudge_does_not_start_a_delayed_entry_after_release():
   assert tick(entry, driver_override=False) == 0
 
 
-def test_retired_edits_do_not_change_shape_and_toggle_cancels():
+def test_retired_edits_cannot_restore_ratio_reduction():
   entry = LaneChangeEntry()
   tick(entry)
   for _ in range(14):
     tick(entry, settings=settings(5, 3))
-  assert entry.applied == pytest.approx(5)
+  assert entry.applied == 0
   assert entry.return_seconds == 1
   for _ in range(25):
     tick(entry, state=1, settings=settings(5, 3))
   tick(entry, settings=settings(5, 3))
-  assert entry.reduction == 5 and entry.return_seconds == 1
+  assert entry.reduction == 0 and entry.return_seconds == 1
 
 
 @pytest.mark.parametrize("bad", (None, "bad", math.nan, math.inf, -math.inf))
@@ -164,7 +156,7 @@ def test_only_optimized_toggle_is_exposed_and_polled():
               "NrdrLaneChangeTorqueFactor", "NrdrLaneChangeFrictionPercent"}.intersection(controls | model)
 
 
-def test_background_snapshot_propagates_entry_edits_without_engagement_or_reboot():
+def test_background_snapshot_cannot_restore_retired_ratio_reduction():
   class Params:
     def __init__(self):
       self.values = settings(0)
@@ -178,8 +170,8 @@ def test_background_snapshot_propagates_entry_edits_without_engagement_or_reboot
   for _ in CONTROL_GROUPS:
     live.poll_once()
   entry = LaneChangeEntry()
-  assert tick(entry, settings=live.snapshot) > 0
-  assert entry.reduction == 5
+  assert tick(entry, settings=live.snapshot) == 0
+  assert entry.reduction == 0
 
 
 def test_shaping_is_before_curvature_limit_and_has_vehicle_gate():

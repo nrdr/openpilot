@@ -126,11 +126,15 @@ Hardcoded endpoints interpolate from 10 to 15 m/s:
 | CR-V A040 | 0.18 s | 0 s |
 | CR-V A220, RDX, Ridgeline, Odyssey | 0.12 s | 0 s |
 
-Both model runners use the donor's 0.1 s PTM curvature filter and add its delay to the
-prediction horizon. Controlsd interpolates model actions between frames. PTM plan
-models use the actual prediction horizon without the 0.3 s floor and no additional
-command delay. Action/curvature heads and unknown sources use the table above; the
-delay multiplier transitions over one second when the source changes.
+Trajectory processing intentionally returns to the pre-November-13 behavior in both
+model runners: model-specific smoothing/lookahead, the 0.3 s trajectory floor, and
+held requests between model frames. Scheduled PTM profiles compensate with
+`max(0.3 - lateralActionTime, 0)` command delay. Missing action times fall back to
+the calibration table above. Command-delay changes use the earlier 0.3 s/s slew.
+
+Action/curvature heads retain the donor's 0.1 s PTM filter, matching lookahead and
+between-frame interpolation; their command-delay targets remain the table above.
+Model-source selection is unchanged, including Sunny's generation-11+ curvature-head bypass.
 Non-PTM model processing retains its existing timing. No saved settings are rewritten.
 
 ## Calibration and unchanged behavior
@@ -156,6 +160,8 @@ zero inactive output and single output LPF are preserved. The RDX/Odyssey state-
 lane changes suppress feedforward (including modeled EPS damping) for either
 controller and fade it back in afterward. No extra rate damping or device-yaw
 blend is added to PTM Controller.
+Optimized Lane Changes no longer applies an artificial steering-ratio reduction;
+the selected steering geometry and incoming curvature request are preserved.
 
 ## Source audit and verification boundary
 

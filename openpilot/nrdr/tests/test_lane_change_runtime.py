@@ -30,9 +30,9 @@ def test_native_enums_and_hook_vehicle_admission():
       nrdr_live_params=SimpleNamespace(record_applied_settings=lambda *args, **kw: reports.append(kw)),
     )
     outputs = [lane_change_request(controls, cs, model, SimpleNamespace(roll=0.0), 0.01, True, 0.01) for _ in range(15)]
-    assert (outputs[-1] < 0.01) if brand == 'honda' else outputs == [0.01] * 15
+    assert outputs == [0.01] * 15
     assert reports[-1]['supported'] == (brand == 'honda')
-    assert reports[-1]['shaped_curvature'] <= reports[-1]['requested_curvature']
+    assert reports[-1]['shaped_curvature'] == reports[-1]['requested_curvature']
     controls.sm.all_checks = lambda services: False
     assert lane_change_request(controls, cs, model, SimpleNamespace(roll=0.0), 0.01, True, 0.01) == 0.01
 
