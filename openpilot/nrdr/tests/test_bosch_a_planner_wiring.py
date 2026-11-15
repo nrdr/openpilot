@@ -17,7 +17,7 @@ from openpilot.cereal import custom, log, messaging
 from opendbc.car.honda.values import HondaFlags
 from opendbc.car.interfaces import ACCEL_MAX
 from opendbc.car.structs import car
-from openpilot.nrdr.features.longitudinal.bosch_a import gate, human_acceleration, human_following, model_lead_qualification
+from openpilot.nrdr.features.longitudinal.bosch_a import bosch_a_smooth, gate, human_acceleration, human_following, model_lead_qualification
 from openpilot.selfdrive.controls.lib import longitudinal_planner
 from openpilot.selfdrive.controls.lib.longitudinal_mpc_lib import long_mpc
 from openpilot.selfdrive.controls.radard import RADAR_TO_CAMERA
@@ -267,8 +267,11 @@ def test_post_mpc_chain_runs_in_source_order_on_bosch_a():
       return _original(*args, **kwargs)
     setattr(obj, method, spy)
   outputs, _ = run(planner, frames=2)
-  assert order == ["bosch_a_long", "bosch_a_coast_first", "bosch_a_release_coast", "bosch_a_smooth", "bosch_a_onset_ramp",
-                   "bosch_a_stop_gap"] * 2
+  # GHOST_ARM: the ghost let-off in bosch_a_smooth replaces the release coast, so the planner skips it.
+  expected = ["bosch_a_long", "bosch_a_coast_first", "bosch_a_smooth", "bosch_a_onset_ramp", "bosch_a_stop_gap"]
+  if not bosch_a_smooth.GHOST_ARM:
+    expected.insert(2, "bosch_a_release_coast")
+  assert order == expected * 2
   assert all(np.isfinite(o[0]) for o in outputs)
 
 

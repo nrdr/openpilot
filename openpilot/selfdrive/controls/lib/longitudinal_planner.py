@@ -4,6 +4,7 @@ import time
 import numpy as np
 
 import openpilot.cereal.messaging as messaging
+from openpilot.cereal import log
 from opendbc.car.interfaces import ACCEL_MIN, ACCEL_MAX
 from openpilot.common.constants import CV
 from openpilot.common.filter_simple import FirstOrderFilter
@@ -26,9 +27,10 @@ from openpilot.nrdr.features.longitudinal.bosch_a import human_acceleration, hum
 from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_coast_first import BoschACoastFirst
 from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_onset_ramp import BoschAOnsetRamp
 from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_release_coast import BoschAReleaseCoast
-from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_smooth import BoschASmooth
+from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_ghost import raw_track_y
+from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_smooth import BoschASmooth, GHOST_ARM as BOSCH_A_GHOST_ARM
 from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_stop_gap import BoschAStopGap
-from openpilot.nrdr.features.longitudinal.bosch_a.honda_bosch_a_long import HondaBoschALongEnhancement
+from openpilot.nrdr.features.longitudinal.bosch_a.honda_bosch_a_long import HondaBoschALongEnhancement, _model_lead0
 from openpilot.nrdr.features.longitudinal.bosch_a.model_lead_qualification import ModelLeadHistory, qualified_model_leads
 
 A_CRUISE_MAX_VALS = [1.6, 1.2, 0.8, 0.6]
@@ -313,12 +315,17 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       output_a_target = self.bosch_a_coast_first.step(
         lead_one=lead_one, lead_two=lead_two, target=float(output_a_target), v_ego=v_ego,
         follow_s=float(self.mpc.params[0, 4]), fcw=bool(self.fcw), reset_state=bool(reset_state))
-      output_a_target = self.bosch_a_release_coast.update(
-        lead_one=lead_one, target=float(output_a_target), lane_change_state=sm['modelV2'].meta.laneChangeState,
-        left_blinker=bool(sm['carState'].leftBlinker), right_blinker=bool(sm['carState'].rightBlinker),
-        gas_pressed=bool(sm['carState'].gasPressed), reset_state=bool(reset_state))
+      if not BOSCH_A_GHOST_ARM:  # the ghost let-off in bosch_a_smooth replaces the release coast
+        output_a_target = self.bosch_a_release_coast.update(
+          lead_one=lead_one, target=float(output_a_target), lane_change_state=sm['modelV2'].meta.laneChangeState,
+          left_blinker=bool(sm['carState'].leftBlinker), right_blinker=bool(sm['carState'].rightBlinker),
+          gas_pressed=bool(sm['carState'].gasPressed), reset_state=bool(reset_state))
+      ghost_skip = (sm['modelV2'].meta.laneChangeState != log.LaneChangeState.off or bool(sm['carState'].leftBlinker) or
+                    bool(sm['carState'].rightBlinker) or bool(sm['carState'].gasPressed))
       output_a_target = self.bosch_a_smooth.step(float(a_prev), float(output_a_target),
-                                                 reset=bool(reset_state or standstill))
+                                                 reset=bool(reset_state or standstill), lead_one=lead_one,
+                                                 raw_y=raw_track_y(sm), v_ego=float(v_ego),
+                                                 model_lead0=_model_lead0(sm['modelV2']), skip=bool(ghost_skip))
       output_a_target = self.bosch_a_onset_ramp.step(
         lead_one=lead_one, lead_two=lead_two, prev=float(a_prev), target=float(output_a_target), fcw=bool(self.fcw),
         stopping=bool(self.output_should_stop), reset=bool(reset_state or standstill))

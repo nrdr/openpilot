@@ -12,7 +12,15 @@ cost there was the hardest brake onset up to 0.3 s later and closed-loop min gap
 a different planner. Here the evidence is static and unit tests only.
 """
 from openpilot.common.realtime import DT_MDL
+from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_ghost import GhostLetoff
 from openpilot.nrdr.features.longitudinal.bosch_a.gate import vehicle_supported
+
+# Ghost let-off (bosch_a_ghost.py, G4 with the 1.5 s no-gas hold): the planner skips the release coast while this is on.
+# Radar on or off. Replay evidence, open loop, on the PTM vasm-jetson bridge base (2026-11-14, main 1141 / second 99 /
+# event / pb pools): score.py harder 0, real_softer 0, phantom_harder 0; 0 rows brake harder than base; cc 15:25 brake
+# gone ~0.5 s sooner; 84 s7 / a2 s42 unchanged.
+# ghost: replay evidence on the vasm-jetson bridge base (main 1141 / second 99 score 0/0/0, 0 rows harder); ported to nrdr, not replayed there, not driven
+GHOST_ARM = True
 
 BRAKE_RELEASE_JERK = 2.5  # m/s^3
 BRAKE_RELEASE_DWELL_TICKS = 2  # 0.1 s at DT_MDL
@@ -47,15 +55,32 @@ class BoschASmooth:
     self.enabled = vehicle_supported(CP)
     self.dt = dt
     self.rise_ticks = BRAKE_RELEASE_DWELL_TICKS + 1
+    self.ghost = GhostLetoff(dt)  # ghost let-off; bosch_a_ghost.py
 
   def action_t(self, actuator_delay: float) -> float:
     return planner_action_t(actuator_delay, self.enabled)
 
-  def step(self, prev: float, target: float, reset: bool) -> float:
-    """Last shaper before the final clip. `prev` is last cycle's published target. `reset` covers disengaged and standstill."""
+  def step(self, prev: float, target: float, reset: bool, lead_one=None, raw_y: dict[int, float] | None = None,
+           v_ego: float = 0.0, model_lead0=None, skip: bool = False) -> float:
+    """Last shaper before the final clip. `prev` is last cycle's published target. `reset` covers disengaged and standstill.
+    `lead_one`, `raw_y`, `v_ego`, `model_lead0` and `skip` (lane change, blinker or gas pressed) feed the let-off;
+    a caller that passes no lead_one keeps the base let-off."""
     if not self.enabled or reset:
       self.rise_ticks = BRAKE_RELEASE_DWELL_TICKS + 1
+      self.ghost.reset()
       return float(target)
+    if GHOST_ARM and lead_one is not None:
+      jerk, floor = self.ghost.update(lead_one, float(prev), float(v_ego), raw_y or {}, model_lead0, skip=skip)
+      if self.ghost.no_gas:
+        target = min(float(target), 0.0)
+      base = brake_release_limited_target(prev, target, self.dt)
+      base, self.rise_ticks = brake_release_dwell_target(prev, base, self.rise_ticks)
+      if jerk is None or prev >= 0.0:
+        return base
+      fast = min(float(target), max(prev + BRAKE_RELEASE_JERK * self.dt, min(prev + jerk * self.dt, floor)))
+      if fast > base:
+        self.rise_ticks = BRAKE_RELEASE_DWELL_TICKS + 1
+      return float(max(base, fast))
     target = brake_release_limited_target(prev, target, self.dt)
     target, self.rise_ticks = brake_release_dwell_target(prev, target, self.rise_ticks)
     return target
