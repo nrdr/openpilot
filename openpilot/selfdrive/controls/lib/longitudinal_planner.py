@@ -365,9 +365,10 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
 
   def set_speed_assist(self, sm, a_model, a_mpc, v_cruise, v_ego, personality, experimental, reset_state):
     is_e2e = bool(experimental) and bool(self.CP.openpilotLongitudinalControl)
-    a_chill = min(float(a_mpc), float(self.a_cruise), approach_accel(float(v_ego), float(v_cruise), int(personality)))
-    # lateral acceleration from the measured steering, as zoompilot reads it
-    steer_lat_accel = sm['controlsState'].curvature * sm['carState'].vEgo ** 2
+    a_chill = min(float(a_mpc), float(self.a_cruise), approach_accel(float(v_ego), float(v_cruise), int(getattr(personality, 'raw', personality))))
+    # lateral acceleration from the measured steering, as zoompilot reads it (only needed while the assist is on or easing out)
+    ctl = self.e2e_set_speed
+    steer_lat_accel = sm['controlsState'].curvature * sm['carState'].vEgo ** 2 if (ctl.enabled or ctl.lift != 0.) else 0.
     return self.e2e_set_speed.update(sm, a_model, a_chill, is_e2e, bool(reset_state), steer_lat_accel)
 
   def publish(self, sm, pm):

@@ -7,6 +7,9 @@ import numpy as np
 import pytest
 
 from openpilot.nrdr.tests import test_mvl_host_parity as h
+from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.approach import approach_accel
+from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.controller import E2ESetSpeedController
+from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.tests.helpers import FakeParams
 from openpilot.nrdr.tests.test_mvl_experimental_selection import messages
 
 
@@ -25,8 +28,10 @@ def boost_env():
   return env, settings, reads
 
 
-def planner_class(env, planner_source=None):
+def planner_class(env, planner_source=None, set_speed=False):
   env = env | {
+    'E2ESetSpeedController': lambda: E2ESetSpeedController(params=FakeParams(ExperimentalModeSetSpeed=set_speed)),
+    'approach_accel': approach_accel,
     'EventsSP': lambda: NS(clear=lambda: None, to_msg=list),
     'E2EAlertsHelper': lambda: NS(update=lambda *_: None),
     'SmartCruiseControl': h.SmartCruiseBoundary, 'SpeedLimitResolver': h.ResolverBoundary,
@@ -168,3 +173,60 @@ def test_stock_longitudinal_does_not_apply_boost(boost_env):
   planner.accel_boost_sp.update_params()
   assert planner.apply_accel_boost(boost_messages(), .1, 1., 1.) == .1
   assert planner.accel_boost_sp.total_boost == 0.
+
+
+def set_speed_messages(profile=1, v_ego=20., v_cruise_kph=120.):
+  """An engaged, lead-free experimental frame well under the set speed, the model holding its own pace."""
+  sm = boost_messages(profile)
+  sm['carState'].vEgo = v_ego
+  sm['carState'].vCruise = v_cruise_kph
+  sm['carState'].standstill = False
+  sm['controlsState'].curvature = 0.
+  sm['modelV2'].action.desiredAcceleration = 0.
+  sm['modelV2'].action.shouldStop = False
+  sm['radarState'].accel = 1.
+  sm['radarState'].crash_cnt = 0
+  sm['radarState'].leadOne = NS(present=False, vRel=0., dRel=0.)
+  md = sm['modelV2']
+  md.velocity = NS(x=[v_ego] * 33)
+  md.orientationRate = NS(z=[0.] * 33)
+  md.meta.laneChangeState = 0
+  return sm
+
+
+@pytest.mark.parametrize('profile', range(4))
+def test_set_speed_assist_off_is_byte_identical_in_mvl(boost_env, profile):
+  """ExperimentalModeSetSpeed off (the default): the MVL planner matches the pre-port source on every output."""
+  env, settings, _ = boost_env
+  previous = subprocess.check_output(['git', 'show', 'd8afee6230:' + h.MPC + 'mvl_planner.py'], cwd=h.ROOT).decode()
+  actual = planner_class(env, set_speed=False)(h.car_params(), NS(enableGasInterceptor=True), init_v=20.)
+  expected = planner_class(env, previous)(h.car_params(), NS(enableGasInterceptor=True), init_v=20.)
+  rng = np.random.default_rng(7)
+  for frame in range(200):
+    settings.enabled = frame % 90 < 45  # both boost paths
+    sm = boost_messages(profile)
+    sm['carState'].gasPressed = frame % 30 > 15
+    sm['selfdriveState'].experimentalMode = frame % 70 < 50
+    sm['modelV2'].action.desiredAcceleration = float(rng.uniform(-2., 2.))
+    sm['radarState'].accel = float(rng.uniform(-2., 2.))
+    actual.update(sm)
+    expected.update(copy.deepcopy(sm))
+    for attr in ('output_a_target', 'output_should_stop', 'a_cruise', 'fcw', 'source'):
+      assert getattr(actual, attr) == getattr(expected, attr), (frame, attr)
+    assert vars(actual.accel_boost) == vars(expected.accel_boost)
+
+
+def test_set_speed_assist_on_lifts_the_model_in_mvl(boost_env):
+  env, settings, _ = boost_env
+  settings.enabled = True  # AccelBoostSP also on: Set Speed Assist must win and zero both boosts
+  cp = h.car_params()
+  off = planner_class(env, set_speed=False)(cp, NS(enableGasInterceptor=True), init_v=20.)
+  on = planner_class(env, set_speed=True)(cp, NS(enableGasInterceptor=True), init_v=20.)
+  on.accel_boost.total_boost = .2
+  for _ in range(200):
+    off.update(set_speed_messages())
+    on.update(set_speed_messages())
+  assert on.e2e_set_speed.enabled and on.e2e_set_speed.lift > 0.
+  assert on.accel_boost.total_boost == 0. and on.accel_boost_sp.total_boost == 0.
+  assert on.output_a_target > off.output_a_target
+  assert on.output_a_target <= on.a_cruise + 1e-9  # the cruise candidate still bounds it

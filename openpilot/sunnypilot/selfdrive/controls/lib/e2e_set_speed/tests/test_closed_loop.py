@@ -15,15 +15,21 @@ import pytest
 from openpilot.cereal import log as cereal_log
 from openpilot.common.constants import CV
 from openpilot.common.realtime import DT_MDL as DT
-from openpilot.selfdrive.controls.lib.longitudinal_planner import get_cruise_accel as nrdr_get_cruise_accel
+from opendbc.car.interfaces import ACCEL_MAX
 from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.tests.helpers import FakeParams
 from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.approach import approach_accel, approach_ceiling
 from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.controller import LIFT_FALL, E2ESetSpeedController, op_long_cruise_jerk
 from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.tests.helpers import ENGAGED, build_sm, plan_ramp
 
+A_CRUISE_MIN = -1.2  # nrdr's selfdrive/controls/lib/longitudinal_planner.py (zoompilot: -0.5)
+
+
 def get_cruise_accel(v_cruise, v_ego, a_cruise_prev, a_target_prev, dt):
-  """nrdr's e2e-mode cruise candidate (zoompilot's takes the previous target too; nrdr's has no such input)."""
-  return nrdr_get_cruise_accel(True, v_cruise, v_ego, a_cruise_prev, 0., None, dt, 0., True)
+  """nrdr's e2e-mode cruise candidate, mirrored: importing the planner pulls in the native MPC solver, which these
+  pure-controller tests must not need. (zoompilot's also takes the previous target; nrdr's has no such input.)"""
+  target = float(np.clip(v_cruise - v_ego, A_CRUISE_MIN, ACCEL_MAX))
+  jerk = op_long_cruise_jerk(v_ego)
+  return float(np.clip(target, a_cruise_prev - jerk * dt, a_cruise_prev + jerk * dt))
 
 
 V_PREF = 20.  # m/s, the model's own pace
