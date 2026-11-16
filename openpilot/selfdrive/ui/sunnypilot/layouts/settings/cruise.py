@@ -66,6 +66,12 @@ class CruiseLayout(Widget):
           "and MVL live learning. Off restores the usual acceleration behavior."),
       param="AccelBoostSP")
 
+    self.set_speed_assist_toggle = toggle_item_sp(
+      title=tr("Set Speed Assist"),
+      description=tr("In Experimental Mode, lifts the model's acceleration toward your set speed and following distance " +
+          "whenever the driving model holds back. The model still makes every slowdown. Off keeps the model's own pace."),
+      param="ExperimentalModeSetSpeed")
+
     self.custom_acc_toggle = toggle_item_sp(
       title=tr("Custom ACC Speed Increments"),
       description="",
@@ -95,6 +101,7 @@ class CruiseLayout(Widget):
       self.scc_v_toggle,
       self.scc_m_toggle,
       self.accel_boost_toggle,
+      self.set_speed_assist_toggle,
       self.custom_acc_toggle,
       self.custom_acc_short_increment,
       self.custom_acc_long_increment,
@@ -112,6 +119,7 @@ class CruiseLayout(Widget):
     self._set_current_panel(PanelType.CRUISE)
     self._scroller.show_event()
     self.accel_boost_toggle.action_item.set_state(ui_state.params.get_bool("AccelBoostSP"))
+    self.set_speed_assist_toggle.action_item.set_state(ui_state.params.get_bool("ExperimentalModeSetSpeed"))
     self.icbm_toggle.show_description(True)
     self.custom_acc_toggle.show_description(True)
 
@@ -123,7 +131,8 @@ class CruiseLayout(Widget):
   def _update_state(self):
     super()._update_state()
     # Reflect external/Sunnylink changes without replaying a saved preference.
-    for item, key in ((self.accel_boost_toggle, "AccelBoostSP"), (self.custom_acc_toggle, "CustomAccIncrementsEnabled"),
+    for item, key in ((self.accel_boost_toggle, "AccelBoostSP"), (self.set_speed_assist_toggle, "ExperimentalModeSetSpeed"),
+                      (self.custom_acc_toggle, "CustomAccIncrementsEnabled"),
                       (self.scc_v_toggle, "SmartCruiseControlVision"), (self.scc_m_toggle, "SmartCruiseControlMap"),
                       (self.icbm_toggle, "IntelligentCruiseButtonManagement")):
       item.action_item.set_state(ui_state.params.get_bool(key))
@@ -179,6 +188,8 @@ class CruiseLayout(Widget):
         self.custom_acc_toggle.show_description(True)
 
     apply_cruise_preferences(self, ui_state, {}, has_long, has_icbm)
+    # Same availability as Acceleration Boost: settable while parked, live only with openpilot longitudinal.
+    self.set_speed_assist_toggle.action_item.set_enabled(ui_state.is_offroad() or has_long)
 
   def _on_icbm_toggle(self, state):
     save_icbm_choice(ui_state, state)

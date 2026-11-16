@@ -405,6 +405,15 @@ def test_call_point_is_only_core_planner_change(preport_sources):
                          any(isinstance(t, ast.Name) and t.id == 'candidates' for t in n.targets))
   assert insertion < candidate_index
   del update.body[insertion]
+  # Set Speed Assist (zoompilot port) adds its own pieces; strip exactly those and nothing else so the rest stays pinned.
+  def is_set_speed(node):
+    return ((isinstance(node, ast.ImportFrom) and 'e2e_set_speed' in (node.module or '')) or
+            (isinstance(node, ast.FunctionDef) and node.name == 'set_speed_assist') or
+            (isinstance(node, ast.Assign) and any('e2e_set_speed' in ast.dump(t) for t in node.targets)) or
+            (isinstance(node, ast.Assign) and calls(node.value, 'set_speed_assist')))
+  for node in ast.walk(actual):
+    if hasattr(node, 'body') and isinstance(node.body, list):
+      node.body = [n for n in node.body if not is_set_speed(n)]
   assert ast.dump(actual) == ast.dump(baseline)
 
 

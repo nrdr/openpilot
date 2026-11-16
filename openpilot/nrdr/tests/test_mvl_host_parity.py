@@ -117,6 +117,9 @@ def environment(**extra):
     "NrdrLongControl": forbidden, "NrdrLongitudinalPlanner": forbidden, "NrdrLongitudinalMpc": forbidden,
     "Params": forbidden, "get_live_params": forbidden, "LongTune": forbidden, "apply_standstill_gap": forbidden,
     "V_CRUISE_MAX": 145, "V_CRUISE_UNSET": 255, "ACCELERATION_DUE_TO_GRAVITY": 9.81,
+    # Set Speed Assist is off by default: a pass-through, as the real controller is with ExperimentalModeSetSpeed off
+    "E2ESetSpeedController": lambda: NS(enabled=False, lift=0., update=lambda sm, a_model, *_args: a_model),
+    "approach_accel": lambda *_: 0.,
   }
   econ = definitions(source(MPC + "mvl_econ.py"), {"np": np})
   env.update({k: v for k, v in econ.items() if not k.startswith("__")})
@@ -256,6 +259,37 @@ def test_planner_only_documented_donor_edits():
   )
   expected = expected.replace("longitudinalPlan.allowBrake = True",
                               "longitudinalPlan.allowBrake = True\n    longitudinalPlan.allowThrottle = True")
+  # Set Speed Assist (ExperimentalModeSetSpeed, off by default): same controller and hook as the standard planner
+  expected = expected.replace(
+    "from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP\n",
+    "from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP\n" +
+    "from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.approach import approach_accel\n" +
+    "from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.controller import E2ESetSpeedController\n", 1)
+  expected = expected.replace("    LongitudinalPlannerSP.__init__(self, self.CP, CP_SP, self.mpc)\n",
+                              "    LongitudinalPlannerSP.__init__(self, self.CP, CP_SP, self.mpc)\n" +
+                              "    self.e2e_set_speed = E2ESetSpeedController()  # Set Speed Assist (ExperimentalModeSetSpeed, off by default)\n", 1)
+  expected = expected.replace(
+    "    self.a_cruise = (econ_cruise_accel(",
+    "    output_a_target_e2e = self.set_speed_assist(sm, output_a_target_e2e, output_a_target_mpc, v_cruise, v_ego,\n" +
+    "                                                sm['selfdriveState'].personality, sm['selfdriveState'].experimentalMode,\n" +
+    "                                                reset_state)\n\n" +
+    "    self.a_cruise = (econ_cruise_accel(", 1)
+  expected = expected.replace(
+    "      if self.accel_boost_sp.enabled:\n        output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(",
+    "      if self.e2e_set_speed.enabled:\n" +
+    "        self.accel_boost.total_boost, self.accel_boost.boost_eligible = 0., False\n" +
+    "        self.accel_boost_sp.boost = self.accel_boost_sp.total_boost = 0.0\n" +
+    "      elif self.accel_boost_sp.enabled:\n        output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(", 1)
+  expected = expected.replace(
+    "  def publish(self, sm, pm):",
+    "  def set_speed_assist(self, sm, a_model, a_mpc, v_cruise, v_ego, personality, experimental, reset_state):\n" +
+    "    is_e2e = bool(experimental) and bool(self.CP.openpilotLongitudinalControl)\n" +
+    "    personality = int(getattr(personality, 'raw', personality))\n" +
+    "    a_chill = min(float(a_mpc), float(self.a_cruise), approach_accel(float(v_ego), float(v_cruise), personality))\n" +
+    "    ctl = self.e2e_set_speed\n" +
+    "    steer_lat_accel = sm['controlsState'].curvature * sm['carState'].vEgo ** 2 if (ctl.enabled or ctl.lift != 0.) else 0.\n" +
+    "    return ctl.update(sm, a_model, a_chill, is_e2e, bool(reset_state), steer_lat_accel)\n\n" +
+    "  def publish(self, sm, pm):", 1)
   assert parsed(source(MPC + "mvl_planner.py")) == parsed(expected)
 
 

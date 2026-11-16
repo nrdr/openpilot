@@ -18,6 +18,8 @@ from openpilot.selfdrive.car.cruise import V_CRUISE_MAX, V_CRUISE_UNSET
 from openpilot.common.swaglog import cloudlog
 
 from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP
+from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.approach import approach_accel
+from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.controller import E2ESetSpeedController
 from openpilot.nrdr.features.longitudinal.longitudinal_planner import NrdrLongitudinalPlanner
 from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
@@ -142,6 +144,9 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       self.bosch_a_clock_ns = time.monotonic_ns  # SOURCE planner: clock_ns
     self.nrdr = NrdrLongitudinalPlanner(CP, CP_SP, self.mpc.tune) if nrdr_enabled else None
     LongitudinalPlannerSP.__init__(self, self.CP, CP_SP, self.mpc)
+    # Set Speed Assist (ported from zoompilot, off by default via ExperimentalModeSetSpeed). Built here, not in the
+    # SP overlay, so the MVL planner (which shares that overlay) is untouched.
+    self.e2e_set_speed = E2ESetSpeedController()
     self.fcw = False
     self.dt = dt
     self.allow_throttle = True
@@ -273,6 +278,12 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
 
     is_e2e = sm['selfdriveState'].experimentalMode
 
+    # Set Speed Assist lifts the e2e candidate toward chill mode's answer, never below the model's. As in zoompilot it
+    # runs after the e2e candidate is built and before this frame's cruise candidate, so a_cruise is last frame's.
+    # The floor is min(MPC candidate, cruise candidate, approach pace toward the final cruise target).
+    output_a_target_e2e = self.set_speed_assist(sm, output_a_target_e2e, output_a_target_mpc, v_cruise, v_ego, personality,
+                                                is_e2e, reset_state)
+
     self.a_cruise = get_cruise_accel(is_e2e, v_cruise, v_ego,
                                      self.a_cruise, steer_angle_without_offset, self.CP, self.dt,
                                      accel_coast, self.allow_throttle,
@@ -283,9 +294,14 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     cruise_should_stop = (bool(v_ego < self.nrdr.v_ego_stopping and self.a_cruise < 0.1)
                           if self.nrdr is not None else should_stop(v_ego, self.a_cruise))
 
-    output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(
-      self, sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise,
-    )
+    if self.e2e_set_speed.enabled:
+      # Set Speed Assist's floor already lifts the model; the gas-press accel boost learns past it, so it only runs
+      # with the assist off (zoompilot's SetSpeedAssistGatedBoost).
+      self.accel_boost_sp.boost = self.accel_boost_sp.total_boost = 0.0
+    else:
+      output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(
+        self, sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise,
+      )
 
     candidates = [(output_a_target_mpc, self.mpc.source, output_should_stop_mpc),
                   (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop)]
@@ -346,6 +362,14 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     self.prev_accel_clip = accel_clip
 
     self.v_desired_filter.x = self.v_desired_filter.x + self.dt * (self.output_a_target + a_prev) / 2.0
+
+  def set_speed_assist(self, sm, a_model, a_mpc, v_cruise, v_ego, personality, experimental, reset_state):
+    is_e2e = bool(experimental) and bool(self.CP.openpilotLongitudinalControl)
+    a_chill = min(float(a_mpc), float(self.a_cruise), approach_accel(float(v_ego), float(v_cruise), int(getattr(personality, 'raw', personality))))
+    # lateral acceleration from the measured steering, as zoompilot reads it (only needed while the assist is on or easing out)
+    ctl = self.e2e_set_speed
+    steer_lat_accel = sm['controlsState'].curvature * sm['carState'].vEgo ** 2 if (ctl.enabled or ctl.lift != 0.) else 0.
+    return self.e2e_set_speed.update(sm, a_model, a_chill, is_e2e, bool(reset_state), steer_lat_accel)
 
   def publish(self, sm, pm):
     if self.mvl_enabled:

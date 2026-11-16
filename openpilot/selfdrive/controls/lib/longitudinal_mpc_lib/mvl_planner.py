@@ -17,6 +17,8 @@ from openpilot.selfdrive.car.cruise import V_CRUISE_UNSET
 from openpilot.common.swaglog import cloudlog
 
 from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP
+from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.approach import approach_accel
+from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.controller import E2ESetSpeedController
 from openpilot.nrdr.features.longitudinal.longitudinal_planner import CRUISE_ACCEL_VALUES, c3_personality_accel_max
 
 J_CRUISE_VALS = [1.6, 1.2, 0.8, 0.6]
@@ -44,6 +46,7 @@ class MvlLongitudinalPlanner(LongitudinalPlannerSP):
     self.CP = CP
     self.mpc = LongitudinalMpc(dt=dt, mvl_enabled=True)
     LongitudinalPlannerSP.__init__(self, self.CP, CP_SP, self.mpc)
+    self.e2e_set_speed = E2ESetSpeedController()  # Set Speed Assist (ExperimentalModeSetSpeed, off by default)
     self.fcw = False
     self.dt = dt
     self.accel_boost = AccelBoost()
@@ -115,6 +118,12 @@ class MvlLongitudinalPlanner(LongitudinalPlannerSP):
     output_a_target_e2e = sm['modelV2'].action.desiredAcceleration
     output_should_stop_e2e = sm['modelV2'].action.shouldStop
 
+    # Set Speed Assist lifts the e2e candidate toward chill mode's answer. Same order as the standard planner: after the
+    # e2e candidate, before this frame's cruise candidate (so a_cruise is last frame's).
+    output_a_target_e2e = self.set_speed_assist(sm, output_a_target_e2e, output_a_target_mpc, v_cruise, v_ego,
+                                                sm['selfdriveState'].personality, sm['selfdriveState'].experimentalMode,
+                                                reset_state)
+
     self.a_cruise = (econ_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt)
                      if sm['selfdriveState'].personality == 3 else
                      get_cruise_accel(v_cruise, v_ego, self.a_cruise, self.dt, sm['selfdriveState'].personality))
@@ -125,7 +134,11 @@ class MvlLongitudinalPlanner(LongitudinalPlannerSP):
     experimental_mode = sm['selfdriveState'].experimentalMode
     if experimental_mode:
       # Select one model-acceleration boost; MVL's gas/brake learning is separate.
-      if self.accel_boost_sp.enabled:
+      if self.e2e_set_speed.enabled:
+        # Set Speed Assist's floor already lifts the model; both model-acceleration boosts only run with it off.
+        self.accel_boost.total_boost, self.accel_boost.boost_eligible = 0., False
+        self.accel_boost_sp.boost = self.accel_boost_sp.total_boost = 0.0
+      elif self.accel_boost_sp.enabled:
         output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(
           self, sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise)
       else:
@@ -143,6 +156,14 @@ class MvlLongitudinalPlanner(LongitudinalPlannerSP):
     self.output_a_target = np.clip(output_a_target, ACCEL_MIN, ACCEL_MAX)
 
     self.v_desired_filter.x = self.v_desired_filter.x + self.dt * (self.output_a_target + a_prev) / 2.0
+
+  def set_speed_assist(self, sm, a_model, a_mpc, v_cruise, v_ego, personality, experimental, reset_state):
+    is_e2e = bool(experimental) and bool(self.CP.openpilotLongitudinalControl)
+    personality = int(getattr(personality, 'raw', personality))
+    a_chill = min(float(a_mpc), float(self.a_cruise), approach_accel(float(v_ego), float(v_cruise), personality))
+    ctl = self.e2e_set_speed
+    steer_lat_accel = sm['controlsState'].curvature * sm['carState'].vEgo ** 2 if (ctl.enabled or ctl.lift != 0.) else 0.
+    return ctl.update(sm, a_model, a_chill, is_e2e, bool(reset_state), steer_lat_accel)
 
   def publish(self, sm, pm):
     plan_send = messaging.new_message('longitudinalPlan')
