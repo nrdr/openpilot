@@ -41,6 +41,7 @@ from openpilot.sunnypilot.modeld_v2.blendful import Blendful
 from openpilot.sunnypilot.modeld_v2.constants import ModelConstants, Plan
 from openpilot.sunnypilot.modeld_v2.meta_helper import load_meta_constants
 from openpilot.sunnypilot.modeld_v2.camera_offset_helper import CameraOffsetHelper
+from openpilot.sunnypilot import jetlink_adapter
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.modeld_v2.helpers import load_model
@@ -275,11 +276,13 @@ def main(demo=False):
 
   cloudlog.bind(daemon=PROCESS_NAME)
   setproctitle(PROCESS_NAME)
-  config_realtime_process(7, 54)
 
   CHESTNUT = chestnut_present()
   if CHESTNUT:
     os.environ['HCQDEV_WAIT_TIMEOUT_MS'] = '3000'
+  JETLINK = jetlink_adapter.prepare(CHESTNUT)  # before going realtime; False unless the user turned JetLink on
+  if not JETLINK:
+    config_realtime_process(7, 54)  # unchanged when JetLink is off; with it, after attach() below
 
   params = Params()
   params.put_bool("ChestnutLoading", CHESTNUT)
@@ -331,6 +334,10 @@ def main(demo=False):
   small_model = ModelState(cam_w=vipc_client_main.width, cam_h=vipc_client_main.height, chestnut=False) if model is None or CHESTNUT else None
   if model is None:
     model = small_model
+  if JETLINK:
+    # JetLink owns the big model only when no chestnut is fitted (prepare() above)
+    model = jetlink_adapter.attach(model, small_model, vipc_client_main.width, vipc_client_main.height)
+    config_realtime_process(7, 54)
   params.put_bool("ChestnutLoading", False)
   assert model is not None
   cloudlog.warning(f"models loaded in {time.monotonic() - st:.1f}s, modeld starting")
@@ -431,7 +438,7 @@ def main(demo=False):
     timing_restored = timing_mode.update(timing_params.snapshot, sm["carState"], sm["carControl"],
                                          sm.all_checks(["carState", "carControl"]))
     lat_delay = model.lat_delay + (PTM_LAT_SMOOTH_SECONDS if firmware_profile is not None and
-                                  (not model.uses_plan or not timing_restored) else model.LAT_SMOOTH_SECONDS)
+                                  (not jetlink_adapter.model_uses_plan(model) or not timing_restored) else model.LAT_SMOOTH_SECONDS)
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["extrinsicsCalibration"].rpyCalib, dtype=np.float32)
       dc = DEVICE_CAMERAS[(str(sm['deviceState'].deviceType), str(sm['narrowRoadCameraState'].sensor))]
@@ -477,6 +484,7 @@ def main(demo=False):
     if 'action_t' in model.numpy_inputs:
       inputs['action_t'] = np.array([lat_action_t, long_action_t], dtype=np.float32)
 
+    model.frame_drop_ratio = frame_drop_ratio
     mt1 = time.perf_counter()
     try:
       send_chestnut = (chestnut_state is not None and
@@ -493,6 +501,8 @@ def main(demo=False):
         chestnut_state.big = False
       run_count = 0
       model_output = None
+    if jetlink_adapter.handed_over(model):
+      run_count, frame_drop_ratio = 0, 0.
     mt2 = time.perf_counter()
     model_execution_time = mt2 - mt1
 
@@ -516,7 +526,7 @@ def main(demo=False):
                      frame_drop_ratio, meta_main.timestamp_eof, model_execution_time, live_calib_seen, meta_constants)
       modelv2_send.modelV2.big = model.chestnut
       set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t,
-                                lateral_source=lateral_source(model_output, model.mlsim), delay_input=delay_input(model.numpy_inputs),
+                                lateral_source=lateral_source(model_output, jetlink_adapter.model_mlsim(model)), delay_input=delay_input(model.numpy_inputs),
                                 timing_restored=timing_restored)
       modelv2_send.modelV2.action.laneGuidanceMode = int(lane_guidance_mode)
       drivingdata_send.drivingModelData.action = modelv2_send.modelV2.action
