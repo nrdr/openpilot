@@ -1,0 +1,91 @@
+BO_ 829 LKAS_HUD: 8 ADAS
+ SG_ LKAS_READY : 0|1@0+ (1,0) [0|127] "" BDY
+ SG_ LKAS_STATE_CHANGE : 6|1@0+ (1,0) [0|1] "" XXX
+ SG_ CAM_TEMP_HIGH : 7|1@0+ (1,0) [0|255] "" BDY
+ SG_ DASHED_LANES : 14|1@0+ (1,0) [0|1] "" BDY
+ SG_ DTC : 13|1@0+ (1,0) [0|1] "" BDY
+ SG_ LKAS_PROBLEM : 12|1@0+ (1,0) [0|1] "" BDY
+ SG_ LKAS_OFF : 11|1@0+ (1,0) [0|1] "" BDY
+ SG_ SOLID_LANES : 10|1@0+ (1,0) [0|1] "" BDY
+ SG_ CLEAN_WINDSHIELD : 26|1@0+ (1,0) [0|1] "" BDY
+ SG_ STEERING_REQUIRED : 8|1@0+ (1,0) [0|1] "" BDY
+ SG_ BEEP : 17|2@0+ (1,0) [0|1] "" BDY
+ SG_ RDM_PROBLEM : 21|1@0+ (1,0) [0|1] "" BDY
+ SG_ RDM_HUD : 9|1@0+ (1,0) [0|1] "" BDY
+ SG_ RDM_HUD_2 : 23|1@0+ (1,0) [0|1] "" XXX
+ SG_ RDM_OFF : 27|1@0+ (1,0) [0|1] "" BDY
+ SG_ RDM_ON : 20|1@0+ (1,0) [0|1] "" XXX
+ SG_ RDM_ON_2 : 28|1@0+ (1,0) [0|1] "" BDY
+ SG_ LANE_ASSIST_BEEP_OFF : 30|1@0+ (1,0) [0|1] "" XXX
+ SG_ LANE_LINES : 36|2@0+ (1,0) [0|3] "" XXX
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" XXX
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" XXX
+
+BO_ 254913108 LKAS_HUD_2: 8 ADAS
+ SG_ COUNTER_2 : 7|2@0+ (1,0) [0|3] "" XXX
+ SG_ SET_ME_X01 : 5|1@0+ (1,0) [0|1] "" XXX
+ SG_ LANE_WIDTH : 15|6@0+ (1,0) [0|63] "" XXX
+ SG_ LEFT_LANE : 23|2@0+ (1,0) [0|3] "" XXX
+ SG_ RIGHT_LANE : 21|2@0+ (1,0) [0|3] "" XXX
+ SG_ LEFT_LANE_CROSSED : 25|1@0+ (1,0) [0|1] "" XXX
+ SG_ RIGHT_LANE_CROSSED : 24|1@0+ (1,0) [0|1] "" XXX
+ SG_ LANE_LENGTH : 31|6@0+ (1,0) [0|63] "" XXX
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" XXX
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" XXX
+
+BO_ 114120023 HUD_OBJECTS: 8 CAM
+ SG_ MUX M : 7|6@0+ (1,0) [0|63] "" XXX
+ SG_ OBJECT_ID m1 : 15|5@0+ (1,0) [0|31] "" XXX
+ SG_ IS_LEAD_CAR m1 : 17|1@0+ (1,0) [0|1] "" XXX
+ SG_ CAR_TYPE m1 : 23|4@0- (1,0) [-8|7] "" XXX
+ SG_ ROTATION m1 : 31|8@0- (1,0) [-128|127] "" XXX
+ SG_ LONG_DIST m1 : 39|10@0+ (0.209,-16.9) [-16.9|196.9] "m" XXX
+ SG_ LAT_DIST m1 : 43|12@0- (0.1,0) [-204.8|204.7] "m" XXX
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" XXX
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" XXX
+
+BO_ 114120025 HUD_OBJECTS_B: 8 XXX
+ SG_ MUX M : 7|6@0+ (1,0) [0|63] "" XXX
+ SG_ OBJECT_ID m1 : 15|5@0+ (1,0) [0|31] "" XXX
+ SG_ IS_LEAD_CAR m1 : 17|1@0+ (1,0) [0|1] "" XXX
+ SG_ CAR_TYPE m1 : 23|4@0- (1,0) [-8|7] "" XXX
+ SG_ ROTATION m1 : 31|8@0- (1,0) [-128|127] "" XXX
+ SG_ LONG_DIST m1 : 39|10@0+ (0.209,-16.9) [-16.9|196.9] "m" XXX
+ SG_ LAT_DIST m1 : 43|12@0- (0.1,0) [-204.8|204.7] "m" XXX
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" XXX
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" XXX
+
+BO_ 114120020 LANE_PATH: 8 CAM
+ SG_ MUX M : 7|6@0+ (1,0) [0|63] "" XXX
+ SG_ PATH_OFFSET_1 m1 : 15|12@0- (1,0) [-2048|2047] "" XXX
+ SG_ PATH_OFFSET_2 m1 : 19|12@0- (1,0) [-2048|2047] "" XXX
+ SG_ PATH_OFFSET_3 m1 : 39|12@0- (1,0) [-2048|2047] "" XXX
+ SG_ PATH_OFFSET_4 m1 : 43|12@0- (1,0) [-2048|2047] "" XXX
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" XXX
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" XXX
+
+BO_ 114120024 LANE_PATH_B: 8 XXX
+ SG_ MUX M : 7|6@0+ (1,0) [0|63] "" XXX
+ SG_ PATH_OFFSET_1 m1 : 15|12@0- (1,0) [-2048|2047] "" XXX
+ SG_ PATH_OFFSET_2 m1 : 19|12@0- (1,0) [-2048|2047] "" XXX
+ SG_ PATH_OFFSET_3 m1 : 39|12@0- (1,0) [-2048|2047] "" XXX
+ SG_ PATH_OFFSET_4 m1 : 43|12@0- (1,0) [-2048|2047] "" XXX
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" XXX
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" XXX
+
+CM_ SG_ 829 BEEP "beeps are pleasant, chimes are for warnings etc...";
+CM_ SG_ 829 CAM_TEMP_HIGH "Some Driver Assist Systems Cannot Operate: Camera Temperature Too High";
+CM_ SG_ 829 CAMERA_OVERHEAT "Lane Keeping Assist Cannot Operate: Camera Too Hot";
+CM_ SG_ 114120023 MUX "1-10, 17-26, 33-42, 49-58 map to the same 10 slots for 5Hz frequency each";
+CM_ SG_ 114120023 IS_LEAD_CAR "1 when this track is the lead car; the lead, when present, is always track index 1";
+CM_ SG_ 114120023 LAT_DIST "positive = left of ego, 204.7 (max value) when inactive";
+CM_ SG_ 114120023 ROTATION "0 straight, negative left, positive right. Range of -3 to 3 seen so far. -128 when inactive.";
+CM_ SG_ 114120025 MUX "1-10, 17-26, 33-42, 49-58 map to the same 10 slots for 5Hz frequency each";
+CM_ SG_ 114120025 IS_LEAD_CAR "1 when this track is the lead car; the lead, when present, is always track index 1";
+CM_ SG_ 114120025 LAT_DIST "positive = left of ego, 204.7 (max value) when inactive";
+CM_ SG_ 114120025 ROTATION "0 straight, negative left, positive right. Range of -3 to 3 seen so far. -128 when inactive.";
+
+VAL_ 829 BEEP 5 "solid_beep" 4 "double_beep" 3 "single_beep" 2 "triple_beep" 1 "repeated_beep" 0 "no_beep";
+VAL_ 829 LANE_LINES 7 "both_lines_green" 6 "both_lines_white" 2 "left_line_white" 0 "no_lines";
+VAL_ 114120023 CAR_TYPE 7 "CAR" 6 "MOTORCYCLE" -7 "TRUCK" -1 "INACTIVE" 0 "UNKNOWN";
+VAL_ 114120025 CAR_TYPE 7 "CAR" 6 "MOTORCYCLE" -7 "TRUCK" -1 "INACTIVE" 0 "UNKNOWN";
