@@ -1,0 +1,125 @@
+from collections.abc import Callable
+import pyray as rl
+
+from openpilot.system.ui.lib.multilang import tr
+from openpilot.system.ui.widgets import Widget
+from openpilot.system.ui.widgets.network import NavButton
+from openpilot.system.ui.widgets.scroller_tici import Scroller
+from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, LineSeparatorSP
+
+
+class SteerFiltersLayout(Widget):
+  def __init__(self, back_btn_callback: Callable):
+    super().__init__()
+    self._back_button = NavButton(tr("Back"))
+    self._back_button.set_click_callback(back_btn_callback)
+
+    items = self._initialize_items()
+    self._scroller = Scroller(items, line_separator=False, spacing=0)
+
+  def _initialize_items(self):
+    self._low_pass_filter = toggle_item_sp(
+      param="HondaTorqueLowPassFilter",
+      title=lambda: tr("Low Pass Filter (tau) (Default: ON)"),
+      description=lambda: tr(
+        "Smooths steering commands; Off disables filtering without changing saved values. Higher values add " +
+            "delay, which can cause steering oscillations if excessive."
+      ),
+    )
+
+    self._lpf_tau_low = option_item_sp(
+      param="HondaLpfTauLowSpeed",
+      title=lambda: tr("Low Pass Filter Tau (Below 25mph) (Default: 0.1)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=1,
+      description=lambda: tr("Sets steering smoothing below 25 mph, in seconds. Higher values add smoothing and delay; zero disables smoothing in this range."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
+    self._lpf_tau_standard = option_item_sp(
+      param="HondaLpfTauStandard",
+      title=lambda: tr("Standard Tau (25-50mph) (Default: 0.02)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=1,
+      description=lambda: tr("Sets steering smoothing from 25 to 50 mph, in seconds. Higher values add smoothing and delay; zero " +
+          "disables smoothing in this range."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
+    self._lpf_tau_highway = option_item_sp(
+      param="HondaLpfTauHighway",
+      title=lambda: tr("Highway Tau (50mph+) (Default: 0.00)"),
+      min_value=0,
+      max_value=500,
+      value_change_step=1,
+      description=lambda: tr("Sets steering smoothing at 50 mph and above, in seconds. Higher values add smoothing and delay; " +
+          "zero disables smoothing in this range."),
+      label_callback=lambda value: f"{value / 100:.2f}",
+      use_float_scaling=True,
+    )
+
+    self._steer_delta_limiter = toggle_item_sp(
+      param="HondaSteerDeltaLimiter",
+      title=lambda: tr("Legacy Steer Delta Rate Limiter (Default: OFF)"),
+      description=lambda: tr(
+        "Limits how quickly steering force can change. Off removes this additional rate limit without changing the saved limits."
+      ),
+    )
+
+    self._steer_delta_up = option_item_sp(
+      param="HondaSteerDeltaUp",
+      title=lambda: tr("Steer Delta Up (Default: 4.0)"),
+      min_value=0,
+      max_value=10000,
+      value_change_step=10,
+      description=lambda: tr("Sets how quickly steering force can increase when the rate limiter is on. Lower values add lag."),
+      label_callback=lambda value: f"{value / 100:.1f}",
+      use_float_scaling=True,
+    )
+
+    self._steer_delta_down = option_item_sp(
+      param="HondaSteerDeltaDown",
+      title=lambda: tr("Steer Delta Down (Default: 4.0)"),
+      min_value=0,
+      max_value=10000,
+      value_change_step=10,
+      description=lambda: tr("Sets how quickly steering force can decrease when the rate limiter is on. Lower values add lag."),
+      label_callback=lambda value: f"{value / 100:.1f}",
+      use_float_scaling=True,
+    )
+
+    return [
+      self._low_pass_filter,
+      self._lpf_tau_low,
+      self._lpf_tau_standard,
+      self._lpf_tau_highway,
+      LineSeparatorSP(40),
+      self._steer_delta_limiter,
+      self._steer_delta_up,
+      self._steer_delta_down,
+    ]
+
+  def _update_state(self):
+    super()._update_state()
+
+    lpf_enabled = self._low_pass_filter.action_item.get_state()
+    self._lpf_tau_low.set_visible(lpf_enabled)
+    self._lpf_tau_standard.set_visible(lpf_enabled)
+    self._lpf_tau_highway.set_visible(lpf_enabled)
+
+    steer_delta_limiter_enabled = self._steer_delta_limiter.action_item.get_state()
+    self._steer_delta_up.set_visible(steer_delta_limiter_enabled)
+    self._steer_delta_down.set_visible(steer_delta_limiter_enabled)
+
+  def _render(self, rect):
+    self._back_button.set_position(self._rect.x, self._rect.y + 20)
+    self._back_button.render()
+    content_rect = rl.Rectangle(rect.x, rect.y + self._back_button.rect.height + 40, rect.width, rect.height - self._back_button.rect.height - 40)
+    self._scroller.render(content_rect)
+
+  def show_event(self):
+    self._scroller.show_event()
