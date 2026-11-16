@@ -157,5 +157,6 @@ ln -sfn opendbc_repo/opendbc opendbc
 ln -sfn rednose_repo/rednose rednose
 ln -sfn teleoprtc_repo/teleoprtc teleoprtc
 ln -sfn tinygrad_repo/tinygrad tinygrad
+ln -sfn jetlink_repo/jetlink jetlink
 
 echo "$TEST_DIR synced with $GIT_COMMIT, t=$SECONDS"

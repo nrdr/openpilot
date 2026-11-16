@@ -390,6 +390,7 @@ ln -sfn opendbc_repo/opendbc opendbc
 ln -sfn rednose_repo/rednose rednose
 ln -sfn teleoprtc_repo/teleoprtc teleoprtc
 ln -sfn tinygrad_repo/tinygrad tinygrad
+ln -sfn jetlink_repo/jetlink jetlink
 rm -f panda/board/obj/panda.bin.signed panda/board/obj/panda_h7.bin.signed || true
 
 VERSION="$(awk -F'["-]' 'NR == 1 {print $2}' openpilot/sunnypilot/common/version.h)"

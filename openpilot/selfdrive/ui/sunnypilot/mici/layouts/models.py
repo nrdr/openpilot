@@ -10,8 +10,9 @@ import pyray as rl
 
 from openpilot.cereal import custom
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigConfirmationDialog, BigDialog
+from openpilot.sunnypilot.jetlink_adapter import KEYS, MODES
 from openpilot.sunnypilot.models.helpers import ACTIVE_BUNDLE_KEYS, get_selected_bundle
-from openpilot.selfdrive.ui.mici.widgets.button import BigButton
+from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigMultiParamToggle
 from openpilot.selfdrive.ui.ui_state import ui_state, device
 from openpilot.selfdrive.ui.sunnypilot.model_info import (active_source, big_model_state, bundles_for_source, carrying_model,
                                                            default_model_name, model_cache_size_mb, model_info, queued_name,
@@ -21,6 +22,20 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.scroller import NavScroller
+
+# the value line: the mode
+LINK_MODE_LABELS = {"off": "off", "usb": "usb", "ios": "iOS"}
+
+
+def link_toggle_meaningful() -> bool:
+  """Offered wherever jetlink is checked out (ui_state.jetlink is its snapshot, None without it or beside a
+  fitted chestnut, which runs the big model itself); and while the setting is on, whatever else. Presence
+  cannot be the gate: with the link off there is no gadget for a Jetson to enumerate."""
+  index = ui_state.params.get(KEYS.link, return_default=True)
+  if isinstance(index, int) and 0 < index < len(MODES):
+    return True
+  return not ui_state.chestnut_present and ui_state.jetlink is not None
+
 
 def _model_info() -> tuple[str, str, str]:
   """(active model, info header, info text) for the panel. Runner-matched: the
@@ -91,11 +106,19 @@ class ModelsLayoutMici(NavScroller):
     self.cancel_download_btn = BigButton(tr("cancel download"))
     self.cancel_download_btn.set_click_callback(lambda: ui_state.params.remove("ModelManager_DownloadRef"))
 
+    # off by default; stores the mode's index. Locked onroad: jetlink switches the link only parked
+    self.link_toggle = BigMultiParamToggle(tr("jetlink"), KEYS.link, [tr(LINK_MODE_LABELS[m]) for m in MODES],
+                                           description=tr("Runs big models on a computer or phone plugged into the comma.\n" +
+                                                          "USB for a Mac, Jetson, Linux PC or Android. iOS for an iPhone or iPad.\n" +
+                                                          "Turns off ADB. The small model drives until the big model is ready."))
+    self.link_toggle.set_enabled(lambda: ui_state.is_offroad())
+    self.link_toggle.set_visible(link_toggle_meaningful)
+
     self.clear_cache_btn = BigButton(tr("clear cache"), value=f"{model_cache_size_mb():.1f} MB")
     self.clear_cache_btn.set_click_callback(self._confirm_clear_cache)
     self._cache_size_time = 0.0
 
-    self.main_items = [self.current_model_info, self.select_model_btn, self.cancel_download_btn, self.refresh_btn, self.clear_cache_btn]
+    self.main_items = [self.current_model_info, self.select_model_btn, self.cancel_download_btn, self.link_toggle, self.refresh_btn, self.clear_cache_btn]
     self._scroller.add_widgets(self.main_items)
 
   @property

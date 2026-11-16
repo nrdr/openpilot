@@ -10,6 +10,7 @@ from openpilot.cereal import messaging, log, custom
 from opendbc.car.structs import car
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.display import OnroadBrightness
+from openpilot.sunnypilot import jetlink_adapter
 from openpilot.sunnypilot.models.helpers import ACTIVE_BUNDLE_KEYS, get_active_source
 from openpilot.sunnypilot.sunnylink.sunnylink_state import SunnylinkState
 from openpilot.system.ui.lib.application import gui_app
@@ -44,6 +45,8 @@ class UIStateSP:
     self.screensaver_enabled: bool = False
 
     self.active_bundle = None
+    # jetlink's snapshot (jetlink.openpilot Status) from the params pass; None with a chestnut fitted or no jetlink on this device
+    self.jetlink = None
     self.model_runner_tinygrad: bool = False
     self.blindspot: bool = False
     self.chevron_metrics = None
@@ -160,6 +163,8 @@ class UIStateSP:
     # chestnut just the same, so ChestnutState has to see it as available too.
     self.chestnut_compiled = self.chestnut_compiled or self.model_runner_tinygrad
     self.blindspot = self.params.get_bool("BlindSpot")
+    # on the params pass, not per frame in a layout; a fitted chestnut runs the big model itself
+    self.jetlink = None if self.chestnut_present else jetlink_adapter.status()
     self.chevron_metrics = self.params.get("ChevronInfo")
     self.custom_interactive_timeout = self.params.get("InteractivityTimeout", return_default=True)
     self.developer_ui = self.params.get("DevUIInfo")

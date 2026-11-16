@@ -24,6 +24,7 @@ from openpilot.common.hardware.usb import CHESTNUT_FW_VERSION, CHESTNUT_USB_PROD
 from openpilot.common.linux import LinuxSystemStats
 from openpilot.system.loggerd.config import get_available_percent
 from openpilot.common.swaglog import cloudlog
+from openpilot.sunnypilot import jetlink_adapter
 from openpilot.sunnypilot.system.statsd import statlog
 from openpilot.system.hardware.power_monitoring import PowerMonitoring
 from openpilot.system.hardware.fan_controller import FanController
@@ -40,6 +41,7 @@ TEMP_TAU = 5.   # 5s time constant
 DISCONNECT_TIMEOUT = 5.  # wait 5 seconds before going offroad after disconnect so you get an alert
 PANDA_STATES_TIMEOUT = round(1000 / SERVICE_LIST['pandaStates'].frequency * 1.5)  # 1.5x the expected pandaState frequency
 ONROAD_CYCLE_TIME = 1  # seconds to wait offroad after requesting an onroad cycle
+JETLINK_SHUTDOWN_CAP_S = 30.  # the longest a shutdown waits on a JetLink host: its own deadline (25 s) and 5 s, so it never keeps a comma on
 SLOW_HARDWARE_STAGE_SECONDS = 0.20
 SLOW_HARDWARE_STAGE_LOG_INTERVAL = 10.0
 NONCRITICAL_TELEMETRY_ERROR_LOG_INTERVAL = 10.0
@@ -394,6 +396,7 @@ def hardware_thread(end_event, hw_queue, telemetry_queue) -> None:
   startup_conditions_prev: dict[str, bool] = {}
 
   off_ts: float | None = None
+  jetlink_shutdown_ts: float | None = None
   started_ts: float | None = None
   started_seen = False
   startup_blocked_ts: float | None = None
@@ -581,6 +584,9 @@ def hardware_thread(end_event, hw_queue, telemetry_queue) -> None:
     startup_conditions["not_tici"] = not is_unsupported_combo
     onroad_conditions["not_tici"] = not is_unsupported_combo
     set_offroad_alert_if_changed("Offroad_TiciSupport", is_unsupported_combo, extra_text=build_metadata.channel)
+    # a JetLink the user turned on that cannot come up is otherwise silently absent; None while the link is off
+    jetlink_error = jetlink_adapter.reason()
+    set_offroad_alert_if_changed("Offroad_JetlinkUnavailable", jetlink_error is not None, extra_text=jetlink_error)
     stage_started = log_slow_hardware_stage("main", "tici_alert", stage_started, last_slow_stage_log,
                                             started_ts is not None, sm.frame)
 
@@ -678,7 +684,17 @@ def hardware_thread(end_event, hw_queue, telemetry_queue) -> None:
                                             started_ts is not None, sm.frame)
 
     # Check if we need to shut down
-    if power_monitor.should_shutdown(onroad_conditions["ignition"], in_car, off_ts, started_seen):
+    # A JetLink host on its own supply outlives the comma, so a shutdown asks it to power off first
+    # (jetlink's shutdown_step asks once and keeps its own deadline) and waits until it says it may,
+    # or JETLINK_SHUTDOWN_CAP_S has passed. Link off: shutdown_step answers `wanted`, so this is
+    # DoShutdown on the loops should_shutdown says yes, as before.
+    shutdown_wanted = power_monitor.should_shutdown(onroad_conditions["ignition"], in_car, off_ts, started_seen)
+    if shutdown_wanted and jetlink_shutdown_ts is None:
+      jetlink_shutdown_ts = time.monotonic()
+    elif not shutdown_wanted:
+      jetlink_shutdown_ts = None
+    jetlink_ready = jetlink_adapter.shutdown_step(shutdown_wanted, f"comma shutting down, offroad since {off_ts}")
+    if shutdown_wanted and (jetlink_ready or time.monotonic() - jetlink_shutdown_ts >= JETLINK_SHUTDOWN_CAP_S):
       cloudlog.warning(f"shutting device down, offroad since {off_ts}")
       params.put_bool("DoShutdown", True, block=True)
     stage_started = log_slow_hardware_stage("main", "shutdown", stage_started, last_slow_stage_log,
