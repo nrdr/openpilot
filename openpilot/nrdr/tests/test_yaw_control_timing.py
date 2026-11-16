@@ -125,7 +125,7 @@ def test_smoothing_matches_ptm_donor_only_for_heads(relative, smooth, ptm, uses_
                   and any(isinstance(target, ast.Name) and target.id == "lat_delay" for target in node.targets)]
   expr = compile(ast.Expression(assignment.value), relative, "eval")
   context = {"model": NS(lat_delay=.30, LAT_SMOOTH_SECONDS=smooth, uses_plan=uses_plan), "LAT_SMOOTH_SECONDS": smooth,
-             "firmware_profile": object() if ptm else None, "PTM_LAT_SMOOTH_SECONDS": .1}
+             "firmware_profile": object() if ptm else None, "PTM_LAT_SMOOTH_SECONDS": .1, "timing_restored": True}
   assert eval(expr, context) == pytest.approx(.30 + (.1 if ptm and not uses_plan else smooth))
 
 

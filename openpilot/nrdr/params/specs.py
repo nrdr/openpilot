@@ -110,6 +110,7 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("LiveView", ParamType.BOOL, (M, O), lifecycle=ParamLifecycle.TRANSIENT, owner=ParamOwner.REMOTE),
   _added("LatPScaleLowSpeed", ParamType.INT, PB, "100", owner=ParamOwner.LATERAL),
   _added("NrdrOptimizedLaneChanges", ParamType.BOOL, PB, "1", owner=ParamOwner.LATERAL),
+  _added("NrdrPtmTimingRestoration", ParamType.BOOL, PB, "1", owner=ParamOwner.LATERAL),
   _added("NrdrLateralController", ParamType.INT, PB, "0", owner=ParamOwner.LATERAL),
   _added("NrdrRdxRouteAConfirmation", ParamType.BYTES, (P, D), lifecycle=ParamLifecycle.STATE, owner=ParamOwner.LATERAL),
   _added("NrdrDeviceYawCorrection", ParamType.BOOL, PB, "1", owner=ParamOwner.LATERAL),

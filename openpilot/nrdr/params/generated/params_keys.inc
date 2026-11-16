@@ -15,6 +15,7 @@
     {"LiveView", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},
     {"LatPScaleLowSpeed", {PERSISTENT | BACKUP, INT, "100"}},
     {"NrdrOptimizedLaneChanges", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"NrdrPtmTimingRestoration", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"NrdrLateralController", {PERSISTENT | BACKUP, INT, "0"}},
     {"NrdrRdxRouteAConfirmation", {PERSISTENT | DONT_LOG, BYTES}},
     {"NrdrDeviceYawCorrection", {PERSISTENT | BACKUP, BOOL, "1"}},

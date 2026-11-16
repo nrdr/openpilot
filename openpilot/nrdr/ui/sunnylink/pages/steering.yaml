@@ -49,6 +49,12 @@ sections:
         widget: toggle
         title: Optimized Lane Changes
         description: "Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the normal steering tune throughout the maneuver."
+      - key: NrdrPtmTimingRestoration
+        widget: toggle
+        title: Timing Restoration
+        description: "PTM Controller only. On keeps the restored trajectory timing; Off uses the preceding timing. Changes apply when stopped with steering assistance off, without a restart."
+        enablement:
+        - {type: param, key: NrdrLateralController, equals: 1}
       - key: NrdrLatStiction
         widget: toggle
         title: Predictive Lateral Stiction

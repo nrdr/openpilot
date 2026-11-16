@@ -38,6 +38,10 @@ class PidfGroundLayout(Widget):
         title=tr("Optimized lane changes"), param="NrdrOptimizedLaneChanges",
         description=tr("Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the " +
             "normal steering tune throughout the maneuver."))),
+      remember("NrdrPtmTimingRestoration", toggle_item_sp(
+        title=tr("Timing Restoration"), param="NrdrPtmTimingRestoration",
+        description=tr("PTM Controller only. On keeps the restored trajectory timing; Off uses the preceding timing. " +
+                       "Changes apply when stopped with steering assistance off, without a restart."))),
       remember("NrdrLatStiction", toggle_item_sp(
         title=tr("Predictive Lateral Stiction"), param="NrdrLatStiction",
         description=tr("Reduces steering force as the wheel reaches its target, then holds it steady until another " +

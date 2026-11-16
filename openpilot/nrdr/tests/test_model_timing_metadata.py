@@ -77,6 +77,7 @@ def test_model_v2_action_timing_field_is_additive_and_zero_when_unavailable():
   assert "shouldStop @2 :Bool;" in body
   assert "lateralActionTime @3 :Float32;" in body
   assert "laneGuidanceMode @6 :UInt8;" in body
+  assert "ptmTimingRestored @7 :Bool = true;" in body
   assert "zero means unavailable" in body
 
 
@@ -97,9 +98,21 @@ def test_model_data_v2_sp_timing_fields_are_additive_and_optional_by_default():
   assert "zero is the unavailable value" in body
 
 
+def test_applied_timing_mode_round_trips_with_model_curvature():
+  pytest.importorskip("capnp")
+  from openpilot.cereal import log
+  assert log.ModelDataV2.Action.new_message().ptmTimingRestored is True
+  for restored in (False, True):
+    action = log.ModelDataV2.Action.new_message(desiredCurvature=.002, ptmTimingRestored=restored)
+    with log.ModelDataV2.Action.from_bytes(action.to_bytes()) as decoded:
+      assert decoded.ptmTimingRestored is restored
+      assert decoded.desiredCurvature == pytest.approx(.002)
+
+
+@pytest.mark.parametrize("restored", (False, True))
 @pytest.mark.parametrize("valid", (False, True), ids=("invalid-model", "valid-model"))
 @pytest.mark.parametrize("action_time", (0.325, 0.475))
-def test_production_helper_attaches_atomic_timing_without_changing_model_action(valid: bool, action_time: float):
+def test_production_helper_attaches_atomic_timing_without_changing_model_action(valid: bool, action_time: float, restored: bool):
   helper = _production_timing_helper()
   action = SimpleNamespace(
     desiredCurvature=-0.0125,
@@ -119,8 +132,10 @@ def test_production_helper_attaches_atomic_timing_without_changing_model_action(
   baseline_action = (action.desiredCurvature, action.desiredAcceleration, action.shouldStop)
 
   helper(model, compatibility, action_time)
+  assert action.ptmTimingRestored is True
   assert (action.lateralSource, action.delayInput) == ("unknown", "unknown")  # a caller that does not know yet
-  helper(model, compatibility, action_time, lateral_source="plan", delay_input="none")
+  helper(model, compatibility, action_time, lateral_source="plan", delay_input="none", timing_restored=restored)
+  assert action.ptmTimingRestored is restored
 
   assert (action.lateralSource, action.delayInput) == ("plan", "none")
   assert model.valid is valid

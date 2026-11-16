@@ -105,6 +105,8 @@ def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedul
                          CP=None, CP_SP=None, is_offroad: bool | None = None) -> bool:
   if not key:
     return True
+  if key == "NrdrPtmTimingRestoration":
+    return str(params.get("NrdrLateralController")) in ("1", "b'1'")
   if key in RETIRED_TUNING_KEYS or key.startswith("NrdrNnlc"):
     return False
   if key in LONG_SCALE_KEYS or key in ("NrdrHondaFullBrakeAuthority", "StaticFeedforwardLong", "NrdrHondaWindBrake"):

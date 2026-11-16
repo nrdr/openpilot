@@ -3,11 +3,37 @@ from openpilot.common.realtime import DT_CTRL, DT_MDL
 from openpilot.selfdrive.controls.lib.drive_helpers import MIN_STABLE_DELAY
 
 PTM_LAT_SMOOTH_SECONDS = 0.1
+CMD_DELAY_RAMP_S = 1.0
 
 ACTION_HEAD = "actionHead"
 CURVATURE_HEAD = "curvatureHead"
 PLAN = "plan"
 UNKNOWN = "unknown"
+
+
+def ptm_timing_restored(action) -> bool:
+  return bool(getattr(action, "ptmTimingRestored", True))
+
+
+class PtmTimingMode:
+  """Apply a saved comparison mode only while stopped with lateral control off.
+
+  The model publisher owns this decision. Consumers use the mode attached to
+  that exact model action, never an independently polled parameter.
+  """
+
+  def __init__(self, settings):
+    self.restored = self._requested(settings)
+
+  @staticmethod
+  def _requested(settings) -> bool:
+    # Missing/invalid values retain the existing, restored timing.
+    return settings.get("NrdrPtmTimingRestoration") not in (False, 0, "0", b"0")
+
+  def update(self, settings, car_state, car_control, valid: bool) -> bool:
+    if valid and car_state.standstill and abs(car_state.vEgo) < 0.1 and not car_control.latActive:
+      self.restored = self._requested(settings)
+    return self.restored
 
 
 def lateral_source(model_output, mlsim: bool) -> str:

@@ -1172,6 +1172,7 @@ struct ModelDataV2 {
     lateralSource @4 :LateralSource;  # where desiredCurvature came from; unknown in older logs
     delayInput @5 :DelayInput;        # which model input carries the told lateral delay; unknown in older logs
     laneGuidanceMode @6 :UInt8;       # 0=model-only, 1=NRDR, 2=Blendful; carried atomically with desiredCurvature.
+    ptmTimingRestored @7 :Bool = true; # Applied timing mode, atomic with curvature; absent fields preserve restored timing.
 
     enum LateralSource {
       unknown @0;

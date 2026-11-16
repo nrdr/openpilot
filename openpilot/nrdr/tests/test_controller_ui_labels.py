@@ -61,6 +61,21 @@ class TestControllerUiLabels(unittest.TestCase):
   def setUpClass(cls):
     cls.schema = compile_schema(DEFAULT_SRC)
 
+  def test_timing_restoration_matches_native_and_remote_and_remains_editable_with_ptm(self):
+    from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+    key = "NrdrPtmTimingRestoration"
+    native = _native_class("pidf_ground.py", "PidfGroundLayout")(lambda: None, lambda: None)
+    web = _panel(self.schema, "steering", "nrdr_pidf_ground")["items"][2]
+    local = native._tuning_items[key]
+    self.assertIs(native._scroller[2], local)
+    self.assertEqual(web["key"], key)
+    self.assertEqual((local["title"], web["title"]), ("Timing Restoration", "Timing Restoration"))
+    self.assertEqual(web["description"], local["description"])
+    self.assertEqual(web["enablement"], [{"type": "param", "key": "NrdrLateralController", "equals": 1}])
+    for controller in (0, 1):
+      settings = {"NrdrLateralController": controller, "NrdrSuggestedSettings": True, "IsOffroad": False}
+      self.assertEqual(tuning_write_allowed(settings, key), controller == 1)
+
   def test_native_and_sunnylink_speed_prefix_copy_order_and_ranges_match(self):
     native = _native_class("pidf_ground.py", "PidfGroundLayout")(lambda: None, lambda: None)
     panel = _panel(self.schema, "steering", "nrdr_pidf_ground")
@@ -177,11 +192,11 @@ class TestControllerUiLabels(unittest.TestCase):
     key = "NrdrDeviceYawCorrection"
     native = _native_class("pidf_ground.py", "PidfGroundLayout")(lambda: None, lambda: None)
     panel = _panel(self.schema, "steering", "nrdr_pidf_ground")
-    self.assertEqual([item["key"] for item in panel["items"][:4]],
-                     ["NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrLatStiction", key])
+    self.assertEqual([item["key"] for item in panel["items"][:5]],
+                     ["NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrPtmTimingRestoration", "NrdrLatStiction", key])
     self.assertIs(native._scroller[0], native._controller)
     self.assertIs(native._scroller[1], native._tuning_items["NrdrOptimizedLaneChanges"])
-    local, web = native._tuning_items[key], panel["items"][3]
+    local, web = native._tuning_items[key], panel["items"][4]
     self.assertEqual(local["title"], "Use Device Yaw Correction")
     self.assertEqual(web["title"], local["title"])
     self.assertEqual(web["description"], local["description"])

@@ -20,7 +20,7 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
 # custom remote client from bypassing the vehicle-aware UI.
 HONDA_TUNING_WRITE_KEYS = frozenset((
   # Lateral tuning.
-  "NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrDeviceYawCorrection",
+  "NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrPtmTimingRestoration", "NrdrDeviceYawCorrection",
   "NrdrLatRateDampingLowSpeed", "NrdrLatRateDampingStandard", "NrdrLatRateDampingHighway",
   "LatPScaleLowSpeed",
   "LatIScaleLowSpeed",

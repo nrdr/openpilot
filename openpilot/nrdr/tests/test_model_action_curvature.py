@@ -45,6 +45,6 @@ def test_plan_decoder_still_uses_actual_speed(decoder):
   plan = np.zeros((ModelConstants.IDX_N, ModelConstants.PLAN_WIDTH))
   output = {'plan': [plan]}
   action = decode(output, 1.0)
-  plan_curvature.assert_called_once_with(output, plan, 1.0, 0.3, False)
+  plan_curvature.assert_called_once_with(output, plan, 1.0, 0.3, False, ptm_controller=False, timing_restored=True)
   assert action.desiredCurvature == -0.03125
   assert action.desiredAcceleration == 0.25

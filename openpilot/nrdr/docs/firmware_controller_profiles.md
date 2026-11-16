@@ -137,6 +137,25 @@ between-frame interpolation; their command-delay targets remain the table above.
 Model-source selection is unchanged, including Sunny's generation-11+ curvature-head bypass.
 Non-PTM model processing retains its existing timing. No saved settings are rewritten.
 
+### Live timing comparison
+
+Lateral Tuning exposes **Timing Restoration** after Optimized Lane Changes, enabled
+only with PTM Controller selected. `NrdrPtmTimingRestoration` defaults to On and persists.
+On keeps the restored timing described above. Off selects the timing immediately
+before `91a0e6ad50`: 0.1 s PTM smoothing and matching lookahead for every source,
+no trajectory floor, interpolated model requests, and the one-second source ramp
+to zero command delay for plans or the calibrated delay for heads. It does not
+revert calibrations, steering geometry, lane-change behavior or safety limits.
+
+The saved selection is read at model startup. Subsequent changes apply only with
+fresh valid car state/control messages, standstill, speed below 0.1 m/s in magnitude,
+and lateral control inactive; otherwise they remain pending. No restart is needed.
+The model publisher attaches the applied mode to `modelV2.action.ptmTimingRestored`,
+so controls and recorded logs use the mode belonging to that exact model output.
+Older messages without the field default to On. Non-PTM processing ignores it.
+For A/B comparison, stop and disengage before switching between passes; keep the
+model and other settings unchanged. Host checks do not establish road performance.
+
 ## Calibration and unchanged behavior
 
 C020 has its own nonlinear command map, speed envelope, angle-dependent rate scale (-153.74 at centre), column

@@ -62,7 +62,7 @@ LANE_CENTERING_PARAM_GROUP = ParamGroup((
 LANE_CHANGE_PARAM_GROUP = ParamGroup((
   "NrdrOptimizedLaneChanges",
 ))
-MODEL_GROUPS = (LANE_CHANGE_PARAM_GROUP,)
+MODEL_GROUPS = (LANE_CHANGE_PARAM_GROUP, ParamGroup(("NrdrPtmTimingRestoration",)))
 
 
 CONTROL_GROUPS = (
