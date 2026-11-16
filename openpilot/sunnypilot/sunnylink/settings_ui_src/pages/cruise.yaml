@@ -257,6 +257,15 @@ sections:
       conditions:
       - {type: offroad_only}
       - {type: capability, field: has_longitudinal_control, equals: true}
+  - key: ExperimentalModeSetSpeed
+    widget: toggle
+    title: Set Speed Assist
+    description: "In Experimental Mode, lifts the model's acceleration toward your set speed and following distance whenever the driving model holds back. The model still makes every slowdown. Off keeps the model's own pace."
+    enablement:
+    - type: any
+      conditions:
+      - {type: offroad_only}
+      - {type: capability, field: has_longitudinal_control, equals: true}
   - key: SmartCruiseControlMap
     widget: toggle
     title: Map
