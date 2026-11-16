@@ -251,7 +251,8 @@ class Controls(ControlsExt):
       hudControl.leftLaneDepart = self.sm['driverAssistance'].leftLaneDeparture
       hudControl.rightLaneDepart = self.sm['driverAssistance'].rightLaneDeparture
 
-    if self.get_lat_active(self.sm):
+    lat_active_for_mismatch = self.get_lat_active(self.sm)
+    if lat_active_for_mismatch:
       CO = self.sm['carOutput']
       if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
         self.steer_limited_by_safety = abs(CC.actuators.steeringAngleDeg - CO.actuatorsOutput.steeringAngleDeg) > \
@@ -289,6 +290,18 @@ class Controls(ControlsExt):
     elif self.CP.steerControlType == car.CarParams.SteerControlType.curvature:
       cs.lateralControlState.curvatureState = lac_log
     elif lat_tuning == 'pid':
+      if lac_log._has('ptmTesting'):
+        # Measurement only: preserve actual subscription IDs and the operands
+        # of the existing mismatch check. Normal PTM has no such payload.
+        trace = lac_log.ptmTesting
+        trace.carStateMonoTime = self.sm.logMonoTime['carState']
+        trace.carOutputMonoTime = self.sm.logMonoTime['carOutput']
+        trace.vehicleParametersMonoTime = self.sm.logMonoTime['vehicleParameters']
+        trace.modelMonoTime = self.sm.logMonoTime['modelV2']
+        trace.mismatchEvaluated = lat_active_for_mismatch
+        trace.comparedCommand = float(CC.actuators.torque)
+        trace.comparedApplied = float(self.sm['carOutput'].actuatorsOutput.torque)
+        trace.nextSteerLimited = bool(self.steer_limited_by_safety)
       cs.lateralControlState.pidState = lac_log
     elif lat_tuning == 'torque':
       cs.lateralControlState.torqueState = lac_log

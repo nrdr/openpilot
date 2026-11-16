@@ -912,7 +912,67 @@ struct ControlsState @0x97ff69c53601abf1 {
     epsFfDesiredRate @14 :Float32;   # deg/s, filtered desired steering-wheel rate it used
     epsFfWeight @15 :Float32;        # 0..1 fade-in; the command carries epsFfWeight * epsFfFeedforward
     commandDelay @16 :Float32;       # s, delay applied to desiredCurvature before the controller
+    # Optional measurement payload, present only in nrdr's opt-in PTM Testing.
+    ptmTesting @17 :PtmTestingTrace;
    }
+
+  struct PtmTestingTrace {
+    version @0 :UInt16;
+    coreUpdated @1 :Bool;          # false: no core call, before/after are absent
+    entryMonoTime @2 :UInt64;      # ns, wrapper entry (not sensor acquisition)
+    intervalValid @3 :Bool;
+    interval @4 :Float64;          # s, observed wrapper interval; controller still uses nominalDt
+    nominalDt @5 :Float64;
+    rawPressed @6 :Bool;
+    driverTorque @7 :Float64;
+    curvatureInput @8 :Float64;    # 1/m, exact wrapper input before command delay/geometry
+    curvatureLimited @9 :Bool;
+    previousDesiredAngle @10 :Float64;  # deg, wrapper slew state, without offset
+    previousPressed @11 :Bool;
+    previousPressedDuration @12 :Float64;
+    modelValid @13 :Bool;
+    modelFrameId @14 :UInt32;
+    modelTimestampEof @15 :UInt64; # ns, consumed model's camera EOF
+    desiredAngleNoOffset @16 :Float64; # deg, actual core input after geometry/slew
+    angleOffset @17 :Float64;      # deg
+    measuredAngle @18 :Float64;    # deg, consumed steering feedback
+    speed @19 :Float64;            # m/s
+    roll @20 :Float64;             # rad
+    effectivePressed @21 :Bool;
+    passedSteerLimited @22 :Bool;  # upstream mismatch feedback, NOT proof of a safety rejection
+    optimizedLaneChange @23 :Bool;
+    overrideFadeUp @24 :Float64;   # s
+    before @25 :PtmTestingCoreState; # before recovery bleed/reset/integration
+    after @26 :PtmTestingCoreState;
+    carStateMonoTime @27 :UInt64;  # exact consumed publication IDs, not sensor acquisition times
+    carOutputMonoTime @28 :UInt64;
+    vehicleParametersMonoTime @29 :UInt64;
+    modelMonoTime @30 :UInt64;
+    mismatchEvaluated @31 :Bool;
+    comparedCommand @32 :Float64; # current command versus received (older) host-applied command
+    comparedApplied @33 :Float64;
+    nextSteerLimited @34 :Bool;   # carried into next control update, not Panda rejection
+  }
+
+  struct PtmTestingCoreState {
+    integral @0 :Float64;
+    p @1 :Float64;                 # unscaled P used by anti-windup
+    d @2 :Float64;
+    weightedFf @3 :Float64;
+    ffAngleValid @4 :Bool;         # false means FF has not initialized
+    ffAngle @5 :Float64;           # deg, without offset
+    ffRate @6 :Float64;            # deg/s
+    ffR5 @7 :Float64;              # firmware counts, after internal FF cap
+    ffOutput @8 :Float64;          # normalized, after FF output filter
+    ffLoad @9 :Float64;             # modeled firmware output counts
+    ffRamp @10 :Float64;
+    ffWeight @11 :Float64;
+    sincePressValid @12 :Bool;     # false represents infinity (no prior press)
+    sincePress @13 :Float64;       # s
+    filterState @14 :Float64;      # normalized, final output filter state
+    filterAlpha @15 :Float64;
+    output @16 :Float64;           # normalized, final core output
+  }
 
   struct LateralTorqueState {
     active @0 :Bool;
