@@ -47,8 +47,7 @@ from openpilot.nrdr.features.lateral.lane_guidance import (
   lane_guidance_mode_from_params,
   set_lane_guidance_mode,
 )
-from openpilot.nrdr.features.lateral.model_source import PTM_LAT_SMOOTH_SECONDS, PtmTimingMode, delay_input, lateral_source
-from openpilot.nrdr.params.snapshots import get_live_params
+from openpilot.nrdr.features.lateral.model_source import PTM_LAT_SMOOTH_SECONDS, delay_input, lateral_source
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 
@@ -59,8 +58,7 @@ BIG_MODEL_TIMEOUT = 60
 
 
 def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
-                          lat_action_t: float, long_action_t: float, v_ego: float, ptm_controller: bool = False,
-                          timing_restored: bool = True) -> log.ModelDataV2.Action:
+                          lat_action_t: float, long_action_t: float, v_ego: float, ptm_controller: bool = False) -> log.ModelDataV2.Action:
   if 'action' not in model_output:
     plan = model_output['plan'][0]
     desired_accel = get_accel_from_plan(plan[:,Plan.VELOCITY][:,0],
@@ -71,7 +69,7 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
                                                 plan[:,Plan.ORIENTATION_RATE][:,2],
                                                 ModelConstants.T_IDXS,
                                                 v_ego,
-                                                lat_action_t, min_stable_delay=0.0 if ptm_controller and not timing_restored else MIN_STABLE_DELAY)
+                                                lat_action_t, min_stable_delay=0.0 if ptm_controller else MIN_STABLE_DELAY)
   else:
     desired_accel = model_output['action'][0,1]
     desired_curvature = model_output['action'][0,0] / (max(2.5 if ptm_controller else 1.0, v_ego))**2
@@ -79,7 +77,7 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
   desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, LONG_SMOOTH_SECONDS)
   if v_ego > MIN_LAT_CONTROL_SPEED:
     desired_curvature = smooth_value(desired_curvature, prev_action.desiredCurvature,
-                                     PTM_LAT_SMOOTH_SECONDS if ptm_controller and ('action' in model_output or not timing_restored) else LAT_SMOOTH_SECONDS)
+                                     PTM_LAT_SMOOTH_SECONDS if ptm_controller else LAT_SMOOTH_SECONDS)
   else:
     desired_curvature = prev_action.desiredCurvature
 
@@ -89,14 +87,14 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
 
 
 def set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t: float,
-                              lateral_source: str = "unknown", delay_input: str = "unknown", timing_restored: bool = True) -> None:
+                              lateral_source: str = "unknown", delay_input: str = "unknown") -> None:
   """Attach one source identity and horizon before either model event is sent, and where the steering came from
   (nrdr.features.lateral.model_source) so the PTM Controller can size its command delay."""
   action_time = float(lat_action_t)
   modelv2_send.modelV2.action.lateralActionTime = action_time
   modelv2_send.modelV2.action.lateralSource = lateral_source
   modelv2_send.modelV2.action.delayInput = delay_input
-  modelv2_send.modelV2.action.ptmTimingRestored = timing_restored
+  modelv2_send.modelV2.action.ptmTimingRestored = False
   mdv2sp_send.valid = modelv2_send.valid
   mdv2sp_send.modelDataV2SP.modelMonoTime = modelv2_send.logMonoTime
   mdv2sp_send.modelDataV2SP.lateralActionTime = action_time
@@ -347,8 +345,6 @@ def main(demo=False):
   from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile_for_model
   from openpilot.nrdr.features.lateral.yaw_control_timing import prediction_delay_schedule
   firmware_profile = firmware_controller_profile_for_model(params, CP)
-  timing_params = get_live_params("modeld")
-  timing_mode = PtmTimingMode(timing_params.snapshot)
   delay_schedule = prediction_delay_schedule(firmware_profile)
   model.lat_delay = get_lat_delay(params, model.lat_delay, CP.steerActuatorDelay, delay_schedule=delay_schedule)
 
@@ -401,10 +397,7 @@ def main(demo=False):
     if delay_schedule is not None or sm.updated["lateralDelay"]:
       model.lat_delay = get_lat_delay(params, sm["lateralDelay"].lateralDelay, CP.steerActuatorDelay,
                                      delay_schedule=delay_schedule, v_ego=v_ego)
-    timing_restored = timing_mode.update(timing_params.snapshot, sm["carState"], sm["carControl"],
-                                         sm.all_checks(["carState", "carControl"]))
-    lat_delay = model.lat_delay + (PTM_LAT_SMOOTH_SECONDS if firmware_profile is not None and
-                                  (not jetlink_adapter.model_uses_plan(model) or not timing_restored) else LAT_SMOOTH_SECONDS)
+    lat_delay = model.lat_delay + (PTM_LAT_SMOOTH_SECONDS if firmware_profile is not None else LAT_SMOOTH_SECONDS)
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["extrinsicsCalibration"].rpyCalib, dtype=np.float32)
       dc = DEVICE_CAMERAS[(str(sm['deviceState'].deviceType), str(sm['narrowRoadCameraState'].sensor))]
@@ -474,7 +467,7 @@ def main(demo=False):
       mdv2sp_send = messaging.new_message('modelDataV2SP')
 
       action = get_action_from_model(model_output, prev_action, lat_action_t, long_action_t, v_ego,
-                                     ptm_controller=firmware_profile is not None, timing_restored=timing_restored)
+                                     ptm_controller=firmware_profile is not None)
       prev_action = action
       fill_model_msg(modelv2_send, model_output, action,
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,
@@ -489,8 +482,7 @@ def main(demo=False):
         set_lane_guidance_mode(params, LaneGuidanceMode.MODEL_ONLY, block=False)
         lane_guidance_mode = LaneGuidanceMode.MODEL_ONLY
       set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t,
-                                lateral_source=lateral_source(model_output, mlsim=True), delay_input=delay_input(model.npy),
-                                timing_restored=timing_restored)
+                                lateral_source=lateral_source(model_output, mlsim=True), delay_input=delay_input(model.npy))
       modelv2_send.modelV2.action.laneGuidanceMode = int(lane_guidance_mode)
       mdv2sp_send.modelDataV2SP.laneGuidanceMode = int(lane_guidance_mode)
 

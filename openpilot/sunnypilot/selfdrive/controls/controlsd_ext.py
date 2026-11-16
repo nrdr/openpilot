@@ -55,8 +55,11 @@ class ControlsExt(ModelStateBase):
     self.pm_services_ext = ['carControlSP', 'laneCenteringStateSP']
 
   def initialize_lateral_control(self, lac, CI, dt):
-    from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_selected
+    from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_selected, firmware_controller_testing_selected
     if firmware_controller_selected(self.params, self.CP, self.CP_SP):
+      if firmware_controller_testing_selected(self.params, self.CP, self.CP_SP):
+        from openpilot.nrdr.features.lateral.latcontrol_ptm_testing import LatControlPtmTesting
+        return LatControlPtmTesting(self.CP, self.CP_SP, CI, dt)
       from openpilot.nrdr.features.lateral.latcontrol_fw import LatControlFirmware
       return LatControlFirmware(self.CP, self.CP_SP, CI, dt)
     enforce_torque_control = self.params.get_bool("EnforceTorqueControl")

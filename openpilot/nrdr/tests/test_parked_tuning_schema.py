@@ -117,9 +117,12 @@ def test_existing_hardware_parked_and_engagement_rules_remain_independent():
 @pytest.mark.parametrize("key,restriction,value", [
   ("LatPScaleStandard", "NrdrHandcraftedLateralTune", True),
   ("LatPScaleStandard", "NrdrLateralController", 1),
+  ("LatPScaleStandard", "NrdrLateralController", 2),
   ("HondaTorqueLowPassFilter", "NrdrLateralController", 1),
+  ("HondaTorqueLowPassFilter", "NrdrLateralController", 2),
   ("LaneCenterOffset", "NrdrHandcraftedLateralTune", True),
   ("LagdToggleDelay", "NrdrLateralController", 1),
+  ("LagdToggleDelay", "NrdrLateralController", 2),
 ])
 def test_parked_mode_exception_does_not_unlock_lateral_guards(key, restriction, value):
   values = {**mode_values(), "NrdrSuggestedSettings": False, "NrdrHandcraftedLateralTune": False,
@@ -156,13 +159,16 @@ def test_compiled_blendful_keeps_custom_model_and_pending_apply_guards(items):
   assert not allowed(sunny, {**values, "custom_model_active": False})
 
 
-def test_compiled_firmware_compatibility_survives_parked_preset_exception(items):
+@pytest.mark.parametrize("controller", [1, 2])
+def test_compiled_firmware_compatibility_survives_parked_preset_exception(items, controller):
   picker = items["NrdrLateralController"]
-  firmware = next(option for option in picker["options"] if option["value"] == 1)
+  firmware = next(option for option in picker["options"] if option["value"] == controller)
   values = {"IsOffroad": True, "NrdrSuggestedSettings": True, "NrdrHandcraftedLateralTune": False,
-            "nrdr_yaw_controller_available": False, "NrdrLateralController": 1}
+            "nrdr_yaw_controller_available": False, "NrdrLateralController": controller}
   assert allowed(picker, values)
   assert not allowed(firmware, values)
+  assert allowed(firmware, {**values, "nrdr_yaw_controller_available": True})
+  assert not allowed(picker, {**values, "IsOffroad": False})
   assert not allowed(items["NrdrDeviceYawCorrection"], values, "visibility")
 
 

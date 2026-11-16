@@ -84,7 +84,7 @@ class CarTuneReporter:
   def _interpolated_torque_pif_info(self, CP) -> tuple[str, bool]:
     supported = supports_interpolated_torque_pif(CP, self._cp_sp())
     controller = self.params.get("NrdrLateralController")
-    enabled = resolve_interpolated_torque_pif_settings(self.params, supported).enabled and controller not in (1, "1", b"1")
+    enabled = resolve_interpolated_torque_pif_settings(self.params, supported).enabled and controller not in (1, "1", b"1", 2, "2", b"2")
     return ("Fixed 1% torque / 99% PIF | LAF 10 | friction 1/1/1 | optimized lane changes bypass blend"
             if enabled else "PIF blend inactive"), enabled
 
@@ -163,10 +163,13 @@ class CarTuneReporter:
             f"immutable CP center anchor {selection.cp_ratio:g} | no lane fade")
 
   def _controller_info(self, controller: str, steer_ratio: SteerRatioSelection, CP) -> str:
-    from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile, firmware_controller_selected
+    from openpilot.nrdr.features.lateral.controller_selection import (
+      firmware_controller_profile, firmware_controller_selected, firmware_controller_testing_selected,
+    )
     if firmware_controller_selected(self.params, CP, self._cp_sp()):
       profile = firmware_controller_profile(CP, self._cp_sp())
-      return f"PTM Controller | {profile.name}"
+      name = "PTM Testing" if firmware_controller_testing_selected(self.params, CP, self._cp_sp()) else "PTM Controller"
+      return f"{name} | {profile.name}"
     return controller.replace("PID/NNLC", "PIF Control")
 
   def _build(self, CP) -> dict[str, str]:

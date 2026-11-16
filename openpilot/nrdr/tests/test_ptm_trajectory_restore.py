@@ -50,202 +50,160 @@ def test_declared_outputs_choose_the_horizon(timing, names, mlsim, expected):
 @pytest.mark.parametrize("ptm", [False, True])
 @pytest.mark.parametrize("uses_plan", [False, True])
 @pytest.mark.parametrize("smooth", [0., .05, .2])
-@pytest.mark.parametrize("restored", [False, True])
-def test_prediction_horizon_matches_the_model_path(timing, path, ptm, uses_plan, smooth, restored):
+def test_prediction_horizon_matches_former_off_for_every_model_path(timing, path, ptm, uses_plan, smooth):
   assignment, = [n for n in ast.walk(ast.parse((ROOT / path).read_text())) if isinstance(n, ast.Assign)
                   and any(isinstance(t, ast.Name) and t.id == "lat_delay" for t in n.targets)]
   timing.update(model=NS(lat_delay=.08, LAT_SMOOTH_SECONDS=smooth, uses_plan=uses_plan),
-                LAT_SMOOTH_SECONDS=smooth, firmware_profile=object() if ptm else None, timing_restored=restored)
+                LAT_SMOOTH_SECONDS=smooth, firmware_profile=object() if ptm else None)
   actual = eval(compile(ast.Expression(assignment.value), path, "eval"), timing)
-  assert actual == pytest.approx(.08 + (.1 if ptm and (not uses_plan or not restored) else smooth))
+  assert actual == pytest.approx(.08 + (.1 if ptm else smooth))
 
 
-@pytest.mark.parametrize("path", RUNNERS)
-@pytest.mark.parametrize("generation", [9, 10, 11, 12])
-@pytest.mark.parametrize("speed", [.2, 7., 25.])
+@pytest.mark.parametrize("path,source", [(RUNNERS[0], "plan"), (RUNNERS[0], "action"),
+                                       *[(RUNNERS[1], source) for source in ("plan", "planplus", "action", "curvature", "zero")]])
+@pytest.mark.parametrize("generation", [None, 9, 10, 11, 12])
+@pytest.mark.parametrize("speed", [0., .3, .300001, 1., 2.49, 2.5, 7., 25.])
 @pytest.mark.parametrize("smooth", [0., .05])
-def test_trajectory_decoder_returns_to_ordinary_model_processing(timing, path, generation, speed, smooth):
+@pytest.mark.parametrize("ptm", [False, True])
+def test_decoders_match_former_off_vectors_and_preserve_non_ptm(timing, path, source, generation, speed, smooth, ptm):
   action = load_function(path, "get_action_from_model", timing)
-  model = NS(generation=generation, mlsim=generation >= 11, LAT_SMOOTH_SECONDS=smooth,
-             LONG_SMOOTH_SECONDS=.3, MIN_LAT_CONTROL_SPEED=.3, constants=ModelConstants, PLANPLUS_CONTROL=1.)
+  sunny = path.startswith("sunnypilot")
+  mlsim = generation is not None and generation >= 11
+  model = NS(generation=generation, mlsim=mlsim, LAT_SMOOTH_SECONDS=smooth,
+             LONG_SMOOTH_SECONDS=.3, MIN_LAT_CONTROL_SPEED=.3, constants=ModelConstants, PLANPLUS_CONTROL=1.4)
   timing["LAT_SMOOTH_SECONDS"] = smooth
+  times = np.asarray(ModelConstants.T_IDXS)
   plan = np.zeros((1, 33, 15))
-  plan[0, :, 11] = .1 * np.asarray(ModelConstants.T_IDXS) ** 2
-  plan[0, :, 3] = speed
+  plan[0, :, 11] = .1 * times ** 2 + .02 * times
+  plan[0, :, 14] = .02
+  plan[0, :, 3] = speed + .4 * times
+  plan[0, :, 6] = .4
   output = {"plan": plan}
-  if generation >= 11 and path.startswith("sunnypilot"):
-    output["desired_curvature"] = np.array([[.09]])  # still deliberately bypassed
+  if source == "action":
+    output["action"] = np.array([[-.025, -.1]])
+  elif source in ("curvature", "zero"):
+    output["desired_curvature"] = np.array([[-.003 if source == "curvature" else 0.]])
+  elif source == "planplus":
+    output["planplus"] = .25 * plan
   prev = NS(desiredCurvature=.004, desiredAcceleration=.2)
-  args = (output, prev, .155, .3, speed)
-  if path.startswith("sunnypilot"):
-    args = (model, *args)
-  normal, ptm = action(*args), action(*args, ptm_controller=True)
-  assert vars(ptm) == vars(normal)
-  if speed > .3 and smooth == 0:
-    # Read heading at .3 s, rescale to .155 s; do not read the earlier heading directly.
-    expected = 2 * np.interp(.3, ModelConstants.T_IDXS, plan[0, :, 11]) / (.3 * speed)
-    assert ptm.desiredCurvature == pytest.approx(expected)
+  for action_time in (.155, .3, .475):
+    args = (output, prev, action_time, .3, speed)
+    actual = action(*((model, *args) if sunny else args), ptm_controller=ptm)
+    # Independent former-OFF equations, including Sunny's generation and zero-head fallbacks.
+    if source == "action":
+      raw = -.025 / max(2.5 if sunny or ptm else 1., speed) ** 2
+      accel = -.1
+    else:
+      curvature_plan = plan[0] + .4 * output["planplus"][0] if source == "planplus" else plan[0]
+      horizon = max(action_time, 0. if ptm else .3)
+      raw = 2 * np.interp(horizon, times, curvature_plan[:, 11]) / (max(speed, 1.) * horizon) - curvature_plan[0, 14] / max(speed, 1.)
+      if source == "curvature" and not mlsim:
+        raw = -.003
+      accel = 2 * (np.interp(.3, times, plan[0, :, 3]) - speed) / .3 - .4
+    if ptm or not sunny or (generation is not None and generation >= 10):
+      tau = .1 if ptm else smooth
+      alpha = 1 - np.exp(-.05 / tau) if tau else 1.
+      expected = alpha * raw + (1 - alpha) * prev.desiredCurvature if speed > .3 else prev.desiredCurvature
+    else:
+      expected = raw
+    assert actual.desiredCurvature == pytest.approx(expected, abs=1e-14)
+    alpha_long = 1 - np.exp(-.05 / .3)
+    assert actual.desiredAcceleration == pytest.approx(alpha_long * accel + (1 - alpha_long) * prev.desiredAcceleration)
+    assert actual.shouldStop == (speed < .3 and accel < .1)
+    prev = actual
 
 
-@pytest.mark.parametrize("path", RUNNERS)
-@pytest.mark.parametrize("restored", [False, True])
-def test_action_head_keeps_ptm_smoothing_and_low_speed_divisor(timing, path, restored):
-  action = load_function(path, "get_action_from_model", timing)
-  model = NS(generation=12, mlsim=True, LAT_SMOOTH_SECONDS=0., LONG_SMOOTH_SECONDS=.3, MIN_LAT_CONTROL_SPEED=.3)
-  output = {"action": np.array([[.025, .4]])}
-  prev = NS(desiredCurvature=.001, desiredAcceleration=.2)
-  args = (output, prev, .275, .3, 1.)
-  if path.startswith("sunnypilot"):
-    args = (model, *args)
-  actual = action(*args, ptm_controller=True, timing_restored=restored)
-  assert actual.desiredCurvature == pytest.approx(timing["smooth_value"](.025 / 2.5 ** 2, .001, .1))
-  assert actual.desiredAcceleration == pytest.approx(timing["smooth_value"](.4, .2, .3))
-
-
-@pytest.mark.parametrize("restored", [False, True])
-def test_direct_curvature_head_keeps_ptm_smoothing(timing, restored):
-  action = load_function(RUNNERS[1], "get_action_from_model", timing)
-  model = NS(generation=9, mlsim=False, LAT_SMOOTH_SECONDS=0., LONG_SMOOTH_SECONDS=.3,
-             MIN_LAT_CONTROL_SPEED=.3, constants=ModelConstants, PLANPLUS_CONTROL=1.)
-  output = {"plan": np.zeros((1, 33, 15)), "desired_curvature": np.array([[.003]])}
-  actual = action(model, output, NS(desiredCurvature=.001, desiredAcceleration=0.), .275, .3, 20.,
-                   ptm_controller=True, timing_restored=restored)
-  assert actual.desiredCurvature == pytest.approx(timing["smooth_value"](.003, .001, .1))
-
-
-@pytest.mark.parametrize("calibration", COMMAND_DELAY_ENDPOINTS)
-def test_plan_delay_compensation_and_return_to_head_calibration(timing, calibration):
-  delay = load_function("nrdr/features/lateral/latcontrol_fw.py", "_command_delay", timing)
-  model = NS(action=NS(lateralSource="plan", lateralActionTime=.155))
-  controller = NS(firmware_profile=NS(calibration=calibration), delay_schedule=True,
-                  model_v2=model, cmd_delay_slew=timing["CommandDelaySlew"](.01), dt=.01, cmd_delay_scale=1.)
-  assert delay(controller, 7.) == pytest.approx(.145)
-  model.action.lateralActionTime = .375
-  values = [.145] + [delay(controller, 25.) for _ in range(100)]
-  assert values[-1] == 0.
-  assert max(abs(np.diff(values))) <= .003 + 1e-12
-  model.action.lateralSource = "actionHead"
-  values = [0.] + [delay(controller, 7.) for _ in range(100)]
-  assert values[-1] == pytest.approx(command_delay(None, 7., calibration=calibration))
-  assert max(abs(np.diff(values))) <= .003 + 1e-12
-  model.action.lateralSource, model.action.lateralActionTime = "plan", 0.
-  assert delay(controller, 7.) == values[-1]  # missing horizon uses calibration, not zero
-
-
-@pytest.mark.parametrize("source", ["plan", "actionHead", "curvatureHead"])
+@pytest.mark.parametrize("source", ["plan", "actionHead", "curvatureHead", "unknown"])
 @pytest.mark.parametrize("active", [False, True])
-@pytest.mark.parametrize("restored", [False, True])
-def test_controlsd_holds_trajectory_requests_but_still_ramps_heads(timing, source, active, restored):
+@pytest.mark.parametrize("legacy_mode", [None, False, True])
+@pytest.mark.parametrize("ptm,maneuver", [(True, False), (False, False), (True, True), (False, True)])
+def test_controlsd_matches_off_ramp_ignoring_old_logged_mode(timing, source, active, legacy_mode, ptm, maneuver):
   tree = ast.parse((ROOT / "selfdrive/controls/controlsd.py").read_text())
   block, = [n for n in ast.walk(tree) if isinstance(n, ast.If) and ast.unparse(n.test) == "self.sm.valid['lateralManeuverPlan']"]
   ramp = timing["ModelActionRamp"]()
   ramp.reset(.001)
-  timing.update(self=NS(sm=NS(valid={"lateralManeuverPlan": False}, updated={"modelV2": True}),
-                        model_action_ramp=ramp, curvature=-.002), CC=NS(latActive=active),
-                model_v2=NS(action=NS(desiredCurvature=.006, lateralSource=source, ptmTimingRestored=restored)))
+  class Messages(dict):
+    valid = {"lateralManeuverPlan": maneuver}
+    updated = {"modelV2": True}
+  sm = Messages(lateralManeuverPlan=NS(desiredCurvature=.008))
+  model_action = NS(desiredCurvature=.006, lateralSource=source)
+  if legacy_mode is not None:
+    model_action.ptmTimingRestored = legacy_mode
+  timing.update(self=NS(sm=sm, model_action_ramp=ramp if ptm else None, curvature=-.002),
+                CC=NS(latActive=active), model_v2=NS(action=model_action))
   code = compile(ast.Module(body=[block], type_ignores=[]), "controlsd", "exec")
-  exec(code, timing)
-  expected = (.006 if source == "plan" and restored else .001) if active else -.002
-  assert timing["new_desired_curvature"] == expected
-  if source == "plan" and restored:
-    assert ramp.output == expected  # no stale interpolation when a head resumes
-
-
-@pytest.mark.parametrize("value,expected", [(None, True), (True, True), (b"1", True), ("invalid", True),
-                                            (False, False), (0, False), (b"0", False), ("0", False)])
-def test_timing_selection_preserves_current_default(timing, value, expected):
-  assert timing["PtmTimingMode"]({"NrdrPtmTimingRestoration": value}).restored is expected
-  assert timing["ptm_timing_restored"](NS()) is True  # old messages retain today's behavior
-
-
-@pytest.mark.parametrize("requested", [False, True])
-@pytest.mark.parametrize("valid", [False, True])
-@pytest.mark.parametrize("standstill", [False, True])
-@pytest.mark.parametrize("active", [False, True])
-@pytest.mark.parametrize("speed", [0., .1, 10., -1., float("nan")])
-def test_mode_changes_only_on_fresh_stopped_disengaged_state(timing, requested, valid, standstill, active, speed):
-  settings = {"NrdrPtmTimingRestoration": not requested}
-  mode = timing["PtmTimingMode"](settings)
-  settings["NrdrPtmTimingRestoration"] = requested
-  applied = mode.update(settings, NS(standstill=standstill, vEgo=speed), NS(latActive=active), valid)
-  allowed = valid and standstill and speed == 0. and not active
-  assert applied is (requested if allowed else not requested)
-  # Latest selection is consumed without restarting either process.
-  assert mode.update(settings, NS(standstill=True, vEgo=0.), NS(latActive=False), True) is requested
-
-
-@pytest.mark.parametrize("path", RUNNERS)
-@pytest.mark.parametrize("generation", [9, 10, 11, 12])
-@pytest.mark.parametrize("speed", [.2, 7., 25.])
-def test_off_restores_preceding_plan_decoder_only_for_ptm(timing, path, generation, speed):
-  action = load_function(path, "get_action_from_model", timing)
-  model = NS(generation=generation, mlsim=generation >= 11, LAT_SMOOTH_SECONDS=.05,
-             LONG_SMOOTH_SECONDS=.3, MIN_LAT_CONTROL_SPEED=.3, constants=ModelConstants, PLANPLUS_CONTROL=1.)
-  timing["LAT_SMOOTH_SECONDS"] = .05
-  plan = np.zeros((1, 33, 15))
-  plan[0, :, 11] = .1 * np.asarray(ModelConstants.T_IDXS) ** 2
-  plan[0, :, 3] = speed
-  output, prev = {"plan": plan}, NS(desiredCurvature=.004, desiredAcceleration=.2)
-  if generation >= 11 and path.startswith("sunnypilot"):
-    output["desired_curvature"] = np.array([[.09]])
-  args = (output, prev, .155, .3, speed)
-  if path.startswith("sunnypilot"):
-    args = (model, *args)
-  off = action(*args, ptm_controller=True, timing_restored=False)
-  raw = timing["get_curvature_from_plan"](plan[0, :, 11], plan[0, :, 14], ModelConstants.T_IDXS, speed, .155,
-                                          min_stable_delay=0.)
-  expected = timing["smooth_value"](raw, prev.desiredCurvature, .1) if speed > .3 else prev.desiredCurvature
-  assert off.desiredCurvature == pytest.approx(expected)
-  on = action(*args, ptm_controller=True)
-  assert (off.desiredAcceleration, off.shouldStop) == (on.desiredAcceleration, on.shouldStop)
-  assert vars(action(*args, timing_restored=False)) == vars(action(*args))
+  for frame in range(8):
+    sm.updated["modelV2"] = frame == 0
+    exec(code, timing)
+    expected = .008 if maneuver else (.001 + min(frame / 5., 1.) * .005 if ptm else .006)
+    assert timing["new_desired_curvature"] == pytest.approx(expected if active else -.002)
 
 
 @pytest.mark.parametrize("calibration", COMMAND_DELAY_ENDPOINTS)
-def test_off_command_delay_matches_preceding_one_second_source_ramp(timing, calibration):
+@pytest.mark.parametrize("legacy_mode", [None, False, True])
+def test_command_delay_matches_off_source_ramp_ignoring_old_mode_and_horizon(timing, calibration, legacy_mode):
   delay = load_function("nrdr/features/lateral/latcontrol_fw.py", "_command_delay", timing)
-  action = NS(lateralSource="plan", lateralActionTime=.155, ptmTimingRestored=False)
+  action = NS(lateralSource="plan", lateralActionTime=.155)
+  if legacy_mode is not None:
+    action.ptmTimingRestored = legacy_mode
   controller = NS(firmware_profile=NS(calibration=calibration), delay_schedule=True, dt=.01,
-                  model_v2=NS(action=action), cmd_delay_slew=timing["CommandDelaySlew"](.01), cmd_delay_scale=1.)
+                  model_v2=NS(action=action), cmd_delay_scale=1.)
   scale = 1.
   for source in ("plan", "actionHead", "curvatureHead", "unknown", "plan"):
     action.lateralSource = source
     for speed in np.linspace(7., 25., 120):
+      action.lateralActionTime = speed / 60.  # old restoration floor must never affect command delay
       scale += np.clip((0. if source == "plan" else 1.) - scale, -.01, .01)
       assert delay(controller, speed) == pytest.approx(scale * command_delay(None, speed, calibration=calibration))
-  action.ptmTimingRestored = True
-  assert delay(controller, 7.) == pytest.approx(.003)  # restored path resumes its existing slew
-  for _ in range(100):
-    result = delay(controller, 7.)
-  assert result == pytest.approx(.145)
+  action.ptmTimingRestored = not legacy_mode
+  assert delay(controller, 7.) == 0.
+  controller.model_v2 = None
+  assert delay(controller, 7.) == pytest.approx(.01 * command_delay(None, 7., calibration=calibration))
 
 
 @pytest.mark.parametrize("path", RUNNERS)
-def test_publishers_use_one_applied_mode_for_horizon_decoder_and_metadata(path):
+def test_publishers_do_not_poll_or_pass_a_restoration_mode(path):
   tree = ast.parse((ROOT / path).read_text())
   calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)]
   for name in ("get_action_from_model", "set_lateral_action_timing"):
     call, = [n for n in calls if getattr(n.func, "id", getattr(n.func, "attr", None)) == name]
-    assert any(k.arg == "timing_restored" and ast.unparse(k.value) == "timing_restored" for k in call.keywords)
-  assignment, = [n for n in ast.walk(tree) if isinstance(n, ast.Assign)
-                  and any(isinstance(t, ast.Name) and t.id == "timing_restored" for t in n.targets)]
-  assert 'sm.all_checks([\'carState\', \'carControl\'])' in ast.unparse(assignment)
+    assert not any(k.arg == "timing_restored" for k in call.keywords)
+  assert "timing_mode" not in ast.unparse(tree)
+  assert "timing_params" not in ast.unparse(tree)
 
 
-def test_live_snapshot_and_registry_publish_the_default_without_control_loop_io():
-  from openpilot.nrdr.params.snapshots import MODEL_GROUPS, CONTROL_GROUPS, LiveParams
-  from openpilot.nrdr.params.specs import PARAM_SPECS_BY_KEY, ParamType
-  key = "NrdrPtmTimingRestoration"
-  spec = PARAM_SPECS_BY_KEY[key]
-  assert spec.param_type == ParamType.BOOL and spec.default == "1"
-  assert key not in {k for group in CONTROL_GROUPS for k in group.keys}  # consume model metadata instead
-  values = {key: True}
-  reader = LiveParams(MODEL_GROUPS, params=values, start_worker=False)
-  assert reader.snapshot.get_bool(key)
-  values[key] = False
-  assert reader.snapshot.get_bool(key)
-  reader.refresh_all()
-  assert reader.snapshot.get_bool(key) is False
+def test_no_runtime_path_can_read_stale_saved_or_logged_restoration():
+  paths = (*RUNNERS, "sunnypilot/modeld_v2/fill_model_msg.py", "sunnypilot/jetlink_adapter/__init__.py",
+           "nrdr/features/lateral/model_source.py", "nrdr/features/lateral/latcontrol_fw.py", "selfdrive/controls/controlsd.py")
+  for path in paths:
+    source = (ROOT / path).read_text()
+    for retired in ("NrdrPtmTimingRestoration", "PtmTimingMode", "ptm_timing_restored", "timing_restored",
+                    "plan_floor_command_delay", "CommandDelaySlew"):
+      assert retired not in source, (path, retired)
+    tree = ast.parse(source)
+    assert not any(isinstance(n, ast.Attribute) and n.attr == "ptmTimingRestored" and isinstance(n.ctx, ast.Load)
+                   for n in ast.walk(tree))
+
+
+@pytest.mark.parametrize("ptm", [False, True])
+@pytest.mark.parametrize("speed", [0., .3, .300001, 1., 2.5, 20.])
+@pytest.mark.parametrize("source", ["plan", "action"])
+def test_jetlink_wrapper_preserves_off_decoder_and_blendful_order(timing, ptm, speed, source):
+  decoder = load_function(RUNNERS[0], "get_action_from_model", timing)
+  wrap = load_function("sunnypilot/jetlink_adapter/__init__.py", "with_blendful", timing)
+  plan = np.zeros((1, 33, 15))
+  plan[0, :, 11] = .1 * np.asarray(ModelConstants.T_IDXS) ** 2
+  output = {"plan": plan} if source == "plan" else {"action": np.array([[.025, .4]])}
+  args = (output, NS(desiredCurvature=.001, desiredAcceleration=.2), .155, .3, speed)
+  baseline = decoder(*args, ptm_controller=ptm)
+  seen = []
+  def blendful(curvature):
+    seen.append(curvature)
+    return .002
+  actual = wrap(decoder, .3)(*args, blendful=blendful, ptm_controller=ptm)
+  assert seen == [baseline.desiredCurvature]
+  assert actual.desiredCurvature == baseline.desiredCurvature + (.002 if speed > .3 else 0.)
+  assert (actual.desiredAcceleration, actual.shouldStop) == (baseline.desiredAcceleration, baseline.shouldStop)
 
 
 @pytest.mark.parametrize("enabled", [False, True])

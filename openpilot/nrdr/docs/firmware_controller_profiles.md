@@ -126,35 +126,29 @@ Hardcoded endpoints interpolate from 10 to 15 m/s:
 | CR-V A040 | 0.18 s | 0 s |
 | CR-V A220, RDX, Ridgeline, Odyssey | 0.12 s | 0 s |
 
-Trajectory processing intentionally returns to the pre-November-13 behavior in both
-model runners: model-specific smoothing/lookahead, the 0.3 s trajectory floor, and
-held requests between model frames. Scheduled PTM profiles compensate with
-`max(0.3 - lateralActionTime, 0)` command delay. Missing action times fall back to
-the calibration table above. Command-delay changes use the earlier 0.3 s/s slew.
-
-Action/curvature heads retain the donor's 0.1 s PTM filter, matching lookahead and
-between-frame interpolation; their command-delay targets remain the table above.
+Both PTM selections permanently use the former Timing Restoration **Off** behavior:
+0.1 s PTM smoothing and matching lookahead for every source, no trajectory floor,
+and interpolated requests between model frames. A one-second source ramp scales
+command delay to zero for plans or back to the calibration table above for heads
+and unknown sources. The table is not removed globally: a plan source reaches zero
+after its transition, while action/curvature heads retain their calibrated delay.
 Model-source selection is unchanged, including Sunny's generation-11+ curvature-head bypass.
 Non-PTM model processing retains its existing timing. No saved settings are rewritten.
 
-### Live timing comparison
+### PTM Testing and retired timing comparison
 
-Lateral Tuning exposes **Timing Restoration** after Optimized Lane Changes, enabled
-only with PTM Controller selected. `NrdrPtmTimingRestoration` defaults to On and persists.
-On keeps the restored timing described above. Off selects the timing immediately
-before `91a0e6ad50`: 0.1 s PTM smoothing and matching lookahead for every source,
-no trajectory floor, interpolated model requests, and the one-second source ramp
-to zero command delay for plans or the calibrated delay for heads. It does not
-revert calibrations, steering geometry, lane-change behavior or safety limits.
+The Timing Restoration parameter, live polling and native/Sunnylink controls are
+retired. Stale stored values cannot re-enable it. The historical
+`modelV2.action.ptmTimingRestored` field retains its schema default for decoding old
+logs; new model publishers write false, and current control logic ignores the field.
 
-The saved selection is read at model startup. Subsequent changes apply only with
-fresh valid car state/control messages, standstill, speed below 0.1 m/s in magnitude,
-and lateral control inactive; otherwise they remain pending. No restart is needed.
-The model publisher attaches the applied mode to `modelV2.action.ptmTimingRestored`,
-so controls and recorded logs use the mode belonging to that exact model output.
-Older messages without the field default to On. Non-PTM processing ignores it.
-For A/B comparison, stop and disengage before switching between passes; keep the
-model and other settings unchanged. Host checks do not establish road performance.
+Controller Type preserves PIF Control (0) and PTM Controller (1), and adds
+**PTM Testing** (2). Testing is opt-in, parked-only and drive-latched, with the same
+exact modified-EPS admission as normal PTM. No existing selection is rewritten.
+It starts with identical timing-off behavior and separate controller/core/feedforward
+classes for future experiments; no filter, cap, gain, geometry or safety-limit change
+is included. Keep experimental behavior in those testing classes instead of retuning
+the shared baseline. Offline parity checks do not establish road performance.
 
 ## Calibration and unchanged behavior
 

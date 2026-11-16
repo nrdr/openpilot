@@ -1,9 +1,8 @@
 """PTM Controller using Biscuit-Labs 45e5b91fae firmware calibrations and fixed timing.
 
 Shared steer-ratio selection, driver override and model-scoped Optimized Lane Changes
-remain nrdr features. Plan models retain the pre-November-13 trajectory-floor
-compensation; other sources use the calibration's hardcoded command delay.
-The timing comparison switch can select the preceding donor timing instead.
+remain nrdr features. Plan models ramp command delay to zero over one second;
+other sources ramp back to the calibration's hardcoded command delay.
 """
 import math
 
@@ -20,7 +19,7 @@ from openpilot.nrdr.features.lateral.vfn_eps_core import (
   ODYSSEY_THR_A020, ODYSSEY_THR_EPS_LOAD, RIDGELINE_T6Z_A110, RIDGELINE_T6Z_EPS_LOAD,
   HondaEpsFirmwareFeedforward, HondaEpsLateralCore,
 )
-from openpilot.nrdr.features.lateral.model_source import PLAN, CMD_DELAY_RAMP_S, CommandDelaySlew, plan_floor_command_delay, ptm_timing_restored
+from openpilot.nrdr.features.lateral.model_source import PLAN, CMD_DELAY_RAMP_S
 from openpilot.nrdr.features.lateral.yaw_control_timing import CommandDelay, command_delay, prediction_delay_schedule
 from openpilot.nrdr.features.lateral.latcontrol_pid import _eps_modified_steering_pressed
 from openpilot.nrdr.features.lateral.lane_change_tuning import optimized_lane_change_active
@@ -49,6 +48,9 @@ _OWN_CALIBRATIONS = {
 
 class LatControlFirmware(LatControl):
   owns_output_filter = True
+  core_type = HondaEpsLateralCore
+  feedforward_type = HondaEpsFirmwareFeedforward
+
   def __init__(self, CP, CP_SP, CI, dt):
     self.firmware_profile = firmware_controller_profile(CP, CP_SP)
     if self.firmware_profile is None:
@@ -61,16 +63,15 @@ class LatControlFirmware(LatControl):
       # Source Bosch base gains as well as its fixed trims, also on the TEG and the Insight, whose
       # trims are not measured. Never retune CP or increase CAN/safety limits.
       cal, load, p_scale, i_scale = _OWN_CALIBRATIONS[self.firmware_profile.calibration]
-      self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt,
-        ff=HondaEpsFirmwareFeedforward(dt, cal=cal, load=load),
+      self.core = self.core_type(GAIN_BP, KP, GAIN_BP, KI, dt,
+        ff=self.feedforward_type(dt, cal=cal, load=load),
         p_scale=p_scale, i_scale=i_scale)
     else:
-      self.core = HondaEpsLateralCore(GAIN_BP, KP, GAIN_BP, KI, dt)
+      self.core = self.core_type(GAIN_BP, KP, GAIN_BP, KI, dt, ff=self.feedforward_type(dt))
     cloudlog.info("PTM Controller profile=%s calibration=%s provisional=%s prediction_schedule=%s required_rwd=%s",
                   self.firmware_profile.name, self.firmware_profile.calibration,
                   self.firmware_profile.provisional, self.delay_schedule, self.firmware_profile.required_rwd or "-")
     self.cmd_delay = CommandDelay(dt)
-    self.cmd_delay_slew = CommandDelaySlew(dt)
     self.cmd_delay_scale = 1.0
     self.model_v2 = None
     self.prev_angle = 0.0
@@ -85,18 +86,10 @@ class LatControlFirmware(LatControl):
   def _command_delay(self, v_ego: float) -> float:
     delay = command_delay(None, v_ego, calibration=self.firmware_profile.calibration)
     action = getattr(self.model_v2, "action", None)
-    # Keep the preceding timing path warm while restored timing is selected.
     target = 0.0 if str(getattr(action, "lateralSource", "unknown")) == PLAN else 1.0
     step = self.dt / CMD_DELAY_RAMP_S
     self.cmd_delay_scale += max(min(target - self.cmd_delay_scale, step), -step)
-    if not ptm_timing_restored(action):
-      self.cmd_delay_slew.value = self.cmd_delay_scale * delay
-      return self.cmd_delay_slew.value
-    if self.delay_schedule is not None and str(getattr(action, "lateralSource", "unknown")) == PLAN:
-      floor_delay = plan_floor_command_delay(getattr(action, "lateralActionTime", 0.0))
-      if floor_delay is not None:
-        delay = floor_delay
-    return self.cmd_delay_slew.update(delay)
+    return self.cmd_delay_scale * delay
 
   def reset(self):
     if self.ride_through_frames == 0 or self.inactive_frames > self.ride_through_frames:

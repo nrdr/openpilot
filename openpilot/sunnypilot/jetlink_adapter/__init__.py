@@ -93,11 +93,11 @@ def model_mlsim(model) -> bool:
 def with_blendful(get_action_from_model, min_lat_control_speed: float):
   """The stock action function taking modeld_v2's extra argument: Blendful's
   correction as a callback on the raw curvature, applied above the minimum
-  lateral control speed. ptm_controller and timing_restored pass through."""
+  lateral control speed. ptm_controller passes through."""
   def action(model_output, prev_action, lat_action_t, long_action_t, v_ego, blendful=None,
-             ptm_controller=False, timing_restored=True):
+             ptm_controller=False):
     result = get_action_from_model(model_output, prev_action, lat_action_t, long_action_t, v_ego,
-                                   ptm_controller=ptm_controller, timing_restored=timing_restored)
+                                   ptm_controller=ptm_controller)
     if blendful is not None:
       correction = blendful(result.desiredCurvature)
       if v_ego > min_lat_control_speed:
@@ -128,7 +128,7 @@ def _adapter_class():
       return ModelConstants
 
     def action_function(self):
-      # modeld_v2 passes Blendful's correction as a callback and the PTM timing flags
+      # modeld_v2 passes Blendful's correction as a callback and the PTM controller flag
       from openpilot.selfdrive.modeld.modeld import MIN_LAT_CONTROL_SPEED, get_action_from_model
       return with_blendful(get_action_from_model, MIN_LAT_CONTROL_SPEED)
 

@@ -271,9 +271,10 @@ def test_parked_suggested_marker_does_not_bypass_sunny_model_requirement(rpc, cu
   assert params.get("NrdrSuggestedSettings") is True
 
 
-def test_parked_suggested_marker_does_not_bypass_firmware_controller_lock(rpc):
+@pytest.mark.parametrize("controller", [1, 2])
+def test_parked_suggested_marker_does_not_bypass_firmware_controller_lock(rpc, controller):
   save, params, _ = rpc
-  params.values.update(NrdrSuggestedSettings=True, NrdrLateralController=1, LatPScaleStandard=100)
+  params.values.update(NrdrSuggestedSettings=True, NrdrLateralController=controller, LatPScaleStandard=100)
   save({"LatPScaleStandard": wire(120)})
   assert params.get("LatPScaleStandard") == 100
   assert params.get("NrdrSuggestedSettings") is True

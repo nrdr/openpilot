@@ -1,6 +1,7 @@
 """Where the model's steering comes from, and the command delay the PTM Controller takes from it."""
 import ast
 import re
+import sys
 from pathlib import Path
 from types import SimpleNamespace as NS
 
@@ -8,13 +9,19 @@ import numpy as np
 import pytest
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
-from opendbc.car.structs import car as car_structs
-from opendbc.car.vehicle_model import VehicleModel
-from openpilot.nrdr.features.lateral import model_source as ms
-from openpilot.nrdr.features.lateral.latcontrol_fw import LatControlFirmware
 from openpilot.nrdr.features.lateral.yaw_control_timing import command_delay
+from openpilot.sunnypilot.modeld_v2.constants import ModelConstants, Plan
 
 ROOT = Path(__file__).resolve().parents[2]
+if sys.platform == "win32":
+  # Exercise the exact pure helpers without importing Linux realtime bindings.
+  source_path = ROOT / "nrdr/features/lateral/model_source.py"
+  nodes = [n for n in ast.parse(source_path.read_text()).body if isinstance(n, (ast.Assign, ast.FunctionDef, ast.ClassDef))]
+  namespace = {"DT_CTRL": .01, "DT_MDL": .05}
+  exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source_path), "exec"), namespace)
+  ms = NS(**namespace)
+else:
+  from openpilot.nrdr.features.lateral import model_source as ms
 
 
 @pytest.mark.parametrize("output,mlsim,source", [
@@ -30,15 +37,17 @@ def test_the_source_is_the_one_get_action_from_model_steers_with(output, mlsim, 
 
 @pytest.mark.parametrize("curvature", [None, 0.0, 0.002, -0.002])
 @pytest.mark.parametrize("mlsim", [False, True])
-def test_source_matches_the_actual_curvature_branch_even_at_zero(curvature, mlsim, monkeypatch):
-  from openpilot.sunnypilot.modeld_v2 import fill_model_msg as publisher
-
+def test_source_matches_the_actual_curvature_branch_even_at_zero(curvature, mlsim):
   plan_curvature = 0.019
-  monkeypatch.setattr(publisher, "get_curvature_from_plan", lambda *args, **kwargs: plan_curvature)
+  path = ROOT / "sunnypilot/modeld_v2/fill_model_msg.py"
+  decoder, = [n for n in ast.parse(path.read_text()).body if isinstance(n, ast.FunctionDef) and n.name == "get_curvature_from_output"]
+  env = {"Plan": Plan, "ModelConstants": ModelConstants, "MIN_STABLE_DELAY": .3,
+         "get_curvature_from_plan": lambda *args, **kwargs: plan_curvature}
+  exec(compile(ast.Module(body=[decoder], type_ignores=[]), str(path), "exec"), env)
   output = {"plan": np.zeros((1, 33, 15))}
   if curvature is not None:
     output["desired_curvature"] = np.array([[curvature]])
-  actual = publisher.get_curvature_from_output(output, output["plan"][0], 20., .275, mlsim)
+  actual = env["get_curvature_from_output"](output, output["plan"][0], 20., .275, mlsim)
   source = ms.lateral_source(output, mlsim)
   assert source == (ms.PLAN if actual == plan_curvature else ms.CURVATURE_HEAD)
   assert actual == (plan_curvature if mlsim or not curvature else curvature)
@@ -46,17 +55,19 @@ def test_source_matches_the_actual_curvature_branch_even_at_zero(curvature, mlsi
 
 @pytest.mark.parametrize("source", [ms.PLAN, ms.CURVATURE_HEAD, ms.ACTION_HEAD])
 def test_sunny_companion_action_keeps_provenance_after_serialization(source):
-  from openpilot.cereal import log, messaging
+  from openpilot.cereal import log
 
   publisher = ROOT / "sunnypilot/modeld_v2/modeld.py"
   tree = ast.parse(publisher.read_text(encoding="utf-8"))
   mirror, = [node for node in ast.walk(tree) if isinstance(node, ast.Assign) and
              any(ast.unparse(target) == "drivingdata_send.drivingModelData.action" for target in node.targets)]
-  model = messaging.new_message("modelV2")
+  model = log.Event.new_message()
+  model.init("modelV2")
   model.modelV2.action = log.ModelDataV2.Action.new_message(
     desiredCurvature=-.0125, desiredAcceleration=.625, shouldStop=True,
-    lateralActionTime=.275, lateralSource=source, delayInput="actionT")
-  driving = messaging.new_message("drivingModelData")
+    lateralActionTime=.275, lateralSource=source, delayInput="actionT", ptmTimingRestored=False)
+  driving = log.Event.new_message()
+  driving.init("drivingModelData")
   exec(compile(ast.Module(body=[mirror], type_ignores=[]), str(publisher), "exec"),
        {"drivingdata_send": driving, "modelv2_send": model})
   with log.Event.from_bytes(driving.to_bytes()) as restored:
@@ -78,12 +89,15 @@ def test_model_action_ramp_matches_donor_and_resets_while_inactive():
 
 
 def _controller(fingerprint, firmware):
+  from openpilot.nrdr.features.lateral.latcontrol_fw import LatControlFirmware
   cp = NS(brand="honda", carFingerprint=fingerprint, steerRatio=16.5, wheelbase=2.75, steerLimitTimer=.8,
           carFw=[NS(ecu="eps", fwVersion=firmware)], lateralTuning=NS(which=lambda: "pid"))
   return LatControlFirmware(cp, NS(flags=HondaFlagsSP.EPS_MODIFIED.value), None, .01)
 
 
 def _delays(control, source, action_time, frames, speed=8.):
+  from opendbc.car.structs import car as car_structs
+  from opendbc.car.vehicle_model import VehicleModel
   vm = VehicleModel(car_structs.CarParams.new_message(
     mass=1840, rotationalInertia=3000, wheelbase=2.75, centerToFront=1.08,
     steerRatioRear=0, steerRatio=16.5, tireStiffnessFront=200000, tireStiffnessRear=200000))
@@ -101,18 +115,20 @@ def _delays(control, source, action_time, frames, speed=8.):
   ("HONDA_CIVIC", b"39990-TEG-A010", "civic_teg_a010", 0.275),         # 0.20 told
   ("HONDA_CIVIC_BOSCH", b"39990-TBA-C020", "civic_bosch_c020", 0.355),  # 0.28 told: above the floor
 ])
-def test_plan_models_restore_floor_compensation_with_slewed_transitions(fingerprint, firmware, calibration, action_time):
+@pytest.mark.skipif(sys.platform == "win32", reason="native parameter/realtime bindings")
+def test_plan_models_ramp_command_delay_to_zero_over_one_second(fingerprint, firmware, calibration, action_time):
   control = _controller(fingerprint, firmware)
   head = _delays(control, "actionHead", action_time, 5)
   assert head[-1] == pytest.approx(command_delay(None, 8., calibration=calibration), abs=1e-6)
   plan = _delays(control, "plan", action_time, 300)
-  expected = max(.3 - action_time, 0.)
-  assert plan[99] == pytest.approx(expected, abs=1e-6) and plan[-1] == pytest.approx(expected, abs=1e-6)
-  assert max(abs(a - b) for a, b in zip([head[-1], *plan], plan, strict=False)) <= .003 + 1e-6
+  assert plan[0] == pytest.approx(.99 * head[-1], abs=1e-6)
+  assert plan[99] == pytest.approx(0., abs=1e-6) and plan[-1] == pytest.approx(0., abs=1e-6)
+  assert max(abs(a - b) for a, b in zip([head[-1], *plan], plan, strict=False)) <= .01 * head[-1] + 1e-6
   head = _delays(control, "actionHead", action_time, 100)
   assert head[-1] == pytest.approx(command_delay(None, 8., calibration=calibration), abs=1e-6)
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="native parameter/realtime bindings")
 def test_an_unknown_source_or_an_older_model_message_keeps_the_calibrations_delay():
   control = _controller("HONDA_CIVIC", b"39990-TEG-A010")
   assert _delays(control, "unknown", 0.275, 3)[-1] == pytest.approx(0.15)

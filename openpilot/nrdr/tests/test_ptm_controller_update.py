@@ -92,7 +92,7 @@ class TestPtmUpdate(unittest.TestCase):
         ptm = action(*args, ptm_controller=True)
         self.assertEqual(vars(normal), vars(disabled))
         self.assertEqual((ptm.desiredAcceleration, ptm.shouldStop), (normal.desiredAcceleration, normal.shouldStop))
-        expected = helpers.smooth_value(normal.desiredCurvature, prev.desiredCurvature, .1) if 'action' in output else normal.desiredCurvature
+        expected = helpers.smooth_value(normal.desiredCurvature, prev.desiredCurvature, .1)
         self.assertAlmostEqual(ptm.desiredCurvature, expected)
 
     times = np.array([0., .1, .2, .3, .4])
@@ -113,10 +113,10 @@ class TestPtmUpdate(unittest.TestCase):
       controller = LatControlFirmware(cp, sp, None, .01)
       full = command_delay(None, 8., calibration=controller.firmware_profile.calibration)
       controller.update_model_v2(NS(meta=NS(laneChangeState=NS(raw=0)), action=NS(lateralSource="plan", lateralActionTime=.2)))
-      self.assertAlmostEqual(controller._command_delay(8.), .1)
+      self.assertAlmostEqual(controller._command_delay(8.), .99 * full)
       for _ in range(99):
         value = controller._command_delay(8.)
-      self.assertAlmostEqual(value, .1)
+      self.assertAlmostEqual(value, 0.)
       controller.update_model_v2(NS(meta=NS(laneChangeState=NS(raw=0)), action=NS(lateralSource="actionHead")))
       for _ in range(100):
         value = controller._command_delay(8.)
@@ -151,16 +151,19 @@ class TestPtmUpdate(unittest.TestCase):
         for child in value:
           yield from items(child)
     selector, = items(schema)
-    self.assertEqual([(o["value"], o["label"]) for o in selector["options"]], [(0, "PIF Control"), (1, "PTM Controller")])
+    self.assertEqual([(o["value"], o["label"]) for o in selector["options"]],
+                     [(0, "PIF Control"), (1, "PTM Controller"), (2, "PTM Testing")])
     source = (root / "nrdr/ui/settings/pidf_ground.py").read_text()
     tree = ast.parse(source)
     label, = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_controller_label"]
     label.decorator_list = []
-    for saved in (1, "1", b"1", 0):
+    for saved in (1, "1", b"1", 2, "2", b"2", 0, "0", b"0", None, 3, "garbage"):
       env = {"tr": lambda text: text, "ui_state": NS(params={"NrdrLateralController": saved})}
       exec(compile(ast.Module(body=[label], type_ignores=[]), "native_controller_label", "exec"), env)
-      self.assertEqual(env["_controller_label"](), "PIF Control" if saved == 0 else "PTM Controller")
+      expected = "PTM Testing" if saved in (2, "2", b"2") else "PTM Controller" if saved in (1, "1", b"1") else "PIF Control"
+      self.assertEqual(env["_controller_label"](), expected)
     self.assertIn('options.append(tr("PTM Controller"))', source)
+    self.assertIn('options.append(tr("PTM Testing"))', source)
     self.assertIn("options.index(dialog.selection)", source)
 
   def test_exact_new_revision_and_saved_selection(self):

@@ -623,8 +623,8 @@
                   "key": "NrdrLateralController",
                   "widget": "multiple_button",
                   "title": "Controller Type",
-                  "description": "Choose the steering controller: PIF uses your feedback tune, while PTM Controller uses a vehicle-specific calibration.",
-                  "details": "Requires the exact modified steering firmware build shown in Controller Type on the device. Older builds with the same version name are incompatible.",
+                  "description": "Choose the steering controller: PIF uses your feedback tune, while PTM Controller uses a vehicle-specific calibration. PTM Testing is experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed.",
+                  "details": "Change while parked. Applies next drive. Both PTM choices require the exact modified steering firmware build shown in Controller Type on the device. Older builds with the same version name are incompatible.",
                   "options": [
                     {
                       "value": 0,
@@ -633,6 +633,17 @@
                     {
                       "value": 1,
                       "label": "PTM Controller",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_yaw_controller_available",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "value": 2,
+                      "label": "PTM Testing",
                       "enablement": [
                         {
                           "type": "capability",
@@ -705,19 +716,6 @@
                   ]
                 },
                 {
-                  "key": "NrdrPtmTimingRestoration",
-                  "widget": "toggle",
-                  "title": "Timing Restoration",
-                  "description": "PTM Controller only. On keeps the restored trajectory timing; Off uses the preceding timing. Changes apply when stopped with steering assistance off, without a restart.",
-                  "enablement": [
-                    {
-                      "type": "param",
-                      "key": "NrdrLateralController",
-                      "equals": 1
-                    }
-                  ]
-                },
-                {
                   "key": "NrdrLatStiction",
                   "widget": "toggle",
                   "title": "Predictive Lateral Stiction",
@@ -755,6 +753,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -763,7 +769,7 @@
                   "widget": "toggle",
                   "title": "Use Device Yaw Correction",
                   "description": "Adds a small steering correction based on the car's measured motion. Off uses PIF control alone.",
-                  "details": "Applies to PIF control and pauses during optimized lane changes. PTM Controller uses its own correction.",
+                  "details": "Applies to PIF control and pauses during optimized lane changes. Both PTM choices use their own correction.",
                   "visibility": [
                     {
                       "type": "not",
@@ -771,6 +777,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ],
@@ -810,6 +824,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -856,6 +878,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -901,6 +931,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -944,6 +982,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -989,6 +1035,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -1032,6 +1086,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -1077,6 +1139,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -1120,6 +1190,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -1165,6 +1243,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -1208,6 +1294,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -1253,6 +1347,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -1296,6 +1398,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -1341,6 +1451,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -1349,7 +1467,7 @@
                   "widget": "option",
                   "title": "Center Boost",
                   "description": "Adds steering correction near the straight-ahead position to help maintain the planned path.",
-                  "details": "Applies to PIF control within the selected angle and speed range. PTM Controller is unchanged.",
+                  "details": "Applies to PIF control within the selected angle and speed range. Both PTM choices are unchanged.",
                   "min": 0.0,
                   "max": 5.0,
                   "step": 0.01,
@@ -1384,6 +1502,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -1429,6 +1555,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -1473,6 +1607,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -2117,6 +2259,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -2164,6 +2314,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -2213,6 +2371,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -2261,6 +2427,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -2301,6 +2475,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -2350,6 +2532,14 @@
                         "key": "NrdrLateralController",
                         "equals": 1
                       }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
+                      }
                     }
                   ]
                 },
@@ -2397,6 +2587,14 @@
                         "type": "param",
                         "key": "NrdrLateralController",
                         "equals": 1
+                      }
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 2
                       }
                     }
                   ]
@@ -4759,9 +4957,19 @@
                     "type": "all",
                     "conditions": [
                       {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
+                        "type": "any",
+                        "conditions": [
+                          {
+                            "type": "param",
+                            "key": "NrdrLateralController",
+                            "equals": 1
+                          },
+                          {
+                            "type": "param",
+                            "key": "NrdrLateralController",
+                            "equals": 2
+                          }
+                        ]
                       },
                       {
                         "type": "capability",
@@ -4826,9 +5034,19 @@
                     "type": "all",
                     "conditions": [
                       {
-                        "type": "param",
-                        "key": "NrdrLateralController",
-                        "equals": 1
+                        "type": "any",
+                        "conditions": [
+                          {
+                            "type": "param",
+                            "key": "NrdrLateralController",
+                            "equals": 1
+                          },
+                          {
+                            "type": "param",
+                            "key": "NrdrLateralController",
+                            "equals": 2
+                          }
+                        ]
                       },
                       {
                         "type": "capability",

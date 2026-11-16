@@ -163,6 +163,7 @@ class TestParamUiMetadata(unittest.TestCase):
           ]},
           {"type": "not", "condition": {"type": "param", "key": "NrdrHandcraftedLateralTune", "equals": True}},
           {"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 1}},
+          {"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 2}},
         ])
 
   def test_sunnylink_explicit_metadata_drift_is_rejected(self):

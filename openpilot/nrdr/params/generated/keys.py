@@ -21,7 +21,6 @@ class NrdrParamKey(StrEnum):
   LIVE_VIEW = "LiveView"
   LAT_P_SCALE_LOW_SPEED = "LatPScaleLowSpeed"
   NRDR_OPTIMIZED_LANE_CHANGES = "NrdrOptimizedLaneChanges"
-  NRDR_PTM_TIMING_RESTORATION = "NrdrPtmTimingRestoration"
   NRDR_LATERAL_CONTROLLER = "NrdrLateralController"
   NRDR_RDX_ROUTE_A_CONFIRMATION = "NrdrRdxRouteAConfirmation"
   NRDR_DEVICE_YAW_CORRECTION = "NrdrDeviceYawCorrection"
@@ -194,7 +193,6 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.LIVE_VIEW,
   NrdrParamKey.LAT_P_SCALE_LOW_SPEED,
   NrdrParamKey.NRDR_OPTIMIZED_LANE_CHANGES,
-  NrdrParamKey.NRDR_PTM_TIMING_RESTORATION,
   NrdrParamKey.NRDR_LATERAL_CONTROLLER,
   NrdrParamKey.NRDR_RDX_ROUTE_A_CONFIRMATION,
   NrdrParamKey.NRDR_DEVICE_YAW_CORRECTION,

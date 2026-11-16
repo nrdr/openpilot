@@ -108,13 +108,18 @@ def yaw_controller_available(CP, CP_SP) -> bool:
 
 def firmware_controller_selected(params, CP, CP_SP) -> bool:
   """Use the admitted selection, not a stale selector left over from another car."""
-  return str(params.get("NrdrLateralController")) in ("1", "b'1'") and yaw_controller_available(CP, CP_SP)
+  return str(params.get("NrdrLateralController")) in ("1", "b'1'", "2", "b'2'") and yaw_controller_available(CP, CP_SP)
+
+
+def firmware_controller_testing_selected(params, CP, CP_SP) -> bool:
+  """Testing is an explicit opt-in with the same firmware admission as PTM."""
+  return str(params.get("NrdrLateralController")) in ("2", "b'2'") and yaw_controller_available(CP, CP_SP)
 
 
 def firmware_controller_profile_for_model(params, CP) -> FirmwareControllerProfile | None:
   """Resolve once per drive, without waiting on Honda-only data for other cars."""
   if _firmware_family(CP) is None or \
-     str(params.get("NrdrLateralController")) not in ("1", "b'1'"):
+     str(params.get("NrdrLateralController")) not in ("1", "b'1'", "2", "b'2'"):
     return None
   from openpilot.cereal import custom, messaging
   CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)

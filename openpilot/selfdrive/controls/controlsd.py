@@ -28,7 +28,7 @@ from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 from openpilot.nrdr.hooks import allow_longitudinal, apply_hud_lead, finalize_lateral_torque, stopping_inputs, vehicle_model_state
 from openpilot.nrdr.hooks.controlsd import lane_change_request
 from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
-from openpilot.nrdr.features.lateral.model_source import PLAN, ModelActionRamp, PTM_LAT_SMOOTH_SECONDS, ptm_timing_restored
+from openpilot.nrdr.features.lateral.model_source import ModelActionRamp, PTM_LAT_SMOOTH_SECONDS
 
 State = log.SelfdriveState.OpenpilotState
 LaneChangeState = log.LaneChangeState
@@ -174,10 +174,7 @@ class Controls(ControlsExt):
     else:
       new_desired_curvature = model_v2.action.desiredCurvature if CC.latActive else self.curvature
       if self.model_action_ramp is not None:
-        if str(model_v2.action.lateralSource) == PLAN and ptm_timing_restored(model_v2.action):
-          self.model_action_ramp.reset(new_desired_curvature)
-        else:
-          new_desired_curvature = self.model_action_ramp.update(new_desired_curvature, self.sm.updated['modelV2'], CC.latActive)
+        new_desired_curvature = self.model_action_ramp.update(new_desired_curvature, self.sm.updated['modelV2'], CC.latActive)
 
     new_desired_curvature = self.lane_centering.update(
       new_desired_curvature, model_v2, CS.vEgo,
@@ -195,8 +192,7 @@ class Controls(ControlsExt):
 
     new_desired_curvature = lane_change_request(self, CS, model_v2, lp, new_desired_curvature, CC.latActive, DT_CTRL)
     self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll)
-    ptm_smoothing = self.model_action_ramp is not None and (str(model_v2.action.lateralSource) != PLAN or not ptm_timing_restored(model_v2.action))
-    lat_delay = self.lat_delay + (PTM_LAT_SMOOTH_SECONDS if ptm_smoothing else LAT_SMOOTH_SECONDS)
+    lat_delay = self.lat_delay + (PTM_LAT_SMOOTH_SECONDS if self.model_action_ramp is not None else LAT_SMOOTH_SECONDS)
 
     actuators.curvature = self.desired_curvature
     steer, lateral_output, lac_log = self.LaC.update(CC.latActive, CS, self.VM, lp,

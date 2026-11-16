@@ -98,7 +98,7 @@ def test_model_data_v2_sp_timing_fields_are_additive_and_optional_by_default():
   assert "zero is the unavailable value" in body
 
 
-def test_applied_timing_mode_round_trips_with_model_curvature():
+def test_historical_timing_mode_default_and_values_round_trip_unchanged():
   pytest.importorskip("capnp")
   from openpilot.cereal import log
   assert log.ModelDataV2.Action.new_message().ptmTimingRestored is True
@@ -109,10 +109,10 @@ def test_applied_timing_mode_round_trips_with_model_curvature():
       assert decoded.desiredCurvature == pytest.approx(.002)
 
 
-@pytest.mark.parametrize("restored", (False, True))
+@pytest.mark.parametrize("legacy_mode", (None, False, True))
 @pytest.mark.parametrize("valid", (False, True), ids=("invalid-model", "valid-model"))
 @pytest.mark.parametrize("action_time", (0.325, 0.475))
-def test_production_helper_attaches_atomic_timing_without_changing_model_action(valid: bool, action_time: float, restored: bool):
+def test_production_helper_always_publishes_off_without_changing_model_action(valid: bool, action_time: float, legacy_mode: bool | None):
   helper = _production_timing_helper()
   action = SimpleNamespace(
     desiredCurvature=-0.0125,
@@ -130,12 +130,14 @@ def test_production_helper_attaches_atomic_timing_without_changing_model_action(
     modelDataV2SP=SimpleNamespace(modelMonoTime=0, lateralActionTime=-1.0),
   )
   baseline_action = (action.desiredCurvature, action.desiredAcceleration, action.shouldStop)
+  if legacy_mode is not None:
+    action.ptmTimingRestored = legacy_mode
 
   helper(model, compatibility, action_time)
-  assert action.ptmTimingRestored is True
+  assert action.ptmTimingRestored is False
   assert (action.lateralSource, action.delayInput) == ("unknown", "unknown")  # a caller that does not know yet
-  helper(model, compatibility, action_time, lateral_source="plan", delay_input="none", timing_restored=restored)
-  assert action.ptmTimingRestored is restored
+  helper(model, compatibility, action_time, lateral_source="plan", delay_input="none")
+  assert action.ptmTimingRestored is False
 
   assert (action.lateralSource, action.delayInput) == ("plan", "none")
   assert model.valid is valid
@@ -217,7 +219,7 @@ def test_sunny_driving_model_mirrors_the_complete_action_after_timing():
       desiredCurvature=driving_action.desiredCurvature,
       desiredAcceleration=driving_action.desiredAcceleration,
       shouldStop=driving_action.shouldStop,
-      lateralActionTime=0.545, lateralSource="plan", delayInput="actionT", laneGuidanceMode=2)),
+      lateralActionTime=0.545, lateralSource="plan", delayInput="actionT", laneGuidanceMode=2, ptmTimingRestored=False)),
   )
   baseline_action = (driving_action.desiredCurvature, driving_action.desiredAcceleration, driving_action.shouldStop)
 
@@ -230,6 +232,7 @@ def test_sunny_driving_model_mirrors_the_complete_action_after_timing():
   assert (mirrored.desiredCurvature, mirrored.desiredAcceleration, mirrored.shouldStop) == baseline_action
   assert mirrored.lateralActionTime == modelv2_send.modelV2.action.lateralActionTime
   assert mirrored.laneGuidanceMode == 2
+  assert mirrored.ptmTimingRestored is False
   assert (mirrored.lateralSource, mirrored.delayInput) == ("plan", "actionT")
   assert drivingdata_send.valid is False
   assert modelv2_send.valid is True

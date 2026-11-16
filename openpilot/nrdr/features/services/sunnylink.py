@@ -20,7 +20,7 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
 # custom remote client from bypassing the vehicle-aware UI.
 HONDA_TUNING_WRITE_KEYS = frozenset((
   # Lateral tuning.
-  "NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrPtmTimingRestoration", "NrdrDeviceYawCorrection",
+  "NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrDeviceYawCorrection",
   "NrdrLatRateDampingLowSpeed", "NrdrLatRateDampingStandard", "NrdrLatRateDampingHighway",
   "LatPScaleLowSpeed",
   "LatIScaleLowSpeed",
@@ -100,7 +100,7 @@ def allow_param_write(key: str, onroad: bool, *, handcrafted_profile_available: 
                       honda_tuning_available: bool | None = None,
                       device_yaw_correction_available: bool | None = None,
                       requested_bool: bool | None = None) -> bool:
-  if key in ("NrdrHandcraftedLateralRequest", "NrdrSettingsDefaultsVersion", "NrdrVehicleDefaultsApplied"):
+  if key in ("NrdrHandcraftedLateralRequest", "NrdrSettingsDefaultsVersion", "NrdrVehicleDefaultsApplied", "NrdrPtmTimingRestoration"):
     return False
   if onroad and key in ONROAD_WRITE_BLOCKLIST:
     return False

@@ -49,8 +49,7 @@ from openpilot.sunnypilot.modeld_v2.model_adapters import get_model_adapter
 from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeController
 from openpilot.nrdr.features.services import admit_selected_artifact, admit_default_artifact
-from openpilot.nrdr.features.lateral.model_source import PLAN, PTM_LAT_SMOOTH_SECONDS, PtmTimingMode, delay_input, lateral_source, model_uses_plan
-from openpilot.nrdr.params.snapshots import get_live_params
+from openpilot.nrdr.features.lateral.model_source import PTM_LAT_SMOOTH_SECONDS, delay_input, lateral_source, model_uses_plan
 from openpilot.nrdr.features.lateral.lane_guidance import LaneGuidanceMode, lane_guidance_mode_from_params
 
 PROCESS_NAME = "openpilot.selfdrive.modeld.modeld_tinygrad"
@@ -240,8 +239,7 @@ class ModelState(ModelStateBase):
 
   def get_action_from_model(self, model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
                             lat_action_t: float, long_action_t: float, v_ego: float,
-                            blendful: Callable[[float], float] | None = None, ptm_controller: bool = False,
-                            timing_restored: bool = True) -> log.ModelDataV2.Action:
+                            blendful: Callable[[float], float] | None = None, ptm_controller: bool = False) -> log.ModelDataV2.Action:
     if 'action' not in model_output:
       plan = model_output['plan'][0]
       desired_accel = get_accel_from_plan(plan[:, Plan.VELOCITY][:, 0], plan[:, Plan.ACCELERATION][:, 0], self.constants.T_IDXS,
@@ -250,7 +248,7 @@ class ModelState(ModelStateBase):
       curvature_plan = (plan + (self.PLANPLUS_CONTROL - 1.0) * model_output['planplus'][0]
                         if 'planplus' in model_output and self.PLANPLUS_CONTROL != 1.0 else plan)
       desired_curvature = get_curvature_from_output(model_output, curvature_plan, v_ego, lat_action_t, self.mlsim,
-                                                   ptm_controller=ptm_controller, timing_restored=timing_restored)
+                                                   ptm_controller=ptm_controller)
     else:
       desired_accel = model_output['action'][0, 1]
       desired_curvature = model_output['action'][0, 0] / (max(2.5, v_ego))**2
@@ -260,11 +258,10 @@ class ModelState(ModelStateBase):
     stop = v_ego < 0.3 and desired_accel < 0.1
     desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, self.LONG_SMOOTH_SECONDS)
 
-    ptm_smoothing = ptm_controller and (lateral_source(model_output, self.mlsim) != PLAN or not timing_restored)
-    if ptm_smoothing or (self.generation is not None and self.generation >= 10): # smooth curvature for post FOF models
+    if ptm_controller or (self.generation is not None and self.generation >= 10): # smooth curvature for post FOF models
       if v_ego > self.MIN_LAT_CONTROL_SPEED:
         desired_curvature = smooth_value(desired_curvature, prev_action.desiredCurvature,
-                                         PTM_LAT_SMOOTH_SECONDS if ptm_smoothing else self.LAT_SMOOTH_SECONDS)
+                                         PTM_LAT_SMOOTH_SECONDS if ptm_controller else self.LAT_SMOOTH_SECONDS)
       else:
         desired_curvature = prev_action.desiredCurvature
 
@@ -373,8 +370,6 @@ def main(demo=False):
   from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile_for_model
   from openpilot.nrdr.features.lateral.yaw_control_timing import prediction_delay_schedule
   firmware_profile = firmware_controller_profile_for_model(params, CP)
-  timing_params = get_live_params("modeld")
-  timing_mode = PtmTimingMode(timing_params.snapshot)
   delay_schedule = prediction_delay_schedule(firmware_profile)
   model.lat_delay = get_lat_delay(params, model.lat_delay, CP.steerActuatorDelay, delay_schedule=delay_schedule)
 
@@ -435,10 +430,7 @@ def main(demo=False):
     # Lane-guidance mode is live and safety-critical. Read it every model frame
     # so selecting Model Only takes effect on the next output, not seconds later.
     lane_guidance_mode = lane_guidance_mode_from_params(params)
-    timing_restored = timing_mode.update(timing_params.snapshot, sm["carState"], sm["carControl"],
-                                         sm.all_checks(["carState", "carControl"]))
-    lat_delay = model.lat_delay + (PTM_LAT_SMOOTH_SECONDS if firmware_profile is not None and
-                                  (not jetlink_adapter.model_uses_plan(model) or not timing_restored) else model.LAT_SMOOTH_SECONDS)
+    lat_delay = model.lat_delay + (PTM_LAT_SMOOTH_SECONDS if firmware_profile is not None else model.LAT_SMOOTH_SECONDS)
     if sm.updated["extrinsicsCalibration"] and sm.seen['narrowRoadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["extrinsicsCalibration"].rpyCalib, dtype=np.float32)
       dc = DEVICE_CAMERAS[(str(sm['deviceState'].deviceType), str(sm['narrowRoadCameraState'].sensor))]
@@ -518,7 +510,6 @@ def main(demo=False):
         partial(blendful.update, model_output, v_ego, blendful_active,
                 enabled=lane_guidance_mode == LaneGuidanceMode.BLENDFUL),
         ptm_controller=firmware_profile is not None,
-        timing_restored=timing_restored,
       )
       prev_action = action
       fill_model_msg(drivingdata_send, modelv2_send, model_output, action,
@@ -526,8 +517,7 @@ def main(demo=False):
                      frame_drop_ratio, meta_main.timestamp_eof, model_execution_time, live_calib_seen, meta_constants)
       modelv2_send.modelV2.big = model.chestnut
       set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t,
-                                lateral_source=lateral_source(model_output, jetlink_adapter.model_mlsim(model)), delay_input=delay_input(model.numpy_inputs),
-                                timing_restored=timing_restored)
+                                lateral_source=lateral_source(model_output, jetlink_adapter.model_mlsim(model)), delay_input=delay_input(model.numpy_inputs))
       modelv2_send.modelV2.action.laneGuidanceMode = int(lane_guidance_mode)
       drivingdata_send.drivingModelData.action = modelv2_send.modelV2.action
 

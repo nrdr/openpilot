@@ -138,7 +138,8 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
       "nrdr_honda_tuning_available": True,
       "nrdr_interpolated_torque_pif_blend_available": True,
     }
-    for locked in ({"NrdrSuggestedSettings": True}, {"NrdrHandcraftedLateralTune": True}, {"NrdrLateralController": 1}):
+    for locked in ({"NrdrSuggestedSettings": True}, {"NrdrHandcraftedLateralTune": True},
+                   {"NrdrLateralController": 1}, {"NrdrLateralController": 2}):
       with self.subTest(locked=locked):
         self.generic_write.reset_mock()
         self.params.get.side_effect = lambda name, locked=locked, **_: locked.get(name, "0")
@@ -166,13 +167,15 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
 
   def test_controller_change_onroad_is_rpc_error_and_never_saves_or_updates_version(self):
     self.params.get_bool.return_value = False
-    with self.assertRaisesRegex(ValueError, "offroad"):
-      self.save_params({"NrdrLateralController": self._encode(b"1")})
+    for selected in (b"0", b"1", b"2"):
+      with self.subTest(selected=selected), self.assertRaisesRegex(ValueError, "offroad"):
+        self.save_params({"NrdrLateralController": self._encode(selected)})
     self.params.put.assert_not_called()
     self.generic_write.assert_not_called()
 
   def test_controller_choice_validates_support_and_reports_invalid_values(self):
-    for available, value in ((False, b"1"), (True, b"2"), (True, b"garbage"), (True, b"1.0")):
+    for available, value in ((False, b"1"), (False, b"2"), (None, b"2"), (True, b"3"),
+                             (True, b"-1"), (True, b"garbage"), (True, b"1.0"), (True, b"2.0"), (True, b"\xff")):
       with self.subTest(available=available, value=value):
         self.namespace["_vehicle_tuning_capabilities"].return_value = {
           "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": available,
@@ -185,10 +188,10 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
     self.namespace["_vehicle_tuning_capabilities"].return_value = {
       "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": True,
     }
-    for value in (0, 1):
+    for value in (0, 1, 2):
       for compression in (False, True):
         with self.subTest(value=value, compression=compression):
-          stored = {"NrdrLateralController": 1 - value}
+          stored = {"NrdrLateralController": (value + 1) % 3}
           self.params.get.side_effect = lambda key, stored=stored, **_: stored.get(key, 0)
           self.params.put.side_effect = lambda key, value, stored=stored, **_: stored.update({key: value})
           self.save_params({"NrdrLateralController": self._encode(str(value).encode(), compression)}, compression)
@@ -199,17 +202,52 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
     self.namespace["_vehicle_tuning_capabilities"].return_value = {
       "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": True,
     }
-    with self.assertRaisesRegex(ValueError, "could not be saved"):
-      self.save_params({"NrdrLateralController": self._encode(b"1")})
+    for selected in (b"1", b"2"):
+      with self.subTest(selected=selected), self.assertRaisesRegex(ValueError, "could not be saved"):
+        self.save_params({"NrdrLateralController": self._encode(selected)})
 
   def test_controller_write_rechecks_road_state_after_validation(self):
     self.namespace["_vehicle_tuning_capabilities"].return_value = {
       "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": True,
     }
-    self.params.get_bool.side_effect = [True, False]
-    with self.assertRaisesRegex(ValueError, "could not be saved"):
-      self.save_params({"NrdrLateralController": self._encode(b"1")})
+    for selected in (b"1", b"2"):
+      for road_states in ([True, False], [True, True, False]):
+        self.params.get_bool.side_effect = road_states
+        with self.subTest(selected=selected, road_states=road_states), self.assertRaises(ValueError):
+          self.save_params({"NrdrLateralController": self._encode(selected)})
     self.params.put.assert_not_called()
+
+  def test_controller_bad_transport_and_unsupported_vehicle_reject_entire_batch(self):
+    for compression in (False, True):
+      self.namespace["_vehicle_tuning_capabilities"].return_value = {
+        "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": True,
+      }
+      with self.subTest(compression=compression), self.assertRaises(ValueError):
+        self.save_params({"ExperimentalMode": self._encode(b"1", compression),
+                          "NrdrLateralController": "!bad-base64"}, compression)
+      for honda in (False, None):
+        self.namespace["_vehicle_tuning_capabilities"].return_value["nrdr_honda_tuning_available"] = honda
+        with self.subTest(compression=compression, honda=honda), self.assertRaises(ValueError):
+          self.save_params({"ExperimentalMode": self._encode(b"1", compression),
+                            "NrdrLateralController": self._encode(b"2", compression)}, compression)
+    self.params.put.assert_not_called()
+    self.generic_write.assert_not_called()
+
+  def test_retired_timing_request_rejects_batch_before_any_write(self):
+    key = "NrdrPtmTimingRestoration"
+    for offroad in (False, True):
+      self.params.get_bool.return_value = offroad
+      self.assertFalse(self.namespace["allow_param_write"](key, not offroad, honda_tuning_available=True))
+      for selected in (0, 1, 2):
+        self.params.get.side_effect = lambda name, selected=selected, **_: selected if name == "NrdrLateralController" else "0"
+        for compression in (False, True):
+          for reverse in (False, True):
+            entries = [("ExperimentalMode", self._encode(b"1", compression)), (key, self._encode(b"0", compression))]
+            with self.subTest(offroad=offroad, selected=selected, compression=compression, reverse=reverse):
+              with self.assertRaisesRegex(ValueError, "Retired settings"):
+                self.save_params(dict(reversed(entries) if reverse else entries), compression)
+    self.params.put.assert_not_called()
+    self.generic_write.assert_not_called()
 
   def test_monitoring_timing_validates_and_reads_back_offroad(self):
     key = "NrdrDriverMonitoringReminderPercent"

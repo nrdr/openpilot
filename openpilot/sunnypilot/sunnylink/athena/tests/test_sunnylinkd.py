@@ -268,6 +268,17 @@ class TestSunnylinkdMethods(OpenpilotTestCase):
     assert not self.saved_params
     assert all(key != "OnroadCycleRequested" for key, _, _ in self.params_writes)
 
+  def test_saveParams_rejects_retired_timing_restoration_before_other_writes(self):
+    key = "NrdrPtmTimingRestoration"
+    assert key not in HONDA_TUNING_WRITE_KEYS
+    for offroad in (False, True):
+      self.fake_params.offroad = offroad
+      assert not allow_param_write(key, onroad=not offroad, honda_tuning_available=True)
+      with self.assertRaisesRegex(ValueError, "Retired settings"):
+        sunnylinkd.saveParams({"SpeedLimitOffset": remote_value("10"), key: remote_value("0")})
+    assert not self.saved_params
+    assert not self.params_writes
+
   def test_stopped_gap_requires_offroad_write(self):
     assert allow_param_write("NrdrStandstillGapExtra", onroad=False)
     assert not allow_param_write("NrdrStandstillGapExtra", onroad=True)

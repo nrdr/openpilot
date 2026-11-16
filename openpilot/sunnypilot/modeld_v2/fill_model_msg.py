@@ -11,14 +11,14 @@ SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 ConfidenceClass = log.ModelDataV2.ConfidenceClass
 
 
-def get_curvature_from_output(output, plan, vego, lat_action_t, mlsim, ptm_controller=False, timing_restored=True):
+def get_curvature_from_output(output, plan, vego, lat_action_t, mlsim, ptm_controller=False):
   if not mlsim:
     if desired_curv := output.get('desired_curvature'):  # If the model outputs the desired curvature, use that directly
       return float(desired_curv[0, 0])
 
   return float(get_curvature_from_plan(plan[:, Plan.T_FROM_CURRENT_EULER][:, 2], plan[:, Plan.ORIENTATION_RATE][:, 2],
                                        ModelConstants.T_IDXS, vego, lat_action_t,
-                                       min_stable_delay=0.0 if ptm_controller and not timing_restored else MIN_STABLE_DELAY))
+                                       min_stable_delay=0.0 if ptm_controller else MIN_STABLE_DELAY))
 
 
 class PublishState:

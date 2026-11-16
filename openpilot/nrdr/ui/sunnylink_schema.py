@@ -63,10 +63,13 @@ def apply_sunnylink_metadata(item: dict) -> dict:
       # A pending preset write remains exclusive even while parked.
       enablement.append({"type": "not", "condition": {"type": "param", "key": "NrdrHandcraftedLateralTune", "equals": True}})
     if key in YAW_FIXED_KEYS or key.startswith("NrdrLatRateDamping"):
-      enablement.append({"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 1}})
+      for controller in (1, 2):
+        enablement.append({"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": controller}})
     if key in ("LagdToggle", "LagdToggleDelay"):
       enablement.append({"type": "not", "condition": {"type": "all", "conditions": [
-        {"type": "param", "key": "NrdrLateralController", "equals": 1},
+        {"type": "any", "conditions": [
+          {"type": "param", "key": "NrdrLateralController", "equals": controller} for controller in (1, 2)
+        ]},
         {"type": "capability", "field": "nrdr_firmware_prediction_schedule", "equals": True},
       ]}})
     if key in LONG_SCALE_KEYS or key == "NrdrHondaFullBrakeAuthority":

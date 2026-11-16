@@ -395,7 +395,7 @@ class TestControllerCleanup(OpenpilotTestCase):
     "NrdrStarPilotPid", "NrdrNnlcEnabled", "NrdrNnlcActivationSpeed",
     "NrdrNnlcKpGain", "NrdrNnlcKfGain", "NrdrNnlcKiGain",
     "NeuralNetworkLateralControl", "NrdrLatRateDamping", "NrdrLatRateDampingFadeSpeed",
-    "NrdrIncreaseOverrideTolerance",
+    "NrdrIncreaseOverrideTolerance", "NrdrPtmTimingRestoration",
   ], names=["key"])
   def test_retired_controls_are_not_exposed(self, schema, key):
     assert _find_item(schema, key) is None
@@ -404,24 +404,25 @@ class TestControllerCleanup(OpenpilotTestCase):
     section = _find_section(schema, "steering", "nrdr")
     panel = next(p for p in section["sub_panels"] if p["id"] == "nrdr_pidf_ground")
     assert [item["key"] for item in panel["items"][:4]] == [
-      "NrdrLateralController", "NrdrLatStiction", "NrdrDeviceYawCorrection", "NrdrOptimizedLaneChanges",
+      "NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrLatStiction", "NrdrDeviceYawCorrection",
     ]
     controller = panel["items"][0]
-    assert [(o["value"], o["label"]) for o in controller["options"]] == [(0, "PIF Control"), (1, "PTM Controller")]
-    assert "exact modified steering firmware revision" in controller["description"]
-    assert "TEG-A010 requires the corrected PTM firmware" in controller["details"]
-    assert "its calibration has been driven on that build" in controller["details"]
-    assert "RWD SHA256 starts 04147917" in controller["details"]
-    assert "Older builds report the same version strings but are not compatible" in controller["details"]
-    assert "PIF and Device Yaw Correction remain separate" in controller["details"]
+    assert [(o["value"], o["label"]) for o in controller["options"]] == [
+      (0, "PIF Control"), (1, "PTM Controller"), (2, "PTM Testing"),
+    ]
+    assert "experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed" in controller["description"]
+    assert "exact modified steering firmware build" in controller["details"]
+    assert "Older builds with the same version name are incompatible" in controller["details"]
+    assert "Change while parked. Applies next drive." in controller["details"]
     assert "offroad_only" in _flatten_rule_types(controller["enablement"])
     assert _references_capability_field(controller["options"][1]["enablement"], "nrdr_yaw_controller_available")
-    correction = panel["items"][2]
+    assert controller["options"][2]["enablement"] == controller["options"][1]["enablement"]
+    correction = panel["items"][3]
     assert correction["title"] == "Use Device Yaw Correction" and correction["widget"] == "toggle"
     assert _references_capability_field(correction["enablement"], "nrdr_interpolated_torque_pif_blend_available")
-    optimized = panel["items"][3]
+    optimized = panel["items"][1]
     assert optimized["widget"] == "toggle"
-    assert "turns off torque blending, feedforward, and rate damping" in optimized["description"]
+    assert "Off keeps the normal steering tune" in optimized["description"]
 
   @parameterized.expand(["LowSpeed", "Standard", "Highway"], names=["band"])
   def test_each_speed_band_is_ordered_pidf(self, schema, band):

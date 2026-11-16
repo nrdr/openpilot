@@ -38,10 +38,6 @@ class PidfGroundLayout(Widget):
         title=tr("Optimized lane changes"), param="NrdrOptimizedLaneChanges",
         description=tr("Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the " +
             "normal steering tune throughout the maneuver."))),
-      remember("NrdrPtmTimingRestoration", toggle_item_sp(
-        title=tr("Timing Restoration"), param="NrdrPtmTimingRestoration",
-        description=tr("PTM Controller only. On keeps the restored trajectory timing; Off uses the preceding timing. " +
-                       "Changes apply when stopped with steering assistance off, without a restart."))),
       remember("NrdrLatStiction", toggle_item_sp(
         title=tr("Predictive Lateral Stiction"), param="NrdrLatStiction",
         description=tr("Reduces steering force as the wheel reaches its target, then holds it steady until another " +
@@ -80,14 +76,16 @@ class PidfGroundLayout(Widget):
 
   @staticmethod
   def _controller_label():
+    if str(ui_state.params.get("NrdrLateralController")) in ("2", "b'2'"):
+      return tr("PTM Testing")
     return tr("PTM Controller") if str(ui_state.params.get("NrdrLateralController")) in ("1", "b'1'") else tr("PIF Control")
 
   @staticmethod
   def _commit_controller_selection(value):
     # Recheck on confirmation: the car may have started while the dialog was open.
-    if not ui_state.is_offroad() or value not in (0, 1):
+    if not ui_state.is_offroad() or value not in (0, 1, 2):
       return False
-    if value == 1 and not yaw_controller_available(ui_state.CP, ui_state.CP_SP):
+    if value in (1, 2) and not yaw_controller_available(ui_state.CP, ui_state.CP_SP):
       return False
     ui_state.params.put("NrdrLateralController", value, block=True)
     return True
@@ -98,6 +96,7 @@ class PidfGroundLayout(Widget):
     options = [tr("PIF Control")]
     if yaw_controller_available(ui_state.CP, ui_state.CP_SP):
       options.append(tr("PTM Controller"))
+      options.append(tr("PTM Testing"))
 
     def selected(result):
       dialog, self._controller_dialog = self._controller_dialog, None
@@ -111,9 +110,10 @@ class PidfGroundLayout(Widget):
     super()._update_state()
     self._controller.action_item.set_enabled(ui_state.is_offroad())
     profile = firmware_controller_profile(ui_state.CP, ui_state.CP_SP)
-    description = ""
+    description = tr("PTM Testing is experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed. " +
+                     "Change while parked. Applies next drive.")
     if profile is not None and profile.required_rwd:
-      description = tr("Requires the corrected PTM firmware (RWD {}). Older builds report the same EPS version and are not "
+      description += " " + tr("Requires the corrected PTM firmware (RWD {}). Older builds report the same EPS version and are not "
                        + "compatible.").format(profile.required_rwd)
       if profile.provisional:
         description += " " + tr("This calibration is not yet road-validated on that build.")
@@ -121,7 +121,7 @@ class PidfGroundLayout(Widget):
     for key, item in self._tuning_items.items():
       available = key != "NrdrDeviceYawCorrection" or supports_interpolated_torque_pif(ui_state.CP, ui_state.CP_SP)
       if key == "NrdrDeviceYawCorrection":
-        item.set_visible(str(ui_state.params.get("NrdrLateralController")) not in ("1", "b'1'"))
+        item.set_visible(str(ui_state.params.get("NrdrLateralController")) not in ("1", "b'1'", "2", "b'2'"))
       item.action_item.set_enabled(available and tuning_write_allowed(ui_state.params, key))
 
   def _render(self, rect):

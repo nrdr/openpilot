@@ -416,8 +416,8 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       controller_selection = int(decoded)
     except (ValueError, TypeError, OSError) as error:
       raise ValueError("Invalid Controller Type. The selection was not saved.") from error
-    if not honda_tuning_available or controller_selection not in (0, 1) or (
-      controller_selection == 1 and capabilities.get("nrdr_yaw_controller_available") is not True
+    if not honda_tuning_available or controller_selection not in (0, 1, 2) or (
+      controller_selection in (1, 2) and capabilities.get("nrdr_yaw_controller_available") is not True
     ):
       raise ValueError("This Controller Type is unavailable for the detected vehicle. The selection was not saved.")
   if "LaneGuidanceMode" in params_to_update:
@@ -428,6 +428,8 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       raise ValueError("Blendful requires a non-Default custom model. The selection was not saved.")
   for key, value in params_to_update.items():
     write_onroad = not params.get_bool("IsOffroad")
+    if write_onroad and key == "NrdrLateralController":
+      raise ValueError("Controller Type cannot be changed after the car starts.")
     if write_onroad and key in ("HondaLiveLearningGas", CONTROLLER_KEY, "NrdrPcmSpeedDeadzone", *pcm_selections):
       raise ValueError("Longitudinal modes can only be changed while parked. Applies next drive.")
     if not tuning_write_allowed(params, key, firmware_prediction_schedule=capabilities.get("nrdr_firmware_prediction_schedule") is True):

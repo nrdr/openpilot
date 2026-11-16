@@ -68,9 +68,10 @@ def test_completed_preset_allows_parked_editing_but_pending_application_is_still
   assert not tuning_write_allowed(params, key)
 
 
-def test_actual_firmware_guards_unchanged():
-  assert not tuning_write_allowed(Params(IsOffroad=True, NrdrLateralController=1), "LatPScaleStandard")
-  assert not tuning_write_allowed(Params(IsOffroad=True, NrdrLateralController=1), "LagdToggle",
+@pytest.mark.parametrize("controller", [1, 2])
+def test_actual_firmware_guards_unchanged(controller):
+  assert not tuning_write_allowed(Params(IsOffroad=True, NrdrLateralController=controller), "LatPScaleStandard")
+  assert not tuning_write_allowed(Params(IsOffroad=True, NrdrLateralController=controller), "LagdToggle",
                                   firmware_prediction_schedule=True)
 
 

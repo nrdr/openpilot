@@ -36,6 +36,7 @@ YAW_FIXED_KEYS = PIF_KEYS | frozenset((
   "HondaSteerDeltaLimiter", "HondaSteerDeltaUp", "HondaSteerDeltaDown",
 ))
 RETIRED_TUNING_KEYS = frozenset((
+  "NrdrPtmTimingRestoration",
   "NrdrMvlPcmDeadzone",
   "NrdrSteerRatioHybrid", "NrdrSteerRatioSourceB", "NrdrSteerRatioBlendStart",
   "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal",
@@ -105,8 +106,6 @@ def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedul
                          CP=None, CP_SP=None, is_offroad: bool | None = None) -> bool:
   if not key:
     return True
-  if key == "NrdrPtmTimingRestoration":
-    return str(params.get("NrdrLateralController")) in ("1", "b'1'")
   if key in RETIRED_TUNING_KEYS or key.startswith("NrdrNnlc"):
     return False
   if key in LONG_SCALE_KEYS or key in ("NrdrHondaFullBrakeAuthority", "StaticFeedforwardLong", "NrdrHondaWindBrake"):
@@ -128,7 +127,7 @@ def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedul
   if (not parked and _enabled(params, "NrdrSuggestedSettings")) or _enabled(params, "NrdrHandcraftedLateralTune"):
     if key in SUGGESTED_LOCK_KEYS or key.startswith(("NrdrSteerRatio", "LaneCenter", "NrdrLatRateDamping")):
       return False
-  if str(params.get("NrdrLateralController")) in ("1", "b'1'"):
+  if str(params.get("NrdrLateralController")) in ("1", "b'1'", "2", "b'2'"):
     if firmware_prediction_schedule and key in ("LagdToggle", "LagdToggleDelay"):
       return False
     if key in YAW_FIXED_KEYS or key.startswith("NrdrLatRateDamping"):

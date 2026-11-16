@@ -61,20 +61,43 @@ class TestControllerUiLabels(unittest.TestCase):
   def setUpClass(cls):
     cls.schema = compile_schema(DEFAULT_SRC)
 
-  def test_timing_restoration_matches_native_and_remote_and_remains_editable_with_ptm(self):
+  def test_timing_restoration_is_retired_from_native_remote_and_write_policy(self):
     from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
     key = "NrdrPtmTimingRestoration"
     native = _native_class("pidf_ground.py", "PidfGroundLayout")(lambda: None, lambda: None)
-    web = _panel(self.schema, "steering", "nrdr_pidf_ground")["items"][2]
-    local = native._tuning_items[key]
-    self.assertIs(native._scroller[2], local)
-    self.assertEqual(web["key"], key)
-    self.assertEqual((local["title"], web["title"]), ("Timing Restoration", "Timing Restoration"))
-    self.assertEqual(web["description"], local["description"])
-    self.assertEqual(web["enablement"], [{"type": "param", "key": "NrdrLateralController", "equals": 1}])
-    for controller in (0, 1):
+    self.assertNotIn(key, native._tuning_items)
+    self.assertNotIn(key, json.dumps(self.schema))
+    for controller in (0, 1, 2):
       settings = {"NrdrLateralController": controller, "NrdrSuggestedSettings": True, "IsOffroad": False}
-      self.assertEqual(tuning_write_allowed(settings, key), controller == 1)
+      self.assertFalse(tuning_write_allowed(settings, key))
+
+  def test_report_distinguishes_ptm_choices_and_disables_the_pif_blend_for_both(self):
+    from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
+    path = ROOT / "openpilot/nrdr/features/services/car_tune_report.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "CarTuneReporter")
+    cls.body = [node for node in cls.body if isinstance(node, ast.FunctionDef)
+                and node.name in ("_controller_info", "_interpolated_torque_pif_info")]
+    env = {"SteerRatioSelection": object, "supports_interpolated_torque_pif": lambda *_: True,
+           "resolve_interpolated_torque_pif_settings": lambda *_: SimpleNamespace(enabled=True)}
+    exec(compile(ast.Module(body=[cls], type_ignores=[]), str(path), "exec"), env)
+    reporter = env["CarTuneReporter"]()
+    cp = SimpleNamespace(brand="honda", carFingerprint="HONDA_CLARITY",
+                         carFw=[SimpleNamespace(ecu="eps", fwVersion=b"39990-TRW-A020")],
+                         lateralTuning=SimpleNamespace(which=lambda: "pid"))
+    for saved, name in ((0, "PIF Control"), (1, "PTM Controller"), ("1", "PTM Controller"),
+                        (b"1", "PTM Controller"), (2, "PTM Testing"), ("2", "PTM Testing"), (b"2", "PTM Testing")):
+      reporter.params = {"NrdrLateralController": saved}
+      reporter._cp_sp = lambda: SimpleNamespace(flags=HondaFlagsSP.EPS_MODIFIED.value)
+      with self.subTest(saved=saved):
+        expected = name if saved == 0 else f"{name} | Clarity A020"
+        self.assertEqual(reporter._controller_info("PIF Control", None, cp), expected)
+        blend, enabled = reporter._interpolated_torque_pif_info(cp)
+        self.assertEqual(enabled, saved == 0)
+        if not enabled:
+          self.assertEqual(blend, "PIF blend inactive")
+        reporter._cp_sp = lambda: SimpleNamespace(flags=0)
+        self.assertEqual(reporter._controller_info("PIF Control", None, cp), "PIF Control")
 
   def test_native_and_sunnylink_speed_prefix_copy_order_and_ranges_match(self):
     native = _native_class("pidf_ground.py", "PidfGroundLayout")(lambda: None, lambda: None)
@@ -192,20 +215,20 @@ class TestControllerUiLabels(unittest.TestCase):
     key = "NrdrDeviceYawCorrection"
     native = _native_class("pidf_ground.py", "PidfGroundLayout")(lambda: None, lambda: None)
     panel = _panel(self.schema, "steering", "nrdr_pidf_ground")
-    self.assertEqual([item["key"] for item in panel["items"][:5]],
-                     ["NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrPtmTimingRestoration", "NrdrLatStiction", key])
+    self.assertEqual([item["key"] for item in panel["items"][:4]],
+                     ["NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrLatStiction", key])
     self.assertIs(native._scroller[0], native._controller)
     self.assertIs(native._scroller[1], native._tuning_items["NrdrOptimizedLaneChanges"])
-    local, web = native._tuning_items[key], panel["items"][4]
+    local, web = native._tuning_items[key], panel["items"][3]
     self.assertEqual(local["title"], "Use Device Yaw Correction")
     self.assertEqual(web["title"], local["title"])
     self.assertEqual(web["description"], local["description"])
     self.assertEqual(web["widget"], "toggle")
     self.assertEqual(web["visibility"], [{
-      "type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 1},
-    }])
+      "type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": controller},
+    } for controller in (1, 2)])
     self.assertEqual([option["label"] for option in panel["items"][0]["options"]],
-                     ["PIF Control", "PTM Controller"])
+                     ["PIF Control", "PTM Controller", "PTM Testing"])
     self.assertEqual(web["enablement"][0], {
       "type": "capability", "field": "nrdr_interpolated_torque_pif_blend_available", "equals": True,
     })
@@ -218,10 +241,11 @@ class TestControllerUiLabels(unittest.TestCase):
     self.assertTrue(tuning_write_allowed({}, key))
     for offroad in (False, True):
       for available in (False, True):
-        for settings in ({}, {"NrdrSuggestedSettings": True}, {"NrdrHandcraftedLateralTune": True}, {"NrdrLateralController": 1}):
+        for settings in ({}, {"NrdrSuggestedSettings": True}, {"NrdrHandcraftedLateralTune": True},
+                         {"NrdrLateralController": 1}, {"NrdrLateralController": 2}):
           with self.subTest(offroad=offroad, capability=available, settings=settings):
             values = {"NrdrSuggestedSettings": False, "NrdrHandcraftedLateralTune": False, "NrdrLateralController": 0, **settings}
-            allowed = not values["NrdrHandcraftedLateralTune"] and values["NrdrLateralController"] != 1 \
+            allowed = not values["NrdrHandcraftedLateralTune"] and values["NrdrLateralController"] not in (1, 2) \
               and (offroad or not values["NrdrSuggestedSettings"])
             self.assertIs(tuning_write_allowed({"IsOffroad": offroad, **values}, key), allowed)
 
@@ -247,10 +271,10 @@ class TestControllerUiLabels(unittest.TestCase):
   def test_controller_copy_requires_the_corrected_firmware_not_the_old_placeholder(self):
     panel = _panel(self.schema, "steering", "nrdr_pidf_ground")
     selector = next(item for item in panel["items"] if item["key"] == "NrdrLateralController")
-    self.assertIn("exact modified steering firmware revision", selector["description"])
-    self.assertIn("04147917", selector["details"])
-    self.assertIn("7ba37432", selector["details"])
-    self.assertIn("same version strings", selector["details"])
+    self.assertIn("exact modified steering firmware build", selector["details"])
+    self.assertIn("same version name are incompatible", selector["details"])
+    self.assertIn("experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed", selector["description"])
+    self.assertIn("Change while parked. Applies next drive.", selector["details"])
     source = (ROOT / "openpilot/nrdr/ui/settings/pidf_ground.py").read_text(encoding="utf-8")
     self.assertNotIn("uses the Bosch C020 tune", source)
     # The device shows each profile's required corrected build, which the profile carries.
