@@ -10,6 +10,7 @@ from openpilot.nrdr.ui.settings.lateral_tuning import LateralTuningLayout, honda
 from openpilot.nrdr.ui.settings.longitudinal_tuning import LongitudinalTuningLayout
 from openpilot.nrdr.ui.settings.party_tricks import PartyTricksLayout
 from openpilot.nrdr.ui.settings.custom_audio_visuals import CustomAudioVisualsLayout
+from openpilot.nrdr.ui.settings.jetlink import JetlinkLayout
 
 
 class PanelType(IntEnum):
@@ -18,6 +19,7 @@ class PanelType(IntEnum):
   LONGITUDINAL = 2
   PARTY_TRICKS = 3
   CUSTOM_AUDIO_VISUALS = 4
+  JETLINK = 5
 
 
 class NrdrLayout(Widget):
@@ -30,6 +32,7 @@ class NrdrLayout(Widget):
     self._longitudinal_layout = LongitudinalTuningLayout(lambda: self._set_current_panel(PanelType.NRDR))
     self._party_tricks_layout = PartyTricksLayout(lambda: self._set_current_panel(PanelType.NRDR))
     self._custom_audio_visuals_layout = CustomAudioVisualsLayout(lambda: self._set_current_panel(PanelType.NRDR))
+    self._jetlink_layout = JetlinkLayout(lambda: self._set_current_panel(PanelType.NRDR))
 
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=False, spacing=0)
@@ -73,6 +76,11 @@ class NrdrLayout(Widget):
       button_width=800,
       callback=lambda: self._set_current_panel(PanelType.CUSTOM_AUDIO_VISUALS),
     )
+    self._jetlink_button = simple_button_item_sp(
+      button_text=lambda: tr("Jetlink"),
+      button_width=800,
+      callback=lambda: self._set_current_panel(PanelType.JETLINK),
+    )
 
     return [
       self._lateral_button,
@@ -83,6 +91,8 @@ class NrdrLayout(Widget):
       self._monitoring_reminder,
       LineSeparatorSP(40),
       self._custom_audio_visuals_button,
+      LineSeparatorSP(40),
+      self._jetlink_button,
     ]
 
   def _panel_widget(self, panel: PanelType) -> Widget:
@@ -94,6 +104,8 @@ class NrdrLayout(Widget):
       return self._party_tricks_layout
     if panel == PanelType.CUSTOM_AUDIO_VISUALS:
       return self._custom_audio_visuals_layout
+    if panel == PanelType.JETLINK:
+      return self._jetlink_layout
     return self._scroller
 
   def _set_current_panel(self, panel: PanelType):
@@ -123,6 +135,8 @@ class NrdrLayout(Widget):
       self._party_tricks_layout.render(rect)
     elif self._current_panel == PanelType.CUSTOM_AUDIO_VISUALS:
       self._custom_audio_visuals_layout.render(rect)
+    elif self._current_panel == PanelType.JETLINK:
+      self._jetlink_layout.render(rect)
     else:
       self._scroller.render(rect)
 

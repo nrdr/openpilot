@@ -250,12 +250,18 @@ def preport_sources():
           for path in (h.CORE + 'longitudinal_planner.py', h.SUNNY + 'longitudinal_planner.py')}
 
 
-def planners(boost_env, preport_sources, cp, sp, enabled=False, tune_scale=1., roen=False, boost_module=None):
+def planners(boost_env, preport_sources, cp, sp, enabled=False, tune_scale=1., roen=False, boost_module=None, set_speed=None):
   module, _ = boost_env
   module = module if boost_module is None else boost_module
   helpers = h.definitions(h.ROOT / (h.CORE + 'drive_helpers.py'), h.environment(ACCELERATION_DUE_TO_GRAVITY=9.81))
   env = h.environment(LongitudinalMpc=Mpc, T_IDXS_MPC=np.linspace(0., 10., 13), log=log, custom=custom, HondaFlags=HondaFlags,
                       should_stop=helpers['should_stop'], get_accel_from_plan=helpers['get_accel_from_plan'])
+  if set_speed is not None:
+    from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.controller import E2ESetSpeedController
+    from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.approach import approach_accel
+    from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.tests.helpers import FakeParams
+    env.update(E2ESetSpeedController=lambda: E2ESetSpeedController(params=FakeParams(ExperimentalModeSetSpeed=set_speed)),
+               approach_accel=approach_accel)
   nrdr_class = h.definitions(h.ROOT / 'openpilot/nrdr/features/longitudinal/longitudinal_planner.py', env)['NrdrLongitudinalPlanner']
 
   def nrdr_factory(CP, SP, _tune):

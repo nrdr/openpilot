@@ -11,7 +11,7 @@ from openpilot.nrdr.tests.test_mvl_native_writes import definitions, tici_contro
 from openpilot.nrdr.tests.test_nidec_pcm_experiments import cp_bytes
 
 
-TOGGLES = {"accel_boost_toggle": "AccelBoostSP", "set_speed_assist_toggle": "ExperimentalModeSetSpeed",
+TOGGLES = {"accel_boost_toggle": "AccelBoostSP",
            "custom_acc_toggle": "CustomAccIncrementsEnabled",
            "scc_v_toggle": "SmartCruiseControlVision", "scc_m_toggle": "SmartCruiseControlMap"}
 INCREMENTS = {"custom_acc_short_increment": "CustomAccShortPressIncrement", "custom_acc_long_increment": "CustomAccLongPressIncrement"}
@@ -99,7 +99,6 @@ def test_refresh_preserves_preferences_and_only_relaxes_parked_normal_controls(o
   assert layout.custom_acc_short_increment.enabled is offroad
   assert layout.custom_acc_long_increment.enabled is offroad
   assert layout.accel_boost_toggle.enabled is (offroad or vehicle in ("long", "fixed"))
-  assert layout.set_speed_assist_toggle.enabled is layout.accel_boost_toggle.enabled
   assert layout.scc_v_toggle.enabled is (offroad or vehicle in ("long", "fixed", "icbm"))
   assert layout.scc_m_toggle.enabled is layout.scc_v_toggle.enabled
 

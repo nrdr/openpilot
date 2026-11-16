@@ -121,6 +121,8 @@ def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedul
   # another tune while parked. Persistent CP describes the previous drive.
   # Unknown road state retains the onroad guards; no saved choice is rewritten.
   parked = _enabled(params, "IsOffroad") if is_offroad is None else is_offroad is True
+  if key in ("JetlinkLink", "JetlinkChargePhone"):
+    return parked
   # A completed preset is a starting point, not a permanent edit lock. Keep
   # the short pending-application guard so edits cannot race the preset write.
   if (not parked and _enabled(params, "NrdrSuggestedSettings")) or _enabled(params, "NrdrHandcraftedLateralTune"):

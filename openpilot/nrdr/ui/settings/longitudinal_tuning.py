@@ -41,6 +41,12 @@ class LongitudinalTuningLayout(Widget):
     self._scroller = Scroller([status, *self._tuning_items], line_separator=False, spacing=0)
 
   def _initialize_items(self):
+    self._set_speed_assist = toggle_item_sp(
+      title=tr("Set Speed Assist"), param="ExperimentalModeSetSpeed",
+      description=tr("Helps Experimental Mode approach your set speed when the model holds back. " +
+                     "Eases off for predicted slowing, bends and closing leads. Replaces Acceleration Boost while enabled. " +
+                     "Requires openpilot longitudinal control; Off keeps the model's own pace."),
+    )
     self._standstill_gap = option_item_sp(
       param="NrdrStandstillGapExtra",
       title=lambda: tr("Extra Stopped Lead Gap (Default: 0 m)"),
@@ -202,6 +208,7 @@ class LongitudinalTuningLayout(Widget):
     return [
       self._longitudinal_controller,
       self._reset_live_gas,
+      self._set_speed_assist,
       LineSeparatorSP(40),
       self._wind_brake,
       self._static_feedforward_long,
@@ -245,6 +252,8 @@ class LongitudinalTuningLayout(Widget):
     self._longitudinal_controller.action_item.set_enabled(
       ui_state.is_offroad() and live_gas_available(ui_state.CP, ui_state.CP_SP, ui_state.params))
     self._reset_live_gas.action_item.set_enabled(gas_reset_available())
+    self._set_speed_assist.action_item.set_enabled(ui_state.is_offroad() or ui_state.has_longitudinal_control)
+    self._set_speed_assist.action_item.set_state(ui_state.params.get_bool("ExperimentalModeSetSpeed"))
     self._wind_brake.action_item.set_enabled(
       wind_brake_editable(ui_state.CP, ui_state.CP_SP, ui_state.params, is_offroad=ui_state.is_offroad()))
     self._wind_brake.action_item.set_state(saved_wind_brake(ui_state.params))

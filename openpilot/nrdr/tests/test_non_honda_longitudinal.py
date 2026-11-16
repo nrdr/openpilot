@@ -381,9 +381,12 @@ def test_honda_mpc_retains_fourth_personality_and_fcw_authorization():
 
 
 @pytest.mark.parametrize('brand,enabled', [('honda', True), ('toyota', False), ('', False)])
-def test_native_tuning_controls_follow_vehicle_policy(brand, enabled, monkeypatch):
+@pytest.mark.parametrize('parked', [False, True])
+@pytest.mark.parametrize('has_long', [False, True])
+def test_native_tuning_controls_follow_vehicle_policy(brand, enabled, parked, has_long, monkeypatch):
   widget = type('Widget', (), {'_update_state': lambda _: None})
-  state = NS(CP=cp(brand), CP_SP=None, is_offroad=lambda: True, params=NS(get_bool=lambda _: False, get=lambda _: None))
+  state = NS(CP=cp(brand), CP_SP=None, is_offroad=lambda: parked, has_longitudinal_control=has_long,
+             params=NS(get_bool=lambda _: False, get=lambda _: None))
   # Current UI callbacks use the real shared lock/admission policy. Its nested
   # import sees the same production predicate with the native enum injected.
   monkeypatch.setattr(policy, "mvl_longitudinal_enabled", load_policy({})["mvl_longitudinal_enabled"])
@@ -392,6 +395,9 @@ def test_native_tuning_controls_follow_vehicle_policy(brand, enabled, monkeypatc
                        "ui_state": state, "nrdr_longitudinal_enabled": policy.nrdr_longitudinal_enabled,
                        "gas_reset_available": lambda: enabled, "pcm_tuning_available": lambda *_: False,
                        "live_gas_available": lambda *_: enabled,
+                       "wind_brake_editable": lambda *_, **kwargs: enabled,
+                       "longitudinal_controller_selection": lambda *_: 0,
+                       "LongitudinalController": NS(STANDARD=0),
                        "mvl_pcm_deadzone_available": lambda *_: False,
                        "tuning_write_allowed": admission["tuning_write_allowed"], "mvl_tuning_locked": admission["mvl_tuning_locked"],
                        "saved_pcm_mode": lambda _: 0, "saved_wind_brake": lambda _: True})
@@ -400,18 +406,18 @@ def test_native_tuning_controls_follow_vehicle_policy(brand, enabled, monkeypatc
     setattr(layout, '_long_pid_tune_scale_' + band, NS(set_visible=lambda _: None,
                                                     action_item=NS(set_enabled=lambda _: None)))
   values = []
-  gas_states = []
-  layout._live_learning_gas = NS(action_item=NS(set_enabled=lambda value: values.append(('gas', value)), set_state=gas_states.append))
+  assist_states = []
+  layout._longitudinal_controller = NS(action_item=NS(set_enabled=lambda value: values.append(('controller', value))))
+  layout._set_speed_assist = NS(action_item=NS(set_enabled=lambda value: values.append(('assist', value)), set_state=assist_states.append))
   layout._reset_live_gas = NS(action_item=NS(set_enabled=lambda value: values.append(('reset', value))))
   layout._standstill_gap = NS(action_item=NS(set_enabled=lambda value: values.append(('gap', value))))
-  layout._pcm_mode = NS(action_item=NS(set_enabled=lambda _: None, set_selected_button=lambda _: None))
-  layout._mvl_pcm_deadzone = NS(action_item=NS(set_enabled=lambda _: None))
+  layout._full_brake_authority = NS(set_visible=lambda _: None)
   layout._wind_brake = NS(action_item=NS(set_enabled=lambda _: None, set_state=lambda _: None))
-  layout._pcm_experiments = {}
-  layout._tuning_items = [layout._live_learning_gas, NS(), NS(action_item=NS(set_enabled=lambda value: values.append(('tune', value))))]
+  layout._tuning_items = [NS(), NS(action_item=NS(set_enabled=lambda value: values.append(('tune', value))))]
   layout._update_state()
-  assert values == [('gas', enabled), ('tune', enabled), ('gas', enabled), ('reset', enabled), ('gap', enabled)]
-  assert gas_states == [False]
+  assert values == [('tune', enabled), ('controller', parked and enabled), ('reset', enabled),
+                    ('assist', parked or has_long), ('gap', parked and enabled)]
+  assert assist_states == [False]
   # The retired engine-braking control is absent, not a disabled live widget.
   assert not hasattr(layout, '_engine_braking')
 
@@ -431,7 +437,13 @@ def test_generated_sunnylink_schema_gates_nrdr_panel_and_econ():
   nodes = list(walk(schema))
   required = {'type': 'capability', 'field': 'nrdr_longitudinal_tuning_available', 'equals': True}
   panel = next(node for node in nodes if node.get('id') == 'nrdr_longitudinal')
-  assert panel['trigger_condition'] == required
+  assert panel['trigger_condition'] == {'type': 'any', 'conditions': [
+    {'type': 'offroad_only'}, required,
+    {'type': 'capability', 'field': 'has_longitudinal_control', 'equals': True},
+  ]}
+  for control in panel['items']:
+    if control['key'] not in ('ExperimentalModeSetSpeed', 'NrdrResetLiveGas', 'NrdrLiveGasResetStatus', 'NrdrHondaWindBrake'):
+      assert required in control['visibility']
   item = next(node for node in nodes if node.get('key') == 'LongitudinalPersonality')
   econ = next(option for option in item['options'] if option['value'] == 3)
   assert econ['enablement'] == [required]

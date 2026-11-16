@@ -307,7 +307,7 @@ assert not a.should_run(False, None, None)
 assert a.status() is None and a.reason() is None
 assert not a.prepare(False) and a.attach('model', object(), 1, 1) == 'model'
 assert not a.shutdown_step(False, 'test') and a.shutdown_step(True, 'test')
-assert a.state() is None and a.swap_events(0.01) is None
+assert a.state() == 'none' and a.swap_events(0.01) is None
 '''
     # under this test's prefix, which the child inherits
     out = run_fresh([sys.executable, '-c', code])

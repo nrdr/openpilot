@@ -96,7 +96,7 @@ class _LifecycleSpy:
 
 
 class TestSettingsNavigation(unittest.TestCase):
-  def test_custom_audio_visuals_is_last_in_native_device_and_nrdr(self) -> None:
+  def test_custom_audio_visuals_and_jetlink_are_at_the_bottom(self) -> None:
     device_init = _method(_tree(MICI_DEVICE), "DeviceLayoutMici", "__init__")
     self.assertEqual(_widget_list(device_init), [
       "DeviceInfoLayoutMici()", "PairBigButton()", "review_training_guide_btn", "cabin_cam_btn", "terms_btn", "regulatory_btn",
@@ -106,7 +106,8 @@ class TestSettingsNavigation(unittest.TestCase):
 
     nrdr_init = _method(_tree(NRDR_LAYOUT), "NrdrLayout", "_initialize_items")
     items = next(node.value for node in nrdr_init.body if isinstance(node, ast.Return))
-    self.assertEqual(ast.unparse(items.elts[-1]), "self._custom_audio_visuals_button")
+    self.assertEqual(ast.unparse(items.elts[-3]), "self._custom_audio_visuals_button")
+    self.assertEqual(ast.unparse(items.elts[-1]), "self._jetlink_button")
     self.assertIn("callback=lambda: self._set_current_panel(PanelType.CUSTOM_AUDIO_VISUALS)", ast.unparse(nrdr_init))
 
   def test_custom_audio_visuals_navigation_unwinds_and_refreshes(self) -> None:

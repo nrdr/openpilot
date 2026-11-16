@@ -2408,11 +2408,45 @@
               "label": "Longitudinal Tuning",
               "trigger_key": null,
               "trigger_condition": {
-                "type": "capability",
-                "field": "nrdr_longitudinal_tuning_available",
-                "equals": true
+                "type": "any",
+                "conditions": [
+                  {
+                    "type": "offroad_only"
+                  },
+                  {
+                    "type": "capability",
+                    "field": "nrdr_longitudinal_tuning_available",
+                    "equals": true
+                  },
+                  {
+                    "type": "capability",
+                    "field": "has_longitudinal_control",
+                    "equals": true
+                  }
+                ]
               },
               "items": [
+                {
+                  "key": "ExperimentalModeSetSpeed",
+                  "widget": "toggle",
+                  "title": "Set Speed Assist",
+                  "description": "Helps Experimental Mode approach your set speed when the model holds back. Eases off for predicted slowing, bends and closing leads. Replaces Acceleration Boost while enabled. Requires openpilot longitudinal control; Off keeps the model's own pace.",
+                  "enablement": [
+                    {
+                      "type": "any",
+                      "conditions": [
+                        {
+                          "type": "offroad_only"
+                        },
+                        {
+                          "type": "capability",
+                          "field": "has_longitudinal_control",
+                          "equals": true
+                        }
+                      ]
+                    }
+                  ]
+                },
                 {
                   "key": "NrdrLongitudinalController",
                   "widget": "multiple_button",
@@ -2460,6 +2494,13 @@
                           "equals": true
                         }
                       ]
+                    }
+                  ],
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
                     }
                   ],
                   "enablement": [
@@ -2568,6 +2609,13 @@
                   "title": "Keep Feedforward Static",
                   "description": "Keeps feedforward strength unchanged when adjusting the PID scale. Off scales feedforward with the rest of the tune.",
                   "details": "Applies to Standard control. PTM Pedal Interceptor uses fixed gains and feedforward.",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ],
                   "enablement": [
                     {
                       "type": "not",
@@ -2586,6 +2634,11 @@
                   "description": "Allows the full available brake-command range. Off restores the standard brake-command limit.",
                   "details": "Applies when the active controller supports this setting.",
                   "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    },
                     {
                       "type": "param",
                       "key": "NrdrLongitudinalController",
@@ -2610,6 +2663,13 @@
                   "max": 500,
                   "step": 5,
                   "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ],
                   "enablement": [
                     {
                       "type": "param",
@@ -2628,6 +2688,13 @@
                   "max": 500,
                   "step": 5,
                   "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ],
                   "enablement": [
                     {
                       "type": "param",
@@ -2646,6 +2713,13 @@
                   "max": 500,
                   "step": 5,
                   "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ],
                   "enablement": [
                     {
                       "type": "param",
@@ -2664,6 +2738,13 @@
                   "max": 500,
                   "step": 5,
                   "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ],
                   "enablement": [
                     {
                       "type": "param",
@@ -2681,7 +2762,14 @@
                   "min": 95.0,
                   "max": 105.0,
                   "step": 0.1,
-                  "unit": "%"
+                  "unit": "%",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ]
                 },
                 {
                   "key": "NrdrStandstillGapExtra",
@@ -2693,6 +2781,13 @@
                   "max": 5.0,
                   "step": 0.25,
                   "unit": "m",
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ],
                   "enablement": [
                     {
                       "type": "offroad_only"
@@ -2711,7 +2806,14 @@
                   "description": "Limits how quickly braking builds as the car comes to a stop.",
                   "min": 0,
                   "max": 100,
-                  "step": 1
+                  "step": 1,
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ]
                 },
                 {
                   "key": "HondaStopAccel",
@@ -2720,7 +2822,14 @@
                   "description": "Sets the braking target used to hold the car at a stop.",
                   "min": -4.0,
                   "max": 0.0,
-                  "step": 0.01
+                  "step": 0.01,
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ]
                 },
                 {
                   "key": "HondaStoppingDecelRateLong",
@@ -2729,7 +2838,14 @@
                   "description": "Sets how quickly the planned braking target increases when stopping.",
                   "min": 0.0,
                   "max": 5.0,
-                  "step": 0.01
+                  "step": 0.01,
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ]
                 },
                 {
                   "key": "HondaVEgoStopping",
@@ -2738,7 +2854,14 @@
                   "description": "Sets the speed below which stopping control takes over, in m/s.",
                   "min": 0.0,
                   "max": 3.0,
-                  "step": 0.01
+                  "step": 0.01,
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ]
                 },
                 {
                   "key": "HondaVEgoStarting",
@@ -2747,7 +2870,14 @@
                   "description": "Sets the speed above which the car is treated as moving again, in m/s.",
                   "min": 0.0,
                   "max": 3.0,
-                  "step": 0.01
+                  "step": 0.01,
+                  "visibility": [
+                    {
+                      "type": "capability",
+                      "field": "nrdr_longitudinal_tuning_available",
+                      "equals": true
+                    }
+                  ]
                 }
               ]
             },
@@ -2826,6 +2956,61 @@
                       "type": "capability",
                       "field": "device_type",
                       "equals": "mici"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "nrdr_jetlink",
+              "label": "Jetlink",
+              "trigger_key": null,
+              "items": [
+                {
+                  "key": "JetlinkLink",
+                  "widget": "multiple_button",
+                  "title": "Jetlink Connection",
+                  "description": "Runs big models on a compatible connected computer or phone. USB is for Mac, Jetson, Linux or Android; iOS is for iPhone or iPad. Requires companion setup and disables ADB. The small model runs until the big model is ready and is the fallback if the link fails. Change only while parked.",
+                  "options": [
+                    {
+                      "label": "Off",
+                      "value": 0
+                    },
+                    {
+                      "label": "USB",
+                      "value": 1
+                    },
+                    {
+                      "label": "iOS",
+                      "value": 2
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    }
+                  ]
+                },
+                {
+                  "key": "JetlinkChargePhone",
+                  "widget": "toggle",
+                  "title": "Charge iPhone / iPad",
+                  "description": "Allows charging the connected iOS device from the comma. This increases power use. Off disables phone charging.",
+                  "visibility": [
+                    {
+                      "type": "param",
+                      "key": "JetlinkLink",
+                      "equals": 2
+                    }
+                  ],
+                  "enablement": [
+                    {
+                      "type": "offroad_only"
+                    },
+                    {
+                      "type": "param",
+                      "key": "JetlinkLink",
+                      "equals": 2
                     }
                   ]
                 }
@@ -3411,27 +3596,6 @@
               "widget": "toggle",
               "title": "Acceleration Boost",
               "description": "Adds acceleration assistance when Experimental Mode falls below the set speed, with any personality and MVL live learning. Off restores the usual acceleration behavior.",
-              "enablement": [
-                {
-                  "type": "any",
-                  "conditions": [
-                    {
-                      "type": "offroad_only"
-                    },
-                    {
-                      "type": "capability",
-                      "field": "has_longitudinal_control",
-                      "equals": true
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "key": "ExperimentalModeSetSpeed",
-              "widget": "toggle",
-              "title": "Set Speed Assist",
-              "description": "In Experimental Mode, lifts the model's acceleration toward your set speed and following distance whenever the driving model holds back. The model still makes every slowdown. Off keeps the model's own pace.",
               "enablement": [
                 {
                   "type": "any",

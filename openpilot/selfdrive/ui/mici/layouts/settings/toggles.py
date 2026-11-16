@@ -58,12 +58,6 @@ class TogglesLayoutMici(NavScroller):
           "and MVL live learning. Off restores the usual acceleration behavior."),
     )
     self._accel_boost_toggle.set_enabled(lambda: ui_state.CP is not None and ui_state.has_longitudinal_control)
-    self._set_speed_assist_toggle = BigParamControl(
-      "set speed assist", "ExperimentalModeSetSpeed",
-      description=("In Experimental Mode, lifts the model's acceleration toward your set speed and following distance " +
-          "whenever the driving model holds back. The model still makes every slowdown. Off keeps the model's own pace."),
-    )
-    self._set_speed_assist_toggle.set_enabled(lambda: ui_state.CP is not None and ui_state.has_longitudinal_control)
     is_metric_toggle = BigParamControl("use metric units", "IsMetric")
     ldw_toggle = BigParamControl("lane departure warnings", "IsLdwEnabled")
     self._lane_centering_panel = LaneCenteringLayoutMici()
@@ -84,7 +78,6 @@ class TogglesLayoutMici(NavScroller):
       self._personality_toggle,
       self._experimental_btn,
       self._accel_boost_toggle,
-      self._set_speed_assist_toggle,
       is_metric_toggle,
       ldw_toggle,
       self._lane_centering_btn,
@@ -98,7 +91,6 @@ class TogglesLayoutMici(NavScroller):
     self._refresh_toggles = (
       ("ExperimentalMode", self._experimental_btn),
       ("AccelBoostSP", self._accel_boost_toggle),
-      ("ExperimentalModeSetSpeed", self._set_speed_assist_toggle),
       ("IsMetric", is_metric_toggle),
       ("IsLdwEnabled", ldw_toggle),
       ("AlwaysOnDM", always_on_dm_toggle),

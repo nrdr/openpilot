@@ -4,8 +4,8 @@ Ported from zoompilot's accelerator_events (Zeph Leggett, MIT License), cut down
 Onroad events for a JetLink big model that joins mid-drive: jetlink's swap
 events (jetlink/openpilot/events.py) read off this fork's messages, and their
 flags raised as events nrdr already has: bigModelLoading for the no-entry
-second and bigModelReady for the chime. nrdr has no events of its own for the
-offer or a lost link, so those two flags are not raised. With no jetlink on the
+second, bigModelReady for the chime, and jetlinkLost for a fallback warning.
+The offer flag is not raised. With no jetlink on the
 device, or the link off, the tracker is inert and nothing is added.
 
 The tracker reads modeld's runtime record (jetlink_adapter.runtime()), as nrdr
@@ -52,3 +52,5 @@ class AcceleratorEvents:
       events.add(EventName.bigModelLoading)
     if flags.chime:
       events_sp.add(EventNameSP.bigModelReady)
+    if flags.link_lost:
+      events_sp.add(EventNameSP.jetlinkLost)

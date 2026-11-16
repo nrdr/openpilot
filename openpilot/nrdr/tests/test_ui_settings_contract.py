@@ -37,7 +37,11 @@ class TestUiSettingsContract(unittest.TestCase):
     self.assertEqual(main_keys, ["NrdrSuggestedSettings", "NrdrRemoteForceUpdate", "DisablePowerDown"])
     longitudinal = self.panels["nrdr_longitudinal"]
     self.assertEqual(longitudinal["trigger_condition"], {
-      "type": "capability", "field": "nrdr_longitudinal_tuning_available", "equals": True,
+      "type": "any", "conditions": [
+        {"type": "offroad_only"},
+        {"type": "capability", "field": "nrdr_longitudinal_tuning_available", "equals": True},
+        {"type": "capability", "field": "has_longitudinal_control", "equals": True},
+      ],
     })
     moved_keys = {item["key"] for item in _items(longitudinal)} | {"NrdrRemoteForceUpdate", "DisablePowerDown"}
     for page_id in ("cruise", "software", "device"):
@@ -118,8 +122,9 @@ class TestUiSettingsContract(unittest.TestCase):
     self.assertIn("nrdr_lane_centering_stack", self.panels)
     self.assertIn("nrdr_special", {section["id"] for section in self.pages["steering"]["sections"]})
 
-  def test_engagement_sounds_are_last_in_nrdr_and_live_without_locks(self):
-    panel = self.nrdr["sub_panels"][-1]
+  def test_engagement_sounds_precede_jetlink_and_are_live_without_locks(self):
+    panel = self.nrdr["sub_panels"][-2]
+    self.assertEqual(self.nrdr["sub_panels"][-1]["id"], "nrdr_jetlink")
     self.assertEqual(panel["id"], "nrdr_custom_audio_visuals")
     self.assertEqual(panel["label"], "Custom Audio & Visuals")
     self.assertIsNone(panel["trigger_key"])

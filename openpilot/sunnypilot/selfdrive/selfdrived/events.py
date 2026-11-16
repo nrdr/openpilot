@@ -265,6 +265,15 @@ EVENTS_SP: dict[int, dict[str, Alert | AlertCallbackType]] = {
       AlertStatus.normal, AlertSize.small,
       Priority.LOW, VisualAlert.none, AudibleAlert.prompt, 2.),
   },
+  EventNameSP.jetlinkLost: {
+    # Permanent also reaches lateral-only/MADS operation; this is a warning,
+    # not a disengagement or a change to Jetlink's small-model handback.
+    ET.PERMANENT: Alert(
+      "TAKE CONTROL",
+      "Jetlink lost - using small model",
+      AlertStatus.userPrompt, AlertSize.mid,
+      Priority.HIGH, VisualAlert.steerRequired, AudibleAlert.prompt, 0.1),
+  },
 }
 
 apply_events(EVENTS_SP, EventNameSP)

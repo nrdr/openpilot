@@ -7,7 +7,7 @@ from openpilot.nrdr.ui.honda_pcm import (saved_wind_brake, save_pcm_choice,
                                        live_gas_available, longitudinal_controller_choices,
                                        longitudinal_controller_label, save_longitudinal_controller)
 from openpilot.nrdr.ui.settings.live_gas_reset import mici_reset_button
-from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigToggle
+from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigToggle, BigParamControl
 from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -90,4 +90,11 @@ class LongitudinalControllerControl(BigButton):
 
 
 def longitudinal_controls():
-  return [LongitudinalControllerControl(), mici_reset_button(), WindBrakeControl(), StaticFeedforwardControl()]
+  set_speed_assist = BigParamControl(
+    tr("Set Speed Assist"), "ExperimentalModeSetSpeed",
+    description=tr("Helps Experimental Mode approach your set speed when the model holds back. " +
+                   "Eases off for predicted slowing, bends and closing leads. Replaces Acceleration Boost while enabled. " +
+                   "Requires openpilot longitudinal control; Off keeps the model's own pace."),
+  )
+  set_speed_assist.set_enabled(lambda: ui_state.is_offroad() or ui_state.has_longitudinal_control)
+  return [LongitudinalControllerControl(), mici_reset_button(), set_speed_assist, WindBrakeControl(), StaticFeedforwardControl()]
