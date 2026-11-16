@@ -32,8 +32,8 @@ launchers, but contain no flashing implementation or firmware.
 ## Guided flash (recommended)
 
 `flash.py` walks the whole thing for you: reads the car's current EPS firmware
-and searches an explicit 15-file menu containing the seven Proper Torque Mod
-images and eight clearly labelled stock recovery images. It lists only choices
+and searches an explicit 23-file menu containing ten Proper Torque Mod
+images and thirteen clearly labelled stock recovery images. It lists only choices
 compatible with the detected EPS (with checksum status), lets you pick one,
 auto-detects the EPS CAN bus via a live UDS probe of the selected image's address
 (asks if more than one bus responds), offers a dry run, and only flashes after
@@ -44,6 +44,14 @@ similar filenames cannot be mistaken for one another.
 Legacy/testing images, the T6Z offline reference, TVA x31 files, the
 extensionless Pilot WIP, and raw binaries are intentionally absent from the
 guided menu. See `rwd/README.md` before using anything outside that menu.
+
+The November 15 firmware update uses the audited Google Drive files and keeps
+this SSH command-line workflow. The on-screen wizard is deferred and not included.
+See [source records](rwd/SOURCES.md) and [SHA256SUMS](rwd/SHA256SUMS).
+Four existing PTM images differ from the current controller-reference hashes;
+RDX runtime PTM admission is still disabled, and the new Clarity payload has
+not been road-validated here. These limitations are detailed in the catalog.
+Passing file checks is not a claim of vehicle compatibility or safe steering.
 
 ```bash
 python3 flash.py                 # auto-detect bus (fallback default 1)
@@ -144,13 +152,13 @@ restarts the timer. Only the *seed request* is retried — a rejected seed reque
 doesn't touch the attempt counter, but re-sending a **key** (NRC 0x35, invalid
 key) increments it and restarts the delay, so that error is never retried.
 
-### `--skip-checksum` (not recommended)
-If a firmware isn't covered by the checksum checker, you can add `--skip-checksum`.
-**Be careful — flashing a `.rwd` with invalid checksums can brick the EPS.** Only
-use it on an image you trust.
-```
-python3 eps-update.py rwd/SOME_FIRMWARE.rwd -b 1 --skip-checksum --danger
-```
+### Mandatory validation
+
+`--skip-checksum` is no longer supported. The offline checker and updater share
+container, firmware checksum, THR/TJB ROM CRC and monitor-shadow checks.
+Invalid or unsupported images are rejected before any Panda connection;
+the guided helper also refuses them before stopping openpilot. T6Z, Pilot A040,
+and Accord x31 files remain reference-only for this updater.
 
 ## Verify it worked
 Turn the car back on and move the wheel by hand. Basic power-steering assist

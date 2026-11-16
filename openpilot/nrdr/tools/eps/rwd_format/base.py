@@ -2,6 +2,8 @@ import struct
 
 class Base(object):
     def __init__(self, data, headers, keys, addr_blocks, encrypted):
+        if len(data) < 4:
+            raise ValueError("truncated file checksum")
         self._file_format = data[0:1]
         self._file_headers = headers
         self._file_checksum = struct.unpack('<L', data[-4:])[0]
@@ -37,7 +39,8 @@ class Base(object):
 
     def validate_file_checksum(self, data):
         calculated = sum(data[0:-4]) & 0xFFFFFFFF
-        assert calculated == self.file_checksum, "file checksum mismatch"
+        if calculated != self.file_checksum:
+            raise ValueError("file checksum mismatch")
 
     def __str__(self):
         info = [

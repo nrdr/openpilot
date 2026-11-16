@@ -60,22 +60,30 @@ PROBE_BUSES = (0, 1)
 
 # This is deliberately narrower than "every valid .rwd in the library". Only
 # the current Proper Torque Mod images and unambiguous stock recovery images are
-# safe choices for the ordinary guided menu. Legacy, testing, WIP, T6Z, and x31
+# reviewed choices for the ordinary guided menu. Legacy, testing, WIP, T6Z, and x31
 # files remain available as catalogued reference material for expert/manual use.
 GUIDED_FLASH_FILES = (
     "39990-TBA-A030/Legacy and Stock/stock-39990-TBA-A030.rwd",
     "39990-TBA-A030/Proper Torque Mod/39990-TBA,A030-PTM.rwd",
     "39990-TBA-C020 (2019 Honda Civic Sport)/Legacy and Stock/stock-39990-TBA-C020.rwd",
-    "39990-TBA-C020 (2019 Honda Civic Sport)/Proper Torque Mod/39990-TBA,C020-Trk4000-PTM.rwd",
+    "39990-TBA-C020 (2019 Honda Civic Sport)/Proper Torque Mod/39990-TBA,C020-PTM.rwd",
     "39990-TBA-C120/Legacy and Stock/stock-39990-TBA-C120.rwd",
     "39990-TBA-C120/Proper Torque Mod/39990-TBA,C120-PTM.rwd",
     "39990-TEG-A010/Proper Torque Mod/39990-TEG,A010-PTM.rwd",
     "39990-TG7-A060 (2019 Honda Pilot)/Legacy and Stock/39990-TG7-A060-STOCK.rwd",
     "39990-TGG-A020/Legacy and Stock/stock-39990-TGG-A020-HatchbackSport.rwd",
+    "39990-TGG-A120/Proper Torque Mod/39990-TGG,A120-PTM-20261016b.rwd",
     "39990-TGG-A120/stock-39990-TGG-A120.rwd",
+    "39990-THR-A020 (Honda Odyssey)/Legacy and Stock/stock_39990-THR-A020.rwd",
+    "39990-TJB-A220 (Acura RDX)/Legacy and Stock/39990-TJB-A220 (Stock I-HDS File).rwd",
+    "39990-TJB-A220 (Acura RDX)/Legacy and Stock/39990-TJB-A220-Stock.rwd",
+    "39990-TJB-A220 (Acura RDX)/Proper Torque Mod/39990-TJB-A220-PTM-Keys.rwd",
     "39990-TLA-A040 - (Honda_CRV_5G)/Legacy and Stock/39990-TLA-A040-stock.rwd",
     "39990-TLA-A040 - (Honda_CRV_5G)/Proper Torque Mod/39990-TLA-A040_Clarity_FF_tune_telemety_8cf8e537.rwd",
-    "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM.rwd",
+    "39990-TLA-A220 (2021 Honda CR-V)/Legacy and Stock/39990-TLA-A220-stock.rwd",
+    "39990-TLA-A220 (2021 Honda CR-V)/Proper Torque Mod/39990-TLA,A220-PTM-20261016b.rwd",
+    "39990-TRW-A020 (Honda Clarity)/Legacy and Stock/39990-TRW-A020 (stock).rwd",
+    "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM-Latest-092826.rwd",
     "39990-TXM-A040 (2019-2022 Honda Insight)/Legacy and Stock/TXM-A040-STOCK.rwd",
     "39990-TXM-A040 (2019-2022 Honda Insight)/Proper Torque Mod/39990-TXM,A040-PTM.rwd",
 )
@@ -100,7 +108,12 @@ def validate(path):
     """True if the image passes check_rwd (run quietly)."""
     try:
         with contextlib.redirect_stdout(io.StringIO()):
-            return bool(check_rwd.check(path))
+            from rwd_format.x5a import x5a
+            with open(path, "rb") as stream:
+                fw = x5a(stream.read())
+            check_rwd.validate_firmware(fw)
+            check_rwd.require_uds_flashable(fw)
+            return True
     except Exception:
         return False
 
@@ -524,7 +537,7 @@ def main():
     for i, f in enumerate(shown):
         ok = validate(f)
         rows.append((f, ok))
-        status = "valid ✓" if ok else "INVALID ✗  -> will need --skip-checksum (brick risk)"
+        status = "valid ✓" if ok else "INVALID / UNSUPPORTED ✗  -> cannot flash"
         print(f"  [{i + 1:>2}] {image_display_name(f)}  {status}")
 
     sel = input("\nSelect a firmware number to flash (q to quit): ").strip()
@@ -541,13 +554,10 @@ def main():
 
     rel = os.path.relpath(path, HERE)
     name = image_display_name(path)
-    skip_checksum = not ok
+    skip_checksum = False
 
     if not ok:
-        print(f"\n!! {name} FAILED checksum validation.")
-        print("!! It can only be flashed with --skip-checksum. A bad image can BRICK the EPS.")
-        if input("   Type 'yes' to continue with this unvalidated image: ").strip().lower() != "yes":
-            sys.exit("Aborted.")
+        sys.exit(f"Aborted — {name} failed validation or is unsupported; no device access performed.")
 
     # Power sequence: kill openpilot with the car OFF, then switch to accessory
     # mode — so openpilot doesn't re-grab the panda when CAN comes alive.
