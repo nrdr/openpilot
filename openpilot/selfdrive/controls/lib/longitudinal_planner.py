@@ -294,9 +294,9 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     cruise_should_stop = (bool(v_ego < self.nrdr.v_ego_stopping and self.a_cruise < 0.1)
                           if self.nrdr is not None else should_stop(v_ego, self.a_cruise))
 
-    if self.e2e_set_speed.enabled:
+    if self.e2e_set_speed.enabled or self.e2e_set_speed.lift > 0.:
       # Set Speed Assist's floor already lifts the model; the gas-press accel boost learns past it, so it only runs
-      # with the assist off (zoompilot's SetSpeedAssistGatedBoost).
+      # once the assist is off and its remaining lift has faded out.
       self.accel_boost_sp.boost = self.accel_boost_sp.total_boost = 0.0
     else:
       output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(

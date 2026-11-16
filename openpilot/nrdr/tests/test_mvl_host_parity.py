@@ -276,7 +276,7 @@ def test_planner_only_documented_donor_edits():
     "    self.a_cruise = (econ_cruise_accel(", 1)
   expected = expected.replace(
     "      if self.accel_boost_sp.enabled:\n        output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(",
-    "      if self.e2e_set_speed.enabled:\n" +
+    "      if self.e2e_set_speed.enabled or self.e2e_set_speed.lift > 0.:\n" +
     "        self.accel_boost.total_boost, self.accel_boost.boost_eligible = 0., False\n" +
     "        self.accel_boost_sp.boost = self.accel_boost_sp.total_boost = 0.0\n" +
     "      elif self.accel_boost_sp.enabled:\n        output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(", 1)

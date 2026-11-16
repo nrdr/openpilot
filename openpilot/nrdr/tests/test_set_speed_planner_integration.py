@@ -24,7 +24,7 @@ def full_messages(frame, e2e=0., mpc=1., personality=1):
   sm = messages(10_000_000_000 + frame * 50_000_000, e2e, mpc, personality)
   sm['modelV2'].velocity = NS(x=[20.] * 33)
   sm['modelV2'].orientationRate = NS(z=[0.] * 33)
-  sm['modelV2'].meta.laneChangeState = log.LateralPlan.LaneChangeState.off
+  sm['modelV2'].meta.laneChangeState = log.LaneChangeState.off
   sm['radarState'].leadOne = NS(present=False)
   sm['controlsState'].curvature = 0.
   return sm
@@ -63,3 +63,15 @@ def test_enabled_assist_keeps_mpc_braking_and_stop_requests(boost_env, before_pr
   sm['controlsState'].longControlState = h.STATE.off
   actual.update(sm)
   assert actual.e2e_set_speed.lift == 0.
+
+
+def test_disabling_assist_does_not_stack_boost_during_fadeout(boost_env, before_pr):
+  ci, _ = interface(CAR.HONDA_CLARITY, interceptor=True)
+  actual, _ = planners(boost_env, before_pr, ci.CP, ci.CP_SP, enabled=True, set_speed=True)
+  for frame in range(200):
+    actual.update(full_messages(frame))
+  actual.e2e_set_speed.params.values['ExperimentalModeSetSpeed'] = False
+  actual.e2e_set_speed.frame = actual.e2e_set_speed.params_frames - 1
+  actual.update(full_messages(200))
+  assert not actual.e2e_set_speed.enabled and actual.e2e_set_speed.lift > 0.
+  assert actual.accel_boost_sp.total_boost == 0.

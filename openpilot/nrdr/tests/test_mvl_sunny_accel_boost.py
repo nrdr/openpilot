@@ -230,3 +230,17 @@ def test_set_speed_assist_on_lifts_the_model_in_mvl(boost_env):
   assert on.accel_boost.total_boost == 0. and on.accel_boost_sp.total_boost == 0.
   assert on.output_a_target > off.output_a_target
   assert on.output_a_target <= on.a_cruise + 1e-9  # the cruise candidate still bounds it
+
+
+@pytest.mark.parametrize('sunny_boost', [False, True])
+def test_assist_fadeout_does_not_stack_either_mvl_boost(boost_env, sunny_boost):
+  env, settings, _ = boost_env
+  settings.enabled = sunny_boost
+  planner = planner_class(env, set_speed=True)(h.car_params(), NS(enableGasInterceptor=True), init_v=20.)
+  for _ in range(200):
+    planner.update(set_speed_messages())
+  planner.e2e_set_speed.params.values['ExperimentalModeSetSpeed'] = False
+  planner.e2e_set_speed.frame = planner.e2e_set_speed.params_frames - 1
+  planner.update(set_speed_messages())
+  assert not planner.e2e_set_speed.enabled and planner.e2e_set_speed.lift > 0.
+  assert planner.accel_boost.total_boost == 0. and planner.accel_boost_sp.total_boost == 0.

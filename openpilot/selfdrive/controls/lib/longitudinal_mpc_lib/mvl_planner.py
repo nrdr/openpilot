@@ -134,8 +134,8 @@ class MvlLongitudinalPlanner(LongitudinalPlannerSP):
     experimental_mode = sm['selfdriveState'].experimentalMode
     if experimental_mode:
       # Select one model-acceleration boost; MVL's gas/brake learning is separate.
-      if self.e2e_set_speed.enabled:
-        # Set Speed Assist's floor already lifts the model; both model-acceleration boosts only run with it off.
+      if self.e2e_set_speed.enabled or self.e2e_set_speed.lift > 0.:
+        # Wait for Set Speed Assist's lift to finish fading out before restarting either boost.
         self.accel_boost.total_boost, self.accel_boost.boost_eligible = 0., False
         self.accel_boost_sp.boost = self.accel_boost_sp.total_boost = 0.0
       elif self.accel_boost_sp.enabled:
