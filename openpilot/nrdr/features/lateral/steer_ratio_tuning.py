@@ -353,7 +353,7 @@ def _safe_positive_ratio(value: Any, default: float) -> float:
 
 
 def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | None = None,
-                                 *, ptm_baseline: bool = False) -> SteerRatioSelection:
+                                 *, ptm_baseline: bool = False, ptm_testing: bool = False) -> SteerRatioSelection:
   fingerprint = str(getattr(CP, "carFingerprint", ""))
   is_honda = str(getattr(CP, "brand", "")).lower() == "honda"
   cp_ratio = _safe_positive_ratio(getattr(CP, "steerRatio", MANUAL_CENTER_DEFAULT), MANUAL_CENTER_DEFAULT)
@@ -393,6 +393,10 @@ def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | N
     endpoint = model_blend_endpoint(CP)
     if endpoint is not None and active_model_supports_optimized_lane_changes():
       final, lock = endpoint
+      if ptm_testing and ptm_baseline and fingerprint == "HONDA_CLARITY":
+        # Temporary Clarity experiment: preserve the measured center and model
+        # gate, but reach the published endpoint earlier. Normal PTM is unchanged.
+        lock = 250.0
       center = cp_ratio * 0.01 / firmware_profile.physical_to_linear(0.01)
       source = AngleSource(0, "Model-Specific Blend", cp_ratio, center, final, lock, cp_ratio)
       selection = replace(selection, model_blend=source)

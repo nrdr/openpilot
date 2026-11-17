@@ -1,8 +1,9 @@
-"""Opt-in PTM measurement, with identical timing-off control calculations.
+"""Opt-in PTM measurement and Clarity model-blend endpoint experiment.
 
 Keep experimental overrides here; do not retune the shared production core to
 change this controller. Admission, driver override, inactivity, command limits
-and model timing remain inherited from PTM. Offline findings are not a tune.
+and model timing remain inherited from PTM. The shared geometry resolver applies
+the Testing-only 250-degree endpoint to eligible Clarity models; the core is unchanged.
 """
 import math
 import time
@@ -57,11 +58,12 @@ class PtmTestingCore(HondaEpsLateralCore):
 class LatControlPtmTesting(LatControlFirmware):
   core_type = PtmTestingCore
   feedforward_type = PtmTestingFeedforward
+  ptm_testing = True
 
   def __init__(self, CP, CP_SP, CI, dt):
     super().__init__(CP, CP_SP, CI, dt)
     self._last_measurement_ns = None
-    cloudlog.info("PTM Testing selected: measurement v1, unchanged timing-off control")
+    cloudlog.info("PTM Testing selected: measurement v1; eligible Clarity model blend ends at 250 degrees")
 
   def update(self, active, CS, VM, params, steer_limited_by_safety, desired_curvature,
              calibrated_pose, curvature_limited, lat_delay):
