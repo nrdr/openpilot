@@ -64,13 +64,14 @@ def test_model_identity_is_read_once_per_process_not_per_control_frame(monkeypat
   helpers.chestnut_present = lambda: calls.append("usb") or False
   monkeypatch.setitem(sys.modules, params.__name__, params)
   monkeypatch.setitem(sys.modules, helpers.__name__, helpers)
-  tuning.active_model_supports_optimized_lane_changes.cache_clear()
+  tuning._active_model_eligibility.cache_clear()
   try:
     for _ in range(100):
       assert not tuning.optimized_lane_changes_enabled({"NrdrOptimizedLaneChanges": True})
+      assert not tuning.active_model_supports_steer_ratio_blend()
     assert calls == ["ModelManager_ActiveBundle", "usb"]
   finally:
-    tuning.active_model_supports_optimized_lane_changes.cache_clear()
+    tuning._active_model_eligibility.cache_clear()
 
 
 def test_model_gate_is_warmed_during_live_parameter_initialization():

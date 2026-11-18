@@ -57,13 +57,31 @@ def model_supports_optimized_lane_changes(bundle: dict | None, *, chestnut: bool
   return overrides.get("folder") in OPTIMIZED_MODEL_FAMILIES or bundle.get("ref") in OPTIMIZED_MODEL_REFS
 
 
+def _model_eligibility(bundle: dict | None, *, chestnut: bool) -> tuple[bool, bool]:
+  lane_changes = model_supports_optimized_lane_changes(bundle, chestnut=chestnut)
+  # Vega is a CD210 derivative, not a request for CD210's steering compensation.
+  # Use its own identity even if a catalog groups it with the older world models.
+  identity = bundle or {}
+  vega = any(str(identity.get(key, "")).lower() in ("spz_polaris_vega", "polaris_vega", "polaris vega", "polarisvega")
+             for key in ("internalName", "short_name", "ref", "displayName", "display_name"))
+  return lane_changes, lane_changes and not vega
+
+
 @cache
-def active_model_supports_optimized_lane_changes() -> bool:
+def _active_model_eligibility() -> tuple[bool, bool]:
   # Model selection is fixed for an onroad process lifetime. Warm this during
   # live-parameter initialization; never poll Params/USB in the control loop.
   from openpilot.common.params import Params
   from openpilot.selfdrive.modeld.helpers import chestnut_present
-  return model_supports_optimized_lane_changes(Params().get("ModelManager_ActiveBundle"), chestnut=chestnut_present())
+  return _model_eligibility(Params().get("ModelManager_ActiveBundle"), chestnut=chestnut_present())
+
+
+def active_model_supports_optimized_lane_changes() -> bool:
+  return _active_model_eligibility()[0]
+
+
+def active_model_supports_steer_ratio_blend() -> bool:
+  return _active_model_eligibility()[1]
 
 
 def optimized_lane_changes_enabled(settings) -> bool:

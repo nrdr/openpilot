@@ -162,6 +162,22 @@ class ManagerDownloadTestBase(OpenpilotTestCase):
 class TestManagerDownload(ManagerDownloadTestBase):
   """Exercises the real _download_file / _download_chunked against a local server."""
 
+  def test_local_only_selection_never_downloads_or_accepts_a_missing_or_changed_file(self):
+    self.base_url = ''
+    artifact = self.make_artifact(chunked=False)
+    artifact.downloadUri.uri = ''
+    with mock.patch.object(self.manager, '_download_file', side_effect=AssertionError('unexpected download')):
+      for data in (None, b'wrong', WHOLE_BODY):
+        if data is not None:
+          with open(os.path.join(self.dest, artifact.fileName), 'wb') as f:
+            f.write(data)
+        if data != WHOLE_BODY:
+          with self.assertRaisesRegex(ValueError, 'Missing or changed local model'):
+            asyncio.run(self.manager._process_artifact(artifact, self.dest))
+        else:
+          asyncio.run(self.manager._process_artifact(artifact, self.dest))
+          self.assertEqual(artifact.downloadProgress.status, custom.ModelManagerSP.DownloadStatus.cached)
+
   def run_with_server(self, fn):
     with http_server_context(handler=DownloadHandler) as (host, port):
       self.base_url = f'http://{host}:{port}'

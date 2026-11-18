@@ -77,12 +77,27 @@ class BaseModelAdapter:
       return run_warp
 
 
+def _captures_npy_inputs(run, *names: str) -> bool:
+  captured = getattr(run, 'captured', None)
+  info = getattr(captured, 'expected_input_info', ())
+  args = getattr(captured, 'expected_names', ())
+  if not info or len(args) != len(info):
+    return False
+  devices = dict(zip(args, (spec[-1] for spec in info), strict=True))
+  return all(devices.get(name) == 'NPY' for name in names)
+
+
 class LegacyModelAdapter(BaseModelAdapter):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
     metadata = self.jits['metadata']
-    device_inputs = 'input_devices' in self.jits
+    # A warp device names where the warp runs, not where its transforms live.
+    # Local JITs record those arguments; portable programs use the bundle marker.
+    device_inputs = None
+    if 'input_devices' in self.jits:
+      device_inputs = not (_captures_npy_inputs(self.jits.get((self.cam_w, self.cam_h)), 'tfm', 'big_tfm') and
+                           _captures_npy_inputs(self.jits.get('run_policy'), 'packed_npy_inputs'))
     self.frame_copy_size = nv12_copy_size(*self.nv12_info[:3])
     # Unified artifacts pack raw frames into the policy input. Separate
     # artifacts always run a warp first, including when hosted on Chestnut.

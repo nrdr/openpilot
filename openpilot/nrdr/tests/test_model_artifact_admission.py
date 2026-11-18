@@ -23,6 +23,39 @@ def bundle(path, compiler_ref=''):
             ref='model-source-ref', internalName='PMV2', displayName='Selected Pop')
 
 
+def test_local_trial_picker_and_runner_pin_the_same_bytes_and_camera(tmp_path, runtime, monkeypatch):
+  trial = json.loads(admission._MANIFEST.read_text())['local_trials'][0]
+  entry = trial['catalog_bundle']
+  artifact = entry['models'][0]['artifact']
+  assert artifact['download_uri']['url'] == '' and entry['short_name'] == entry['ref'] == 'spz_polaris_vega'
+  path = tmp_path / artifact['file_name']
+  payload = b'test trial'
+  artifact['download_uri']['sha256'] = hashlib.sha256(payload).hexdigest()
+  runtime['local_trials'] = [trial]
+  manifest = tmp_path / 'manifest.json'
+  manifest.write_text(json.dumps(runtime))
+  monkeypatch.setattr(admission, '_MANIFEST', manifest)
+  camera = (1344, 760)
+  assert admission.verified_rebuild_bundles(tmp_path, camera) == []
+  path.write_bytes(payload)
+  assert admission.verified_rebuild_bundles(tmp_path, camera) == [entry]
+  assert admission.verified_rebuild_bundles(tmp_path, (1928, 1208)) == []
+  selected = bundle(path, compiler_ref=entry['tinygrad_ref'])
+  selected.ref = selected.internalName = entry['ref']
+  assert admission.admit_selected_artifact(path, selected, camera, device='QCOM') == path
+  for cam, dev in ((camera, 'AMD'), ((1928, 1208), 'QCOM')):
+    with pytest.raises(admission.ModelAdmissionError):
+      admission.admit_selected_artifact(path, selected, cam, device=dev)
+  selected.ref = 'other'
+  with pytest.raises(admission.ModelAdmissionError):
+    admission.admit_selected_artifact(path, selected, camera, device='QCOM')
+  selected.ref = entry['ref']
+  path.write_bytes(b'different bytes')
+  assert admission.verified_rebuild_bundles(tmp_path, camera) == []
+  with pytest.raises(admission.ModelAdmissionError):
+    admission.admit_selected_artifact(path, selected, camera, device='QCOM')
+
+
 def test_unknown_default_pkl_is_not_unpickled(tmp_path, runtime):
   path = tmp_path / 'driving.pkl'
   path.write_bytes(b'old ABI')

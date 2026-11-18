@@ -64,3 +64,119 @@ The C4 was fast-forwarded from `991cfb2` to `bcce1996be`, including opendbc `aaa
 Installed Cheddar passed another 110-frame run: finite plan, pose and camera odometry; output digest `0d4baf84a523efebc5dd4df490c704ceca581a1bd3ff8ca3c85011f3b6539a00`, exactly matching the pre-update baseline. Mean / p95 / maximum were 43.08 / 45.01 / 56.37 ms under this offroad workload; this is not road validation.
 
 Before/after hashes confirm 327 existing persistent keys unchanged, including the selected models and user preferences. Eight persistent bookkeeping/cache keys changed normally: daemon PID, the two model catalogs, boot count/log, Git commit/date and offroad uptime. Transient manager state was regenerated. No saved setting was manually written or toggled. Release branches and `release/build_prebuilt.sh` were untouched.
+
+## Polaris Vega: November 18 desktop-only build, not admitted
+
+The [publisher's Vega page](https://polaris.firestar.link/models/spz_polaris_vega) supplies the MIT-licensed source ONNX (SHA-256 `cfd9dbb518d3fdbae5f3eb1f64eeae9a8a9ea88526529038a71359de2a9cb021`) and a separate StarPilot QCOM artifact. The latter is not admitted by nrdr. Using development `a05e42cd6f`, the unmodified combined-model compiler built the source with `supercombo`, model size 512×256, camera 1344×760, derived frame skip 4, and desktop targets `CUDA:PTX;CPU:X86`. Policy and warp passed the compiler's own serialization/reload checks. The combined desktop artifact is 106,846,581 bytes, SHA-256 `2be68d401d0cbdee6f568259f95aed52528e3ecf13bab3e50650d745ab643d49`. It is **not a C4 binary**. This Windows host cannot execute nrdr's Qualcomm backend.
+
+- **Loader:** the desktop build emits `input_devices={'warp':'CUDA'}` although its captured camera transforms and packed policy inputs reside on `NPY`. The legacy adapter treats the mere presence of that key as a request for GPU-backed auxiliary inputs. Stock adapter initialization failed when it tried to map CUDA memory for host writes. Passing GPU-resident auxiliary inputs directly to the captured warp and policy separately reproduced the input-device mismatches; passing their captured NPY layout worked. Omitting only the ambiguous marker on an **in-memory copy of this locally built artifact** allowed the existing adapter to initialize and run. No loader/admission change is approved; portable downloads really can require GPU-backed inputs.
+- **Numerical comparison:** independently packed, padded synthetic NV12 buffers for both cameras with distinct integer translations; no road footage or borrowed camera pointers. Over 24 frames with identical reference-supplied feature histories, both camera warps matched the NumPy oracle byte-for-byte, all parsed outputs were finite, and peak differences vs CPU ONNX Runtime were 0.00381 m/s² lateral action and 0.000887 m/s² longitudinal action. Over a separate 144-frame test using the in-memory metadata correction, preloaded CUDA frame tensors and each implementation's own recurrent history, both warps still matched on every frame and all outputs were finite. Peak action differences were 0.00398 and 0.00195 m/s² respectively; 8/144 lateral actions exceeded a diagnostic comparison at `rtol=atol=0.001`. Across the entire raw tensor, 18.4% of values exceeded that comparison. This is **not** a C4 equivalence result or an approved tolerance; CUDA/ONNX precision, auxiliary input types and accumulation have not been isolated.
+- **Loader fix (desktop-verified):** the as-built artifact already declares its auxiliary argument devices in the warp and policy call signatures. For marked bundles the adapter now keeps the transforms and packed policy inputs on the host when all three explicitly declare NPY. Portable programs without those capture details keep their previous device-backed layout; unmarked legacy programs keep their previous defaults. This is independent of model size. Repeating the independent-history test on the **unaltered** desktop artifact, without editing metadata in memory, produced the same 144-frame comparison report byte-for-byte. Added coverage for host and device captures, portable and incomplete signatures, and unmarked legacy bundles with and without the Chestnut environment setting.
+- **Next:** build and verify Vega separately on a parked C4 using QCOM. Compare camera preprocessing, action, recurrent state, pose and plan against pinned reference inputs; the desktop numerical discrepancy is not resolved by this loader fix. No model selection, vehicle process, steer-ratio gate or PTM behavior changed. No lane or unwind performance claim follows from synthetic inputs.
+
+## Polaris Vega: November 18 parked C4 bench
+
+With the car off, the standalone adapter used the C4's own Qualcomm GPU, with no Chestnut,
+live camera, vehicle publisher, selector write or change to the installed checkout. The C4
+was on development `a05e42cd6f`, tinygrad `87846ccb3b`; the compiler and adapter under test
+were staged from the working tree. Compared 144 deterministic synthetic frames to a separate
+CPU ONNX Runtime reference (each runner feeding back its own features). Both camera warps
+were also compared to independent NumPy outputs, not merely to the other runner.
+
+The generic QCOM artifact (SHA-256 `70402e5ad9c28f0a0cc0e143f4fd692a13793a965099a23f1b5b147023b0fc29`)
+reloaded and produced finite outputs; all 288 warps were byte-exact. Peak absolute action differences
+were 0.00465 lateral and 0.00208 longitudinal m/s². The synchronized adapter call with preloaded
+camera tensors measured 435.1 / 438.6 ms (median / p95 excluding frame zero), far over the 50 ms
+model period. This was not the board's normal optimized build configuration.
+
+Rebuilding the same ONNX with the comma-arm64 flags in `selfdrive/modeld/SConscript`
+(`IMAGE=1 FLOAT16=1 NOLOCALS=1 JIT_BATCH_SIZE=0 OPENPILOT_HACKS=1`, on QCOM)
+produced SHA-256 `f26652bb639f86b9d8520f3371b6df37f55af79809350b9e6235746e6d586b1d`.
+The warmed synchronized adapter call fell to **40.0 / 41.1 ms** (median / p95, 143 timed frames);
+policy alone was 32–33 ms. Both camera warps were again byte-exact on all frames and every parsed
+output finite. Peak absolute differences vs the same reference increased to **0.01217 / 0.02179 m/s²**
+(lateral / longitudinal action), exceeding the 0.001 diagnostic threshold in 125 / 135 of 144 frames.
+Maximum absolute differences in the parsed plan, pose and recurrent arrays were 4.9030, 1.0659
+and 0.01036 respectively; the plan and pose arrays combine components with different units.
+This is not proof of numerical equivalence or of 20 Hz end-to-end performance in the driving stack.
+No catalog entry or deployment. Before admission, compare identical recurrent inputs to separate
+single-frame from accumulated differences, then check per-component outputs and full replay cadence
+on time-aligned recorded frames. Retained isolated artifacts and logs: `/data/tmp/vega-bench.UxoC7F`
+on the C4. Active bundle, SR mode and blend preference hashes were unchanged after both tests.
+
+The local model-specific SR gate excludes Vega independently of its catalog family; it does not
+disable optimized lane changes or change the saved global preference. Any future picker entry must
+retain Vega's own identity rather than alias the CD210 bundle. These inference runs did not use a
+steering controller. See [the Clarity's physical ratio check](ptm_testing_investigation.md#current-decision).
+
+## Polaris Vega: saved-road replay, November 18 — not admitted
+
+The parked C4 replayed the optimized artifact above on route `0000020d--9a6e742932`,
+segment 30, encoded frames 120–839 (camera IDs 36122–36841). All 720 narrow/wide pairs
+matched in sequence; speed 7.62–11.04 m/s, wheel angle −5.0° to +9.7°, no active lane changes.
+This is a gentle 36-second clip, not an S-curve or closed-loop test. No vehicle controller
+was started. The private replay had blend off; live Pop v2, SR and controller parameter
+hashes were unchanged. Artifacts, analysis scripts and per-frame results are retained under
+`../analysis/vega-road-2026-11-18` relative to the checkout.
+
+**Numerics (unpaced, no skipped frames):** used saved calibration, exact-frame lateral action
+times, Vega's zero smoothing override for longitudinal delay and identical QCOM-warped image bytes.
+Compared C4 to CPU ONNX Runtime twice: CPU fed the recorded C4 feature history (cast to
+the declared fp16 input), then CPU fed its own outputs. Both started from zero; histories
+advanced at every frame. The parsed plan has one trajectory, not competing plan hypotheses.
+
+| Absolute position difference at a 3-second forecast | Matched history | Independent histories |
+|---|---:|---:|
+| Lateral, p95 / max | 2.0 / 21.7 mm | 1.7 / 16.2 mm |
+| Forward, p95 / max | 5.3 / 10.4 cm | 8.9 / 18.2 cm |
+| Forward p95, first → last six seconds of footage | 5.3 → 6.9 cm | 5.9 → 16.7 cm |
+
+No sustained lateral buildup in chronological windows. Lateral errors did widen with
+*forecast horizon* (at 10 s, independent-history p95 1.05 cm, max 40.15 cm).
+Recurrent differences contributed to the later forward-position increase, but it
+was not monotonic over all six windows. This does not demonstrate unbounded drift.
+
+**Paced full process:** ran the actual development model loop, installed parser, message filling
+and private publishers, using the verified bench artifact and staged adapter. VisionIPC received
+both padded camera streams at 20 Hz; a separate subscriber counted distinct published modelV2 IDs.
+Recorded Honda parameters and vehicle/calibration messages were provided in the private namespace.
+The initial setup attempt waited for missing CarParamsSP and produced no timing result. With that
+record supplied, all counted model messages were valid with matching camera IDs and EOF timestamps.
+
+| After first 20 input frames | Pass 1 (transfer overlapped) | Clean repeat |
+|---|---:|---:|
+| Distinct outputs / 700 inputs | 577 | 623 |
+| Output Hz, first to last received | 17.17 | 17.81 |
+| Output spacing p50 / p95 | 54.7 / 84.2 ms | 54.0 / 80.2 ms |
+| Model execution p50 / p95 | 45.4 / 56.1 ms | 45.0 / 53.1 ms |
+| Camera feed to subscriber receipt p50 / p95 | 89.0 / 130.4 ms | 87.2 / 127.2 ms |
+
+Inputs averaged 20.000 Hz on both passes; clean feed interval p95 51.4 ms. Even excluding
+the first 300 input frames, only 374/420 were published on the repeat. Only CPUs 0–3 were online
+offroad, so the process used ordinary scheduling rather than the driving-time FIFO/core-7
+configuration. No CPU was brought online. This **fails the parked replay cadence criterion**,
+not a measurement of onroad throughput. Next: compare a known-good small model in precisely
+this harness, then separate preprocessing, inference, postprocessing and publication. Repeat the
+numerical comparison on turns and a longer, independent recording before considering the picker.
+
+### Experimental Sunnylink entry for the C4
+
+At owner request, expose **Polaris Vega (experimental, C4 only)** for personal evaluation.
+This does not qualify it for general distribution or road use. The clean parked result remains
+17.81 Hz; no same-harness Pop v2 comparison or sharp-curve validation has been performed.
+The [publisher](https://polaris.firestar.link/models/spz_polaris_vega) also reports shoulder cutting on tight exits.
+
+Only the exact optimized QCOM bytes above are listed, in the small-model picker on a C4 that
+has the file installed. Sunnylink uses the existing device-local catalog; no server change,
+publisher pickle, automatic download, auto-selection, CD210 alias or global SR setting change.
+The runner checks the pinned artifact, camera and backend again when loading. A missing or
+changed local file fails selection rather than fetching a substitute. The catalog uses
+the replay's supercombo constants (`is_20hz: false` selects the metadata layout, **not** the camera rate),
+non-MLSim path (generation 0 = unspecified for this trial), and zero smoothing overrides.
+Vega is excluded from SR blend even if the saved preference is on for Pop v2.
+
+On the test C4 the retained source is `/data/tmp/vega-road.3cT9gM/vega-replay.pkl`; the local
+model filename is `/data/media/0/models/nrdr-polaris-vega-c4-f26652bb.pkl`.
+Provision the exact verified file **offroad** before refreshing Sunnylink. No artifact is
+distributed in Git. Clearing the inactive model cache can remove the entry; the retained
+replay copy can be used to provision it again. Rollback is simply reselecting Pop v2 offroad.

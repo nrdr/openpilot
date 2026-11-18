@@ -133,7 +133,7 @@ def test_tuning_locks_do_not_rewrite_saved_values(controller):
 @pytest.mark.parametrize("fingerprint,firmware", sr._MODEL_BLEND_ENDPOINTS)
 @pytest.mark.parametrize("ptm_baseline", [False, True])
 def test_blend_endpoints_monotonicity_and_inverse(monkeypatch, fingerprint, firmware, ptm_baseline):
-  monkeypatch.setattr(lane_change_tuning, "active_model_supports_optimized_lane_changes", lambda: True)
+  monkeypatch.setattr(lane_change_tuning, "active_model_supports_steer_ratio_blend", lambda: True)
   CP = ratio_cp(fingerprint, firmware.encode())
   selection = sr.resolve_steer_ratio_selection(CP, {"NrdrSteerRatioMode": 3, "NrdrSteerRatioModelBlend": True}, ptm_baseline=ptm_baseline)
   blend = selection.model_blend
@@ -156,7 +156,7 @@ def test_blend_endpoints_monotonicity_and_inverse(monkeypatch, fingerprint, firm
 
 @pytest.mark.parametrize("eligible,mode,toggle", [(False, 3, True), (True, 1, True), (True, 3, False)])
 def test_blend_isolation(monkeypatch, eligible, mode, toggle):
-  monkeypatch.setattr(lane_change_tuning, "active_model_supports_optimized_lane_changes", lambda: eligible)
+  monkeypatch.setattr(lane_change_tuning, "active_model_supports_steer_ratio_blend", lambda: eligible)
   CP = ratio_cp("HONDA_CLARITY", b"39990-TRW-A020")
   selection = sr.resolve_steer_ratio_selection(CP, {"NrdrSteerRatioMode": mode, "NrdrSteerRatioModelBlend": toggle})
   baseline = sr.resolve_steer_ratio_selection(CP, {"NrdrSteerRatioMode": mode})
@@ -180,7 +180,7 @@ def test_model_default_c3x_only_and_existing_selection_untouched():
 
 
 def test_lane_change_shaping_uses_the_blended_mapping_in_both_directions(monkeypatch):
-  monkeypatch.setattr(lane_change_tuning, "active_model_supports_optimized_lane_changes", lambda: True)
+  monkeypatch.setattr(lane_change_tuning, "active_model_supports_steer_ratio_blend", lambda: True)
   CP = ratio_cp("HONDA_CLARITY", b"39990-TRW-A020")
   selection = sr.resolve_steer_ratio_selection(CP, {"NrdrSteerRatioMode": 3, "NrdrSteerRatioModelBlend": True})
   for request in (-.03, -.003, .003, .03):

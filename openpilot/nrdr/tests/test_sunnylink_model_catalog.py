@@ -73,6 +73,17 @@ def test_devices_without_verified_local_rebuilds_keep_existing_remote_catalog():
   assert params.values == settings()
 
 
+def test_local_vega_is_opt_in_in_the_small_picker_only():
+  entry = json.loads((ROOT / "openpilot/nrdr/config/model_artifacts.json").read_text())["local_trials"][0]["catalog_bundle"]
+  values = {**settings(), "ModelManager_ActiveBundle": {"ref": "pop", "internalName": "PMV2"}}
+  params = MemoryParams(values)
+  response = catalog_response(params, [entry])
+  assert response["ModelManager_ModelsCache"]["bundles"] == values["ModelManager_ModelsCache"]["bundles"] + [entry]
+  assert response["ModelManager_ActiveJson"]["chestnut"] == values["ModelManager_ActiveJson"]["chestnut"]
+  assert entry["is_big"] is False and "experimental" in entry["display_name"]
+  assert params.values == values
+
+
 def test_local_entry_is_not_duplicated_if_upstream_catalog_already_contains_it():
   params = MemoryParams(settings())
   params.values["ModelManager_ModelsCache"]["bundles"].append(cheddar())

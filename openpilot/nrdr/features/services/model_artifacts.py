@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from functools import lru_cache
 from pathlib import Path
 
 from openpilot.common.file_chunker import open_file_chunked
@@ -70,10 +71,19 @@ def admit_default_artifact(path: str | Path, *, device: str | None = None) -> Pa
 
 def admit_selected_artifact(path: str | Path, bundle, camera: tuple[int, int], *, device: str | None = None) -> Path:
   """Never reinterpret bundle.ref as tinygrad_ref or silently select another model."""
-  runtime_provenance()
+  manifest = runtime_provenance()
   path = Path(path)
   source_sha = str(bundle.models[0].artifact.downloadUri.sha256).lower()
   compiler_ref = str(getattr(bundle, "tinygradRef", ""))
+  for trial in manifest.get("local_trials", []):
+    entry = trial["catalog_bundle"]
+    digest = entry["models"][0]["artifact"]["download_uri"]["sha256"]
+    if bundle.ref == entry["ref"] or bundle.internalName == entry["short_name"] or source_sha == digest:
+      if (bundle.ref == entry["ref"] and bundle.internalName == entry["short_name"] and
+          source_sha == digest and compiler_ref == entry["tinygrad_ref"] == TINYGRAD_RUNTIME_REF and
+          list(camera) == trial["camera"] and device == trial["device"] and artifact_sha256(path) == digest):
+        return path
+      raise ModelAdmissionError(f"Local trial {entry['short_name']} does not match its pinned artifact or hardware")
   if compiler_ref == TINYGRAD_RUNTIME_REF and artifact_sha256(path) == source_sha:
     return path
   record = _read_record(Path(str(path) + ".nrdr-migration.json"))
@@ -106,11 +116,31 @@ def write_artifact_record(path: str | Path, *, source_sha256: str | None = None,
   temporary.replace(destination)
 
 
+@lru_cache(maxsize=4)
+def _listed_digest(path: Path, identity: tuple[int, ...]) -> str:
+  # Sunnylink and the picker can poll. Rehash on replacement/change, not on every poll.
+  # Selection and runtime admission independently verify contents without this cache.
+  return artifact_sha256(path)
+
+
 def verified_rebuild_bundles(model_root: str | Path, camera: tuple[int, int]) -> list[dict]:
   """List locally verified QCOM rebuilds; execution still requires full admission."""
   root = Path(model_root).resolve()
   bundles = []
-  for source_sha, recipe in _read_record(_MANIFEST).get("legacy_rebuilds", {}).items():
+  manifest = _read_record(_MANIFEST)
+  for trial in manifest.get("local_trials", []):
+    if trial["device"] != "QCOM" or trial["camera"] != list(camera):
+      continue
+    bundle = trial["catalog_bundle"]
+    artifact = bundle["models"][0]["artifact"]
+    path = root / artifact["file_name"]
+    try:
+      st = path.stat()
+      if _listed_digest(path, (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)) == artifact["download_uri"]["sha256"]:
+        bundles.append(bundle)
+    except OSError:
+      pass  # Optional: absent/unreadable trials are not advertised.
+  for source_sha, recipe in manifest.get("legacy_rebuilds", {}).items():
     if not (bundle := recipe.get("catalog_bundle")):
       continue
     source = root / bundle["models"][0]["artifact"]["file_name"]

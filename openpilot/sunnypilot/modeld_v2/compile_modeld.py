@@ -155,7 +155,7 @@ def host_view(tensor: Tensor) -> np.ndarray:
 
 
 def generate_queues_and_npy(input_shapes: dict, frame_skip: int, device: str = Device.DEFAULT,
-                            is_supercombo: bool = False, device_inputs: bool = False) -> tuple[dict, dict]:
+                            is_supercombo: bool = False, device_inputs: bool | None = None) -> tuple[dict, dict]:
   road_key, _ = _detect_vision_keys(input_shapes)
   if not road_key:
     raise ValueError("Vision road key missing from input shapes.")
@@ -184,12 +184,15 @@ def generate_queues_and_npy(input_shapes: dict, frame_skip: int, device: str = D
   for (k, s), v in zip(shapes.items(), split_views, strict=True):
     npy_arrays[k] = v.reshape(s)
 
+  # Unspecified legacy captures used a device-side packed buffer under CHESTNUT.
+  # An explicitly captured NPY layout must stay host-backed on any machine.
+  packed_on_device = bool(os.getenv('CHESTNUT')) if device_inputs is None else device_inputs
   queues = {
     'img_q': Tensor(np.zeros(img_buf_shape, dtype=np.uint8), device=device).contiguous().realize(),
     'big_img_q': Tensor(np.zeros(img_buf_shape, dtype=np.uint8), device=device).contiguous().realize(),
     'desire_q': Tensor(np.zeros((frame_skip * desire_shape[1], desire_shape[0], desire_shape[2]),
                   dtype=np.float32), device=device).contiguous().realize(),
-    'packed_npy_inputs': Tensor(packed_npy_inputs, device=device if device_inputs or os.getenv('CHESTNUT') else 'NPY').realize(),
+    'packed_npy_inputs': Tensor(packed_npy_inputs, device=device if packed_on_device else 'NPY').realize(),
   }
 
   if features_buffer:
@@ -212,12 +215,12 @@ def generate_queues_and_npy(input_shapes: dict, frame_skip: int, device: str = D
 
 
 def make_split_input_queues(vision_input_shapes: dict, policy_input_shapes: dict,
-                            frame_skip: int, device: str = Device.DEFAULT, device_inputs: bool = False) -> tuple[dict, dict]:
+                            frame_skip: int, device: str = Device.DEFAULT, device_inputs: bool | None = None) -> tuple[dict, dict]:
   return generate_queues_and_npy({**vision_input_shapes, **policy_input_shapes}, frame_skip, device, is_supercombo=False, device_inputs=device_inputs)
 
 
 def make_supercombo_input_queues(input_shapes: dict, frame_skip: int,
-                                 device: str = Device.DEFAULT, device_inputs: bool = False) -> tuple[dict, dict]:
+                                 device: str = Device.DEFAULT, device_inputs: bool | None = None) -> tuple[dict, dict]:
   return generate_queues_and_npy(input_shapes, frame_skip, device, is_supercombo=True, device_inputs=device_inputs)
 
 

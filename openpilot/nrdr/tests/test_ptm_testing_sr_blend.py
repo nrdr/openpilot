@@ -16,7 +16,7 @@ def car(fingerprint="HONDA_CLARITY", firmware=b"39990-TRW-A020"):
 
 @pytest.fixture
 def eligible(monkeypatch):
-  monkeypatch.setattr(lane_change_tuning, "active_model_supports_optimized_lane_changes", lambda: True)
+  monkeypatch.setattr(lane_change_tuning, "active_model_supports_steer_ratio_blend", lambda: True)
 
 
 def selection(cp=None, testing=False, **settings):
@@ -56,6 +56,22 @@ def test_round_trip_symmetry_and_monotonicity(eligible):
       assert candidate.desired_angle_no_offset(vm, 0., speed, roll, curvature) == pytest.approx(a, abs=1e-6)
 
 
+@pytest.mark.parametrize("identity", [
+  {"internalName": "spz_polaris_vega"}, {"ref": "spz_polaris_vega"}, {"displayName": "Polaris Vega"},
+  {"short_name": "POLARISVEGA"}, {"display_name": "Polaris Vega"},
+])
+def test_vega_keeps_physical_geometry_even_in_eligible_family(monkeypatch, identity):
+  bundle = {"overrides": [{"key": "folder", "value": "2026 World Models"}], **identity}
+  flags = lane_change_tuning._model_eligibility(bundle, chestnut=False)
+  assert flags == (True, False)
+  monkeypatch.setattr(lane_change_tuning, "_active_model_eligibility", lambda: flags)
+  for testing in (False, True):
+    vega = selection(testing=testing)
+    assert vega.rack_map is not None
+    assert vega == selection(testing=testing, NrdrSteerRatioModelBlend=False)
+    assert vega.model_blend is None
+
+
 @pytest.mark.parametrize("fingerprint,firmware", [
   ("HONDA_CIVIC", b"39990-TEG-A010"), ("HONDA_ODYSSEY", b"39990-THR-A020"),
   ("HONDA_CLARITY", b"unknown"),
@@ -67,7 +83,7 @@ def test_other_cars_and_unknown_eps_unchanged(eligible, fingerprint, firmware):
 
 @pytest.mark.parametrize("mode,toggle,model_eligible", [(1, True, True), (3, False, True), (3, True, False)])
 def test_existing_admission_gates_remain(monkeypatch, mode, toggle, model_eligible):
-  monkeypatch.setattr(lane_change_tuning, "active_model_supports_optimized_lane_changes", lambda: model_eligible)
+  monkeypatch.setattr(lane_change_tuning, "active_model_supports_steer_ratio_blend", lambda: model_eligible)
   options = {"NrdrSteerRatioMode": mode, "NrdrSteerRatioModelBlend": toggle}
   assert selection(testing=True, **options) == selection(**options)
   assert selection(testing=True, **options).model_blend is None

@@ -21,6 +21,22 @@
     "driving_supercombo.onnx": {"sha256": "65a08adc31d5c456219687d99b7bf5e44d61dae2d49ea67850e76105c7248cce", "size": 60918562},
     "dmonitoring_model.onnx": {"sha256": "dd299afabe7a3e0d04cbe2bd97fdb0c93bba8ad6d3cc3663a0e0ededaf243ac2", "size": 7497335}
   },
+  "local_trials": [{
+    "camera": [1344, 760], "device": "QCOM",
+    "catalog_bundle": {
+      "short_name": "spz_polaris_vega", "ref": "spz_polaris_vega",
+      "display_name": "Polaris Vega (experimental, C4 only)",
+      "environment": "development", "runner": "tinygrad", "index": 1000,
+      "minimum_selector_version": "21", "generation": "0", "is_20hz": false, "is_big": false,
+      "tinygrad_ref": "fe5d3169ba4f41d0947ad174925f413cbea9d056",
+      "onnx_sha256": "cfd9dbb518d3fdbae5f3eb1f64eeae9a8a9ea88526529038a71359de2a9cb021",
+      "build_time": "2026-11-18", "overrides": {"folder": "nrdr testing", "lat": ".0", "long": ".0"},
+      "models": [{"type": "supercombo", "artifact": {
+        "file_name": "nrdr-polaris-vega-c4-f26652bb.pkl",
+        "download_uri": {"url": "", "sha256": "f26652bb639f86b9d8520f3371b6df37f55af79809350b9e6235746e6d586b1d"}
+      }}]
+    }
+  }],
   "legacy_rebuilds": {
     "24fa1b3e67b64a1531d564aeca672969e4fcb8c120866325ff6eb71a31bb7f20": {
       "model_ref": "875a6b7e1e59a76e1c5d9972371564a4feb1deb9",

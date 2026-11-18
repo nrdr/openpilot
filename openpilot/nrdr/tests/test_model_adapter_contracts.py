@@ -180,6 +180,40 @@ def test_legacy_input_memory_matches_artifact_and_host_updates_reach_device(monk
     assert np.count_nonzero(queues['packed_npy_inputs'].numpy() == value) == 8
 
 
+@pytest.mark.parametrize('chestnut_env', [False, True])
+@pytest.mark.parametrize('layout', ['host_capture', 'device_capture', 'portable', 'incomplete', 'untagged'])
+def test_separate_model_auxiliary_buffers_follow_capture(adapters, monkeypatch, layout, chestnut_env):
+  if chestnut_env:
+    monkeypatch.setenv('CHESTNUT', '1')
+  else:
+    monkeypatch.delenv('CHESTNUT', raising=False)
+  camera = (16, 16)
+  shapes = {'img': (1, 12, 2, 2), 'big_img': (1, 12, 2, 2), 'desire_pulse': (1, 2, 8),
+            'features_buffer': (1, 2, 2), 'action_t': (1, 2)}
+  def warp(**inputs):
+    return inputs['frame']
+  def policy(**inputs):
+    return inputs['packed_npy_inputs']
+  jits = {'metadata': {'model': {'input_shapes': shapes, 'output_slices': {}}}, camera: warp, 'run_policy': policy}
+  if layout != 'untagged':
+    jits['input_devices'] = {'warp': 'PYTHON'}
+  device = 'PYTHON' if layout == 'device_capture' else 'NPY'
+  # Portable programs (including a cache hit) have input names but no tinygrad input-info table.
+  warp.captured = NS(expected_names=['big_tfm', 'tfm'], expected_input_info=[] if layout == 'portable' else
+                     [(None, (), None, device)] * 2)
+  policy.captured = NS(expected_names=['packed_npy_inputs'], expected_input_info=[] if layout in ('portable', 'incomplete') else
+                       [(None, (), None, device)])
+  adapter = adapters.get_model_adapter(jits, *camera, 'PYTHON', 'PYTHON', 'NPY')
+  mapped = layout not in ('host_capture', 'untagged')
+  packed = mapped or (layout == 'untagged' and chestnut_env)
+  for key in ('tfm', 'big_tfm'):
+    assert adapter.input_queues[key].device == ('PYTHON' if mapped else 'NPY')
+  assert adapter.input_queues['packed_npy_inputs'].device == ('PYTHON' if packed else 'NPY')
+  if layout != 'untagged' or not chestnut_env:
+    adapter.numpy_inputs['action_t'][:] = 0.25
+    assert np.count_nonzero(adapter.input_queues['packed_npy_inputs'].numpy() == 0.25) == 2
+
+
 @pytest.mark.parametrize('target,expected', [
   ('CPU:LLVM', 'CPU'), ('USB+AMD:LLVM', 'AMD'), ('QCOM', 'QCOM'), ('USB:1+AMD:LLVM:gfx1100', 'AMD'),
 ])

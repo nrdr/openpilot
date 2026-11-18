@@ -216,6 +216,13 @@ class ModelManagerSP:
 
   async def _process_artifact(self, artifact, destination_path: str) -> None:
     if not artifact.downloadUri.uri:
+      # Local-only picker entries must still pass verification before committing
+      # the selection. Never fall back to a different, downloadable build.
+      if artifact.downloadUri.sha256:
+        if not await verify_file(os.path.join(destination_path, artifact.fileName), artifact.downloadUri.sha256):
+          raise ValueError(f"Missing or changed local model: {artifact.fileName}")
+        artifact.downloadProgress.status = custom.ModelManagerSP.DownloadStatus.cached
+        artifact.downloadProgress.progress = 100
       return None
     if self._download_interrupted():
       raise DownloadCancelled("Download cancelled")

@@ -389,9 +389,9 @@ def resolve_steer_ratio_selection(CP, settings: Any, live_comma_ratio: float | N
   )
   enabled = _value(settings, "NrdrSteerRatioModelBlend")
   if (selection.firmware_vgr_selected and str(enabled).lower() in ("1", "true", "b'1'", "b'true'")):
-    from openpilot.nrdr.features.lateral.lane_change_tuning import active_model_supports_optimized_lane_changes
+    from openpilot.nrdr.features.lateral.lane_change_tuning import active_model_supports_steer_ratio_blend
     endpoint = model_blend_endpoint(CP)
-    if endpoint is not None and active_model_supports_optimized_lane_changes():
+    if endpoint is not None and active_model_supports_steer_ratio_blend():
       final, lock = endpoint
       if ptm_testing and ptm_baseline and fingerprint == "HONDA_CLARITY":
         # Temporary Clarity experiment: preserve the measured center and model
