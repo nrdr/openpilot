@@ -53,7 +53,7 @@ class PidfGroundLayout(Widget):
         title=tr("Use Device Yaw Correction"), param="NrdrDeviceYawCorrection",
         description=tr("Adds a small steering correction based on the car's measured motion. Off uses PIF control alone."))),
       simple_button_item_sp(button_text=lambda: tr("Steer Ratio Tuning"), button_width=800, callback=steer_ratio_callback,
-                            enabled=lambda: tuning_write_allowed(ui_state.params, "NrdrSteerRatioMode")),
+                            enabled=lambda: tuning_write_allowed(ui_state.params, "NrdrSteerRatioMode", CP=ui_state.CP, CP_SP=ui_state.CP_SP)),
     ]
     for band, label in (("LowSpeed", "[0-25MPH]"), ("Standard", "[25-50MPH]"), ("Highway", "[50+MPH]")):
       items.append(LineSeparatorSP(40))
@@ -85,7 +85,7 @@ class PidfGroundLayout(Widget):
   @staticmethod
   def _controller_label():
     saved = ui_state.params.get("NrdrLateralController")
-    if saved in (3, "3", b"3"):
+    if angle_controller_available(ui_state.CP, ui_state.CP_SP) or saved in (3, "3", b"3"):
       return tr("Angle Controller")
     if saved in (2, "2", b"2"):
       return tr("PTM Testing")
@@ -96,21 +96,21 @@ class PidfGroundLayout(Widget):
     # Recheck on confirmation: the car may have started while the dialog was open.
     if not ui_state.is_offroad() or value not in (0, 1, 2, 3):
       return False
+    if angle_controller_available(ui_state.CP, ui_state.CP_SP):
+      return value == 3  # Firmware owns this choice. Leave the saved preference alone.
     if value in (1, 2) and firmware_controller_profile(ui_state.CP, ui_state.CP_SP, for_picker=True) is None:
       return False
-    if value == 3 and not angle_controller_available(ui_state.CP, ui_state.CP_SP):
+    if value == 3:
       return False
     ui_state.params.put("NrdrLateralController", value, block=True)
     return True
 
   def _show_controller_selector(self):
-    if not ui_state.is_offroad():
+    if not ui_state.is_offroad() or angle_controller_available(ui_state.CP, ui_state.CP_SP):
       return
     choices = {tr("PIF Control"): 0}
     if firmware_controller_profile(ui_state.CP, ui_state.CP_SP, for_picker=True) is not None:
       choices.update({tr("PTM Controller"): 1, tr("PTM Testing"): 2})
-    if angle_controller_available(ui_state.CP, ui_state.CP_SP):
-      choices[tr("Angle Controller")] = 3
     options = list(choices)
 
     def selected(result):
@@ -124,10 +124,11 @@ class PidfGroundLayout(Widget):
 
   def _update_state(self):
     super()._update_state()
-    self._controller.action_item.set_enabled(ui_state.is_offroad())
+    angle_required = angle_controller_available(ui_state.CP, ui_state.CP_SP)
+    self._controller.action_item.set_enabled(ui_state.is_offroad() and not angle_required)
     profile = firmware_controller_profile(ui_state.CP, ui_state.CP_SP)
     description = tr("PTM Testing is experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed. " +
-                     "Change while parked. Applies next drive. Angle Controller requires the Clarity angle EPS firmware. " +
+                     "Change while parked. Applies next drive. Clarity EPS 39990+TRW+A020 selects Angle Controller automatically. " +
                      "Angle assistance has unresolved steering dropouts; not for road use.")
     if profile is not None and profile.required_rwd:
       description += " " + tr("Requires the corrected PTM firmware (RWD {}). Older builds report the same EPS version and are not "
@@ -140,8 +141,8 @@ class PidfGroundLayout(Widget):
       if key in ANGLE_TUNING_KEYS:
         available = angle_controller_available(ui_state.CP, ui_state.CP_SP)
       if key == "NrdrDeviceYawCorrection":
-        item.set_visible(str(ui_state.params.get("NrdrLateralController")) not in ("1", "b'1'", "2", "b'2'"))
-      item.action_item.set_enabled(available and tuning_write_allowed(ui_state.params, key))
+        item.set_visible(angle_required or str(ui_state.params.get("NrdrLateralController")) not in ("1", "b'1'", "2", "b'2'"))
+      item.action_item.set_enabled(available and tuning_write_allowed(ui_state.params, key, angle_required=angle_required))
 
   def _render(self, rect):
     self._back_button.set_position(self._rect.x, self._rect.y + 20)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -112,17 +113,21 @@ def build_sunnypilot_car_config(params, *, start_worker: bool = True,
 
 
 def configure_detected_car_defaults(CP, CP_SP, config, params):
-  """Resolve the one-time controller default from live hardware, before constructing actuators."""
+  """Resolve controller selection from detected hardware before constructing the car interface."""
+  from openpilot.nrdr.features.lateral.controller_selection import angle_controller_available
   from openpilot.nrdr.params.profiles import _put_verified, recommended_longitudinal_controller, vehicle_defaults_pending
   from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_KEY
   controller = recommended_longitudinal_controller(CP, CP_SP)
-  if controller is None or not vehicle_defaults_pending(params, CP.carFingerprint):
-    return config
-  _put_verified(params, "HondaLiveLearningGas", controller == 1)
-  _put_verified(params, "NrdrHondaPcmMode", 0)
-  _put_verified(params, CONTROLLER_KEY, int(controller))
-  config.honda.provider.close()
-  return build_sunnypilot_car_config(params)
+  if controller is not None and vehicle_defaults_pending(params, CP.carFingerprint):
+    _put_verified(params, "HondaLiveLearningGas", controller == 1)
+    _put_verified(params, "NrdrHondaPcmMode", 0)
+    _put_verified(params, CONTROLLER_KEY, int(controller))
+    config.honda.provider.close()
+    config = build_sunnypilot_car_config(params)
+  detected_angle = angle_controller_available(CP, CP_SP)
+  if config.honda.clarity_angle_mode != detected_angle:
+    config = replace(config, honda=replace(config.honda, clarity_angle_mode=detected_angle))
+  return config
 
 
 __all__ = (

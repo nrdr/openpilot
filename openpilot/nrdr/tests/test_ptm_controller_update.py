@@ -158,7 +158,8 @@ class TestPtmUpdate(unittest.TestCase):
     label, = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_controller_label"]
     label.decorator_list = []
     for saved in (1, "1", b"1", 2, "2", b"2", 0, "0", b"0", None, 3, "3", b"3", "garbage"):
-      env = {"tr": lambda text: text, "ui_state": NS(params={"NrdrLateralController": saved})}
+      env = {"tr": lambda text: text, "ui_state": NS(params={"NrdrLateralController": saved}, CP=None, CP_SP=None),
+             "angle_controller_available": lambda *_: False}
       exec(compile(ast.Module(body=[label], type_ignores=[]), "native_controller_label", "exec"), env)
       expected = "PTM Testing" if saved in (2, "2", b"2") else "PTM Controller" if saved in (1, "1", b"1") else "PIF Control"
       self.assertEqual(env["_controller_label"](), "Angle Controller" if saved in (3, "3", b"3") else expected)

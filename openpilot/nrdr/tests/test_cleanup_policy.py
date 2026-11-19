@@ -158,10 +158,10 @@ def test_native_controller_picker_rechecks_vehicle_and_offroad_on_confirmation(o
   env = {"Widget": object, "Callable": Callable,
          "ui_state": NS(params=params, CP=object(), CP_SP=object(), is_offroad=lambda: offroad),
          "firmware_controller_profile": lambda cp, sp, **kw: True if available else None,
-         "angle_controller_available": lambda cp, sp: available}
+         "angle_controller_available": lambda cp, sp: available and value == 3}
   picker = _definitions("openpilot/nrdr/ui/settings/pidf_ground.py", env)["PidfGroundLayout"]
   assert picker._commit_controller_selection(value) == allowed
-  assert params["NrdrLateralController"] == (value if allowed else 0)
+  assert params["NrdrLateralController"] == (value if allowed and value != 3 else 0)
 
 
 @pytest.mark.parametrize("available", [False, True])
@@ -182,7 +182,7 @@ def test_native_picker_only_offers_both_ptm_choices_for_supported_parked_cars(av
     assert shown[0].options == (["PIF Control", "PTM Controller", "PTM Testing"] if available else ["PIF Control"])
 
 
-def test_angle_picker_keeps_its_wire_id_even_without_torque_options():
+def test_angle_firmware_displays_angle_and_never_accepts_a_torque_choice():
   from collections.abc import Callable
   shown = []
   state = NS(params=MemoryParams(NrdrLateralController=0), CP=object(), CP_SP=object(), is_offroad=lambda: True)
@@ -193,15 +193,17 @@ def test_angle_picker_keeps_its_wire_id_even_without_torque_options():
   picker = _definitions("openpilot/nrdr/ui/settings/pidf_ground.py", env)["PidfGroundLayout"]
   layout = picker.__new__(picker)
   layout._show_controller_selector()
-  dialog, = shown
-  assert dialog.options == ["PIF Control", "Angle Controller"]
-  dialog.selection = "Angle Controller"
-  dialog.callback(1)
-  assert state.params["NrdrLateralController"] == 3
+  assert not shown
+  assert layout._controller_label() == "Angle Controller"
+  assert not layout._commit_controller_selection(0)
+  assert not layout._commit_controller_selection(2)
+  assert layout._commit_controller_selection(3)
+  assert state.params["NrdrLateralController"] == 0
 
 
 @pytest.mark.parametrize("controller", [0, 1, "1", b"1", 2, "2", b"2", 3, "3", b"3"])
-def test_native_ptm_choices_hide_yaw_correction_and_keep_fixed_tuning_locked(controller):
+@pytest.mark.parametrize("detected", [False, True])
+def test_native_ptm_choices_hide_yaw_correction_and_keep_fixed_tuning_locked(controller, detected):
   from collections.abc import Callable
   from unittest.mock import Mock
   class Widget:
@@ -210,17 +212,17 @@ def test_native_ptm_choices_hide_yaw_correction_and_keep_fixed_tuning_locked(con
   env = {"Widget": Widget, "Callable": Callable, "tr": lambda text: text,
          "ui_state": NS(params=MemoryParams(NrdrLateralController=controller), CP=object(), CP_SP=object(), is_offroad=lambda: True),
          "firmware_controller_profile": lambda *_: None, "supports_interpolated_torque_pif": lambda *_: True,
-         "angle_controller_available": lambda *_: True,
+         "angle_controller_available": lambda *_: detected,
          "tuning_write_allowed": tuning_write_allowed, "ANGLE_TUNING_KEYS": {"HondaClarityAngleCap3", "HondaEpsAngleRateLimit"}}
   picker = _definitions("openpilot/nrdr/ui/settings/pidf_ground.py", env)["PidfGroundLayout"]
   layout = picker.__new__(picker)
   layout._controller = Mock()
-  angle = controller in (3, "3", b"3")
+  angle = detected or controller in (3, "3", b"3")
   layout._tuning_items = {key: Mock() for key in ("NrdrDeviceYawCorrection", "LatPScaleStandard", *env["ANGLE_TUNING_KEYS"])}
   layout._update_state()
   layout._tuning_items["NrdrDeviceYawCorrection"].set_visible.assert_called_once_with(controller == 0 or angle)
   for key, item in layout._tuning_items.items():
-    item.action_item.set_enabled.assert_called_once_with(angle if key in env["ANGLE_TUNING_KEYS"] else controller == 0)
+    item.action_item.set_enabled.assert_called_once_with(detected if key in env["ANGLE_TUNING_KEYS"] else controller == 0 and not angle)
   description = layout._controller.set_description.call_args.args[0]
   assert "experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed" in description
   assert "Change while parked. Applies next drive." in description

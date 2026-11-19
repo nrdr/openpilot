@@ -221,12 +221,14 @@ def getParams(params_keys: list[str], compression: bool = False) -> str | dict[s
     catalog_overrides = (sunnylink_model_catalog_overrides(params)
                          if {"ModelManager_ActiveJson", "ModelManager_ModelsCache"}.intersection(param_keys_validated) else {})
     from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_KEY, saved_controller
-    controller_caps = _vehicle_tuning_capabilities() if CONTROLLER_KEY in param_keys_validated else {}
+    controller_caps = _vehicle_tuning_capabilities() if {CONTROLLER_KEY, "NrdrLateralController"}.intersection(param_keys_validated) else {}
     params_dict: dict[str, list[dict[str, str | bool | int]]] = {"params": []}
     for key in param_keys_validated:
       value = json.dumps(catalog_overrides[key]).encode("utf-8") if key in catalog_overrides else get_param_as_byte(key)
       if key == CONTROLLER_KEY:
         value = str(int(saved_controller(params, bosch_radar_available=controller_caps.get("nrdr_bosch_radar_controller_available") is True))).encode()
+      if key == "NrdrLateralController" and controller_caps.get("nrdr_angle_controller_available") is True:
+        value = b"3"
       if value is None:
         value = get_param_as_byte(key, get_default=True)
       if value is None:
@@ -340,13 +342,14 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
   capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
   handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
   honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
+  angle_required = capabilities.get("nrdr_angle_controller_available") is True
   angle_keys = ANGLE_TUNING_KEYS.intersection(params_to_update)
   if "NrdrLateralController" in params_to_update and (angle_keys or ANGLE_LOCKED_KEYS.intersection(params_to_update)):
     raise ValueError("Save Controller Type before editing its tuning.")
   for key in angle_keys:
     valid = (_remote_bool_value(params_to_update[key], compression) if key == "HondaClarityAngleCap3" else
              _remote_int_value(params_to_update[key], compression, tuple(range(0, 301, 10))))
-    if valid is None or capabilities.get("nrdr_angle_controller_available") is not True or not tuning_write_allowed(params, key):
+    if valid is None or not angle_required or not tuning_write_allowed(params, key, angle_required=angle_required):
       raise ValueError("Angle tuning requires Angle Controller on a supported Clarity and a valid setting.")
 
   def available_long_controllers(caps):
@@ -428,6 +431,7 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     except (ValueError, TypeError, OSError) as error:
       raise ValueError("Invalid Controller Type. The selection was not saved.") from error
     if (not honda_tuning_available or controller_selection not in (0, 1, 2, 3)
+        or (angle_required and controller_selection != 3)
         or (controller_selection in (1, 2) and capabilities.get("nrdr_yaw_controller_available") is not True)
         or (controller_selection == 3 and capabilities.get("nrdr_angle_controller_available") is not True)):
       raise ValueError("This Controller Type is unavailable for the detected vehicle. The selection was not saved.")
@@ -443,7 +447,8 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       raise ValueError("Controller Type cannot be changed after the car starts.")
     if write_onroad and key in ("HondaLiveLearningGas", CONTROLLER_KEY, "NrdrPcmSpeedDeadzone", *pcm_selections):
       raise ValueError("Longitudinal modes can only be changed while parked. Applies next drive.")
-    if not tuning_write_allowed(params, key, firmware_prediction_schedule=capabilities.get("nrdr_firmware_prediction_schedule") is True):
+    if not tuning_write_allowed(params, key, angle_required=angle_required,
+                                firmware_prediction_schedule=capabilities.get("nrdr_firmware_prediction_schedule") is True):
       cloudlog.warning(f"sunnylinkd.saveParams.locked: '{key}'")
       continue
     # disallow modifications to blocked parameters
@@ -513,8 +518,11 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
         # Recheck road state immediately before the write, including stale UI.
         if not params.get_bool("IsOffroad"):
           raise ValueError("Controller Type cannot be changed after the car starts.")
-        if controller_selection == 3 and _vehicle_tuning_capabilities().get("nrdr_angle_controller_available") is not True:
-          raise ValueError("Angle Controller is no longer available on the connected vehicle.")
+        detected_angle = _vehicle_tuning_capabilities().get("nrdr_angle_controller_available") is True
+        if detected_angle != (controller_selection == 3):
+          raise ValueError("Controller Type no longer matches the connected firmware.")
+        if detected_angle:
+          continue  # An echo of the effective selection must not overwrite another rack's preference.
         params.put(key, controller_selection, block=True)
         if str(params.get(key)) not in (str(controller_selection), f"b'{controller_selection}'"):
           raise ValueError("Controller Type readback did not match the requested selection.")

@@ -112,13 +112,16 @@ def mvl_tuning_locked(params, CP=None) -> bool:
 
 
 def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedule: bool = False,
-                         CP=None, CP_SP=None, is_offroad: bool | None = None) -> bool:
+                         CP=None, CP_SP=None, is_offroad: bool | None = None, angle_required: bool = False) -> bool:
   if not key:
     return True
   if key in RETIRED_TUNING_KEYS or key.startswith("NrdrNnlc"):
     return False
   if key in ANGLE_TUNING_KEYS or key in ANGLE_LOCKED_KEYS:
-    angle = params.get("NrdrLateralController") in (3, "3", b"3")
+    if CP is not None and CP_SP is not None:
+      from openpilot.nrdr.features.lateral.controller_selection import angle_controller_available
+      angle_required = angle_controller_available(CP, CP_SP)
+    angle = angle_required or params.get("NrdrLateralController") in (3, "3", b"3")
     if (key in ANGLE_TUNING_KEYS) != angle:
       return False
   if key in LONG_SCALE_KEYS or key in ("NrdrHondaFullBrakeAuthority", "StaticFeedforwardLong", "NrdrHondaWindBrake"):

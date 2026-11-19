@@ -1,5 +1,12 @@
 from openpilot.system.ui.lib.multilang import tr
-from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.params.tuning_policy import ANGLE_LOCKED_KEYS, ANGLE_TUNING_KEYS, tuning_write_allowed
+
+
+def device_tuning_write_allowed(params, key):
+  if key in ANGLE_LOCKED_KEYS or key in ANGLE_TUNING_KEYS:
+    from openpilot.selfdrive.ui.ui_state import ui_state
+    return tuning_write_allowed(params, key, CP=ui_state.CP, CP_SP=ui_state.CP_SP)
+  return tuning_write_allowed(params, key)
 
 
 CRUISE_PARAMS = (

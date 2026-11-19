@@ -186,9 +186,9 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
 
   def test_controller_choice_is_saved_and_read_back_offroad(self):
     self.namespace["_vehicle_tuning_capabilities"].return_value = {
-      "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": True, "nrdr_angle_controller_available": True,
+      "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": True, "nrdr_angle_controller_available": False,
     }
-    for value in (0, 1, 2, 3):
+    for value in (0, 1, 2):
       for compression in (False, True):
         with self.subTest(value=value, compression=compression):
           stored = {"NrdrLateralController": (value + 1) % 3}
@@ -198,7 +198,16 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
           self.assertEqual(stored["NrdrLateralController"], value)
           self.assertNotIn("NrdrDeviceYawCorrection", stored)
 
-  def test_angle_knobs_require_both_hardware_and_selection(self):
+  def test_angle_firmware_owns_selector_without_overwriting_the_torque_preference(self):
+    caps = self.namespace["_vehicle_tuning_capabilities"].return_value
+    caps.update(nrdr_honda_tuning_available=True, nrdr_yaw_controller_available=True, nrdr_angle_controller_available=True)
+    for raw in (b"0", b"1", b"2"):
+      with self.assertRaises(ValueError):
+        self.save_params({"NrdrLateralController": self._encode(raw)})
+    self.save_params({"NrdrLateralController": self._encode(b"3")})
+    assert not any(c.args[0] == "NrdrLateralController" for c in self.params.put.call_args_list)
+
+  def test_angle_knobs_follow_detected_firmware_even_with_saved_torque_preference(self):
     cap = {"nrdr_honda_tuning_available": True, "nrdr_angle_controller_available": True}
     self.namespace["_vehicle_tuning_capabilities"].return_value = cap
     for key, raw in (("HondaClarityAngleCap3", b"1"), ("HondaEpsAngleRateLimit", b"60")):
@@ -206,7 +215,7 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
         cap["nrdr_angle_controller_available"] = hardware
         self.params.get.side_effect = lambda k, selection=selection, **_: selection if k == "NrdrLateralController" else 0
         self.generic_write.reset_mock()
-        if selection == 3 and hardware:
+        if hardware:
           self.save_params({key: self._encode(raw)})
           self.generic_write.assert_called_once()
         else:

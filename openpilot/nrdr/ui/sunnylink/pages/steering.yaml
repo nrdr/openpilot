@@ -35,7 +35,7 @@ sections:
         widget: multiple_button
         title: Controller Type
         description: "Choose the steering controller: PIF uses your feedback tune, while PTM Controller uses a vehicle-specific calibration. PTM Testing is experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed."
-        details: "Change while parked. Applies next drive. Both PTM choices require the exact modified steering firmware build shown in Controller Type on the device. Older builds with the same version name are incompatible. Angle Controller requires the Clarity angle EPS firmware and has unresolved steering dropouts; not for road use."
+        details: "Change while parked. Applies next drive. Both PTM choices require the exact modified steering firmware build shown in Controller Type on the device. Older builds with the same version name are incompatible. Clarity EPS 39990+TRW+A020 selects Angle Controller automatically. Angle assistance has unresolved steering dropouts; not for road use."
         options:
         - value: 0
           label: PIF Control
@@ -53,6 +53,7 @@ sections:
           - {type: capability, field: nrdr_angle_controller_available, equals: true}
         enablement:
         - {type: offroad_only}
+        - {type: not, condition: {type: capability, field: nrdr_angle_controller_available, equals: true}}
       - key: HondaClarityAngleCap3
         widget: toggle
         title: Clarity Angle Lateral Cap 3.0 m/s²

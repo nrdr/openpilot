@@ -165,27 +165,10 @@ def _migrate_steer_ratio_settings(params: Params) -> None:
 
 
 def _migrate_angle_controller(params: Params) -> None:
-  # The old independent switch took precedence only on an angle-capable Clarity.
-  # Never convert an ignored toggle on another vehicle into a controller selection.
-  if params.get("HondaClarityAngleMode") not in (True, "1", b"1"):
-    return
-  from openpilot.nrdr.features.lateral.controller_selection import angle_controller_available
-  from openpilot.cereal import custom
-  from opendbc.car.structs import car
-  cp, sp = params.get("CarParamsPersistent"), params.get("CarParamsSPPersistent")
-  if cp and sp:
-    from capnp import KjException
-    try:
-      with car.CarParams.from_bytes(cp) as CP, custom.CarParamsSP.from_bytes(sp) as CP_SP:
-        supported = angle_controller_available(CP, CP_SP)
-    except (KjException, ValueError, TypeError):
-      supported = False
-    if supported:
-      params.put("NrdrLateralController", 3, block=True)
-      if params.get("NrdrLateralController") not in (3, "3", b"3"):
-        cloudlog.warning("Angle Controller migration not saved; retaining legacy preference")
-        return
-  params.put_bool("HondaClarityAngleMode", False, block=True)
+  # The live firmware match now owns this choice. Do not copy it into the
+  # global preference, which the owner may reuse with a different rack.
+  if params.get("HondaClarityAngleMode") in (True, "1", b"1"):
+    params.put_bool("HondaClarityAngleMode", False, block=True)
 
 
 def apply_defaults(params: Params) -> None:

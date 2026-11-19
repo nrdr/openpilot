@@ -8,7 +8,7 @@ from collections.abc import Callable
 
 import pyray as rl
 from openpilot.common.params import Params
-from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+from openpilot.nrdr.ui.settings_policy import device_tuning_write_allowed as tuning_write_allowed
 from openpilot.system.ui.lib.application import MousePos
 from openpilot.system.ui.widgets.toggle import Toggle
 from openpilot.system.ui.sunnypilot.lib.styles import style

@@ -17,6 +17,7 @@ from openpilot.nrdr.params import (
 )
 from openpilot.nrdr.params import disable_suggested_settings
 from openpilot.nrdr.params.tuning_policy import SUGGESTED_DESCRIPTION
+from openpilot.nrdr.features.lateral.controller_selection import angle_controller_available
 from openpilot.sunnypilot.selfdrive.car.opendbc_config import build_sunnypilot_car_config
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.lane_centering import LaneCenteringLayout
 from openpilot.system.ui.lib.application import gui_app
@@ -404,13 +405,13 @@ class LateralTuningLayout(Widget):
     self._override_button = simple_button_item_sp(
       button_text=lambda: tr("Override Tuning"),
       button_width=800,
-      enabled=lambda: ui_state.params.get("NrdrLateralController") not in (3, "3", b"3"),
+      enabled=lambda: not angle_controller_available(ui_state.CP, ui_state.CP_SP) and ui_state.params.get("NrdrLateralController") not in (3, "3", b"3"),
       callback=lambda: self._set_panel(LateralPanel.OVERRIDE),
     )
     self._steer_filters_button = simple_button_item_sp(
       button_text=lambda: tr("Steer Filters"),
       button_width=800,
-      enabled=lambda: ui_state.params.get("NrdrLateralController") not in (3, "3", b"3"),
+      enabled=lambda: not angle_controller_available(ui_state.CP, ui_state.CP_SP) and ui_state.params.get("NrdrLateralController") not in (3, "3", b"3"),
       callback=lambda: self._set_panel(LateralPanel.STEER_FILTERS),
     )
     self._honda_only_items = [
