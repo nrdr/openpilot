@@ -295,6 +295,11 @@ class RadarD:
           self.radar_state, (lead_one, lead_two),
           (self.lead_prob_filters[0].x, self.lead_prob_filters[1].x),
         )
+        # leadTwo on leadOne's radar track bypasses the leadOne-only bounds (bound_implausible_drop); publish it as no-lead
+        # (Biscuit-Labs a2 s50 t3025.7 track 24). Last, so the strict-match record and FCW authority above see both slots.
+        if (lead_one.get('present') and lead_one.get('radar') and lead_two.get('present') and lead_two.get('radar') and
+            lead_one.get('radarTrackId') == lead_two.get('radarTrackId')):
+          self.radar_state.leadTwo = {'present': False}
         return
 
       for i in range(2):
