@@ -215,11 +215,19 @@ class TestControllerUiLabels(unittest.TestCase):
     key = "NrdrDeviceYawCorrection"
     native = _native_class("pidf_ground.py", "PidfGroundLayout")(lambda: None, lambda: None)
     panel = _panel(self.schema, "steering", "nrdr_pidf_ground")
-    self.assertEqual([item["key"] for item in panel["items"][:4]],
-                     ["NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrLatStiction", key])
+    self.assertEqual([item["key"] for item in panel["items"][:6]],
+                     ["NrdrLateralController", "HondaClarityAngleCap3", "HondaEpsAngleRateLimit", "NrdrOptimizedLaneChanges", "NrdrLatStiction", key])
+    override = _panel(self.schema, "steering", "nrdr_override")
+    self.assertFalse({"HondaClarityAngleMode", "HondaClarityAngleCap3", "HondaEpsAngleRateLimit"}
+                     .intersection(item["key"] for item in override["items"]))
+    for row in panel["items"][1:3]:
+      self.assertFalse(row.get("visibility"))
+      self.assertIn({"type": "param", "key": "NrdrLateralController", "equals": 3}, row["enablement"])
+      self.assertIn({"type": "capability", "field": "nrdr_angle_controller_available", "equals": True}, row["enablement"])
     self.assertIs(native._scroller[0], native._controller)
-    self.assertIs(native._scroller[1], native._tuning_items["NrdrOptimizedLaneChanges"])
-    local, web = native._tuning_items[key], panel["items"][3]
+    for i, key_ in enumerate(("HondaClarityAngleCap3", "HondaEpsAngleRateLimit", "NrdrOptimizedLaneChanges"), start=1):
+      self.assertIs(native._scroller[i], native._tuning_items[key_])
+    local, web = native._tuning_items[key], panel["items"][5]
     self.assertEqual(local["title"], "Use Device Yaw Correction")
     self.assertEqual(web["title"], local["title"])
     self.assertEqual(web["description"], local["description"])
@@ -228,7 +236,7 @@ class TestControllerUiLabels(unittest.TestCase):
       "type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": controller},
     } for controller in (1, 2)])
     self.assertEqual([option["label"] for option in panel["items"][0]["options"]],
-                     ["PIF Control", "PTM Controller", "PTM Testing"])
+                     ["PIF Control", "PTM Controller", "PTM Testing", "Angle Controller"])
     self.assertEqual(web["enablement"][0], {
       "type": "capability", "field": "nrdr_interpolated_torque_pif_blend_available", "equals": True,
     })
@@ -242,10 +250,10 @@ class TestControllerUiLabels(unittest.TestCase):
     for offroad in (False, True):
       for available in (False, True):
         for settings in ({}, {"NrdrSuggestedSettings": True}, {"NrdrHandcraftedLateralTune": True},
-                         {"NrdrLateralController": 1}, {"NrdrLateralController": 2}):
+                         {"NrdrLateralController": 1}, {"NrdrLateralController": 2}, {"NrdrLateralController": 3}):
           with self.subTest(offroad=offroad, capability=available, settings=settings):
             values = {"NrdrSuggestedSettings": False, "NrdrHandcraftedLateralTune": False, "NrdrLateralController": 0, **settings}
-            allowed = not values["NrdrHandcraftedLateralTune"] and values["NrdrLateralController"] not in (1, 2) \
+            allowed = not values["NrdrHandcraftedLateralTune"] and values["NrdrLateralController"] not in (1, 2, 3) \
               and (offroad or not values["NrdrSuggestedSettings"])
             self.assertIs(tuning_write_allowed({"IsOffroad": offroad, **values}, key), allowed)
 

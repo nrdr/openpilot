@@ -3,8 +3,8 @@ from collections.abc import Callable
 import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
-from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile, yaw_controller_available
+from openpilot.nrdr.params.tuning_policy import ANGLE_TUNING_KEYS, tuning_write_allowed
+from openpilot.nrdr.features.lateral.controller_selection import angle_controller_available, firmware_controller_profile
 from openpilot.nrdr.features.lateral.capabilities import supports_interpolated_torque_pif
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
 from openpilot.system.ui.lib.application import gui_app
@@ -34,6 +34,13 @@ class PidfGroundLayout(Widget):
       return item
 
     items = [self._controller,
+      remember("HondaClarityAngleCap3", toggle_item_sp(
+        title=tr("Clarity Angle Lateral Cap 3.0 m/s²"), param="HondaClarityAngleCap3",
+        description=tr("Uses the 3.0 m/s² clamp (mode 4) instead of 4.0. Requires EPS build 0x05. Switches while lateral is off."))),
+      remember("HondaEpsAngleRateLimit", option_item_sp(
+        title=tr("Clarity Angle Rate Limit"), param="HondaEpsAngleRateLimit", min_value=0, max_value=300, value_change_step=10,
+        description=tr("Limits how fast the steering-angle target may move. Zero disables this optional cap."),
+        label_callback=lambda value: tr("Off") if value == 0 else f"{value} deg/s")),
       remember("NrdrOptimizedLaneChanges", toggle_item_sp(
         title=tr("Optimized lane changes"), param="NrdrOptimizedLaneChanges",
         description=tr("Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the " +
@@ -45,7 +52,8 @@ class PidfGroundLayout(Widget):
       remember("NrdrDeviceYawCorrection", toggle_item_sp(
         title=tr("Use Device Yaw Correction"), param="NrdrDeviceYawCorrection",
         description=tr("Adds a small steering correction based on the car's measured motion. Off uses PIF control alone."))),
-      simple_button_item_sp(button_text=lambda: tr("Steer Ratio Tuning"), button_width=800, callback=steer_ratio_callback),
+      simple_button_item_sp(button_text=lambda: tr("Steer Ratio Tuning"), button_width=800, callback=steer_ratio_callback,
+                            enabled=lambda: tuning_write_allowed(ui_state.params, "NrdrSteerRatioMode")),
     ]
     for band, label in (("LowSpeed", "[0-25MPH]"), ("Standard", "[25-50MPH]"), ("Highway", "[50+MPH]")):
       items.append(LineSeparatorSP(40))
@@ -76,16 +84,21 @@ class PidfGroundLayout(Widget):
 
   @staticmethod
   def _controller_label():
-    if str(ui_state.params.get("NrdrLateralController")) in ("2", "b'2'"):
+    saved = ui_state.params.get("NrdrLateralController")
+    if saved in (3, "3", b"3"):
+      return tr("Angle Controller")
+    if saved in (2, "2", b"2"):
       return tr("PTM Testing")
-    return tr("PTM Controller") if str(ui_state.params.get("NrdrLateralController")) in ("1", "b'1'") else tr("PIF Control")
+    return tr("PTM Controller") if saved in (1, "1", b"1") else tr("PIF Control")
 
   @staticmethod
   def _commit_controller_selection(value):
     # Recheck on confirmation: the car may have started while the dialog was open.
-    if not ui_state.is_offroad() or value not in (0, 1, 2):
+    if not ui_state.is_offroad() or value not in (0, 1, 2, 3):
       return False
-    if value in (1, 2) and not yaw_controller_available(ui_state.CP, ui_state.CP_SP):
+    if value in (1, 2) and firmware_controller_profile(ui_state.CP, ui_state.CP_SP, for_picker=True) is None:
+      return False
+    if value == 3 and not angle_controller_available(ui_state.CP, ui_state.CP_SP):
       return False
     ui_state.params.put("NrdrLateralController", value, block=True)
     return True
@@ -93,17 +106,20 @@ class PidfGroundLayout(Widget):
   def _show_controller_selector(self):
     if not ui_state.is_offroad():
       return
-    options = [tr("PIF Control")]
-    if yaw_controller_available(ui_state.CP, ui_state.CP_SP):
-      options.append(tr("PTM Controller"))
-      options.append(tr("PTM Testing"))
+    choices = {tr("PIF Control"): 0}
+    if firmware_controller_profile(ui_state.CP, ui_state.CP_SP, for_picker=True) is not None:
+      choices.update({tr("PTM Controller"): 1, tr("PTM Testing"): 2})
+    if angle_controller_available(ui_state.CP, ui_state.CP_SP):
+      choices[tr("Angle Controller")] = 3
+    options = list(choices)
 
     def selected(result):
       dialog, self._controller_dialog = self._controller_dialog, None
       if result == DialogResult.CONFIRM and dialog is not None and dialog.selection in options:
-        self._commit_controller_selection(options.index(dialog.selection))
+        self._commit_controller_selection(choices[dialog.selection])
 
-    self._controller_dialog = MultiOptionDialog(tr("Controller Type"), options, self._controller_label(), callback=selected)
+    current = self._controller_label()
+    self._controller_dialog = MultiOptionDialog(tr("Controller Type"), options, current if current in choices else options[0], callback=selected)
     gui_app.push_widget(self._controller_dialog)
 
   def _update_state(self):
@@ -111,7 +127,8 @@ class PidfGroundLayout(Widget):
     self._controller.action_item.set_enabled(ui_state.is_offroad())
     profile = firmware_controller_profile(ui_state.CP, ui_state.CP_SP)
     description = tr("PTM Testing is experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed. " +
-                     "Change while parked. Applies next drive.")
+                     "Change while parked. Applies next drive. Angle Controller requires the Clarity angle EPS firmware. " +
+                     "Angle assistance has unresolved steering dropouts; not for road use.")
     if profile is not None and profile.required_rwd:
       description += " " + tr("Requires the corrected PTM firmware (RWD {}). Older builds report the same EPS version and are not "
                        + "compatible.").format(profile.required_rwd)
@@ -120,6 +137,8 @@ class PidfGroundLayout(Widget):
     self._controller.set_description(description)
     for key, item in self._tuning_items.items():
       available = key != "NrdrDeviceYawCorrection" or supports_interpolated_torque_pif(ui_state.CP, ui_state.CP_SP)
+      if key in ANGLE_TUNING_KEYS:
+        available = angle_controller_available(ui_state.CP, ui_state.CP_SP)
       if key == "NrdrDeviceYawCorrection":
         item.set_visible(str(ui_state.params.get("NrdrLateralController")) not in ("1", "b'1'", "2", "b'2'"))
       item.action_item.set_enabled(available and tuning_write_allowed(ui_state.params, key))

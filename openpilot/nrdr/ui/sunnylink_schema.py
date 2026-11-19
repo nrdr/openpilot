@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 
 from openpilot.nrdr.params.tuning_policy import (
-  MVL_DESCRIPTION, SUGGESTED_DESCRIPTION, SUGGESTED_LOCK_KEYS, YAW_FIXED_KEYS, LONG_SCALE_KEYS,
+  ANGLE_LOCKED_KEYS, ANGLE_TUNING_KEYS, MVL_DESCRIPTION, SUGGESTED_DESCRIPTION, SUGGESTED_LOCK_KEYS, YAW_FIXED_KEYS, LONG_SCALE_KEYS,
 )
 
 from openpilot.nrdr.params import NRDR_UI_METADATA_BY_KEY, get_ui_metadata
@@ -51,6 +51,11 @@ def apply_sunnylink_metadata(item: dict) -> dict:
     merged.setdefault(field, copy.deepcopy(expected_value))
   if key:
     enablement = copy.deepcopy(merged.get("enablement", []))
+    if key in ANGLE_LOCKED_KEYS:
+      enablement.append({"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 3}})
+    if key in ANGLE_TUNING_KEYS:
+      enablement.extend([{"type": "param", "key": "NrdrLateralController", "equals": 3},
+                         {"type": "capability", "field": "nrdr_angle_controller_available", "equals": True}])
     if key == "MaxTimeOffroad":
       # The upstream timer stays on Device; its nrdr shutdown override now
       # lives under Steering. Keep the cross-page exclusion at the UI boundary.

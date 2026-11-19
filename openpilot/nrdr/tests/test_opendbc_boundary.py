@@ -121,7 +121,6 @@ class TestOpendbcBoundary(unittest.TestCase):
     self.assertTrue(set(HOST_STARTUP_DEFAULTS).isdisjoint(set(NrdrHondaParamKey)))
     self.assertSetEqual(set(NrdrHondaParamKey), set(grouped_keys) | {
       NrdrHondaParamKey.HONDA_BOSCH_A_RADAR,
-      NrdrHondaParamKey.HONDA_CLARITY_ANGLE_MODE,  # startup only (build_nrdr_honda_config)
       OpendbcParamKey.HONDA_GAS_ALPHA,
       OpendbcParamKey.HONDA_GAS_FACTOR,
       OpendbcParamKey.HONDA_WIND_FACTOR,
@@ -152,9 +151,16 @@ class TestOpendbcBoundary(unittest.TestCase):
       "NrdrLongitudinalController",
       str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS),
       str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE),
-      str(NrdrHondaParamKey.HONDA_CLARITY_ANGLE_MODE),
+      str(NrdrHondaParamKey.NRDR_LATERAL_CONTROLLER),
       *(str(key) for key in HOST_STARTUP_DEFAULTS),
     ])
+
+  def test_only_explicit_angle_selection_requests_angle_at_startup(self):
+    for selected in (None, 0, 1, 2, "bad", 3, "3", b"3"):
+      params = FakeParams({"HondaClarityAngleMode": True, "NrdrLateralController": selected})
+      config = build_sunnypilot_car_config(params, start_worker=False, metadata_path=self.tmp_path / "meta.json")
+      self.assertEqual(config.honda.clarity_angle_mode, selected in (3, "3", b"3"))
+      self.assertEqual(params.writes, [])
 
   def test_longitudinal_controller_selection_uses_existing_startup_boundary(self):
     for mode, mvl, radar, personal in ((-1, True, True, False), (0, False, False, False),

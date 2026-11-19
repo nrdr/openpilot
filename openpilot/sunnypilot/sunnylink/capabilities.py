@@ -57,6 +57,7 @@ CAPABILITY_FIELDS = (
   "has_handcrafted_lateral_profile",
   "nrdr_honda_tuning_available",
   "nrdr_yaw_controller_available",
+  "nrdr_angle_controller_available",
   "nrdr_firmware_prediction_schedule",
   "nrdr_firmware_controller_provisional",
   "nrdr_longitudinal_tuning_available",
@@ -97,6 +98,7 @@ CAPABILITY_LABELS: dict[str, str] = {
   "subaru_has_sng": "Subaru Stop-and-Go available",
   "hyundai_alpha_long_available": "Hyundai Alpha Longitudinal available",
   "has_handcrafted_lateral_profile": "Handcrafted lateral profile available",
+  "nrdr_angle_controller_available": "Clarity with angle PTM EPS firmware",
   "nrdr_yaw_controller_available": "Supported Honda PTM Controller",
   "nrdr_firmware_prediction_schedule": "Measured PTM Controller prediction-delay schedule",
   "nrdr_firmware_controller_provisional": "Provisional firmware-specific calibration; confirm the required EPS build before driving",
@@ -239,9 +241,11 @@ def generate_capabilities(params: Params | None = None) -> dict:
   confirmed_identity = confirmed_vehicle_identity(
     CP, selected_fingerprint, selected_brand, selection_present=selection_present,
   )
-  from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile
+  from openpilot.nrdr.features.lateral.controller_selection import angle_controller_available, firmware_controller_profile
   firmware_profile = firmware_controller_profile(CP, CP_SP) if confirmed_identity is not None else None
-  caps["nrdr_yaw_controller_available"] = firmware_profile is not None
+  caps["nrdr_angle_controller_available"] = confirmed_identity is not None and angle_controller_available(CP, CP_SP)
+  caps["nrdr_yaw_controller_available"] = firmware_profile is not None or (
+    caps["nrdr_angle_controller_available"] and firmware_controller_profile(CP, CP_SP, for_picker=True) is not None)
   caps["nrdr_firmware_prediction_schedule"] = firmware_profile is not None and firmware_profile.prediction_schedule
   caps["nrdr_firmware_controller_provisional"] = firmware_profile is not None and firmware_profile.provisional
   caps["nrdr_honda_tuning_available"] = confirmed_identity is not None and confirmed_identity[1] == "honda"

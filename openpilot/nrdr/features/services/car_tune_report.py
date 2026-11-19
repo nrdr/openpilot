@@ -84,7 +84,7 @@ class CarTuneReporter:
   def _interpolated_torque_pif_info(self, CP) -> tuple[str, bool]:
     supported = supports_interpolated_torque_pif(CP, self._cp_sp())
     controller = self.params.get("NrdrLateralController")
-    enabled = resolve_interpolated_torque_pif_settings(self.params, supported).enabled and controller not in (1, "1", b"1", 2, "2", b"2")
+    enabled = resolve_interpolated_torque_pif_settings(self.params, supported).enabled and controller not in (1, "1", b"1", 2, "2", b"2", 3, "3", b"3")
     return ("Fixed 1% torque / 99% PIF | LAF 10 | friction 1/1/1 | optimized lane changes bypass blend"
             if enabled else "PIF blend inactive"), enabled
 
@@ -101,6 +101,8 @@ class CarTuneReporter:
     return reconstructed if reconstructed.lateralTuning.which() == "pid" else CP
 
   def _controller_name(self, CP) -> str:
+    if str(CP.carFingerprint) == "HONDA_CLARITY" and getattr(CP, "steerControlType", "") == "angle":
+      return "Angle Controller"
     return "PIF Control" if str(CP.carFingerprint) == "HONDA_CLARITY" else CP.lateralTuning.which().upper()
 
   def _pid_info(self, CP) -> tuple[str, str, str]:

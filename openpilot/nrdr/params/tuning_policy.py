@@ -36,6 +36,7 @@ YAW_FIXED_KEYS = PIF_KEYS | frozenset((
   "HondaSteerDeltaLimiter", "HondaSteerDeltaUp", "HondaSteerDeltaDown",
 ))
 RETIRED_TUNING_KEYS = frozenset((
+  "HondaClarityAngleMode",
   "NrdrPtmTimingRestoration",
   "NrdrMvlPcmDeadzone",
   "NrdrSteerRatioHybrid", "NrdrSteerRatioSourceB", "NrdrSteerRatioBlendStart",
@@ -49,6 +50,14 @@ RETIRED_TUNING_KEYS = frozenset((
   "NrdrInterpolatedTorqueFriction", "NrdrInterpolatedTorqueFrictionStandard", "NrdrInterpolatedTorqueFrictionHighway",
   "NrdrLaneChangeMinTime", "NrdrLaneChangeEntrySrReduction", "NrdrLaneChangeEntryReturnTime",
   "NrdrLaneChangeTorqueFactor", "NrdrLaneChangeFrictionPercent",
+))
+
+ANGLE_TUNING_KEYS = frozenset(("HondaClarityAngleCap3", "HondaEpsAngleRateLimit"))
+ANGLE_LOCKED_KEYS = YAW_FIXED_KEYS | frozenset((
+  "NrdrOptimizedLaneChanges", "NrdrSteerRatioMode", "NrdrSteerRatioModelBlend",
+  "NrdrDriverOverrideThreshold", "NrdrOverrideThresholdCenterBoost", "HondaDriverAssistDuringOverride",
+  "HondaOverrideFadeUpSecs", "HondaOverrideFadeDownSecs", "HondaOverrideTorqueScale",
+  "NrdrLatRateDampingLowSpeed", "NrdrLatRateDampingStandard", "NrdrLatRateDampingHighway",
 ))
 SUGGESTED_LOCK_KEYS = PIF_KEYS | frozenset((
   "LaneGuidanceMode", "NrdrLateralController",
@@ -108,6 +117,10 @@ def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedul
     return True
   if key in RETIRED_TUNING_KEYS or key.startswith("NrdrNnlc"):
     return False
+  if key in ANGLE_TUNING_KEYS or key in ANGLE_LOCKED_KEYS:
+    angle = params.get("NrdrLateralController") in (3, "3", b"3")
+    if (key in ANGLE_TUNING_KEYS) != angle:
+      return False
   if key in LONG_SCALE_KEYS or key in ("NrdrHondaFullBrakeAuthority", "StaticFeedforwardLong", "NrdrHondaWindBrake"):
     from openpilot.nrdr.params.longitudinal_controller import LongitudinalController, saved_controller
     controller = saved_controller(params, bosch_radar_available=True)

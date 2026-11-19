@@ -65,16 +65,20 @@ class Controls(ControlsExt):
     self.LoC = LongControl(self.CP, self.CP_SP)
     self.VM = VehicleModel(self.CP)
     self.LaC: LatControl
+    # Angle/curvature cars can still carry PID or torque tuning data. Only
+    # torque-actuated controllers consume the corresponding per-frame hooks.
+    self.torque_tuning = self.CP.lateralTuning.which() if self.CP.steerControlType == car.CarParams.SteerControlType.torque else None
     if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       self.LaC = LatControlAngle(self.CP, self.CP_SP, self.CI, DT_CTRL)
     elif self.CP.steerControlType == car.CarParams.SteerControlType.curvature:
       self.LaC = LatControlCurvature(self.CP, self.CP_SP, self.CI, DT_CTRL)
-    elif self.CP.lateralTuning.which() == 'pid':
-      self.LaC = LatControlPID(self.CP, self.CP_SP, self.CI, DT_CTRL)
-    elif self.CP.lateralTuning.which() == 'torque':
-      self.LaC = LatControlTorque(self.CP, self.CP_SP, self.CI, DT_CTRL)
+    else:
+      if self.torque_tuning == 'pid':
+        self.LaC = LatControlPID(self.CP, self.CP_SP, self.CI, DT_CTRL)
+      elif self.torque_tuning == 'torque':
+        self.LaC = LatControlTorque(self.CP, self.CP_SP, self.CI, DT_CTRL)
+      self.LaC = ControlsExt.initialize_lateral_control(self, self.LaC, self.CI, DT_CTRL)
 
-    self.LaC = ControlsExt.initialize_lateral_control(self, self.LaC, self.CI, DT_CTRL)
     ptm_controller = getattr(self.LaC, "firmware_profile", None) is not None
     self.model_action_ramp = ModelActionRamp() if ptm_controller else None
 
@@ -119,7 +123,7 @@ class Controls(ControlsExt):
       self.VM, CS.steeringAngleDeg, CS.vEgo, lp.roll, angle_offset_deg=angle_offset)
 
     # Update Torque Params
-    if self.CP.lateralTuning.which() == 'torque':
+    if self.torque_tuning == 'torque':
       torque_params = self.sm['lateralTorqueParameters']
       if self.sm.all_checks(['lateralTorqueParameters']) and torque_params.useParams:
         self.LaC.update_torque_parameters(torque_params.latAccelFactorFiltered, torque_params.latAccelOffsetFiltered,
@@ -131,7 +135,7 @@ class Controls(ControlsExt):
 
       self.LaC.extension.update_lateral_lag(self.lat_delay)
 
-    elif self.CP.lateralTuning.which() == 'pid':
+    elif self.torque_tuning == 'pid':
       self.LaC.update_model_v2(self.sm['modelV2'])
 
     long_plan = self.sm['longitudinalPlan']
@@ -284,12 +288,11 @@ class Controls(ControlsExt):
     # trigger the car's stock driver monitoring escalation
     CC.driverMonitoringEscalation = cs.forceDecel
 
-    lat_tuning = self.CP.lateralTuning.which()
     if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
       cs.lateralControlState.angleState = lac_log
     elif self.CP.steerControlType == car.CarParams.SteerControlType.curvature:
       cs.lateralControlState.curvatureState = lac_log
-    elif lat_tuning == 'pid':
+    elif self.torque_tuning == 'pid':
       if lac_log._has('ptmTesting'):
         # Measurement only: preserve actual subscription IDs and the operands
         # of the existing mismatch check. Normal PTM has no such payload.
@@ -303,7 +306,7 @@ class Controls(ControlsExt):
         trace.comparedApplied = float(self.sm['carOutput'].actuatorsOutput.torque)
         trace.nextSteerLimited = bool(self.steer_limited_by_safety)
       cs.lateralControlState.pidState = lac_log
-    elif lat_tuning == 'torque':
+    elif self.torque_tuning == 'torque':
       cs.lateralControlState.torqueState = lac_log
 
     self.pm.send('controlsState', dat)

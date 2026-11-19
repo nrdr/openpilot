@@ -46,7 +46,6 @@ class NrdrHondaParamKey(StrEnum):
   HONDA_OVERRIDE_FADE_UP_SECS = NrdrParamKey.HONDA_OVERRIDE_FADE_UP_SECS
   HONDA_OVERRIDE_TORQUE_SCALE = NrdrParamKey.HONDA_OVERRIDE_TORQUE_SCALE
   HONDA_DRIVER_ASSIST_DURING_OVERRIDE = NrdrParamKey.HONDA_DRIVER_ASSIST_DURING_OVERRIDE
-  HONDA_CLARITY_ANGLE_MODE = NrdrParamKey.HONDA_CLARITY_ANGLE_MODE
   HONDA_CLARITY_ANGLE_CAP3 = NrdrParamKey.HONDA_CLARITY_ANGLE_CAP3
   HONDA_EPS_ANGLE_RATE_LIMIT = NrdrParamKey.HONDA_EPS_ANGLE_RATE_LIMIT
   HONDA_LIVE_LEARNING_GAS = NrdrParamKey.HONDA_LIVE_LEARNING_GAS
@@ -568,7 +567,7 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
     # Old acceleration-error settings are retained on disk, never reinterpreted as speed.
     mvl_pcm_deadzone=0.0,
     civic_pcm_speed_deadzone=0.0,
-    clarity_angle_mode=_bool_value(_read_param(params, OpendbcParamKey.HONDA_CLARITY_ANGLE_MODE), False),
+    clarity_angle_mode=_read_param(params, OpendbcParamKey.NRDR_LATERAL_CONTROLLER) in (3, "3", b"3"),
   )
 
 

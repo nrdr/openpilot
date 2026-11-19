@@ -82,33 +82,6 @@ class OverrideTuningLayout(Widget):
       label_callback=lambda value: f"{value}%",
     )
 
-    # Clarity mode-switch / angle-loop EPS (opendbc sunnypilot/car/honda/clarity_eps.py)
-    self._clarity_angle_mode = toggle_item_sp(
-      param="HondaClarityAngleMode",
-      title=lambda: tr("Clarity Angle Mode (Restart Required)"),
-      description=lambda: tr(
-        "Clarity only: steer by wheel angle through the angle PTM EPS firmware (software ID 39990+TRW+A020). Ignored on any "
-        "other EPS firmware, which keeps torque control. Takes effect at the next start."
-      ),
-    )
-    self._clarity_angle_cap3 = toggle_item_sp(
-      param="HondaClarityAngleCap3",
-      title=lambda: tr("Clarity Angle Lateral Cap 3.0 m/s\u00b2"),
-      description=lambda: tr(
-        "Angle mode only: use the EPS's 3.0 m/s\u00b2 lateral-acceleration clamp (mode 4) instead of 4.0. Needs EPS build 0x05; "
-        "no effect on other builds. Switches while lateral is off."
-      ),
-    )
-    self._angle_rate_limit = option_item_sp(
-      param="HondaEpsAngleRateLimit",
-      title=lambda: tr("Clarity Angle Rate Limit"),
-      min_value=0,
-      max_value=300,
-      value_change_step=10,
-      description=lambda: tr("Angle mode only: caps how fast the steering-angle target may move, in deg/s. 0 turns the cap off."),
-      label_callback=lambda value: tr("Off") if value == 0 else f"{value} deg/s",
-    )
-
     return [
       self._driver_override_threshold_cb,
       self._driver_override_threshold,
@@ -117,9 +90,6 @@ class OverrideTuningLayout(Widget):
       self._override_fade_down,
       self._override_fade_up,
       self._override_torque_scale,
-      self._clarity_angle_mode,
-      self._clarity_angle_cap3,
-      self._angle_rate_limit,
     ]
 
   def _render(self, rect):

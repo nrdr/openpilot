@@ -404,11 +404,13 @@ class LateralTuningLayout(Widget):
     self._override_button = simple_button_item_sp(
       button_text=lambda: tr("Override Tuning"),
       button_width=800,
+      enabled=lambda: ui_state.params.get("NrdrLateralController") not in (3, "3", b"3"),
       callback=lambda: self._set_panel(LateralPanel.OVERRIDE),
     )
     self._steer_filters_button = simple_button_item_sp(
       button_text=lambda: tr("Steer Filters"),
       button_width=800,
+      enabled=lambda: ui_state.params.get("NrdrLateralController") not in (3, "3", b"3"),
       callback=lambda: self._set_panel(LateralPanel.STEER_FILTERS),
     )
     self._honda_only_items = [

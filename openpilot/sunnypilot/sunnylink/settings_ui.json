@@ -624,7 +624,7 @@
                   "widget": "multiple_button",
                   "title": "Controller Type",
                   "description": "Choose the steering controller: PIF uses your feedback tune, while PTM Controller uses a vehicle-specific calibration. PTM Testing is experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed.",
-                  "details": "Change while parked. Applies next drive. Both PTM choices require the exact modified steering firmware build shown in Controller Type on the device. Older builds with the same version name are incompatible.",
+                  "details": "Change while parked. Applies next drive. Both PTM choices require the exact modified steering firmware build shown in Controller Type on the device. Older builds with the same version name are incompatible. Angle Controller requires the Clarity angle EPS firmware and has unresolved steering dropouts; not for road use.",
                   "options": [
                     {
                       "value": 0,
@@ -648,6 +648,17 @@
                         {
                           "type": "capability",
                           "field": "nrdr_yaw_controller_available",
+                          "equals": true
+                        }
+                      ]
+                    },
+                    {
+                      "value": 3,
+                      "label": "Angle Controller",
+                      "enablement": [
+                        {
+                          "type": "capability",
+                          "field": "nrdr_angle_controller_available",
                           "equals": true
                         }
                       ]
@@ -684,11 +695,59 @@
                   ]
                 },
                 {
+                  "key": "HondaClarityAngleCap3",
+                  "widget": "toggle",
+                  "title": "Clarity Angle Lateral Cap 3.0 m/s\u00b2",
+                  "description": "Angle mode only: use the EPS's 3.0 m/s\u00b2 lateral-acceleration clamp (mode 4) instead of 4.0. Needs EPS build 0x05; no effect on other builds. Switches while lateral is off.",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrLateralController",
+                      "equals": 3
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_angle_controller_available",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
+                  "key": "HondaEpsAngleRateLimit",
+                  "widget": "option",
+                  "title": "Clarity Angle Rate Limit",
+                  "description": "Angle mode only: caps how fast the steering-angle target may move, in deg/s. 0 turns the cap off.",
+                  "min": 0,
+                  "max": 300,
+                  "step": 10,
+                  "unit": "deg/s",
+                  "enablement": [
+                    {
+                      "type": "param",
+                      "key": "NrdrLateralController",
+                      "equals": 3
+                    },
+                    {
+                      "type": "capability",
+                      "field": "nrdr_angle_controller_available",
+                      "equals": true
+                    }
+                  ]
+                },
+                {
                   "key": "NrdrOptimizedLaneChanges",
                   "widget": "toggle",
                   "title": "Optimized Lane Changes",
                   "description": "Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the normal steering tune throughout the maneuver.",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -722,6 +781,14 @@
                   "description": "Reduces steering force as the wheel reaches its target, then holds it steady until another correction is needed. Off uses the normal steering response.",
                   "details": "Pauses during driver steering input and lane changes. Steering faults and control limits take priority.",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -795,6 +862,14 @@
                       "equals": true
                     },
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -847,6 +922,14 @@
                   "step": 5,
                   "unit": "%",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -901,6 +984,14 @@
                   "unit": "%",
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -952,6 +1043,14 @@
                   "step": 5,
                   "unit": "%",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -1005,6 +1104,14 @@
                   "unit": "%",
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -1056,6 +1163,14 @@
                   "step": 5,
                   "unit": "%",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -1109,6 +1224,14 @@
                   "unit": "%",
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -1160,6 +1283,14 @@
                   "step": 5,
                   "unit": "%",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -1213,6 +1344,14 @@
                   "unit": "%",
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -1264,6 +1403,14 @@
                   "step": 5,
                   "unit": "%",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -1317,6 +1464,14 @@
                   "unit": "%",
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -1368,6 +1523,14 @@
                   "step": 5,
                   "unit": "%",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -1421,6 +1584,14 @@
                   "unit": "%",
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -1472,6 +1643,14 @@
                   "max": 5.0,
                   "step": 0.01,
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -1525,6 +1704,14 @@
                   "unit": "deg",
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -1577,6 +1764,14 @@
                   "step": 1,
                   "unit": "mph",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -1918,6 +2113,14 @@
                   ],
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -1958,6 +2161,14 @@
                       "type": "capability",
                       "field": "nrdr_firmware_steer_ratio_available",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
                     },
                     {
                       "type": "any",
@@ -2008,6 +2219,14 @@
                   "step": 100,
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -2044,6 +2263,14 @@
                   "step": 100,
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -2075,6 +2302,14 @@
                   "title": "Assist Pass-Through",
                   "description": "Reduces steering assistance when you take over to make manual steering feel smoother. Off keeps the normal override response.",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -2112,6 +2347,14 @@
                   "unit": "second",
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -2147,6 +2390,14 @@
                   "step": 0.01,
                   "unit": "second",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -2184,6 +2435,14 @@
                   "unit": "%",
                   "enablement": [
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -2208,28 +2467,6 @@
                       }
                     }
                   ]
-                },
-                {
-                  "key": "HondaClarityAngleMode",
-                  "widget": "toggle",
-                  "title": "Clarity Angle Mode (Restart Required)",
-                  "description": "Clarity only: steer by wheel angle through the angle PTM EPS firmware (software ID 39990+TRW+A020). Ignored on any other EPS firmware, which keeps torque control. Takes effect at the next start."
-                },
-                {
-                  "key": "HondaClarityAngleCap3",
-                  "widget": "toggle",
-                  "title": "Clarity Angle Lateral Cap 3.0 m/s\u00b2",
-                  "description": "Angle mode only: use the EPS's 3.0 m/s\u00b2 lateral-acceleration clamp (mode 4) instead of 4.0. Needs EPS build 0x05; no effect on other builds. Switches while lateral is off."
-                },
-                {
-                  "key": "HondaEpsAngleRateLimit",
-                  "widget": "option",
-                  "title": "Clarity Angle Rate Limit",
-                  "description": "Angle mode only: caps how fast the steering-angle target may move, in deg/s. 0 turns the cap off.",
-                  "min": 0,
-                  "max": 300,
-                  "step": 10,
-                  "unit": "deg/s"
                 }
               ]
             },
@@ -2250,6 +2487,14 @@
                   "description": "Smooths steering commands across all three speed ranges. Off disables filtering without changing your saved values.",
                   "details": "Higher values add smoothing and delay; excessive delay can cause steering oscillations. Zero disables filtering for an individual speed range.",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -2305,6 +2550,14 @@
                       "type": "param",
                       "key": "HondaTorqueLowPassFilter",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
                     },
                     {
                       "type": "any",
@@ -2363,6 +2616,14 @@
                       "equals": true
                     },
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -2419,6 +2680,14 @@
                       "equals": true
                     },
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -2467,6 +2736,14 @@
                   "description": "Limits how quickly steering force can change. Off removes this additional rate limit without changing the saved limits.",
                   "details": "Lower limits produce a slower steering response and can add lag.",
                   "enablement": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
                     {
                       "type": "any",
                       "conditions": [
@@ -2524,6 +2801,14 @@
                       "equals": true
                     },
                     {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
+                    },
+                    {
                       "type": "any",
                       "conditions": [
                         {
@@ -2578,6 +2863,14 @@
                       "type": "param",
                       "key": "HondaSteerDeltaLimiter",
                       "equals": true
+                    },
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "param",
+                        "key": "NrdrLateralController",
+                        "equals": 3
+                      }
                     },
                     {
                       "type": "any",

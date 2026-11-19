@@ -93,11 +93,19 @@ def _firmware_family(CP) -> FirmwareControllerProfile | None:
   return None
 
 
-def firmware_controller_profile(CP, CP_SP) -> FirmwareControllerProfile | None:
+def angle_controller_available(CP, CP_SP) -> bool:
+  flags = getattr(CP_SP, "flags", 0)
+  required = HondaFlagsSP.EPS_MODIFIED | HondaFlagsSP.EPS_ANGLE_PTM
+  return (getattr(CP, "brand", "") == "honda" and str(getattr(CP, "carFingerprint", "")) == "HONDA_CLARITY"
+          and flags & required == required and any(
+            fw.ecu == "eps" and bytes(fw.fwVersion).rstrip(b"\0") == b"39990+TRW+A020" for fw in getattr(CP, "carFw", ())))
+
+
+def firmware_controller_profile(CP, CP_SP, *, for_picker: bool = False) -> FirmwareControllerProfile | None:
   profile = _firmware_family(CP)
   flags = getattr(CP_SP, "flags", 0)
   # Clarity angle mode steers through LatControlAngle; the PTM torque controllers must not replace it
-  if profile is not None and flags & HondaFlagsSP.EPS_MODIFIED.value and not flags & HondaFlagsSP.CLARITY_ANGLE_MODE.value and \
+  if profile is not None and flags & HondaFlagsSP.EPS_MODIFIED.value and (for_picker or not flags & HondaFlagsSP.CLARITY_ANGLE_MODE.value) and \
      get_honda_vgr_profile(CP) is not None and CP.lateralTuning.which() == "pid":
     return profile
   return None

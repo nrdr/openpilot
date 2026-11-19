@@ -403,12 +403,12 @@ class TestControllerCleanup(OpenpilotTestCase):
   def test_controller_stiction_and_optimized_lane_changes_lead_dungeon(self, schema):
     section = _find_section(schema, "steering", "nrdr")
     panel = next(p for p in section["sub_panels"] if p["id"] == "nrdr_pidf_ground")
-    assert [item["key"] for item in panel["items"][:4]] == [
-      "NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrLatStiction", "NrdrDeviceYawCorrection",
+    assert [item["key"] for item in panel["items"][:6]] == [
+      "NrdrLateralController", "HondaClarityAngleCap3", "HondaEpsAngleRateLimit", "NrdrOptimizedLaneChanges", "NrdrLatStiction", "NrdrDeviceYawCorrection",
     ]
     controller = panel["items"][0]
     assert [(o["value"], o["label"]) for o in controller["options"]] == [
-      (0, "PIF Control"), (1, "PTM Controller"), (2, "PTM Testing"),
+      (0, "PIF Control"), (1, "PTM Controller"), (2, "PTM Testing"), (3, "Angle Controller"),
     ]
     assert "experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed" in controller["description"]
     assert "exact modified steering firmware build" in controller["details"]
@@ -417,10 +417,10 @@ class TestControllerCleanup(OpenpilotTestCase):
     assert "offroad_only" in _flatten_rule_types(controller["enablement"])
     assert _references_capability_field(controller["options"][1]["enablement"], "nrdr_yaw_controller_available")
     assert controller["options"][2]["enablement"] == controller["options"][1]["enablement"]
-    correction = panel["items"][3]
+    correction = panel["items"][5]
     assert correction["title"] == "Use Device Yaw Correction" and correction["widget"] == "toggle"
     assert _references_capability_field(correction["enablement"], "nrdr_interpolated_torque_pif_blend_available")
-    optimized = panel["items"][1]
+    optimized = panel["items"][3]
     assert optimized["widget"] == "toggle"
     assert "Off keeps the normal steering tune" in optimized["description"]
 

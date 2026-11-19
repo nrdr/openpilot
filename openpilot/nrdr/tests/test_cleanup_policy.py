@@ -51,14 +51,14 @@ def test_yaw_locks_ignored_pif_controls_without_changing_the_saved_values(key, c
   assert tuning_write_allowed(params, key)
 
 
-@pytest.mark.parametrize("key", ["NrdrSteerRatioMode", "NrdrSteerRatioHybrid", "NrdrSteerRatioSourceB",
-                                 "NrdrSteerRatioBlendStart", "NrdrSteerRatioManualCenter", "NrdrSteerRatioManualFinal"])
+@pytest.mark.parametrize("key", ["NrdrSteerRatioMode", "NrdrSteerRatioModelBlend"])
 def test_shared_geometry_is_not_locked_by_controller_selection(key):
   from openpilot.nrdr.ui.sunnylink_schema import apply_sunnylink_metadata
   params = MemoryParams(NrdrLateralController=1, NrdrSuggestedSettings=False)
   assert tuning_write_allowed(params, key)
   item = apply_sunnylink_metadata({"key": key})
   assert item["enablement"] == [
+    {"type": "not", "condition": {"type": "param", "key": "NrdrLateralController", "equals": 3}},
     {"type": "any", "conditions": [
       {"type": "offroad_only"},
       {"type": "not", "condition": {"type": "param", "key": "NrdrSuggestedSettings", "equals": True}},
@@ -149,7 +149,7 @@ def _definitions(relative, env):
 @pytest.mark.parametrize("offroad,available,value,allowed", [
   (True, True, 1, True), (True, False, 1, False), (False, True, 1, False),
   (True, False, 0, True), (False, True, 0, False), (True, True, 2, True),
-  (True, False, 2, False), (False, True, 2, False), (True, True, 3, False),
+  (True, False, 2, False), (False, True, 2, False), (True, True, 3, True), (True, False, 3, False), (False, True, 3, False),
   (True, True, None, False), (True, True, "2", False), (True, True, "garbage", False),
 ])
 def test_native_controller_picker_rechecks_vehicle_and_offroad_on_confirmation(offroad, available, value, allowed):
@@ -157,7 +157,8 @@ def test_native_controller_picker_rechecks_vehicle_and_offroad_on_confirmation(o
   params = MemoryParams(NrdrLateralController=0)
   env = {"Widget": object, "Callable": Callable,
          "ui_state": NS(params=params, CP=object(), CP_SP=object(), is_offroad=lambda: offroad),
-         "yaw_controller_available": lambda cp, sp: available}
+         "firmware_controller_profile": lambda cp, sp, **kw: True if available else None,
+         "angle_controller_available": lambda cp, sp: available}
   picker = _definitions("openpilot/nrdr/ui/settings/pidf_ground.py", env)["PidfGroundLayout"]
   assert picker._commit_controller_selection(value) == allowed
   assert params["NrdrLateralController"] == (value if allowed else 0)
@@ -170,7 +171,8 @@ def test_native_picker_only_offers_both_ptm_choices_for_supported_parked_cars(av
   shown = []
   env = {"Widget": object, "Callable": Callable, "tr": lambda text: text,
          "ui_state": NS(params=MemoryParams(NrdrLateralController=0), CP=object(), CP_SP=object(), is_offroad=lambda: offroad),
-         "yaw_controller_available": lambda *_: available,
+         "firmware_controller_profile": lambda *_, **kw: True if available else None,
+         "angle_controller_available": lambda *_: False,
          "MultiOptionDialog": lambda title, options, selected, **kwargs: NS(options=options, selected=selected),
          "gui_app": NS(push_widget=shown.append)}
   picker = _definitions("openpilot/nrdr/ui/settings/pidf_ground.py", env)["PidfGroundLayout"]
@@ -180,7 +182,25 @@ def test_native_picker_only_offers_both_ptm_choices_for_supported_parked_cars(av
     assert shown[0].options == (["PIF Control", "PTM Controller", "PTM Testing"] if available else ["PIF Control"])
 
 
-@pytest.mark.parametrize("controller", [0, 1, "1", b"1", 2, "2", b"2"])
+def test_angle_picker_keeps_its_wire_id_even_without_torque_options():
+  from collections.abc import Callable
+  shown = []
+  state = NS(params=MemoryParams(NrdrLateralController=0), CP=object(), CP_SP=object(), is_offroad=lambda: True)
+  env = {"Widget": object, "Callable": Callable, "tr": lambda text: text, "ui_state": state,
+         "firmware_controller_profile": lambda *_, **kw: None, "angle_controller_available": lambda *_: True,
+         "MultiOptionDialog": lambda title, options, selected, **kw: NS(options=options, selection=selected, **kw),
+         "DialogResult": NS(CONFIRM=1), "gui_app": NS(push_widget=shown.append)}
+  picker = _definitions("openpilot/nrdr/ui/settings/pidf_ground.py", env)["PidfGroundLayout"]
+  layout = picker.__new__(picker)
+  layout._show_controller_selector()
+  dialog, = shown
+  assert dialog.options == ["PIF Control", "Angle Controller"]
+  dialog.selection = "Angle Controller"
+  dialog.callback(1)
+  assert state.params["NrdrLateralController"] == 3
+
+
+@pytest.mark.parametrize("controller", [0, 1, "1", b"1", 2, "2", b"2", 3, "3", b"3"])
 def test_native_ptm_choices_hide_yaw_correction_and_keep_fixed_tuning_locked(controller):
   from collections.abc import Callable
   from unittest.mock import Mock
@@ -190,15 +210,17 @@ def test_native_ptm_choices_hide_yaw_correction_and_keep_fixed_tuning_locked(con
   env = {"Widget": Widget, "Callable": Callable, "tr": lambda text: text,
          "ui_state": NS(params=MemoryParams(NrdrLateralController=controller), CP=object(), CP_SP=object(), is_offroad=lambda: True),
          "firmware_controller_profile": lambda *_: None, "supports_interpolated_torque_pif": lambda *_: True,
-         "tuning_write_allowed": tuning_write_allowed}
+         "angle_controller_available": lambda *_: True,
+         "tuning_write_allowed": tuning_write_allowed, "ANGLE_TUNING_KEYS": {"HondaClarityAngleCap3", "HondaEpsAngleRateLimit"}}
   picker = _definitions("openpilot/nrdr/ui/settings/pidf_ground.py", env)["PidfGroundLayout"]
   layout = picker.__new__(picker)
   layout._controller = Mock()
-  layout._tuning_items = {key: Mock() for key in ("NrdrDeviceYawCorrection", "LatPScaleStandard")}
+  angle = controller in (3, "3", b"3")
+  layout._tuning_items = {key: Mock() for key in ("NrdrDeviceYawCorrection", "LatPScaleStandard", *env["ANGLE_TUNING_KEYS"])}
   layout._update_state()
-  layout._tuning_items["NrdrDeviceYawCorrection"].set_visible.assert_called_once_with(controller == 0)
-  for item in layout._tuning_items.values():
-    item.action_item.set_enabled.assert_called_once_with(controller == 0)
+  layout._tuning_items["NrdrDeviceYawCorrection"].set_visible.assert_called_once_with(controller == 0 or angle)
+  for key, item in layout._tuning_items.items():
+    item.action_item.set_enabled.assert_called_once_with(angle if key in env["ANGLE_TUNING_KEYS"] else controller == 0)
   description = layout._controller.set_description.call_args.args[0]
   assert "experimental and starts with the same PTM Timing Off behavior; no new tuning is deployed" in description
   assert "Change while parked. Applies next drive." in description

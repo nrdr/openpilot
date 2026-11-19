@@ -152,19 +152,16 @@ class TestPtmUpdate(unittest.TestCase):
           yield from items(child)
     selector, = items(schema)
     self.assertEqual([(o["value"], o["label"]) for o in selector["options"]],
-                     [(0, "PIF Control"), (1, "PTM Controller"), (2, "PTM Testing")])
+                     [(0, "PIF Control"), (1, "PTM Controller"), (2, "PTM Testing"), (3, "Angle Controller")])
     source = (root / "nrdr/ui/settings/pidf_ground.py").read_text()
     tree = ast.parse(source)
     label, = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_controller_label"]
     label.decorator_list = []
-    for saved in (1, "1", b"1", 2, "2", b"2", 0, "0", b"0", None, 3, "garbage"):
+    for saved in (1, "1", b"1", 2, "2", b"2", 0, "0", b"0", None, 3, "3", b"3", "garbage"):
       env = {"tr": lambda text: text, "ui_state": NS(params={"NrdrLateralController": saved})}
       exec(compile(ast.Module(body=[label], type_ignores=[]), "native_controller_label", "exec"), env)
       expected = "PTM Testing" if saved in (2, "2", b"2") else "PTM Controller" if saved in (1, "1", b"1") else "PIF Control"
-      self.assertEqual(env["_controller_label"](), expected)
-    self.assertIn('options.append(tr("PTM Controller"))', source)
-    self.assertIn('options.append(tr("PTM Testing"))', source)
-    self.assertIn("options.index(dialog.selection)", source)
+      self.assertEqual(env["_controller_label"](), "Angle Controller" if saved in (3, "3", b"3") else expected)
 
   def test_exact_new_revision_and_saved_selection(self):
     for fingerprint, profile in (("HONDA_ODYSSEY", ODYSSEY_PROFILE), ("HONDA_RIDGELINE", RIDGELINE_PROFILE)):

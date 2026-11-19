@@ -289,7 +289,9 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
   import math
 
   from openpilot.nrdr.car.live_gas_reset import REQUEST, request_reset, stored_cp
-  from openpilot.nrdr.params.tuning_policy import CRUISE_PREFERENCE_KEYS, MVL_LOCK_KEYS, RETIRED_TUNING_KEYS, tuning_write_allowed
+  from openpilot.nrdr.params.tuning_policy import (
+    ANGLE_LOCKED_KEYS, ANGLE_TUNING_KEYS, CRUISE_PREFERENCE_KEYS, MVL_LOCK_KEYS, RETIRED_TUNING_KEYS, tuning_write_allowed,
+  )
   from openpilot.nrdr.params.pcm_speed_deadzone import decode_speed_deadzone
   from openpilot.nrdr.params.longitudinal_controller import CONTROLLER_KEY
   from openpilot.nrdr.ui.honda_pcm import store_controller_choice
@@ -338,6 +340,15 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
   capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
   handcrafted_available = capabilities.get("has_handcrafted_lateral_profile") is True
   honda_tuning_available = capabilities.get("nrdr_honda_tuning_available") is True
+  angle_keys = ANGLE_TUNING_KEYS.intersection(params_to_update)
+  if "NrdrLateralController" in params_to_update and (angle_keys or ANGLE_LOCKED_KEYS.intersection(params_to_update)):
+    raise ValueError("Save Controller Type before editing its tuning.")
+  for key in angle_keys:
+    valid = (_remote_bool_value(params_to_update[key], compression) if key == "HondaClarityAngleCap3" else
+             _remote_int_value(params_to_update[key], compression, tuple(range(0, 301, 10))))
+    if valid is None or capabilities.get("nrdr_angle_controller_available") is not True or not tuning_write_allowed(params, key):
+      raise ValueError("Angle tuning requires Angle Controller on a supported Clarity and a valid setting.")
+
   def available_long_controllers(caps):
     if caps.get("nrdr_honda_mvl_selection_available") is not True:
       return ()
@@ -416,9 +427,9 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
       controller_selection = int(decoded)
     except (ValueError, TypeError, OSError) as error:
       raise ValueError("Invalid Controller Type. The selection was not saved.") from error
-    if not honda_tuning_available or controller_selection not in (0, 1, 2) or (
-      controller_selection in (1, 2) and capabilities.get("nrdr_yaw_controller_available") is not True
-    ):
+    if (not honda_tuning_available or controller_selection not in (0, 1, 2, 3)
+        or (controller_selection in (1, 2) and capabilities.get("nrdr_yaw_controller_available") is not True)
+        or (controller_selection == 3 and capabilities.get("nrdr_angle_controller_available") is not True)):
       raise ValueError("This Controller Type is unavailable for the detected vehicle. The selection was not saved.")
   if "LaneGuidanceMode" in params_to_update:
     lane_guidance_selection = _remote_int_value(params_to_update["LaneGuidanceMode"], compression)
@@ -502,6 +513,8 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
         # Recheck road state immediately before the write, including stale UI.
         if not params.get_bool("IsOffroad"):
           raise ValueError("Controller Type cannot be changed after the car starts.")
+        if controller_selection == 3 and _vehicle_tuning_capabilities().get("nrdr_angle_controller_available") is not True:
+          raise ValueError("Angle Controller is no longer available on the connected vehicle.")
         params.put(key, controller_selection, block=True)
         if str(params.get(key)) not in (str(controller_selection), f"b'{controller_selection}'"):
           raise ValueError("Controller Type readback did not match the requested selection.")

@@ -12,6 +12,46 @@ The target is a shared PTM baseline with the StarPilot port: identical core outp
 calibrations and tuning. nrdr's optional geometry, lane guidance and Optimized Lane Changes remain fork-specific.
 Do not silently retune PTM calibrations when adapting them to sunnypilot.
 
+### A220 owner-log first pass — November 17, 2026
+
+Read-only review of the three owner-shared routes on device `957267d27a04f758`:
+`00000011--10dd64c50e`, `00000016--4eee921d36`, and `00000018--a2bcca0ec7`.
+All 157 qlogs and 12 selected full-rate segments were saved locally with SHA-256 manifests.
+These are approximately 155 minutes recorded November 14, **not** the current development baseline:
+all identify clean nightly `b9998e103cb619a22b70b520d7a63e7406f7463a` (November 9 build).
+Startup records identify HONDA_CRV_5G / TLA-A220, Pop v2 `62bf6fb072880905a4c490f0f4f4a6b3c23346ec`,
+controller ID 1, and consumed Firmware steer-ratio selection with hybrid disabled. Active PID telemetry
+confirms firmware feedforward; a reported EPS part string does not verify the flashed modified image.
+
+The recorded source still uses `CRV_TLA_A220_SPEC_RACK`, whereas development includes the
+A040-derived A220 map from donor `d8ccb1866a`, integrated by `2a582d396c`. This is an existing
+baseline difference, not a new missing port. The old command-delay/settings path also predates
+the donor-parity integration; changing the rack alone is not a replay of the complete newer controller.
+
+The coarse survey contains approximately 130 assisted minutes, overwhelmingly highway driving.
+In samples without detected driver input or blinkers (one-second exclusion), highway absolute
+wheel-target error has route-specific 95th percentiles of 0.64–0.68 degrees; no saturation flags
+occur in that screened sample. Full-rate spot checks also show small tracking errors and no
+saturation. This does not establish correct lane placement or exclude brief events between qlog samples.
+There is essentially no screened assisted driving below 9 m/s, so these routes do not validate
+large-angle town turns or the Clarity-specific unwind experiment.
+
+In approximately 89 seconds of screened highway turning from the selected full-rate sections,
+the existing newer map better predicts measured yaw: old/new RMS disagreement against 0x94 yaw
+is approximately 0.47/0.20 deg/s. This uses the donor-reported **A220** yaw scale (0.2467 deg/s/count
+plus 0.135 clockwise), each route's stationary zero, timestamp-based alignment, and the existing
+tool's wheel-to-yaw lag assumption. Device-motion yaw supports the direction of improvement.
+This is exploratory, not a new calibration: the sample is mostly left turns at 2–7 degrees;
+right-turn slopes are poorly constrained, yaw scaling is not independently GPS-refitted here,
+and the newer rack itself remains inferred from A040 measurements. No controller/filter tuning,
+vehicle access, deployment, firmware flash, or release operation was performed.
+
+Evidence is under `C:\Openpilot Workspace\analysis\crv-a220-2026-11-17`:
+`startup-audit.json`, `survey.json`, `focus.json`, source-pinned analysis helpers, and both download manifests.
+Next obtain the owner's exact EPS image/revision, current software version, and symptom timestamps;
+compare any newer-baseline logs before proposing an A220-specific change. Keep this case separate
+from the Clarity SR250 experiment.
+
 | Donor change | nrdr integration |
 | --- | --- |
 | Ridgeline T6Z-A110 rev b5 (`2200525cb9`) | Exact hybrid-comma revision, linear 4096 E4 transport, V850 output scale/P clamp, measured load and rack, and the donor's default prediction/command timing. Earlier comma-only builds are not admitted to this controller. |

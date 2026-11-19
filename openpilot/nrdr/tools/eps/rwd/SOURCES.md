@@ -100,3 +100,28 @@ Verification is offline: file hashes, checksums, corruption rejection,
 identity/seed lookups and SSH catalog selection. No Panda connection, ECU flash
 or runtime controller change was performed. These checks do not establish
 successful on-car flashing or safe steering behavior.
+
+## Full-memory dump inventory — November 17, 2026
+
+Read-only inspection of this checkout found TEG-A010 and TRW-A020 RWD update
+images, not verified complete readbacks of either owner's installed ECU.
+All five matching containers parse to one 304 KiB flash block at `0x4000`,
+length `0x4c000`, ending at `0x50000` exclusive. They contain neither the lower
+`0x0000–0x3fff` region nor an SRAM snapshot. This address coverage alone does
+not establish the ECU's complete memory layout. Raw binaries for other EPS
+families are not evidence of a complete TEG/TRW dump.
+
+`CarParams.carFw` and the guided helper's "current firmware" lookup contain
+software identification responses, not firmware code. `eps-diag.py` checks
+communication/software IDs; `eps-update.py` programs supplied images. Neither
+implements a verified TEG/TRW flash-plus-SRAM acquisition procedure. opendbc
+provides generic UDS memory-read/upload methods, but their presence does not
+establish that these ECUs support them, which regions are accessible, or that
+the required diagnostic session is non-disruptive. No live requests were made.
+
+For the requested TEG research, obtain the donor's exact acquisition tool and
+revision, memory ranges, expected file sizes, required ECU state and recovery
+procedure before attempting a read. Independently confirm which image is
+installed: the bundled TEG PTM file still hashes to `80fbd0e02345...`, whereas
+the controller reference is `04147917...`. That discrepancy is an unresolved
+pairing question, not proof of what is installed or of a steering defect.

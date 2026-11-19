@@ -49,7 +49,6 @@ HONDA_TUNING_WRITE_KEYS = frozenset((
   "HondaOverrideFadeDownSecs",
   "HondaOverrideFadeUpSecs",
   "HondaOverrideTorqueScale",
-  "HondaClarityAngleMode",
   "HondaClarityAngleCap3",
   "HondaEpsAngleRateLimit",
   "HondaTorqueLowPassFilter",
@@ -103,7 +102,7 @@ def allow_param_write(key: str, onroad: bool, *, handcrafted_profile_available: 
                       honda_tuning_available: bool | None = None,
                       device_yaw_correction_available: bool | None = None,
                       requested_bool: bool | None = None) -> bool:
-  if key in ("NrdrHandcraftedLateralRequest", "NrdrSettingsDefaultsVersion", "NrdrVehicleDefaultsApplied", "NrdrPtmTimingRestoration"):
+  if key in ("NrdrHandcraftedLateralRequest", "NrdrSettingsDefaultsVersion", "NrdrVehicleDefaultsApplied", "NrdrPtmTimingRestoration", "HondaClarityAngleMode"):
     return False
   if onroad and key in ONROAD_WRITE_BLOCKLIST:
     return False
