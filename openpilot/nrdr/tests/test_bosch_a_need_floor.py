@@ -14,16 +14,15 @@ def lead(d, v_rel, a=0.0, tid=1, radar=True, present=True):
   return SimpleNamespace(present=present, radar=radar, radarTrackId=tid, dRel=d, vRel=v_rel, aLeadK=a)
 
 
-def make(monkeypatch, enabled=True, active=True, min_gap=False):
-  # min_gap is the module switch NEED_FLOOR_MIN_GAP_ENABLED (shipped True); the older tests below assume no gate
+def make(monkeypatch, enabled=True, active=True, min_gap=False):  # min_gap False keeps the floor mechanics tests independent of the headway gate
   monkeypatch.setattr(hb, 'active_for', lambda CP: active)
   monkeypatch.setattr(hb, 'NEED_FLOOR_ENABLED', enabled)
-  monkeypatch.setattr(hb, 'NEED_FLOOR_MIN_GAP_ENABLED', min_gap)
-  return hb.HondaBoschALongEnhancement(SimpleNamespace(radarUnavailable=False), 0.05, stock_brake_feel=True)
+  monkeypatch.setattr(hb, 'NEED_FLOOR_MIN_GAP_ENABLED', min_gap)  # read by NeedFloor at construction
+  return hb.HondaBoschALongEnhancement(SimpleNamespace(radarUnavailable=False), 0.05)
 
 
-def nf(p, ld, target, v_ego=25.0, ld2=None, reset_state=False):
-  return p.need_floor(lead_one=ld, lead_two=ld2, target=target, v_ego=v_ego, reset_state=reset_state)
+def nf(p, ld, target, v_ego=25.0, ld2=None, reset_state=False, **kw):
+  return p.need_floor(lead_one=ld, lead_two=ld2, target=target, v_ego=v_ego, reset_state=reset_state, **kw)
 
 
 # steady closing moving lead: v_ego 25, vRel -3 (vLead 22), d 80: need = 9 / (2 * (80 - 28)) = 0.0865 -> floor -0.8
@@ -153,6 +152,32 @@ def test_track_id_change_restarts_gate(monkeypatch):
   assert nf(p, steady(tid=2), -2.0) == pytest.approx(-0.8)
 
 
+# ---- fixes A + B (owner 2026-11-14, route 000000d2 seg 21 t1298.8) ---------------------------------------------------------
+# d2 case: camera lead (tid -1, radar False) 73.7 m, vRel -5.34, v_ego 13.6 (vLead 8.3); e2e braking -1.89 for a red light.
+def d2_lead(radar=False, tid=-1):
+  return lead(73.7, -5.34, 0.0, tid=tid, radar=radar)
+
+
+def test_d2_camera_lead_never_lifts(monkeypatch):
+  p = make(monkeypatch, min_gap=True)
+  assert run(p, d2_lead(), 30, target=-1.89, v_ego=13.6) == -1.89
+
+
+def test_d2_radar_lead_lifted(monkeypatch):  # a radar lead: -0.80
+  p = make(monkeypatch, min_gap=True)
+  assert run(p, d2_lead(radar=True, tid=6), 30, target=-1.89, v_ego=13.6) == pytest.approx(-0.8)
+
+
+def test_camera_lead_keeps_state_machine(monkeypatch):  # camera lead still latches sticky-off (it just never lifts)
+  p = make(monkeypatch)
+  nf(p, lead(40.0, -15.0, tid=-1, radar=False), -2.0)  # ttc 2.7 -> off
+  assert p._need_floor.off
+
+
+def test_default_radar_only_is_on():
+  assert hb.NEED_FLOOR_RADAR_ONLY is True
+
+
 def test_radar_flag_change_restarts_gate(monkeypatch):
   p = make(monkeypatch)
   assert run(p, steady(radar=True), 11) == pytest.approx(-0.8)
@@ -229,7 +254,7 @@ def ref_d(sticky, ld, ve, a_, emergency, MULT=None):
       sticky['gcnt'] = sticky.get('gcnt', 0) + 1
     sticky['gid'] = lid
     gate_ok = sticky['gcnt'] >= 10
-    if gate_ok and closing and not sticky['off'] and ve >= 5.0 and d >= 15.0 and ttc > 3.0 and need < 2.0:
+    if gate_ok and closing and not sticky['off'] and ve >= 5.0 and d >= 15.0 and ttc > 3.0 and need < 2.0 and l['radar']:  # + fix B
       fl = -max(MULT * need, 0.8)
       if a_ < fl:
         a_ = fl
@@ -250,7 +275,7 @@ def test_parity_with_reference_random_walk(monkeypatch):
   v_ego = 22.0
   emergency = False
   mismatches = binding = 0
-  for _i in range(N):
+  for _ in range(N):
     v_ego = min(35.0, max(0.0, v_ego + rng.gauss(0, 0.05)))
     for t in tracks:
       t['v'] = min(6.0, max(-25.0, t['v'] + rng.gauss(0, 0.15) - 0.01 * t['v']))
@@ -284,10 +309,11 @@ def test_parity_with_reference_random_walk(monkeypatch):
   assert binding >= 300
 
 
-# NEED_FLOOR_MIN_GAP_ENABLED (static, replay on a different stack pending): v_ego 25 -> 1.5 s headway = 37.5 m. A slow-closing
-# lead (vRel -0.5) keeps need, ttc and the other gates open at every gap used below, so only the headway condition differs.
+# NEED_FLOOR_MIN_GAP_ENABLED (static, replay only; the module constant is on, make() sets it per test): v_ego 25 -> 1.5 s headway = 37.5 m. A
+# slow-closing lead (vRel -0.5) keeps
+# need, ttc and the other gates open at every gap used below, so only the headway condition differs.
 def test_min_gap_off_floors_inside_1p5_s(monkeypatch):
-  p = make(monkeypatch)
+  p = make(monkeypatch, min_gap=False)
   assert run(p, steady(d=30.0, v_rel=-0.5), 20) == pytest.approx(-0.8)
 
 
@@ -314,52 +340,10 @@ def test_min_gap_is_evaluated_every_frame_not_sticky(monkeypatch):
   assert nf(p, steady(d=40.0, v_rel=-0.5), -2.0) == pytest.approx(-0.8)  # back above 1.5 s: on again at once
 
 
-def test_min_gap_switch_is_on_by_default_and_read_at_construction(monkeypatch):
-  assert hb.NEED_FLOOR_MIN_GAP_ENABLED is True
-  assert hb.NEED_FLOOR_MIN_GAP_S == 1.5
+def test_min_gap_default_is_on(monkeypatch):
   monkeypatch.setattr(hb, 'active_for', lambda CP: True)
-  p = hb.HondaBoschALongEnhancement(SimpleNamespace(radarUnavailable=False), 0.05, stock_brake_feel=True)
-  assert p._need_floor.min_gap is True
-  assert run(p, steady(d=30.0, v_rel=-0.5), 30) == -2.0          # shipped default: no floor inside 1.5 s
-  monkeypatch.setattr(hb, 'NEED_FLOOR_MIN_GAP_ENABLED', False)
-  p = hb.HondaBoschALongEnhancement(SimpleNamespace(radarUnavailable=False), 0.05, stock_brake_feel=True)
-  assert p._need_floor.min_gap is False
-
-
-def test_needfloor_class_default_is_no_gate():
+  assert hb.NEED_FLOOR_MIN_GAP_ENABLED is True
+  assert hb.NeedFloor().min_gap is True
+  monkeypatch.setattr(hb, 'NEED_FLOOR_MIN_GAP_ENABLED', False)   # a replay harness sets the module constant before construction
   assert hb.NeedFloor().min_gap is False
-  assert hb.NeedFloor(min_gap=True).min_gap is True
-
-
-@pytest.mark.parametrize("condition", ["stopping", "fcw"])
-def test_stop_and_fcw_bypass_and_reset_floor(monkeypatch, condition):
-  p = make(monkeypatch)
-  assert run(p, steady(), 12) == pytest.approx(-0.8)
-  assert p.need_floor(lead_one=steady(), lead_two=None, target=-3.0, v_ego=25.0,
-                      reset_state=False, **{condition: True}) == -3.0
-  assert p._need_floor.gate_count == 0
-  assert nf(p, steady(), -3.0) == -3.0
-
-
-def test_braking_second_lead_retains_emergency_authority(monkeypatch):
-  p = make(monkeypatch)
-  assert run(p, steady(), 12) == pytest.approx(-0.8)
-  braking = lead(d=90.0, v_rel=-15.0, a=-4.0, tid=2)
-  p.step(lead_one=steady(), lead_two=braking, prev=-3.0, target=-3.0, v_ego=25.0,
-         stopping=False, standstill=False, reset_state=False)
-  assert p.emergency
-  assert nf(p, steady(), -3.0, ld2=braking) == -3.0
-
-
-def test_need_floor_does_not_undo_ghost_no_gas_hold(monkeypatch):
-  from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_smooth import BoschASmooth
-  p = make(monkeypatch)
-  smooth = BoschASmooth(SimpleNamespace(brand='honda', carFingerprint='HONDA_CIVIC_BOSCH',
-                                        openpilotLongitudinalControl=True, radarUnavailable=False))
-  previous = steady(d=20.0, v_rel=-5.0)
-  farther = steady(d=80.0, tid=2)
-  assert run(p, farther, 12) == pytest.approx(-0.8)
-  smooth.step(-2.0, -2.0, False, lead_one=previous, raw_y={1: 0.0}, v_ego=25.0)
-  target = smooth.step(-2.0, 1.0, False, lead_one=farther, raw_y={1: 0.0}, v_ego=25.0)
-  assert smooth.ghost.no_gas
-  assert target <= nf(p, farther, target) <= 0.0
+  assert hb.NEED_FLOOR_MIN_GAP_S == 1.5

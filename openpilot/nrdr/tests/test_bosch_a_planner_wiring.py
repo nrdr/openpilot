@@ -182,13 +182,12 @@ def spy_mpc_update(planner):
 def test_wired_only_for_bosch_a_with_op_long_and_mvl_off():
   planner = build(BOSCH_A)
   assert planner.bosch_a_wired and planner.mpc.nrdr.human_following
-  for name in ("bosch_a_long", "bosch_a_smooth", "bosch_a_coast_first", "bosch_a_release_coast", "bosch_a_onset_ramp",
-               "bosch_a_stop_gap"):
+  for name in ("bosch_a_long", "bosch_a_release", "bosch_a_stop_gap"):
     assert hasattr(planner, name), name
   assert planner.bosch_a_long.stock_feel
   vision_only = build(cp(radar_unavailable=True))
   assert vision_only.bosch_a_wired  # HumanFollowing / HumanAcceleration run vision-only (SOURCE semantics)
-  assert not vision_only.bosch_a_long.enabled
+  assert not vision_only.bosch_a_long.coast_enabled
   for CP in NOT_BOSCH_A:
     other = build(CP)
     assert not other.bosch_a_wired, CP.carFingerprint
@@ -257,30 +256,22 @@ def test_no_fresh_human_path_falls_back_to_raw_extrapolation_not_the_bosch_model
   assert planner.mpc.nrdr._lead_trajectory(NS(), lead, 0, 21.9, raw, bad).tolist() == raw.tolist()
 
 
-def test_post_mpc_chain_runs_in_source_order_on_bosch_a():
+def test_post_mpc_chain_runs_in_tip_order_on_bosch_a():
+  # Biscuit-Labs tip order: bosch_a_long.lead (lead candidate, need floor inside) before min(candidates), then after it
+  # bosch_a_long.step (onset ramp + coast first) -> bosch_a_release.step -> bosch_a_stop_gap.step.
   planner = build(BOSCH_A)
   order = []
-  for name, method in (("bosch_a_long", "step"), ("bosch_a_coast_first", "step"), ("bosch_a_release_coast", "update"),
-                       ("bosch_a_smooth", "step"), ("bosch_a_onset_ramp", "step"), ("bosch_a_stop_gap", "step")):
+  for label, name, method in (("lead", "bosch_a_long", "lead"), ("long", "bosch_a_long", "step"),
+                              ("release", "bosch_a_release", "step"), ("stop_gap", "bosch_a_stop_gap", "step")):
     obj = getattr(planner, name)
     original = getattr(obj, method)
 
-    def spy(*args, _name=name, _original=original, **kwargs):
-      order.append(_name)
+    def spy(*args, _label=label, _original=original, **kwargs):
+      order.append(_label)
       return _original(*args, **kwargs)
     setattr(obj, method, spy)
-  original_nf = planner.bosch_a_long.need_floor
-
-  def spy_nf(*args, **kwargs):
-    order.append("need_floor")
-    return original_nf(*args, **kwargs)
-  planner.bosch_a_long.need_floor = spy_nf
   outputs, _ = run(planner, frames=2)
-  # GHOST_ARM: the ghost let-off in bosch_a_smooth replaces the release coast, so the planner skips it.
-  expected = ["bosch_a_long", "bosch_a_coast_first", "bosch_a_smooth", "bosch_a_onset_ramp", "bosch_a_stop_gap", "need_floor"]
-  if not planner.bosch_a_smooth.ghost_enabled:
-    expected.insert(2, "bosch_a_release_coast")
-  assert order == expected * 2
+  assert order == ["lead", "long", "release", "stop_gap"] * 2
   assert all(np.isfinite(o[0]) for o in outputs)
 
 
@@ -397,16 +388,16 @@ def test_engage_seed_is_the_unlimited_cruise_target():
 
 
 # ---- Review fixes: follow time, acceleration base, model-lead freshness ------------------------------------------------
-def test_coast_first_gets_the_follow_time_the_mpc_used_this_frame():
+def test_coast_first_gets_the_follow_time_the_mpc_used_this_frame():  # coast first now runs inside bosch_a_long.step
   planner = build(BOSCH_A)
   planner.mpc.nrdr.tune.t_follow_offset = lambda _name: 0.3  # a tune offset the raw personality lookup cannot know
   follows = []
-  original = planner.bosch_a_coast_first.step
+  original = planner.bosch_a_long.step
 
   def spy(*args, **kwargs):
     follows.append(kwargs["follow_s"])
     return original(*args, **kwargs)
-  planner.bosch_a_coast_first.step = spy
+  planner.bosch_a_long.step = spy
   with patch.object(LongitudinalPlannerSP, "update", lambda *_: None), \
        patch.object(LongitudinalPlannerSP, "update_targets", lambda self, sm, v, a, cruise: (cruise, a)):
     planner.update(submaster(1, personality=log.LongitudinalPersonality.aggressive))
@@ -509,30 +500,24 @@ def test_qualified_model_leads_rejects_a_clock_that_is_ahead_of_the_pair():
 
 def test_new_shapers_require_bosch_a_radar():
   radar = build(BOSCH_A)
-  assert radar.bosch_a_smooth.ghost_enabled
+  assert radar.bosch_a_release.coast_enabled
   assert radar.bosch_a_long._need_floor is not None
   vision = build(cp(radar_unavailable=True))
-  assert not vision.bosch_a_smooth.ghost_enabled
+  assert not vision.bosch_a_release.coast_enabled
   assert vision.bosch_a_long._need_floor is None
-  with patch.object(vision.bosch_a_release_coast, 'update', wraps=vision.bosch_a_release_coast.update) as coast:
+  with patch.object(vision.bosch_a_release, 'step', wraps=vision.bosch_a_release.step) as release:
     run(vision, frames=2)
-  assert coast.call_count == 2  # keep the previous vision-only path
+  assert release.call_count == 2  # the release step still runs vision-only (smoothing), without coast or raw tracks
+  assert all(call.kwargs['raw_y'] is None for call in release.call_args_list)
 
 
-@pytest.mark.parametrize('condition', ['stopping', 'fcw', 'standstill', 'reset'])
-def test_planner_does_not_floor_protected_braking(condition):
+@pytest.mark.parametrize('condition', ['standstill', 'reset'])
+def test_planner_does_not_floor_on_standstill_or_reset(condition):
+  # D3: the tip's need floor runs in bosch_a_long.lead() and only knows reset_state/standstill; nrdr's old stopping/fcw
+  # 1.15*need variant is dropped, so those two protections are no longer tested here.
   planner = build(BOSCH_A)
   sm = submaster(0 if condition == 'reset' else 1)
   sm['carState'].standstill = condition == 'standstill'
-  if condition == 'fcw':
-    original_update = planner.mpc.update
-
-    def crash_update(*args, **kwargs):
-      original_update(*args, **kwargs)
-      planner.mpc.crash_cnt = 3
-    planner.mpc.update = crash_update
-    planner.mpc.nrdr.fcw_authorized = lambda *_: True
-  planner.bosch_a_stop_gap.step = lambda **_kw: (-3.0, condition == 'stopping')
   floor = planner.bosch_a_long._need_floor
   floor.gate_id = (1, 1)
   floor.gate_count = 30
@@ -548,8 +533,8 @@ def test_planner_does_not_floor_protected_braking(condition):
        patch.object(LongitudinalPlannerSP, 'update_targets', lambda self, sm, v, a, cruise: (cruise, a)):
     planner.update(sm)
   kw, out = seen[0]
-  assert kw['stopping' if condition == 'stopping' else 'fcw' if condition == 'fcw' else 'reset_state']
-  assert out == kw['target'] == -3.0
+  assert kw['reset_state']
+  assert out == kw['target']
   assert floor.gate_count == 0
 
 
@@ -561,7 +546,7 @@ def test_ghost_camera_evidence_uses_existing_freshness_checks(state):
     sm.logMonoTime['modelV2'] = NOW_NS - 400_000_000
   elif state == 'invalid':
     sm.valid['modelV2'] = False
-  with patch.object(planner.bosch_a_smooth, 'step', wraps=planner.bosch_a_smooth.step) as smooth, \
+  with patch.object(planner.bosch_a_release, 'step', wraps=planner.bosch_a_release.step) as smooth, \
        patch.object(LongitudinalPlannerSP, 'update', lambda *_: None), \
        patch.object(LongitudinalPlannerSP, 'update_targets', lambda self, sm, v, a, cruise: (cruise, a)):
     planner.update(sm)
@@ -576,11 +561,13 @@ def test_planner_passes_driver_override_to_ghost(condition):
     sm['modelV2'].meta.laneChangeState = log.LaneChangeState.laneChangeStarting
   else:
     setattr(sm['carState'], condition, True)
-  with patch.object(planner.bosch_a_smooth, 'step', wraps=planner.bosch_a_smooth.step) as smooth, \
+  with patch.object(planner.bosch_a_release, 'step', wraps=planner.bosch_a_release.step) as smooth, \
        patch.object(LongitudinalPlannerSP, 'update', lambda *_: None), \
        patch.object(LongitudinalPlannerSP, 'update_targets', lambda self, sm, v, a, cruise: (cruise, a)):
     planner.update(sm)
-  assert smooth.call_args.kwargs['skip']
+  kwargs = smooth.call_args.kwargs  # the release step derives skip from these four inputs
+  assert (kwargs['left_blinker'] or kwargs['right_blinker'] or kwargs['gas_pressed'] or
+          kwargs['lane_change_state'] != log.LaneChangeState.off)
 
 
 def test_optional_raw_tracks_do_not_invalidate_planning():

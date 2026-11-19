@@ -84,7 +84,7 @@ def _drive_one_frame(policy: BoschALeadPolicy, lead, lead_prob: float, model_v_e
   # harness just to drive the staleness path.
   policy._update_honda_bosch_a_preferred_staleness(0, lead, lead_prob)
   lead_dict = get_lead(
-    policy.v_ego, policy.ready, policy.tracks, lead, model_v_ego, policy.starpilot_toggles,
+    policy.v_ego, policy.ready, policy.tracks, lead, model_v_ego, policy.lead_toggles,
     low_speed_override=False, lead_prob=lead_prob, preferred_track_id=policy.prev_lead_track_ids[0],
     vision_state=policy.vision_state,
   )
