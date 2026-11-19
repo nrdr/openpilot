@@ -75,3 +75,38 @@ def test_disabling_assist_does_not_stack_boost_during_fadeout(boost_env, before_
   actual.update(full_messages(200))
   assert not actual.e2e_set_speed.enabled and actual.e2e_set_speed.lift > 0.
   assert actual.accel_boost_sp.total_boost == 0.
+
+
+def test_curve_correction_gating_and_mpc_priority(boost_env, before_pr):
+  from openpilot.nrdr.features.longitudinal.curve_speed import CurveSpeed
+  ci, _ = interface(CAR.HONDA_CLARITY, interceptor=True)
+  actual, _ = planners(boost_env, before_pr, ci.CP, ci.CP_SP, enabled=True, set_speed=False)
+  actual.curve_speed = CurveSpeed(.05)
+  def frame(i, mpc=1.):
+    sm = full_messages(i, .4, mpc)
+    sm['vehicleParameters'].roll, sm['vehicleParameters'].valid = 0., True
+    sm['modelV2'].position = NS(t=np.linspace(0., 8., 33))
+    sm['modelV2'].orientationRate.z = [.4] * 33
+    return sm
+  for i in range(30):
+    actual.update(frame(i))
+  assert actual.output_a_target < -1. and actual.curve_speed.correction > 1.
+  sm = frame(30, mpc=-2.5)
+  sm['modelV2'].action.shouldStop = True
+  actual.update(sm)
+  assert actual.output_should_stop and actual.output_a_target <= -2.5
+  for i, (key, field, value) in enumerate((
+      ('selfdriveState', 'experimentalMode', False), ('carControl', 'longActive', False), ('carState', 'gasPressed', True),
+      ('carState', 'brakePressed', True), ('vehicleParameters', 'valid', False), ('controlsState', 'longControlState', h.STATE.off),
+      ('override', '', True), ('stale', '', True))):
+    actual.update(frame(31+2*i))
+    assert actual.curve_speed.correction > 0.
+    sm = frame(32+2*i)
+    if key == 'override':
+      sm['carControl'].cruiseControl.override = True
+    elif key == 'stale':
+      sm.valid = False
+    else:
+      setattr(sm[key], field, value)
+    actual.update(sm)
+    assert actual.curve_speed.correction == 0.

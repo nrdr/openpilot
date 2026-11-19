@@ -108,6 +108,9 @@ class NrdrParamKey(StrEnum):
   NRDR_STEER_RATIO_MODEL_BLEND = "NrdrSteerRatioModelBlend"
   NRDR_FIRST_RUN_SETUP_DONE = "NrdrFirstRunSetupDone"
   NRDR_AUTO_SELECT_MODEL = "NrdrAutoSelectModel"
+  NRDR_ACTION_TIME_CAP = "NrdrActionTimeCap"
+  NRDR_MODEL_FIDX = "NrdrModelFidx"
+  NRDR_CURVE_SPEED = "NrdrCurveSpeed"
   STATIC_FEEDFORWARD_LONG = "StaticFeedforwardLong"
   NRDR_HONDA_ECU_MATCHED_LONG = "NrdrHondaEcuMatchedLong"
   NRDR_HONDA_PCM_MODE = "NrdrHondaPcmMode"
@@ -280,6 +283,9 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.NRDR_STEER_RATIO_MODEL_BLEND,
   NrdrParamKey.NRDR_FIRST_RUN_SETUP_DONE,
   NrdrParamKey.NRDR_AUTO_SELECT_MODEL,
+  NrdrParamKey.NRDR_ACTION_TIME_CAP,
+  NrdrParamKey.NRDR_MODEL_FIDX,
+  NrdrParamKey.NRDR_CURVE_SPEED,
   NrdrParamKey.STATIC_FEEDFORWARD_LONG,
   NrdrParamKey.NRDR_HONDA_ECU_MATCHED_LONG,
   NrdrParamKey.NRDR_HONDA_PCM_MODE,

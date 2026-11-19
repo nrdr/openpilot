@@ -208,6 +208,9 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("NrdrSteerRatioModelBlend", ParamType.BOOL, PB, "1", owner=ParamOwner.LATERAL),
   _added("NrdrFirstRunSetupDone", ParamType.BOOL, PB, "0", ParamLifecycle.STATE, ParamOwner.SYSTEM),
   _added("NrdrAutoSelectModel", ParamType.BOOL, PB, "0", owner=ParamOwner.MODEL),
+  _added("NrdrActionTimeCap", ParamType.BOOL, PB, "0", owner=ParamOwner.MODEL),
+  _added("NrdrModelFidx", ParamType.INT, PB, "3", owner=ParamOwner.MODEL),
+  _added("NrdrCurveSpeed", ParamType.BOOL, PB, "0", owner=ParamOwner.LONGITUDINAL),
   _added("StaticFeedforwardLong", ParamType.BOOL, PB, "0", owner=ParamOwner.LONGITUDINAL),
   # Retained for downgrade compatibility only. Never migrate old True to mode 1.
   _added("NrdrHondaEcuMatchedLong", ParamType.BOOL, PB, "0", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),

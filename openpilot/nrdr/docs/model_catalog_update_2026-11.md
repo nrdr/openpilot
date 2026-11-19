@@ -180,3 +180,20 @@ model filename is `/data/media/0/models/nrdr-polaris-vega-c4-f26652bb.pkl`.
 Provision the exact verified file **offroad** before refreshing Sunnylink. No artifact is
 distributed in Git. Clearing the inactive model cache can remove the entry; the retained
 replay copy can be used to provision it again. Rollback is simply reselecting Pop v2 offroad.
+
+### Development timing inputs and experimental curve slowdown
+
+These are independent settings, read when the model or planner starts. They do not
+change model selection, steer ratio, steering filters, or the restored-timing setting.
+
+| Setting | Branch default | Effect |
+| --- | --- | --- |
+| `NrdrActionTimeCap` | Off | Caps each supplied `action_t` input (lateral and longitudinal) at 0.4 s. Does not change plan decoding, the camera rate, or legacy `lateral_control_params`. [Upstream #39401](https://github.com/commaai/openpilot/pull/39401) |
+| `NrdrCurveSpeed` | Off | In the nrdr planner with openpilot longitudinal and Experimental Mode active, uses the model's predicted speed and yaw to lower the model acceleration candidate. MPC/braking/stop arbitration remains in place. Resets on pedal/override, invalid inputs, or disengagement. Independent MVL and stock-cruise paths are unchanged. [Upstream #39242](https://github.com/commaai/openpilot/pull/39242) |
+| `NrdrModelFidx` | 3 | Supplies a 1–6 second path horizon only to a local runner with an actual `fidx` tensor. Not a new weight file, a JetLink protocol change, or a time offset for Vega. [Upstream experiment](https://github.com/commaai/openpilot/commit/3471915de772c645d60a563cc3c335b17da1fe0b) |
+
+The curve port bounds both signs of bank before taking the square root. It only modifies the
+model candidate: the −2 m/s² floor applies to **added curve braking**, not to stronger braking
+already requested. The 2 m/s³ slew applies to the correction state, not to total vehicle jerk.
+Disable the two boolean settings while parked/offroad to return to their previous behavior
+at the next model/planner start. There is no dashboard toggle or change to fault reporting.

@@ -55,18 +55,25 @@ def test_invalid_inference_is_rejected_before_parsing_on_all_hardware(chestnut, 
 
 
 @pytest.mark.parametrize('camera', [(1344, 760), (1928, 1208)])
-def test_native_recurrent_image_state_is_not_a_camera_and_both_transforms_are_filled(adapters, camera):
+@pytest.mark.parametrize('with_fidx', [False, True])
+def test_native_recurrent_image_state_is_not_a_camera_and_both_transforms_are_filled(adapters, camera, with_fidx):
   captures = []
+  fidx_values = []
   def warp(*, input_frame, M_inv):
     captures.append((input_frame.numpy().copy(), M_inv.numpy().copy()))
     return Tensor(np.zeros((2, 6, 2, 2), dtype=np.uint8), device='NPY')
   def model(*, output_buffers, **inputs):
+    assert ('fidx' in inputs) == with_fidx
+    if with_fidx:
+      fidx_values.append(inputs['fidx'].numpy().item())
     assert inputs['new_img'].shape == (2, 6, 2, 2)
     assert inputs['state_img_q'].shape == (2, 1, 6, 2, 2)
     np.testing.assert_array_equal(inputs['state_img_q'].numpy(), 0)
     output_buffers['outputs'].numpy()[:] = [[.1, .2]]
   specs = {'new_img': ((2, 6, 2, 2), '|u1', 'NPY'), 'state_img_q': ((2, 1, 6, 2, 2), '|u1', 'NPY'),
            'desire': ((8,), '<f4', 'NPY'), 'traffic_convention': ((2,), '<f4', 'NPY'), 'action_t': ((2,), '<f4', 'NPY')}
+  if with_fidx:
+    specs['fidx'] = ((1,), '<f4', 'NPY')
   metadata = {'input_shapes': {key: value[0] for key, value in specs.items()},
               'output_shapes': {'outputs': (1, 2), 'next_state_img_q': (2, 1, 6, 2, 2)},
               'metadata': {'output_slices': base64.b64encode(pickle.dumps({'plan': slice(0, 2)})).decode()}}
@@ -84,13 +91,17 @@ def test_native_recurrent_image_state_is_not_a_camera_and_both_transforms_are_fi
              parser=NS(parse_outputs=lambda outputs: outputs))
   run = model_run_definition()
   # Same path warmup uses: both camera transforms must be initialized.
+  inputs.pop('fidx', None)
   run(state, frames, transforms, inputs)
   np.testing.assert_array_equal(captures[-1][1], np.stack([np.eye(3), np.eye(3)]))
   frames['img'][:] = 17
   frames['big_img'][:] = 93
   transforms['img'][0, 2] = 2.
   transforms['big_img'][0, 2] = 9.
+  if with_fidx:
+    inputs['fidx'] = np.array([5.], dtype=np.float32)
   result = run(state, frames, transforms, inputs)
+  assert fidx_values == ([3., 5.] if with_fidx else [])
   np.testing.assert_array_equal(captures[-1][0][0], 17)
   np.testing.assert_array_equal(captures[-1][0][1], 93)
   np.testing.assert_array_equal(captures[-1][1], np.stack([transforms['img'], transforms['big_img']]))

@@ -27,6 +27,7 @@ from msgq.visionipc import VisionIpcClient, VisionBuf
 from opendbc.car.car_helpers import get_demo_car_params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
+from openpilot.nrdr.features.model_inputs import action_time_input, model_fidx
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import config_realtime_process, DT_MDL
 from openpilot.common.transformations.camera import DEVICE_CAMERAS
@@ -150,6 +151,8 @@ class ModelState(ModelStateBase):
 
   def warmup(self) -> None:
     dummy_frames, transforms, dummy_inputs = self.adapter.get_dummy_inputs()
+    if 'fidx' in dummy_inputs:
+      dummy_inputs['fidx'][:] = 3.
     self.run(dummy_frames, transforms, dummy_inputs)
     self.adapter.reset_warmup_buffers()
     self.prev_desire[:] = 0
@@ -180,6 +183,8 @@ class ModelState(ModelStateBase):
     for key in ('traffic_convention', 'lateral_control_params', 'action_t'):
       if key in self.numpy_inputs and key in inputs:
         self.numpy_inputs[key][:] = inputs[key]
+    if 'fidx' in self.numpy_inputs:
+      self.numpy_inputs['fidx'][:] = inputs.get('fidx', 3.)
 
     if self.adapter.is_native:
       for i, key in enumerate(self._vision_input_names):
@@ -282,6 +287,8 @@ def main(demo=False):
     config_realtime_process(7, 54)  # unchanged when JetLink is off; with it, after attach() below
 
   params = Params()
+  cap_action_t = params.get_bool("NrdrActionTimeCap")
+  fidx_seconds = np.array([model_fidx(params)], dtype=np.float32)
   params.put_bool("ChestnutLoading", CHESTNUT)
   params.remove("ChestnutActive")
 
@@ -474,7 +481,9 @@ def main(demo=False):
       inputs['lateral_control_params'] = np.array([v_ego, lat_delay], dtype=np.float32)
 
     if 'action_t' in model.numpy_inputs:
-      inputs['action_t'] = np.array([lat_action_t, long_action_t], dtype=np.float32)
+      inputs['action_t'] = action_time_input(lat_action_t, long_action_t, cap_action_t)
+    if 'fidx' in model.numpy_inputs:
+      inputs['fidx'] = fidx_seconds
 
     model.frame_drop_ratio = frame_drop_ratio
     mt1 = time.perf_counter()
@@ -516,6 +525,10 @@ def main(demo=False):
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,
                      frame_drop_ratio, meta_main.timestamp_eof, model_execution_time, live_calib_seen, meta_constants)
       modelv2_send.modelV2.big = model.chestnut
+      # For an action head report the horizon it actually received; a decoded
+      # plan still uses the original actuator/processing horizon above.
+      if cap_action_t and 'action' in model_output and 'action_t' in inputs:
+        lat_action_t = min(lat_action_t, 0.4)
       set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t,
                                 lateral_source=lateral_source(model_output, jetlink_adapter.model_mlsim(model)), delay_input=delay_input(model.numpy_inputs))
       modelv2_send.modelV2.action.laneGuidanceMode = int(lane_guidance_mode)

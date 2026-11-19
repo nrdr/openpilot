@@ -20,6 +20,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot.selfdrive.controls.lib.longitudinal_planner import LongitudinalPlannerSP
 from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.approach import approach_accel
 from openpilot.sunnypilot.selfdrive.controls.lib.e2e_set_speed.controller import E2ESetSpeedController
+from openpilot.nrdr.features.longitudinal.curve_speed import CurveSpeed
 from openpilot.nrdr.features.longitudinal.longitudinal_planner import NrdrLongitudinalPlanner
 from openpilot.nrdr.features.longitudinal.policy import longitudinal_personality, nrdr_longitudinal_enabled
 from openpilot.nrdr.features.longitudinal.policy import mvl_longitudinal_enabled
@@ -147,6 +148,7 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
     # Set Speed Assist (ported from zoompilot, off by default via ExperimentalModeSetSpeed). Built here, not in the
     # SP overlay, so the MVL planner (which shares that overlay) is untouched.
     self.e2e_set_speed = E2ESetSpeedController()
+    self.curve_speed = CurveSpeed.from_settings(dt) if self.nrdr is not None and CP.openpilotLongitudinalControl else None
     self.fcw = False
     self.dt = dt
     self.allow_throttle = True
@@ -302,6 +304,14 @@ class LongitudinalPlanner(LongitudinalPlannerSP):
       output_a_target_e2e = LongitudinalPlannerSP.apply_accel_boost(
         self, sm, output_a_target_e2e, output_a_target_mpc, self.a_cruise,
       )
+
+    if self.curve_speed is not None:
+      if (is_e2e and not reset_state and sm['carControl'].longActive and not sm['carControl'].cruiseControl.override and
+          not (sm['carState'].gasPressed or sm['carState'].brakePressed) and sm['vehicleParameters'].valid and
+          sm.all_checks(['modelV2', 'vehicleParameters', 'carControl', 'carState', 'selfdriveState', 'controlsState'])):
+        output_a_target_e2e = self.curve_speed.update(sm['modelV2'], sm['vehicleParameters'].roll, output_a_target_e2e)
+      else:
+        self.curve_speed.reset()
 
     candidates = [(output_a_target_mpc, self.mpc.source, output_should_stop_mpc),
                   (self.a_cruise, LongitudinalPlanSource.cruise, cruise_should_stop)]

@@ -25,6 +25,7 @@ from msgq.visionipc import VisionIpcClient, VisionBuf
 from opendbc.car.car_helpers import get_demo_car_params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
+from openpilot.nrdr.features.model_inputs import action_time_input, model_fidx
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import config_realtime_process, DT_MDL
 from openpilot.common.transformations.camera import DEVICE_CAMERAS
@@ -223,6 +224,8 @@ class ModelState(ModelStateBase):
     self.prev_desire[:] = inputs['desire_pulse']
     self.npy['traffic_convention'][:] = inputs['traffic_convention']
     self.npy['action_t'][:] = inputs['action_t']
+    if 'fidx' in self.npy:
+      self.npy['fidx'][:] = inputs.get('fidx', 3.)
 
     self.input_device.copy_from(self.input_host)
     self.input_queues['new_img'] = self.run_warp(**self.warp_inputs)
@@ -256,6 +259,8 @@ def main(demo=False):
   if CHESTNUT:
     os.environ['HCQDEV_WAIT_TIMEOUT_MS'] = '3000'
   params = Params()
+  cap_action_t = params.get_bool("NrdrActionTimeCap")
+  fidx_seconds = np.array([model_fidx(params)], dtype=np.float32)
   params.put_bool("ChestnutLoading", CHESTNUT)
   params.remove("ChestnutActive")
   JETLINK = jetlink_adapter.prepare(CHESTNUT)  # before going realtime; False unless the user turned JetLink on
@@ -434,8 +439,10 @@ def main(demo=False):
     inputs: dict[str, np.ndarray] = {
       'desire_pulse': vec_desire,
       'traffic_convention': traffic_convention,
-      'action_t': np.array([lat_action_t, long_action_t], dtype=np.float32),
+      'action_t': action_time_input(lat_action_t, long_action_t, cap_action_t),
     }
+    if 'fidx' in model.npy:
+      inputs['fidx'] = fidx_seconds
 
     model.frame_drop_ratio = frame_drop_ratio
     mt1 = time.perf_counter()
@@ -481,6 +488,10 @@ def main(demo=False):
         # after a future runner change.
         set_lane_guidance_mode(params, LaneGuidanceMode.MODEL_ONLY, block=False)
         lane_guidance_mode = LaneGuidanceMode.MODEL_ONLY
+      # For an action head report the horizon it actually received; a decoded
+      # plan still uses the original actuator/processing horizon above.
+      if cap_action_t and 'action' in model_output and 'action_t' in inputs:
+        lat_action_t = min(lat_action_t, 0.4)
       set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t,
                                 lateral_source=lateral_source(model_output, mlsim=True), delay_input=delay_input(model.npy))
       modelv2_send.modelV2.action.laneGuidanceMode = int(lane_guidance_mode)

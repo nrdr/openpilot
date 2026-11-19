@@ -67,6 +67,7 @@ def environment(**overrides):
     "time": NS(monotonic=lambda: 100.0), "Literal": Literal, "interp": np.interp,
     # Set Speed Assist (ExperimentalModeSetSpeed, off by default): the controller's own tests live beside it; here it is inert.
     "E2ESetSpeedController": lambda: NS(enabled=False, lift=0., update=lambda sm, a_model, *_args: a_model),
+    "CurveSpeed": NS(from_settings=lambda dt: None),
     "approach_accel": lambda *_: 0.,
     "enforce_mode_dwell": enforce_mode_dwell, "slow_down_threshold": slow_down_threshold,
     "nrdr_longitudinal_enabled": policy.nrdr_longitudinal_enabled,
