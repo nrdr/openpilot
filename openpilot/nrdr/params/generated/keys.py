@@ -96,6 +96,9 @@ class NrdrParamKey(StrEnum):
   HONDA_OVERRIDE_FADE_UP_SECS = "HondaOverrideFadeUpSecs"
   HONDA_OVERRIDE_TORQUE_SCALE = "HondaOverrideTorqueScale"
   HONDA_DRIVER_ASSIST_DURING_OVERRIDE = "HondaDriverAssistDuringOverride"
+  HONDA_CLARITY_ANGLE_MODE = "HondaClarityAngleMode"
+  HONDA_CLARITY_ANGLE_CAP3 = "HondaClarityAngleCap3"
+  HONDA_EPS_ANGLE_RATE_LIMIT = "HondaEpsAngleRateLimit"
   HONDA_LIVE_LEARNING_GAS = "HondaLiveLearningGas"
   NRDR_RESET_LIVE_GAS = "NrdrResetLiveGas"
   NRDR_LIVE_GAS_RESET_STATUS = "NrdrLiveGasResetStatus"
@@ -271,6 +274,9 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.HONDA_OVERRIDE_FADE_UP_SECS,
   NrdrParamKey.HONDA_OVERRIDE_TORQUE_SCALE,
   NrdrParamKey.HONDA_DRIVER_ASSIST_DURING_OVERRIDE,
+  NrdrParamKey.HONDA_CLARITY_ANGLE_MODE,
+  NrdrParamKey.HONDA_CLARITY_ANGLE_CAP3,
+  NrdrParamKey.HONDA_EPS_ANGLE_RATE_LIMIT,
   NrdrParamKey.HONDA_LIVE_LEARNING_GAS,
   NrdrParamKey.NRDR_RESET_LIVE_GAS,
   NrdrParamKey.NRDR_LIVE_GAS_RESET_STATUS,

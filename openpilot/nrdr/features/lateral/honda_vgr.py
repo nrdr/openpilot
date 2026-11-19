@@ -182,7 +182,8 @@ def normalize_honda_eps_firmware(version) -> str:
       pass
   if isinstance(version, bytes):
     version = version.split(b"\0", 1)[0].decode("ascii", errors="ignore")
-  return str(version).split("\0", 1)[0].strip().replace(",", "-")
+  # ",": PTM images; "+": PTM 2.0 / angle PTM images (Clarity 39990+TRW+A020, EPS build 0x05 on): same tables
+  return str(version).split("\0", 1)[0].strip().replace(",", "-").replace("+", "-")
 
 
 def get_honda_vgr_profile(CP) -> HondaVgrProfile | RdxMeasuredPosition | None:

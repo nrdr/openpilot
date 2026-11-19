@@ -95,7 +95,9 @@ def _firmware_family(CP) -> FirmwareControllerProfile | None:
 
 def firmware_controller_profile(CP, CP_SP) -> FirmwareControllerProfile | None:
   profile = _firmware_family(CP)
-  if profile is not None and getattr(CP_SP, "flags", 0) & HondaFlagsSP.EPS_MODIFIED.value and \
+  flags = getattr(CP_SP, "flags", 0)
+  # Clarity angle mode steers through LatControlAngle; the PTM torque controllers must not replace it
+  if profile is not None and flags & HondaFlagsSP.EPS_MODIFIED.value and not flags & HondaFlagsSP.CLARITY_ANGLE_MODE.value and \
      get_honda_vgr_profile(CP) is not None and CP.lateralTuning.which() == "pid":
     return profile
   return None

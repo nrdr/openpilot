@@ -81,6 +81,7 @@ def build_sunnypilot_car_config(params, *, start_worker: bool = True,
       personal_pedal=nrdr_honda.personal_pedal,
       mvl_pcm_deadzone=nrdr_honda.mvl_pcm_deadzone,
       civic_pcm_speed_deadzone=nrdr_honda.civic_pcm_speed_deadzone,
+      clarity_angle_mode=nrdr_honda.clarity_angle_mode,
     ),
     hyundai=HyundaiCarConfig(
       longitudinal_tuning=int(_float_value(

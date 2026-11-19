@@ -46,6 +46,9 @@ class NrdrHondaParamKey(StrEnum):
   HONDA_OVERRIDE_FADE_UP_SECS = NrdrParamKey.HONDA_OVERRIDE_FADE_UP_SECS
   HONDA_OVERRIDE_TORQUE_SCALE = NrdrParamKey.HONDA_OVERRIDE_TORQUE_SCALE
   HONDA_DRIVER_ASSIST_DURING_OVERRIDE = NrdrParamKey.HONDA_DRIVER_ASSIST_DURING_OVERRIDE
+  HONDA_CLARITY_ANGLE_MODE = NrdrParamKey.HONDA_CLARITY_ANGLE_MODE
+  HONDA_CLARITY_ANGLE_CAP3 = NrdrParamKey.HONDA_CLARITY_ANGLE_CAP3
+  HONDA_EPS_ANGLE_RATE_LIMIT = NrdrParamKey.HONDA_EPS_ANGLE_RATE_LIMIT
   HONDA_LIVE_LEARNING_GAS = NrdrParamKey.HONDA_LIVE_LEARNING_GAS
   HONDA_TORQUE_LOW_PASS_FILTER = NrdrParamKey.HONDA_TORQUE_LOW_PASS_FILTER
   HONDA_LPF_TAU_LOW_SPEED = NrdrParamKey.HONDA_LPF_TAU_LOW_SPEED
@@ -110,6 +113,7 @@ SLOW_PARAM_GROUPS = (
     OpendbcParamKey.HONDA_SPOOF_CAMERA_MESSAGES,
   ),
   (OpendbcParamKey.NRDR_CRUISE_BUTTON_SUB_MODE,),
+  (OpendbcParamKey.HONDA_CLARITY_ANGLE_CAP3, OpendbcParamKey.HONDA_EPS_ANGLE_RATE_LIMIT),
   (
     OpendbcParamKey.NRDR_DRIVER_OVERRIDE_THRESHOLD,
     OpendbcParamKey.HONDA_CENTER_BOOST_THRESHOLD,
@@ -262,6 +266,8 @@ class HondaParamsProvider:
       full_brake_authority=_bool_value(values.get(OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY), True),
       roen_acceleration_limits=False,
       pedal_wind_brake=_bool_value(values.get(OpendbcParamKey.NRDR_HONDA_WIND_BRAKE), True),
+      clarity_angle_cap3=_bool_value(values.get(OpendbcParamKey.HONDA_CLARITY_ANGLE_CAP3), False),
+      angle_rate_limit_deg_s=_float_value(values.get(OpendbcParamKey.HONDA_EPS_ANGLE_RATE_LIMIT), 0.0, 0.0, 2000.0),
     )
     self._tuning_cache = tuning
     return tuning
@@ -525,6 +531,7 @@ class NrdrHondaConfig:
   personal_pedal: bool = False
   mvl_pcm_deadzone: float = 0.0
   civic_pcm_speed_deadzone: float = 0.15
+  clarity_angle_mode: bool = False
 
 
 def build_nrdr_honda_config(params, *, start_worker: bool = True,
@@ -561,6 +568,7 @@ def build_nrdr_honda_config(params, *, start_worker: bool = True,
     # Old acceleration-error settings are retained on disk, never reinterpreted as speed.
     mvl_pcm_deadzone=0.0,
     civic_pcm_speed_deadzone=0.0,
+    clarity_angle_mode=_bool_value(_read_param(params, OpendbcParamKey.HONDA_CLARITY_ANGLE_MODE), False),
   )
 
 

@@ -241,16 +241,19 @@ def test_personal_actuator_uses_neutral_factors_and_disables_learning():
 def test_startup_flag_is_hardware_qualified_without_extra_safety_authority(pedal, stock, nidec, selected):
   from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP, HondaSafetyFlagsSP
   from opendbc.car.honda.values import HondaSafetyFlags
+  from opendbc.sunnypilot.car.honda.clarity_eps import apply_angle_mode as apply_clarity_angle_mode
   path = ROOT / "opendbc_repo/opendbc/sunnypilot/car/interfaces.py"
   node = next(n for n in ast.parse(path.read_text()).body if isinstance(n, ast.FunctionDef) and n.name == "_initialize_honda")
   env = dict(HondaFlags=HondaFlags, HondaFlagsSP=HondaFlagsSP, HondaSafetyFlagsSP=HondaSafetyFlagsSP,
-             HondaSafetyFlags=HondaSafetyFlags, structs=NS(CarParams=object, CarParamsSP=object), HondaCarConfig=object)
+             HondaSafetyFlags=HondaSafetyFlags, structs=NS(CarParams=object, CarParamsSP=object), HondaCarConfig=object,
+             apply_clarity_angle_mode=apply_clarity_angle_mode)
   exec(compile(ast.Module(body=[node], type_ignores=[]), str(path), "exec"), env)
   params = cp(False)
   params.flags = HondaFlags.NIDEC if nidec else HondaFlags.BOSCH
   params.safetyConfigs = [NS(safetyParam=0)]
   sp = NS(enableGasInterceptor=pedal, flags=0, safetyParam=0)
-  config = NS(personal_pedal=selected, enforce_stock_longitudinal=stock, clarity_interceptor_brake_bench=False)
+  config = NS(personal_pedal=selected, enforce_stock_longitudinal=stock, clarity_interceptor_brake_bench=False,
+              clarity_angle_mode=False)
   env["_initialize_honda"](params, sp, config)
   assert bool(params.flags & HondaFlags.PERSONAL_PEDAL) is (pedal and not stock and nidec and selected)
   if not stock:
