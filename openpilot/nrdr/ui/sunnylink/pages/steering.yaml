@@ -290,6 +290,22 @@ sections:
         max: 100
         step: 1
         unit: '%'
+      - key: HondaClarityAngleMode
+        widget: toggle
+        title: Clarity Angle Mode (Restart Required)
+        description: "Clarity only: steer by wheel angle through the angle-loop EPS firmware (build 0x04/0x05). On any other EPS firmware steering stays unavailable, so leave this off. Takes effect at the next start."
+      - key: HondaClarityAngleCap3
+        widget: toggle
+        title: Clarity Angle Lateral Cap 3.0 m/s²
+        description: "Angle mode only: use the EPS's 3.0 m/s² lateral-acceleration clamp (mode 4) instead of 4.0. Needs EPS build 0x05; no effect on other builds. Switches while lateral is off."
+      - key: HondaEpsAngleRateLimit
+        widget: option
+        title: Clarity Angle Rate Limit
+        description: "Angle mode only: caps how fast the steering-angle target may move, in deg/s. 0 turns the cap off."
+        min: 0
+        max: 300
+        step: 10
+        unit: deg/s
     - id: nrdr_steer_filters
       label: Steer Filters
       trigger_key: null

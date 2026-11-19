@@ -114,11 +114,14 @@ class TestOpendbcBoundary(unittest.TestCase):
       OpendbcParamKey.NRDR_HONDA_FULL_BRAKE_AUTHORITY,
       OpendbcParamKey.NRDR_LATERAL_CONTROLLER,
       OpendbcParamKey.NRDR_HONDA_WIND_BRAKE,
+      OpendbcParamKey.HONDA_CLARITY_ANGLE_CAP3,
+      OpendbcParamKey.HONDA_EPS_ANGLE_RATE_LIMIT,
     })
     self.assertIs(OpendbcParamKey, NrdrHondaParamKey)
     self.assertTrue(set(HOST_STARTUP_DEFAULTS).isdisjoint(set(NrdrHondaParamKey)))
     self.assertSetEqual(set(NrdrHondaParamKey), set(grouped_keys) | {
       NrdrHondaParamKey.HONDA_BOSCH_A_RADAR,
+      NrdrHondaParamKey.HONDA_CLARITY_ANGLE_MODE,  # startup only (build_nrdr_honda_config)
       OpendbcParamKey.HONDA_GAS_ALPHA,
       OpendbcParamKey.HONDA_GAS_FACTOR,
       OpendbcParamKey.HONDA_WIND_FACTOR,
@@ -149,6 +152,7 @@ class TestOpendbcBoundary(unittest.TestCase):
       "NrdrLongitudinalController",
       str(NrdrHondaParamKey.HONDA_LIVE_LEARNING_GAS),
       str(NrdrHondaParamKey.NRDR_HONDA_WIND_BRAKE),
+      str(NrdrHondaParamKey.HONDA_CLARITY_ANGLE_MODE),
       *(str(key) for key in HOST_STARTUP_DEFAULTS),
     ])
 
