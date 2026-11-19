@@ -87,8 +87,8 @@ class OverrideTuningLayout(Widget):
       param="HondaClarityAngleMode",
       title=lambda: tr("Clarity Angle Mode (Restart Required)"),
       description=lambda: tr(
-        "Clarity only: steer by wheel angle through the angle-loop EPS firmware (build 0x04/0x05). On any other EPS firmware "
-        "steering stays unavailable, so leave this off. Takes effect at the next start."
+        "Clarity only: steer by wheel angle through the angle PTM EPS firmware (software ID 39990+TRW+A020). Ignored on any "
+        "other EPS firmware, which keeps torque control. Takes effect at the next start."
       ),
     )
     self._clarity_angle_cap3 = toggle_item_sp(

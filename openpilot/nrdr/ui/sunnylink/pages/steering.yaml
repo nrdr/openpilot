@@ -293,7 +293,7 @@ sections:
       - key: HondaClarityAngleMode
         widget: toggle
         title: Clarity Angle Mode (Restart Required)
-        description: "Clarity only: steer by wheel angle through the angle-loop EPS firmware (build 0x04/0x05). On any other EPS firmware steering stays unavailable, so leave this off. Takes effect at the next start."
+        description: "Clarity only: steer by wheel angle through the angle PTM EPS firmware (software ID 39990+TRW+A020). Ignored on any other EPS firmware, which keeps torque control. Takes effect at the next start."
       - key: HondaClarityAngleCap3
         widget: toggle
         title: Clarity Angle Lateral Cap 3.0 m/s²

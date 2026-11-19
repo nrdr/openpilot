@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from opendbc.sunnypilot.car.honda.values_ext import HondaFlagsSP
 from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile
+from openpilot.nrdr.features.lateral.yaw_control_timing import prediction_delay_schedule
 from openpilot.nrdr.features.lateral.honda_vgr import get_honda_vgr_profile, normalize_honda_eps_firmware
 
 
@@ -24,3 +25,13 @@ def test_angle_mode_is_excluded_from_the_ptm_controller():
   angle = SimpleNamespace(flags=int(HondaFlagsSP.EPS_MODIFIED | HondaFlagsSP.CLARITY_ANGLE_MODE))
   assert firmware_controller_profile(cp, torque) is not None
   assert firmware_controller_profile(cp, angle) is None
+
+
+def test_angle_mode_uses_lagd_not_the_ptm_delay_schedule():
+  # modeld and controlsd take the PTM prediction-delay schedule only from the PTM controller profile; angle mode gets
+  # none, so both use lagd's learned delay (get_lat_delay with delay_schedule=None)
+  cp = _cp(b"39990-TRW,A020\x00\x00")
+  torque = SimpleNamespace(flags=int(HondaFlagsSP.EPS_MODIFIED))
+  angle = SimpleNamespace(flags=int(HondaFlagsSP.EPS_MODIFIED | HondaFlagsSP.CLARITY_ANGLE_MODE))
+  assert prediction_delay_schedule(firmware_controller_profile(cp, torque)) is not None
+  assert prediction_delay_schedule(firmware_controller_profile(cp, angle)) is None
