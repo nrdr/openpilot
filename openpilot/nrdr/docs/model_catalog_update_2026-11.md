@@ -36,7 +36,7 @@ All model layouts now reject non-finite inference before parsing/publication, ra
 - 163 focused model tests and 24 subtests pass; eight native-dependent checks are skipped on Windows. Coverage includes actual Python-backend kernels, weights, copies, views, recurrent outputs, cache reload/invalidation, old chunked/pickle loading, artifact admission, selection migration, Sunnylink catalogs, host-written input visibility, hidden-state contracts and timing metadata. Deployment verification additionally passes 117 Wind Brake tests, 127 Honda tests and schema consistency. Three QCOM tests pass against the installed C4 checkout. Diff whitespace checks pass; Ruff is unavailable in the host runtime.
 - The current parser accepts all 78 small and 22 big catalog entries. None of these current portable downloads uses a chunk manifest.
 - Downloaded reference frames for OPM10V3, Cheddar, Flip Flop, Light Speed 2 and Fidx pass the unchanged output parser: finite plans `(1, 33, 15)` and poses `(1, 6)`. This validates the output interface, not device inference or driving performance.
-- Fidx's additional `fidx` input remains zero-initialized, matching the inspected upstream runner; no model-specific semantics have been invented.
+- At the November 14 revision, Fidx's additional `fidx` input was zero-initialized. The [development timing-input port](#development-timing-inputs-and-experimental-curve-slowdown) supersedes that behavior for models declaring the input.
 - Both portable OPM10V3 and Cheddar pass C4 reference verification, cache write/reload, and 110-frame runs through the actual model adapter/parser. All eight camera-odometry vector fields remain finite; messages were constructed but never published. OPM10V3's embedded C3X-size warp reference also passes on the C4 GPU; this is not physical C3X validation.
 - Existing installed Cheddar produces byte-identical plan/pose sequences over 110 frames before and after the runtime correction. Its saved selection remains active.
 
@@ -197,3 +197,11 @@ model candidate: the −2 m/s² floor applies to **added curve braking**, not to
 already requested. The 2 m/s³ slew applies to the correction state, not to total vehicle jerk.
 Disable the two boolean settings while parked/offroad to return to their previous behavior
 at the next model/planner start. There is no dashboard toggle or change to fault reporting.
+
+Offline check of the pre-port Vega outing `0000020e--22347bdc3d` (15 segments): all 16,925
+lateral action horizons were 0.255–0.325 s; none exceeded 0.4 s. Feeding the **recorded model
+acceleration** to the curve helper, no reduction was called for on the 337 frames matching
+experimental longitudinal engagement, pedal/override and valid data in the recording.
+Ignoring engagement/pedal gating as a counterfactual only, 181 of 13,084 moving frames with
+valid roll/model data reduced the candidate by over 0.01 m/s² (largest reduction 0.92 m/s²).
+This is a fixed-input helper replay, not final planner commands, closed-loop response, or a road test.
