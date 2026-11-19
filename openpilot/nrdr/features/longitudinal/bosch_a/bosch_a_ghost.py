@@ -1,23 +1,24 @@
 """Bosch-A ghost let-off (arm G4, 1.5 s no-gas hold; in the car build 2026-11-14, replay evidence only): one rule for every brake that outlives its lead.
 
 Owner, 2026-11-13: "ideally I want to develop a universal fix for all of those situations" (turn-offs, cut-outs,
-radar dropouts, camera-only leads), replacing the turn-off trigger (PTM bosch_a_turnoff.FastLetoff, not ported to nrdr) and the release coast.
-It runs from BoschASmooth.step (bosch_a_smooth.GHOST_ARM); the nrdr planner skips BoschAReleaseCoast while GHOST_ARM is on.
+radar dropouts, camera-only leads), replacing the turn-off trigger (bosch_a_turnoff.FastLetoff) and the release coast.
 
 When the lead we were braking for leaves leadOne (gone, or replaced by a lead that is farther or not closing), it is kept
-as a ghost: its last gap, speed and accel, moved forward in time. Until it is cleared, the existing brake-release
-rate and dwell remain unchanged. Once cleared, the brake may release at FAST_JERK, no higher than zero or the
-planner's target. The historical ghost_a_req helper is not used by this strategy.
+as a ghost: its last gap, speed and accel, moved forward in time. Each cycle the ghost gives the braking it still
+justifies (a_req: stop behind it, assuming it keeps braking at min(aLeadK, 0) to a stop). The brake then lets off:
+  - always at least at the base rate (BRAKE_RELEASE_JERK, unchanged);
+  - faster, up to FAST_JERK, but never above the ghost's a_req (no evidence it left: physics alone bounds the let-off);
+  - faster up to FAST_JERK all the way to the planner's target once the ghost is CLEARED.
 Cleared means evidence the obstacle left our path: its raw radar track grew to |yRel| >= CLEAR_Y_LETOFF by at least
 CLEAR_DY, or the camera's lead 0 has been absent (prob < CAM_CLEAR_PROB, or farther than ghost + CAM_FAR_M) for
 CAM_CLEAR_S. Gas is withheld while the ghost lives and is not GAS-cleared (|yRel| >= CLEAR_Y_GAS, or the raw track
 vanished after passing CLEAR_Y_LETOFF), for at most NOGAS_MAX_S.
 Arm G3: before a clear only the base let-off applies (the a_req bound above is not used; see the end of update).
-The ghost dies when a lead within MERGE_M of it comes back (the planner owns it again), a nearer closing lead takes
-over, a driver override/lane change skips it, or after GHOST_MAX_S. Gas-clear only ends the no-gas hold.
+The ghost dies when a lead within MERGE_M of it comes back (the planner owns it again), a closing lead inside
+CLOSE_D_M appears, the ghost has been gas-cleared, or after GHOST_MAX_S.
 It never adds braking (every output is min(target, ...) or a slower-than-planner rise) and never removes a radar point.
-ghost: replay evidence on the vasm-jetson bridge base (main 1141 / second 99 score 0/0/0, 0 rows harder); ported to nrdr, not replayed there, not driven
-Radar dropout without evidence of departure retains the base brake release; missing raw-track data is not a clear.
+Radar dropout with the car still there: the camera still sees it and the raw track did not move out, so only a_req
+applies; at short gaps a_req stays below the base let-off and nothing changes.
 """
 from types import SimpleNamespace
 
@@ -42,19 +43,6 @@ CAM_RADAR_DX = 1.5       # m; device-frame x minus radar dRel, rough
 # and a2 s42 (+0.5). The camera clear now only counts for a camera ghost, or a radar ghost whose raw track was last seen
 # at least this far out (FastLetoff CLEAR_Y); that keeps it for far-off-centre leads (80 s3, y0 4.33).
 CAM_RADAR_Y = 1.8        # m
-
-
-def raw_track_y(sm) -> dict[int, float] | None:
-  """Valid raw tracks, or None when unavailable; a valid empty frame means no tracks remain."""
-  try:
-    rt = sm['radarTracks']
-  except (KeyError, AttributeError):
-    return None
-  valid = getattr(sm, 'valid', {})
-  alive = getattr(sm, 'alive', {})
-  if not valid.get('radarTracks', True) or not alive.get('radarTracks', True):
-    return None
-  return {int(p.trackId): float(p.yRel) for p in rt.points}
 
 
 def ghost_a_req(d: float, v_ego: float, v_lead: float, a_lead: float) -> float:
@@ -111,8 +99,11 @@ class GhostLetoff:
     self.nogas_s = 0.0
     self.fired = 0      # ghosts born
     self.cleared = 0    # ghosts cleared for the fast let-off
+    self.end_reason = ''  # why the last ghost ended (back/closing/ttl/skip/reset); diagnostic only
 
   def reset(self):
+    if self.ghost is not None:
+      self.end_reason = 'reset'
     self.prev = None
     self.ghost = None
     self.nogas_s = 0.0
@@ -143,6 +134,7 @@ class GhostLetoff:
       # 1.27 m/s, kill the 10.5 m turner's ghost on pb c1 s13 before its raw track moved out (+0.375 vs car for 0.6 s).
       closing = (cur is not None and cur.dRel < min(CLOSE_D_M, g.d0 + MERGE_M) and cur.vRel < CLOSE_VREL)
       if back or closing or g.age >= g.ttl:
+        self.end_reason = 'back' if back else ('closing' if closing else 'ttl')  # diagnostic only (bosch_a_ghost log)
         self.ghost = g = None
         self.nogas_s = 0.0 if (back or closing) else self.nogas_s
     if g is not None:
@@ -171,6 +163,8 @@ class GhostLetoff:
         self.nogas_s = 0.0
 
     if skip:  # lane change, blinker or gas pressed: passing a slower car also releases its lead, and we want gas there
+      if g is not None:
+        self.end_reason = 'skip'
       self.ghost = g = None
       self.nogas_s = 0.0
     elif (g is None and prev is not None and prev.vRel < TRIGGER_VREL and prev_target < TRIGGER_PREV_TARGET and

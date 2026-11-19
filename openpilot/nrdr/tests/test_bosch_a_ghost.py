@@ -124,40 +124,41 @@ def test_ghost_expires():
   assert out == (None, None) and not gl.no_gas
 
 
-def test_smooth_step_without_lead_one_keeps_base_path():
-  from openpilot.nrdr.features.longitudinal.bosch_a import bosch_a_smooth as bs
+# nrdr additions: a missing radarTracks frame (None) is not evidence that the track vanished. The Biscuit-Labs tip passes
+# {} for missing data; nrdr keeps None distinct from a valid empty frame (turnoff.raw_track_y_or_none, release passes it on).
+def _release():
+  from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_release import BoschARelease
   cp = SimpleNamespace(brand="honda", carFingerprint="HONDA_CIVIC_BOSCH", openpilotLongitudinalControl=True, radarUnavailable=False)
-  s = bs.BoschASmooth(cp)
-  assert s.step(-2.0, -0.5, False) == bs.brake_release_limited_target(-2.0, -0.5, s.dt)
+  return BoschARelease(cp, DT)
 
 
-def test_smooth_step_ghost_withholds_gas_and_never_adds_brake():
-  from openpilot.nrdr.features.longitudinal.bosch_a import bosch_a_smooth as bs
-  cp = SimpleNamespace(brand="honda", carFingerprint="HONDA_CIVIC_BOSCH", openpilotLongitudinalControl=True, radarUnavailable=False)
-  s = bs.BoschASmooth(cp)
-  s.step(-3.0, -3.0, False, lead_one=lead(), raw_y={22: -0.8}, v_ego=13.0, model_lead0=CAM_SEES)
-  out = s.step(-3.0, 1.0, False, lead_one=GONE, raw_y={}, v_ego=13.0, model_lead0=CAM_SEES)
-  assert s.ghost.no_gas and out <= 0.0
+def test_release_step_ghost_withholds_gas_and_never_adds_brake():
+  r = _release()
+  r.step(lead_one=lead(), prev=-3.0, target=-3.0, raw_y={22: -0.8}, v_ego=13.0, model_lead0=CAM_SEES)
+  out = r.step(lead_one=GONE, prev=-3.0, target=1.0, raw_y={}, v_ego=13.0, model_lead0=CAM_SEES)
+  assert r.ghost.no_gas and out <= 0.0
   assert out >= -3.0  # a rise or hold, never more braking than the previous target
 
 
-def test_raw_track_y_distinguishes_unavailable_from_empty():
-  assert G.raw_track_y({}) is None
+def test_raw_track_y_or_none_distinguishes_unavailable_from_empty():
+  from openpilot.nrdr.features.longitudinal.bosch_a import bosch_a_turnoff as T
+  assert T.raw_track_y_or_none({}) is None
+  assert T.raw_track_y({}) == {}  # Biscuit-Labs semantics kept for the other callers
   rt = SimpleNamespace(points=[SimpleNamespace(trackId=4, yRel=1.25)])
 
   class SM(dict):
     valid = {'radarTracks': True}
     alive = {'radarTracks': True}
   sm = SM(radarTracks=rt)
-  assert G.raw_track_y(sm) == {4: 1.25}
+  assert T.raw_track_y_or_none(sm) == {4: 1.25}
   sm.alive = {'radarTracks': False}
-  assert G.raw_track_y(sm) is None
+  assert T.raw_track_y_or_none(sm) is None
   sm.alive = {'radarTracks': True}
   sm.valid = {'radarTracks': False}
-  assert G.raw_track_y(sm) is None
+  assert T.raw_track_y_or_none(sm) is None
   sm.valid = {'radarTracks': True}
   rt.points = []
-  assert G.raw_track_y(sm) == {}
+  assert T.raw_track_y_or_none(sm) == {}
 
 
 def test_unavailable_tracks_do_not_release_the_gas_hold():
@@ -171,21 +172,17 @@ def test_unavailable_tracks_do_not_release_the_gas_hold():
   assert not gl.no_gas  # a valid empty frame confirms the departure
 
 
-def test_smooth_preserves_gas_hold_when_track_service_is_lost():
-  from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_smooth import BoschASmooth
-  cp = SimpleNamespace(brand="honda", carFingerprint="HONDA_CIVIC_BOSCH", openpilotLongitudinalControl=True, radarUnavailable=False)
-  s = BoschASmooth(cp)
-  born(s.ghost)
-  s.ghost.update(GONE, -2.5, 12.0, {22: -1.6}, CAM_SEES)
-  s.step(-2.0, 1.0, False, lead_one=GONE, raw_y=None, v_ego=12.0, model_lead0=CAM_SEES)
-  assert s.ghost.no_gas
+def test_release_preserves_gas_hold_when_track_service_is_lost():
+  r = _release()
+  born(r.ghost)
+  r.ghost.update(GONE, -2.5, 12.0, {22: -1.6}, CAM_SEES)
+  r.step(lead_one=GONE, prev=-2.0, target=1.0, raw_y=None, v_ego=12.0, model_lead0=CAM_SEES)
+  assert r.ghost.no_gas
 
 
 def test_cleared_ghost_does_not_reduce_a_new_braking_request():
-  from openpilot.nrdr.features.longitudinal.bosch_a.bosch_a_smooth import BoschASmooth
-  cp = SimpleNamespace(brand="honda", carFingerprint="HONDA_CIVIC_BOSCH", openpilotLongitudinalControl=True, radarUnavailable=False)
-  s = BoschASmooth(cp)
-  born(s.ghost)
-  s.ghost.update(GONE, -2.5, 12.0, {22: -1.6}, CAM_SEES)
-  assert s.ghost.ghost.letoff_clear
-  assert s.step(-2.0, -3.0, False, lead_one=GONE, raw_y={}, v_ego=12.0, model_lead0=CAM_SEES) == -3.0
+  r = _release()
+  born(r.ghost)
+  r.ghost.update(GONE, -2.5, 12.0, {22: -1.6}, CAM_SEES)
+  assert r.ghost.ghost.letoff_clear
+  assert r.step(lead_one=GONE, prev=-2.0, target=-3.0, raw_y={}, v_ego=12.0, model_lead0=CAM_SEES) == -3.0

@@ -2,7 +2,7 @@
 
 car.capnp's RadarPoint is upstream-owned, so card publishes the decoder's point_statuses in
 carStateSP.radarPointStatus (custom.capnp), stamped with the logMonoTime of the radarTracks message they describe.
-Ported from the Biscuit-Labs starpilotCarState carrier; nrdr's companion message is carStateSP.
+Ported from the Biscuit-Labs carState carrier; nrdr's companion message is carStateSP.
 radard uses them only when they belong to the radarTracks message it holds or one close to it.
 Absent, stale or unpaired statuses read as empty, so the STATUS tell is off (no bound) as before this carrier.
 """
