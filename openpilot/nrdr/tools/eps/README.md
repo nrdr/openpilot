@@ -32,7 +32,7 @@ launchers, but contain no flashing implementation or firmware.
 ## Guided flash (recommended)
 
 `flash.py` walks the whole thing for you: reads the car's current EPS firmware
-and searches an explicit 23-file menu containing ten Proper Torque Mod
+and searches an explicit 24-file menu containing eleven Proper Torque Mod
 images and thirteen clearly labelled stock recovery images. It lists only choices
 compatible with the detected EPS (with checksum status), lets you pick one,
 auto-detects the EPS CAN bus via a live UDS probe of the selected image's address

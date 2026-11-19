@@ -63,6 +63,7 @@ EXPECTED_ASSETS = {
   "39990-TLA-A220 (2021 Honda CR-V)/Legacy and Stock/39990-TLA-A220-stock.rwd": "70d38d2e72a82da472786a9f429d5469740db57a49b66831bf2dee9a485d6517",
   "39990-TLA-A220 (2021 Honda CR-V)/Proper Torque Mod/39990-TLA,A220-PTM-20261016b.rwd": "2c99299725fa34ad65a7f5d25a7f32659f5fb97d173fd2789e2428aea8959227",
   "39990-TRW-A020 (Honda Clarity)/Legacy and Stock/39990-TRW-A020 (stock).rwd": "d08a7f5c18ea6af9aaa1b366828fef226bb4ce192dc89a3d79d9c2661e1a7673",
+  "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261118-05.rwd": "1fbf3b63e02b147530bd164b1a325098a4e97c1ddef86868c709b75b3f5c1c74",
   "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM-Latest-092826.rwd": "9e2e98857a6734f4631205cb9550bf7cb61720da566a4c117b9187a8ddf25d61",
   "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM.rwd": "d4fe903bcf347495f4321be65a3c650c8c931f1650c3bef6443721da0dd80f7d",
   "39990-TVA-A160 (Honda Accord)/39990-TVA,A160-V37-2xTorque.rwd": "8a809d1b320957e4846c9145ee662858759d514681ce46c247a4a197784202da",
@@ -101,6 +102,7 @@ GUIDED_IMAGES = {
   "39990-TLA-A220 (2021 Honda CR-V)/Legacy and Stock/39990-TLA-A220-stock.rwd",
   "39990-TLA-A220 (2021 Honda CR-V)/Proper Torque Mod/39990-TLA,A220-PTM-20261016b.rwd",
   "39990-TRW-A020 (Honda Clarity)/Legacy and Stock/39990-TRW-A020 (stock).rwd",
+  "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261118-05.rwd",
   "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM-Latest-092826.rwd",
   "39990-TXM-A040 (2019-2022 Honda Insight)/Legacy and Stock/TXM-A040-STOCK.rwd",
   "39990-TXM-A040 (2019-2022 Honda Insight)/Proper Torque Mod/39990-TXM,A040-PTM.rwd",
@@ -209,7 +211,7 @@ class TestCuratedRwdLibrary(unittest.TestCase):
       return check_rwd.check(path)
 
   def test_exact_drive_audited_asset_paths_hashes_and_manifest(self):
-    self.assertEqual(len(EXPECTED_ASSETS), 53)
+    self.assertEqual(len(EXPECTED_ASSETS), 54)
     manifest = {}
     for line in SHA256_MANIFEST.read_text().splitlines():
       if not line.strip():
@@ -227,7 +229,7 @@ class TestCuratedRwdLibrary(unittest.TestCase):
     self.assertEqual(actual, EXPECTED_ASSETS)
 
   def test_all_rwd_containers_have_valid_outer_checksums(self):
-    self.assertEqual(len(OUTER_CHECKSUM_IMAGES), 50)
+    self.assertEqual(len(OUTER_CHECKSUM_IMAGES), 51)
     for name in OUTER_CHECKSUM_IMAGES:
       with self.subTest(name=name):
         raw = (RWD_DIR / name).read_bytes()
@@ -235,20 +237,29 @@ class TestCuratedRwdLibrary(unittest.TestCase):
         self.assertEqual(struct.unpack("<I", raw[-4:])[0], sum(raw[:-4]) & 0xffffffff)
 
   def test_all_x5a_containers_pass_full_offline_validation(self):
-    self.assertEqual(len(X5A_CONTAINERS), 43)
+    self.assertEqual(len(X5A_CONTAINERS), 44)
     for name in X5A_CONTAINERS:
       with self.subTest(name=name):
         self.assertTrue(self.check_quietly(RWD_DIR / name))
 
   def test_guided_menu_matches_current_drive_images(self):
-    self.assertEqual(len(GUIDED_IMAGES), 23)
-    self.assertEqual(sum("/Proper Torque Mod/" in name for name in GUIDED_IMAGES), 10)
+    self.assertEqual(len(GUIDED_IMAGES), 24)
+    self.assertEqual(sum("/Proper Torque Mod/" in name for name in GUIDED_IMAGES), 11)
     self.assertEqual(sum("stock" in Path(name).name.lower() for name in GUIDED_IMAGES), 13)
     self.assertEqual(set(flash.GUIDED_FLASH_FILES), GUIDED_IMAGES)
     self.assertEqual(
       {Path(path).relative_to(RWD_DIR).as_posix() for path in flash.find_images()},
       GUIDED_IMAGES,
     )
+
+  def test_angle_build_is_a_separate_clarity_choice_with_its_own_supported_ids(self):
+    rows = {flash.image_display_name(path): flash.rwd_supported_versions(path) for path in flash.find_images()}
+    angle = "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261118-05.rwd"
+    stock = "39990-TRW-A020 (Honda Clarity)/Legacy and Stock/39990-TRW-A020 (stock).rwd"
+    torque = "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM-Latest-092826.rwd"
+    for eps_id, expected in (("39990-TRW-A020", {stock, torque, angle}), ("39990-TRW,A020", {stock, torque, angle}),
+                             ("39990+TRW+A020", {angle})):
+      self.assertEqual({path for path, ids in rows.items() if flash.norm_fw(eps_id) in ids}, expected)
 
   def test_every_guided_image_passes_updater_checks_and_seed_lookup(self):
     updater = load_eps_update_with_dependency_stubs()

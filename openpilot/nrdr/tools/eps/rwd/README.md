@@ -9,12 +9,12 @@ authority to replace a Drive image with a different tune.
 The November 15, 2026 audit checked all 17 vehicle folders and their PTM/stock
 categories. [SOURCES.md](SOURCES.md) records the 30 downloaded current PTM/stock
 artifacts, exact source links, and remaining discrepancies. [SHA256SUMS](SHA256SUMS)
-pins all 53 local firmware artifacts, including retained historical files.
+pins those 53 artifacts and the separately owner-supplied Clarity AnglePTM build 05.
 
 ## Guided catalog
 
 Run `python3 flash.py` over SSH from the repository root. The command-line helper offers an explicit
-23-image menu: 10 PTM images and 13 stock-recovery images, filtered by the EPS
+24-image menu: 11 PTM images and 13 stock-recovery images, filtered by the EPS
 software IDs in each container. Old C020 and Clarity files remain stored but are
 no longer menu choices. A valid checksum and matching header are not proof of
 vehicle/controller compatibility.
@@ -29,13 +29,22 @@ vehicle/controller compatibility.
 | TGG-A120 Civic | Added `6640806d` | 1 |
 | TLA-A040 CR-V | Drive `26f5390b`; controller-reference mismatch | 1 |
 | TLA-A220 CR-V | Added `2c992997` | 1 |
-| TRW-A020 Clarity | `ClarityMax-PTM-Latest-092826.rwd`, `9e2e9885` | 1 added |
+| TRW-A020 Clarity | ClarityMax September PTM (`9e2e9885`); separate AnglePTM 20261118 build 05 (`1fbf3b63`) | 1 |
 | TXM-A040 Insight | Drive `833a41bf`; controller-reference mismatch | 1 |
 | THR-A020 Odyssey | No PTM file in Drive | 1 added |
 | TJB-A220 RDX | Added `68a6fdb4`; runtime PTM admission remains disabled | 2 added |
 | TG7-A060 Pilot | No PTM file in Drive | 1 |
 
 Missing PTM files are not fabricated or substituted with legacy tunes.
+
+The November 18 AnglePTM image is a manual choice, paired with
+[openpilot #34](https://github.com/nrdr/openpilot/pull/34) and
+[opendbc #5](https://github.com/nrdr/opendbc/pull/5). Adding it does not flash
+the EPS or select angle mode. Its header declares the `39990+TRW+A020` ID as
+well as earlier Clarity IDs. The bundled stock and September PTM headers do
+**not** declare the plus ID: do not assume they provide a verified rollback
+from build 05. Container validation is not a bench test of steering or recovery.
+
 Adding RDX firmware does not enable RDX lateral-control support. The four
 controller-reference mismatches and Clarity payload changes need separate
 calibration review; no runtime tuning changed in this audit.
