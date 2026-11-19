@@ -27,10 +27,14 @@ def vehicle_supported(CP) -> bool:
   return _bosch_a_platform(CP) and bool(getattr(CP, "openpilotLongitudinalControl", False))
 
 
-def active_for(CP) -> bool:
-  """honda_bosch_a_long gate: Bosch-A Honda, radar on, openpilot longitudinal (same as is_honda_bosch_a_radar and
-  openpilotLongitudinalControl)."""
+def long_tuning_active(CP) -> bool:
+  """The one gate for every radar-dependent Bosch-A longitudinal part (PTM bosch_a_toggles.long_tuning_active): verified
+  Bosch-A Honda (HONDA_BOSCH_A, 14 cars), openpilot longitudinal, radar on."""
   return vehicle_supported(CP) and not bool(getattr(CP, "radarUnavailable", True))
+
+
+# Kept so existing nrdr callers (and the nrdr gate tests) keep working; identical to long_tuning_active.
+active_for = long_tuning_active
 
 
 def human_following_enabled(CP) -> bool:

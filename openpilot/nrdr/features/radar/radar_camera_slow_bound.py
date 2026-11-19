@@ -25,8 +25,7 @@ from __future__ import annotations
 from typing import Any
 
 from openpilot.common.realtime import DT_MDL
-
-RADAR_TO_CAMERA = 1.52
+from openpilot.nrdr.features.radar.radar_camera_witness import RADAR_TO_CAMERA
 CAM_SLOW_PROB = 0.9          # filtered model lead prob (D-105 CamABound uses the same confidence)
 CAM_SLOW_RANGE_FRAC = 0.1    # same object: |dRel - camera range| <= max(CAM_SLOW_RANGE_M, frac * dRel) (D-105)
 CAM_SLOW_RANGE_M = 8.0       # was max(10 m, 20 %). Census 2026-10-30 (Job, open loop, 16 CSB movers): 2f8 T1365 matched
