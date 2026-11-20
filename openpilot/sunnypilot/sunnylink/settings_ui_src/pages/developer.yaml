@@ -1,0 +1,135 @@
+# Page: developer
+# Edit this file. Run compile_settings_ui.py to emit settings_ui.json.
+id: developer
+label: Developer
+icon: developer
+order: 9
+remote_configurable: true
+description: Debug tools, remote access, and advanced services
+sections:
+- id: connectivity
+  title: Connectivity
+  description: Remote access and debugging interfaces
+  items:
+  - key: AdbEnabled
+    widget: toggle
+    blocked: true
+    title: Enable ADB
+    description: "Enables Android Debug Bridge access over USB or the local network."
+    details: "Use ADB to access developer tools on the device."
+    enablement:
+    - $ref: '#/macros/offroad'
+  - key: SshEnabled
+    widget: toggle
+    blocked: true
+    title: Enable SSH
+  - key: JoystickDebugMode
+    widget: toggle
+    title: Joystick Debug Mode
+    enablement:
+    - $ref: '#/macros/offroad'
+  - key: AlphaLongitudinalEnabled
+    widget: toggle
+    needs_onroad_cycle: true
+    title: sunnypilot Longitudinal Control (Alpha)
+    description: "Replaces factory ACC with experimental openpilot acceleration and braking. This disables factory Automatic Emergency Braking (AEB)."
+    details: "Off restores factory ACC; changing this setting while the car is on restarts sunnypilot."
+    visibility:
+    - type: all
+      conditions:
+      - type: capability
+        field: alpha_long_available
+        equals: true
+      - type: not
+        condition:
+          type: capability
+          field: has_icbm
+          equals: true
+    enablement:
+    - $ref: '#/macros/not_engaged'
+  - key: ShowDebugInfo
+    widget: toggle
+    title: UI Debug Mode
+- id: test_maneuvers
+  title: Test Maneuvers
+  description: 'DANGER: enabling these maneuvers replaces normal driving behavior with deterministic test sequences. Each
+    toggle requires explicit confirmation per write. Use only in a closed environment.'
+  visibility:
+  - type: any
+    conditions:
+    - type: capability
+      field: is_development
+      equals: true
+    - type: capability
+      field: is_sp_release
+      equals: true
+  enablement:
+  - type: any
+    conditions:
+    - type: capability
+      field: is_development
+      equals: true
+    - type: param
+      key: ShowAdvancedControls
+      equals: true
+  attestation_required: true
+  items:
+  - key: LateralManeuverMode
+    widget: toggle
+    title: '[TEST] Lateral Maneuver Mode'
+    description: Replaces normal lateral control with a deterministic test sequence. NOT for road use.
+    enablement:
+    - $ref: '#/macros/not_engaged'
+    - type: capability
+      field: torque_allowed
+      equals: true
+  - key: LongitudinalManeuverMode
+    widget: toggle
+    title: '[TEST] Longitudinal Maneuver Mode'
+    description: Replaces normal longitudinal control with a deterministic test sequence. NOT for road use.
+    enablement:
+    - $ref: '#/macros/not_engaged'
+    - $ref: '#/macros/longitudinal'
+- id: advanced_services
+  title: Advanced Settings
+  description: ''
+  items:
+  - key: ShowAdvancedControls
+    widget: toggle
+    title: Show Advanced Controls
+    description: "Shows advanced settings. Hiding them leaves their current values unchanged."
+    details: "Only changes which settings are visible."
+  - key: EnableGithubRunner
+    widget: toggle
+    title: GitHub Runner Service
+    description: Enables or disables the GitHub runner service.
+    visibility:
+    - $ref: '#/macros/release_branches_hide'
+    enablement:
+    - $ref: '#/macros/advanced_only'
+  - key: EnableCopyparty
+    widget: toggle
+    title: copyparty Service
+    description: "Lets you browse, download, and manage device files in a web browser on the same network."
+    details: "Available while the car is off; disabling it stops browser access to the file server."
+    enablement:
+    - $ref: '#/macros/advanced_only'
+  - key: QuickBootToggle
+    widget: toggle
+    title: Quickboot Mode
+    visibility:
+    - type: not
+      condition:
+        type: any
+        conditions:
+        - type: capability
+          field: is_sp_release
+          equals: true
+        - type: capability
+          field: is_development
+          equals: true
+    enablement:
+    - type: param
+      key: DisableUpdates
+      equals: true
+    - $ref: '#/macros/advanced_only'
