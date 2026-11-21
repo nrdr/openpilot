@@ -215,6 +215,8 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("NrdrActionTimeCap", ParamType.BOOL, PB, "0", owner=ParamOwner.MODEL),
   _added("NrdrModelFidx", ParamType.INT, PB, "3", owner=ParamOwner.MODEL),
   _added("NrdrCurveSpeed", ParamType.BOOL, PB, "0", owner=ParamOwner.LONGITUDINAL),
+  _added("NrdrLateralSpeedBound", ParamType.BOOL, PB, "0", owner=ParamOwner.MODEL),
+  _added("NrdrTurnDesireRefresh", ParamType.BOOL, PB, "0", owner=ParamOwner.MODEL),
   _added("StaticFeedforwardLong", ParamType.BOOL, PB, "0", owner=ParamOwner.LONGITUDINAL),
   # Retained for downgrade compatibility only. Never migrate old True to mode 1.
   _added("NrdrHondaEcuMatchedLong", ParamType.BOOL, PB, "0", ParamLifecycle.TOMBSTONE, ParamOwner.HONDA),

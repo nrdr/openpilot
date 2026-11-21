@@ -79,6 +79,7 @@ class DummyCarState:
     self.leftBlindspot = leftBlindspot
     self.rightBlindspot = rightBlindspot
     self.steeringPressed = steeringPressed
+    self.steeringAngleDeg = 0.0
     self.steeringTorque = steeringTorque
     self.brakePressed = brakePressed
 

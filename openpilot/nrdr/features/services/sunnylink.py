@@ -11,6 +11,7 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
   "NrdrStandstillGapExtra",
   "NrdrSuggestedSettings",
   "NrdrLateralController",
+  "NrdrLateralSpeedBound", "NrdrTurnDesireRefresh",
   "NrdrDriverMonitoringReminderPercent",
   "NrdrPcmSpeedDeadzone",
 ))
@@ -20,6 +21,7 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
 # custom remote client from bypassing the vehicle-aware UI.
 HONDA_TUNING_WRITE_KEYS = frozenset((
   # Lateral tuning.
+  "NrdrLateralSpeedBound", "NrdrTurnDesireRefresh",
   "NrdrLateralController", "NrdrOptimizedLaneChanges", "NrdrDeviceYawCorrection",
   "NrdrLatRateDampingLowSpeed", "NrdrLatRateDampingStandard", "NrdrLatRateDampingHighway",
   "LatPScaleLowSpeed",

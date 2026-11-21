@@ -114,6 +114,8 @@ class NrdrParamKey(StrEnum):
   NRDR_ACTION_TIME_CAP = "NrdrActionTimeCap"
   NRDR_MODEL_FIDX = "NrdrModelFidx"
   NRDR_CURVE_SPEED = "NrdrCurveSpeed"
+  NRDR_LATERAL_SPEED_BOUND = "NrdrLateralSpeedBound"
+  NRDR_TURN_DESIRE_REFRESH = "NrdrTurnDesireRefresh"
   STATIC_FEEDFORWARD_LONG = "StaticFeedforwardLong"
   NRDR_HONDA_ECU_MATCHED_LONG = "NrdrHondaEcuMatchedLong"
   NRDR_HONDA_PCM_MODE = "NrdrHondaPcmMode"
@@ -292,6 +294,8 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.NRDR_ACTION_TIME_CAP,
   NrdrParamKey.NRDR_MODEL_FIDX,
   NrdrParamKey.NRDR_CURVE_SPEED,
+  NrdrParamKey.NRDR_LATERAL_SPEED_BOUND,
+  NrdrParamKey.NRDR_TURN_DESIRE_REFRESH,
   NrdrParamKey.STATIC_FEEDFORWARD_LONG,
   NrdrParamKey.NRDR_HONDA_ECU_MATCHED_LONG,
   NrdrParamKey.NRDR_HONDA_PCM_MODE,

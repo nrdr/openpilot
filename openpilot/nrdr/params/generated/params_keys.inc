@@ -108,6 +108,8 @@
     {"NrdrActionTimeCap", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrModelFidx", {PERSISTENT | BACKUP, INT, "3"}},
     {"NrdrCurveSpeed", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrLateralSpeedBound", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrTurnDesireRefresh", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"StaticFeedforwardLong", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrHondaEcuMatchedLong", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrHondaPcmMode", {PERSISTENT | BACKUP, INT, "0"}},

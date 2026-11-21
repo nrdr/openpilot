@@ -31,6 +31,24 @@ class TestUiSettingsContract(unittest.TestCase):
     cls.nrdr = next(section for section in cls.pages["steering"]["sections"] if section["id"] == "nrdr")
     cls.panels = {panel["id"]: panel for panel in cls.nrdr["sub_panels"]}
 
+  def test_lateral_experiments_match_native_switches_and_parked_policy(self):
+    from openpilot.nrdr.params.specs import PARAM_SPECS_BY_KEY
+    from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
+    from openpilot.nrdr.ui.settings.lateral_experiments import LATERAL_EXPERIMENTS
+
+    panel = self.panels["nrdr_pidf_ground"]
+    rows = {item["key"]: item for item in _items(panel)}
+    for key, title, description in LATERAL_EXPERIMENTS:
+      self.assertEqual(sum(item["key"] == key for item in _items(self.schema)), 1)
+      self.assertEqual((rows[key]["widget"], rows[key]["title"], rows[key]["description"]), ("toggle", title, description))
+      self.assertIn({"type": "offroad_only"}, rows[key]["enablement"])
+      self.assertEqual(PARAM_SPECS_BY_KEY[key].default, "0")
+      for parent in (True, False):
+        params = {"LaneTurnDesire": parent}
+        self.assertFalse(tuning_write_allowed(params, key, is_offroad=False))
+        self.assertEqual(tuning_write_allowed(params, key, is_offroad=True), parent or key == "NrdrLateralSpeedBound")
+    self.assertIn({"type": "param", "key": "LaneTurnDesire", "equals": True}, rows["NrdrTurnDesireRefresh"]["enablement"])
+
   def test_moved_items_live_only_in_steering_nrdr(self):
     self.assertEqual(self.nrdr["title"], "nrdr")
     main_keys = [item["key"] for item in self.nrdr["items"]]

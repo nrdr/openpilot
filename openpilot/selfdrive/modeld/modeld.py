@@ -49,6 +49,8 @@ from openpilot.nrdr.features.lateral.lane_guidance import (
   set_lane_guidance_mode,
 )
 from openpilot.nrdr.features.lateral.model_source import PTM_LAT_SMOOTH_SECONDS, delay_input, lateral_source
+from openpilot.nrdr.features.lateral import lateral_speed_bound
+from openpilot.nrdr.features.lateral.lateral_speed_bound import LateralSpeedBound, plan_speed
 
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 
@@ -59,7 +61,9 @@ BIG_MODEL_TIMEOUT = 60
 
 
 def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
-                          lat_action_t: float, long_action_t: float, v_ego: float, ptm_controller: bool = False) -> log.ModelDataV2.Action:
+                          lat_action_t: float, long_action_t: float, v_ego: float, ptm_controller: bool = False,
+                          lateral_speed: float | None = None) -> log.ModelDataV2.Action:
+  v_lat = v_ego if lateral_speed is None else lateral_speed  # speed that turns the lateral output into curvature
   if 'action' not in model_output:
     plan = model_output['plan'][0]
     desired_accel = get_accel_from_plan(plan[:,Plan.VELOCITY][:,0],
@@ -69,11 +73,11 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
     desired_curvature = get_curvature_from_plan(plan[:,Plan.T_FROM_CURRENT_EULER][:,2],
                                                 plan[:,Plan.ORIENTATION_RATE][:,2],
                                                 ModelConstants.T_IDXS,
-                                                v_ego,
+                                                v_lat,
                                                 lat_action_t, min_stable_delay=0.0 if ptm_controller else MIN_STABLE_DELAY)
   else:
     desired_accel = model_output['action'][0,1]
-    desired_curvature = model_output['action'][0,0] / (max(2.5 if ptm_controller else 1.0, v_ego))**2
+    desired_curvature = model_output['action'][0,0] / (max(2.5 if ptm_controller else 1.0, v_lat))**2
   stop = should_stop(v_ego, desired_accel)
   desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, LONG_SMOOTH_SECONDS)
   if v_ego > MIN_LAT_CONTROL_SPEED:
@@ -260,6 +264,7 @@ def main(demo=False):
     os.environ['HCQDEV_WAIT_TIMEOUT_MS'] = '3000'
   params = Params()
   cap_action_t = params.get_bool("NrdrActionTimeCap")
+  speed_bound_enabled = lateral_speed_bound.enabled(params)
   fidx_seconds = np.array([model_fidx(params)], dtype=np.float32)
   params.put_bool("ChestnutLoading", CHESTNUT)
   params.remove("ChestnutActive")
@@ -351,6 +356,8 @@ def main(demo=False):
   from openpilot.nrdr.features.lateral.yaw_control_timing import prediction_delay_schedule
   firmware_profile = firmware_controller_profile_for_model(params, CP)
   delay_schedule = prediction_delay_schedule(firmware_profile)
+  # Opt-in, and never with the PTM torque controllers: their request path is calibrated as shipped.
+  speed_bound = LateralSpeedBound() if speed_bound_enabled and firmware_profile is None else None
   model.lat_delay = get_lat_delay(params, model.lat_delay, CP.steerActuatorDelay, delay_schedule=delay_schedule)
 
   # TODO this needs more thought, use .2s extra for now to estimate other delays
@@ -473,8 +480,13 @@ def main(demo=False):
       posenet_send = messaging.new_message('cameraOdometry')
       mdv2sp_send = messaging.new_message('modelDataV2SP')
 
+      lateral_speed = None
+      if speed_bound is not None and 'plan' in model_output and sm.all_checks(['carState', 'carControl']):
+        lateral_speed = speed_bound.update(
+          v_ego, sm["carState"].aEgo, plan_speed(ModelConstants.T_IDXS, model_output['plan'][0][:, Plan.VELOCITY][:, 0]),
+          1.0, not sm['carControl'].longActive)
       action = get_action_from_model(model_output, prev_action, lat_action_t, long_action_t, v_ego,
-                                     ptm_controller=firmware_profile is not None)
+                                     ptm_controller=firmware_profile is not None, lateral_speed=lateral_speed)
       prev_action = action
       fill_model_msg(modelv2_send, model_output, action,
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,

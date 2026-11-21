@@ -52,6 +52,8 @@ from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeC
 from openpilot.nrdr.features.services import admit_selected_artifact, admit_default_artifact
 from openpilot.nrdr.features.lateral.model_source import PTM_LAT_SMOOTH_SECONDS, delay_input, lateral_source, model_uses_plan
 from openpilot.nrdr.features.lateral.lane_guidance import LaneGuidanceMode, lane_guidance_mode_from_params
+from openpilot.nrdr.features.lateral import lateral_speed_bound
+from openpilot.nrdr.features.lateral.lateral_speed_bound import LateralSpeedBound, plan_speed
 
 PROCESS_NAME = "openpilot.selfdrive.modeld.modeld_tinygrad"
 BIG_MODEL_TIMEOUT = 60
@@ -244,7 +246,9 @@ class ModelState(ModelStateBase):
 
   def get_action_from_model(self, model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
                             lat_action_t: float, long_action_t: float, v_ego: float,
-                            blendful: Callable[[float], float] | None = None, ptm_controller: bool = False) -> log.ModelDataV2.Action:
+                            blendful: Callable[[float], float] | None = None, ptm_controller: bool = False,
+                            lateral_speed: float | None = None) -> log.ModelDataV2.Action:
+    v_lat = v_ego if lateral_speed is None else lateral_speed  # speed that turns the lateral output into curvature
     if 'action' not in model_output:
       plan = model_output['plan'][0]
       desired_accel = get_accel_from_plan(plan[:, Plan.VELOCITY][:, 0], plan[:, Plan.ACCELERATION][:, 0], self.constants.T_IDXS,
@@ -252,11 +256,11 @@ class ModelState(ModelStateBase):
 
       curvature_plan = (plan + (self.PLANPLUS_CONTROL - 1.0) * model_output['planplus'][0]
                         if 'planplus' in model_output and self.PLANPLUS_CONTROL != 1.0 else plan)
-      desired_curvature = get_curvature_from_output(model_output, curvature_plan, v_ego, lat_action_t, self.mlsim,
+      desired_curvature = get_curvature_from_output(model_output, curvature_plan, v_lat, lat_action_t, self.mlsim,
                                                    ptm_controller=ptm_controller)
     else:
       desired_accel = model_output['action'][0, 1]
-      desired_curvature = model_output['action'][0, 0] / (max(2.5, v_ego))**2
+      desired_curvature = model_output['action'][0, 0] / (max(2.5, v_lat))**2
     if blendful is not None:
       desired_curvature += blendful(desired_curvature)
 
@@ -288,6 +292,7 @@ def main(demo=False):
 
   params = Params()
   cap_action_t = params.get_bool("NrdrActionTimeCap")
+  speed_bound_enabled = lateral_speed_bound.enabled(params)
   fidx_seconds = np.array([model_fidx(params)], dtype=np.float32)
   params.put_bool("ChestnutLoading", CHESTNUT)
   params.remove("ChestnutActive")
@@ -378,6 +383,8 @@ def main(demo=False):
   from openpilot.nrdr.features.lateral.yaw_control_timing import prediction_delay_schedule
   firmware_profile = firmware_controller_profile_for_model(params, CP)
   delay_schedule = prediction_delay_schedule(firmware_profile)
+  # Opt-in, and never with the PTM torque controllers: their request path is calibrated as shipped.
+  speed_bound = LateralSpeedBound() if speed_bound_enabled and firmware_profile is None else None
   model.lat_delay = get_lat_delay(params, model.lat_delay, CP.steerActuatorDelay, delay_schedule=delay_schedule)
 
   # TODO Move smooth seconds to action function
@@ -513,12 +520,18 @@ def main(demo=False):
       posenet_send = messaging.new_message('cameraOdometry')
       mdv2sp_send = messaging.new_message('modelDataV2SP')
 
-      blendful_active = desire == log.Desire.none and DH.lane_change_state == log.LaneChangeState.off
+      blendful_active = desire == log.Desire.none and not DH.lane_turn_held and DH.lane_change_state == log.LaneChangeState.off
+      lateral_speed = None
+      if speed_bound is not None and 'plan' in model_output and sm.all_checks(['carState', 'carControl']):
+        lateral_speed = speed_bound.update(
+          v_ego, sm["carState"].aEgo, plan_speed(model.constants.T_IDXS, model_output['plan'][0][:, Plan.VELOCITY][:, 0]),
+          2.5 if 'action' in model_output else 1.0, not sm['carControl'].longActive)
       action = model.get_action_from_model(
         model_output, prev_action, lat_action_t, long_action_t, v_ego,
         partial(blendful.update, model_output, v_ego, blendful_active,
                 enabled=lane_guidance_mode == LaneGuidanceMode.BLENDFUL),
         ptm_controller=firmware_profile is not None,
+        lateral_speed=lateral_speed,
       )
       prev_action = action
       fill_model_msg(drivingdata_send, modelv2_send, model_output, action,

@@ -66,6 +66,19 @@ sections:
         max: 300
         step: 10
         unit: deg/s
+      - key: NrdrLateralSpeedBound
+        widget: toggle
+        title: Lateral Speed Bound
+        description: "Experimental. Can reduce requested steering when you control speed and the model expects a faster turn. Not used by PTM torque controllers. Takes effect next drive."
+        enablement:
+        - {type: offroad_only}
+      - key: NrdrTurnDesireRefresh
+        widget: toggle
+        title: Turn Desire Refresh
+        description: "Experimental. Repeats a signaled turn request while waiting to turn. Requires Lane Turn Desire; does not keep the request after the signal cancels."
+        enablement:
+        - {type: offroad_only}
+        - {type: param, key: LaneTurnDesire, equals: true}
       - key: NrdrOptimizedLaneChanges
         widget: toggle
         title: Optimized Lane Changes

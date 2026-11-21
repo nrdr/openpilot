@@ -33,6 +33,7 @@ class DesireHelper:
     self.alc = AutoLaneChangeController(self)
     self.lane_turn_controller = LaneTurnController(self)
     self.lane_turn_direction = TurnDirection.none
+    self.lane_turn_held = False
 
   @staticmethod
   def get_lane_change_direction(CS):
@@ -47,8 +48,10 @@ class DesireHelper:
 
     # Lane turn controller update
     self.lane_turn_controller.update_lane_turn(blindspot_left=carstate.leftBlindspot, blindspot_right=carstate.rightBlindspot,
-                                               left_blinker=carstate.leftBlinker, right_blinker=carstate.rightBlinker, v_ego=v_ego)
+                                               left_blinker=carstate.leftBlinker, right_blinker=carstate.rightBlinker, v_ego=v_ego,
+                                               steering_angle_deg=carstate.steeringAngleDeg)
     self.lane_turn_direction = self.lane_turn_controller.get_turn_direction()
+    self.lane_turn_held = self.lane_turn_controller.held
 
     if not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX or self.alc.lane_change_set_timer == AutoLaneChangeMode.OFF:
       self.lane_change_state = LaneChangeState.off
@@ -98,7 +101,7 @@ class DesireHelper:
 
     self.prev_one_blinker = one_blinker and lateral_active
 
-    if self.lane_turn_direction != TurnDirection.none:
+    if self.lane_turn_held:
       self.desire = TURN_DESIRES[self.lane_turn_direction]
     else:
       self.desire = log.Desire.none

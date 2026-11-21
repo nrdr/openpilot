@@ -4,6 +4,7 @@ import pyray as rl
 
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params.tuning_policy import ANGLE_TUNING_KEYS, tuning_write_allowed
+from openpilot.nrdr.ui.settings.lateral_experiments import LATERAL_EXPERIMENTS
 from openpilot.nrdr.features.lateral.controller_selection import angle_controller_available, firmware_controller_profile
 from openpilot.nrdr.features.lateral.capabilities import supports_interpolated_torque_pif
 from openpilot.nrdr.ui.native_param_controls import get_native_option_spec
@@ -41,6 +42,8 @@ class PidfGroundLayout(Widget):
         title=tr("Clarity Angle Rate Limit"), param="HondaEpsAngleRateLimit", min_value=0, max_value=300, value_change_step=10,
         description=tr("Limits how fast the steering-angle target may move. Zero disables this optional cap."),
         label_callback=lambda value: tr("Off") if value == 0 else f"{value} deg/s")),
+      *(remember(key, toggle_item_sp(title=tr(title), param=key, description=tr(description)))
+        for key, title, description in LATERAL_EXPERIMENTS),
       remember("NrdrOptimizedLaneChanges", toggle_item_sp(
         title=tr("Optimized lane changes"), param="NrdrOptimizedLaneChanges",
         description=tr("Adjusts the steering response during lane changes to reduce abrupt corrections. Off keeps the " +

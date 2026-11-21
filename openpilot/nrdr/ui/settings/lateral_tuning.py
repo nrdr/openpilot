@@ -13,7 +13,7 @@ from opendbc.car.structs import car
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.nrdr.params import (
-  confirmed_vehicle_identity, get_selected_car_identity, handcrafted_lateral_profile_supported, request_handcrafted_lateral_profile,
+  get_selected_car_identity, handcrafted_lateral_profile_supported, request_handcrafted_lateral_profile,
 )
 from openpilot.nrdr.params import disable_suggested_settings
 from openpilot.nrdr.params.tuning_policy import SUGGESTED_DESCRIPTION
@@ -32,6 +32,7 @@ from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.sunnypilot.widgets.html_render import HtmlModalSP
 from openpilot.system.ui.sunnypilot.widgets.list_view import LineSeparatorSP, simple_button_item_sp, toggle_item_sp
 from openpilot.nrdr.ui.settings.pidf_ground import PidfGroundLayout
+from openpilot.nrdr.ui.settings.lateral_experiments import confirmed_honda_tuning
 from openpilot.nrdr.ui.settings.vehicle_model_learning import VehicleModelLearningLayout
 from openpilot.nrdr.ui.settings.override_tuning import OverrideTuningLayout
 from openpilot.nrdr.ui.settings.steer_ratio_tuning import SteerRatioTuningLayout
@@ -63,11 +64,7 @@ HONDA_ONLY_LATERAL_PANELS = frozenset((
 
 def honda_tuning_available() -> bool:
   """Require live CP to agree with any manually selected Honda platform."""
-  selection_present, selected_fingerprint, selected_brand = get_selected_car_identity(ui_state.params)
-  identity = confirmed_vehicle_identity(
-    ui_state.CP, selected_fingerprint, selected_brand, selection_present=selection_present,
-  )
-  return identity is not None and identity[1] == "honda"
+  return confirmed_honda_tuning(ui_state)
 
 
 class _TuneReportAction(ItemAction):
