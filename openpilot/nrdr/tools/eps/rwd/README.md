@@ -9,7 +9,7 @@ authority to replace a Drive image with a different tune.
 The November 15, 2026 audit checked all 17 vehicle folders and their PTM/stock
 categories. [SOURCES.md](SOURCES.md) records the 30 downloaded current PTM/stock
 artifacts, exact source links, and remaining discrepancies. [SHA256SUMS](SHA256SUMS)
-pins those 53 artifacts and the separately owner-supplied Clarity AnglePTM build 09.
+pins those 53 artifacts and the separately owner-supplied Clarity AnglePTM build 0A.
 
 ## Guided catalog
 
@@ -29,7 +29,7 @@ vehicle/controller compatibility.
 | TGG-A120 Civic | Added `6640806d` | 1 |
 | TLA-A040 CR-V | Drive `26f5390b`; controller-reference mismatch | 1 |
 | TLA-A220 CR-V | Added `2c992997` | 1 |
-| TRW-A020 Clarity | ClarityMax September PTM (`9e2e9885`); separate AnglePTM 20261119 build 09 (`6fef0b9c`) | 1 |
+| TRW-A020 Clarity | ClarityMax September PTM (`9e2e9885`); separate AnglePTM 20261120 build 0A (`ac3ab12f`) | 1 |
 | TXM-A040 Insight | Drive `833a41bf`; controller-reference mismatch | 1 |
 | THR-A020 Odyssey | No PTM file in Drive | 1 added |
 | TJB-A220 RDX | Added `68a6fdb4`; runtime PTM admission remains disabled | 2 added |
@@ -37,13 +37,15 @@ vehicle/controller compatibility.
 
 Missing PTM files are not fabricated or substituted with legacy tunes.
 
-The November 19 AnglePTM image replaces build 05 as the manual angle choice;
-it is paired with [openpilot #36](https://github.com/nrdr/openpilot/pull/36)
-and [opendbc #8](https://github.com/nrdr/opendbc/pull/8). Adding it does not flash
+The November 20 AnglePTM image (build 0A = build 09 with a softer rate
+feed-forward) replaces build 09 as the manual angle choice; it needs opendbc's
+0x0A build-set entry (paired openpilot and opendbc PRs, building on
+[openpilot #36](https://github.com/nrdr/openpilot/pull/36) and
+[opendbc #8](https://github.com/nrdr/opendbc/pull/8)). Adding it does not flash
 the EPS or select angle mode. Its header declares the `39990+TRW+A020` ID as
 well as earlier Clarity IDs. The bundled stock and September PTM headers do
 **not** declare the plus ID: do not assume they provide a verified rollback
-from build 05 or 09. These two builds share a software ID; that ID alone cannot
+from build 05, 09 or 0A. These builds share a software ID; that ID alone cannot
 confirm which build is installed. Container validation is not a bench test of steering or recovery.
 
 Adding RDX firmware does not enable RDX lateral-control support. The four

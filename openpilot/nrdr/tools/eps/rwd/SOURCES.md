@@ -9,6 +9,15 @@ files and vehicle-specific flashing scripts were not promoted to current images.
 The table records 30 unique current artifacts, including unchanged local copies.
 Full hashes for all retained assets are in [SHA256SUMS](SHA256SUMS).
 
+### Clarity AnglePTM replacement — November 20, 2026 (build 0A)
+
+The owner supplied `39990+TRW+A020-AnglePTM-20261120-0A.rwd` separately
+from Drive. It replaces build 09 in the angle slot only. The unmodified RWD's
+SHA-256 is `ac3ab12f0266a7fb189108712b8a7ebd125cfec533a3d45356404dd341d3d17d`;
+the decoded binary's prefix is `cc6e2419` (unpackaged leading region padded with
+`0xff`, not ECU readback data). Build 0A differs from 09 only in the angle loop's
+rate feed-forward filter (2 to 6 Hz) and gain (x0.7), its build ID and checksums.
+
 ### Clarity AnglePTM replacement — November 20, 2026
 
 The owner supplied `39990+TRW+A020-AnglePTM-20261119-09.rwd` separately
