@@ -11,7 +11,7 @@ ONROAD_WRITE_BLOCKLIST = frozenset((
   "NrdrStandstillGapExtra",
   "NrdrSuggestedSettings",
   "NrdrLateralController",
-  "NrdrLateralSpeedBound", "NrdrTurnDesireRefresh",
+  "NrdrLateralSpeedBound", "NrdrTurnDesireRefresh", "NrdrClarityAngleLookaheadMs",
   "NrdrDriverMonitoringReminderPercent",
   "NrdrPcmSpeedDeadzone",
 ))

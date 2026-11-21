@@ -43,12 +43,30 @@ sections:
     min: 0.05
     max: 1.0
     step: 0.01
+    visibility:
+    - type: not
+      condition: {type: capability, field: nrdr_angle_controller_available, equals: true}
     enablement:
     - type: not
       condition:
         type: param
         key: LagdToggle
         equals: true
+    - $ref: '#/macros/advanced_only'
+  - key: NrdrClarityAngleLookaheadMs
+    widget: option
+    title: Steering Prediction Time
+    description: "Clarity angle control: choose the total time ahead the model predicts steering. 0 keeps your previous timing."
+    details: "5–400 ms replaces the actuator estimate, software offset and frame allowances. With live learning off, applies next drive to local models with a timed action output (action_t). Other models and JetLink keep their timing. This is not measured steering lag."
+    min: 0
+    max: 400
+    step: 5
+    unit: ms
+    visibility:
+    - {type: capability, field: nrdr_angle_controller_available, equals: true}
+    enablement:
+    - {type: offroad_only}
+    - {type: param, key: LagdToggle, equals: false}
     - $ref: '#/macros/advanced_only'
 - id: camera
   title: Camera

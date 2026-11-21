@@ -27,7 +27,7 @@ from msgq.visionipc import VisionIpcClient, VisionBuf
 from opendbc.car.car_helpers import get_demo_car_params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
-from openpilot.nrdr.features.model_inputs import action_time_input, model_fidx
+from openpilot.nrdr.features.model_inputs import action_time_input, clarity_manual_lookahead, lateral_model_times, model_fidx
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import config_realtime_process, DT_MDL
 from openpilot.common.transformations.camera import DEVICE_CAMERAS
@@ -134,6 +134,7 @@ class ModelState(ModelStateBase):
     self._combined_model_type = self.adapter._combined_model_type
     self._vision_input_names = self.adapter._vision_input_names
     self.numpy_inputs = self.adapter.numpy_inputs
+    self.timed_action_head = 'action' in output_names and 'action_t' in self.numpy_inputs
     self._policy_keys = self.adapter._policy_keys
     self._has_on_policy = self.adapter._has_on_policy
     self._desire_key = self.adapter._desire_key
@@ -383,6 +384,7 @@ def main(demo=False):
   from openpilot.nrdr.features.lateral.yaw_control_timing import prediction_delay_schedule
   firmware_profile = firmware_controller_profile_for_model(params, CP)
   delay_schedule = prediction_delay_schedule(firmware_profile)
+  manual_lookahead = clarity_manual_lookahead(params, CP)
   # Opt-in, and never with the PTM torque controllers: their request path is calibrated as shipped.
   speed_bound = LateralSpeedBound() if speed_bound_enabled and firmware_profile is None else None
   model.lat_delay = get_lat_delay(params, model.lat_delay, CP.steerActuatorDelay, delay_schedule=delay_schedule)
@@ -476,7 +478,8 @@ def main(demo=False):
 
     frame_delay = DT_MDL # compensate for time passed since the frame was captured: current_time - timestamp_eof is 50ms on average
     action_delay = DT_MDL / 2 # middle of the interval between model output (current state) and next frame (expected state)
-    lat_action_t = lat_delay + frame_delay + action_delay
+    lat_delay, lat_action_t = lateral_model_times(manual_lookahead, isinstance(model, ModelState) and model.timed_action_head,
+                                                  lat_delay, frame_delay, action_delay)
     long_action_t = long_delay + frame_delay + action_delay
 
     inputs:dict[str, np.ndarray] = {

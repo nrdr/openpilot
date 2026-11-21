@@ -336,7 +336,7 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
     if monitoring_selection is None:
       raise ValueError("Monitoring reminder timing must be 50–250% in 5% steps.")
   vehicle_scoped_keys = HONDA_TUNING_WRITE_KEYS | {
-    "NrdrHandcraftedLateralTune", "NrdrSuggestedSettings", "LagdToggle", "LagdToggleDelay", "LaneGuidanceMode",
+    "NrdrHandcraftedLateralTune", "NrdrSuggestedSettings", "LagdToggle", "LagdToggleDelay", "NrdrClarityAngleLookaheadMs", "LaneGuidanceMode",
     "HondaLiveLearningGas", "NrdrHondaPcmMode", "NrdrHondaWindBrake", "NrdrPcmSpeedDeadzone", CONTROLLER_KEY,
   }
   capabilities = _vehicle_tuning_capabilities() if vehicle_scoped_keys.intersection(params_to_update) else {}
@@ -389,6 +389,12 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
   # Preconfiguration changes saved values only. Validate the whole mode-tuning
   # batch before writing, including when a mode selection shares the batch.
   tuning_selections = {}
+  if "NrdrClarityAngleLookaheadMs" in params_to_update:
+    key = "NrdrClarityAngleLookaheadMs"
+    ms = _remote_int_value(params_to_update[key], compression, tuple(range(0, 401, 5)))
+    if ms is None or not angle_required or onroad or not tuning_write_allowed(params, key):
+      raise ValueError("Steering Prediction Time requires a parked angle PTM Clarity, live learning off, and 0–400 ms in 5 ms steps.")
+    tuning_selections[key] = ms
   for key in mode_lock_keys.intersection(params_to_update) - {"HondaLiveLearningGas", "NrdrHondaWindBrake", "NrdrPcmSpeedDeadzone", *pcm_selections}:
     try:
       raw = base64.b64decode(params_to_update[key], validate=True)

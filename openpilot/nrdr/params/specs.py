@@ -213,6 +213,7 @@ PARAM_SPECS: tuple[ParamSpec, ...] = (
   _added("NrdrFirstRunSetupDone", ParamType.BOOL, PB, "0", ParamLifecycle.STATE, ParamOwner.SYSTEM),
   _added("NrdrAutoSelectModel", ParamType.BOOL, PB, "0", owner=ParamOwner.MODEL),
   _added("NrdrActionTimeCap", ParamType.BOOL, PB, "0", owner=ParamOwner.MODEL),
+  _added("NrdrClarityAngleLookaheadMs", ParamType.INT, PB, "0", owner=ParamOwner.MODEL),
   _added("NrdrModelFidx", ParamType.INT, PB, "3", owner=ParamOwner.MODEL),
   _added("NrdrCurveSpeed", ParamType.BOOL, PB, "0", owner=ParamOwner.LONGITUDINAL),
   _added("NrdrLateralSpeedBound", ParamType.BOOL, PB, "0", owner=ParamOwner.MODEL),

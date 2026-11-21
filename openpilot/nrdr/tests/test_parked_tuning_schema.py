@@ -56,6 +56,18 @@ def items(schema):
   return {item["key"]: item for item in items_in(schema)}
 
 
+def test_angle_lookahead_replaces_offset_slider_and_requires_manual_offroad(items):
+  absolute, old = items["NrdrClarityAngleLookaheadMs"], items["LagdToggleDelay"]
+  assert (absolute["min"], absolute["max"], absolute["step"], absolute["unit"]) == (0, 400, 5, "ms")
+  for angle in (True, False):
+    values = {"nrdr_angle_controller_available": angle, "ShowAdvancedControls": True, "IsOffroad": True, "LagdToggle": False}
+    assert allowed(absolute, values, "visibility") == angle
+    assert allowed(old, values, "visibility") != angle
+    assert allowed(absolute, values)
+    assert not allowed(absolute, {**values, "LagdToggle": True})
+    assert not allowed(absolute, {**values, "IsOffroad": False})
+
+
 @pytest.mark.parametrize("key", sorted(MVL_LOCK_KEYS))
 def test_parked_editing_accepts_saved_and_cached_modes_without_clearing_capabilities(key):
   values = mode_values()  # Both saved/latched modes deliberately remain true.

@@ -61,7 +61,7 @@ ANGLE_LOCKED_KEYS = YAW_FIXED_KEYS | frozenset((
 ))
 SUGGESTED_LOCK_KEYS = PIF_KEYS | frozenset((
   "LaneGuidanceMode", "NrdrLateralController",
-  "NrdrOptimizedLaneChanges", "LagdToggle", "LagdToggleDelay",
+  "NrdrOptimizedLaneChanges", "LagdToggle", "LagdToggleDelay", "NrdrClarityAngleLookaheadMs",
   "NrdrDriverOverrideThreshold", "NrdrOverrideThresholdCenterBoost", "HondaDriverAssistDuringOverride",
   "HondaOverrideFadeUpSecs", "HondaOverrideFadeDownSecs", "HondaOverrideTorqueScale",
   "HondaTorqueLowPassFilter", "HondaLpfTauLowSpeed", "HondaLpfTauStandard", "HondaLpfTauHighway",
@@ -136,6 +136,8 @@ def tuning_write_allowed(params, key: str | None, *, firmware_prediction_schedul
   # another tune while parked. Persistent CP describes the previous drive.
   # Unknown road state retains the onroad guards; no saved choice is rewritten.
   parked = _enabled(params, "IsOffroad") if is_offroad is None else is_offroad is True
+  if key == "NrdrClarityAngleLookaheadMs" and (not parked or _enabled(params, "LagdToggle")):
+    return False
   if key == "NrdrTurnDesireRefresh":
     return parked and _enabled(params, "LaneTurnDesire")
   if key in ("JetlinkLink", "JetlinkChargePhone", "NrdrLateralSpeedBound"):

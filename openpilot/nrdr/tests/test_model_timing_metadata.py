@@ -111,7 +111,7 @@ def test_historical_timing_mode_default_and_values_round_trip_unchanged():
 
 @pytest.mark.parametrize("legacy_mode", (None, False, True))
 @pytest.mark.parametrize("valid", (False, True), ids=("invalid-model", "valid-model"))
-@pytest.mark.parametrize("action_time", (0.325, 0.475))
+@pytest.mark.parametrize("action_time", (0.005, 0.325, 0.475))
 def test_production_helper_always_publishes_off_without_changing_model_action(valid: bool, action_time: float, legacy_mode: bool | None):
   helper = _production_timing_helper()
   action = SimpleNamespace(

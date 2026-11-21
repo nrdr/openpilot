@@ -112,6 +112,7 @@ class NrdrParamKey(StrEnum):
   NRDR_FIRST_RUN_SETUP_DONE = "NrdrFirstRunSetupDone"
   NRDR_AUTO_SELECT_MODEL = "NrdrAutoSelectModel"
   NRDR_ACTION_TIME_CAP = "NrdrActionTimeCap"
+  NRDR_CLARITY_ANGLE_LOOKAHEAD_MS = "NrdrClarityAngleLookaheadMs"
   NRDR_MODEL_FIDX = "NrdrModelFidx"
   NRDR_CURVE_SPEED = "NrdrCurveSpeed"
   NRDR_LATERAL_SPEED_BOUND = "NrdrLateralSpeedBound"
@@ -292,6 +293,7 @@ ADDED_KEYS: frozenset[NrdrParamKey] = frozenset((
   NrdrParamKey.NRDR_FIRST_RUN_SETUP_DONE,
   NrdrParamKey.NRDR_AUTO_SELECT_MODEL,
   NrdrParamKey.NRDR_ACTION_TIME_CAP,
+  NrdrParamKey.NRDR_CLARITY_ANGLE_LOOKAHEAD_MS,
   NrdrParamKey.NRDR_MODEL_FIDX,
   NrdrParamKey.NRDR_CURVE_SPEED,
   NrdrParamKey.NRDR_LATERAL_SPEED_BOUND,

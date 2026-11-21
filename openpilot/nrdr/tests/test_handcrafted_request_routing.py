@@ -226,6 +226,25 @@ class TestHandcraftedRequestRouting(unittest.TestCase):
       with self.assertRaises(ValueError):
         self.save_params({key: self._encode(raw)})
 
+  def test_angle_lookahead_remote_write(self):
+    key = "NrdrClarityAngleLookaheadMs"
+    cap = {"nrdr_honda_tuning_available": True, "nrdr_angle_controller_available": True}
+    self.namespace["_vehicle_tuning_capabilities"].return_value = cap
+    stored = {"IsOffroad": True, "LagdToggle": False}
+    self.params.get.side_effect = stored.get
+    self.params.get_bool.side_effect = lambda k: bool(stored.get(k))
+    for ms in (0, 5, 400):
+      self.save_params({key: self._encode(str(ms).encode(), True)}, True)
+      self.params.put.assert_any_call(key, ms, block=True)
+    for parked, angle, live, raw in [(False, True, False, b"5"), (True, False, False, b"5"), (True, True, True, b"5"),
+                                     (True, True, False, b"1"), (True, True, False, b"405")]:
+      self.params.put.reset_mock()
+      stored.update(IsOffroad=parked, LagdToggle=live)
+      cap["nrdr_angle_controller_available"] = angle
+      with self.assertRaises(ValueError):
+        self.save_params({key: self._encode(raw)})
+      self.params.put.assert_not_called()
+
   def test_controller_choice_readback_failure_propagates_error(self):
     self.namespace["_vehicle_tuning_capabilities"].return_value = {
       "nrdr_honda_tuning_available": True, "nrdr_yaw_controller_available": True,

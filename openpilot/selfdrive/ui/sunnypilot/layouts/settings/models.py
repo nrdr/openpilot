@@ -9,7 +9,7 @@ import time
 import pyray as rl
 
 from openpilot.cereal import custom
-from openpilot.nrdr.features.lateral.controller_selection import firmware_controller_profile, firmware_controller_selected
+from openpilot.nrdr.features.lateral.controller_selection import angle_controller_available, firmware_controller_profile, firmware_controller_selected
 from openpilot.nrdr.params.tuning_policy import tuning_write_allowed
 from openpilot.sunnypilot.models.helpers import ACTIVE_BUNDLE_KEYS, get_selected_bundle, resolve_bundle_by_ref
 from openpilot.common.constants import CV
@@ -101,6 +101,12 @@ class ModelsLayout(Widget):
                                          tr("Sets the additional steering prediction delay when live delay learning is off."),
                                         1, None, True, "", style.BUTTON_ACTION_WIDTH, None, True, lambda v: f"{v / 100:.2f}s")
 
+    self.angle_lookahead_control = option_item_sp(
+      tr("Steering Prediction Time"), "NrdrClarityAngleLookaheadMs", 0, 400,
+      tr("Total lateral model lookahead next drive. 5–400 ms replaces all timing offsets. Previous keeps your saved timing. "
+         "Only used by local models with a timed action output. This is not measured steering lag."),
+      value_change_step=5, label_callback=lambda ms: f"{ms} ms" if ms else tr("Previous"))
+
     self.lagd_toggle = toggle_item_sp(tr("Live Learning Steer Delay"), "", param="LagdToggle")
 
     self.camera_offset = option_item_sp(tr("Adjust Camera Offset"), "CameraOffset", -35, 35,
@@ -110,7 +116,8 @@ class ModelsLayout(Widget):
                                         lambda v: f"{v / 100:.2f} m")
 
     self.items = [self.small_model_item, self.big_model_item, self.cancel_download_item, self.download_item, self.refresh_item, self.clear_cache_item,
-                  self.lane_turn_desire_toggle, self.lane_turn_value_control, self.lagd_toggle, self.delay_control, self.camera_offset]
+                  self.lane_turn_desire_toggle, self.lane_turn_value_control, self.lagd_toggle, self.delay_control,
+                  self.angle_lookahead_control, self.camera_offset]
 
   def _update_lagd_description(self, lagd_toggle: bool):
     profile = firmware_controller_profile(ui_state.CP, ui_state.CP_SP)
@@ -121,6 +128,8 @@ class ModelsLayout(Widget):
     desc = tr("Learns the car's steering response time as you drive. Off uses a fixed delay.")
     if lagd_toggle:
       desc += f"<br>{tr('Live Steer Delay:')} {ui_state.sm['lateralDelay'].lateralDelay:.3f} s"
+    elif angle_controller_available(ui_state.CP, ui_state.CP_SP):
+      desc += "<br>" + tr("Use Steering Prediction Time to set the complete lookahead on compatible models.")
     elif ui_state.CP is not None:
       sw = float(ui_state.params.get("LagdToggleDelay", return_default=True))
       cp = ui_state.CP.steerActuatorDelay
@@ -328,7 +337,10 @@ class ModelsLayout(Widget):
     scheduled = profile is not None and profile.prediction_schedule
     self.lagd_toggle.action_item.set_enabled(tuning_write_allowed(ui_state.params, "LagdToggle", firmware_prediction_schedule=scheduled))
     self.delay_control.action_item.set_enabled(tuning_write_allowed(ui_state.params, "LagdToggleDelay", firmware_prediction_schedule=scheduled))
-    self.delay_control.set_visible(not live_delay and advanced_controls)
+    angle = angle_controller_available(ui_state.CP, ui_state.CP_SP)
+    self.delay_control.set_visible(not angle and not live_delay and advanced_controls)
+    self.angle_lookahead_control.set_visible(angle and not live_delay and advanced_controls)
+    self.angle_lookahead_control.action_item.set_enabled(ui_state.is_offroad())
     new_step = int(round(100 / CV.MPH_TO_KPH)) if ui_state.is_metric else 100
     if self.lane_turn_value_control.action_item is not None and self.lane_turn_value_control.action_item.value_change_step != new_step:
       self.lane_turn_value_control.action_item.value_change_step = new_step

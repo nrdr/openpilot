@@ -106,6 +106,7 @@
     {"NrdrFirstRunSetupDone", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrAutoSelectModel", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrActionTimeCap", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"NrdrClarityAngleLookaheadMs", {PERSISTENT | BACKUP, INT, "0"}},
     {"NrdrModelFidx", {PERSISTENT | BACKUP, INT, "3"}},
     {"NrdrCurveSpeed", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"NrdrLateralSpeedBound", {PERSISTENT | BACKUP, BOOL, "0"}},
