@@ -63,7 +63,7 @@ EXPECTED_ASSETS = {
   "39990-TLA-A220 (2021 Honda CR-V)/Legacy and Stock/39990-TLA-A220-stock.rwd": "70d38d2e72a82da472786a9f429d5469740db57a49b66831bf2dee9a485d6517",
   "39990-TLA-A220 (2021 Honda CR-V)/Proper Torque Mod/39990-TLA,A220-PTM-20261016b.rwd": "2c99299725fa34ad65a7f5d25a7f32659f5fb97d173fd2789e2428aea8959227",
   "39990-TRW-A020 (Honda Clarity)/Legacy and Stock/39990-TRW-A020 (stock).rwd": "d08a7f5c18ea6af9aaa1b366828fef226bb4ce192dc89a3d79d9c2661e1a7673",
-  "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261119-09.rwd": "6fef0b9cd2a51e42b681befeba1a0d996b97618df2bbf52a4e3bafaca7b96d99",
+  "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261120-0A.rwd": "ac3ab12f0266a7fb189108712b8a7ebd125cfec533a3d45356404dd341d3d17d",
   "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM-Latest-092826.rwd": "9e2e98857a6734f4631205cb9550bf7cb61720da566a4c117b9187a8ddf25d61",
   "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM.rwd": "d4fe903bcf347495f4321be65a3c650c8c931f1650c3bef6443721da0dd80f7d",
   "39990-TVA-A160 (Honda Accord)/39990-TVA,A160-V37-2xTorque.rwd": "8a809d1b320957e4846c9145ee662858759d514681ce46c247a4a197784202da",
@@ -102,7 +102,7 @@ GUIDED_IMAGES = {
   "39990-TLA-A220 (2021 Honda CR-V)/Legacy and Stock/39990-TLA-A220-stock.rwd",
   "39990-TLA-A220 (2021 Honda CR-V)/Proper Torque Mod/39990-TLA,A220-PTM-20261016b.rwd",
   "39990-TRW-A020 (Honda Clarity)/Legacy and Stock/39990-TRW-A020 (stock).rwd",
-  "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261119-09.rwd",
+  "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261120-0A.rwd",
   "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM-Latest-092826.rwd",
   "39990-TXM-A040 (2019-2022 Honda Insight)/Legacy and Stock/TXM-A040-STOCK.rwd",
   "39990-TXM-A040 (2019-2022 Honda Insight)/Proper Torque Mod/39990-TXM,A040-PTM.rwd",
@@ -254,7 +254,7 @@ class TestCuratedRwdLibrary(unittest.TestCase):
 
   def test_angle_build_is_a_separate_clarity_choice_with_its_own_supported_ids(self):
     rows = {flash.image_display_name(path): flash.rwd_supported_versions(path) for path in flash.find_images()}
-    angle = "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261119-09.rwd"
+    angle = "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261120-0A.rwd"
     stock = "39990-TRW-A020 (Honda Clarity)/Legacy and Stock/39990-TRW-A020 (stock).rwd"
     torque = "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM-Latest-092826.rwd"
     for eps_id, expected in (("39990-TRW-A020", {stock, torque, angle}), ("39990-TRW,A020", {stock, torque, angle}),
