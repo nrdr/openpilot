@@ -37,7 +37,7 @@ class PidfGroundLayout(Widget):
     items = [self._controller,
       remember("HondaClarityAngleCap3", toggle_item_sp(
         title=tr("Clarity Angle Lateral Cap 3.0 m/s²"), param="HondaClarityAngleCap3",
-        description=tr("Uses the 3.0 m/s² clamp (mode 4) instead of 4.0. Requires EPS build 0x05. Switches while lateral is off."))),
+        description=tr("Uses the 3.0 m/s² clamp (mode 4) instead of 4.0. EPS builds 0x05, 0x09 and 0x0A; ignored on 0x0B (one 3.6 m/s² profile). Switches while lateral is off."))),
       remember("HondaEpsAngleRateLimit", option_item_sp(
         title=tr("Clarity Angle Rate Limit"), param="HondaEpsAngleRateLimit", min_value=0, max_value=300, value_change_step=10,
         description=tr("Limits how fast the steering-angle target may move. Zero disables this optional cap."),

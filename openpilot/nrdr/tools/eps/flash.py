@@ -83,7 +83,7 @@ GUIDED_FLASH_FILES = (
     "39990-TLA-A220 (2021 Honda CR-V)/Legacy and Stock/39990-TLA-A220-stock.rwd",
     "39990-TLA-A220 (2021 Honda CR-V)/Proper Torque Mod/39990-TLA,A220-PTM-20261016b.rwd",
     "39990-TRW-A020 (Honda Clarity)/Legacy and Stock/39990-TRW-A020 (stock).rwd",
-    "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261120-0A.rwd",
+    "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/39990+TRW+A020-AnglePTM-20261121-0B.rwd",
     "39990-TRW-A020 (Honda Clarity)/Proper Torque Mod/ClarityMax-PTM-Latest-092826.rwd",
     "39990-TXM-A040 (2019-2022 Honda Insight)/Legacy and Stock/TXM-A040-STOCK.rwd",
     "39990-TXM-A040 (2019-2022 Honda Insight)/Proper Torque Mod/39990-TXM,A040-PTM.rwd",
