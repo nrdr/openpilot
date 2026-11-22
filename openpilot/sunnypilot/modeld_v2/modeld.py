@@ -490,7 +490,10 @@ def main(demo=False):
     if 'lateral_control_params' in model.numpy_inputs:
       inputs['lateral_control_params'] = np.array([v_ego, lat_delay], dtype=np.float32)
 
-    if 'action_t' in model.numpy_inputs:
+    # numpy_inputs is the small bundle's, whichever model drives; JetLink's large model always has an
+    # action_t input and may take over on any frame, so with the link joined it is supplied regardless
+    small_action_t = 'action_t' in model.numpy_inputs
+    if small_action_t or JETLINK:
       inputs['action_t'] = action_time_input(lat_action_t, long_action_t, cap_action_t)
     if 'fidx' in model.numpy_inputs:
       inputs['fidx'] = fidx_seconds
@@ -543,7 +546,7 @@ def main(demo=False):
       modelv2_send.modelV2.big = model.chestnut
       # For an action head report the horizon it actually received; a decoded
       # plan still uses the original actuator/processing horizon above.
-      if cap_action_t and 'action' in model_output and 'action_t' in inputs:
+      if cap_action_t and 'action' in model_output and (small_action_t or (JETLINK and model.chestnut)):
         lat_action_t = min(lat_action_t, 0.4)
       set_lateral_action_timing(modelv2_send, mdv2sp_send, lat_action_t,
                                 lateral_source=lateral_source(model_output, jetlink_adapter.model_mlsim(model)), delay_input=delay_input(model.numpy_inputs))
