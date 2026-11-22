@@ -52,7 +52,7 @@ def test_runner_inputs_across_model_changes(relative, cap):
     pass
 
   ctx = dict(np=np, DT_MDL=.05, ModelState=LocalModel, lateral_model_times=lateral_model_times, action_time_input=action_time_input,
-             cap_action_t=cap, v_ego=10., vec_desire=np.zeros(8), traffic_convention=np.zeros(2))
+             cap_action_t=cap, JETLINK=False, v_ego=10., vec_desire=np.zeros(8), traffic_convention=np.zeros(2))
   # Same vehicle and saved knob throughout: legacy -> timed head -> plan fallback -> external runner.
   for ms, cls, timed, expected in [(0, LocalModel, True, .225), (5, LocalModel, True, .005), (400, LocalModel, True, .4),
                                     (5, LocalModel, False, .225), (5, NS, True, .225)]:
@@ -64,3 +64,31 @@ def test_runner_inputs_across_model_changes(relative, cap):
     assert ctx["inputs"]["action_t"] == pytest.approx([expected, .4 if cap else .575])
     if "lateral_control_params" in ctx["inputs"]:
       assert ctx["inputs"]["lateral_control_params"] == pytest.approx([10., .15 if expected == .225 else expected])
+
+
+def _frame_inputs(relative="sunnypilot/modeld_v2/modeld.py"):
+  path = ROOT / relative
+  main = next(n for n in ast.parse(path.read_text(encoding="utf-8")).body if isinstance(n, ast.FunctionDef) and n.name == "main")
+  loop, = [n for n in main.body if isinstance(n, ast.While) and any(
+    isinstance(s, ast.Assign) and ast.unparse(s.targets[0]) == "frame_delay" for s in n.body)]
+  start = next(i for i, n in enumerate(loop.body) if isinstance(n, ast.Assign) and ast.unparse(n.targets[0]) == "frame_delay")
+  end = next(i for i, n in enumerate(loop.body[start:], start) if isinstance(n, ast.Assign) and ast.unparse(n.targets[0]) == "model.frame_drop_ratio")
+  return compile(ast.Module(loop.body[start:end], type_ignores=[]), str(path), "exec")
+
+
+@pytest.mark.parametrize("jetlink", [False, True])
+@pytest.mark.parametrize("small_has_action_t", [False, True])
+def test_jetlink_large_model_always_gets_action_t(jetlink, small_has_action_t):
+  """JetLink's large model has an action_t input however the small bundle (e.g. Pop Model v2) is built."""
+  class LocalModel(NS):
+    pass
+
+  small_inputs = {"desire": None, **({"action_t": None} if small_has_action_t else {})}
+  model = LocalModel(timed_action_head=False, numpy_inputs=small_inputs, npy=small_inputs, desire_key="desire")
+  ctx = dict(np=np, DT_MDL=.05, ModelState=LocalModel, lateral_model_times=lateral_model_times, action_time_input=action_time_input,
+             cap_action_t=False, JETLINK=jetlink, v_ego=10., vec_desire=np.zeros(8), traffic_convention=np.zeros(2),
+             model=model, manual_lookahead=None, lat_delay=.15, long_delay=.5)
+  exec(_frame_inputs(), ctx)
+  assert ("action_t" in ctx["inputs"]) == (jetlink or small_has_action_t)
+  if jetlink or small_has_action_t:
+    assert ctx["inputs"]["action_t"] == pytest.approx([ctx["lat_action_t"], .575])
