@@ -706,7 +706,7 @@
                   "key": "HondaClarityAngleCap3",
                   "widget": "toggle",
                   "title": "Clarity Angle Lateral Cap 3.0 m/s\u00b2",
-                  "description": "Angle mode only: use the EPS's 3.0 m/s\u00b2 lateral-acceleration clamp (mode 4) instead of 4.0. Needs EPS build 0x05; no effect on other builds. Switches while lateral is off.",
+                  "description": "Angle mode only: use the EPS's 3.0 m/s\u00b2 lateral-acceleration clamp (mode 4) instead of 4.0. EPS builds 0x05, 0x09 and 0x0A; ignored on 0x0B (one 3.6 m/s\u00b2 profile). Switches when lateral is off.",
                   "enablement": [
                     {
                       "type": "param",

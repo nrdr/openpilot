@@ -9,6 +9,18 @@ files and vehicle-specific flashing scripts were not promoted to current images.
 The table records 30 unique current artifacts, including unchanged local copies.
 Full hashes for all retained assets are in [SHA256SUMS](SHA256SUMS).
 
+### Clarity AnglePTM replacement — November 21, 2026 (build 0B)
+
+The owner supplied `39990+TRW+A020-AnglePTM-20261121-0B.rwd` separately
+from Drive. It replaces build 0A in the angle slot only. The unmodified RWD's
+SHA-256 is `8f50b2e280e00063450cba4fbc134c18bd13b178e01c01ce73f72ff0c945704e`;
+the decoded binary's prefix is `4ecc4b81` (unpackaged leading region padded with
+`0xff`, not ECU readback data). Build 0B is 0A's angle loop, gains and limits with
+EPS protocol v2 (byte 3 AUTH | MODE, refused malformed frames, 0x6A4 layout 4 with
+REASON codes), one angle profile clamped at 3.6 m/s^2 at v - 1 m/s, and the loop
+held in reset while the stock LKAS is locked out. The owner's car runs it since
+2026-11-21.
+
 ### Clarity AnglePTM replacement — November 20, 2026 (build 0A)
 
 The owner supplied `39990+TRW+A020-AnglePTM-20261120-0A.rwd` separately
