@@ -14,6 +14,7 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.hardware import HARDWARE, PC
 from openpilot.common.hardware.usb import TYPEC_CC_ORIENTATION_PATH, get_usb_state, is_chestnut_usb_id, read_int
 from openpilot.selfdrive.modeld.helpers import chestnut_compiled
+from openpilot.sunnypilot import jetlink_adapter
 
 from openpilot.selfdrive.ui.sunnypilot.ui_state import UIStateSP, DeviceSP
 
@@ -221,11 +222,22 @@ class UIState(UIStateSP):
     detected = self.sm["deviceState"].chestnutPresent
     if not self.started:
       self.chestnut_present = detected
+      if not detected and self.jetlink_on:
+        # no chestnut fitted and the Jetlink setting on: Jetlink drives the icon (state from the params-pass snapshot)
+        self.chestnut_state = ChestnutState(jetlink_adapter.chestnut_icon(self.jetlink, False, False, False, self.jetlink_state))
+        return
       self.chestnut_state = (ChestnutState.READY if detected and self.chestnut_compiled else
                              ChestnutState.UNCOMPILED if detected else ChestnutState.DISCONNECTED)
       return
 
     model_seen = self.sm.recv_frame["modelV2"] > self.started_frame
+    if not self.chestnut_present and self.jetlink_on:
+      # Jetlink (setting on) drives the same icon as a chestnut when no chestnut is fitted; the accelerator
+      # state comes from the params-pass snapshot (jetlink_state), the rest per frame
+      running_big = bool(self.sm.alive["modelV2"] and self.sm["modelV2"].big)
+      self.chestnut_state = ChestnutState(jetlink_adapter.chestnut_icon(self.jetlink, self.started, model_seen, running_big,
+                                                                        self.jetlink_state))
+      return
     if not self.chestnut_present:
       self.chestnut_state = ChestnutState.DISCONNECTED
     elif not self.chestnut_compiled:

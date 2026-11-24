@@ -47,6 +47,10 @@ class UIStateSP:
     self.active_bundle = None
     # jetlink's snapshot (jetlink.openpilot Status) from the params pass; None with a chestnut fitted or no jetlink on this device
     self.jetlink = None
+    # modeld's joining state (jetlink_adapter.runtime().state) from the same pass; '' without a record
+    self.jetlink_state = ''
+    # the Jetlink setting is on (status() answers with the link off too, for the settings panel)
+    self.jetlink_on: bool = False
     self.model_runner_tinygrad: bool = False
     self.blindspot: bool = False
     self.chevron_metrics = None
@@ -165,6 +169,11 @@ class UIStateSP:
     self.blindspot = self.params.get_bool("BlindSpot")
     # on the params pass, not per frame in a layout; a fitted chestnut runs the big model itself
     self.jetlink = None if self.chestnut_present else jetlink_adapter.status()
+    self.jetlink_on = self.jetlink is not None and jetlink_adapter.link_on()
+    try:
+      self.jetlink_state = (jetlink_adapter.runtime().state or '') if self.jetlink_on else ''
+    except Exception:
+      self.jetlink_state = ''
     self.chevron_metrics = self.params.get("ChevronInfo")
     self.custom_interactive_timeout = self.params.get("InteractivityTimeout", return_default=True)
     self.developer_ui = self.params.get("DevUIInfo")
