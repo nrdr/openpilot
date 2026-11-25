@@ -293,6 +293,54 @@ def test_release_forces_shared_camera_models_and_checks_both_variants() -> None:
   assert source.index('echo "[-] Building mandatory') < second < source.index('CLEAN_COMMIT="$(git rev-parse HEAD)"')
 
 
+@pytest.mark.parametrize("gate", ["eof", "empty", "credential"])
+def test_atomic_publish_credential_gate(tmp_path: Path, gate: str) -> None:
+  # Run just the production publish section. Intercept the transport, but let
+  # real Git run the credential helper against its actual HTTPS target.
+  assert BASH is not None
+  source = BUILD_SCRIPT.read_text(encoding="utf-8")
+  publish = source[source.index("\nif [ \"$PUSH\" = \"1\" ]; then", source.index("\nBUILD_READY=1")):]
+  push_fn = source[source.index("push_release_refs() {"):source.index("\nfinish() {")]
+  script = r'''
+set -euo pipefail
+set -x
+die() { echo "$*" >&2; return 1; }
+GITHUB_USER=nrdr GITHUB_REPO=openpilot GITHUB_TOKEN_FILE=/dev/null PUSH=1
+RELEASE_BRANCH=dated NIGHTLY_BRANCH=nightly CLEAN_BRANCH=clean RELEASE_COMMIT=aaa CLEAN_COMMIT=bbb
+unset GITHUB_TOKEN
+git() {
+  local -a config=()
+  while [[ "${1:-}" == -c ]]; do config+=("$1" "$2"); shift 2; done
+  if [[ "$1" != push ]]; then command git "${config[@]}" "$@"; return; fi
+  test "$*" = "push --atomic -f origin dated:dated dated:nightly clean:clean" || return 1
+  [[ "${config[*]}" != *"$NRDR_PUSH_TOKEN"* ]] || return 1
+  local result
+  result=$(printf 'url=https://github.com/nrdr/openpilot.git\n\n' | command git "${config[@]}" credential fill) || return 1
+  [[ "$result" == *"password=$NRDR_PUSH_TOKEN"* ]] || return 1
+  if printf 'url=https://other.invalid/repo.git\n\n' | command git "${config[@]}" credential fill >/dev/null 2>&1; then return 1; fi
+  echo transport-checked
+}
+sleep() { :; }
+'''
+  git("init", "-q", cwd=tmp_path)
+  git("remote", "add", "origin", "https://github.com/nrdr/openpilot.git", cwd=tmp_path)
+  fake_token = "test-only-in-memory-value"
+  env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"}
+  with subprocess.Popen([BASH, "-c", script + push_fn + publish], cwd=tmp_path, env=env, stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as proc:
+    assert proc.stdout is not None
+    assert proc.stdout.readline().strip() == "RELEASE_READY full=aaa clean=bbb"
+    assert proc.poll() is None
+    out, err = proc.communicate(input={"eof": "", "empty": "\n", "credential": fake_token + "\n"}[gate], timeout=15)
+  assert fake_token not in out + err
+  assert fake_token not in (tmp_path / ".git/config").read_text()
+  assert (proc.returncode == 0) == (gate == "credential"), out + err
+  assert ("transport-checked" in out) == (gate == "credential")
+  assert ("PUSH_START utc=" in out) == (gate == "credential")
+  assert ("result=ok" in out) == (gate == "credential")
+  assert git("remote", "get-url", "--push", "origin", cwd=tmp_path).stdout.strip() == "https://github.com/nrdr/openpilot.git"
+
+
 def test_releases_preserve_source_communication_policy_and_clean_monitoring() -> None:
   source = BUILD_SCRIPT.read_text(encoding="utf-8")
   assert "restore_comm_events" not in source

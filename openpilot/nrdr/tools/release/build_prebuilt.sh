@@ -297,14 +297,20 @@ safe_remove_build_dir() {
   rm -rf -- "$resolved"
 }
 
+# Called only with xtrace off, after the credential gate. The helper text is
+# literal: Git sees no password in argv, the remote URL, or a credential store.
+push_release_refs() {
+  local helper='!f() { if test "$1" = get; then printf "username=%s\npassword=%s\n" "$NRDR_PUSH_USER" "$NRDR_PUSH_TOKEN"; fi; }; f'
+  NRDR_PUSH_USER="$GITHUB_USER" NRDR_PUSH_TOKEN="$GITHUB_TOKEN" GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/false \
+    GIT_TRACE_CURL=0 GIT_CURL_VERBOSE=0 GIT_TRACE_REDACT=1 \
+    git -c credential.helper= -c "credential.https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git.helper=$helper" \
+      -c http.followRedirects=false push --atomic -f origin \
+      "$RELEASE_BRANCH:$RELEASE_BRANCH" "$RELEASE_BRANCH:$NIGHTLY_BRANCH" "$CLEAN_BRANCH:$CLEAN_BRANCH"
+}
+
 finish() {
   local status=$?
   set +e
-
-  if [ -d "$BUILD_DIR/.git" ]; then
-    git -C "$BUILD_DIR" remote set-url origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git" 2>/dev/null || true
-    git -C "$BUILD_DIR" remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git" 2>/dev/null || true
-  fi
 
   if [ "$status" = "0" ]; then
     if [ "$PUSH" = "1" ] && [ "$DELETE_BUILD_DIR_WHEN_DONE" = "1" ] && [ "$BUILD_DIR_OWNED" = "1" ]; then
@@ -477,37 +483,34 @@ CLEAN_COMMIT="$(git rev-parse HEAD)"
 BUILD_READY=1
 
 if [ "$PUSH" = "1" ]; then
-  echo "[-] PUSH T=$SECONDS"
+  git config http.version HTTP/1.1
+  git config http.postBuffer 524288000
+  git config http.lowSpeedLimit 1000
+  git config http.lowSpeedTime 600
   set +x
+  echo "RELEASE_READY full=$RELEASE_COMMIT clean=$CLEAN_COMMIT"
   if [ -z "${GITHUB_TOKEN:-}" ] && [ -f "$GITHUB_TOKEN_FILE" ]; then
     echo "[-] Using GitHub token from $GITHUB_TOKEN_FILE"
     GITHUB_TOKEN="$(tr -d '[:space:]' < "$GITHUB_TOKEN_FILE")"
   fi
   if [ -z "${GITHUB_TOKEN:-}" ]; then
     printf "GitHub PAT for %s: " "$GITHUB_USER"
-    read -r -s GITHUB_TOKEN
+    IFS= read -r -s GITHUB_TOKEN || die "publish gate closed; no push attempted"
+    GITHUB_TOKEN="${GITHUB_TOKEN%$'\r'}"  # Accept a Windows CRLF line over non-PTY SSH.
     printf "\n"
   fi
 
-  AUTH_REMOTE="https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
-  git remote set-url origin "$AUTH_REMOTE"
-  git remote set-url --push origin "$AUTH_REMOTE"
-  set -x
-
-  git config http.version HTTP/1.1
-  git config http.postBuffer 524288000
-  git config http.lowSpeedLimit 1000
-  git config http.lowSpeedTime 600
+  [ -n "$GITHUB_TOKEN" ] || die "empty publish credential; no push attempted"
 
   push_all_with_retry() {
     local tries=0
     while :; do
-      if git push --atomic -f origin \
-        "$RELEASE_BRANCH:$RELEASE_BRANCH" \
-        "$RELEASE_BRANCH:$NIGHTLY_BRANCH" \
-        "$CLEAN_BRANCH:$CLEAN_BRANCH"; then
+      echo "PUSH_START utc=$(date -u +%FT%T.%3NZ) attempt=$((tries+1))"
+      if push_release_refs; then
+        echo "PUSH_END utc=$(date -u +%FT%T.%3NZ) result=ok"
         return 0
       fi
+      echo "PUSH_END utc=$(date -u +%FT%T.%3NZ) result=failed"
       tries=$((tries + 1))
       [ "$tries" -ge 3 ] && return 1
       echo "[!] Atomic release push failed (try $tries/3); retrying in 15s..."
@@ -518,10 +521,7 @@ if [ "$PUSH" = "1" ]; then
   # All three refs move together, or none do. This prevents a stale clean branch.
   push_all_with_retry || exit 1
 
-  set +x
-  git remote set-url origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
-  git remote set-url --push origin "https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
-  unset AUTH_REMOTE GITHUB_TOKEN
+  unset GITHUB_TOKEN
   set -x
 else
   echo "[-] PUSH=0: release and clean trees are committed locally at $BUILD_DIR"
