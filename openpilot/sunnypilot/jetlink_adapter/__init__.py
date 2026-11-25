@@ -242,3 +242,20 @@ def _hook(name: str):
 HOOK_NAMES = (*_Off.ANSWERS, 'reason')
 (should_run, status, prepare, attach, handed_over, state, shutdown_step, request_shutdown, shutdown_pending,
  runtime, swap_events, reason) = map(_hook, HOOK_NAMES)
+
+
+_ICON_STATES = frozenset(('disconnected', 'uncompiled', 'ready', 'loading', 'active', 'failed'))
+
+
+def chestnut_icon(status, started: bool, model_seen: bool, running_big: bool, state: str) -> str:
+  """The chestnut icon's ChestnutState value for a jetlink snapshot. 'waiting' is
+  shown as loading; anything unknown, or a raising status, as disconnected."""
+  if status is None:
+    return 'disconnected'
+  try:
+    icon = status.icon(started, model_seen, running_big, state)
+  except Exception:
+    return 'disconnected'
+  if icon == 'waiting':
+    return 'loading'
+  return icon if icon in _ICON_STATES else 'disconnected'
