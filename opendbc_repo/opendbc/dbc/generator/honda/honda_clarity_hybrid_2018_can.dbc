@@ -1,0 +1,67 @@
+CM_ "IMPORT _community.dbc";
+CM_ "IMPORT _honda_common.dbc";
+CM_ "IMPORT _nidec_common.dbc";
+CM_ "IMPORT _lkas_hud_5byte.dbc";
+CM_ "IMPORT _nidec_scm_group_b.dbc";
+CM_ "IMPORT _steering_sensors_a.dbc";
+CM_ "IMPORT _steering_control_a.dbc";
+CM_ "IMPORT _gearbox_common.dbc";
+
+BO_ 545 ECON_STATUS: 6 XXX
+ SG_ ECON_ON_2 : 37|2@0+ (1,0) [0|3] "" EON
+ SG_ ECON_ON : 23|1@0+ (1,0) [0|1] "" EON
+ SG_ CHECKSUM : 43|4@0+ (1,0) [0|3] "" EON
+ SG_ COUNTER : 45|2@0+ (1,0) [0|3] "" EON
+
+BO_ 768 VEHICLE_STATE: 8 ADAS
+ SG_ SET_ME_XF9 : 7|8@0+ (1,0) [0|255] "" Vector__XXX
+ SG_ VEHICLE_SPEED : 15|8@0+ (1,0) [0|255] "kph" Vector__XXX
+ SG_ SET_ME_X8A : 23|8@0+ (1,0) [0|255] "" XXX
+ SG_ SET_ME_XD0 : 31|8@0+ (1,0) [0|255] "" XXX
+ SG_ SALTED_WITH_IDX : 39|8@0+ (1,0) [0|255] "" XXX
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" XXX
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" XXX
+
+BO_ 769 VEHICLE_STATE2: 8 ADAS
+ SG_ SET_ME_X5D : 23|8@0+ (1,0) [0|255] "" XXX
+ SG_ SET_ME_X02 : 31|8@0+ (1,0) [0|255] "" XXX
+ SG_ SET_ME_X5F : 39|8@0+ (1,0) [0|255] "" XXX
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" XXX
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" XXX
+
+BO_ 1700 EPS_CAL_STATUS: 8 EPS
+ SG_ REQUESTED_MODE : 7|4@0+ (1,0) [0|15] "" EON
+ SG_ ANGLE_LOOP_RUNNING : 3|1@0+ (1,0) [0|1] "" EON
+ SG_ ACTIVE_MODE : 2|3@0+ (1,0) [0|7] "" EON
+ SG_ BUILD_ID : 15|8@0+ (1,0) [0|255] "" EON
+ SG_ ANGLE_FAULT : 16|1@0+ (1,0) [0|1] "" EON
+ SG_ ANGLE_FAULT_WHY : 18|2@0+ (1,0) [0|3] "" EON
+ SG_ ANGLE_TARGET_HELD : 19|1@0+ (1,0) [0|1] "" EON
+ SG_ ANGLE_LOOP_ACTIVE : 20|1@0+ (1,0) [0|1] "" EON
+ SG_ ANGLE_REF : 31|16@0- (-0.1,0) [-3276.8|3276.7] "deg" EON
+ SG_ ANGLE_OUT : 47|16@0- (1,0) [-32768|32767] "" EON
+ SG_ COUNTER : 61|2@0+ (1,0) [0|3] "" EON
+ SG_ CHECKSUM : 59|4@0+ (1,0) [0|15] "" EON
+
+CM_ BO_ 1700 "Clarity mode-switch EPS builds (rwd-xray lab/clarity/CLARITY_MODESW_MM_P2): calibration status, 50 Hz. Layout v2 (build 0x02): bytes 2-6 reserved, 0. Layout v3 (angle builds 0x04 = modes 0-3, 0x05 = modes 0-4, rwd-xray lab/clarity/CLARITY_ANGLE_MODE_*): byte 0 bit 3 and bytes 2-6 carry the angle loop. Absent on stock, CleanPTM and P1.";
+CM_ SG_ 1700 BUILD_ID "EPS build; implies the frame layout and the modes built in";
+CM_ SG_ 1700 ACTIVE_MODE "calibration mode in the EPS RAM now (0 = stock); changes only at LKAS idle";
+CM_ SG_ 1700 ANGLE_LOOP_RUNNING "v3: the angle loop is running (mode 3 or 4, request + angle payload + control type angle)";
+CM_ SG_ 1700 ANGLE_FAULT "v3: angle-loop fault, output 0, latched until the request drops";
+CM_ SG_ 1700 ANGLE_FAULT_WHY "v3: last fault reason: 1 target jump rejected 3 times, 2 stale 0xE4 (> 32 ms), 3 angle sensor invalid";
+CM_ SG_ 1700 ANGLE_TARGET_HELD "v3: an accepted target is held";
+CM_ SG_ 1700 ANGLE_LOOP_ACTIVE "v3: same as ANGLE_LOOP_RUNNING";
+CM_ SG_ 1700 ANGLE_REF "v3: the loop reference angle (filtered, rate-limited target), same scale and sign as STEER_ANGLE";
+CM_ SG_ 1700 ANGLE_OUT "v3: the value the loop wrote into the 0xE4 torque latch (STEER_TORQUE units)";
+CM_ SG_ 1700 REQUESTED_MODE "(last valid 0xE4 byte 3 >> 1) & 7, 0 if no valid latch";
+CM_ BO_ 1700 "Clarity mode-switch EPS builds (rwd-xray lab/clarity/CLARITY_MODESW_MM_P2): calibration status, 50 Hz. Layout v2 (build 0x02): bytes 2-6 reserved, 0. Layout v3 (angle builds 0x04 = modes 0-3, 0x05 = modes 0-4, rwd-xray lab/clarity/CLARITY_ANGLE_MODE_*): byte 0 bit 3 and bytes 2-6 carry the angle loop. Absent on stock, CleanPTM and P1.";
+CM_ SG_ 1700 BUILD_ID "EPS build; implies the frame layout and the modes built in";
+CM_ SG_ 1700 ACTIVE_MODE "calibration mode in the EPS RAM now (0 = stock); changes only at LKAS idle";
+CM_ SG_ 1700 ANGLE_LOOP_RUNNING "v3: the angle loop is running (mode 3 or 4, request + angle payload + control type angle)";
+CM_ SG_ 1700 ANGLE_FAULT "v3: angle-loop fault, output 0, latched until the request drops";
+CM_ SG_ 1700 ANGLE_FAULT_WHY "v3: last fault reason: 1 target jump rejected 3 times, 2 stale 0xE4 (> 32 ms), 3 angle sensor invalid";
+CM_ SG_ 1700 ANGLE_TARGET_HELD "v3: an accepted target is held";
+CM_ SG_ 1700 ANGLE_LOOP_ACTIVE "v3: same as ANGLE_LOOP_RUNNING";
+CM_ SG_ 1700 ANGLE_REF "v3: the loop reference angle (filtered, rate-limited target), same scale and sign as STEER_ANGLE";
+CM_ SG_ 1700 ANGLE_OUT "v3: the value the loop wrote into the 0xE4 torque latch (STEER_TORQUE units)";
+CM_ SG_ 1700 REQUESTED_MODE "(last valid 0xE4 byte 3 >> 1) & 7, 0 if no valid latch";

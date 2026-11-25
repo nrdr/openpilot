@@ -1,0 +1,246 @@
+import ast
+from importlib import import_module
+from pathlib import Path
+import subprocess
+import sys
+import unittest
+
+
+UI_MODULES = {
+  "openpilot.sunnypilot.nrdr.circular_alerts": (
+    "openpilot.nrdr.ui.onroad.circular_alerts", ("StandstillLatch",),
+  ),
+  "openpilot.sunnypilot.nrdr.home": (
+    "openpilot.nrdr.ui.home.layout", ("REFRESH_INTERVAL", "FirstRunSetup", "NrdrForkWidget", "NrdrHomeLayout"),
+  ),
+  "openpilot.sunnypilot.nrdr.mici_home": (
+    "openpilot.nrdr.ui.home.mici", ("NrdrMiciHome",),
+  ),
+  "openpilot.sunnypilot.nrdr.mici_hud": (
+    "openpilot.nrdr.ui.onroad.mici_hud", ("NrdrHudRenderer",),
+  ),
+  "openpilot.sunnypilot.nrdr.mici_onroad": (
+    "openpilot.nrdr.ui.onroad.mici_onroad",
+    ("NrdrAugmentedRoadView", "NrdrConfidenceBall", "NrdrDriverStateRenderer", "StripDevUiRenderer"),
+  ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr": (
+    "openpilot.nrdr.ui.settings.layout", ("NrdrLayout", "PanelType"),
+  ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.footage": (
+    "openpilot.nrdr.ui.settings.footage",
+    ("COPYPARTY_PORT", "MAX_ROUTES", "ROUTES_MOUNT", "SEGMENT_RE", "FootageLayout", "FootageQrDialog"),
+  ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.lateral_tuning": (
+    "openpilot.nrdr.ui.settings.lateral_tuning",
+    ("MEDIA_ROOT", "RLOG_GLOBS", "TUNE_REPORT_PATH", "TUNE_REPORT_TMP", "LateralPanel", "LateralTuningLayout"),
+  ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.longitudinal_tuning": (
+    "openpilot.nrdr.ui.settings.longitudinal_tuning", ("LongitudinalTuningLayout",),
+  ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.override_tuning": (
+    "openpilot.nrdr.ui.settings.override_tuning", ("OverrideTuningLayout",),
+  ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.party_tricks": (
+    "openpilot.nrdr.ui.settings.party_tricks", ("PartyTricksLayout",),
+  ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.pidf_ground": (
+    "openpilot.nrdr.ui.settings.pidf_ground", ("PidfGroundLayout",),
+  ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.steer_filters": (
+    "openpilot.nrdr.ui.settings.steer_filters", ("SteerFiltersLayout",),
+  ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.steer_ratio_tuning": (
+    "openpilot.nrdr.ui.settings.steer_ratio_tuning", ("SteerRatioTuningLayout",),
+  ),
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr_sub_layouts.vehicle_model_learning": (
+    "openpilot.nrdr.ui.settings.vehicle_model_learning", ("VehicleModelLearningLayout",),
+  ),
+}
+
+UI_PRODUCTION_IMPORTS = {
+  "openpilot/selfdrive/ui/mici/layouts/main.py": ("openpilot.nrdr.ui.onroad.mici_onroad", "mici_onroad"),
+  "openpilot/selfdrive/ui/sunnypilot/layouts/home.py": ("openpilot.nrdr.ui.home.layout", "home"),
+  "openpilot/selfdrive/ui/sunnypilot/layouts/settings/device.py": ("openpilot.nrdr.ui.settings.device_power", "device_power"),
+  "openpilot/selfdrive/ui/sunnypilot/mici/layouts/home.py": ("openpilot.nrdr.ui.home.mici", "mici_home"),
+  "openpilot/selfdrive/ui/sunnypilot/mici/layouts/device.py": ("openpilot.nrdr.ui.settings.device_power", "device_power"),
+  "openpilot/selfdrive/ui/sunnypilot/mici/onroad/hud_renderer.py": ("openpilot.nrdr.ui.onroad.mici_hud", "mici_hud"),
+  "openpilot/selfdrive/ui/sunnypilot/onroad/circular_alerts.py": ("openpilot.nrdr.ui.onroad.circular_alerts", "circular_alerts"),
+}
+
+
+class TestUiOwnership(unittest.TestCase):
+  def test_native_hybrid_controls_keep_one_selection_per_source_and_existing_live_controls(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    source = (repository_root / "openpilot/nrdr/ui/settings/steer_ratio_tuning.py").read_text(encoding="utf-8")
+    pidf_source = (repository_root / "openpilot/nrdr/ui/settings/pidf_ground.py").read_text(encoding="utf-8")
+
+    for title in (
+      "Enable Hybrid Steer Ratio",
+      "Ratio A — Near Center / Single Source",
+      "Blend Starts At",
+      "Ratio B — Beyond the Blend",
+      "Manual Override On-Center Ratio",
+      "Manual Override Final Ratio",
+    ):
+      self.assertIn(title, source)
+    self.assertNotIn("ui_state.engaged", source)
+    self.assertIn("multiple_button_item_sp", source)
+    self.assertIn("set_enabled_buttons(allowed)", source)
+    self.assertIn("self._hybrid, self._source_a, self._blend_start, self._source_b", source)
+    self.assertIn("manual_enabled = manual_available", source)
+    self.assertNotIn("ui_state.engaged", pidf_source)
+    self.assertIn("set_enabled(available and tuning_write_allowed(ui_state.params, key))", pidf_source)
+    self.assertIn('key != "NrdrDeviceYawCorrection" or supports_interpolated_torque_pif(ui_state.CP, ui_state.CP_SP)', pidf_source)
+    self.assertNotIn("NrdrInterpolatedTorquePifBlend", pidf_source)
+    self.assertIn('param="NrdrOptimizedLaneChanges"', pidf_source)
+
+  def test_lateral_tuning_routes_all_feedforward_outputs_through_decimal_formatters(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    source = (repository_root / "openpilot/nrdr/ui/settings/lateral_tuning.py").read_text(encoding="utf-8")
+
+    self.assertIn("self._fmt_decimal_vals(pid.kfV)", source)
+    self.assertIn("self._fmt_decimal(pid.kf)", source)
+    self.assertIn("self._fmt_decimal(lt_deprecated.kf)", source)
+    self.assertNotIn("float(pid.kf):g", source)
+    self.assertNotIn("float(lt_deprecated.kf):g", source)
+
+  def test_framework_settings_entrypoint_uses_canonical_layout(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    source = (repository_root / "openpilot/selfdrive/ui/sunnypilot/layouts/settings/settings.py").read_text(encoding="utf-8")
+    self.assertIn("from openpilot.nrdr.ui.settings.layout import NrdrLayout", source)
+    self.assertNotIn("layouts.settings.nrdr import NrdrLayout", source)
+
+  def test_canonical_layouts_never_import_legacy_layouts(self):
+    settings_dir = Path(__file__).resolve().parents[1] / "ui" / "settings"
+    for path in settings_dir.glob("*.py"):
+      with self.subTest(path=path.name):
+        source = path.read_text(encoding="utf-8")
+        self.assertNotIn("openpilot.selfdrive.ui.sunnypilot.layouts.settings.nrdr", source)
+
+  def test_canonical_native_ui_modules_never_import_legacy_nrdr_modules(self):
+    ui_dir = Path(__file__).resolve().parents[1] / "ui"
+    for package_name in ("home", "onroad"):
+      for path in (ui_dir / package_name).glob("*.py"):
+        with self.subTest(path=f"{package_name}/{path.name}"):
+          source = path.read_text(encoding="utf-8")
+          self.assertNotIn("openpilot.sunnypilot.nrdr", source)
+
+  def test_framework_onroad_entrypoints_use_canonical_owners(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    for relative_path, (canonical_module, legacy_module) in UI_PRODUCTION_IMPORTS.items():
+      with self.subTest(path=relative_path):
+        source = (repository_root / relative_path).read_text(encoding="utf-8")
+        self.assertIn(f"from {canonical_module} import", source)
+        self.assertNotIn(f"from openpilot.sunnypilot.nrdr.{legacy_module} import", source)
+
+  def test_native_ui_packages_import_lazily_without_native_dependencies(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    script = """
+import sys
+sys.modules["pyray"] = None
+import openpilot.nrdr.ui.home
+import openpilot.nrdr.ui.onroad
+assert "openpilot.nrdr.ui.onroad.circular_alerts" not in sys.modules
+assert "openpilot.nrdr.ui.home.layout" not in sys.modules
+assert "openpilot.nrdr.ui.home.mici" not in sys.modules
+assert "openpilot.nrdr.ui.onroad.mici_hud" not in sys.modules
+assert "openpilot.nrdr.ui.onroad.mici_onroad" not in sys.modules
+"""
+    subprocess.run([sys.executable, "-c", script], cwd=repository_root, check=True)
+
+  def test_translation_extractor_scans_canonical_ui(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    source = (repository_root / "openpilot/selfdrive/ui/translations/update_translations.py").read_text(encoding="utf-8")
+    self.assertIn('NRDR_UI_DIR = os.path.join(BASEDIR, "openpilot", "nrdr", "ui")', source)
+    self.assertIn("os.walk(NRDR_UI_DIR)", source)
+
+  def test_legacy_layouts_are_explicit_facades(self):
+    repository_root = Path(__file__).resolve().parents[3]
+    for legacy_name, (canonical_name, expected_exports) in UI_MODULES.items():
+      relative = Path(*legacy_name.split(".")).with_suffix(".py")
+      tree = ast.parse((repository_root / relative).read_text(encoding="utf-8"), filename=str(relative))
+      imports = [node for node in tree.body if isinstance(node, ast.ImportFrom)]
+      assignments = [node for node in tree.body if isinstance(node, ast.Assign)]
+      self.assertEqual(len(imports), 1, legacy_name)
+      self.assertEqual(imports[0].module, canonical_name)
+      self.assertEqual(tuple(alias.name for alias in imports[0].names), expected_exports)
+      self.assertEqual(len(assignments), 1, legacy_name)
+      self.assertEqual(assignments[0].targets[0].id, "__all__")
+      self.assertEqual(ast.literal_eval(assignments[0].value), expected_exports)
+
+  def test_legacy_layouts_preserve_runtime_object_identity(self):
+    try:
+      import_module("pyray")
+    except ModuleNotFoundError as error:
+      self.skipTest(f"native UI dependencies unavailable: {error}")
+
+    # Import the real layouts, but do not require running car services or read
+    # saved device preferences. A child process also prevents the UI singleton
+    # from leaving these fixture dependencies in another test's module cache.
+    script = r'''
+import capnp
+from importlib import import_module
+from unittest import mock
+from openpilot.cereal import messaging
+from openpilot.common import params
+
+
+class MemoryParams:
+  def get(self, key, *args, **kwargs):
+    return None
+
+  def get_bool(self, key, default=False):
+    return default
+
+  def get_int(self, key, default=0):
+    return default
+
+  def get_float(self, key, default=0.0):
+    return default
+
+
+class PureSubMaster:
+  requested = set()
+
+  def __init__(self, services, *args, **kwargs):
+    self.requested.update(services)
+    self.services = services
+    self.frame = -1
+    self.data = {}
+    self.updated = dict.fromkeys(services, False)
+    self.recv_frame = dict.fromkeys(services, 0)
+    self.logMonoTime = dict.fromkeys(services, 0)
+    for service in services:
+      try:
+        message = messaging.new_message(service)
+      except capnp.KjException:
+        message = messaging.new_message(service, 0)
+      self.data[service] = getattr(message.as_reader(), service)
+
+  def __getitem__(self, service):
+    return self.data[service]
+
+
+with mock.patch.object(params, "Params", MemoryParams), mock.patch.object(messaging, "SubMaster", PureSubMaster):
+  for legacy_name, (canonical_name, expected_exports) in UI_MODULES.items():
+    legacy = import_module(legacy_name)
+    canonical = import_module(canonical_name)
+    assert legacy.__all__ == expected_exports, legacy_name
+    for name in expected_exports:
+      assert getattr(legacy, name) is getattr(canonical, name), (legacy_name, name)
+  assert {"deviceState", "modelV2"} <= PureSubMaster.requested
+'''
+    repository_root = Path(__file__).resolve().parents[3]
+    result = subprocess.run([sys.executable, "-c", f"UI_MODULES = {UI_MODULES!r}\n" + script],
+                            cwd=repository_root, capture_output=True, text=True)
+    self.assertEqual(result.returncode, 0, f"{result.stdout}\n{result.stderr}")
+
+  def test_portable_onroad_facade_preserves_runtime_object_identity(self):
+    legacy = import_module("openpilot.sunnypilot.nrdr.circular_alerts")
+    canonical = import_module("openpilot.nrdr.ui.onroad.circular_alerts")
+    self.assertEqual(legacy.__all__, ("StandstillLatch",))
+    self.assertIs(legacy.StandstillLatch, canonical.StandstillLatch)
+
+
+if __name__ == "__main__":
+  unittest.main()
