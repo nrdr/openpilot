@@ -9,7 +9,7 @@ from collections import defaultdict
 from openpilot.cereal import log, messaging
 from openpilot.cereal.services import SERVICE_LIST
 from openpilot.common.transformations.orientation import rot_from_euler
-from openpilot.common.realtime import config_realtime_process
+from openpilot.common.realtime import DT_MDL, config_realtime_process
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.locationd.helpers import rotate_std
@@ -246,6 +246,25 @@ class LocationEstimator:
     return msg
 
 
+def classify_camera_skip(msg, pose, camera_valid, other_inputs_ok, last_good_frame):
+  """Annotate a discarded pose for the alert UI; never change validity or fuse it."""
+  motion = msg.deviceMotion
+  if not (msg.valid and motion.sensorsOK and motion.posenetOK and other_inputs_ok):
+    return None
+  if camera_valid:
+    return pose.frameId if motion.inputsOK else None
+  skipped = pose.calibratedFrameSkip
+  if (skipped in (1, 2) and last_good_frame is not None and pose.frameId == last_good_frame + skipped + 1
+      and 0 <= msg.logMonoTime - pose.timestampEof < int(3 * DT_MDL * 1e9)):
+    # Discarded samples never reach the estimator's sanity checks. Don't defer a malformed pose.
+    vectors = (pose.rot, pose.trans, pose.rotStd, pose.transStd)
+    motion.isolatedCameraSkip = all(len(v) == 3 and np.isfinite(v).all() for v in vectors) and bool(
+      np.linalg.norm(pose.rot) <= ROTATION_SANITY_CHECK and np.linalg.norm(pose.trans) <= TRANS_SANITY_CHECK
+      and min(pose.rotStd) > MIN_STD_SANITY_CHECK and min(pose.transStd) > MIN_STD_SANITY_CHECK
+      and np.linalg.norm(pose.rotStd) <= 10 * ROTATION_SANITY_CHECK and np.linalg.norm(pose.transStd) <= 10 * TRANS_SANITY_CHECK)
+  return None  # A second invalid pose cannot inherit grace from the first.
+
+
 def sensor_all_checks(acc_msgs, gyro_msgs, sensor_valid, sensor_recv_time, sensor_alive, simulation):
   cur_time = time.monotonic()
   for which, msgs in [("accelerometer", acc_msgs), ("gyroscope", gyro_msgs)]:
@@ -278,6 +297,7 @@ def main():
   estimator = LocationEstimator(DEBUG)
 
   filter_initialized = False
+  last_good_camera_frame = None
   critical_services = ["accelerometer", "gyroscope", "cameraOdometry"]
   observation_input_invalid = defaultdict(int)
 
@@ -295,6 +315,7 @@ def main():
 
   while True:
     sm.update()
+    observation_rejected = False
 
     acc_msgs, gyro_msgs = (messaging.drain_sock(sock) for sock in sensor_sockets)
 
@@ -313,6 +334,8 @@ def main():
         if valid:
           t = log_mono_time * 1e-9
           res = estimator.handle_log(t, which, msg)
+          if res in (HandleLogResult.TIMING_INVALID, HandleLogResult.INPUT_INVALID):
+            observation_rejected = True
           if which not in critical_services:
             continue
 
@@ -333,6 +356,8 @@ def main():
       sensors_valid = sensor_all_checks(acc_msgs, gyro_msgs, sensor_valid, sensor_recv_time, sensor_alive, SIMULATION)
 
       msg = estimator.get_msg(sensors_valid, inputs_valid, filter_initialized)
+      other_inputs_ok = not observation_rejected and critical_service_inputs_valid and sm.all_checks(['carState', 'extrinsicsCalibration'])
+      last_good_camera_frame = classify_camera_skip(msg, sm['cameraOdometry'], sm.valid['cameraOdometry'], other_inputs_ok, last_good_camera_frame)
       pm.send("deviceMotion", msg)
 
 

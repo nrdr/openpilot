@@ -181,6 +181,8 @@ def fill_pose_msg(msg: capnp._DynamicStructBuilder, net_output_data: dict[str, n
   cameraOdometry = msg.cameraOdometry
 
   cameraOdometry.frameId = vipc_frame_id
+  if extrinsics_calibration_seen and vipc_dropped_frames:
+    cameraOdometry.calibratedFrameSkip = vipc_dropped_frames
   cameraOdometry.timestampEof = timestamp_eof
 
   cameraOdometry.trans = net_output_data['pose'][0,:3].tolist()

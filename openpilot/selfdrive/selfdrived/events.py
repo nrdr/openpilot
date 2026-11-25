@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 import math
 import os
+import time
 
 from openpilot.cereal import log
 from opendbc.car.structs import car
 import openpilot.cereal.messaging as messaging
 from openpilot.common.constants import CV
 from openpilot.common.git import get_short_branch
-from openpilot.common.realtime import DT_CTRL
+from openpilot.common.realtime import DT_CTRL, DT_MDL
 from openpilot.selfdrive.locationd.calibrationd import MIN_SPEED_FILTER
 from openpilot.common.hardware import HARDWARE
 
@@ -53,11 +54,17 @@ def get_display_speed(speed_ms: float, metric: bool) -> str:
 # ********** alert callback functions **********
 
 
-def soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
+def soft_disable_alert(alert_text_2: str, *, defer_isolated_camera_skip: bool = False) -> AlertCallbackType:
   def func(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, personality) -> Alert:
     if soft_disable_time < int(0.5 / DT_CTRL):
       return ImmediateDisableAlert(alert_text_2)
-    return SoftDisableAlert(alert_text_2)
+    alert = SoftDisableAlert(alert_text_2)
+    if defer_isolated_camera_skip and sm['deviceMotion'].isolatedCameraSkip and sm.valid['deviceMotion']:
+      # A fresh healthy pose cancels presentation. A second invalid one, a stale message,
+      # or an expiring soft-disable timer gets the original warning without waiting.
+      if 0 <= time.monotonic_ns() - sm.logMonoTime['deviceMotion'] < int(2 * DT_MDL * 1e9):
+        alert.creation_delay = 2 * DT_MDL
+    return alert
   return func
 
 def user_soft_disable_alert(alert_text_2: str) -> AlertCallbackType:
@@ -467,11 +474,9 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("Camera Frame Rate Low: Reboot Your Device"),
   },
 
-  # Unused
-
   EventName.locationdTemporaryError: {
     ET.NO_ENTRY: NoEntryAlert("locationd Temporary Error"),
-    ET.SOFT_DISABLE: soft_disable_alert("locationd Temporary Error"),
+    ET.SOFT_DISABLE: soft_disable_alert("locationd Temporary Error", defer_isolated_camera_skip=True),
   },
 
   EventName.locationdPermanentError: {

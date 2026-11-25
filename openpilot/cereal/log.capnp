@@ -1501,6 +1501,7 @@ struct DeviceMotion @0xc24ca2b57206b44d {
   inputsOK @4 :Bool = false;
   posenetOK @5 :Bool = false;
   sensorsOK @6 :Bool = false;
+  isolatedCameraSkip @9 :Bool; # Alert presentation only; inputsOK is still false.
 
   timestamp @8 :UInt64;
 
@@ -2464,6 +2465,7 @@ struct LiveMapDataDEPRECATED {
 struct CameraOdometry {
   frameId @4 :UInt32;
   timestampEof @5 :UInt64;
+  calibratedFrameSkip @10 :UInt32; # Frames skipped by modeld with calibration seen; zero if unknown.
   trans @0 :List(Float32); # m/s in device frame
   rot @1 :List(Float32); # rad/s in device frame
   transStd @2 :List(Float32); # std m/s in device frame
