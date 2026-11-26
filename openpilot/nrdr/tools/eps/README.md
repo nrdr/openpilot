@@ -19,6 +19,7 @@ openpilot/nrdr/tools/eps/
   flash.py          guided flash: stop op -> pick image -> dry run -> --danger
   eps-update.py     UDS .rwd flasher (validate + erase/program over CAN)
   check_rwd.py      offline .rwd checksum validator (stdlib only)
+  check_teg_dump.py offline size/hash check for saved Civic TEG-A010 flash and SRAM
   eps-diag.py       EPS CAN liveness/diagnostic (sniff, UDS ping, part number)
   rwd_format/       vendored Python-3 .rwd container parser (0x5A/0x31)
   rwd/              curated nested firmware library + hashes/safety catalog
@@ -28,6 +29,20 @@ The normal commands run from the **openpilot repository root**. The small root
 launchers preserve arguments, prompts, and exit codes while finding the parser
 and firmware here. Historical `eps_tools/...` commands remain compatibility
 launchers, but contain no flashing implementation or firmware.
+
+## Check already-saved Civic TEG-A010 files (no vehicle connection)
+
+From the folder containing the finished files on the C4:
+
+```sh
+python3 /data/openpilot/openpilot/nrdr/tools/eps/check_teg_dump.py teg_flash.bin teg_sram.bin
+```
+
+The expected sizes supplied for this rack are 393,216 bytes of flash and 65,536
+bytes of SRAM. The checker reads local files only and prints each file's SHA-256.
+For two separate flash captures, add `--compare-flash second_flash.bin`. RAM
+can change between reads. Matching size is not proof of correct contents,
+firmware identity, or suitability for flashing. A raw dump is not an RWD update.
 
 ## Guided flash (recommended)
 
